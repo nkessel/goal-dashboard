@@ -45,6 +45,8 @@ export default async function Home() {
   const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
   const today = new Date().toISOString().slice(0, 10);
   const alreadyCheckedInToday = profile?.last_check_in_at?.slice(0, 10) === today;
+  const theme = profile?.theme ?? "calm";
+  const isAdventure = theme === "adventure";
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
@@ -61,20 +63,21 @@ export default async function Home() {
 
         <section>
           <h2 className="mb-3 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Today&apos;s Priorities
+            {isAdventure ? "⚔️ Today's Battle" : "Today's Priorities"}
             <span className="ml-2 text-sm font-normal text-zinc-500">
               ({topPriorities.length}/3)
             </span>
           </h2>
           {topPriorities.length === 0 ? (
             <p className="rounded-xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">
-              Nothing pinned yet — pin up to 3 tasks below to curate today&apos;s
-              focus.
+              {isAdventure
+                ? "No monsters queued yet — join up to 3 tasks below to enter today's battle."
+                : "Nothing pinned yet — pin up to 3 tasks below to curate today's focus."}
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
               {topPriorities.map((task) => (
-                <TaskRow key={task.id} task={task} />
+                <TaskRow key={task.id} task={task} theme={theme} />
               ))}
             </ul>
           )}
@@ -93,7 +96,7 @@ export default async function Home() {
             </summary>
             <ul className="mt-3 flex flex-col gap-2">
               {otherTasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
+                <TaskRow key={task.id} task={task} theme={theme} />
               ))}
               {otherTasks.length === 0 && (
                 <p className="text-sm text-zinc-500">Nothing here — nice.</p>

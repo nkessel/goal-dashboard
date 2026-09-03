@@ -166,7 +166,7 @@ try {
 
     await feedItem.getByPlaceholder("Write a comment…").fill("Nice job Ava!");
     await feedItem.getByRole("button", { name: "Send" }).click();
-    await benPage.waitForTimeout(1000);
+    await feedItem.getByText("Nice job Ava!").waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
     assert(await feedItem.getByText("Nice job Ava!").isVisible().catch(() => false), "Ben's comment shows up on the activity");
   }
 

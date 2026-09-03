@@ -384,3 +384,29 @@ export async function markAllNotificationsReadAction() {
   await notificationsData.markAllRead(ownerId);
   revalidatePath("/notifications");
 }
+
+// ---------------------------------------------------------------------------
+// Theme + avatar (Priority #10)
+// ---------------------------------------------------------------------------
+export async function updateThemeAction(theme: "calm" | "adventure") {
+  const ownerId = await requireProfileId();
+  await profilesData.updateProfileTheme(ownerId, theme);
+  revalidatePath("/", "layout");
+}
+
+export async function updateAvatarAction(base: string, color: string, accessory: string | null) {
+  const ownerId = await requireProfileId();
+  await profilesData.updateProfileAvatar(ownerId, { base, color, accessory });
+  revalidatePath("/", "layout");
+}
+
+export async function setTaskIconAction(
+  taskId: string,
+  iconKey: string | null,
+  iconSource: "monster" | "library"
+) {
+  const ownerId = await requireProfileId();
+  await tasksData.setTaskIcon(taskId, ownerId, { iconKey, iconSource });
+  revalidatePath("/");
+  revalidatePath("/matrix");
+}

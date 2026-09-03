@@ -7,10 +7,11 @@ import {
   toggleManualPriorityAction,
 } from "@/app/actions";
 
-export function TaskActions({ task }: { task: Task }) {
+export function TaskActions({ task, theme = "calm" }: { task: Task; theme?: "calm" | "adventure" }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const isAdventure = theme === "adventure";
 
   function togglePin() {
     setError(null);
@@ -36,15 +37,23 @@ export function TaskActions({ task }: { task: Task }) {
               : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
           }`}
         >
-          {task.is_manual_priority ? "★ In Top 3" : "☆ Pin to Top 3"}
+          {task.is_manual_priority
+            ? isAdventure
+              ? "⚔️ In today's battle"
+              : "★ In Top 3"
+            : isAdventure
+              ? "☆ Join today's battle"
+              : "☆ Pin to Top 3"}
         </button>
 
         <button
           type="button"
           onClick={() => setShowDatePicker((v) => !v)}
-          className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+          className={`rounded-full px-3 py-1 text-xs font-medium text-white ${
+            isAdventure ? "bg-rose-600 hover:bg-rose-700 active:scale-95" : "bg-emerald-600 hover:bg-emerald-700"
+          } transition-transform`}
         >
-          Complete
+          {isAdventure ? "⚔️ Defeat" : "Complete"}
         </button>
       </div>
 

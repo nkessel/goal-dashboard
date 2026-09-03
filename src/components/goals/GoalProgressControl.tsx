@@ -42,6 +42,8 @@ export function GoalProgressControl({
         onChange={(e) => setProgress(Number(e.target.value))}
         onMouseUp={(e) => commit(Number((e.target as HTMLInputElement).value))}
         onTouchEnd={(e) => commit(Number((e.target as HTMLInputElement).value))}
+        onKeyUp={(e) => commit(Number((e.target as HTMLInputElement).value))}
+        onBlur={(e) => commit(Number((e.target as HTMLInputElement).value))}
         className="flex-1 accent-emerald-600"
       />
       <button

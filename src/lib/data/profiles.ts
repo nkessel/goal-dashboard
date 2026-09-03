@@ -56,3 +56,23 @@ export async function updateProfileTheme(
   if (error) throw new Error(`Failed to update theme: ${error.message}`);
   return data;
 }
+
+export async function updateProfileAvatar(
+  id: string,
+  input: { base: string; color: string; accessory: string | null }
+): Promise<Profile> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("profiles")
+    .update({
+      avatar_base: input.base,
+      avatar_color: input.color,
+      avatar_accessory: input.accessory,
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Failed to update avatar: ${error.message}`);
+  return data;
+}

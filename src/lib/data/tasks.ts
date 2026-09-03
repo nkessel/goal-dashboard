@@ -45,6 +45,20 @@ export async function setTaskXpValue(taskId: string, ownerId: string, xpValue: n
   if (error) throw new Error(`Failed to update task XP: ${error.message}`);
 }
 
+export async function setTaskIcon(
+  taskId: string,
+  ownerId: string,
+  input: { iconKey: string | null; iconSource: "monster" | "library" }
+): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db
+    .from("tasks")
+    .update({ icon_key: input.iconKey, icon_source: input.iconSource })
+    .eq("id", taskId)
+    .eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to update task icon: ${error.message}`);
+}
+
 export type TaskWithBoard = Task & { board_id: string | null };
 
 /**

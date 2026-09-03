@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { signOut } from "@/auth";
 import { countUnread } from "@/lib/data/notifications";
+import { getProfileById } from "@/lib/data/profiles";
+import { Avatar } from "@/components/settings/Avatar";
 
 const NAV_ITEMS = [
   { href: "/", label: "Priority", icon: "🎯", enabled: true },
@@ -20,13 +22,24 @@ export async function AppShell({
   /** Optional: when given, shows an unread-notifications badge. */
   profileId?: string;
 }) {
-  const unreadCount = profileId ? await countUnread(profileId) : 0;
+  const [unreadCount, profile] = await Promise.all([
+    profileId ? countUnread(profileId) : Promise.resolve(0),
+    profileId ? getProfileById(profileId) : Promise.resolve(null),
+  ]);
+  const isAdventure = profile?.theme === "adventure";
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 dark:bg-black">
-      <aside className="flex w-16 flex-col items-center gap-2 border-r border-zinc-200 py-4 dark:border-zinc-800 sm:w-48 sm:items-stretch sm:px-3">
+    <div
+      data-theme={profile?.theme ?? "calm"}
+      className={`flex min-h-screen ${isAdventure ? "bg-gradient-to-br from-amber-50 to-rose-50 dark:from-zinc-950 dark:to-red-950" : "bg-zinc-50 dark:bg-black"}`}
+    >
+      <aside
+        className={`flex w-16 flex-col items-center gap-2 border-r py-4 sm:w-48 sm:items-stretch sm:px-3 ${
+          isAdventure ? "border-amber-200 dark:border-red-950" : "border-zinc-200 dark:border-zinc-800"
+        }`}
+      >
         <div className="mb-4 hidden px-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50 sm:block">
-          Goal Dashboard
+          {isAdventure ? "⚔️ Goal Dashboard" : "Goal Dashboard"}
         </div>
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map((item) =>
@@ -68,12 +81,24 @@ export async function AppShell({
               <span className="hidden sm:inline">Notifications</span>
             </Link>
           )}
+          {profileId && (
+            <Link
+              href="/settings"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              <span aria-hidden>⚙️</span>
+              <span className="hidden sm:inline">Settings</span>
+            </Link>
+          )}
         </nav>
 
         <div className="mt-auto flex flex-col gap-2 px-1 pt-4">
-          <span className="hidden truncate text-xs text-zinc-500 sm:block">
-            {userLabel}
-          </span>
+          <div className="flex items-center gap-2">
+            {profile && <Avatar profile={profile} size={7} />}
+            <span className="hidden truncate text-xs text-zinc-500 sm:block">
+              {userLabel}
+            </span>
+          </div>
           <form
             action={async () => {
               "use server";

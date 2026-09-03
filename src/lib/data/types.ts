@@ -54,6 +54,9 @@ export type Profile = {
   email: string;
   name: string | null;
   avatar_url: string | null;
+  avatar_base: string;
+  avatar_color: string;
+  avatar_accessory: string | null;
   theme: "calm" | "adventure";
   level: number;
   total_xp: number;
