@@ -3,9 +3,17 @@
 import { useRef, useState, useTransition } from "react";
 import { createTaskAction } from "@/app/actions";
 
-export function AddTaskForm({ goalId }: { goalId?: string }) {
+export function AddTaskForm({
+  goalId,
+  remainingXpBudget,
+}: {
+  goalId?: string;
+  /** Weekly XP budget left to assign, if known — shown as a hint next to the XP field. */
+  remainingXpBudget?: number;
+}) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   if (!open) {
@@ -24,10 +32,15 @@ export function AddTaskForm({ goalId }: { goalId?: string }) {
     <form
       ref={formRef}
       action={(formData) => {
+        setError(null);
         startTransition(async () => {
-          await createTaskAction(formData);
-          formRef.current?.reset();
-          setOpen(false);
+          try {
+            await createTaskAction(formData);
+            formRef.current?.reset();
+            setOpen(false);
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Something went wrong");
+          }
         });
       }}
       className="flex flex-col gap-2 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800"
@@ -81,11 +94,18 @@ export function AddTaskForm({ goalId }: { goalId?: string }) {
             type="number"
             name="xpValue"
             min={0}
+            max={remainingXpBudget}
             defaultValue={0}
             className="w-16 rounded border border-zinc-300 bg-transparent px-1 py-0.5 dark:border-zinc-700"
           />
         </label>
+        {remainingXpBudget !== undefined && (
+          <span className="self-center text-zinc-400">
+            {remainingXpBudget} XP left this week
+          </span>
+        )}
       </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-2">
         <button
           type="submit"

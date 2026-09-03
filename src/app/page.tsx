@@ -3,7 +3,10 @@ import { AppShell } from "@/components/layout/AppShell";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
+import { XpSummary } from "@/components/xp/XpSummary";
 import { listOpenTasksForOwner, listCompletedTasksForOwner } from "@/lib/data/tasks";
+import { getProfileById } from "@/lib/data/profiles";
+import { getWeeklyAllocated, currentWeekStart } from "@/lib/data/xp";
 
 export default async function Home() {
   const session = await auth();
@@ -31,17 +34,31 @@ export default async function Home() {
     );
   }
 
-  const [openTasks, completedTasks] = await Promise.all([
+  const [openTasks, completedTasks, profile] = await Promise.all([
     listOpenTasksForOwner(session.user.id),
     listCompletedTasksForOwner(session.user.id),
+    getProfileById(session.user.id),
   ]);
+  const weeklyAllocated = profile ? await getWeeklyAllocated(session.user.id, currentWeekStart()) : 0;
 
   const topPriorities = openTasks.filter((t) => t.is_manual_priority);
   const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
+  const today = new Date().toISOString().slice(0, 10);
+  const alreadyCheckedInToday = profile?.last_check_in_at?.slice(0, 10) === today;
 
   return (
-    <AppShell userLabel={session.user.email ?? ""}>
+    <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <div className="mx-auto flex max-w-2xl flex-col gap-8">
+        {profile && (
+          <section>
+            <XpSummary
+              profile={profile}
+              weeklyAllocated={weeklyAllocated}
+              alreadyCheckedInToday={alreadyCheckedInToday}
+            />
+          </section>
+        )}
+
         <section>
           <h2 className="mb-3 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             Today&apos;s Priorities
@@ -64,7 +81,9 @@ export default async function Home() {
         </section>
 
         <section>
-          <AddTaskForm />
+          <AddTaskForm
+            remainingXpBudget={profile ? Math.max(0, profile.weekly_xp_budget - weeklyAllocated) : undefined}
+          />
         </section>
 
         <section>

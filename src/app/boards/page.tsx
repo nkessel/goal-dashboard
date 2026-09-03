@@ -9,7 +9,7 @@ export default async function BoardsPage() {
   const boards = await listBoardsForOwner(session.user.id);
 
   return (
-    <AppShell userLabel={session.user.email ?? ""}>
+    <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <div className="mx-auto flex max-w-2xl flex-col gap-6">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">

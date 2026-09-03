@@ -1,21 +1,27 @@
 import Link from "next/link";
 import { signOut } from "@/auth";
+import { countUnread } from "@/lib/data/notifications";
 
 const NAV_ITEMS = [
   { href: "/", label: "Priority", icon: "🎯", enabled: true },
   { href: "/calendar", label: "Calendar", icon: "📅", enabled: false },
-  { href: "/matrix", label: "Priority Matrix", icon: "📊", enabled: false },
+  { href: "/matrix", label: "Priority Matrix", icon: "📊", enabled: true },
   { href: "/boards", label: "Boards", icon: "🗂️", enabled: true },
-  { href: "/feed", label: "Friend Feed", icon: "👥", enabled: false },
+  { href: "/feed", label: "Friend Feed", icon: "👥", enabled: true },
 ];
 
-export function AppShell({
+export async function AppShell({
   children,
   userLabel,
+  profileId,
 }: {
   children: React.ReactNode;
   userLabel: string;
+  /** Optional: when given, shows an unread-notifications badge. */
+  profileId?: string;
 }) {
+  const unreadCount = profileId ? await countUnread(profileId) : 0;
+
   return (
     <div className="flex min-h-screen bg-zinc-50 dark:bg-black">
       <aside className="flex w-16 flex-col items-center gap-2 border-r border-zinc-200 py-4 dark:border-zinc-800 sm:w-48 sm:items-stretch sm:px-3">
@@ -45,6 +51,22 @@ export function AppShell({
                 </span>
               </span>
             )
+          )}
+          {profileId && (
+            <Link
+              href="/notifications"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              <span aria-hidden className="relative">
+                🔔
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </span>
+              <span className="hidden sm:inline">Notifications</span>
+            </Link>
           )}
         </nav>
 

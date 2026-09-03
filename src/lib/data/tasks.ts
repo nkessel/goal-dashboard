@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { logTaskCompletedActivity } from "./activity";
 import type { Task } from "./types";
 
 const MAX_MANUAL_PRIORITIES = 3;
@@ -32,6 +33,16 @@ export async function listCompletedTasksForOwner(
 
   if (error) throw new Error(`Failed to list completed tasks: ${error.message}`);
   return data ?? [];
+}
+
+export async function setTaskXpValue(taskId: string, ownerId: string, xpValue: number): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db
+    .from("tasks")
+    .update({ xp_value: xpValue })
+    .eq("id", taskId)
+    .eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to update task XP: ${error.message}`);
 }
 
 export type TaskWithBoard = Task & { board_id: string | null };
@@ -172,14 +183,9 @@ export async function completeTask(
 
   if (error) throw new Error(`Failed to complete task: ${error.message}`);
 
-  // Log a public activity event for the (future) friend feed, respecting
-  // the owning goal/board's privacy where the task has one.
-  await db.from("activity_events").insert({
-    owner_id: ownerId,
-    kind: "task_completed",
-    task_id: taskId,
-    is_public: true, // privacy resolution against goal/board arrives with the social layer (Priority #7)
-  });
+  // Log an activity event for the friend feed, respecting the owning
+  // goal/board's privacy (or the profile default for standalone tasks).
+  await logTaskCompletedActivity(ownerId, { id: taskId, goal_id: data.goal_id });
 
   return data;
 }
@@ -253,4 +259,36 @@ export async function getTask(taskId: string, ownerId: string): Promise<Task | n
 
   if (error) throw new Error(`Failed to load task: ${error.message}`);
   return data;
+}
+
+/**
+ * Open, calendar-scheduled tasks starting within the next `windowMinutes`
+ * that haven't gotten a reminder yet — feeds the reschedule-reminder cron
+ * route (Priority #9).
+ */
+export async function listUpcomingTasksNeedingReminder(windowMinutes: number): Promise<Task[]> {
+  const db = supabaseAdmin();
+  const now = new Date();
+  const windowEnd = new Date(now.getTime() + windowMinutes * 60_000);
+
+  const { data, error } = await db
+    .from("tasks")
+    .select("*")
+    .eq("status", "open")
+    .eq("is_on_calendar", true)
+    .is("reminder_sent_at", null)
+    .gte("scheduled_start", now.toISOString())
+    .lte("scheduled_start", windowEnd.toISOString());
+
+  if (error) throw new Error(`Failed to list tasks needing reminders: ${error.message}`);
+  return data ?? [];
+}
+
+export async function markReminderSent(taskId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db
+    .from("tasks")
+    .update({ reminder_sent_at: new Date().toISOString() })
+    .eq("id", taskId);
+  if (error) throw new Error(`Failed to mark reminder sent: ${error.message}`);
 }

@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { logGoalCompletedActivity } from "./activity";
 import type { Goal } from "./types";
 
 export async function listGoalsForBoard(boardId: string): Promise<Goal[]> {
@@ -59,6 +60,15 @@ export async function updateGoalProgress(
 ): Promise<Goal> {
   const clamped = Math.max(0, Math.min(100, Math.round(progress)));
   const db = supabaseAdmin();
+
+  const before = await db
+    .from("goals")
+    .select("completed_at")
+    .eq("id", goalId)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+  const wasAlreadyComplete = Boolean(before.data?.completed_at);
+
   const { data, error } = await db
     .from("goals")
     .update({
@@ -71,5 +81,16 @@ export async function updateGoalProgress(
     .single();
 
   if (error) throw new Error(`Failed to update goal progress: ${error.message}`);
+
+  // Only log a feed event the moment a goal *crosses into* 100%, not every
+  // subsequent nudge of an already-complete goal.
+  if (clamped >= 100 && !wasAlreadyComplete) {
+    await logGoalCompletedActivity(ownerId, {
+      id: data.id,
+      is_private: data.is_private,
+      board_id: data.board_id,
+    });
+  }
+
   return data;
 }
