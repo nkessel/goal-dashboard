@@ -34,6 +34,35 @@ export async function listCompletedTasksForOwner(
   return data ?? [];
 }
 
+export type TaskWithBoard = Task & { board_id: string | null };
+
+/**
+ * Open tasks with their resolved board id, for the Priority Matrix's
+ * board filter. A task's board comes from its goal (goals.board_id) when
+ * it has one; standalone tasks (no goal) resolve to board_id: null and
+ * show up only under "All boards".
+ */
+export async function listOpenTasksWithBoardForOwner(
+  ownerId: string
+): Promise<TaskWithBoard[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("tasks")
+    .select("*, goals(board_id)")
+    .eq("owner_id", ownerId)
+    .eq("status", "open")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Failed to list tasks: ${error.message}`);
+
+  return (data ?? []).map((row) => {
+    const { goals, ...task } = row as Task & {
+      goals: { board_id: string } | null;
+    };
+    return { ...task, board_id: goals?.board_id ?? null };
+  });
+}
+
 export async function listTasksForGoal(goalId: string): Promise<Task[]> {
   const db = supabaseAdmin();
   const { data, error } = await db
