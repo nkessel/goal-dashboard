@@ -178,7 +178,8 @@ export async function rescheduleTask(
   taskId: string,
   ownerId: string,
   scheduledStart: string,
-  scheduledEnd: string
+  scheduledEnd: string,
+  googleCalendarEventId?: string
 ): Promise<Task> {
   const db = supabaseAdmin();
   const { data: current, error: fetchError } = await db
@@ -201,6 +202,7 @@ export async function rescheduleTask(
       scheduled_end: scheduledEnd,
       is_on_calendar: true,
       reschedule_count: nextCount,
+      ...(googleCalendarEventId ? { google_calendar_event_id: googleCalendarEventId } : {}),
     })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
@@ -208,5 +210,18 @@ export async function rescheduleTask(
     .single();
 
   if (error) throw new Error(`Failed to reschedule task: ${error.message}`);
+  return data;
+}
+
+export async function getTask(taskId: string, ownerId: string): Promise<Task | null> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("tasks")
+    .select("*")
+    .eq("id", taskId)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Failed to load task: ${error.message}`);
   return data;
 }
