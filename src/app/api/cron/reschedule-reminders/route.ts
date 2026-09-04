@@ -7,17 +7,21 @@ import { getProfileById } from "@/lib/data/profiles";
 import { createNotification, markEmailSent } from "@/lib/data/notifications";
 import { sendEmail } from "@/lib/email";
 
-const WINDOW_MINUTES = 60;
+// Vercel Hobby-plan cron jobs can only run once a day (see vercel.json —
+// "0 13 * * *"), so the window has to cover a full day rather than the
+// ~15-minute cadence this was originally written for. Bump WINDOW_MINUTES
+// back down to 60 (and the cron schedule to something like "*/15 * * * *")
+// if this ever moves to a Pro plan for tighter, near-real-time reminders.
+const WINDOW_MINUTES = 24 * 60;
 
 /**
  * Reschedule reminder sweep (Priority #9). Not a background job on its
- * own — wire this up to Vercel Cron (add a `crons` entry in vercel.json
- * pointing here, e.g. every 15 minutes) after deploying, or trigger it
- * from any external scheduler. Protected by CRON_SECRET so it can't be
- * hit by randoms; without that env var set, the route stays open (fine
- * for local dev, not for a public deployment).
+ * own — wired up via the `crons` entry in vercel.json pointing here.
+ * Protected by CRON_SECRET so it can't be hit by randoms; without that
+ * env var set, the route stays open (fine for local dev, not for a
+ * public deployment).
  *
- * For each open, calendar-scheduled task starting within the next hour
+ * For each open, calendar-scheduled task starting within the window
  * that hasn't been reminded about yet: log an in-app notification, send
  * an email (this is one of the spec's "higher-value moments"), and mark
  * it so the next sweep doesn't double-send.
