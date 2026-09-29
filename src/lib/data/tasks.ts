@@ -45,6 +45,21 @@ export async function setTaskXpValue(taskId: string, ownerId: string, xpValue: n
   if (error) throw new Error(`Failed to update task XP: ${error.message}`);
 }
 
+export async function setTaskMatrixPosition(
+  taskId: string,
+  ownerId: string,
+  input: { importance: number; urgency: number }
+): Promise<void> {
+  const clamp = (n: number) => Math.min(5, Math.max(1, Math.round(n)));
+  const db = supabaseAdmin();
+  const { error } = await db
+    .from("tasks")
+    .update({ importance: clamp(input.importance), urgency: clamp(input.urgency) })
+    .eq("id", taskId)
+    .eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to move task: ${error.message}`);
+}
+
 export async function setTaskIcon(
   taskId: string,
   ownerId: string,

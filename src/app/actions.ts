@@ -410,3 +410,10 @@ export async function setTaskIconAction(
   revalidatePath("/");
   revalidatePath("/matrix");
 }
+
+export async function setTaskMatrixPositionAction(taskId: string, importance: number, urgency: number) {
+  const ownerId = await requireProfileId();
+  await tasksData.setTaskMatrixPosition(taskId, ownerId, { importance, urgency });
+  revalidatePath("/");
+  revalidatePath("/matrix");
+}
