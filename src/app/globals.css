@@ -90,31 +90,53 @@ body {
 .adventure-shell{
   font-family:var(--font-garamond),'EB Garamond',Georgia,serif;
   background-color:#232b22;
-  background-image:linear-gradient(rgba(9,13,8,.35),rgba(9,13,8,.35)),url(/adventure/bg-forest-wide.jpg);
+  background-image:linear-gradient(rgba(9,13,8,.30),rgba(9,13,8,.30)),url(/adventure/bg-forest-wide.jpg);
   background-size:cover;background-position:top center;background-attachment:fixed;
   color:#efe6cc;
 }
-.adventure-shell aside{background:rgba(18,24,16,.72);border-color:#a88a3f!important}
+.adventure-shell aside{background:rgba(18,24,16,.78);border-color:#a88a3f!important}
 .adventure-shell aside *{color:#efe6cc}
 .adventure-shell aside a:hover{background:rgba(217,180,95,.18)}
 .adventure-shell aside button{border-color:#a88a3f}
-/* headings & loose text sitting on the forest */
-.adventure-shell main :is(h1,h2,summary){color:#efe6cc}
-.adventure-shell main :is(h1,h2){text-shadow:0 2px 10px rgba(0,0,0,.6)}
-/* bordered cards become parchment with gold trim */
-.adventure-shell main :is(.rounded-xl,.rounded-lg):is([class*="border-zinc"],[class*="border-dashed"]){
+
+/* text sitting directly on the forest */
+.adventure-shell main :is(h1,h2,summary){color:#efe6cc;text-shadow:0 2px 10px rgba(0,0,0,.6)}
+.adventure-shell main :is(.text-zinc-400,.text-zinc-500,.text-zinc-600,.text-zinc-700){color:rgba(239,230,204,.78)}
+.adventure-shell main .divide-y>*{border-color:rgba(217,180,95,.3)}
+
+/* cards & task rows become parchment with gold trim */
+.adventure-shell main :is(.rounded-xl,.rounded-lg):is([class*="border-zinc"],[class*="border-amber"],[class*="border-dashed"]){
   background-color:#e2caa2;background-image:url(/adventure/parchment.jpg);background-size:92px auto;
   border:2px solid #d9b45f;
   box-shadow:inset 0 0 0 1px #7c6135,inset 0 0 0 2px rgba(255,236,200,.8),0 3px 8px rgba(0,0,0,.35);
   color:#2f2a1f;
+  & :is(p,span,div,h1,h2,h3,label,li,summary){color:#2f2a1f;text-shadow:none}
+  & :is(.text-zinc-400,.text-zinc-500,.text-zinc-600,.text-zinc-700){color:#6b6252}
+  & :is(input,textarea,select){background:rgba(255,255,255,.5);color:#2f2a1f;border:1.5px solid #8a7250;border-radius:8px}
+  /* plain buttons & pills */
+  & button:not([class*="bg-"]){border:1.5px solid #8a7250;background:rgba(255,255,255,.35);color:#2f2a1f!important}
+  & button:not([class*="bg-"]):hover{background:rgba(255,255,255,.6)}
+  & button[class*="border-amber"]{background:linear-gradient(180deg,#3b4636,#232c22);border-color:#d9b45f;color:#efe6cc}
+  & button[class*="border-dashed"]{border-style:dashed;border-color:#a88a3f}
 }
-.adventure-shell main :is(.rounded-xl,.rounded-lg):is([class*="border-zinc"],[class*="border-dashed"]) :is(p,span,div,h1,h2,h3,label,li){color:#2f2a1f;text-shadow:none}
-.adventure-shell main :is(.rounded-xl,.rounded-lg):is([class*="border-zinc"],[class*="border-dashed"]) :is(.text-zinc-500,.text-zinc-400){color:#6b6252}
-.adventure-shell main :is(.rounded-xl,.rounded-lg):is([class*="border-zinc"],[class*="border-dashed"]) :is(input,textarea,select){background:rgba(255,255,255,.45);color:#2f2a1f}
-/* gold primary buttons */
-.adventure-shell main :is(.bg-amber-500,.bg-emerald-600,.bg-indigo-600,.bg-foreground){
+/* the big "+ Add task" bar */
+.adventure-shell main button.rounded-xl.border-dashed{color:#2f2a1f;font-weight:600}
+
+/* gold primary buttons (solid fills) */
+.adventure-shell main :is(.bg-amber-500,.bg-emerald-600,.bg-indigo-600,.bg-foreground,.bg-zinc-900){
   border:2px solid #31301e;
   background:radial-gradient(circle at 32% 28%,#f2c96a,#d9b45f 55%,#a88a3f);
   color:#2a1c10!important;font-weight:700;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 4px rgba(0,0,0,.25),0 2px 6px rgba(0,0,0,.35);
 }
+/* "Defeat" = crimson with gold trim */
+.adventure-shell main .bg-rose-600{
+  border:2px solid #d9b45f;
+  background:linear-gradient(180deg,#b23a2e,#7d231b);
+  color:#fff4d8!important;font-weight:700;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 2px 6px rgba(0,0,0,.4);
+}
+.adventure-shell main .bg-rose-600:hover{background:linear-gradient(180deg,#c4463a,#8b2920)}
 .adventure-shell .bg-indigo-500{background:linear-gradient(180deg,#f2d27e,#a88a3f)}
+/* XP tracks */
+.adventure-shell main .bg-zinc-100{background:#1c231b;border:1.5px solid #a88a3f}
