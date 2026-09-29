@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
+import { CelebrationSettings } from "@/components/settings/CelebrationSettings";
 import { AvatarBuilder } from "@/components/settings/AvatarBuilder";
 import { getProfileById } from "@/lib/data/profiles";
 import { notFound } from "next/navigation";
@@ -22,6 +23,12 @@ export default async function SettingsPage() {
             animations, monster icons, and level-up fanfare.
           </p>
           <ThemeToggle theme={profile.theme} />
+        </section>
+
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-zinc-500">Celebration effects</h2>
+          <p className="text-xs text-zinc-400">The dust and sparks that fly when you complete a quest.</p>
+          <CelebrationSettings />
         </section>
 
         <section>

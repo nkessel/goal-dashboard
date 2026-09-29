@@ -7,6 +7,8 @@ import { listTasksForGoal } from "@/lib/data/tasks";
 import { CreateGoalForm } from "@/components/goals/CreateGoalForm";
 import { GoalProgressControl } from "@/components/goals/GoalProgressControl";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
+import { getProfileById } from "@/lib/data/profiles";
+import { xpToNextLevel } from "@/lib/data/xp";
 import { TaskRow } from "@/components/tasks/TaskRow";
 
 export default async function BoardDetailPage({
@@ -20,6 +22,8 @@ export default async function BoardDetailPage({
   const board = await getBoard(boardId, session.user.id);
   if (!board) notFound();
 
+  const profile = await getProfileById(session.user.id);
+  const lvl = xpToNextLevel(profile?.total_xp ?? 0);
   const goals = await listGoalsForBoard(boardId);
   const goalsWithTasks = await Promise.all(
     goals.map(async (goal) => ({
@@ -67,6 +71,15 @@ export default async function BoardDetailPage({
                 goalId={goal.id}
                 boardId={board.id}
                 initialProgress={goal.progress}
+                celebration={{
+                  title: goal.title,
+                  description: goal.description,
+                  tag: board.title,
+                  questXp: tasks.reduce((sum, t) => sum + (t.xp_value ?? 0), 0),
+                  level: lvl.level,
+                  xpIntoLevel: lvl.xpIntoLevel,
+                  xpForNextLevel: lvl.xpForNextLevel,
+                }}
               />
 
               {tasks.length > 0 && (
