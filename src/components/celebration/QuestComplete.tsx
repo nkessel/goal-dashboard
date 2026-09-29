@@ -199,13 +199,19 @@ export function QuestComplete(props: QuestCompleteProps) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/adventure/icon-dragon.png" alt="" className="h-full w-full object-cover" />
                   </div>
+                  <div className="pointer-events-none absolute inset-0">
+                    <div className="qc-ripple" />
+                    <div className="qc-ripple qc-ripple2" />
+                  </div>
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="qc-pulse">
                     <div className="qc-check h-20 w-20" style={{ filter: "drop-shadow(0 0 10px rgba(110,230,80,.75)) drop-shadow(0 4px 6px rgba(0,0,0,.5))" }}>
                       <svg width="80" height="80" viewBox="0 0 24 24" fill="none" role="img" aria-label="Completed">
                         <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#16300f" strokeWidth="5.2" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#3fbf3a" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
                         <path d="M5.6 12.6 L9.6 16.6 L18.4 6.9" stroke="#8ff070" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" opacity=".85" />
                       </svg>
+                    </div>
                     </div>
                   </div>
                   <div className="pointer-events-none absolute" style={{ left: 46, top: 46, width: 0, height: 0 }}>
