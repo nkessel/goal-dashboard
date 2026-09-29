@@ -9,8 +9,8 @@ import { setTaskMatrixPositionAction } from "@/app/actions";
 
 const GRID_LINES = [20, 40, 60, 80];
 
-/** Plot position (10%-90%) back to a 1-5 score. */
-const toScore = (pct: number) => Math.min(5, Math.max(1, Math.round(1 + ((pct - 10) / 80) * 4)));
+/** Plot position (10%-90%) back to a 1-5 score, to one decimal place. */
+const toScore = (pct: number) => Math.min(5, Math.max(1, Math.round((1 + ((pct - 10) / 80) * 4) * 10) / 10));
 
 type Drag = { id: string; startX: number; startY: number; x: number; y: number; moved: boolean };
 

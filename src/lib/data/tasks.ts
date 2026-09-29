@@ -50,7 +50,7 @@ export async function setTaskMatrixPosition(
   ownerId: string,
   input: { importance: number; urgency: number }
 ): Promise<void> {
-  const clamp = (n: number) => Math.min(5, Math.max(1, Math.round(n)));
+  const clamp = (n: number) => Math.min(5, Math.max(1, Math.round(n * 10) / 10));
   const db = supabaseAdmin();
   const { error } = await db
     .from("tasks")
