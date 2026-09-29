@@ -114,8 +114,8 @@ body {
   & :is(.text-zinc-400,.text-zinc-500,.text-zinc-600,.text-zinc-700){color:#6b6252}
   & :is(input,textarea,select){background:rgba(255,255,255,.5);color:#2f2a1f;border:1.5px solid #8a7250;border-radius:8px}
   /* plain buttons & pills */
-  & button:not([class*="bg-"]){border:1.5px solid #8a7250;background:rgba(255,255,255,.35);color:#2f2a1f!important}
-  & button:not([class*="bg-"]):hover{background:rgba(255,255,255,.6)}
+  & button:not([class*=" bg-"]):not([class^="bg-"]){border:1.5px solid #8a7250;background:rgba(255,255,255,.35);color:#2f2a1f!important}
+  & button:not([class*=" bg-"]):not([class^="bg-"]):hover{background:rgba(255,255,255,.6)}
   & button[class*="border-amber"]{background:linear-gradient(180deg,#3b4636,#232c22);border-color:#d9b45f;color:#efe6cc}
   & button[class*="border-dashed"]{border-style:dashed;border-color:#a88a3f}
 }
