@@ -18,7 +18,6 @@ export type QuestCompleteProps = {
   description?: string | null;
   /** Small tag over the quest icon, e.g. the board name. */
   tag: string;
-  icon?: string;
   /** XP the quest was worth (sum of its tasks). */
   questXp: number;
   level: number;
@@ -63,11 +62,11 @@ function Dust({ items, mode }: { items: Speck[]; mode: "center" | "pct" | "px" }
 }
 
 export function QuestComplete(props: QuestCompleteProps) {
-  const { title, description, tag, icon = "🐉", questXp, level, xpIntoLevel, xpForNextLevel, onClose } = props;
+  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, onClose } = props;
   const router = useRouter();
   // Only ever mounted client-side (after a user action), so localStorage is readable up front.
   const [fx] = useState<FxSettings>(() => loadFx());
-  const [reduce] = useState(() => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+  const [reduce] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const [p, setP] = useState(reduce ? 1 : 0);
   const [playing, setPlaying] = useState(false);
   const raf = useRef<number | null>(null);
@@ -132,10 +131,8 @@ export function QuestComplete(props: QuestCompleteProps) {
       aria-modal="true"
       aria-label="Quest complete"
       className="fixed inset-0 z-50 overflow-hidden"
-      style={{ fontFamily: "'EB Garamond', Georgia, serif", background: "radial-gradient(ellipse at top, #2c3a29, #171d16 70%)" }}
+      style={{ fontFamily: "var(--font-garamond), 'EB Garamond', Georgia, serif", backgroundColor: "#232b22", backgroundImage: "url(/adventure/bg-forest.jpg)", backgroundSize: "cover", backgroundPosition: "top center" }}
     >
-      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;600;700&display=swap" />
       <div className="qc-overlay absolute inset-0" style={{ background: "rgba(9,13,8,.84)" }} />
 
       {/* ambient embers keep drifting after the main animation */}
@@ -178,7 +175,7 @@ export function QuestComplete(props: QuestCompleteProps) {
           {/* Featured quest card */}
           <div
             className="qc-card relative box-border w-full rounded-xl px-4 pb-4 pt-3.5"
-            style={{ border: "2px solid #d9b45f", background: "linear-gradient(180deg, #ecd6ae, #dcc296)" }}
+            style={{ border: "2px solid #d9b45f", backgroundColor: "#e2caa2", backgroundImage: "url(/adventure/parchment.jpg)", backgroundSize: "92px auto" }}
           >
             <div className="qc-fade pointer-events-none absolute inset-0" style={{ opacity: spark }}>
               <Dust items={card0} mode="pct" />
@@ -196,10 +193,11 @@ export function QuestComplete(props: QuestCompleteProps) {
                   <div className="qc-ring2 absolute inset-0 rounded-full" style={{ border: "3px solid #f2c96a" }} />
                   <div className="qc-ring3 absolute inset-0 rounded-full" style={{ border: "2px solid #fff" }} />
                   <div
-                    className="qc-icon absolute inset-0 flex items-center justify-center overflow-hidden rounded-full text-[46px]"
-                    style={{ border: "2px solid #a58c66", background: "radial-gradient(circle at 35% 30%, #4a5a44, #1f291e)", boxShadow: "0 0 0 3px rgba(217,180,95,.55), 0 4px 10px rgba(0,0,0,.35)" }}
+                    className="qc-icon absolute inset-0 flex items-center justify-center overflow-hidden rounded-full"
+                    style={{ border: "2px solid #a58c66", boxShadow: "0 0 0 3px rgba(217,180,95,.55), 0 4px 10px rgba(0,0,0,.35)" }}
                   >
-                    <span aria-hidden>{icon}</span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/adventure/icon-dragon.png" alt="" className="h-full w-full object-cover" />
                   </div>
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <div className="qc-check h-20 w-20" style={{ filter: "drop-shadow(0 0 10px rgba(110,230,80,.75)) drop-shadow(0 4px 6px rgba(0,0,0,.5))" }}>
@@ -247,7 +245,8 @@ export function QuestComplete(props: QuestCompleteProps) {
             <div className="relative h-16 w-16 shrink-0">
               <div className="relative box-border h-16 w-16 rounded-full p-0.5" style={{ border: "2px solid #d9b45f", background: "#1a2118" }}>
                 <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full text-[28px]" style={{ border: "2px solid #a88a3f", background: "#c9d2bd" }}>
-                  <span aria-hidden>🧙</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/adventure/avatar-ranger.jpg" alt="Your character" className="h-full w-full object-cover" />
                 </div>
               </div>
               <div

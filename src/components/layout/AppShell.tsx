@@ -31,7 +31,7 @@ export async function AppShell({
   return (
     <div
       data-theme={profile?.theme ?? "calm"}
-      className={`flex min-h-screen ${isAdventure ? "bg-gradient-to-br from-amber-50 to-rose-50 dark:from-zinc-950 dark:to-red-950" : "bg-zinc-50 dark:bg-black"}`}
+      className={`flex min-h-screen ${isAdventure ? "adventure-shell" : "bg-zinc-50 dark:bg-black"}`}
     >
       <aside
         className={`flex w-16 flex-col items-center gap-2 border-r py-4 sm:w-48 sm:items-stretch sm:px-3 ${
