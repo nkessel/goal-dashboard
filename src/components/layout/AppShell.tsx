@@ -5,12 +5,21 @@ import { getProfileById } from "@/lib/data/profiles";
 import { Avatar } from "@/components/settings/Avatar";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Priority", icon: "🎯", enabled: true },
-  { href: "/calendar", label: "Calendar", icon: "📅", enabled: false },
-  { href: "/matrix", label: "Priority Matrix", icon: "📊", enabled: true },
-  { href: "/boards", label: "Boards", icon: "🗂️", enabled: true },
-  { href: "/feed", label: "Friend Feed", icon: "👥", enabled: true },
+  { href: "/", label: "Priority", icon: "🎯", art: "ui-compass", enabled: true },
+  { href: "/calendar", label: "Calendar", icon: "📅", art: "ui-scroll", enabled: false },
+  { href: "/matrix", label: "Priority Matrix", icon: "📊", art: "ui-target", enabled: true },
+  { href: "/boards", label: "Boards", icon: "🗂️", art: "ui-grid", enabled: true },
+  { href: "/feed", label: "Friend Feed", icon: "👥", art: "ui-party", enabled: true },
 ];
+
+/** Drawn Adventure-theme icon, or the plain emoji in Calm. */
+function NavIcon({ adventure, art, emoji, dim }: { adventure: boolean; art: string; emoji: string; dim?: boolean }) {
+  if (!adventure) return <span aria-hidden>{emoji}</span>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={`/adventure/${art}.png`} alt="" aria-hidden width={28} height={28} className={`h-7 w-7 shrink-0 ${dim ? "opacity-40" : ""}`} />
+  );
+}
 
 export async function AppShell({
   children,
@@ -49,7 +58,7 @@ export async function AppShell({
                 href={item.href}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
               >
-                <span aria-hidden>{item.icon}</span>
+                <NavIcon adventure={isAdventure} art={item.art} emoji={item.icon} />
                 <span className="hidden sm:inline">{item.label}</span>
               </Link>
             ) : (
@@ -58,7 +67,7 @@ export async function AppShell({
                 title="Coming soon"
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 dark:text-zinc-600"
               >
-                <span aria-hidden>{item.icon}</span>
+                <NavIcon adventure={isAdventure} art={item.art} emoji={item.icon} dim />
                 <span className="hidden sm:inline">
                   {item.label} <span className="text-xs">(soon)</span>
                 </span>
@@ -71,7 +80,7 @@ export async function AppShell({
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
             >
               <span aria-hidden className="relative">
-                🔔
+                <NavIcon adventure={isAdventure} art="ui-flame" emoji="🔔" />
                 {unreadCount > 0 && (
                   <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
                     {unreadCount > 9 ? "9+" : unreadCount}
@@ -86,7 +95,7 @@ export async function AppShell({
               href="/settings"
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
             >
-              <span aria-hidden>⚙️</span>
+              <NavIcon adventure={isAdventure} art="ui-shield" emoji="⚙️" />
               <span className="hidden sm:inline">Settings</span>
             </Link>
           )}

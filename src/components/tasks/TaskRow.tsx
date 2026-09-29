@@ -3,7 +3,7 @@ import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { TaskActions } from "./TaskActions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { IconPicker } from "./IconPicker";
-import { MONSTER_ICONS } from "@/lib/monster-icons";
+import { MONSTER_ICONS, MONSTER_ART } from "@/lib/monster-icons";
 
 export function TaskRow({ task, theme = "calm" }: { task: Task; theme?: "calm" | "adventure" }) {
   const tint = rescheduleRedness(task.reschedule_count);
@@ -27,7 +27,17 @@ export function TaskRow({ task, theme = "calm" }: { task: Task; theme?: "calm" |
         <div className="flex min-w-0 flex-1 items-start gap-2">
           {isAdventure && (
             <div className="flex flex-col items-center gap-1">
-              <span className="text-2xl leading-none">{monsterEmoji || "❔"}</span>
+              {task.icon_source === "monster" && task.icon_key && MONSTER_ART[task.icon_key] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/adventure/${MONSTER_ART[task.icon_key]}.png`}
+                  alt=""
+                  className="h-12 w-12 rounded-full object-cover"
+                  style={{ border: "2px solid #a58c66", boxShadow: "0 0 0 2px rgba(217,180,95,.45)" }}
+                />
+              ) : (
+                <span className="text-2xl leading-none">{monsterEmoji || "❔"}</span>
+              )}
               <IconPicker taskId={task.id} currentIcon={task.icon_key} currentSource={task.icon_source} />
             </div>
           )}

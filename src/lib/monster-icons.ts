@@ -26,3 +26,11 @@ export const MONSTER_ICONS: { key: string; emoji: string; label: string }[] = [
 export function findMonsterIcon(key: string | null | undefined) {
   return MONSTER_ICONS.find((m) => m.key === key);
 }
+
+/** Drawn Adventure-theme art for the monsters the mockups illustrated (files in /public/adventure). */
+export const MONSTER_ART: Record<string, string> = {
+  dragon: "icon-dragon",
+  sorcerer: "icon-sorcerer",
+  goblin: "icon-goblin",
+  bat: "icon-bat",
+};
