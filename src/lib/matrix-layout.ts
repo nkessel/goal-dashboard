@@ -7,7 +7,7 @@ export type PlottedTask = {
 };
 
 /**
- * Maps each task's (importance, urgency) — both 1-5 — onto a 10%-90% plot
+ * Maps each task's (importance, urgency) — both 0-5 — onto a 10%-90% plot
  * area, jittering tasks that land in the same cell so they don't fully
  * overlap. Deterministic (no randomness) so re-renders don't jump around.
  */
@@ -25,8 +25,8 @@ export function computeMatrixLayout(tasks: TaskWithBoard[]): PlottedTask[] {
     group.sort((a, b) => a.id.localeCompare(b.id)); // stable order
     const n = group.length;
     group.forEach((task, i) => {
-      const baseX = 10 + ((task.urgency - 1) / 4) * 80;
-      const baseY = 10 + ((task.importance - 1) / 4) * 80;
+      const baseX = 10 + (task.urgency / 5) * 80;
+      const baseY = 10 + (task.importance / 5) * 80;
       // Spread same-cell points along a short horizontal line, centered.
       const spacing = 4; // percentage points
       const jitter = (i - (n - 1) / 2) * spacing;

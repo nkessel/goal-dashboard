@@ -48,7 +48,7 @@ export function ActivityFeedItem({
     >
       <div className="flex items-center gap-2.5">
         {author ? (
-          <Avatar profile={author} size={9} />
+          <Avatar profile={author} size={12} />
         ) : (
           <span className="h-9 w-9 shrink-0 rounded-full" style={{ background: "var(--t-ink-soft)" }} />
         )}

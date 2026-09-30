@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
-import { createPriorityTaskAction, toggleManualPriorityAction } from "@/app/actions";
+import { toggleManualPriorityAction } from "@/app/actions";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { QuestEditorDialog } from "./QuestEditorDialog";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 type Step = "choose" | "create" | "existing";
@@ -28,14 +29,15 @@ export function QuestPickerSheet({
   const isAdventure = theme === "adventure";
   const [step, setStep] = useState<Step>("choose");
 
+  if (step === "create") {
+    return (
+      <QuestEditorDialog mode={{ kind: "create", pinToBattle: true }} theme={theme} onClose={onClose} />
+    );
+  }
+
   return (
     <BottomSheet onClose={onClose} theme={theme}>
       {(requestClose) => {
-        if (step === "create") {
-          return (
-            <CreateStep isAdventure={isAdventure} onBack={() => setStep("choose")} onDone={requestClose} />
-          );
-        }
         if (step === "existing") {
           return (
             <ExistingStep
@@ -148,67 +150,6 @@ function PickerOption({
       </span>
       {label}
     </button>
-  );
-}
-
-function CreateStep({
-  isAdventure,
-  onBack,
-  onDone,
-}: {
-  isAdventure: boolean;
-  onBack: () => void;
-  onDone: () => void;
-}) {
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const fieldStyle = {
-    borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
-    background: isAdventure ? "var(--t-panel-2)" : "var(--t-bg)",
-    color: "var(--t-ink)",
-  };
-
-  return (
-    <form
-      ref={formRef}
-      action={(formData) => {
-        setError(null);
-        startTransition(async () => {
-          try {
-            await createPriorityTaskAction(formData);
-            formRef.current?.reset();
-            onDone();
-          } catch (e) {
-            setError(e instanceof Error ? e.message : "Something went wrong");
-          }
-        });
-      }}
-      className="flex flex-col gap-3"
-    >
-      <Header title={isAdventure ? "New quest" : "New task"} isAdventure={isAdventure} onClose={onDone} onBack={onBack} />
-      <input
-        name="title"
-        placeholder={isAdventure ? "Quest title" : "Task title"}
-        required
-        autoFocus
-        className="rounded border px-2 py-1.5 text-sm"
-        style={fieldStyle}
-      />
-      {error && (
-        <p className="text-xs" style={{ color: "var(--t-warn)" }}>
-          {error}
-        </p>
-      )}
-      <button
-        type="submit"
-        disabled={isPending}
-        className="hover-glow rounded-full px-4 py-1.5 text-sm font-medium disabled:opacity-50"
-        style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
-      >
-        {isPending ? "Adding…" : "Add"}
-      </button>
-    </form>
   );
 }
 

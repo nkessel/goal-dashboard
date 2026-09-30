@@ -28,18 +28,19 @@ export default async function AvatarSettingsPage() {
           <ViewTransitionLink
             href="/settings"
             ariaLabel="Back to settings"
-            className="hover-glow flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+            className="hover-glow flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
             style={{
               background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
               border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path
-                d="M5 5l14 14M19 5L5 19"
+                d="M15 5l-7 7 7 7"
                 stroke={isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)"}
-                strokeWidth="2.2"
+                strokeWidth="2.4"
                 strokeLinecap="round"
+                strokeLinejoin="round"
               />
             </svg>
           </ViewTransitionLink>

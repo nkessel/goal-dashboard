@@ -11,12 +11,10 @@ import {
 } from "@/lib/data/tasks";
 
 export default async function MatrixPage({
-  searchParams,
 }: {
-  searchParams: Promise<{ board?: string }>;
+  searchParams: Promise<Record<string, string>>;
 }) {
   const session = await requireSession();
-  const { board: boardFilter } = await searchParams;
 
   const [boards, tasks, completedTasks, profile] = await Promise.all([
     listBoardsForOwner(session.user.id),
@@ -25,7 +23,6 @@ export default async function MatrixPage({
     getProfileById(session.user.id),
   ]);
 
-  const filteredTasks = boardFilter ? tasks.filter((t) => t.board_id === boardFilter) : tasks;
   const theme = profile?.theme ?? "calm";
   const isAdventure = theme === "adventure";
   const level = profile ? xpToNextLevel(profile.total_xp).level : 1;
@@ -69,37 +66,8 @@ export default async function MatrixPage({
           </p>
         </div>
 
-        <form method="GET" className="flex items-center gap-2 text-sm">
-          <select
-            name="board"
-            defaultValue={boardFilter ?? ""}
-            className="flex-1 rounded-lg border px-2 py-1.5"
-            style={{
-              borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
-              background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-              color: "var(--t-ink)",
-            }}
-          >
-            <option value="">All boards</option>
-            {boards.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.title}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="rounded-full px-3 py-1.5 text-xs font-medium"
-            style={{
-              border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-              color: isAdventure ? "var(--t-cream)" : "var(--t-ink)",
-            }}
-          >
-            Filter
-          </button>
-        </form>
 
-        <PriorityMatrix tasks={filteredTasks} theme={theme} />
+        <PriorityMatrix tasks={tasks} theme={theme} boards={boards.map((b) => ({ id: b.id, title: b.title }))} />
 
         <section className="flex flex-col gap-2.5 rounded-2xl px-4 py-3.5" style={victoriesStyle}>
           <div className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>

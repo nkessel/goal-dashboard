@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
-import { convertCalendarEventToTaskAction } from "@/app/actions";
+import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { formatTimeRange } from "@/lib/calendar-dates";
 
 const HIDDEN_KEY = "hidden-gcal-events-v1";
@@ -50,11 +51,10 @@ export function GoogleEventChip({
   // for a purely client-side, per-browser preference like this.
   const [hidden, setHidden] = useState(() => (typeof window !== "undefined" ? readHidden().has(event.id) : false));
   const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   const [converted, setConverted] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  if (hidden || converted) return null;
+  if (hidden || (converted && !creating)) return null;
 
   function hideEvent() {
     const ids = readHidden();
@@ -65,29 +65,19 @@ export function GoogleEventChip({
   }
 
   function convertToQuest() {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await convertCalendarEventToTaskAction({
-          googleEventId: event.id,
-          title: event.title,
-          description: event.description ?? undefined,
-          startISO: event.start,
-          endISO: event.end,
-        });
-        // Hide the raw appointment chip now that it exists as a quest too —
-        // the task chip (from the fresh server data) takes its place.
-        const ids = readHidden();
-        ids.add(event.id);
-        writeHidden(ids);
-        setConverted(true);
-        setOpen(false);
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't add that as a quest.");
-      }
-    });
+    setOpen(false);
+    setCreating(true);
   }
+
+  function onQuestCreated() {
+    const ids = readHidden();
+    ids.add(event.id);
+    writeHidden(ids);
+    setConverted(true);
+    router.refresh();
+  }
+
+  const durationMin = Math.max(0, Math.round((new Date(event.end).getTime() - new Date(event.start).getTime()) / 60000));
 
   const start = new Date(event.start);
   const end = new Date(event.end);
@@ -131,15 +121,16 @@ export function GoogleEventChip({
         </div>
       </button>
 
-      {open && (
+      {open &&
+        createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "var(--t-overlay)" }}
           onClick={() => setOpen(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="flex w-full max-w-md flex-col gap-3 rounded-t-2xl p-4 sm:rounded-2xl"
+            className="flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 shadow-2xl"
             style={{
               background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
               border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
@@ -166,11 +157,6 @@ export function GoogleEventChip({
                 {event.description}
               </p>
             )}
-            {error && (
-              <p className="text-xs" style={{ color: "var(--t-warn)" }}>
-                {error}
-              </p>
-            )}
             <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
@@ -183,15 +169,31 @@ export function GoogleEventChip({
               <button
                 type="button"
                 onClick={convertToQuest}
-                disabled={isPending}
                 className="hover-glow rounded-full px-4 py-1.5 text-sm font-medium disabled:opacity-50"
                 style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
               >
-                {isPending ? "Adding…" : isAdventure ? "Make it a quest" : "Add as task"}
+                {isAdventure ? "Make it a quest" : "Add as task"}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+      {creating && (
+        <QuestEditorDialog
+          mode={{
+            kind: "create",
+            prefill: {
+              title: event.title,
+              description: event.description ?? undefined,
+              estimateMinutes: event.isAllDay ? null : durationMin,
+            },
+            schedule: { startISO: event.start, endISO: event.end, googleEventId: event.id },
+          }}
+          theme={theme}
+          onCreated={onQuestCreated}
+          onClose={() => setCreating(false)}
+        />
       )}
     </>
   );

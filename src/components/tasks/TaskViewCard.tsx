@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useState } from "react";
 import type { Task } from "@/lib/data/types";
 import { EditTaskModal } from "./EditTaskModal";
@@ -37,9 +38,9 @@ export function TaskViewCard({
     color: "var(--t-ink)",
   };
 
-  return (
+  return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4 ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
         closing ? "overlay-fade-out" : "overlay-fade-in"
       }`}
       style={{ background: "var(--t-overlay)" }}
@@ -50,7 +51,7 @@ export function TaskViewCard({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`relative flex w-full max-w-md flex-col gap-3 rounded-t-2xl p-4 sm:rounded-2xl ${
+        className={`relative flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 shadow-2xl ${
           closing ? "card-pop-out" : "card-pop-in"
         }`}
         style={panelStyle}
@@ -113,6 +114,7 @@ export function TaskViewCard({
 
         {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

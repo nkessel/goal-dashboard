@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Shared popup shell: slides up from the bottom over a darkening backdrop,
@@ -47,9 +48,12 @@ export function BottomSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- requestClose's setClosing updater always reads fresh state, doesn't need to be a dep
   }, []);
 
-  return (
+  // Portaled to <body> so no transformed/animated ancestor (page slide-in,
+  // hover lift) can trap the "fixed" overlay inside itself, and centered on
+  // screen rather than pinned to the bottom edge.
+  return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-end justify-center ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
         closing ? "overlay-fade-out" : "overlay-fade-in"
       }`}
       style={{ background: "var(--t-overlay)" }}
@@ -63,7 +67,7 @@ export function BottomSheet({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`flex w-full max-w-md flex-col gap-3 rounded-t-2xl p-4 ${
+        className={`flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 shadow-2xl ${
           closing ? "sheet-minimize-out" : "sheet-slide-up-in"
         }`}
         style={{
@@ -76,6 +80,7 @@ export function BottomSheet({
       >
         {children(requestClose)}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

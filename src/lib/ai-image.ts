@@ -21,19 +21,13 @@ const CHROMA_KEY_HEX = "#39ff14";
  * lighting, and explicit "not cartoonish/cute/chibi" steering. Callers can
  * layer an additional mood on top via buildStyleSuffix (avatar-prompts.ts).
  */
-export function buildAvatarPrompt(subject: string, opts: { withBackground?: boolean } = {}) {
+export function buildAvatarPrompt(subject: string, opts: { withBackground?: boolean; look: string }) {
   const base =
-    `hyper-detailed dark fantasy RPG character portrait, ${subject}, single character centered in frame, ` +
-    "battle-worn and weathered, fierce intense expression, dramatic chiaroscuro lighting, gritty realistic " +
-    "textures, battle-damaged armor and weapon detail, painterly digital concept art in the style of a AAA " +
-    "game box cover, sharp focus, moody atmosphere, epic and imposing, not cartoonish, not cute, not chibi, " +
-    "no other characters, no props on the ground, no text, no watermark";
+    `${opts.look}, ${subject}, single character centered in frame, head and shoulders portrait, ` +
+    "no other characters, no text, no watermark";
 
-  // Default: a flat chroma-key backdrop so stripChromaBackground() below can
-  // key it out to real transparency. Opt-in alternative: let the model
-  // paint a full moody scene instead, left in as the JPEG's own background.
   return opts.withBackground
-    ? `${base}, dramatic magical environment background with swirling energy, light rays and motion, painted scenery, cinematic atmosphere`
+    ? `${base}, scenic fantasy background that matches the art style`
     : `${base}, flat solid ${CHROMA_KEY_HEX} background with no gradient, no scenery, no vignette`;
 }
 

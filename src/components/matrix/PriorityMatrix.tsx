@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { TaskWithBoard } from "@/lib/data/tasks";
 import { computeMatrixLayout } from "@/lib/matrix-layout";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
@@ -38,16 +38,19 @@ function clampPct(n: number) {
  * anywhere in the grid rather than snapping to 5 coarse steps per axis.
  */
 function pctToScale(pct: number) {
-  const value = Math.round((1 + ((pct - 10) / 80) * 4) * 10) / 10;
-  return Math.min(5, Math.max(1, value));
+  const value = Math.round(((pct - 10) / 80) * 5 * 10) / 10;
+  return Math.min(5, Math.max(0, value));
 }
 
 export function PriorityMatrix({
   tasks: initialTasks,
   theme = "calm",
+  boards,
 }: {
   tasks: TaskWithBoard[];
   theme?: "calm" | "adventure";
+  /** When given, shows a checkbox per board to choose which quests are plotted. */
+  boards?: { id: string; title: string }[];
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [seenInitialTasks, setSeenInitialTasks] = useState(initialTasks);
@@ -74,7 +77,34 @@ export function PriorityMatrix({
 
   const isAdventure = theme === "adventure";
   const legend = LEGEND[theme];
-  const plotted = computeMatrixLayout(tasks);
+  // Board filter: unchecked board ids ("none" = quests without a board).
+  // Remembered per browser.
+  const [hiddenBoards, setHiddenBoards] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem("matrix-hidden-boards") ?? "[]");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
+      if (Array.isArray(saved) && saved.length) setHiddenBoards(new Set(saved));
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  function toggleBoard(id: string) {
+    setHiddenBoards((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        window.localStorage.setItem("matrix-hidden-boards", JSON.stringify(Array.from(next)));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }
+  const visibleTasks = boards ? tasks.filter((t) => !hiddenBoards.has(t.board_id ?? "none")) : tasks;
+  const plotted = computeMatrixLayout(visibleTasks);
+  const hasUnboarded = tasks.some((t) => !t.board_id);
   // Looked up by id (rather than holding the task object itself) so the
   // popped-up card always reflects the latest data, including right after
   // an edit made from its own Edit button.
@@ -98,7 +128,29 @@ export function PriorityMatrix({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-2">
+      {boards && boards.length > 0 && (
+        <fieldset className="flex flex-wrap gap-x-4 gap-y-1.5">
+          <legend className="sr-only">Boards shown on the map</legend>
+          {[...boards, ...(hasUnboarded ? [{ id: "none", title: "No board" }] : [])].map((b) => (
+            <label
+              key={b.id}
+              className="flex min-h-9 cursor-pointer items-center gap-2 text-sm"
+              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
+            >
+              <input
+                type="checkbox"
+                checked={!hiddenBoards.has(b.id)}
+                onChange={() => toggleBoard(b.id)}
+                className="h-5 w-5"
+                style={{ accentColor: isAdventure ? "var(--t-gold)" : "var(--t-accent)" }}
+              />
+              {b.title}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {/* Sized to leave room for what's below: never taller than the screen minus the header area. */}
+      <div className="mx-auto flex w-full gap-2" style={{ maxWidth: "min(100%, max(280px, calc(100svh - 330px)))" }}>
         <div
           className="flex w-6 shrink-0 flex-col items-center justify-between py-1.5 text-[11px]"
           style={{ ...axisLabelStyle, writingMode: "vertical-rl", transform: "rotate(180deg)" }}

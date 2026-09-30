@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useViewTransitionNavigate, useViewTransitionHistory } from "@/components/ui/ViewTransitionProvider";
+import { useViewTransitionNavigate, useLastAppPathname } from "@/components/ui/ViewTransitionProvider";
 
 /**
  * Settings' "X" close button: returns to wherever the user actually came
@@ -11,21 +11,14 @@ import { useViewTransitionNavigate, useViewTransitionHistory } from "@/component
  * fades out to the destination instead of the default expand/zoom root
  * transition (see the "settings-close" rules in globals.css).
  */
-export function CloseSettingsButton({ isAdventure }: { isAdventure: boolean }) {
+export function CloseSettingsButton({ isAdventure, size = 32 }: { isAdventure: boolean; size?: number }) {
   const navigate = useViewTransitionNavigate();
-  const getPreviousPathname = useViewTransitionHistory();
+  const getLastAppPathname = useLastAppPathname();
 
   function close() {
-    const target = getPreviousPathname() ?? "/";
+    const target = getLastAppPathname() ?? "/";
     document.documentElement.setAttribute("data-transition", "settings-close");
-    const transition = navigate(target);
-    if (transition) {
-      transition.finished.finally(() => {
-        document.documentElement.removeAttribute("data-transition");
-      });
-    } else {
-      document.documentElement.removeAttribute("data-transition");
-    }
+    navigate(target);
   }
 
   useEffect(() => {
@@ -42,13 +35,15 @@ export function CloseSettingsButton({ isAdventure }: { isAdventure: boolean }) {
       type="button"
       onClick={close}
       aria-label="Close settings"
-      className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+      className="hover-glow flex shrink-0 items-center justify-center rounded-full"
       style={{
+        width: size,
+        height: size,
         background: isAdventure ? "rgba(0,0,0,.16)" : "var(--t-card)",
         border: `1px solid ${isAdventure ? "rgba(214,200,150,.25)" : "var(--t-card-border)"}`,
       }}
     >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <svg width={size * 0.4} height={size * 0.4} viewBox="0 0 24 24" fill="none">
         <path
           d="M6 6l12 12M18 6L6 18"
           stroke={isAdventure ? "var(--t-nav-inactive)" : "var(--t-ink-soft)"}

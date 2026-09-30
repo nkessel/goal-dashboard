@@ -4,7 +4,6 @@ import { requireSession } from "@/lib/session";
 import { signOut } from "@/auth";
 import { AppShell } from "@/components/layout/AppShell";
 import { Avatar } from "@/components/settings/Avatar";
-import { CloseSettingsButton } from "@/components/settings/CloseSettingsButton";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
@@ -36,7 +35,6 @@ export default async function SettingsPage({
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <div className="flex flex-col gap-5">
         <div className="flex items-center gap-2.5">
-          <CloseSettingsButton isAdventure={isAdventure} />
           <h1 className="font-display text-xl" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
             Settings
           </h1>
@@ -50,17 +48,17 @@ export default async function SettingsPage({
             border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
           }}
         >
-          <div className="relative" style={{ width: 76, height: 76 }}>
+          <div className="relative" style={{ width: 120, height: 120 }}>
             <Link
               href="/settings/avatar"
               aria-label="Edit avatar"
               className="hover-glow block overflow-hidden rounded-full"
-              style={{ width: 76, height: 76, border: `3px solid ${iconColor}` }}
+              style={{ width: 120, height: 120, border: `3px solid ${iconColor}` }}
             >
-              <Avatar profile={profile} size={19} />
+              <Avatar profile={profile} size={30} />
             </Link>
             <div
-              className="absolute left-1/2 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-bold"
+              className="absolute left-1/2 whitespace-nowrap rounded-full px-3 py-0.5 text-xs font-bold"
               style={{
                 bottom: -6,
                 transform: "translateX(-50%)",
@@ -73,15 +71,15 @@ export default async function SettingsPage({
             </div>
           </div>
           <p
-            className="mt-1 text-sm font-semibold"
-            style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
+            className={`mt-2 text-lg font-semibold ${isAdventure ? "font-display" : ""}`}
+            style={{ color: "var(--t-ink)" }}
           >
             {profile.name ?? session.user.email}
           </p>
-          <div className="flex w-full max-w-[220px] flex-col gap-1">
+          <div className="flex w-full max-w-[240px] flex-col gap-1">
             <div
-              className="h-2 overflow-hidden rounded-full"
-              style={{ background: isAdventure ? "#0e170f" : "var(--t-card-border)" }}
+              className="h-3 overflow-hidden rounded-full"
+              style={{ background: isAdventure ? "#1c231b" : "var(--t-card-border)", border: isAdventure ? "1.5px solid var(--t-gold-deep)" : undefined }}
             >
               <div
                 className="h-full rounded-full"
@@ -92,8 +90,8 @@ export default async function SettingsPage({
               />
             </div>
             <div
-              className="text-center text-[11px]"
-              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.8 : 1 }}
+              className="text-center text-[13px] font-medium"
+              style={{ color: "var(--t-ink-soft)" }}
             >
               {nextLevel ? `${xpIntoLevel} / ${xpForNextLevel} XP` : `${profile.total_xp} XP · Max level`}
             </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
 import { reopenTaskAction } from "@/app/actions";
@@ -40,15 +41,16 @@ export function CompletedTaskRow({ task, theme = "calm" }: { task: Task; theme?:
         </button>
       </li>
 
-      {open && (
+      {open &&
+        createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "var(--t-overlay)" }}
           onClick={() => setOpen(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="flex w-full max-w-sm flex-col gap-3 rounded-t-2xl p-4 sm:rounded-2xl"
+            className="flex w-full max-w-sm flex-col gap-3 rounded-2xl p-4 shadow-2xl"
             style={{
               background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
               border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
@@ -92,7 +94,8 @@ export function CompletedTaskRow({ task, theme = "calm" }: { task: Task; theme?:
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

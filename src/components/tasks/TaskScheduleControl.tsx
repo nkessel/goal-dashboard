@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
 import { scheduleTaskAction, suggestSlotsAction } from "@/app/actions";
 
@@ -20,7 +20,19 @@ function formatSlot(slot: Slot) {
   return `${dayLabel} · ${timeLabel}`;
 }
 
-export function TaskScheduleControl({ task, theme = "calm" }: { task: Task; theme?: "calm" | "adventure" }) {
+export function TaskScheduleControl({
+  task,
+  theme = "calm",
+  startOpen = false,
+  onDone,
+}: {
+  task: Task;
+  theme?: "calm" | "adventure";
+  /** Open straight into slot suggestions (used by the quest card's menu). */
+  startOpen?: boolean;
+  /** Called after scheduling or cancelling, e.g. to close a surrounding dialog. */
+  onDone?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [manualStart, setManualStart] = useState("");
@@ -28,6 +40,19 @@ export function TaskScheduleControl({ task, theme = "calm" }: { task: Task; them
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (startOpen && !autoOpened.current) {
+      autoOpened.current = true;
+      openAndFetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
+
+  function finish() {
+    setOpen(false);
+    onDone?.();
+  }
 
   const fieldStyle = {
     borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
@@ -53,7 +78,7 @@ export function TaskScheduleControl({ task, theme = "calm" }: { task: Task; them
     startTransition(async () => {
       try {
         await scheduleTaskAction(task.id, slot.start, slot.end);
-        setOpen(false);
+        finish();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't schedule task");
       }
@@ -70,7 +95,7 @@ export function TaskScheduleControl({ task, theme = "calm" }: { task: Task; them
           new Date(manualStart).toISOString(),
           new Date(manualEnd).toISOString()
         );
-        setOpen(false);
+        finish();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't schedule task");
       }
@@ -78,6 +103,7 @@ export function TaskScheduleControl({ task, theme = "calm" }: { task: Task; them
   }
 
   if (!open) {
+    if (startOpen) return null;
     return (
       <button
         type="button"
@@ -170,7 +196,7 @@ export function TaskScheduleControl({ task, theme = "calm" }: { task: Task; them
         </div>
       </details>
 
-      <button type="button" onClick={() => setOpen(false)} className="mt-2 underline" style={{ color: "var(--t-ink-soft)" }}>
+      <button type="button" onClick={finish} className="mt-2 underline" style={{ color: "var(--t-ink-soft)" }}>
         cancel
       </button>
     </div>

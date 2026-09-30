@@ -13,8 +13,9 @@ import * as profilesData from "@/lib/data/profiles";
 import * as avatarLibraryData from "@/lib/data/avatar-library";
 import * as taskIconLibraryData from "@/lib/data/task-icon-library";
 import * as xp from "@/lib/data/xp";
+import { supabaseAdmin } from "@/lib/supabase/server";
 import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt } from "@/lib/ai-image";
-import { buildStyleSuffix } from "@/lib/avatar-prompts";
+import { styleLook, AVATAR_STYLE_OPTIONS, STYLE_EXAMPLE_SUBJECT } from "@/lib/avatar-prompts";
 import { exportAccountData, type AccountExport } from "@/lib/data/export";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
 import { sendEmail } from "@/lib/email";
@@ -652,7 +653,7 @@ export async function generateAvatarImageAction(
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe what you want your avatar to look like first.");
 
-  const fullPrompt = buildAvatarPrompt(trimmed, { withBackground }) + buildStyleSuffix(style);
+  const fullPrompt = buildAvatarPrompt(trimmed, { withBackground, look: styleLook(style) });
   const url = await generateAndStoreImage(fullPrompt, `avatars/${ownerId}-${Date.now()}.jpg`, {
     transparentBackground: !withBackground,
   });
@@ -702,4 +703,105 @@ export async function generateTaskIconAction(taskId: string, prompt: string) {
   revalidatePath("/");
   revalidatePath("/matrix");
   return url;
+}
+
+/** Remove one image from the shared avatar library. Profiles already using
+ * it keep their avatar — only the library tile goes away. */
+export async function removeAvatarFromLibraryAction(id: string) {
+  await requireProfileId();
+  await avatarLibraryData.removeAvatarFromLibrary(id);
+  revalidatePath("/settings/avatar");
+}
+
+/**
+ * Create a quest from the quest editor dialog. Optionally pins it to Today's
+ * Battle, or places it on the calendar (e.g. when turning a Google Calendar
+ * event into a quest). Returns the new quest's id.
+ */
+export async function createQuestAction(input: {
+  title: string;
+  description?: string;
+  importance: number;
+  urgency: number;
+  xpValue: number;
+  estimateMinutes?: number | null;
+  goalId?: string | null;
+  iconKey?: string | null;
+  iconSource?: "library" | "ai";
+  pinToBattle?: boolean;
+  schedule?: { startISO: string; endISO: string; googleEventId?: string };
+}): Promise<string> {
+  const ownerId = await requireProfileId();
+  const title = input.title.trim();
+  if (!title) throw new Error("Give your quest a title first.");
+  const clamp = (n: number) => Math.max(0, Math.min(5, Math.round(n * 10) / 10));
+  const task = await tasksData.createTask(ownerId, {
+    title,
+    description: input.description?.trim() || undefined,
+    importance: clamp(input.importance),
+    urgency: clamp(input.urgency),
+    xpValue: Math.max(0, Math.round(input.xpValue)),
+    goalId: input.goalId ?? null,
+    estimateMinutes: input.estimateMinutes ?? null,
+    iconKey: input.iconKey ?? null,
+    iconSource: input.iconSource,
+  });
+  if (input.schedule) {
+    await tasksData.rescheduleTask(
+      task.id,
+      ownerId,
+      input.schedule.startISO,
+      input.schedule.endISO,
+      input.schedule.googleEventId
+    );
+  }
+  if (input.pinToBattle) {
+    await tasksData.setManualPriority(task.id, ownerId, true);
+  }
+  revalidatePath("/");
+  revalidatePath("/matrix");
+  revalidatePath("/calendar");
+  if (input.goalId) {
+    const goal = await goalsData.getGoal(input.goalId, ownerId);
+    if (goal) revalidatePath(`/boards/${goal.board_id}`);
+  }
+  return task.id;
+}
+
+/** Generate a quest portrait without attaching it to a quest yet (the create
+ * dialog, before the quest exists). Added to the shared icon library. */
+export async function generateQuestIconImageAction(prompt: string): Promise<string> {
+  const ownerId = await requireProfileId();
+  const trimmed = prompt.trim();
+  if (!trimmed) throw new Error("Describe the monster/icon you want first.");
+  const url = await generateAndStoreImage(buildTaskIconPrompt(trimmed), `tasks/draft-${ownerId}-${Date.now()}.jpg`, {
+    transparentBackground: true,
+  });
+  await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: trimmed });
+  return url;
+}
+
+/**
+ * Example portrait for each art style (same subject in every style), made
+ * once and cached in storage at a fixed path. Returns { styleKey: url }.
+ */
+export async function ensureStyleExamplesAction(): Promise<Record<string, string>> {
+  await requireProfileId();
+  const out: Record<string, string> = {};
+  const db = supabaseAdmin();
+  const { data: existing } = await db.storage.from("ai-images").list("style-examples");
+  const have = new Set((existing ?? []).map((f: { name: string }) => f.name));
+  for (const style of AVATAR_STYLE_OPTIONS) {
+    const name = `${style.key}-v1.png`;
+    if (have.has(name)) {
+      out[style.key] = db.storage.from("ai-images").getPublicUrl(`style-examples/${name}`).data.publicUrl;
+      continue;
+    }
+    out[style.key] = await generateAndStoreImage(
+      buildAvatarPrompt(STYLE_EXAMPLE_SUBJECT, { withBackground: false, look: style.look }),
+      `style-examples/${style.key}-v1.jpg`,
+      { transparentBackground: true }
+    );
+  }
+  return out;
 }

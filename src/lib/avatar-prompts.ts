@@ -17,43 +17,52 @@ export const SAMPLE_AVATAR_PROMPTS = [
 ];
 
 /**
- * Optional art-style presets for the generator — layered on top of the base
- * prompt (see buildAvatarPrompt in ai-image.ts, which already pushes toward
- * "epic, gritty, not cartoonish") to give the image a more specific mood.
- * Single-select in the UI; picking none just uses the base style. Shared
- * between the client component (rendering the buttons) and the server
- * action (building the prompt), so it isn't "server-only" like ai-image.ts.
+ * The three avatar art styles. Each one fully defines the look (the base
+ * prompt in ai-image.ts only adds framing and background), so the choices
+ * read as genuinely different styles rather than moods of one style. Every
+ * style has an example portrait of the same subject (STYLE_EXAMPLE_SUBJECT),
+ * shown as the style's selector tile in the avatar editor.
  */
-export const AVATAR_STYLE_OPTIONS: { key: string; label: string; description: string; promptSuffix: string }[] = [
+export const AVATAR_STYLE_OPTIONS: { key: string; label: string; description: string; look: string }[] = [
   {
-    key: "dark-fantasy",
-    label: "Dark Fantasy",
-    description: "Shadowy, gothic, moody",
-    promptSuffix: ", shadowy gothic dark fantasy aesthetic, desaturated moody palette, eerie atmospheric fog",
+    key: "storybook",
+    label: "Storybook Painted",
+    description: "Soft watercolor and ink, like a fairy-tale book",
+    look:
+      "storybook fairy-tale illustration, soft watercolor washes with delicate ink linework, warm gentle palette, " +
+      "hand-painted paper texture, charming and friendly expression, classic children's book art",
   },
   {
-    key: "epic-cinematic",
-    label: "Epic Cinematic",
-    description: "Movie-poster, larger than life",
-    promptSuffix: ", epic cinematic movie-poster composition, dramatic rim lighting, larger-than-life heroic scale",
+    key: "heroic",
+    label: "Heroic Game Art",
+    description: "Bold, crisp fantasy RPG character art",
+    look:
+      "hyper-detailed fantasy RPG character portrait, painterly digital concept art like a AAA game character card, " +
+      "rich saturated color, dramatic rim lighting, crisp detail on armor and gear, heroic and confident, sharp focus",
   },
   {
-    key: "grimdark-war",
-    label: "Grimdark War",
-    description: "Battle-scarred, brutal, war-torn",
-    promptSuffix: ", grimdark war-torn aesthetic, scars and grime, brutal battle damage, harsh desaturated tones",
-  },
-  {
-    key: "mythic-legend",
-    label: "Mythic Legend",
-    description: "Ancient, godlike, awe-inspiring",
-    promptSuffix: ", mythic legendary godlike presence, ancient glowing runes, awe-inspiring epic scale",
+    key: "pixel",
+    label: "Pixel Hero",
+    description: "Chunky 16-bit retro video-game sprite",
+    look:
+      "16-bit pixel art character portrait, chunky clearly visible square pixels, limited retro color palette, " +
+      "crisp pixel edges, no anti-aliasing, SNES-era RPG sprite style, bold readable silhouette",
   },
 ];
 
-/** Turns a chosen style key into a prompt clause, or "" when none is
- * chosen (or the key doesn't match, e.g. stale client state). */
-export function buildStyleSuffix(styleKey: string | null | undefined): string {
-  const style = AVATAR_STYLE_OPTIONS.find((s) => s.key === styleKey);
-  return style ? style.promptSuffix : "";
+export const DEFAULT_AVATAR_STYLE = "heroic";
+
+/** Subject used for every style's example tile, so the tiles differ only in style. */
+export const STYLE_EXAMPLE_SUBJECT = "a friendly ranger with a longbow, a hooded green cloak and leather armor";
+
+export function styleLook(styleKey: string | null | undefined): string {
+  const style =
+    AVATAR_STYLE_OPTIONS.find((s) => s.key === styleKey) ??
+    AVATAR_STYLE_OPTIONS.find((s) => s.key === DEFAULT_AVATAR_STYLE)!;
+  return style.look;
+}
+
+/** @deprecated styles now fully define the look; see styleLook(). */
+export function buildStyleSuffix(): string {
+  return "";
 }

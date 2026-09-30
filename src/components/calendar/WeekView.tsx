@@ -88,7 +88,7 @@ export function WeekView({
       <div
         className="grid"
         style={{
-          gridTemplateColumns: "24px repeat(7, 1fr)",
+          gridTemplateColumns: "24px repeat(7, minmax(0, 1fr))",
           gridTemplateRows: `auto repeat(${hourCount}, 42px)`,
           columnGap: 2,
         }}

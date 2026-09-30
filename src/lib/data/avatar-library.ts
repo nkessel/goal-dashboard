@@ -27,3 +27,9 @@ export async function addAvatarToLibrary(input: {
     );
   if (error) throw new Error(`Failed to add avatar to library: ${error.message}`);
 }
+
+export async function removeAvatarFromLibrary(id: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db.from("avatar_library").delete().eq("id", id);
+  if (error) throw new Error(`Failed to remove avatar from library: ${error.message}`);
+}

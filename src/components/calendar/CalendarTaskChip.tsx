@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import type { Task } from "@/lib/data/types";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
@@ -29,6 +33,7 @@ export function CalendarTaskChip({
   compact?: boolean;
 }) {
   const isAdventure = theme === "adventure";
+  const [editing, setEditing] = useState(false);
   const isCompleted = task.status === "completed";
   const isWarned = !isCompleted && task.reschedule_count >= 3;
   const tint = !isCompleted ? rescheduleRedness(task.reschedule_count) : undefined;
@@ -74,8 +79,16 @@ export function CalendarTaskChip({
   const iconSize = compact ? (isAdventure ? 22 : 18) : isAdventure ? 32 : 28;
 
   return (
-    <div
-      className="flex h-full w-full items-center overflow-hidden rounded-lg"
+    <>
+    <button
+      type="button"
+      title={`Edit "${task.title}"`}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      className="hover-glow flex h-full w-full min-w-0 items-center overflow-hidden rounded-lg text-left"
       style={{
         ...cardStyle,
         flexDirection: compact ? "column" : "row",
@@ -138,6 +151,8 @@ export function CalendarTaskChip({
           </p>
         )}
       </div>
-    </div>
+    </button>
+    {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
+    </>
   );
 }

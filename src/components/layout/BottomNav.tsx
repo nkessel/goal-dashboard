@@ -86,13 +86,21 @@ export function BottomNav({ theme }: { theme: Theme }) {
   const rowRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const [highlight, setHighlight] = useState<{ left: number; width: number } | null>(null);
+  // Tapped tab, shown as active right away while its screen is still loading.
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    setPendingHref(null);
+  }
+  const activePath = pendingHref ?? pathname;
 
   // Measure the active item's position within the row and slide the
   // highlight box there — kept in sync with `pathname` so it moves at the
   // same moment the screen-level view transition kicks off (see navigate()
   // below), not just when this component happens to re-render.
   useLayoutEffect(() => {
-    const activeIndex = navIndex(pathname);
+    const activeIndex = navIndex(activePath);
     const row = rowRef.current;
     const el = itemRefs.current[activeIndex];
     if (!row || !el) {
@@ -110,7 +118,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
     // recheck on both so the box never drifts out of alignment.
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [pathname, isAdventure]);
+  }, [activePath, isAdventure]);
 
   // Whole screen slides in from the right when moving to a tab further
   // right in the nav order, or from the left when moving to one further
@@ -136,14 +144,8 @@ export function BottomNav({ theme }: { theme: Theme }) {
     const toIndex = navIndex(href);
     const direction = fromIndex >= 0 && toIndex >= 0 && toIndex < fromIndex ? "nav-back" : "nav-forward";
     document.documentElement.setAttribute("data-transition", direction);
-    const transition = navigateWithTransition(href);
-    if (transition) {
-      transition.finished.finally(() => {
-        document.documentElement.removeAttribute("data-transition");
-      });
-    } else {
-      document.documentElement.removeAttribute("data-transition");
-    }
+    setPendingHref(href);
+    navigateWithTransition(href);
   }
 
   return (
@@ -198,11 +200,11 @@ export function BottomNav({ theme }: { theme: Theme }) {
           />
         )}
         {ITEMS.map((item, i) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = item.href === "/" ? activePath === "/" : activePath.startsWith(item.href);
           const label = isAdventure ? item.adventureLabel : item.calmLabel;
 
           return (
-            <div key={item.href} className="relative flex items-stretch" style={{ zIndex: 1 }}>
+            <div key={item.href} className="relative flex min-w-0 flex-1 items-stretch" style={{ zIndex: 1 }}>
               {i > 0 && (
                 <div
                   aria-hidden
@@ -220,7 +222,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
                 ref={(el) => {
                   itemRefs.current[i] = el;
                 }}
-                className="flex min-h-11 min-w-11 flex-1 flex-col items-center justify-end gap-1 px-2 py-1.5 transition-transform duration-150 hover:scale-110 active:scale-95"
+                className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-end gap-1 px-0.5 py-1.5 transition-transform duration-150 hover:scale-110 active:scale-95"
               >
                 {isAdventure ? (
                   <>
@@ -233,9 +235,9 @@ export function BottomNav({ theme }: { theme: Theme }) {
                       style={{ display: "block" }}
                     />
                     <span
-                      className="font-display whitespace-nowrap"
+                      className="font-display max-w-full truncate whitespace-nowrap"
                       style={{
-                        fontSize: 12.5,
+                        fontSize: "clamp(9.5px, 2.9vw, 12.5px)",
                         fontWeight: active ? 700 : 400,
                         color: active ? "var(--t-cream)" : "var(--t-nav-inactive)",
                       }}

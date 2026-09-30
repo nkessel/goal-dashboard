@@ -6,6 +6,7 @@ import {
   generateTaskIconAction,
   listTaskIconLibraryAction,
   pickTaskIconFromLibraryAction,
+  generateQuestIconImageAction,
 } from "@/app/actions";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
@@ -18,8 +19,12 @@ export function IconPicker({
   theme = "calm",
   size = 28,
   fallbackEmoji = "➕",
+  emptyContent,
+  onDraftChange,
+  centered = false,
 }: {
-  taskId: string;
+  /** Omit together with `onDraftChange` when the quest doesn't exist yet. */
+  taskId?: string;
   currentIcon: string | null;
   currentSource: "monster" | "library" | "ai";
   taskTitle?: string;
@@ -31,6 +36,12 @@ export function IconPicker({
    * (e.g. "❔"/"✦") so swapping in IconPicker as the avatar itself doesn't
    * change what an icon-less card looks like. */
   fallbackEmoji?: string;
+  /** Rendered instead of `fallbackEmoji` when no icon is set. */
+  emptyContent?: React.ReactNode;
+  /** Draft mode (create dialog): report picks instead of saving to a quest. */
+  onDraftChange?: (url: string | null, source: "library" | "ai") => void;
+  /** Center the popover under the trigger (for large, centered avatars). */
+  centered?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"library" | "ai">("library");
@@ -45,7 +56,12 @@ export function IconPicker({
     setGenError(null);
     startGeneratingIcon(async () => {
       try {
-        await generateTaskIconAction(taskId, aiPrompt);
+        if (onDraftChange) {
+          const url = await generateQuestIconImageAction(aiPrompt);
+          onDraftChange(url, "ai");
+        } else if (taskId) {
+          await generateTaskIconAction(taskId, aiPrompt);
+        }
         setOpen(false);
       } catch (e) {
         setGenError(e instanceof Error ? e.message : "Couldn't generate an icon.");
@@ -60,6 +76,12 @@ export function IconPicker({
   }, [tab, library]);
 
   function pickLibraryEntry(imageUrl: string) {
+    if (onDraftChange) {
+      onDraftChange(imageUrl, "library");
+      setOpen(false);
+      return;
+    }
+    if (!taskId) return;
     startTransition(async () => {
       await pickTaskIconFromLibraryAction(taskId, imageUrl);
       setOpen(false);
@@ -67,8 +89,14 @@ export function IconPicker({
   }
 
   function clear() {
+    if (onDraftChange) {
+      onDraftChange(null, "library");
+      setOpen(false);
+      return;
+    }
+    if (!taskId) return;
     startTransition(async () => {
-      await setTaskIconAction(taskId, null, "monster");
+      await setTaskIconAction(taskId!, null, "monster");
       setOpen(false);
     });
   }
@@ -120,15 +148,17 @@ export function IconPicker({
         {currentImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL
           <img src={currentImageUrl} alt="" className="h-full w-full object-cover" />
+        ) : currentEmoji ? (
+          currentEmoji
         ) : (
-          currentEmoji || fallbackEmoji
+          emptyContent ?? fallbackEmoji
         )}
       </button>
 
       {open && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute left-0 z-20 w-72 rounded-xl p-2 shadow-lg"
+          className={`absolute z-30 w-72 rounded-xl p-2 shadow-lg ${centered ? "left-1/2 -translate-x-1/2" : "left-0"}`}
           style={{
             top: size + 6,
             background: "var(--t-panel)",

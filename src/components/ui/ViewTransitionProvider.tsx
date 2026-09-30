@@ -1,11 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
-
-type StartViewTransitionDoc = Document & {
-  startViewTransition?: (cb: () => Promise<void> | void) => { finished: Promise<void> };
-};
 
 type ViewTransitionContextValue = {
   /**
@@ -26,6 +22,8 @@ type ViewTransitionContextValue = {
    * re-renders as it changes.
    */
   getPreviousPathname: () => string | null;
+  /** Last pathname visited outside /settings. */
+  getLastAppPathname: () => string | null;
 };
 
 const ViewTransitionContext = createContext<ViewTransitionContextValue | null>(null);
@@ -51,58 +49,68 @@ const ViewTransitionContext = createContext<ViewTransitionContextValue | null>(n
 export function ViewTransitionProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const pendingResolveRef = useRef<(() => void) | null>(null);
+  const [, startTransition] = useTransition();
   const currentPathnameRef = useRef(pathname);
   const previousPathnameRef = useRef<string | null>(null);
+  // Last screen outside Settings, so closing Settings from any depth
+  // (Settings → Avatar → …) returns to the app instead of bouncing between
+  // the settings pages.
+  const lastAppPathnameRef = useRef<string | null>(pathname.startsWith("/settings") ? null : pathname);
+  const pendingRef = useRef<{ direction: string; resolve: () => void } | null>(null);
 
-  // Fires after every commit where the pathname changed — including the one
-  // caused by our own router.push() below — releasing whatever transition is
-  // waiting on it, and shifting the current pathname into "previous" so
-  // getPreviousPathname() always reflects one step back from wherever the
-  // user is now. Tracks every route change regardless of how it was
-  // triggered (ViewTransitionLink, a plain next/link Link, BottomNav), since
-  // they all funnel through Next's router and update usePathname() here.
+  // Screen-change animation, played on the NEW screen once it has actually
+  // rendered. The earlier View Transitions version snapshotted the "new"
+  // state after a fixed timeout, so on a slow server response it animated
+  // old-screen-to-old-screen and then jumped. Now the old screen simply
+  // stays (dimmed) while the next one loads, and the next one slides in the
+  // moment it commits — no matter how long the fetch took.
   useEffect(() => {
-    if (currentPathnameRef.current !== pathname) {
-      previousPathnameRef.current = currentPathnameRef.current;
-      currentPathnameRef.current = pathname;
-    }
-    pendingResolveRef.current?.();
-    pendingResolveRef.current = null;
+    if (currentPathnameRef.current === pathname) return;
+    previousPathnameRef.current = currentPathnameRef.current;
+    currentPathnameRef.current = pathname;
+    if (!pathname.startsWith("/settings")) lastAppPathnameRef.current = pathname;
+    const html = document.documentElement;
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    html.removeAttribute("data-nav-pending");
+    html.setAttribute("data-enter", pending?.direction ?? "fade");
+    const t = setTimeout(() => {
+      html.removeAttribute("data-enter");
+      pending?.resolve();
+    }, 320);
+    return () => clearTimeout(t);
   }, [pathname]);
 
   function navigate(href: string) {
-    const doc = document as StartViewTransitionDoc;
-    if (typeof doc.startViewTransition !== "function") {
-      router.push(href);
-      return null;
-    }
-
-    return doc.startViewTransition(() => {
-      return new Promise<void>((resolve) => {
-        // A prior transition that never saw its pathname change (e.g. two
-        // rapid taps) shouldn't hang around forever holding a stale frame.
-        pendingResolveRef.current?.();
-        pendingResolveRef.current = resolve;
-        router.push(href);
-        // Safety net: if the pathname somehow never changes (navigation
-        // error, same-URL edge case), don't freeze the UI indefinitely.
-        setTimeout(() => {
-          if (pendingResolveRef.current === resolve) {
-            pendingResolveRef.current = null;
-            resolve();
-          }
-        }, 1500);
-      });
-    });
+    const html = document.documentElement;
+    const direction = html.getAttribute("data-transition") ?? "fade";
+    html.removeAttribute("data-transition");
+    pendingRef.current?.resolve();
+    let resolve!: () => void;
+    const finished = new Promise<void>((r) => (resolve = r));
+    pendingRef.current = { direction, resolve };
+    html.setAttribute("data-nav-pending", "");
+    startTransition(() => router.push(href));
+    // Safety net: never leave the old screen dimmed if the route errors out.
+    setTimeout(() => {
+      if (pendingRef.current?.resolve === resolve) {
+        pendingRef.current = null;
+        html.removeAttribute("data-nav-pending");
+        resolve();
+      }
+    }, 10000);
+    return { finished };
   }
 
   function getPreviousPathname() {
     return previousPathnameRef.current;
   }
+  function getLastAppPathname() {
+    return lastAppPathnameRef.current;
+  }
 
   return (
-    <ViewTransitionContext.Provider value={{ navigate, getPreviousPathname }}>
+    <ViewTransitionContext.Provider value={{ navigate, getPreviousPathname, getLastAppPathname }}>
       {children}
     </ViewTransitionContext.Provider>
   );
@@ -122,4 +130,10 @@ export function useViewTransitionHistory() {
     throw new Error("useViewTransitionHistory must be used within a ViewTransitionProvider");
   }
   return ctx.getPreviousPathname;
+}
+
+export function useLastAppPathname() {
+  const ctx = useContext(ViewTransitionContext);
+  if (!ctx) throw new Error("useLastAppPathname must be used within a ViewTransitionProvider");
+  return ctx.getLastAppPathname;
 }

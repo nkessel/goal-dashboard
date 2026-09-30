@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   generateAvatarImageAction,
   clearAvatarImageAction,
   pickAvatarFromLibraryAction,
+  removeAvatarFromLibraryAction,
+  ensureStyleExamplesAction,
 } from "@/app/actions";
-import { SAMPLE_AVATAR_PROMPTS, AVATAR_STYLE_OPTIONS } from "@/lib/avatar-prompts";
+import { SAMPLE_AVATAR_PROMPTS, AVATAR_STYLE_OPTIONS, DEFAULT_AVATAR_STYLE } from "@/lib/avatar-prompts";
 import type { AvatarLibraryEntry } from "@/lib/data/types";
 
 /**
@@ -34,10 +36,17 @@ export function AvatarBuilder({
   const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl);
   const [prompt, setPrompt] = useState("");
   const [withBackground, setWithBackground] = useState(false);
-  const [style, setStyle] = useState<string | null>(null);
+  const [style, setStyle] = useState<string>(DEFAULT_AVATAR_STYLE);
+  const [examples, setExamples] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    ensureStyleExamplesAction()
+      .then(setExamples)
+      .catch(() => setExamples({}));
+  }, []);
   const [isGenerating, startGenerating] = useTransition();
   const [genError, setGenError] = useState<string | null>(null);
   const [isPicking, startPicking] = useTransition();
+  const [removed, setRemoved] = useState<Set<string>>(() => new Set());
 
   // Draws attention to the Generate button right after a sample prompt gets
   // auto-filled, since picking a sample no longer generates immediately —
@@ -86,6 +95,21 @@ export function AvatarBuilder({
     });
   }
 
+  function removeFromLibrary(id: string) {
+    setRemoved((prev) => new Set(prev).add(id));
+    startPicking(async () => {
+      try {
+        await removeAvatarFromLibraryAction(id);
+      } catch {
+        setRemoved((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    });
+  }
+
   function clearImage() {
     startGenerating(async () => {
       await clearAvatarImageAction();
@@ -95,22 +119,22 @@ export function AvatarBuilder({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col items-center gap-3 text-center">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL
           <img
             src={imageUrl}
             alt="Your avatar"
-            className="h-16 w-16 shrink-0 rounded-full object-cover"
-            style={{ border: `2px solid ${initialColor}` }}
+            className="h-32 w-32 shrink-0 rounded-full object-cover"
+            style={{ border: `3px solid ${isAdventure ? "var(--t-gold)" : initialColor}` }}
           />
         ) : (
           <div
-            className="h-16 w-16 shrink-0 rounded-full"
-            style={{ background: `${initialColor}33`, border: `2px solid ${initialColor}` }}
+            className="h-32 w-32 shrink-0 rounded-full"
+            style={{ background: `${initialColor}33`, border: `3px solid ${initialColor}` }}
           />
         )}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col items-center gap-1">
           <span className="text-sm font-medium" style={{ color: inkColor }}>
             Your avatar
           </span>
@@ -158,27 +182,54 @@ export function AvatarBuilder({
           Illustrated scene background (unchecked = no background)
         </label>
 
-        <div className="flex flex-col gap-1">
-          <p className="text-xs" style={{ color: inkSoft }}>
-            Art style (optional):
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs font-medium" style={{ color: inkSoft }}>
+            Art style
           </p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Art style">
             {AVATAR_STYLE_OPTIONS.map((s) => {
               const active = style === s.key;
+              const src = examples?.[s.key];
               return (
                 <button
                   key={s.key}
                   type="button"
+                  role="radio"
+                  aria-checked={active}
                   title={s.description}
-                  onClick={() => setStyle(active ? null : s.key)}
-                  className="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
+                  onClick={() => setStyle(s.key)}
+                  className="hover-glow flex flex-col overflow-hidden rounded-xl text-left transition-transform active:scale-95"
                   style={{
-                    background: active ? accentBg : fieldBg,
-                    border: `1px solid ${active ? "transparent" : fieldBorder}`,
-                    color: active ? accentInk : inkColor,
+                    border: `3px solid ${active ? accentBg : fieldBorder}`,
+                    background: fieldBg,
+                    boxShadow: active ? "0 0 0 2px rgba(209,161,60,.35)" : undefined,
                   }}
                 >
-                  {s.label}
+                  <div className="relative aspect-square w-full" style={{ background: isAdventure ? "#e9dcbd" : "#f1f1f1" }}>
+                    {src ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL
+                      <img src={src} alt={`${s.label} example`} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[10px]" style={{ color: inkSoft }}>
+                        {examples ? "No preview" : "Painting…"}
+                      </div>
+                    )}
+                    {active && (
+                      <span
+                        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold"
+                        style={{ background: accentBg, color: accentInk }}
+                        aria-hidden
+                      >
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className="px-1.5 py-1.5 text-center text-[12px] font-semibold leading-tight"
+                    style={{ color: inkColor, background: active ? (isAdventure ? "rgba(209,161,60,.25)" : "var(--t-accent-soft)") : undefined }}
+                  >
+                    {s.label}
+                  </span>
                 </button>
               );
             })}
@@ -229,20 +280,36 @@ export function AvatarBuilder({
         <p className="mb-1.5 text-xs font-medium" style={{ color: inkSoft }}>
           Avatar library — presets, plus every avatar anyone has made
         </p>
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-          {library.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              onClick={() => pickFromLibrary(entry.image_url)}
-              disabled={isPicking}
-              className="aspect-square overflow-hidden rounded-full disabled:opacity-50"
-              style={{ border: `2px solid ${imageUrl === entry.image_url ? initialColor : "transparent"}` }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- static /design/ asset or external Supabase Storage URL */}
-              <img src={entry.image_url} alt="" className="h-full w-full object-cover" />
-            </button>
-          ))}
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+          {library
+            .filter((entry) => !removed.has(entry.id))
+            .map((entry) => (
+              <div key={entry.id} className="relative">
+                <button
+                  type="button"
+                  onClick={() => pickFromLibrary(entry.image_url)}
+                  disabled={isPicking}
+                  title={entry.prompt ?? undefined}
+                  className="hover-glow block aspect-square w-full overflow-hidden rounded-full disabled:opacity-50"
+                  style={{
+                    border: `3px solid ${imageUrl === entry.image_url ? (isAdventure ? "var(--t-gold)" : initialColor) : "transparent"}`,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- static /design/ asset or external Supabase Storage URL */}
+                  <img src={entry.image_url} alt="" className="h-full w-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeFromLibrary(entry.id)}
+                  aria-label="Remove from library"
+                  title="Remove from library"
+                  className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold shadow"
+                  style={{ background: isAdventure ? "#2f2a1f" : "var(--t-ink)", color: "#fff", border: "2px solid var(--t-panel)" }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
         </div>
       </div>
     </div>

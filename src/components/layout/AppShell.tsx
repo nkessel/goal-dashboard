@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { countUnread } from "@/lib/data/notifications";
 import { getProfileById } from "@/lib/data/profiles";
-import { Avatar } from "@/components/settings/Avatar";
+import { TopRightAvatar } from "@/components/layout/TopRightAvatar";
 import { BottomNav } from "@/components/layout/BottomNav";
 
 /**
@@ -50,13 +50,13 @@ export async function AppShell({
             <Link
               href="/notifications"
               aria-label="Notifications"
-              className="relative flex h-8 w-8 items-center justify-center rounded-full"
+              className="relative flex h-10 w-10 items-center justify-center rounded-full"
               style={{
                 background: isAdventure ? "rgba(0,0,0,.22)" : "var(--t-card)",
                 border: isAdventure ? "1px solid rgba(209,161,60,.35)" : "1px solid var(--t-card-border)",
               }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path
                   d="M6 9a6 6 0 1 1 12 0c0 3.5 1 5.5 2 6.5H4c1-1 2-3 2-6.5z"
                   stroke={iconColor}
@@ -73,9 +73,7 @@ export async function AppShell({
             </Link>
           )}
           {profileId && profile && (
-            <Link href="/settings/avatar" aria-label={`Edit avatar — signed in as ${userLabel}`}>
-              <Avatar profile={profile} size={8} />
-            </Link>
+            <TopRightAvatar profile={profile} isAdventure={isAdventure} label={userLabel} />
           )}
         </div>
 

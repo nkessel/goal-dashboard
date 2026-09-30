@@ -12,22 +12,21 @@ function StatTile({
   iconSrc,
   value,
   label,
-  align,
 }: {
   iconSrc: string;
   value: number;
-  label: string;
-  align: "left" | "right";
+  label: React.ReactNode;
 }) {
+  // Sizes follow the Today's Quests mockup: 32px art icon, 19px number, 11px caption.
   return (
-    <div className={`flex items-center gap-1.5 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
+    <div className="flex items-center gap-2.5">
       {/* eslint-disable-next-line @next/next/no-img-element -- static /design asset */}
-      <img src={iconSrc} alt="" width={22} height={22} className="shrink-0" />
-      <div className="flex flex-col leading-tight">
-        <span className="font-display text-[15px] font-bold" style={{ color: "var(--t-cream)" }}>
+      <img src={iconSrc} alt="" width={32} height={32} className="h-8 w-8 shrink-0" />
+      <div className="flex flex-col">
+        <span className="font-display text-[19px] font-bold leading-none" style={{ color: "var(--t-cream)" }}>
           {value}
         </span>
-        <span className="text-[9.5px] leading-tight" style={{ color: "var(--t-cream)", opacity: 0.65 }}>
+        <span className="mt-[3px] text-[11px] leading-[1.2]" style={{ color: "var(--t-cream)", opacity: 0.85 }}>
           {label}
         </span>
       </div>
@@ -58,25 +57,29 @@ export function XpSummary({
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-1">
-          <div className="flex flex-col gap-3 pt-2">
-            <StatTile iconSrc="/design/ui-shield.png" value={stats?.questsComplete ?? 0} label="Quests Complete" align="left" />
-            <StatTile iconSrc="/design/ui-flame.png" value={profile.streak_count} label="Quest Streak" align="left" />
+          <div className="flex min-w-0 flex-1 flex-col gap-[18px] pt-2.5">
+            <StatTile
+              iconSrc="/design/ui-shield.png"
+              value={stats?.questsComplete ?? 0}
+              label={<>Quests<br />Complete</>}
+            />
+            <StatTile iconSrc="/design/ui-flame.png" value={profile.streak_count} label="Quest Streak" />
           </div>
 
-          <div className="flex flex-col items-center gap-2.5">
-            <div className="relative" style={{ width: 84, height: 84 }}>
+          <div className="flex shrink-0 flex-col items-center gap-2.5">
+            <div className="relative" style={{ width: 104, height: 104 }}>
               <Link
                 href="/settings?open=appearance"
                 aria-label="Edit avatar"
                 className="hover-glow block overflow-hidden rounded-full"
-                style={{ width: 84, height: 84, border: "4px solid var(--t-gold)" }}
+                style={{ width: 104, height: 104, border: "3px solid var(--t-gold)", boxShadow: "0 0 0 2px var(--t-gold-deep) inset" }}
               >
-                <Avatar profile={profile} size={21} />
+                <Avatar profile={profile} size={26} />
               </Link>
               <div
-                className="font-display absolute left-1/2 whitespace-nowrap rounded-full px-3 py-0.5 text-xs font-bold"
+                className="font-display absolute left-1/2 whitespace-nowrap rounded-full px-3.5 py-0.5 text-[13px] font-bold"
                 style={{
-                  bottom: -6,
+                  bottom: -10,
                   transform: "translateX(-50%)",
                   background: "var(--t-gold)",
                   color: "#3b2a10",
@@ -87,25 +90,27 @@ export function XpSummary({
                 {level >= 8 && " · Adventurer"}
               </div>
             </div>
-            <div className="flex w-full max-w-[160px] flex-col gap-1">
+            <div className="mt-2 flex w-[166px] flex-col gap-[5px]">
               <div
-                className="h-2.5 overflow-hidden rounded-full border"
-                style={{ background: "#0e170f", borderColor: "#000" }}
+                className="h-3 overflow-hidden rounded-full"
+                style={{ background: "#1c231b", border: "1.5px solid var(--t-gold-deep)" }}
               >
                 <div
                   className="h-full rounded-full"
                   style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--t-gold-deep), var(--t-gold))" }}
                 />
               </div>
-              <div className="text-center text-[10px] tracking-wide" style={{ color: "var(--t-cream)" }}>
+              <div className="text-center text-[12.5px] tracking-wide" style={{ color: "var(--t-gold)" }}>
                 {nextLevel ? `${xpIntoLevel} / ${xpForNextLevel} XP` : `${profile.total_xp} XP · Max level`}
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 pt-2">
-            <StatTile iconSrc="/design/ui-xpshield.png" value={stats?.xpThisWeek ?? 0} label="XP this week" align="right" />
-            <StatTile iconSrc="/design/ui-partybig.png" value={stats?.partySize ?? 0} label="Party Size" align="right" />
+          <div className="flex min-w-0 flex-1 flex-col items-end gap-[18px] pt-2.5">
+            <div className="flex flex-col gap-[18px]">
+              <StatTile iconSrc="/design/ui-xpshield.png" value={stats?.xpThisWeek ?? 0} label={<>XP this<br />week</>} />
+              <StatTile iconSrc="/design/ui-partybig.png" value={stats?.partySize ?? 0} label="Party Size" />
+            </div>
           </div>
         </div>
 
@@ -123,7 +128,7 @@ export function XpSummary({
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <Link href="/settings?open=appearance" aria-label="Edit avatar" className="hover-glow shrink-0 rounded-full">
-          <Avatar profile={profile} size={13} />
+          <Avatar profile={profile} size={18} />
         </Link>
         <div className="flex-1">
           <div className="text-base font-bold" style={{ color: "var(--t-ink)" }}>

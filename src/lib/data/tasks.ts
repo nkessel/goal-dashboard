@@ -79,8 +79,8 @@ export async function updateTaskPriority(
   ownerId: string,
   input: { importance: number; urgency: number }
 ): Promise<Task> {
-  const importance = Math.max(1, Math.min(5, Math.round(input.importance * 10) / 10));
-  const urgency = Math.max(1, Math.min(5, Math.round(input.urgency * 10) / 10));
+  const importance = Math.max(0, Math.min(5, Math.round(input.importance * 10) / 10));
+  const urgency = Math.max(0, Math.min(5, Math.round(input.urgency * 10) / 10));
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
@@ -112,8 +112,8 @@ export async function updateTask(
     estimateMinutes?: number | null;
   }
 ): Promise<Task> {
-  const importance = Math.max(1, Math.min(5, Math.round(input.importance * 10) / 10));
-  const urgency = Math.max(1, Math.min(5, Math.round(input.urgency * 10) / 10));
+  const importance = Math.max(0, Math.min(5, Math.round(input.importance * 10) / 10));
+  const urgency = Math.max(0, Math.min(5, Math.round(input.urgency * 10) / 10));
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
@@ -242,12 +242,15 @@ export async function createTask(
     goalId?: string | null;
     color?: string;
     estimateMinutes?: number | null;
+    iconKey?: string | null;
+    iconSource?: "monster" | "library" | "ai";
   }
 ): Promise<Task> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
     .insert({
+      ...(input.iconKey ? { icon_key: input.iconKey, icon_source: input.iconSource ?? "library" } : {}),
       owner_id: ownerId,
       goal_id: input.goalId || null,
       title: input.title,

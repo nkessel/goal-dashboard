@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { TaskActions } from "./TaskActions";
+import { completeTaskAction, toggleManualPriorityAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
-import { IconPicker } from "./IconPicker";
 import { EditTaskModal } from "./EditTaskModal";
+import { QuestActionMenu, type QuestAction } from "./QuestActionMenu";
+import { MONSTER_ICONS } from "@/lib/monster-icons";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
  * Kept as a plain helper (not inlined in the component) so the impure
@@ -60,18 +62,17 @@ export function TaskRow({
   innerRef?: (el: HTMLLIElement | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [menu, setMenu] = useState<"icon" | "dots" | null>(null);
+  const [scheduling, setScheduling] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const tint = rescheduleRedness(task.reschedule_count);
   const isAdventure = theme === "adventure";
   const isWarned = task.reschedule_count >= 3;
-  // "Overdue" per HANDOFF.md §4: scheduled in the past, still open. Derived
-  // here rather than stored — no data-model change.
   const isOverdue = isTaskOverdue(task);
   const isWarnedCard = isWarned || isOverdue;
 
-  // Layer the redness tint over the card's own opaque base rather than using
-  // it as the whole background — on Adventure's dark page background (this
-  // row appears directly on it on the Home page), a bare translucent tint
-  // composites too dark for --t-ink title text to stay legible.
   const cardStyle: React.CSSProperties = {
     background: isOverdue
       ? "var(--t-warn-bg)"
@@ -81,37 +82,63 @@ export function TaskRow({
           ? "var(--t-panel)"
           : "var(--t-card)",
     borderStyle: "solid",
-    borderWidth: isAdventure ? 1.5 : 1,
-    borderColor: isWarnedCard ? "var(--t-warn)" : isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
+    borderWidth: isAdventure ? 2 : 1,
+    borderColor: isWarnedCard ? "var(--t-warn)" : isAdventure ? "#b39a6a" : "var(--t-card-border)",
     boxShadow: isAdventure
-      ? "0 3px 8px rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,255,255,.35)"
+      ? "inset 0 0 0 1px #7c6135, inset 0 0 0 2px rgba(255,236,200,.8), 0 3px 8px rgba(0,0,0,.35)"
       : undefined,
   };
 
   const xpColor = isAdventure ? "var(--t-xp)" : "var(--t-accent)";
-  const metaColor = isAdventure ? "var(--t-ink-soft)" : "var(--t-ink-soft)";
+  const metaColor = "var(--t-ink-soft)";
   const dividerColor = isAdventure ? "var(--t-divider)" : "var(--t-card-border)";
-  const avatarSize = isAdventure ? 52 : 44;
+  const avatarSize = 54;
 
-  // Urgency (1–5 flames) and importance (1–3 bolts) — the real data model
-  // keeps both on a continuous 1–5 scale (see PriorityMatrix), unlike the
-  // mockup's fixed integer scales, so importance is rescaled onto the
-  // 1–3 glyph count the design calls for.
-  const urgencyCount = Math.min(5, Math.max(1, Math.round(task.urgency)));
-  const importanceCount = Math.min(3, Math.max(1, Math.round(1 + ((task.importance - 1) / 4) * 2)));
+  // Urgency (flames) and importance (bolts), 0–5 each — same icons as the quest editor.
+  const urgencyCount = Math.min(5, Math.max(0, Math.round(task.urgency)));
+  const importanceCount = Math.min(5, Math.max(0, Math.round(task.importance)));
+
+  const imageUrl = task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null;
+  const emoji = task.icon_source === "monster" ? MONSTER_ICONS.find((m) => m.key === task.icon_key)?.emoji : null;
+
+  function pick(action: QuestAction) {
+    setMenu(null);
+    setError(null);
+    if (action === "edit") return setEditing(true);
+    if (action === "calendar") return setScheduling(true);
+    startTransition(async () => {
+      try {
+        if (action === "battle") {
+          await toggleManualPriorityAction(task.id, !task.is_manual_priority);
+        } else {
+          setDone(true);
+          const fd = new FormData();
+          fd.set("taskId", task.id);
+          await completeTaskAction(fd);
+        }
+      } catch (e) {
+        setDone(false);
+        setError(e instanceof Error ? e.message : "Something went wrong");
+      }
+    });
+  }
+
+  const menuEl = (align: "left" | "right") => (
+    <QuestActionMenu
+      isAdventure={isAdventure}
+      inBattle={task.is_manual_priority}
+      onCalendar={task.is_on_calendar}
+      align={align}
+      onPick={pick}
+      onClose={() => setMenu(null)}
+    />
+  );
 
   return (
     <li
       ref={innerRef}
-      // Explicitly false (never just omitted) when this row isn't itself a
-      // drag source: GoalList nests TaskRow inside each goal card's own
-      // `draggable` <div> (for reordering goals). Without an explicit
-      // `draggable=false` here, the browser walks up from any mousedown
-      // inside this <li> — including the card-wide click-to-edit area added
-      // for quest-card click-to-edit — to that ancestor and starts dragging
-      // the *goal card* instead of registering the click, which is what
-      // made both "click a quest" and "drag to reorder" feel broken/erratic
-      // inside goal boards.
+      // Explicitly false when this row isn't itself a drag source, so a press
+      // inside a goal card on Board Detail doesn't start dragging the goal.
       draggable={draggable ?? false}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
@@ -119,127 +146,156 @@ export function TaskRow({
       onDragEnd={onDragEnd}
       onClick={() => setEditing(true)}
       title="Click to edit"
-      className={`hover-glow flex flex-col gap-2 rounded-2xl p-3.5 transition-transform hover:-translate-y-[1px] cursor-pointer ${
+      className={`hover-glow relative flex cursor-pointer flex-col rounded-xl px-3 pb-2.5 pt-2 ${
         draggable ? "active:cursor-grabbing" : ""
-      }`}
+      } ${isPending ? "opacity-70" : ""}`}
       style={cardStyle}
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          {/* Its own click swaps/generates the avatar instead of opening the
-              task editor — stopPropagation inside IconPicker keeps this from
-              also bubbling up to the card's own onClick above. 52px circle /
-              1.5px border per HANDOFF.md §4 "creature portrait". */}
-          <IconPicker
-            taskId={task.id}
-            currentIcon={task.icon_key}
-            currentSource={task.icon_source}
-            taskTitle={task.title}
-            theme={theme}
-            size={avatarSize}
-            fallbackEmoji={isAdventure ? "❔" : "✦"}
-          />
-          <div className="min-w-0 flex-1">
-            {categoryLabel && (
-              <span
-                className="mb-1 inline-block max-w-full truncate rounded-full px-2 py-0.5 align-middle text-[10px] font-semibold"
-                style={{
-                  background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
-                  border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-                  color: isAdventure ? "var(--t-gold)" : "var(--t-accent)",
-                }}
-              >
-                {categoryLabel}
-              </span>
-            )}
-            <p
-              className={`truncate text-[15px] font-semibold ${isAdventure ? "font-display" : ""}`}
-              style={{ color: isOverdue ? "var(--t-warn)" : "var(--t-ink)" }}
+      {/* ⋯ menu, upper right */}
+      <div className="absolute right-1 top-1 z-10" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          aria-label="Quest actions"
+          aria-haspopup="menu"
+          aria-expanded={menu === "dots"}
+          onClick={() => setMenu((m) => (m === "dots" ? null : "dots"))}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"
+          style={{ color: "var(--t-ink-soft)" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <circle cx="5" cy="12" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="19" cy="12" r="2" />
+          </svg>
+        </button>
+        {menu === "dots" && menuEl("right")}
+      </div>
+
+      <div className="flex items-stretch gap-3">
+        {/* Left: board tag centered over (and overlapping) the quest icon */}
+        <div className="relative flex shrink-0 flex-col items-center" onClick={(e) => e.stopPropagation()}>
+          {categoryLabel && (
+            <span
+              className="relative z-[2] -mb-2 max-w-[84px] truncate rounded-md px-2 py-px text-[11.5px] leading-tight"
+              style={{
+                background: isAdventure ? "#d0b991" : "var(--t-accent-soft)",
+                border: `1px solid ${isAdventure ? "#8a7250" : "var(--t-card-border)"}`,
+                color: isAdventure ? "var(--t-ink)" : "var(--t-accent)",
+                boxShadow: isAdventure ? "inset 0 1px 0 rgba(255,240,210,.6), 0 1px 2px rgba(0,0,0,.25)" : undefined,
+              }}
             >
-              {task.title}
-            </p>
-            {task.description && (
-              <p className="truncate text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-                {task.description}
-              </p>
+              {categoryLabel}
+            </span>
+          )}
+          <button
+            type="button"
+            aria-label={`Actions for ${task.title}`}
+            aria-haspopup="menu"
+            aria-expanded={menu === "icon"}
+            onClick={() => setMenu((m) => (m === "icon" ? null : "icon"))}
+            className="hover-glow flex items-center justify-center overflow-hidden rounded-full"
+            style={{
+              width: avatarSize,
+              height: avatarSize,
+              border: imageUrl || emoji ? `2px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}` : "none",
+              background: imageUrl || emoji ? undefined : "transparent",
+              marginTop: categoryLabel ? 0 : 4,
+            }}
+          >
+            {done ? (
+              <CheckMark checked isAdventure={isAdventure} />
+            ) : imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL or /design asset
+              <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+            ) : emoji ? (
+              <span style={{ fontSize: 26 }}>{emoji}</span>
+            ) : (
+              <CheckMark checked={false} isAdventure={isAdventure} />
             )}
-            <div className="mt-1.5 flex flex-wrap items-center gap-2" style={{ color: metaColor, fontSize: 12.5 }}>
-              {task.is_on_calendar && task.scheduled_start && (
-                <span className="flex items-center gap-1.5" style={isOverdue ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
-                  {isAdventure ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                    <img src="/design/ui-calendar.png" alt="" width={14} height={14} />
-                  ) : (
-                    "📅"
-                  )}
-                  {isOverdue
-                    ? "Overdue"
-                    : new Date(task.scheduled_start).toLocaleString(undefined, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                </span>
-              )}
-              {task.reschedule_count > 0 && (
-                <span style={isWarned ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
-                  &#8635; {task.reschedule_count}
-                  {isWarned && " — rescheduled often"}
-                </span>
-              )}
-              {/* Divider grouped together with the flames it introduces (not
-                  a bare sibling in the flex-wrap row) so flex-wrap always
-                  breaks *before* the pair rather than stranding the divider
-                  at the end of the previous line — and only shown at all
-                  when there's a badge to its left to separate from, instead
-                  of rendering as an orphan mark next to nothing. */}
-              <span className="flex items-center gap-2">
-                {(task.is_on_calendar || task.reschedule_count > 0) && (
-                  <span style={{ width: 1, height: 14, background: dividerColor }} aria-hidden />
+          </button>
+          {menu === "icon" && menuEl("left")}
+        </div>
+
+        {/* Middle: title, description, due + urgency */}
+        <div className="flex min-w-0 flex-1 flex-col justify-center pr-6 pt-1">
+          <p
+            className={`truncate text-[16.5px] font-bold leading-tight ${isAdventure ? "font-display" : ""}`}
+            style={{ color: isOverdue ? "var(--t-warn)" : "var(--t-ink)" }}
+          >
+            {task.title}
+          </p>
+          {task.description && (
+            <p className="line-clamp-2 text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+              {task.description}
+            </p>
+          )}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: metaColor, fontSize: 12.5 }}>
+            {task.is_on_calendar && task.scheduled_start && (
+              <span className="flex items-center gap-1.5" style={isOverdue ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
+                {isAdventure ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
+                  <img src="/design/ui-calendar.png" alt="" width={14} height={14} />
+                ) : (
+                  "📅"
                 )}
-                <span className="flex items-center gap-0.5" title={`Urgency ${task.urgency.toFixed(1)}`}>
-                  {Array.from({ length: urgencyCount }).map((_, i) =>
-                    isAdventure ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                      <img key={i} src="/design/ui-flame-sm.png" alt="" width={13} height={13} />
-                    ) : (
-                      <span key={i} style={{ color: "var(--t-clay)", fontSize: 12 }}>
-                        &#9679;
-                      </span>
-                    )
-                  )}
-                </span>
+                {isOverdue
+                  ? "Overdue"
+                  : new Date(task.scheduled_start).toLocaleString(undefined, {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
               </span>
-            </div>
+            )}
+            {task.reschedule_count > 0 && (
+              <span style={isWarned ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
+                &#8635; {task.reschedule_count}
+                {isWarned && " — rescheduled often"}
+              </span>
+            )}
+            <span className="flex items-center gap-2">
+              {(task.is_on_calendar || task.reschedule_count > 0) && (
+                <span style={{ width: 1, height: 14, background: dividerColor }} aria-hidden />
+              )}
+              <span className="flex items-center gap-0.5" title={`Urgency ${task.urgency.toFixed(1)}`}>
+                {Array.from({ length: urgencyCount }).map((_, i) =>
+                  isAdventure ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
+                    <img key={i} src="/design/ui-flame-sm.png" alt="" width={13} height={13} />
+                  ) : (
+                    <span key={i} style={{ color: "var(--t-clay)", fontSize: 12 }}>
+                      &#9679;
+                    </span>
+                  )
+                )}
+              </span>
+            </span>
           </div>
         </div>
 
-        <div className="hidden shrink-0 sm:block" style={{ width: 1, background: dividerColor }} aria-hidden />
+        <div className="shrink-0" style={{ width: 1, background: dividerColor }} aria-hidden />
 
-        <div className="flex shrink-0 flex-row items-center justify-between gap-3 sm:w-[64px] sm:flex-col sm:items-end sm:justify-center sm:gap-1.5">
-          {task.xp_value > 0 && (
-            <span
-              className={isAdventure ? "font-display" : ""}
-              style={{ color: xpColor, fontWeight: 700, fontSize: isAdventure ? 17 : 14 }}
-            >
-              {isAdventure ? "XP " : ""}
-              {task.xp_value}
-              {!isAdventure ? " pts" : ""}
-            </span>
-          )}
+        {/* Right: time, XP, importance */}
+        <div className="flex w-[76px] shrink-0 flex-col items-start justify-center gap-1 pt-5">
           {task.estimate_minutes != null && (
-            <span className="flex items-center gap-1" style={{ color: metaColor, fontSize: 11.5 }}>
+            <span className="flex items-center gap-1" style={{ color: "var(--t-ink)", fontSize: 13.5 }}>
               {isAdventure ? (
                 // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                <img src="/design/ui-clock.png" alt="" width={12} height={12} />
+                <img src="/design/ui-clock.png" alt="" width={15} height={15} />
               ) : (
                 "⏱"
               )}
               {formatEstimate(task.estimate_minutes)}
             </span>
           )}
+          <span
+            className={`whitespace-nowrap ${isAdventure ? "font-display" : ""}`}
+            style={{ color: xpColor, fontWeight: 700, fontSize: isAdventure ? 17 : 15 }}
+          >
+            {isAdventure ? `XP ${task.xp_value}` : `${task.xp_value} pts`}
+          </span>
           <span className="flex items-center gap-0.5" title={`Importance ${task.importance.toFixed(1)}`}>
             {Array.from({ length: importanceCount }).map((_, i) =>
               isAdventure ? (
@@ -255,22 +311,50 @@ export function TaskRow({
         </div>
       </div>
 
-      {/* TaskActions' pin/complete buttons need real width for their text
-          labels ("Add to Today's Battle", "Defeat") — they used to be
-          crammed into the ~64px XP/estimate/importance column above, which
-          only ever had room for compact icons, and squeezed the buttons
-          into an overlapping, circular mess once that column's fixed width
-          kicked in (the sm: breakpoint). Giving them their own full-width
-          row, same pattern as TaskScheduleControl below, fixes that. */}
-      <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-        <TaskActions task={task} theme={theme} />
-      </div>
+      {error && (
+        <p className="mt-1 text-xs" style={{ color: "var(--t-warn)" }}>
+          {error}
+        </p>
+      )}
 
-      <div onClick={(e) => e.stopPropagation()}>
-        <TaskScheduleControl task={task} theme={theme} />
-      </div>
+      {scheduling &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 overlay-fade-in"
+            style={{ background: "var(--t-overlay)" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setScheduling(false);
+            }}
+          >
+            <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <TaskScheduleControl task={task} theme={theme} startOpen onDone={() => setScheduling(false)} />
+            </div>
+          </div>,
+          document.body
+        )}
 
       {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
     </li>
+  );
+}
+
+/** The quest's default "icon": an empty checkbox (ticked once completed). */
+function CheckMark({ checked, isAdventure }: { checked: boolean; isAdventure: boolean }) {
+  return (
+    <span
+      className="flex h-9 w-9 items-center justify-center rounded-lg"
+      style={{
+        border: `2.5px solid ${isAdventure ? "#8a7250" : "var(--t-card-border)"}`,
+        background: checked ? (isAdventure ? "var(--t-xp)" : "var(--t-good)") : isAdventure ? "rgba(255,255,255,.35)" : "var(--t-card)",
+        boxShadow: isAdventure ? "inset 0 1px 2px rgba(0,0,0,.2)" : undefined,
+      }}
+    >
+      {checked && (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M5 12.5l4.5 4.5L19 7" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </span>
   );
 }
