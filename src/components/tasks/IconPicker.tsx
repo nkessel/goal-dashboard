@@ -270,7 +270,7 @@ export function IconPicker({
                 </p>
               )}
               {library && (
-                <div className="grid max-h-52 grid-cols-5 gap-1.5 overflow-y-auto">
+                <div className="grid max-h-52 grid-cols-5 gap-1.5 overflow-y-auto overflow-x-hidden p-1">
                   {filteredLibrary?.map((entry) => (
                     <div key={entry.id} className="group/tile relative">
                       <button
