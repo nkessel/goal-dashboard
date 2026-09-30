@@ -69,7 +69,7 @@ const ITEMS: {
   { href: "/boards", key: "grid", adventureIcon: "ui-grid.png", adventureLabel: "Goals", calmLabel: "Boards" },
   { href: "/", key: "now", adventureIcon: "ui-compass.png", adventureLabel: "Today's Quest", calmLabel: "Now" },
   { href: "/matrix", key: "target", adventureIcon: "ui-target.png", adventureLabel: "Priority", calmLabel: "Priority" },
-  { href: "/feed", key: "party", adventureIcon: "ui-party.png", adventureLabel: "Party", calmLabel: "Friends" },
+  { href: "/feed", key: "party", adventureIcon: "ui-party-simple.svg", adventureLabel: "Party", calmLabel: "Friends" },
 ];
 
 /** Index of the nav item a pathname belongs to, or -1 if it's not one of

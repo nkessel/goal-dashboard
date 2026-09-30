@@ -77,7 +77,7 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     const t = setTimeout(() => {
       html.removeAttribute("data-enter");
       pending?.resolve();
-    }, 320);
+    }, 460);
     return () => clearTimeout(t);
   }, [pathname]);
 
@@ -90,8 +90,11 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     const finished = new Promise<void>((r) => (resolve = r));
     pendingRef.current = { direction, resolve };
     html.setAttribute("data-nav-pending", direction);
-    if (direction === "nav-up") window.scrollTo({ top: 0, behavior: "smooth" });
-    startTransition(() => router.push(href));
+    // Leaving Settings: let it roll up out of view first, then swap screens.
+    const rollUp = direction === "nav-up" || direction === "settings-close";
+    const go = () => startTransition(() => router.push(href));
+    if (rollUp) setTimeout(go, 260);
+    else go();
     // Safety net: never leave the old screen dimmed if the route errors out.
     setTimeout(() => {
       if (pendingRef.current?.resolve === resolve) {

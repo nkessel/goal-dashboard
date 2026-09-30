@@ -109,7 +109,7 @@ export function XpSummary({
           <div className="flex min-w-0 flex-1 flex-col items-end gap-[18px] pt-2.5">
             <div className="flex flex-col gap-[18px]">
               <StatTile iconSrc="/design/ui-xpshield.png" value={stats?.xpThisWeek ?? 0} label={<>XP this<br />week</>} />
-              <StatTile iconSrc="/design/ui-partybig.png" value={stats?.partySize ?? 0} label="Party Size" />
+              <StatTile iconSrc="/design/ui-party-simple.svg" value={stats?.partySize ?? 0} label="Party Size" />
             </div>
           </div>
         </div>

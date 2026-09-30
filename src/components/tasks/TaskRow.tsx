@@ -139,6 +139,7 @@ export function TaskRow({
   return (
     <li
       ref={innerRef}
+      data-task-id={task.id}
       // Explicitly false when this row isn't itself a drag source, so a press
       // inside a goal card on Board Detail doesn't start dragging the goal.
       draggable={draggable ?? false}

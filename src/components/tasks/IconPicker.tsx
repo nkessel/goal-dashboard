@@ -44,6 +44,8 @@ export function IconPicker({
   centered?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // Fixed-position popover so a scrolling dialog can't clip it.
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const [tab, setTab] = useState<"library" | "ai">("library");
   const [query, setQuery] = useState("");
   const [library, setLibrary] = useState<TaskIconLibraryEntry[] | null>(null);
@@ -132,6 +134,12 @@ export function IconPicker({
         type="button"
         onClick={(e) => {
           e.stopPropagation(); // don't also trigger a card-level "click to edit"
+          const r = e.currentTarget.getBoundingClientRect();
+          const w = 288;
+          const left = Math.max(8, Math.min(window.innerWidth - w - 8, centered ? r.left + r.width / 2 - w / 2 : r.left));
+          const below = r.bottom + 6;
+          const top = below + 300 > window.innerHeight ? Math.max(8, r.top - 306) : below;
+          setPos({ top, left });
           setOpen((v) => !v);
         }}
         title="Click to change the avatar"
@@ -163,9 +171,10 @@ export function IconPicker({
       {open && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute z-30 w-72 rounded-xl p-2 shadow-lg ${centered ? "left-1/2 -translate-x-1/2" : "left-0"}`}
+          className="fixed z-[60] w-72 rounded-xl p-2 shadow-lg"
           style={{
-            top: size + 6,
+            top: pos.top,
+            left: pos.left,
             background: "var(--t-panel)",
             border: "1px solid var(--t-panel-border)",
             color: "var(--t-ink)",

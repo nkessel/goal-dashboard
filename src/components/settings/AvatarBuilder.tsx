@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import {
   generateAvatarImageAction,
   clearAvatarImageAction,
@@ -309,36 +310,61 @@ export function AvatarBuilder({
                 >
                   ×
                 </button>
-                {confirmRemove === entry.id && (
-                  <div
-                    role="alertdialog"
-                    aria-label="Delete this image from the library?"
-                    className="absolute left-1/2 top-full z-30 mt-1 flex w-44 -translate-x-1/2 flex-col gap-2 rounded-lg p-2.5 text-xs shadow-xl"
-                    style={{ background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)", border: `1px solid ${fieldBorder}`, color: inkColor }}
-                  >
-                    <p className="font-medium">Delete this image from the library?</p>
-                    <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => setConfirmRemove(null)} className="rounded-full px-2 py-1" style={{ color: inkSoft }}>
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setConfirmRemove(null);
-                          removeFromLibrary(entry.id);
-                        }}
-                        className="rounded-full px-2.5 py-1 font-semibold"
-                        style={{ background: "var(--t-warn)", color: "#fff" }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
         </div>
       </div>
+      {confirmRemove &&
+        createPortal(
+          <div
+            className="overlay-fade-in fixed inset-0 z-[60] flex items-center justify-center p-4"
+            style={{ background: "var(--t-overlay)" }}
+            onClick={() => setConfirmRemove(null)}
+          >
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-label="Delete this image from the library?"
+              onClick={(e) => e.stopPropagation()}
+              className="sheet-slide-up-in flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl p-4 text-center shadow-2xl"
+              style={{ background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `2px solid ${fieldBorder}`, color: inkColor }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- library image */}
+              <img
+                src={library.find((e) => e.id === confirmRemove)?.image_url}
+                alt=""
+                className="h-16 w-16 rounded-full object-cover"
+              />
+              <p className="text-[15px] font-semibold">Delete this image from the library?</p>
+              <p className="text-xs" style={{ color: inkSoft }}>
+                Anyone already using it keeps it as their avatar.
+              </p>
+              <div className="flex w-full gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmRemove(null)}
+                  className="h-10 flex-1 rounded-full text-sm"
+                  style={{ border: `1px solid ${fieldBorder}`, color: inkColor }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = confirmRemove;
+                    setConfirmRemove(null);
+                    removeFromLibrary(id);
+                  }}
+                  className="h-10 flex-1 rounded-full text-sm font-semibold"
+                  style={{ background: "var(--t-warn)", color: "#fff" }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

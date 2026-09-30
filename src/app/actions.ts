@@ -748,13 +748,25 @@ export async function createQuestAction(input: {
     iconSource: input.iconSource,
   });
   if (input.schedule) {
-    await tasksData.rescheduleTask(
-      task.id,
-      ownerId,
-      input.schedule.startISO,
-      input.schedule.endISO,
-      input.schedule.googleEventId
-    );
+    const session = await auth();
+    if (!input.schedule.googleEventId && session?.googleAccessToken) {
+      // New time picked in the quest editor: also put it on Google Calendar.
+      await attachCalendarEvent(
+        session.googleAccessToken,
+        ownerId,
+        task,
+        new Date(input.schedule.startISO),
+        new Date(input.schedule.endISO)
+      );
+    } else {
+      await tasksData.rescheduleTask(
+        task.id,
+        ownerId,
+        input.schedule.startISO,
+        input.schedule.endISO,
+        input.schedule.googleEventId
+      );
+    }
   }
   if (input.pinToBattle) {
     await tasksData.setManualPriority(task.id, ownerId, true);

@@ -341,7 +341,7 @@ html[data-transition="settings-close"]::view-transition-new(root) {
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: none;
     opacity: 1;
   }
 }
@@ -429,9 +429,15 @@ html[data-transition="settings-close"]::view-transition-new(root) {
    direction and a thin gold bar runs across the top. */
 html[data-nav-pending="nav-forward"] main { animation: nav-exit-left 220ms ease-in both; }
 html[data-nav-pending="nav-back"] main { animation: nav-exit-right 220ms ease-in both; }
-html[data-nav-pending="nav-up"] main { animation: nav-exit-up 240ms ease-in both; }
+html[data-nav-pending="nav-up"] main,
+html[data-nav-pending="settings-close"] main { animation: settings-roll-up 260ms cubic-bezier(.4,0,.6,1) forwards; }
 html[data-nav-pending="fade"] main,
-html[data-nav-pending="settings-close"] main { opacity: .5; transition: opacity 150ms ease; }
+html[data-nav-pending="settings-open"] main { opacity: .6; transition: opacity 150ms ease; }
+/* Settings unrolls downward when opened and rolls back up when closed — the
+   edge moves, the content itself stays put. */
+html[data-enter="settings-open"] main { animation: settings-unroll 420ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes settings-unroll { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes settings-roll-up { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 100% 0); } }
 @keyframes nav-exit-left { to { transform: translateX(-12%); opacity: .25; } }
 @keyframes nav-exit-right { to { transform: translateX(12%); opacity: .25; } }
 @keyframes nav-exit-up { to { transform: translateY(-18%); opacity: 0; } }
@@ -447,8 +453,8 @@ html[data-nav-pending] .nav-progress { opacity: 1; animation: nav-progress 2.5s 
 @keyframes nav-progress { from { width: 0; } to { width: 88%; } }
 html[data-enter="nav-forward"] main { animation: nav-enter-right 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 html[data-enter="nav-back"] main { animation: nav-enter-left 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-html[data-enter="fade"] main,
-html[data-enter="settings-close"] main { animation: board-expand-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+html[data-enter="fade"] main { animation: board-expand-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+html[data-enter="settings-close"] main { animation: overlay-fade-in 220ms ease both; }
 @keyframes nav-enter-right { from { transform: translateX(40%); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes nav-enter-left { from { transform: translateX(-40%); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
@@ -467,3 +473,17 @@ html[data-enter="settings-close"] main { animation: board-expand-in 260ms cubic-
 }
 .qc-card-check { animation: qc-card-check 700ms linear both; }
 @media (prefers-reduced-motion: reduce) { .qc-card-check { animation: none; } }
+
+/* Quest editor opened from the floating + : rises out of the button, sinks back into it. */
+@keyframes qe-rise-in {
+  from { transform: translateY(42vh) scale(.12); opacity: 0; }
+  60% { opacity: 1; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes qe-sink-out {
+  from { transform: none; opacity: 1; }
+  to { transform: translateY(42vh) scale(.12); opacity: 0; }
+}
+.qe-rise-in { animation: qe-rise-in 320ms cubic-bezier(.2,.8,.2,1) both; transform-origin: 50% 100%; }
+.qe-sink-out { animation: qe-sink-out 260ms cubic-bezier(.4,0,1,1) both; transform-origin: 50% 100%; }
+@media (prefers-reduced-motion: reduce) { .qe-rise-in, .qe-sink-out { animation: none; } }

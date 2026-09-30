@@ -293,6 +293,7 @@ export function TodayTaskBoard({
             the clickable header, where it belongs. */}
         <details className="group rounded-xl" open={otherOpen} onToggle={(e) => setOtherOpen(e.currentTarget.open)}>
           <summary
+            data-quest-dropzone="other"
             className="hover-glow relative flex cursor-pointer list-none items-center justify-center rounded-xl px-4 py-3"
             style={{
               background: isAdventure ? "rgba(0,0,0,.28)" : "var(--t-card)",

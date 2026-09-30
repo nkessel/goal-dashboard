@@ -20,7 +20,7 @@ export function TopRightAvatar({
   const pathname = usePathname();
   if (pathname.startsWith("/settings")) return <CloseSettingsButton isAdventure={isAdventure} size={40} />;
   return (
-    <ViewTransitionLink href="/settings" ariaLabel={`Settings — signed in as ${label}`} className="hover-glow rounded-full">
+    <ViewTransitionLink href="/settings" transition="settings-open" ariaLabel={`Settings — signed in as ${label}`} className="hover-glow rounded-full">
       <Avatar profile={profile} size={10} />
     </ViewTransitionLink>
   );

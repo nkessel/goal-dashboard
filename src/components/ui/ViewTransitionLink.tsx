@@ -18,6 +18,7 @@ export function ViewTransitionLink({
   children,
   draggable,
   ariaLabel,
+  transition,
 }: {
   href: string;
   className?: string;
@@ -25,12 +26,15 @@ export function ViewTransitionLink({
   children: ReactNode;
   draggable?: boolean;
   ariaLabel?: string;
+  /** Named screen animation (see globals.css data-enter / data-nav-pending rules). */
+  transition?: string;
 }) {
   const navigate = useViewTransitionNavigate();
 
   function handleClick(e: MouseEvent<HTMLAnchorElement>) {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // let opens-in-new-tab work normally
     e.preventDefault();
+    if (transition) document.documentElement.setAttribute("data-transition", transition);
     navigate(href);
   }
 

@@ -36,7 +36,14 @@ export function AddTaskForm({
           <FloatingActionButton onClick={() => setOpen(true)} label={`Add ${isAdventure ? "quest" : "task"}`} theme={theme} />
         )
       )}
-      {open && <QuestEditorDialog mode={{ kind: "create", goalId }} theme={theme} onClose={() => setOpen(false)} />}
+      {open && (
+        <QuestEditorDialog
+          mode={{ kind: "create", goalId }}
+          theme={theme}
+          origin={goalId ? "center" : "fab"}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }
