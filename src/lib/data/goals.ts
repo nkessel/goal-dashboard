@@ -9,10 +9,28 @@ export async function listGoalsForBoard(boardId: string): Promise<Goal[]> {
     .from("goals")
     .select("*")
     .eq("board_id", boardId)
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(`Failed to list goals: ${error.message}`);
   return data ?? [];
+}
+
+/**
+ * Persists a new drag-and-drop order for a board's goals: `orderedIds` is
+ * the full list of that board's goal ids in their new display order, each
+ * getting its `sort_order` set to its index. Scoped by both board_id and
+ * owner_id as a safety check.
+ */
+export async function updateGoalOrder(boardId: string, ownerId: string, orderedIds: string[]): Promise<void> {
+  const db = supabaseAdmin();
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      db.from("goals").update({ sort_order: index }).eq("id", id).eq("board_id", boardId).eq("owner_id", ownerId)
+    )
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(`Failed to reorder goals: ${failed.error.message}`);
 }
 
 export async function getGoal(

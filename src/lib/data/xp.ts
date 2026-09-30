@@ -40,15 +40,13 @@ export function xpToNextLevel(totalXp: number): { level: number; nextLevel: numb
   };
 }
 
-// Levels 4-7 (functional tier): weekly budget bump + a streak-protection
-// token, each granted once, the moment that level is first reached.
-const FUNCTIONAL_TIER_BUDGET_BONUS = 20;
+// Levels 4-7 (functional tier): a streak-protection token, granted once,
+// the moment that level is first reached.
 const FUNCTIONAL_TIER_LEVELS = [4, 5, 6, 7];
 
 export function getLevelPerks(level: number): string[] {
   const perks: string[] = [];
   if (level >= 1) perks.push("New avatar gear + minimal-mode color palettes unlock as you climb levels 1-3.");
-  if (level >= 4) perks.push(`+${FUNCTIONAL_TIER_BUDGET_BONUS} weekly XP budget per level through 7.`);
   if (level >= 4) perks.push("A streak-protection token per level through 7 (guards one missed check-in day).");
   if (level >= 8) perks.push("Rare monster icons for tasks unlock.");
   if (level >= 8) perks.push(`Your feed flair: "Level ${level} Adventurer" next to comments/reactions.`);
@@ -67,57 +65,22 @@ export function currentWeekStart(): string {
   return mondayOf(new Date());
 }
 
-export async function getWeeklyAllocated(ownerId: string, weekStart: string): Promise<number> {
+/**
+ * Total XP actually earned this week (sum of all xp_events amounts for the
+ * given week_start) — the "XP this week" stat on the Today's Quest header.
+ * Distinct from the old weekly XP *budget* concept (removed): this is just
+ * a read of what was earned, with no cap or enforcement attached.
+ */
+export async function getWeeklyXpEarned(ownerId: string, weekStart: string): Promise<number> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("xp_events")
     .select("amount")
     .eq("owner_id", ownerId)
-    .eq("kind", "task_assigned")
     .eq("week_start", weekStart);
 
-  if (error) throw new Error(`Failed to load weekly XP allocation: ${error.message}`);
+  if (error) throw new Error(`Failed to load weekly XP: ${error.message}`);
   return (data ?? []).reduce((sum, row) => sum + row.amount, 0);
-}
-
-/**
- * Enforces the weekly XP budget (spec: "users have a fixed pool of points
- * to distribute across tasks per week") before letting a new task claim
- * XP. Throws if the assignment would exceed the remaining budget.
- */
-export async function recordTaskXpAssignment(
-  ownerId: string,
-  taskId: string,
-  amount: number
-): Promise<void> {
-  if (amount <= 0) return;
-
-  const db = supabaseAdmin();
-  const { data: profile, error: profileErr } = await db
-    .from("profiles")
-    .select("weekly_xp_budget")
-    .eq("id", ownerId)
-    .single();
-  if (profileErr) throw new Error(`Failed to load profile budget: ${profileErr.message}`);
-
-  const weekStart = currentWeekStart();
-  const allocated = await getWeeklyAllocated(ownerId, weekStart);
-  const remaining = profile.weekly_xp_budget - allocated;
-
-  if (amount > remaining) {
-    throw new Error(
-      `That task's XP (${amount}) would exceed your weekly budget — you have ${Math.max(remaining, 0)} XP left to assign this week.`
-    );
-  }
-
-  const { error } = await db.from("xp_events").insert({
-    owner_id: ownerId,
-    task_id: taskId,
-    kind: "task_assigned",
-    amount,
-    week_start: weekStart,
-  });
-  if (error) throw new Error(`Failed to record XP assignment: ${error.message}`);
 }
 
 export type XpAwardResult = {
@@ -162,13 +125,11 @@ export async function awardXp(
   const newLevel = computeLevelForXp(newTotal);
   const leveledUp = newLevel > profile.level;
 
-  let budgetDelta = 0;
   let tokenDelta = 0;
   const unlockedPerks: string[] = [];
   if (leveledUp) {
     for (let l = profile.level + 1; l <= newLevel; l++) {
       if (FUNCTIONAL_TIER_LEVELS.includes(l)) {
-        budgetDelta += FUNCTIONAL_TIER_BUDGET_BONUS;
         tokenDelta += 1;
       }
     }
@@ -180,7 +141,6 @@ export async function awardXp(
     .update({
       total_xp: newTotal,
       level: newLevel,
-      weekly_xp_budget: profile.weekly_xp_budget + budgetDelta,
       streak_protection_tokens: profile.streak_protection_tokens + tokenDelta,
     })
     .eq("id", ownerId);

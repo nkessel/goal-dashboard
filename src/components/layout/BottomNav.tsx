@@ -1,0 +1,268 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import { useViewTransitionNavigate } from "@/components/ui/ViewTransitionProvider";
+
+type Theme = "calm" | "adventure";
+
+/**
+ * Simple line icons for Calm (per HANDOFF.md "Theme switching" §3 — Calm
+ * keeps hand-drawn SVGs, only Adventure swaps to the painted ui-*.png set).
+ */
+function calmIcon(name: string, color: string) {
+  switch (name) {
+    case "calendar":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="5" width="18" height="16" rx="2" stroke={color} strokeWidth="1.6" />
+          <path d="M3 9h18M8 3v4M16 3v4" stroke={color} strokeWidth="1.6" />
+        </svg>
+      );
+    case "grid":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="4" y="4" width="7" height="7" rx="1.5" stroke={color} strokeWidth="1.6" />
+          <rect x="13" y="4" width="7" height="7" rx="1.5" stroke={color} strokeWidth="1.6" />
+          <rect x="4" y="13" width="7" height="7" rx="1.5" stroke={color} strokeWidth="1.6" />
+          <rect x="13" y="13" width="7" height="7" rx="1.5" stroke={color} strokeWidth="1.6" />
+        </svg>
+      );
+    case "now":
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="4.5" fill={color} />
+        </svg>
+      );
+    case "target":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="8" stroke={color} strokeWidth="1.6" />
+          <circle cx="12" cy="12" r="4.8" stroke={color} strokeWidth="1.6" />
+          <circle cx="12" cy="12" r="1.6" fill={color} />
+        </svg>
+      );
+    default:
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="9" cy="9" r="3" stroke={color} strokeWidth="1.6" />
+          <circle cx="17" cy="10" r="2.3" stroke={color} strokeWidth="1.6" />
+          <path d="M4 19c.5-3 2.5-5 5-5s4.5 2 5 5" stroke={color} strokeWidth="1.6" fill="none" />
+          <path d="M14.5 19c.3-2.2 1.8-3.8 3.5-3.8" stroke={color} strokeWidth="1.6" fill="none" />
+        </svg>
+      );
+  }
+}
+
+const ITEMS: {
+  href: string;
+  key: "calendar" | "grid" | "now" | "target" | "party";
+  /** Deliberate divergence from mockup.png, per HANDOFF.md §5: Goals/Boards
+   * uses ui-grid (four squares), Priority uses ui-target (bullseye) — the
+   * opposite of the original painted reference. Keep it this way. */
+  adventureIcon: string;
+  adventureLabel: string;
+  calmLabel: string;
+}[] = [
+  { href: "/calendar", key: "calendar", adventureIcon: "ui-scroll.png", adventureLabel: "Calendar", calmLabel: "Calendar" },
+  { href: "/boards", key: "grid", adventureIcon: "ui-grid.png", adventureLabel: "Goals", calmLabel: "Boards" },
+  { href: "/", key: "now", adventureIcon: "ui-compass.png", adventureLabel: "Today's Quest", calmLabel: "Now" },
+  { href: "/matrix", key: "target", adventureIcon: "ui-target.png", adventureLabel: "Priority", calmLabel: "Priority" },
+  { href: "/feed", key: "party", adventureIcon: "ui-party.png", adventureLabel: "Party", calmLabel: "Friends" },
+];
+
+/** Index of the nav item a pathname belongs to, or -1 if it's not one of
+ * the main tabs (a detail page, settings, etc). */
+function navIndex(pathname: string) {
+  return ITEMS.findIndex((item) => (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)));
+}
+
+export function BottomNav({ theme }: { theme: Theme }) {
+  const pathname = usePathname();
+  const navigateWithTransition = useViewTransitionNavigate();
+  const isAdventure = theme === "adventure";
+
+  const rowRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+  const [highlight, setHighlight] = useState<{ left: number; width: number } | null>(null);
+
+  // Measure the active item's position within the row and slide the
+  // highlight box there — kept in sync with `pathname` so it moves at the
+  // same moment the screen-level view transition kicks off (see navigate()
+  // below), not just when this component happens to re-render.
+  useLayoutEffect(() => {
+    const activeIndex = navIndex(pathname);
+    const row = rowRef.current;
+    const el = itemRefs.current[activeIndex];
+    if (!row || !el) {
+      setHighlight(null);
+      return;
+    }
+    const measure = () => {
+      const rowRect = row.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      setHighlight({ left: elRect.left - rowRect.left, width: elRect.width });
+    };
+    measure();
+    // Icon size (and therefore item width) changes slightly between
+    // active/inactive in Adventure mode, and the row can reflow on resize —
+    // recheck on both so the box never drifts out of alignment.
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [pathname, isAdventure]);
+
+  // Whole screen slides in from the right when moving to a tab further
+  // right in the nav order, or from the left when moving to one further
+  // left — a low-key sense of spatial direction, layered on the browser's
+  // native View Transitions API (progressively enhanced; a plain navigation
+  // everywhere else). Scoped with the `data-transition` attribute so it
+  // doesn't fight the existing board-detail expand/fade transition, which
+  // also animates ::view-transition-old/new(root). Actual promise timing
+  // (so the transition animates real content instead of a stale frame) is
+  // handled centrally by ViewTransitionProvider.
+  function navigate(e: MouseEvent<HTMLAnchorElement>, href: string) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // let opens-in-new-tab work normally
+    if (href === pathname) {
+      // Already there — swallow the tap instead of letting Link perform a
+      // real (if same-URL) navigation, which was refetching/flashing the
+      // page for no visible benefit and looked like a stray "blip" on
+      // repeated taps of the current tab.
+      e.preventDefault();
+      return;
+    }
+    e.preventDefault();
+    const fromIndex = navIndex(pathname);
+    const toIndex = navIndex(href);
+    const direction = fromIndex >= 0 && toIndex >= 0 && toIndex < fromIndex ? "nav-back" : "nav-forward";
+    document.documentElement.setAttribute("data-transition", direction);
+    const transition = navigateWithTransition(href);
+    if (transition) {
+      transition.finished.finally(() => {
+        document.documentElement.removeAttribute("data-transition");
+      });
+    } else {
+      document.documentElement.removeAttribute("data-transition");
+    }
+  }
+
+  return (
+    <nav
+      className="fixed inset-x-0 bottom-0 z-30 flex w-full items-stretch justify-between"
+      style={{
+        // Full-width bar anchored to the bottom (HANDOFF.md §4) — not a
+        // floating pill. Adventure gets the nav-strip.jpg texture tiled
+        // horizontally, with a flat colour fallback while it loads/if it
+        // fails; Calm keeps the plain card surface.
+        background: isAdventure
+          ? `#262c23 url("/design/nav-strip.jpg")`
+          : "var(--t-card)",
+        backgroundSize: isAdventure ? "auto 100%" : undefined,
+        backgroundRepeat: isAdventure ? "repeat-x" : undefined,
+        borderTop: isAdventure ? "1px solid var(--t-nav-line)" : "1px solid var(--t-card-border)",
+        paddingBottom: "max(10px, env(safe-area-inset-bottom))",
+        paddingTop: 8,
+        // AppShell (and therefore this nav) is re-mounted fresh on every
+        // route change rather than living in a persistent layout, so
+        // without its own name it gets flattened into the page-wide
+        // ::view-transition-old/new(root) snapshot pair and visibly
+        // slides/fades along with the page content on every tap — which is
+        // what reads as "the navbar is buggy". Giving it a stable name
+        // pulls it out of that group; see globals.css for the matching
+        // rule that keeps it fully static instead of the UA's default
+        // crossfade.
+        viewTransitionName: "app-bottom-nav",
+      }}
+    >
+      <div ref={rowRef} className="relative mx-auto flex w-full max-w-md items-stretch justify-between px-1 sm:max-w-lg">
+        {highlight && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute transition-[left,width] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+            style={{
+              left: highlight.left,
+              width: highlight.width,
+              top: isAdventure ? 4 : 6,
+              bottom: isAdventure ? 4 : 6,
+              borderRadius: isAdventure ? 10 : 999,
+              zIndex: 0,
+              ...(isAdventure
+                ? {
+                    border: "2px solid var(--t-gold)",
+                    background: "linear-gradient(180deg, var(--t-active-1), var(--t-active-2))",
+                    boxShadow:
+                      "inset 0 1px 0 rgba(255,235,180,.22), inset 0 -6px 12px rgba(0,0,0,.35), 0 2px 7px rgba(0,0,0,.45)",
+                  }
+                : { background: "var(--t-accent-soft)" }),
+            }}
+          />
+        )}
+        {ITEMS.map((item, i) => {
+          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const label = isAdventure ? item.adventureLabel : item.calmLabel;
+
+          return (
+            <div key={item.href} className="relative flex items-stretch" style={{ zIndex: 1 }}>
+              {i > 0 && (
+                <div
+                  aria-hidden
+                  className="self-stretch"
+                  style={{
+                    width: 1,
+                    margin: "7px 0",
+                    background: isAdventure ? "rgba(214,200,150,.1)" : "var(--t-card-border)",
+                  }}
+                />
+              )}
+              <Link
+                href={item.href}
+                onClick={(e) => navigate(e, item.href)}
+                ref={(el) => {
+                  itemRefs.current[i] = el;
+                }}
+                className="flex min-h-11 min-w-11 flex-1 flex-col items-center justify-end gap-1 px-2 py-1.5 transition-transform duration-150 hover:scale-110 active:scale-95"
+              >
+                {isAdventure ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- static asset from /public, decorative-only nav glyph */}
+                    <img
+                      src={`/design/${item.adventureIcon}`}
+                      alt=""
+                      width={active ? 32 : 29}
+                      height={active ? 32 : 29}
+                      style={{ display: "block" }}
+                    />
+                    <span
+                      className="font-display whitespace-nowrap"
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: active ? 700 : 400,
+                        color: active ? "var(--t-cream)" : "var(--t-nav-inactive)",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  </>
+                ) : active ? (
+                  <>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full">
+                      {calmIcon(item.key, "var(--t-accent)")}
+                    </div>
+                    <span style={{ fontSize: 9, color: "var(--t-accent)", fontWeight: 700, whiteSpace: "nowrap" }}>
+                      {label}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {calmIcon(item.key, "var(--t-ink-soft)")}
+                    <span style={{ fontSize: 9, color: "var(--t-ink-soft)", whiteSpace: "nowrap" }}>{label}</span>
+                  </>
+                )}
+              </Link>
+            </div>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}

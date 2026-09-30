@@ -1,13 +1,15 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
-import { getBoard } from "@/lib/data/boards";
+import { getBoard, getBoardAncestors, listBoardsWithStatsForOwner } from "@/lib/data/boards";
+import { getProfileById } from "@/lib/data/profiles";
 import { listGoalsForBoard } from "@/lib/data/goals";
 import { listTasksForGoal } from "@/lib/data/tasks";
-import { CreateGoalForm } from "@/components/goals/CreateGoalForm";
-import { GoalProgressControl } from "@/components/goals/GoalProgressControl";
-import { AddTaskForm } from "@/components/tasks/AddTaskForm";
-import { TaskRow } from "@/components/tasks/TaskRow";
+import { BoardFabMenu } from "@/components/boards/BoardFabMenu";
+import { BoardGrid } from "@/components/boards/BoardGrid";
+import { GoalList } from "@/components/goals/GoalList";
+import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
 
 export default async function BoardDetailPage({
   params,
@@ -17,10 +19,17 @@ export default async function BoardDetailPage({
   const { boardId } = await params;
   const session = await requireSession();
 
-  const board = await getBoard(boardId, session.user.id);
+  const [board, profile] = await Promise.all([
+    getBoard(boardId, session.user.id),
+    getProfileById(session.user.id),
+  ]);
   if (!board) notFound();
 
-  const goals = await listGoalsForBoard(boardId);
+  const [goals, ancestors, subBoards] = await Promise.all([
+    listGoalsForBoard(boardId),
+    getBoardAncestors(boardId, session.user.id),
+    listBoardsWithStatsForOwner(session.user.id, boardId),
+  ]);
   const goalsWithTasks = await Promise.all(
     goals.map(async (goal) => ({
       goal,
@@ -28,61 +37,97 @@ export default async function BoardDetailPage({
     }))
   );
 
+  const theme = profile?.theme ?? "calm";
+  const isAdventure = theme === "adventure";
+  const allTasks = goalsWithTasks.flatMap((g) => g.tasks);
+  const doneCount = allTasks.filter((t) => t.status === "completed").length;
+  const xpEarned = allTasks
+    .filter((t) => t.status === "completed")
+    .reduce((sum, t) => sum + t.xp_value, 0);
+  // Nested one level up: back goes to the immediate parent board instead of
+  // always the top-level Boards list, so drilling down and backing out
+  // retraces the same path.
+  const backHref = board.parent_board_id ? `/boards/${board.parent_board_id}` : "/boards";
+
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
-      <div className="mx-auto flex max-w-2xl flex-col gap-6">
-        <div>
-          <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            {board.title}
-            {board.is_private && (
-              <span className="ml-2 text-xs text-zinc-400">🔒 private</span>
-            )}
-          </h1>
-          {board.description && (
-            <p className="text-sm text-zinc-500">{board.description}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-4">
-          {goalsWithTasks.map(({ goal, tasks }) => (
-            <div
-              key={goal.id}
-              className="flex flex-col gap-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-            >
-              <div>
-                <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                  {goal.title}
-                  {goal.is_private && (
-                    <span className="ml-2 text-xs text-zinc-400">
-                      🔒 private
-                    </span>
-                  )}
-                </p>
-                {goal.description && (
-                  <p className="text-sm text-zinc-500">{goal.description}</p>
-                )}
-              </div>
-
-              <GoalProgressControl
-                goalId={goal.id}
-                boardId={board.id}
-                initialProgress={goal.progress}
+      <div className="flex flex-col gap-5">
+        {ancestors.length > 0 && (
+          <div className="-mb-2 flex flex-wrap items-center gap-1 text-xs" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.7 : 1 }}>
+            <Link href="/boards" className="hover-glow underline-offset-2 hover:underline">
+              {isAdventure ? "Quest Boards" : "Boards"}
+            </Link>
+            {ancestors.map((a) => (
+              <span key={a.id} className="flex items-center gap-1">
+                <span>/</span>
+                <Link href={`/boards/${a.id}`} className="hover-glow underline-offset-2 hover:underline">
+                  {a.title}
+                </Link>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-2.5">
+          <ViewTransitionLink href={backHref} ariaLabel="Back" className="hover-glow rounded-full p-1">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 5l-7 7 7 7"
+                stroke={isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)"}
+                strokeWidth="2"
+                fill="none"
               />
-
-              {tasks.length > 0 && (
-                <ul className="flex flex-col gap-2">
-                  {tasks.map((task) => (
-                    <TaskRow key={task.id} task={task} />
-                  ))}
-                </ul>
-              )}
-
-              <AddTaskForm goalId={goal.id} />
+            </svg>
+          </ViewTransitionLink>
+          <div
+            className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm"
+            style={{
+              border: isAdventure ? "2px solid var(--t-panel-border)" : undefined,
+              background: isAdventure ? undefined : "var(--t-accent-soft)",
+            }}
+          >
+            {isAdventure ? "🗺️" : "✦"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1
+              className={isAdventure ? "font-display truncate text-lg" : "truncate text-lg font-extrabold"}
+              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
+            >
+              {board.title}
+              {board.is_private && <span className="ml-1.5 text-xs font-normal">🔒</span>}
+            </h1>
+            <div
+              className="text-[11.5px]"
+              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.65 : 1 }}
+            >
+              {doneCount} of {allTasks.length} quests · {xpEarned} {isAdventure ? "XP" : "pts"} earned
             </div>
-          ))}
+          </div>
         </div>
 
-        <CreateGoalForm boardId={board.id} />
+        {board.description && (
+          <p
+            className="-mt-3 text-sm"
+            style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.75 : 1 }}
+          >
+            {board.description}
+          </p>
+        )}
+
+        {subBoards.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h2
+              className={isAdventure ? "font-display text-sm" : "text-sm font-bold"}
+              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)", opacity: isAdventure ? 0.85 : 1 }}
+            >
+              {isAdventure ? "Sub quest-boards" : "Sub-boards"}
+            </h2>
+            <BoardGrid boards={subBoards} theme={theme} parentBoardId={board.id} />
+          </div>
+        )}
+
+        <GoalList boardId={board.id} boardTitle={board.title} goalsWithTasks={goalsWithTasks} theme={theme} />
+
+        <BoardFabMenu boardId={board.id} theme={theme} />
       </div>
     </AppShell>
   );

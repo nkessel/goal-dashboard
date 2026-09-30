@@ -1,22 +1,36 @@
 import { auth, signIn } from "@/auth";
 import { AppShell } from "@/components/layout/AppShell";
-import { TaskRow } from "@/components/tasks/TaskRow";
+import { TodayTaskBoard } from "@/components/tasks/TodayTaskBoard";
 import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 import { XpSummary } from "@/components/xp/XpSummary";
-import { listOpenTasksForOwner, listCompletedTasksForOwner } from "@/lib/data/tasks";
+import {
+  listOpenTasksForOwnerWithCategory,
+  listCompletedTasksForOwner,
+  countCompletedTasksForOwner,
+} from "@/lib/data/tasks";
 import { getProfileById } from "@/lib/data/profiles";
-import { getWeeklyAllocated, currentWeekStart } from "@/lib/data/xp";
+import { getWeeklyXpEarned, currentWeekStart } from "@/lib/data/xp";
+import { listFriendIds } from "@/lib/data/friendships";
 
 export default async function Home() {
   const session = await auth();
 
   if (!session?.user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-zinc-50 p-8 font-sans dark:bg-black">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Goal Dashboard
-        </h1>
+      <div
+        data-theme="adventure"
+        className="flex min-h-screen flex-col items-center justify-center gap-8 p-8"
+      >
+        <div className="flex flex-col items-center gap-2 text-center">
+          <h1 className="font-display text-3xl" style={{ color: "var(--t-cream)" }}>
+            Goal Dashboard
+          </h1>
+          <p className="max-w-xs text-sm" style={{ color: "var(--t-cream)", opacity: 0.75 }}>
+            Turn your to-do list into a daily quest log — track tasks, earn XP, and share progress
+            with friends.
+          </p>
+        </div>
         <form
           action={async () => {
             "use server";
@@ -25,7 +39,8 @@ export default async function Home() {
         >
           <button
             type="submit"
-            className="rounded-full bg-foreground px-6 py-3 text-sm font-medium text-background hover:bg-[#383838] dark:hover:bg-[#ccc]"
+            className="font-display rounded-full px-6 py-3 text-sm font-bold"
+            style={{ background: "var(--t-gold)", color: "#3b2a10" }}
           >
             Sign in with Google
           </button>
@@ -34,87 +49,60 @@ export default async function Home() {
     );
   }
 
-  const [openTasks, completedTasks, profile] = await Promise.all([
-    listOpenTasksForOwner(session.user.id),
+  const [openTasks, completedTasks, profile, questsComplete, xpThisWeek, friendIds] = await Promise.all([
+    listOpenTasksForOwnerWithCategory(session.user.id),
     listCompletedTasksForOwner(session.user.id),
     getProfileById(session.user.id),
+    countCompletedTasksForOwner(session.user.id),
+    getWeeklyXpEarned(session.user.id, currentWeekStart()),
+    listFriendIds(session.user.id),
   ]);
-  const weeklyAllocated = profile ? await getWeeklyAllocated(session.user.id, currentWeekStart()) : 0;
-
   const topPriorities = openTasks.filter((t) => t.is_manual_priority);
   const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
-  const today = new Date().toISOString().slice(0, 10);
-  const alreadyCheckedInToday = profile?.last_check_in_at?.slice(0, 10) === today;
   const theme = profile?.theme ?? "calm";
   const isAdventure = theme === "adventure";
 
+  const victoriesStyle = {
+    background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
+    border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+  };
+
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
-      <div className="mx-auto flex max-w-2xl flex-col gap-8">
+      <div className="flex flex-col gap-6">
         {profile && (
           <section>
             <XpSummary
               profile={profile}
-              weeklyAllocated={weeklyAllocated}
-              alreadyCheckedInToday={alreadyCheckedInToday}
+              stats={{ questsComplete, xpThisWeek, partySize: friendIds.length }}
             />
           </section>
         )}
 
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            {isAdventure ? "⚔️ Today's Battle" : "Today's Priorities"}
-            <span className="ml-2 text-sm font-normal text-zinc-500">
-              ({topPriorities.length}/3)
-            </span>
-          </h2>
-          {topPriorities.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700">
-              {isAdventure
-                ? "No monsters queued yet — join up to 3 tasks below to enter today's battle."
-                : "Nothing pinned yet — pin up to 3 tasks below to curate today's focus."}
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {topPriorities.map((task) => (
-                <TaskRow key={task.id} task={task} theme={theme} />
-              ))}
-            </ul>
-          )}
-        </section>
+        <TodayTaskBoard priorityTasks={topPriorities} otherTasks={otherTasks} theme={theme} />
 
         <section>
-          <AddTaskForm
-            remainingXpBudget={profile ? Math.max(0, profile.weekly_xp_budget - weeklyAllocated) : undefined}
-          />
+          <AddTaskForm theme={theme} />
         </section>
 
-        <section>
-          <details className="group" open={otherTasks.length > 0 && topPriorities.length === 0}>
-            <summary className="cursor-pointer text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-              All other tasks ({otherTasks.length})
-            </summary>
-            <ul className="mt-3 flex flex-col gap-2">
-              {otherTasks.map((task) => (
-                <TaskRow key={task.id} task={task} theme={theme} />
-              ))}
-              {otherTasks.length === 0 && (
-                <p className="text-sm text-zinc-500">Nothing here — nice.</p>
-              )}
-            </ul>
-          </details>
-        </section>
-
-        <section>
-          <h2 className="mb-2 text-sm font-semibold text-zinc-500">
-            Completed
-          </h2>
-          <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+        <section className="flex flex-col gap-2.5 rounded-2xl px-4 py-3.5" style={victoriesStyle}>
+          <div className="flex items-center justify-center gap-2 text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
+            {isAdventure && (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 2l2 5 5 .5-4 3.6 1.1 5.4L12 13.9 7.9 16.5 9 11.1 5 7.5 10 7z"
+                  fill="var(--t-gold-deep)"
+                />
+              </svg>
+            )}
+            {isAdventure ? "Victories Today" : "Completed today"}
+          </div>
+          <ul className="flex flex-col gap-1">
             {completedTasks.map((task) => (
-              <CompletedTaskRow key={task.id} task={task} />
+              <CompletedTaskRow key={task.id} task={task} theme={theme} />
             ))}
             {completedTasks.length === 0 && (
-              <p className="py-2 text-sm text-zinc-400">
+              <p className="py-1 text-sm" style={{ color: "var(--t-ink-soft)" }}>
                 Nothing completed yet today — you&apos;ve got this.
               </p>
             )}

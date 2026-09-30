@@ -57,22 +57,55 @@ export async function updateProfileTheme(
   return data;
 }
 
-export async function updateProfileAvatar(
-  id: string,
-  input: { base: string; color: string; accessory: string | null }
-): Promise<Profile> {
+/**
+ * Default visibility for the profile's activity/boards/goals on the friend
+ * feed and directory. Individual boards/goals can still override this with
+ * their own is_private flag.
+ */
+export async function updateProfilePrivacy(id: string, isPublic: boolean): Promise<Profile> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("profiles")
-    .update({
-      avatar_base: input.base,
-      avatar_color: input.color,
-      avatar_accessory: input.accessory,
-    })
+    .update({ is_public: isPublic })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Failed to update privacy: ${error.message}`);
+  return data;
+}
+
+/**
+ * Sets (or clears, with `url: null`) the user's avatar image — either one
+ * they just generated or one they picked from the shared library.
+ */
+export async function updateProfileAvatarImage(id: string, url: string | null): Promise<Profile> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("profiles")
+    .update({ avatar_image_url: url })
     .eq("id", id)
     .select("*")
     .single();
 
   if (error) throw new Error(`Failed to update avatar: ${error.message}`);
+  return data;
+}
+
+/**
+ * Updates the display name shown on the Friend Feed, in comments, and atop
+ * the Settings profile card — the "character name" field in the avatar
+ * editor.
+ */
+export async function updateProfileName(id: string, name: string): Promise<Profile> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("profiles")
+    .update({ name })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Failed to update name: ${error.message}`);
   return data;
 }

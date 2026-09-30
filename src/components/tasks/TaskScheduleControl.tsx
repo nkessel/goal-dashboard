@@ -20,13 +20,20 @@ function formatSlot(slot: Slot) {
   return `${dayLabel} · ${timeLabel}`;
 }
 
-export function TaskScheduleControl({ task }: { task: Task }) {
+export function TaskScheduleControl({ task, theme = "calm" }: { task: Task; theme?: "calm" | "adventure" }) {
   const [open, setOpen] = useState(false);
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [manualStart, setManualStart] = useState("");
   const [manualEnd, setManualEnd] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const isAdventure = theme === "adventure";
+
+  const fieldStyle = {
+    borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
+    background: isAdventure ? "var(--t-panel-2)" : "var(--t-bg)",
+    color: "var(--t-ink)",
+  };
 
   function openAndFetch() {
     setOpen(true);
@@ -75,7 +82,8 @@ export function TaskScheduleControl({ task }: { task: Task }) {
       <button
         type="button"
         onClick={openAndFetch}
-        className="rounded-full border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+        className="hover-glow self-start rounded-full border px-3 py-1 text-xs font-medium"
+        style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}
       >
         {task.is_on_calendar ? "📅 Reschedule" : "📅 Pull to calendar"}
       </button>
@@ -83,16 +91,29 @@ export function TaskScheduleControl({ task }: { task: Task }) {
   }
 
   return (
-    <div className="w-full rounded-lg border border-zinc-200 bg-white p-3 text-xs dark:border-zinc-700 dark:bg-zinc-900">
-      <p className="mb-2 font-medium text-zinc-700 dark:text-zinc-300">
+    <div
+      className="w-full rounded-lg p-3 text-xs"
+      style={{
+        background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+        border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+        color: "var(--t-ink)",
+      }}
+    >
+      <p className="mb-2 font-medium">
         {task.is_on_calendar ? "Reschedule" : "Pull"} &quot;{task.title}&quot; onto your calendar
       </p>
 
-      {slots === null && !error && <p className="text-zinc-500">Finding open slots…</p>}
-      {error && <p className="mb-2 text-red-600">{error}</p>}
+      {slots === null && !error && <p style={{ color: "var(--t-ink-soft)" }}>Finding open slots…</p>}
+      {error && (
+        <p className="mb-2" style={{ color: "var(--t-warn)" }}>
+          {error}
+        </p>
+      )}
 
       {slots && slots.length === 0 && (
-        <p className="mb-2 text-zinc-500">No open slots found in the next 14 days.</p>
+        <p className="mb-2" style={{ color: "var(--t-ink-soft)" }}>
+          No open slots found in the next 14 days.
+        </p>
       )}
 
       {slots && slots.length > 0 && (
@@ -103,7 +124,8 @@ export function TaskScheduleControl({ task }: { task: Task }) {
               type="button"
               disabled={isPending}
               onClick={() => pick(slot)}
-              className="rounded border border-zinc-300 px-2 py-1 text-left hover:bg-emerald-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-emerald-950"
+              className="hover-glow rounded border px-2 py-1 text-left disabled:opacity-50"
+              style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)" }}
             >
               {formatSlot(slot)}
             </button>
@@ -112,7 +134,9 @@ export function TaskScheduleControl({ task }: { task: Task }) {
       )}
 
       <details className="mt-1">
-        <summary className="cursor-pointer text-zinc-500">Pick a different time</summary>
+        <summary className="cursor-pointer" style={{ color: "var(--t-ink-soft)" }}>
+          Pick a different time
+        </summary>
         <div className="mt-2 flex flex-col gap-1">
           <label className="flex items-center justify-between gap-2">
             Start
@@ -120,7 +144,8 @@ export function TaskScheduleControl({ task }: { task: Task }) {
               type="datetime-local"
               value={manualStart}
               onChange={(e) => setManualStart(e.target.value)}
-              className="rounded border border-zinc-300 bg-transparent px-1 py-0.5 dark:border-zinc-700"
+              className="rounded border px-1 py-0.5"
+              style={fieldStyle}
             />
           </label>
           <label className="flex items-center justify-between gap-2">
@@ -129,25 +154,23 @@ export function TaskScheduleControl({ task }: { task: Task }) {
               type="datetime-local"
               value={manualEnd}
               onChange={(e) => setManualEnd(e.target.value)}
-              className="rounded border border-zinc-300 bg-transparent px-1 py-0.5 dark:border-zinc-700"
+              className="rounded border px-1 py-0.5"
+              style={fieldStyle}
             />
           </label>
           <button
             type="button"
             disabled={isPending || !manualStart || !manualEnd}
             onClick={pickManual}
-            className="mt-1 rounded bg-zinc-900 px-2 py-1 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+            className="hover-glow mt-1 rounded px-2 py-1 disabled:opacity-50"
+            style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
           >
             Use this time
           </button>
         </div>
       </details>
 
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        className="mt-2 text-zinc-400 underline"
-      >
+      <button type="button" onClick={() => setOpen(false)} className="mt-2 underline" style={{ color: "var(--t-ink-soft)" }}>
         cancel
       </button>
     </div>

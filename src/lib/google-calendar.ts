@@ -79,3 +79,53 @@ export async function updateCalendarEvent(
     },
   });
 }
+
+export type GoogleCalendarEvent = {
+  id: string;
+  title: string;
+  description: string | null;
+  start: string; // ISO
+  end: string; // ISO
+  isAllDay: boolean;
+};
+
+/**
+ * The user's real Google Calendar appointments in a range — read-only,
+ * separate from the app's own "pull a task onto the calendar" flow. Lets
+ * the Calendar view show what's actually on someone's calendar, not just
+ * quests the app scheduled there. All-day events (date-only, no time) are
+ * given a start/end spanning the whole day so they still plot sensibly.
+ */
+export async function listEvents(
+  accessToken: string,
+  timeMin: Date,
+  timeMax: Date
+): Promise<GoogleCalendarEvent[]> {
+  const calendar = calendarClient(accessToken);
+  const res = await calendar.events.list({
+    calendarId: "primary",
+    timeMin: timeMin.toISOString(),
+    timeMax: timeMax.toISOString(),
+    singleEvents: true,
+    orderBy: "startTime",
+    maxResults: 250,
+  });
+
+  return (res.data.items ?? [])
+    .filter((e) => e.status !== "cancelled" && e.id)
+    .map((e) => {
+      const isAllDay = Boolean(e.start?.date && !e.start?.dateTime);
+      const start = e.start?.dateTime ?? (e.start?.date ? `${e.start.date}T00:00:00` : undefined);
+      const end = e.end?.dateTime ?? (e.end?.date ? `${e.end.date}T23:59:59` : undefined);
+      if (!start || !end) return null;
+      return {
+        id: e.id!,
+        title: e.summary || "(No title)",
+        description: e.description ?? null,
+        start: new Date(start).toISOString(),
+        end: new Date(end).toISOString(),
+        isAllDay,
+      };
+    })
+    .filter((e): e is GoogleCalendarEvent => e !== null);
+}

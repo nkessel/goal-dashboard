@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { listForProfile } from "@/lib/data/notifications";
+import { getProfileById } from "@/lib/data/profiles";
 import { NotificationList } from "@/components/notifications/NotificationList";
 
 const ICONS: Record<string, string> = {
@@ -15,16 +16,25 @@ const ICONS: Record<string, string> = {
 
 export default async function NotificationsPage() {
   const session = await requireSession();
-  const notifications = await listForProfile(session.user.id, 50);
+  const [notifications, profile] = await Promise.all([
+    listForProfile(session.user.id, 50),
+    getProfileById(session.user.id),
+  ]);
+  const theme = profile?.theme ?? "calm";
+  const isAdventure = theme === "adventure";
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
-      <div className="mx-auto flex max-w-2xl flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Notifications</h1>
-        </div>
+      <div className="flex flex-col gap-4">
+        <h1
+          className={isAdventure ? "font-display text-xl" : "text-lg font-extrabold"}
+          style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
+        >
+          Notifications
+        </h1>
         <NotificationList
           notifications={notifications.map((n) => ({ ...n, icon: ICONS[n.kind] ?? "🔔" }))}
+          theme={theme}
         />
       </div>
     </AppShell>

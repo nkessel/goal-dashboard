@@ -14,25 +14,47 @@ export type CommentWithAuthor = {
 export function CommentThread({
   activityId,
   comments,
+  theme = "calm",
 }: {
   activityId: string;
   comments: CommentWithAuthor[];
+  theme?: "calm" | "adventure";
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(comments.length === 0);
   const formRef = useRef<HTMLFormElement>(null);
+  const isAdventure = theme === "adventure";
+  const dim = { color: isAdventure ? "var(--t-ink-soft)" : "var(--t-ink-soft)" };
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="self-end text-xs underline"
+        style={dim}
+      >
+        {comments.length > 0 ? `View ${comments.length} comment${comments.length === 1 ? "" : "s"}` : "Add a comment"}
+      </button>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">
       {comments.length > 0 && (
         <ul className="flex flex-col gap-1.5">
           {comments.map((c) => (
-            <li key={c.id} className="text-xs">
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">
+            <li key={c.id} className="text-xs" style={{ color: "var(--t-ink)" }}>
+              <span className="font-semibold">
                 {c.authorName}
-                {c.authorLevel >= 8 && <span className="ml-1 text-amber-500">Lv{c.authorLevel}</span>}
+                {c.authorLevel >= 8 && (
+                  <span className="ml-1" style={{ color: "var(--t-gold-deep)" }}>
+                    Lv{c.authorLevel}
+                  </span>
+                )}
               </span>
-              <span className="text-zinc-500">: {c.body}</span>
+              <span style={dim}>: {c.body}</span>
             </li>
           ))}
         </ul>
@@ -51,23 +73,33 @@ export function CommentThread({
             }
           });
         }}
-        className="flex gap-1"
+        className="flex gap-1.5"
       >
         <input type="hidden" name="activityId" value={activityId} />
         <input
           name="body"
           placeholder="Write a comment…"
-          className="flex-1 rounded border border-zinc-300 bg-transparent px-2 py-1 text-xs dark:border-zinc-700"
+          className="flex-1 rounded border px-2 py-1 text-xs"
+          style={{
+            borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
+            background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
+            color: "var(--t-ink)",
+          }}
         />
         <button
           type="submit"
           disabled={isPending}
-          className="rounded bg-zinc-900 px-2 py-1 text-xs text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded px-2 py-1 text-xs font-medium disabled:opacity-50"
+          style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#3b2a10" : "#fff" }}
         >
           Send
         </button>
       </form>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <p className="text-xs" style={{ color: "var(--t-warn)" }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }

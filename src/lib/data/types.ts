@@ -6,6 +6,8 @@ export type Board = {
   color: string | null;
   is_private: boolean;
   sort_order: number;
+  /** Null for a top-level board; another board's id for a nested sub-board. */
+  parent_board_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -31,10 +33,13 @@ export type Task = {
   description: string | null;
   importance: number;
   urgency: number;
+  /** Minutes the task is expected to take (the "⏱ 25m" row on the card).
+   * Null when no estimate was given. */
+  estimate_minutes: number | null;
   reschedule_count: number;
   color: string | null;
   icon_key: string | null;
-  icon_source: "monster" | "library";
+  icon_source: "monster" | "library" | "ai";
   xp_value: number;
   is_on_calendar: boolean;
   scheduled_start: string | null;
@@ -57,6 +62,7 @@ export type Profile = {
   avatar_base: string;
   avatar_color: string;
   avatar_accessory: string | null;
+  avatar_image_url: string | null;
   theme: "calm" | "adventure";
   level: number;
   total_xp: number;
@@ -67,6 +73,31 @@ export type Profile = {
   is_public: boolean;
   created_at: string;
   updated_at: string;
+};
+
+/** A shared avatar image — either one of the built-in presets or one a user
+ * generated (every generated avatar is added here automatically, so the
+ * whole library grows as people use it). */
+export type AvatarLibraryEntry = {
+  id: string;
+  image_url: string;
+  created_by: string | null;
+  prompt: string | null;
+  is_preset: boolean;
+  created_at: string;
+};
+
+/** A shared quest/task icon — either a built-in preset or one a user
+ * generated (every generated task icon is added here automatically, so the
+ * whole library grows as people use it). Mirrors AvatarLibraryEntry but
+ * scoped to task icons, which use their own generation prompt style. */
+export type TaskIconLibraryEntry = {
+  id: string;
+  image_url: string;
+  created_by: string | null;
+  prompt: string | null;
+  is_preset: boolean;
+  created_at: string;
 };
 
 export type FriendshipStatus = "pending" | "accepted" | "declined" | "blocked";

@@ -7,13 +7,16 @@ export function GoalProgressControl({
   goalId,
   boardId,
   initialProgress,
+  theme = "calm",
 }: {
   goalId: string;
   boardId: string;
   initialProgress: number;
+  theme?: "calm" | "adventure";
 }) {
   const [progress, setProgress] = useState(initialProgress);
   const [isPending, startTransition] = useTransition();
+  const isAdventure = theme === "adventure";
 
   function commit(next: number) {
     const clamped = Math.max(0, Math.min(100, next));
@@ -23,40 +26,50 @@ export function GoalProgressControl({
     });
   }
 
+  const btnStyle = {
+    border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+    color: "var(--t-ink)",
+  };
+
   return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => commit(progress - 5)}
-        disabled={isPending || progress <= 0}
-        className="h-6 w-6 shrink-0 rounded-full border border-zinc-300 text-xs disabled:opacity-30 dark:border-zinc-700"
-      >
-        −
-      </button>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        step={1}
-        value={progress}
-        onChange={(e) => setProgress(Number(e.target.value))}
-        onMouseUp={(e) => commit(Number((e.target as HTMLInputElement).value))}
-        onTouchEnd={(e) => commit(Number((e.target as HTMLInputElement).value))}
-        onKeyUp={(e) => commit(Number((e.target as HTMLInputElement).value))}
-        onBlur={(e) => commit(Number((e.target as HTMLInputElement).value))}
-        className="flex-1 accent-emerald-600"
-      />
-      <button
-        type="button"
-        onClick={() => commit(progress + 5)}
-        disabled={isPending || progress >= 100}
-        className="h-6 w-6 shrink-0 rounded-full border border-zinc-300 text-xs disabled:opacity-30 dark:border-zinc-700"
-      >
-        +
-      </button>
-      <span className="w-10 shrink-0 text-right text-sm font-medium tabular-nums">
-        {progress}%
-      </span>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-2.5">
+        <div
+          className="h-3 flex-1 overflow-hidden rounded-full"
+          style={{ background: isAdventure ? "rgba(59,42,24,.15)" : "var(--t-card-border)" }}
+        >
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${progress}%`,
+              background: isAdventure ? "linear-gradient(90deg, var(--t-gold-deep), var(--t-gold))" : "var(--t-accent)",
+            }}
+          />
+        </div>
+        <span className="w-10 shrink-0 text-right text-sm font-semibold tabular-nums" style={{ color: "var(--t-ink)" }}>
+          {progress}%
+        </span>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => commit(progress - 5)}
+          disabled={isPending || progress <= 0}
+          className="hover-glow flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold disabled:opacity-30"
+          style={btnStyle}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={() => commit(progress + 5)}
+          disabled={isPending || progress >= 100}
+          className="hover-glow flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold disabled:opacity-30"
+          style={btnStyle}
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }

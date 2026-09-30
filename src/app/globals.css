@@ -24,3 +24,341 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ---------------------------------------------------------------------
+ * Theme design tokens (visual redesign to match the Productivity RPG
+ * mockups). Applied via `data-theme="adventure" | "calm"` on the app-root
+ * wrapper (see AppShell). Components read these with `var(--t-*)` inline
+ * styles rather than Tailwind dark: variants, mirroring the mockups'
+ * own approach and guaranteeing exact color/spacing fidelity.
+ * ------------------------------------------------------------------- */
+
+[data-theme="adventure"] {
+  /* Exact values from the design handoff (SPEC.md §2) — lifted verbatim,
+     not rounded. Tokens keep the app's existing `--t-*` prefix; anything
+     the handoff names without a prefix (e.g. `--gold`) is mapped 1:1. */
+  --t-bg-1: #3a3f2e;
+  --t-bg-2: #232b22;
+  --t-nav-1: #293027;
+  --t-nav-2: #222922;
+  --t-nav-line: #564e38;
+  --t-active-1: #6a5326;
+  --t-active-2: #31301e;
+  --t-panel: #eedcb8;
+  --t-panel-2: #f3e7cb;
+  --t-panel-border: #bda06d;
+  --t-divider: #cbb68c;
+  --t-ink: #2f2a1f;
+  --t-ink-soft: #6b6252;
+  --t-cream: #efe6cc;
+  --t-gold: #d9b45f;
+  --t-gold-deep: #a88a3f;
+  --t-xp: #4f6d3c;
+  --t-flame: #d6532c;
+  --t-warn: #9a4a3a;
+  --t-warn-bg: #ecd6c4;
+  --t-good: #3f5c33;
+  /* Legacy/general-chrome tokens (avatar rings, FAB border, icon buttons,
+     etc. across settings/feed/notifications) — not part of the handoff's
+     card/nav palette, kept close to the nav strip's own colours. */
+  --t-nav-bg: #262c23;
+  --t-nav-inactive: #d8cfb1;
+  --t-glow: rgba(217, 180, 95, 0.65);
+  --t-overlay: rgba(10, 8, 4, 0.6);
+  --font-display: var(--font-cinzel), Georgia, serif;
+  --font-body: var(--font-eb-garamond), Georgia, serif;
+
+  background:
+    linear-gradient(180deg, rgba(58, 63, 46, 0.55), rgba(35, 43, 34, 0.82)),
+    url("/design/bg-forest.jpg") top center / cover no-repeat fixed;
+  background-color: var(--t-bg-2);
+  color: var(--t-cream);
+  font-family: var(--font-body);
+}
+
+@media (min-width: 900px) {
+  [data-theme="adventure"] {
+    background:
+      linear-gradient(180deg, rgba(58, 63, 46, 0.55), rgba(35, 43, 34, 0.82)),
+      url("/design/bg-forest-wide.jpg") top center / cover no-repeat fixed;
+    background-color: var(--t-bg-2);
+  }
+}
+
+[data-theme="calm"] {
+  /* SPEC.md §2 "Calm" tokens, lifted verbatim. */
+  --t-bg: #f6f4ef;
+  --t-card: #ffffff;
+  --t-card-border: #e7e2d8;
+  --t-ink: #2c2b27;
+  --t-ink-soft: #807a6d;
+  --t-accent: #7a9471;
+  --t-accent-soft: #e4ebe0;
+  --t-clay: #b98a6a;
+  --t-clay-soft: #f3e5db;
+  --t-good: #7a9471;
+  /* Not specified by the handoff for Calm (only Adventure's overdue colours
+     are given) — kept as a warm, low-saturation clay/rust pair consistent
+     with the rest of the Calm palette. */
+  --t-warn: #b3541e;
+  --t-warn-bg: #fbe6d8;
+  --t-glow: rgba(122, 148, 113, 0.5);
+  --t-overlay: rgba(20, 20, 16, 0.45);
+  --font-display: var(--font-manrope), sans-serif;
+  --font-body: var(--font-manrope), sans-serif;
+
+  background: var(--t-bg);
+  color: var(--t-ink);
+  font-family: var(--font-body);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+/* Tasteful hover glow used on cards and buttons throughout the app. */
+.hover-glow {
+  transition: box-shadow 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 0 1px var(--t-glow), 0 0 16px var(--t-glow);
+}
+.hover-glow:active {
+  transform: scale(0.98);
+}
+
+/* FAB entrance: rises up from the bottom instead of just popping in. */
+@keyframes fab-rise {
+  from {
+    transform: translateY(36px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.fab-rise {
+  animation: fab-rise 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Board-detail navigation transition (progressively enhanced — a no-op in
+   browsers without the View Transitions API). */
+::view-transition-old(root) {
+  animation: board-fade-out 200ms ease both;
+}
+::view-transition-new(root) {
+  animation: board-expand-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes board-fade-out {
+  to {
+    opacity: 0;
+    transform: scale(1.01);
+  }
+}
+@keyframes board-expand-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Bottom-nav directional slide, set via a `data-transition` attribute on
+   <html> right before starting the transition (see BottomNav.tsx). Scoped
+   to that attribute so it overrides — without permanently replacing — the
+   default board-detail expand/fade transition above, which stays the
+   fallback for navigations that don't go through the bottom nav. */
+html[data-transition="nav-forward"]::view-transition-old(root) {
+  animation: nav-slide-out-left 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+html[data-transition="nav-forward"]::view-transition-new(root) {
+  animation: nav-slide-in-right 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+html[data-transition="nav-back"]::view-transition-old(root) {
+  animation: nav-slide-out-right 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+html[data-transition="nav-back"]::view-transition-new(root) {
+  animation: nav-slide-in-left 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes nav-slide-out-left {
+  to {
+    transform: translateX(-28%);
+    opacity: 0.6;
+  }
+}
+@keyframes nav-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes nav-slide-out-right {
+  to {
+    transform: translateX(28%);
+    opacity: 0.6;
+  }
+}
+@keyframes nav-slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Fixed app chrome (bottom nav, floating action button) opts out of both
+   transitions above via its own view-transition-name (set inline in
+   BottomNav.tsx / FloatingActionButton.tsx). Without this, that chrome has
+   no name of its own, so it gets flattened into the page-wide root snapshot
+   and visibly slides/fades along with the page on every navigation — which
+   is what reads as "the navbar is buggy" — even though it's meant to stay
+   put while only the content underneath changes. Once pulled into its own
+   named group, it keeps fully static (no crossfade either) since its look
+   doesn't actually change between pages. */
+::view-transition-group(app-bottom-nav),
+::view-transition-group(app-fab) {
+  animation: none;
+}
+::view-transition-old(app-bottom-nav),
+::view-transition-new(app-bottom-nav),
+::view-transition-old(app-fab),
+::view-transition-new(app-fab) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Simple, low-intensity pop for the task/quest view card (Priority Matrix
+   click-to-view) and its backdrop. */
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes overlay-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes card-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes card-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+}
+.overlay-fade-in {
+  animation: overlay-fade-in 180ms ease both;
+}
+.overlay-fade-out {
+  animation: overlay-fade-out 170ms ease both;
+}
+.card-pop-in {
+  animation: card-pop-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.card-pop-out {
+  animation: card-pop-out 170ms ease both;
+}
+
+/* Avatar editor: pulses a glow around the Generate button right after a
+   sample prompt gets auto-filled, since picking a sample no longer
+   generates immediately — a nudge toward "you can tweak this first, then
+   hit Generate". Finite iteration count, so it settles back to normal
+   rather than looping forever; see AvatarBuilder.tsx. */
+@keyframes generate-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--t-glow);
+  }
+  50% {
+    box-shadow: 0 0 0 6px var(--t-glow);
+  }
+}
+.generate-pulse {
+  animation: generate-pulse 700ms ease-in-out 3;
+}
+
+/* Settings "close" (X button / Esc): a plain fade rather than the default
+   expand/zoom root transition, scoped to data-transition="settings-close"
+   the same way the bottom-nav directional slide is scoped above — see
+   CloseSettingsButton.tsx. */
+html[data-transition="settings-close"]::view-transition-old(root) {
+  animation: settings-close-fade-out 200ms ease both;
+}
+html[data-transition="settings-close"]::view-transition-new(root) {
+  animation: settings-close-fade-in 260ms ease both;
+}
+@keyframes settings-close-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes settings-close-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Bottom sheet (New Quest FAB, the Today's Battle "add a quest" picker):
+   slides up from the bottom over a darkening backdrop — the backdrop reuses
+   .overlay-fade-in/.overlay-fade-out above, since "fade to a bit darker" is
+   exactly what those already do. Closing plays a distinct "minimize toward
+   the center" shrink instead of mirroring the slide back down, so open and
+   close read as two different gestures rather than a reversed loop — see
+   BottomSheet.tsx. */
+@keyframes sheet-slide-up-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes sheet-minimize-out {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.05);
+    opacity: 0;
+  }
+}
+.sheet-slide-up-in {
+  animation: sheet-slide-up-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.sheet-minimize-out {
+  animation: sheet-minimize-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+  transform-origin: center center;
+}

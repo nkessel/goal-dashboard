@@ -10,7 +10,8 @@ import {
 export function TaskActions({ task, theme = "calm" }: { task: Task; theme?: "calm" | "adventure" }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [completedAt, setCompletedAt] = useState(() => toLocalDatetimeValue(new Date()));
   const isAdventure = theme === "adventure";
 
   function togglePin() {
@@ -24,6 +25,32 @@ export function TaskActions({ task, theme = "calm" }: { task: Task; theme?: "cal
     });
   }
 
+  function confirmComplete() {
+    setError(null);
+    const formData = new FormData();
+    formData.set("taskId", task.id);
+    formData.set("completedAt", completedAt);
+    startTransition(async () => {
+      try {
+        await completeTaskAction(formData);
+        setShowConfirm(false);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong");
+      }
+    });
+  }
+
+  const pinBtnStyle = task.is_manual_priority
+    ? {
+        borderColor: isAdventure ? "var(--t-gold)" : "var(--t-accent)",
+        background: isAdventure ? "rgba(209,161,60,.18)" : "var(--t-accent-soft)",
+        color: isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)",
+      }
+    : {
+        borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
+        color: "var(--t-ink-soft)",
+      };
+
   return (
     <div className="flex shrink-0 flex-col items-end gap-1">
       <div className="flex items-center gap-2">
@@ -31,56 +58,87 @@ export function TaskActions({ task, theme = "calm" }: { task: Task; theme?: "cal
           type="button"
           onClick={togglePin}
           disabled={isPending}
-          className={`rounded-full border px-3 py-1 text-xs font-medium ${
-            task.is_manual_priority
-              ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-              : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          }`}
+          className="hover-glow rounded-full border px-3 py-1 text-xs font-medium disabled:opacity-50"
+          style={pinBtnStyle}
         >
           {task.is_manual_priority
             ? isAdventure
               ? "⚔️ In today's battle"
               : "★ In Top 3"
             : isAdventure
-              ? "☆ Join today's battle"
+              ? "☆ Add to Today's Battle"
               : "☆ Pin to Top 3"}
         </button>
 
         <button
           type="button"
-          onClick={() => setShowDatePicker((v) => !v)}
-          className={`rounded-full px-3 py-1 text-xs font-medium text-white ${
-            isAdventure ? "bg-rose-600 hover:bg-rose-700 active:scale-95" : "bg-emerald-600 hover:bg-emerald-700"
-          } transition-transform`}
+          onClick={() => setShowConfirm((v) => !v)}
+          className="hover-glow rounded-full px-3 py-1 text-xs font-medium"
+          style={{
+            background: isAdventure ? "var(--t-warn)" : "var(--t-good)",
+            color: "#fff",
+          }}
         >
           {isAdventure ? "⚔️ Defeat" : "Complete"}
         </button>
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <p className="text-xs" style={{ color: "var(--t-warn)" }}>
+          {error}
+        </p>
+      )}
 
-      {showDatePicker && (
-        <form
-          action={completeTaskAction}
-          className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white p-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+      {showConfirm && (
+        <div
+          className="flex w-56 flex-col gap-2 rounded-lg p-2.5 text-xs"
+          style={{
+            background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+            border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+            color: "var(--t-ink)",
+          }}
         >
-          <input type="hidden" name="taskId" value={task.id} />
-          <label className="text-zinc-500">
-            Completed at
+          <p className="font-medium">
+            {isAdventure ? `Defeat "${task.title}"?` : `Mark "${task.title}" complete?`}
+          </p>
+          <label className="flex items-center justify-between gap-2" style={{ color: "var(--t-ink-soft)" }}>
+            {isAdventure ? "Defeated at" : "Completed at"}
             <input
               type="datetime-local"
-              name="completedAt"
-              defaultValue={toLocalDatetimeValue(new Date())}
-              className="ml-2 rounded border border-zinc-300 bg-transparent px-1 py-0.5 dark:border-zinc-700"
+              value={completedAt}
+              onChange={(e) => setCompletedAt(e.target.value)}
+              className="rounded border px-1 py-0.5"
+              style={{
+                borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
+                background: isAdventure ? "var(--t-panel-2)" : "var(--t-bg)",
+                color: "var(--t-ink)",
+              }}
             />
           </label>
-          <button
-            type="submit"
-            className="rounded bg-zinc-900 px-2 py-1 text-white dark:bg-zinc-100 dark:text-zinc-900"
-          >
-            Confirm
-          </button>
-        </form>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowConfirm(false)}
+              disabled={isPending}
+              className="rounded-full px-3 py-1 font-medium"
+              style={{ color: "var(--t-ink-soft)" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmComplete}
+              disabled={isPending}
+              className="hover-glow rounded-full px-3 py-1 font-medium disabled:opacity-50"
+              style={{
+                background: isAdventure ? "var(--t-warn)" : "var(--t-good)",
+                color: "#fff",
+              }}
+            >
+              {isPending ? "…" : isAdventure ? "Confirm defeat" : "Confirm"}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

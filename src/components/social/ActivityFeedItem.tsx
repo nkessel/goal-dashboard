@@ -1,12 +1,14 @@
 import type { FeedItem } from "@/lib/data/activity";
 import type { Profile } from "@/lib/data/types";
+import { Avatar } from "@/components/settings/Avatar";
+import { formatRelativeTime } from "@/lib/format-time";
 import { ReactionBar } from "./ReactionBar";
 import { CommentThread, type CommentWithAuthor } from "./CommentThread";
 
 function describe(item: FeedItem, authorName: string): string {
-  if (item.kind === "task_completed") return `${authorName} completed "${item.task_title ?? "a task"}" ✅`;
-  if (item.kind === "goal_completed") return `${authorName} completed the goal "${item.goal_title ?? ""}" 🎯`;
-  return `${authorName} leveled up! 🎉`;
+  if (item.kind === "task_completed") return `${authorName} completed "${item.task_title ?? "a task"}"`;
+  if (item.kind === "goal_completed") return `${authorName} completed the goal "${item.goal_title ?? ""}"`;
+  return `${authorName} leveled up!`;
 }
 
 export function ActivityFeedItem({
@@ -14,12 +16,15 @@ export function ActivityFeedItem({
   author,
   profiles,
   viewerId,
+  theme = "calm",
 }: {
   item: FeedItem;
   author: Profile | undefined;
   profiles: Map<string, Profile>;
   viewerId: string;
+  theme?: "calm" | "adventure";
 }) {
+  const isAdventure = theme === "adventure";
   const authorName = author?.name || author?.email || "Someone";
   const comments: CommentWithAuthor[] = item.comments.map((c) => {
     const p = profiles.get(c.profile_id);
@@ -33,23 +38,43 @@ export function ActivityFeedItem({
   });
 
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-zinc-200 p-3 text-sm dark:border-zinc-800">
-      <div className="flex items-center justify-between">
-        <span className="text-zinc-800 dark:text-zinc-200">
-          {describe(item, authorName)}
-          {author && author.level >= 8 && (
-            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-              Lv{author.level} Adventurer
-            </span>
-          )}
-        </span>
-        <time className="shrink-0 text-xs text-zinc-400">
-          {new Date(item.created_at).toLocaleString()}
-        </time>
+    <li
+      className="flex flex-col gap-2.5 rounded-2xl p-3.5"
+      style={{
+        background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+        border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+        borderWidth: isAdventure ? 2 : 1,
+      }}
+    >
+      <div className="flex items-center gap-2.5">
+        {author ? (
+          <Avatar profile={author} size={9} />
+        ) : (
+          <span className="h-9 w-9 shrink-0 rounded-full" style={{ background: "var(--t-ink-soft)" }} />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
+            {authorName}{" "}
+            {author && (
+              <span className="text-xs font-bold" style={{ color: "var(--t-gold-deep)" }}>
+                Lvl {author.level}
+              </span>
+            )}
+          </div>
+          <div className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
+            {formatRelativeTime(item.created_at)}
+          </div>
+        </div>
       </div>
 
-      <ReactionBar activityId={item.id} reactions={item.reactions} profileId={viewerId} />
-      <CommentThread activityId={item.id} comments={comments} />
+      <p className="text-sm" style={{ color: "var(--t-ink)" }}>
+        {describe(item, authorName)}
+      </p>
+
+      <div className="flex items-center gap-2.5">
+        <ReactionBar activityId={item.id} reactions={item.reactions} profileId={viewerId} theme={theme} />
+      </div>
+      <CommentThread activityId={item.id} comments={comments} theme={theme} />
     </li>
   );
 }

@@ -7,6 +7,7 @@ import { updateThemeAction } from "@/app/actions";
 export function ThemeToggle({ theme }: { theme: "calm" | "adventure" }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const isAdventure = theme === "adventure";
 
   function setTheme(next: "calm" | "adventure") {
     if (next === theme) return;
@@ -17,14 +18,16 @@ export function ThemeToggle({ theme }: { theme: "calm" | "adventure" }) {
   }
 
   return (
-    <div className="inline-flex rounded-full border border-zinc-300 p-0.5 text-xs dark:border-zinc-700">
+    <div
+      className="inline-flex rounded-full p-0.5 text-xs"
+      style={{ border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}` }}
+    >
       <button
         type="button"
         disabled={isPending}
         onClick={() => setTheme("calm")}
-        className={`rounded-full px-3 py-1 font-medium transition-colors ${
-          theme === "calm" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "text-zinc-500"
-        }`}
+        className="hover-glow rounded-full px-3 py-1 font-medium transition-colors"
+        style={theme === "calm" ? { background: "var(--t-accent)", color: "#fff" } : { color: "var(--t-ink-soft)" }}
       >
         🧘 Calm
       </button>
@@ -32,9 +35,10 @@ export function ThemeToggle({ theme }: { theme: "calm" | "adventure" }) {
         type="button"
         disabled={isPending}
         onClick={() => setTheme("adventure")}
-        className={`rounded-full px-3 py-1 font-medium transition-colors ${
-          theme === "adventure" ? "bg-amber-500 text-white" : "text-zinc-500"
-        }`}
+        className="hover-glow rounded-full px-3 py-1 font-medium transition-colors"
+        style={
+          theme === "adventure" ? { background: "var(--t-gold)", color: "#2a1c10" } : { color: "var(--t-ink-soft)" }
+        }
       >
         ⚔️ Adventure
       </button>

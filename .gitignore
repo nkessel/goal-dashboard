@@ -42,3 +42,4 @@ next-env.d.ts
 scripts/.xp-module.mjs
 scripts/.email-module.mjs
 scripts/.test-session*.json
+dev.log

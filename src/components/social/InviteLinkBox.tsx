@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 
-export function InviteLinkBox({ code }: { code: string }) {
+export function InviteLinkBox({ code, theme = "calm" }: { code: string; theme?: "calm" | "adventure" }) {
   const [copied, setCopied] = useState(false);
   const path = `/invite/${code}`;
+  const isAdventure = theme === "adventure";
 
   async function copy() {
     const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
@@ -18,19 +19,36 @@ export function InviteLinkBox({ code }: { code: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-zinc-200 p-3 text-sm dark:border-zinc-800">
-      <h3 className="font-semibold text-zinc-900 dark:text-zinc-50">Invite a friend</h3>
-      <p className="text-xs text-zinc-500">
+    <div
+      className="flex flex-col gap-1.5 rounded-2xl p-3.5 text-sm"
+      style={{
+        background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+        border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+        borderWidth: isAdventure ? 2 : 1,
+        color: "var(--t-ink)",
+      }}
+    >
+      <h3 className="font-semibold">{isAdventure ? "Recruit a fellow adventurer" : "Invite a friend"}</h3>
+      <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
         Anyone who opens this link and signs in becomes your friend automatically.
       </p>
       <div className="flex items-center gap-2">
-        <code className="flex-1 overflow-x-auto rounded border border-zinc-300 bg-zinc-50 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900">
+        <code
+          className="flex-1 overflow-x-auto rounded border px-2 py-1 text-xs"
+          style={{
+            borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
+            background: isAdventure ? "var(--t-panel-2)" : "var(--t-bg)",
+          }}
+        >
           {path}
         </code>
         <button
           type="button"
           onClick={copy}
-          className="shrink-0 rounded-full border border-zinc-300 px-3 py-1 text-xs font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          className="shrink-0 rounded-full px-3 py-1 text-xs font-medium"
+          style={{
+            border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+          }}
         >
           {copied ? "Copied!" : "Copy link"}
         </button>

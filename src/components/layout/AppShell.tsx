@@ -1,121 +1,88 @@
 import Link from "next/link";
-import { signOut } from "@/auth";
 import { countUnread } from "@/lib/data/notifications";
 import { getProfileById } from "@/lib/data/profiles";
 import { Avatar } from "@/components/settings/Avatar";
+import { BottomNav } from "@/components/layout/BottomNav";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Priority", icon: "🎯", enabled: true },
-  { href: "/calendar", label: "Calendar", icon: "📅", enabled: false },
-  { href: "/matrix", label: "Priority Matrix", icon: "📊", enabled: true },
-  { href: "/boards", label: "Boards", icon: "🗂️", enabled: true },
-  { href: "/feed", label: "Friend Feed", icon: "👥", enabled: true },
-];
-
+/**
+ * App shell for the mobile-app-style redesign (matches the Productivity RPG
+ * mockups). No more desktop sidebar: a themed full-bleed background, a
+ * mobile-width centered column, and a fixed bottom tab bar. Each page owns
+ * its own mockup-specific header (title + level badge, avatar + XP, etc.);
+ * this shell only adds a thin utility strip for notifications/settings
+ * access, since the mockups don't depict a persistent app-chrome header.
+ */
 export async function AppShell({
   children,
   userLabel,
   profileId,
+  wide,
 }: {
   children: React.ReactNode;
   userLabel: string;
   /** Optional: when given, shows an unread-notifications badge. */
   profileId?: string;
+  /**
+   * Let content use more of the screen on larger viewports — for grid or
+   * calendar-style pages that have real width to fill, rather than the
+   * single-column mobile-card pages that stay comfortable narrow. The
+   * bottom nav and FABs are unaffected (fixed, independently centered), so
+   * they stay a consistent tappable width regardless.
+   */
+  wide?: boolean;
 }) {
   const [unreadCount, profile] = await Promise.all([
     profileId ? countUnread(profileId) : Promise.resolve(0),
     profileId ? getProfileById(profileId) : Promise.resolve(null),
   ]);
-  const isAdventure = profile?.theme === "adventure";
+  const theme = profile?.theme === "adventure" ? "adventure" : "calm";
+  const isAdventure = theme === "adventure";
+  const iconColor = isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)";
+  const widthClass = wide
+    ? "max-w-md sm:max-w-2xl md:max-w-4xl lg:max-w-6xl"
+    : "max-w-md sm:max-w-lg md:max-w-xl";
 
   return (
-    <div
-      data-theme={profile?.theme ?? "calm"}
-      className={`flex min-h-screen ${isAdventure ? "bg-gradient-to-br from-amber-50 to-rose-50 dark:from-zinc-950 dark:to-red-950" : "bg-zinc-50 dark:bg-black"}`}
-    >
-      <aside
-        className={`flex w-16 flex-col items-center gap-2 border-r py-4 sm:w-48 sm:items-stretch sm:px-3 ${
-          isAdventure ? "border-amber-200 dark:border-red-950" : "border-zinc-200 dark:border-zinc-800"
-        }`}
-      >
-        <div className="mb-4 hidden px-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50 sm:block">
-          {isAdventure ? "⚔️ Goal Dashboard" : "Goal Dashboard"}
-        </div>
-        <nav className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) =>
-            item.enabled ? (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
-              >
-                <span aria-hidden>{item.icon}</span>
-                <span className="hidden sm:inline">{item.label}</span>
-              </Link>
-            ) : (
-              <span
-                key={item.href}
-                title="Coming soon"
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 dark:text-zinc-600"
-              >
-                <span aria-hidden>{item.icon}</span>
-                <span className="hidden sm:inline">
-                  {item.label} <span className="text-xs">(soon)</span>
-                </span>
-              </span>
-            )
-          )}
+    <div data-theme={theme} className="flex min-h-screen flex-col items-center">
+      <div className={`flex w-full flex-1 flex-col ${widthClass}`}>
+        <div className="flex items-center justify-end gap-2.5 px-5 pt-3">
           {profileId && (
             <Link
               href="/notifications"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              aria-label="Notifications"
+              className="relative flex h-8 w-8 items-center justify-center rounded-full"
+              style={{
+                background: isAdventure ? "rgba(0,0,0,.22)" : "var(--t-card)",
+                border: isAdventure ? "1px solid rgba(209,161,60,.35)" : "1px solid var(--t-card-border)",
+              }}
             >
-              <span aria-hidden className="relative">
-                🔔
-                {unreadCount > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </span>
-              <span className="hidden sm:inline">Notifications</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M6 9a6 6 0 1 1 12 0c0 3.5 1 5.5 2 6.5H4c1-1 2-3 2-6.5z"
+                  stroke={iconColor}
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path d="M10 19a2 2 0 0 0 4 0" stroke={iconColor} strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </Link>
           )}
-          {profileId && (
-            <Link
-              href="/settings"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            >
-              <span aria-hidden>⚙️</span>
-              <span className="hidden sm:inline">Settings</span>
+          {profileId && profile && (
+            <Link href="/settings/avatar" aria-label={`Edit avatar — signed in as ${userLabel}`}>
+              <Avatar profile={profile} size={8} />
             </Link>
           )}
-        </nav>
-
-        <div className="mt-auto flex flex-col gap-2 px-1 pt-4">
-          <div className="flex items-center gap-2">
-            {profile && <Avatar profile={profile} size={7} />}
-            <span className="hidden truncate text-xs text-zinc-500 sm:block">
-              {userLabel}
-            </span>
-          </div>
-          <form
-            action={async () => {
-              "use server";
-              await signOut();
-            }}
-          >
-            <button
-              type="submit"
-              className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-            >
-              Sign out
-            </button>
-          </form>
         </div>
-      </aside>
 
-      <main className="flex-1 overflow-y-auto p-4 sm:p-8">{children}</main>
+        <main className="flex-1 px-5 pb-28 pt-2">{children}</main>
+      </div>
+
+      {profileId && <BottomNav theme={theme} />}
     </div>
   );
 }

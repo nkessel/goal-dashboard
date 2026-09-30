@@ -5,7 +5,7 @@ export function ComingSoon({ title }: { title: string }) {
         {title}
       </h1>
       <p className="max-w-sm text-sm text-zinc-500">
-        Coming later in the build — see SPEC.md's &quot;Suggested Build Priority&quot;.
+        Coming later in the build — see SPEC.md&apos;s &quot;Suggested Build Priority&quot;.
       </p>
     </div>
   );

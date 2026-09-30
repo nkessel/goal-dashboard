@@ -12,10 +12,134 @@ export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
     .select("*")
     .eq("owner_id", ownerId)
     .eq("status", "open")
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
   return data ?? [];
+}
+
+export type TaskWithCategory = Task & {
+  /** The title of the board the task's goal belongs to — the "category
+   * pill" on the quest/task card (HANDOFF.md §4). Null for a standalone
+   * task with no goal. */
+  categoryLabel: string | null;
+};
+
+/**
+ * Same as listOpenTasksForOwner, but also resolves each task's category
+ * pill: the title of the board its goal lives on (task -> goal -> board).
+ * Used on the Today view, where tasks from many different boards sit in
+ * one list, so each card needs to say which board it came from.
+ */
+export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promise<TaskWithCategory[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("tasks")
+    .select("*, goals(boards(title))")
+    .eq("owner_id", ownerId)
+    .eq("status", "open")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Failed to list tasks: ${error.message}`);
+
+  return (data ?? []).map((row) => {
+    const { goals, ...task } = row as Task & {
+      goals: { boards: { title: string } | null } | null;
+    };
+    return { ...task, categoryLabel: goals?.boards?.title ?? null };
+  });
+}
+
+/**
+ * Persists a new drag-and-drop order for a set of the owner's open tasks
+ * (the Today view's pinned-priority list and "other tasks" list reorder
+ * independently, so each calls this with just its own ids). Scoped by
+ * owner_id as a safety check.
+ */
+export async function updateTaskOrder(ownerId: string, orderedIds: string[]): Promise<void> {
+  const db = supabaseAdmin();
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      db.from("tasks").update({ sort_order: index }).eq("id", id).eq("owner_id", ownerId)
+    )
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(`Failed to reorder tasks: ${failed.error.message}`);
+}
+
+/**
+ * Sets a task's importance/urgency directly (1-5 each, one decimal place)
+ * — used by the draggable Priority Matrix, where dropping a task's dot at
+ * a new position maps back to a quadrant coordinate.
+ */
+export async function updateTaskPriority(
+  taskId: string,
+  ownerId: string,
+  input: { importance: number; urgency: number }
+): Promise<Task> {
+  const importance = Math.max(1, Math.min(5, Math.round(input.importance * 10) / 10));
+  const urgency = Math.max(1, Math.min(5, Math.round(input.urgency * 10) / 10));
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("tasks")
+    .update({ importance, urgency })
+    .eq("id", taskId)
+    .eq("owner_id", ownerId)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Failed to update task priority: ${error.message}`);
+  return data;
+}
+
+/**
+ * Full edit of a task's own fields (title/description/importance/urgency/xp)
+ * — used by the click-to-edit dialog on a quest card. Does not touch status,
+ * scheduling, or icon fields; those have their own dedicated flows.
+ */
+export async function updateTask(
+  taskId: string,
+  ownerId: string,
+  input: {
+    title: string;
+    description: string | null;
+    importance: number;
+    urgency: number;
+    xpValue: number;
+    /** Undefined leaves the existing estimate untouched; null clears it. */
+    estimateMinutes?: number | null;
+  }
+): Promise<Task> {
+  const importance = Math.max(1, Math.min(5, Math.round(input.importance * 10) / 10));
+  const urgency = Math.max(1, Math.min(5, Math.round(input.urgency * 10) / 10));
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("tasks")
+    .update({
+      title: input.title,
+      description: input.description,
+      importance,
+      urgency,
+      xp_value: Math.max(0, Math.round(input.xpValue)),
+      ...(input.estimateMinutes !== undefined
+        ? { estimate_minutes: input.estimateMinutes === null ? null : Math.max(0, Math.round(input.estimateMinutes)) }
+        : {}),
+    })
+    .eq("id", taskId)
+    .eq("owner_id", ownerId)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Failed to update task: ${error.message}`);
+  return data;
+}
+
+export async function deleteTask(taskId: string, ownerId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db.from("tasks").delete().eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to delete task: ${error.message}`);
 }
 
 export async function listCompletedTasksForOwner(
@@ -35,20 +159,27 @@ export async function listCompletedTasksForOwner(
   return data ?? [];
 }
 
-export async function setTaskXpValue(taskId: string, ownerId: string, xpValue: number): Promise<void> {
+/**
+ * Lifetime count of completed tasks — the "Quests Complete" stat on the
+ * Today's Quest header. All-time, unlike listCompletedTasksForOwner's
+ * recent/limited list (used for the "Victories Today" section).
+ */
+export async function countCompletedTasksForOwner(ownerId: string): Promise<number> {
   const db = supabaseAdmin();
-  const { error } = await db
+  const { count, error } = await db
     .from("tasks")
-    .update({ xp_value: xpValue })
-    .eq("id", taskId)
-    .eq("owner_id", ownerId);
-  if (error) throw new Error(`Failed to update task XP: ${error.message}`);
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", ownerId)
+    .eq("status", "completed");
+
+  if (error) throw new Error(`Failed to count completed tasks: ${error.message}`);
+  return count ?? 0;
 }
 
 export async function setTaskIcon(
   taskId: string,
   ownerId: string,
-  input: { iconKey: string | null; iconSource: "monster" | "library" }
+  input: { iconKey: string | null; iconSource: "monster" | "library" | "ai" }
 ): Promise<void> {
   const db = supabaseAdmin();
   const { error } = await db
@@ -110,6 +241,7 @@ export async function createTask(
     xpValue?: number;
     goalId?: string | null;
     color?: string;
+    estimateMinutes?: number | null;
   }
 ): Promise<Task> {
   const db = supabaseAdmin();
@@ -124,6 +256,10 @@ export async function createTask(
       urgency: input.urgency ?? 3,
       xp_value: input.xpValue ?? 0,
       color: input.color || null,
+      estimate_minutes:
+        input.estimateMinutes === undefined || input.estimateMinutes === null
+          ? null
+          : Math.max(0, Math.round(input.estimateMinutes)),
     })
     .select("*")
     .single();
@@ -296,6 +432,49 @@ export async function listUpcomingTasksNeedingReminder(windowMinutes: number): P
 
   if (error) throw new Error(`Failed to list tasks needing reminders: ${error.message}`);
   return data ?? [];
+}
+
+/**
+ * Tasks to show on the Calendar view for a given date range: anything
+ * scheduled onto the calendar whose [scheduled_start, scheduled_end) window
+ * overlaps the range, plus anything completed within the range (even if it
+ * was never pulled onto the calendar) — per spec, completed tasks show
+ * inline "at their scheduled (or completed) time". De-duped by id since a
+ * task can satisfy both conditions.
+ */
+export async function listCalendarTasksForOwner(
+  ownerId: string,
+  rangeStart: Date,
+  rangeEnd: Date
+): Promise<Task[]> {
+  const db = supabaseAdmin();
+  const startIso = rangeStart.toISOString();
+  const endIso = rangeEnd.toISOString();
+
+  const [scheduledRes, completedRes] = await Promise.all([
+    db
+      .from("tasks")
+      .select("*")
+      .eq("owner_id", ownerId)
+      .eq("is_on_calendar", true)
+      .lt("scheduled_start", endIso)
+      .gt("scheduled_end", startIso),
+    db
+      .from("tasks")
+      .select("*")
+      .eq("owner_id", ownerId)
+      .eq("status", "completed")
+      .gte("completed_at", startIso)
+      .lt("completed_at", endIso),
+  ]);
+
+  if (scheduledRes.error) throw new Error(`Failed to list scheduled tasks: ${scheduledRes.error.message}`);
+  if (completedRes.error) throw new Error(`Failed to list completed tasks: ${completedRes.error.message}`);
+
+  const byId = new Map<string, Task>();
+  for (const t of scheduledRes.data ?? []) byId.set(t.id, t);
+  for (const t of completedRes.data ?? []) byId.set(t.id, t);
+  return [...byId.values()];
 }
 
 export async function markReminderSent(taskId: string): Promise<void> {

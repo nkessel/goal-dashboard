@@ -1,37 +1,268 @@
-import { requireSession } from "@/lib/session";
-import { AppShell } from "@/components/layout/AppShell";
-import { ThemeToggle } from "@/components/settings/ThemeToggle";
-import { AvatarBuilder } from "@/components/settings/AvatarBuilder";
-import { getProfileById } from "@/lib/data/profiles";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { requireSession } from "@/lib/session";
+import { signOut } from "@/auth";
+import { AppShell } from "@/components/layout/AppShell";
+import { Avatar } from "@/components/settings/Avatar";
+import { CloseSettingsButton } from "@/components/settings/CloseSettingsButton";
+import { ThemeToggle } from "@/components/settings/ThemeToggle";
+import { ExportDataButton } from "@/components/settings/ExportDataButton";
+import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
+import { SettingsRow } from "@/components/settings/SettingsRow";
+import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
+import { getProfileById } from "@/lib/data/profiles";
+import { xpToNextLevel } from "@/lib/data/xp";
 
-export default async function SettingsPage() {
+const ICON_STROKE = { strokeWidth: 1.6, fill: "none" as const };
+
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ open?: string }>;
+}) {
   const session = await requireSession();
   const profile = await getProfileById(session.user.id);
   if (!profile) notFound();
+  const { open } = await searchParams;
+  const openAppearance = open === "appearance";
+  const isAdventure = profile.theme === "adventure";
+  const iconColor = isAdventure ? "var(--t-gold)" : "var(--t-accent)";
+  const { level, nextLevel, xpIntoLevel, xpForNextLevel } = xpToNextLevel(profile.total_xp);
+  const pct = xpForNextLevel ? Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100)) : 100;
+  const themeLabel = isAdventure ? "Adventure" : "Calm (Default)";
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
-      <div className="mx-auto flex max-w-lg flex-col gap-6">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Settings</h1>
+      <div className="flex flex-col gap-5">
+        <div className="flex items-center gap-2.5">
+          <CloseSettingsButton isAdventure={isAdventure} />
+          <h1 className="font-display text-xl" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+            Settings
+          </h1>
+        </div>
 
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-zinc-500">Theme</h2>
-          <p className="text-xs text-zinc-400">
-            Calm keeps things quiet and minimal. Adventure turns your day into a battle — bouncier
-            animations, monster icons, and level-up fanfare.
+        {/* Profile header — avatar, name, level + XP bar */}
+        <section
+          className="flex flex-col items-center gap-2.5 rounded-2xl p-5"
+          style={{
+            background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+            border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+          }}
+        >
+          <div className="relative" style={{ width: 76, height: 76 }}>
+            <Link
+              href="/settings/avatar"
+              aria-label="Edit avatar"
+              className="hover-glow block overflow-hidden rounded-full"
+              style={{ width: 76, height: 76, border: `3px solid ${iconColor}` }}
+            >
+              <Avatar profile={profile} size={19} />
+            </Link>
+            <div
+              className="absolute left-1/2 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-bold"
+              style={{
+                bottom: -6,
+                transform: "translateX(-50%)",
+                background: iconColor,
+                color: isAdventure ? "#2a1c10" : "#fff",
+                border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card)"}`,
+              }}
+            >
+              {isAdventure ? `LVL ${level}` : `LV ${level}`}
+            </div>
+          </div>
+          <p
+            className="mt-1 text-sm font-semibold"
+            style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
+          >
+            {profile.name ?? session.user.email}
           </p>
-          <ThemeToggle theme={profile.theme} />
+          <div className="flex w-full max-w-[220px] flex-col gap-1">
+            <div
+              className="h-2 overflow-hidden rounded-full"
+              style={{ background: isAdventure ? "#0e170f" : "var(--t-card-border)" }}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${pct}%`,
+                  background: isAdventure ? "linear-gradient(90deg, var(--t-gold-deep), var(--t-gold))" : "var(--t-accent)",
+                }}
+              />
+            </div>
+            <div
+              className="text-center text-[11px]"
+              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.8 : 1 }}
+            >
+              {nextLevel ? `${xpIntoLevel} / ${xpForNextLevel} XP` : `${profile.total_xp} XP · Max level`}
+            </div>
+          </div>
         </section>
 
-        <section>
-          <h2 className="mb-2 text-sm font-semibold text-zinc-500">Avatar</h2>
-          <AvatarBuilder
-            initialBase={profile.avatar_base}
-            initialColor={profile.avatar_color}
-            initialAccessory={profile.avatar_accessory}
+        {/* Expandable settings rows */}
+        <div className="flex flex-col gap-2.5">
+          <SettingsRow
+            theme={profile.theme}
+            label="Account"
+            rightLabel={session.user.email ?? undefined}
+            icon={
+              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+              </svg>
+            }
+          >
+            <div className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
+              Signed in with Google as {session.user.email}
+            </div>
+            <form
+              action={async () => {
+                "use server";
+                await signOut();
+              }}
+            >
+              <button
+                type="submit"
+                className="hover-glow rounded-lg border px-3 py-1.5 text-xs font-medium"
+                style={{
+                  borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
+                  color: "var(--t-ink)",
+                }}
+              >
+                Sign out
+              </button>
+            </form>
+          </SettingsRow>
+
+          <Link
+            href="/notifications"
+            className="hover-glow flex w-full items-center gap-3 px-4 py-3"
+            style={{
+              background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+              border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+              borderRadius: 14,
+            }}
+          >
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+              style={{ background: isAdventure ? "rgba(209,161,60,.16)" : "var(--t-accent-soft)" }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
+                <path d="M6 9a6 6 0 1 1 12 0c0 3.5 1 5.5 2 6.5H4c1-1 2-3 2-6.5z" strokeLinejoin="round" />
+                <path d="M10 19a2 2 0 0 0 4 0" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span className="flex-1 text-sm font-medium" style={{ color: "var(--t-ink)" }}>
+              Notifications
+            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M9 5l7 7-7 7" stroke="var(--t-ink-soft)" strokeWidth="2" fill="none" />
+            </svg>
+          </Link>
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Calendar Sync"
+            rightLabel={session.googleAccessToken ? "Google Calendar ✓" : "Not connected"}
+            icon={
+              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
+                <rect x="3" y="5" width="18" height="16" rx="2" />
+                <path d="M3 9h18M8 3v4M16 3v4" />
+              </svg>
+            }
+          >
+            <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
+              {session.googleAccessToken
+                ? "Your Google Calendar is connected — appointments show on the Calendar view, and scheduling a quest adds it to your calendar too."
+                : "Sign in with Google again to connect your calendar."}
+            </p>
+          </SettingsRow>
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Appearance"
+            rightLabel={themeLabel}
+            defaultOpen={openAppearance}
+            icon={<span style={{ fontSize: 14 }}>🎨</span>}
+          >
+            <div className="flex flex-col gap-3">
+              <div>
+                <p className="mb-1.5 text-xs" style={{ color: "var(--t-ink-soft)" }}>
+                  Calm keeps things quiet and minimal. Adventure turns your day into a battle —
+                  bouncier animations, monster icons, and level-up fanfare.
+                </p>
+                <ThemeToggle theme={profile.theme} />
+              </div>
+              <ViewTransitionLink
+                href="/settings/avatar"
+                className="hover-glow inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
+                style={{
+                  background: isAdventure ? "var(--t-gold)" : "var(--t-accent)",
+                  color: isAdventure ? "#2a1c10" : "#fff",
+                }}
+              >
+                Edit avatar
+              </ViewTransitionLink>
+            </div>
+          </SettingsRow>
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Sound & Haptics"
+            disabled
+            icon={<span style={{ fontSize: 14 }}>🔊</span>}
           />
-        </section>
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Privacy & Security"
+            icon={
+              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
+                <rect x="5" y="11" width="14" height="9" rx="2" />
+                <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+              </svg>
+            }
+          >
+            <PrivacyToggle initialIsPublic={profile.is_public} theme={profile.theme} />
+          </SettingsRow>
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Your Data"
+            icon={
+              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
+                <path d="M12 3v13m0 0-4-4m4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" />
+              </svg>
+            }
+          >
+            <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
+              Download everything tied to your account — boards, goals, tasks, friends, activity,
+              and XP history — as one JSON file.
+            </p>
+            <ExportDataButton theme={profile.theme} />
+          </SettingsRow>
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Help & Support"
+            icon={
+              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7" strokeLinecap="round" />
+                <path d="M12 17.5h.01" strokeLinecap="round" />
+              </svg>
+            }
+          >
+            <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
+              Something not working, or an idea for the app? Reach out at{" "}
+              <a href="mailto:support@example.com" className="underline" style={{ color: iconColor }}>
+                support@example.com
+              </a>
+              .
+            </p>
+          </SettingsRow>
+        </div>
       </div>
     </AppShell>
   );

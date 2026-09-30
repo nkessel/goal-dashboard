@@ -10,13 +10,16 @@ export function ReactionBar({
   activityId,
   reactions,
   profileId,
+  theme = "calm",
 }: {
   activityId: string;
   reactions: ActivityReaction[];
   profileId: string;
+  theme?: "calm" | "adventure";
 }) {
   const [isPending, startTransition] = useTransition();
   const [customEmoji, setCustomEmoji] = useState("");
+  const isAdventure = theme === "adventure";
 
   // Group by emoji -> count + whether the current user reacted with it.
   const grouped = new Map<string, { count: number; mine: boolean }>();
@@ -42,19 +45,22 @@ export function ReactionBar({
     });
   }
 
+  const chipStyle = (mine: boolean) => ({
+    border: `1px solid ${mine ? "var(--t-gold-deep)" : isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+    background: mine ? (isAdventure ? "rgba(209,161,60,.18)" : "var(--t-accent-soft)") : "transparent",
+    color: "var(--t-ink)",
+  });
+
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1.5">
       {[...grouped.entries()].map(([emoji, { count, mine }]) => (
         <button
           key={emoji}
           type="button"
           disabled={isPending}
           onClick={() => toggle(emoji)}
-          className={`rounded-full border px-2 py-0.5 text-xs ${
-            mine
-              ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-950"
-              : "border-zinc-300 dark:border-zinc-700"
-          }`}
+          className="rounded-full px-2 py-0.5 text-xs"
+          style={chipStyle(mine)}
         >
           {emoji} {count}
         </button>
@@ -66,7 +72,8 @@ export function ReactionBar({
           type="button"
           disabled={isPending}
           onClick={() => toggle(emoji)}
-          className="rounded-full border border-dashed border-zinc-300 px-2 py-0.5 text-xs text-zinc-400 hover:text-zinc-700 dark:border-zinc-700 dark:hover:text-zinc-300"
+          className="rounded-full border border-dashed px-2 py-0.5 text-xs opacity-60 hover:opacity-100"
+          style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)" }}
         >
           {emoji}
         </button>
@@ -87,7 +94,8 @@ export function ReactionBar({
           onChange={(e) => setCustomEmoji(e.target.value)}
           placeholder="🦖"
           maxLength={8}
-          className="w-10 rounded border border-zinc-300 bg-transparent px-1 py-0.5 text-xs dark:border-zinc-700"
+          className="w-10 rounded border px-1 py-0.5 text-xs"
+          style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", color: "var(--t-ink)" }}
         />
       </form>
     </div>
