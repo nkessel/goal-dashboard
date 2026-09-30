@@ -29,8 +29,9 @@ export const AVATAR_STYLE_OPTIONS: { key: string; label: string; description: st
     label: "Storybook Painted",
     description: "Soft watercolor and ink, like a fairy-tale book",
     look:
-      "storybook fairy-tale illustration, soft watercolor washes with delicate ink linework, warm gentle palette, " +
-      "hand-painted paper texture, charming and friendly expression, classic children's book art",
+      "vintage storybook illustration in the manner of Arthur Rackham and Beatrix Potter, loose pen-and-ink " +
+      "outlines with pale transparent watercolor washes, muted earthy sepia palette, visible textured watercolor " +
+      "paper grain, whimsical slightly exaggerated proportions, flat and hand-drawn, not 3D, not glossy",
   },
   {
     key: "heroic",
@@ -45,8 +46,9 @@ export const AVATAR_STYLE_OPTIONS: { key: string; label: string; description: st
     label: "Pixel Hero",
     description: "Chunky 16-bit retro video-game sprite",
     look:
-      "16-bit pixel art character portrait, chunky clearly visible square pixels, limited retro color palette, " +
-      "crisp pixel edges, no anti-aliasing, SNES-era RPG sprite style, bold readable silhouette",
+      "8-bit NES-era pixel art sprite, extremely low resolution 32x32 sprite scaled up with huge chunky square " +
+      "pixels, only about 8 flat colors, thick 1-pixel black outline, no shading gradients, no anti-aliasing, " +
+      "simple iconic retro video game character",
   },
 ];
 

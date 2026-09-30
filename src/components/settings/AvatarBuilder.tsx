@@ -186,7 +186,7 @@ export function AvatarBuilder({
           <p className="text-xs font-medium" style={{ color: inkSoft }}>
             Art style
           </p>
-          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Art style">
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Art style">
             {AVATAR_STYLE_OPTIONS.map((s) => {
               const active = style === s.key;
               const src = examples?.[s.key];
@@ -198,9 +198,9 @@ export function AvatarBuilder({
                   aria-checked={active}
                   title={s.description}
                   onClick={() => setStyle(s.key)}
-                  className="hover-glow flex flex-col overflow-hidden rounded-xl text-left transition-transform active:scale-95"
+                  className="hover-glow flex w-[88px] flex-col overflow-hidden rounded-lg text-left transition-transform active:scale-95"
                   style={{
-                    border: `3px solid ${active ? accentBg : fieldBorder}`,
+                    border: `2px solid ${active ? accentBg : fieldBorder}`,
                     background: fieldBg,
                     boxShadow: active ? "0 0 0 2px rgba(209,161,60,.35)" : undefined,
                   }}
@@ -216,7 +216,7 @@ export function AvatarBuilder({
                     )}
                     {active && (
                       <span
-                        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold"
+                        className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
                         style={{ background: accentBg, color: accentInk }}
                         aria-hidden
                       >
@@ -225,7 +225,7 @@ export function AvatarBuilder({
                     )}
                   </div>
                   <span
-                    className="px-1.5 py-1.5 text-center text-[12px] font-semibold leading-tight"
+                    className="px-1 py-1 text-center text-[10.5px] font-semibold leading-tight"
                     style={{ color: inkColor, background: active ? (isAdventure ? "rgba(209,161,60,.25)" : "var(--t-accent-soft)") : undefined }}
                   >
                     {s.label}

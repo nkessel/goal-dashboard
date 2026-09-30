@@ -112,6 +112,8 @@ export function TaskRow({
           await toggleManualPriorityAction(task.id, !task.is_manual_priority);
         } else {
           setDone(true);
+          // Let the check finish its thud before the card leaves the list.
+          await new Promise((r) => setTimeout(r, 800));
           const fd = new FormData();
           fd.set("taskId", task.id);
           await completeTaskAction(fd);
@@ -339,22 +341,43 @@ export function TaskRow({
   );
 }
 
-/** The quest's default "icon": an empty checkbox (ticked once completed). */
-function CheckMark({ checked, isAdventure }: { checked: boolean; isAdventure: boolean }) {
+/** The quest's default "icon": a round badge with a greyed-out check. On
+ * completion the same check turns green and thuds in (same motion as the
+ * quest-complete screen). */
+export function CheckMark({ checked, isAdventure, size = 54 }: { checked: boolean; isAdventure: boolean; size?: number }) {
+  const check = Math.round(size * 0.87);
   return (
     <span
-      className="flex h-9 w-9 items-center justify-center rounded-lg"
+      className="flex items-center justify-center rounded-full"
       style={{
-        border: `2.5px solid ${isAdventure ? "#8a7250" : "var(--t-card-border)"}`,
-        background: checked ? (isAdventure ? "var(--t-xp)" : "var(--t-good)") : isAdventure ? "rgba(255,255,255,.35)" : "var(--t-card)",
-        boxShadow: isAdventure ? "inset 0 1px 2px rgba(0,0,0,.2)" : undefined,
+        width: size,
+        height: size,
+        border: `2px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}`,
+        background: isAdventure ? "radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), rgba(255,255,255,.15))" : "var(--t-card)",
+        boxShadow: isAdventure ? "inset 0 1px 3px rgba(0,0,0,.18)" : undefined,
       }}
     >
-      {checked && (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M5 12.5l4.5 4.5L19 7" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <span
+        className={checked ? "qc-card-check" : undefined}
+        style={{
+          width: check,
+          height: check,
+          display: "block",
+          filter: checked ? "drop-shadow(0 0 6px rgba(110,230,80,.7)) drop-shadow(0 2px 3px rgba(0,0,0,.4))" : undefined,
+        }}
+      >
+        <svg width={check} height={check} viewBox="0 0 24 24" fill="none" aria-hidden>
+          {checked ? (
+            <>
+              <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#16300f" strokeWidth="5.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#3fbf3a" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M5.6 12.6 L9.6 16.6 L18.4 6.9" stroke="#8ff070" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" opacity=".85" />
+            </>
+          ) : (
+            <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="rgba(90,80,60,.28)" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+          )}
         </svg>
-      )}
+      </span>
     </span>
   );
 }

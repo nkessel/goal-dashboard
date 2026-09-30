@@ -140,7 +140,12 @@ export function IconPicker({
           width: size,
           height: size,
           fontSize: size * 0.45,
-          border: isAdventure ? "2px solid var(--t-panel-border)" : "1.5px dashed var(--t-card-border)",
+          border:
+            !currentImageUrl && !currentEmoji && emptyContent
+              ? "none"
+              : isAdventure
+                ? "2px solid var(--t-panel-border)"
+                : "1.5px dashed var(--t-card-border)",
           background: isAdventure ? undefined : "var(--t-accent-soft)",
           color: "var(--t-ink-soft)",
         }}

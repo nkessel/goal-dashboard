@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { createQuestAction, deleteTaskAction, updateTaskAction } from "@/app/actions";
 import { IconPicker } from "./IconPicker";
+import { CheckMark } from "./TaskRow";
 
 export type QuestDraft = {
   title?: string;
@@ -125,12 +126,8 @@ export function QuestEditorDialog({
     });
   }
 
-  const checkbox = (
-    <span
-      className="flex h-12 w-12 items-center justify-center rounded-xl"
-      style={{ border: `3px solid ${isAdventure ? "#8a7250" : "var(--t-card-border)"}`, background: "rgba(255,255,255,.35)" }}
-    />
-  );
+  const checkbox = <CheckMark checked={false} isAdventure={isAdventure} size={96} />;
+
 
   return createPortal(
     <div
@@ -344,7 +341,7 @@ function IconScale({
   return (
     <div className="flex items-center gap-3">
       <span className="w-24 shrink-0 text-[13px] font-semibold">{label}</span>
-      <div className="flex flex-1 items-center gap-1" role="radiogroup" aria-label={label}>
+      <div className="flex flex-1 items-center gap-0.5" role="radiogroup" aria-label={label}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
@@ -353,16 +350,16 @@ function IconScale({
             aria-checked={value === n}
             aria-label={`${label} ${n}`}
             onClick={() => onChange(value === n ? 0 : n)}
-            className="flex h-10 w-10 items-center justify-center rounded-lg transition-transform active:scale-90"
+            className="flex h-7 w-7 items-center justify-center rounded-md transition-transform active:scale-90"
             style={{ background: n <= value ? "rgba(255,255,255,.4)" : "transparent" }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
             <img
               src={icon}
               alt=""
-              width={24}
-              height={24}
-              className="h-6 w-6"
+              width={14}
+              height={14}
+              className="h-3.5 w-3.5"
               style={{ opacity: n <= value ? 1 : 0.22, filter: n <= value ? undefined : "grayscale(1)" }}
             />
           </button>
