@@ -7,6 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 // once the image comes back, since the underlying model (Flux 1 Schnell)
 // has no native transparent-background mode.
 const CHROMA_KEY = { r: 57, g: 255, b: 20 }; // #39FF14
+const CHROMA_KEY_HEX = "#39ff14";
 
 /**
  * Prompt template shared by avatar and quest-icon generation: pushes toward
@@ -27,13 +28,13 @@ export function buildAvatarPrompt(subject: string, opts: { withBackground?: bool
 
   return opts.withBackground
     ? `${base}, scenic fantasy background that matches the art style`
-    : `${base}, plain flat solid pure neon green chroma-key background, no gradient, no scenery, no vignette, no lettering`;
+    : `${base}, flat solid ${CHROMA_KEY_HEX} green background with no gradient, no scenery, no vignette, no letters, no numbers, no writing of any kind`;
 }
 
 export function buildTaskIconPrompt(subject: string) {
   return (
     `single fantasy monster, ${subject}, hi-res RPG concept art, dramatic lighting, intricate detail, ` +
-    "centered, no other creatures, plain flat solid pure neon green chroma-key background, no gradient, no scenery, " +
+    `centered, no other creatures, flat solid ${CHROMA_KEY_HEX} green background with no gradient, no scenery, no letters or numbers, ` +
     "no text, no watermark"
   );
 }
