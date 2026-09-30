@@ -793,7 +793,7 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
   const { data: existing } = await db.storage.from("ai-images").list("style-examples");
   const have = new Set((existing ?? []).map((f: { name: string }) => f.name));
   for (const style of AVATAR_STYLE_OPTIONS) {
-    const version = "v6";
+    const version = style.key === "heroic" ? "v7" : "v6";
     const name = `${style.key}-${version}.png`;
     if (have.has(name)) {
       out[style.key] = db.storage.from("ai-images").getPublicUrl(`style-examples/${name}`).data.publicUrl;

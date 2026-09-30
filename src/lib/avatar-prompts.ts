@@ -38,8 +38,9 @@ export const AVATAR_STYLE_OPTIONS: { key: string; label: string; description: st
     label: "Heroic",
     description: "Painterly fantasy book-cover art",
     look:
-      "painterly fantasy illustration, traditional oil painting with visible brushstrokes, rich warm color, " +
-      "dramatic light, heroic and confident, fantasy book-cover art, hand-painted, not a 3D render, not CGI, not photoreal",
+      "painterly fantasy illustration, traditional oil painting with visible brushstrokes, deep saturated color, " +
+      "rich greens, browns and gold, strong dramatic light and shadow, heroic and confident, fantasy book-cover art, " +
+      "hand-painted, fully colored, not a sketch, not pale, not a 3D render, not CGI",
   },
   {
     key: "pixel",
