@@ -792,14 +792,14 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
   const { data: existing } = await db.storage.from("ai-images").list("style-examples");
   const have = new Set((existing ?? []).map((f: { name: string }) => f.name));
   for (const style of AVATAR_STYLE_OPTIONS) {
-    const name = `${style.key}-v1.png`;
+    const name = `${style.key}-v2.png`;
     if (have.has(name)) {
       out[style.key] = db.storage.from("ai-images").getPublicUrl(`style-examples/${name}`).data.publicUrl;
       continue;
     }
     out[style.key] = await generateAndStoreImage(
       buildAvatarPrompt(STYLE_EXAMPLE_SUBJECT, { withBackground: false, look: style.look }),
-      `style-examples/${style.key}-v1.jpg`,
+      `style-examples/${style.key}-v2.jpg`,
       { transparentBackground: true }
     );
   }

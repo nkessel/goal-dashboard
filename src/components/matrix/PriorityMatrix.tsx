@@ -150,7 +150,7 @@ export function PriorityMatrix({
         </fieldset>
       )}
       {/* Sized to leave room for what's below: never taller than the screen minus the header area. */}
-      <div className="mx-auto flex w-full gap-2" style={{ maxWidth: "min(100%, max(280px, calc(100svh - 330px)))" }}>
+      <div className="mx-auto flex w-full gap-2" style={{ maxWidth: "min(100%, max(260px, calc(100svh - 420px)))" }}>
         <div
           className="flex w-6 shrink-0 flex-col items-center justify-between py-1.5 text-[11px]"
           style={{ ...axisLabelStyle, writingMode: "vertical-rl", transform: "rotate(180deg)" }}
