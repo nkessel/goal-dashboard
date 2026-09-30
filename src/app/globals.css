@@ -487,3 +487,10 @@ html[data-enter="settings-close"] main { animation: overlay-fade-in 220ms ease b
 .qe-rise-in { animation: qe-rise-in 320ms cubic-bezier(.2,.8,.2,1) both; transform-origin: 50% 100%; }
 .qe-sink-out { animation: qe-sink-out 260ms cubic-bezier(.4,0,1,1) both; transform-origin: 50% 100%; }
 @media (prefers-reduced-motion: reduce) { .qe-rise-in, .qe-sink-out { animation: none; } }
+
+/* Screen slide animations move <main> sideways; never let that create a
+   horizontal scrollbar. */
+html,
+body {
+  overflow-x: clip;
+}
