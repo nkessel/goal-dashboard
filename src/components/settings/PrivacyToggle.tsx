@@ -48,12 +48,15 @@ export function PrivacyToggle({
           aria-checked={isPublic}
           onClick={toggle}
           disabled={isPending}
-          className="relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50"
-          style={{ background: isPublic ? (isAdventure ? "var(--t-gold)" : "var(--t-accent)") : "var(--t-card-border)" }}
+          className="relative block h-7 w-12 shrink-0 rounded-full p-0 transition-colors disabled:opacity-50"
+          style={{
+            background: isPublic ? (isAdventure ? "var(--t-gold)" : "var(--t-accent)") : "rgba(0,0,0,.18)",
+            border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+          }}
         >
           <span
-            className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
-            style={{ transform: isPublic ? "translateX(22px)" : "translateX(2px)" }}
+            className="absolute left-[2px] top-1/2 h-[22px] w-[22px] rounded-full bg-white shadow transition-transform"
+            style={{ transform: `translate(${isPublic ? 20 : 0}px, -50%)` }}
           />
         </button>
       </div>

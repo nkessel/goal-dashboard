@@ -206,7 +206,7 @@ async function stripChromaBackground(bytes: Buffer): Promise<Buffer> {
 export async function generateAndStoreImage(
   prompt: string,
   path: string,
-  opts: { transparentBackground?: boolean } = {}
+  opts: { transparentBackground?: boolean; pixelate?: number } = {}
 ): Promise<string> {
   let bytes: Buffer;
   let contentType = "image/jpeg";
@@ -236,6 +236,20 @@ export async function generateAndStoreImage(
         "Background removal failed — storing the image with its original background instead:",
         err instanceof Error ? err.message : err
       );
+    }
+  }
+
+  // Pixel style: snap to a real low-res pixel grid, then scale back up with
+  // hard edges, so every pixel is a visible square.
+  if (opts.pixelate && !isFallback) {
+    try {
+      const grid = opts.pixelate;
+      const small = await sharp(bytes).resize(grid, grid, { kernel: "nearest", fit: "cover" }).png().toBuffer();
+      bytes = await sharp(small).resize(512, 512, { kernel: "nearest" }).png().toBuffer();
+      contentType = "image/png";
+      finalPath = finalPath.replace(/\.[a-zA-Z0-9]+$/, ".png");
+    } catch (err) {
+      console.warn("Pixelation failed — storing the unpixelated image:", err instanceof Error ? err.message : err);
     }
   }
 

@@ -47,6 +47,7 @@ export function AvatarBuilder({
   const [genError, setGenError] = useState<string | null>(null);
   const [isPicking, startPicking] = useTransition();
   const [removed, setRemoved] = useState<Set<string>>(() => new Set());
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   // Draws attention to the Generate button right after a sample prompt gets
   // auto-filled, since picking a sample no longer generates immediately —
@@ -280,11 +281,11 @@ export function AvatarBuilder({
         <p className="mb-1.5 text-xs font-medium" style={{ color: inkSoft }}>
           Avatar library — presets, plus every avatar anyone has made
         </p>
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+        <div className="grid grid-cols-6 gap-2.5 sm:grid-cols-8">
           {library
             .filter((entry) => !removed.has(entry.id))
             .map((entry) => (
-              <div key={entry.id} className="relative">
+              <div key={entry.id} className="group relative">
                 <button
                   type="button"
                   onClick={() => pickFromLibrary(entry.image_url)}
@@ -292,7 +293,7 @@ export function AvatarBuilder({
                   title={entry.prompt ?? undefined}
                   className="hover-glow block aspect-square w-full overflow-hidden rounded-full disabled:opacity-50"
                   style={{
-                    border: `3px solid ${imageUrl === entry.image_url ? (isAdventure ? "var(--t-gold)" : initialColor) : "transparent"}`,
+                    border: `2px solid ${imageUrl === entry.image_url ? (isAdventure ? "var(--t-gold)" : initialColor) : "transparent"}`,
                   }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- static /design/ asset or external Supabase Storage URL */}
@@ -300,14 +301,40 @@ export function AvatarBuilder({
                 </button>
                 <button
                   type="button"
-                  onClick={() => removeFromLibrary(entry.id)}
-                  aria-label="Remove from library"
-                  title="Remove from library"
-                  className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold shadow"
-                  style={{ background: isAdventure ? "#2f2a1f" : "var(--t-ink)", color: "#fff", border: "2px solid var(--t-panel)" }}
+                  onClick={() => setConfirmRemove(entry.id)}
+                  aria-label="Delete from library"
+                  title="Delete from library"
+                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold opacity-0 shadow transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                  style={{ background: isAdventure ? "#2f2a1f" : "var(--t-ink)", color: "#fff", border: "1.5px solid var(--t-panel)" }}
                 >
                   ×
                 </button>
+                {confirmRemove === entry.id && (
+                  <div
+                    role="alertdialog"
+                    aria-label="Delete this image from the library?"
+                    className="absolute left-1/2 top-full z-30 mt-1 flex w-44 -translate-x-1/2 flex-col gap-2 rounded-lg p-2.5 text-xs shadow-xl"
+                    style={{ background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)", border: `1px solid ${fieldBorder}`, color: inkColor }}
+                  >
+                    <p className="font-medium">Delete this image from the library?</p>
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => setConfirmRemove(null)} className="rounded-full px-2 py-1" style={{ color: inkSoft }}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmRemove(null);
+                          removeFromLibrary(entry.id);
+                        }}
+                        className="rounded-full px-2.5 py-1 font-semibold"
+                        style={{ background: "var(--t-warn)", color: "#fff" }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
         </div>

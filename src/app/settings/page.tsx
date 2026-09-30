@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
 import { SettingsRow } from "@/components/settings/SettingsRow";
+import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import { CelebrationSettings } from "@/components/settings/CelebrationSettings";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
 import { getProfileById } from "@/lib/data/profiles";
@@ -52,10 +53,19 @@ export default async function SettingsPage({
             <Link
               href="/settings/avatar"
               aria-label="Edit avatar"
-              className="hover-glow block overflow-hidden rounded-full"
+              className="hover-glow group relative block overflow-hidden rounded-full"
               style={{ width: 120, height: 120, border: `3px solid ${iconColor}` }}
             >
               <Avatar profile={profile} size={30} />
+              <span
+                className="absolute inset-0 flex items-center justify-center gap-1 rounded-full text-sm font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                style={{ background: "rgba(20,16,8,.55)" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
+                </svg>
+                Edit
+              </span>
             </Link>
             <div
               className="absolute left-1/2 whitespace-nowrap rounded-full px-3 py-0.5 text-xs font-bold"
@@ -70,12 +80,7 @@ export default async function SettingsPage({
               {isAdventure ? `LVL ${level}` : `LV ${level}`}
             </div>
           </div>
-          <p
-            className={`mt-2 text-lg font-semibold ${isAdventure ? "font-display" : ""}`}
-            style={{ color: "var(--t-ink)" }}
-          >
-            {profile.name ?? session.user.email}
-          </p>
+          <InlineNameEditor initialName={profile.name ?? session.user.email ?? ""} isAdventure={isAdventure} />
           <div className="flex w-full max-w-[240px] flex-col gap-1">
             <div
               className="h-3 overflow-hidden rounded-full"
@@ -179,7 +184,7 @@ export default async function SettingsPage({
 
           <SettingsRow
             theme={profile.theme}
-            label="Appearance"
+            label="Theme"
             rightLabel={themeLabel}
             defaultOpen={openAppearance}
             icon={<span style={{ fontSize: 14 }}>🎨</span>}
@@ -217,12 +222,6 @@ export default async function SettingsPage({
             <CelebrationSettings />
           </SettingsRow>
 
-          <SettingsRow
-            theme={profile.theme}
-            label="Sound & Haptics"
-            disabled
-            icon={<span style={{ fontSize: 14 }}>🔊</span>}
-          />
 
           <SettingsRow
             theme={profile.theme}

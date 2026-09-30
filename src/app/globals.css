@@ -425,7 +425,26 @@ html[data-transition="settings-close"]::view-transition-new(root) {
 
 
 /* ---------- Screen change animation (see ViewTransitionProvider) ---------- */
-html[data-nav-pending] main { opacity: .55; transition: opacity 150ms ease; }
+/* While the next screen loads, the current one eases out in the travel
+   direction and a thin gold bar runs across the top. */
+html[data-nav-pending="nav-forward"] main { animation: nav-exit-left 220ms ease-in both; }
+html[data-nav-pending="nav-back"] main { animation: nav-exit-right 220ms ease-in both; }
+html[data-nav-pending="nav-up"] main { animation: nav-exit-up 240ms ease-in both; }
+html[data-nav-pending="fade"] main,
+html[data-nav-pending="settings-close"] main { opacity: .5; transition: opacity 150ms ease; }
+@keyframes nav-exit-left { to { transform: translateX(-12%); opacity: .25; } }
+@keyframes nav-exit-right { to { transform: translateX(12%); opacity: .25; } }
+@keyframes nav-exit-up { to { transform: translateY(-18%); opacity: 0; } }
+html[data-enter="nav-up"] main { animation: nav-enter-up 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes nav-enter-up { from { transform: translateY(35%); opacity: 0; } to { transform: none; opacity: 1; } }
+.nav-progress {
+  position: fixed; top: 0; left: 0; z-index: 70; height: 3px; width: 0;
+  background: linear-gradient(90deg, var(--t-gold-deep, #a88a3f), var(--t-gold, #d9b45f));
+  box-shadow: 0 0 8px rgba(217,180,95,.7);
+  opacity: 0; pointer-events: none;
+}
+html[data-nav-pending] .nav-progress { opacity: 1; animation: nav-progress 2.5s cubic-bezier(.1,.7,.3,1) forwards; }
+@keyframes nav-progress { from { width: 0; } to { width: 88%; } }
 html[data-enter="nav-forward"] main { animation: nav-enter-right 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 html[data-enter="nav-back"] main { animation: nav-enter-left 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 html[data-enter="fade"] main,

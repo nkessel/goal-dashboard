@@ -89,7 +89,8 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     let resolve!: () => void;
     const finished = new Promise<void>((r) => (resolve = r));
     pendingRef.current = { direction, resolve };
-    html.setAttribute("data-nav-pending", "");
+    html.setAttribute("data-nav-pending", direction);
+    if (direction === "nav-up") window.scrollTo({ top: 0, behavior: "smooth" });
     startTransition(() => router.push(href));
     // Safety net: never leave the old screen dimmed if the route errors out.
     setTimeout(() => {
@@ -111,6 +112,8 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
 
   return (
     <ViewTransitionContext.Provider value={{ navigate, getPreviousPathname, getLastAppPathname }}>
+      {/* Thin top progress bar while the next screen loads (see globals.css). */}
+      <div className="nav-progress" aria-hidden />
       {children}
     </ViewTransitionContext.Provider>
   );

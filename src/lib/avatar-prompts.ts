@@ -26,29 +26,28 @@ export const SAMPLE_AVATAR_PROMPTS = [
 export const AVATAR_STYLE_OPTIONS: { key: string; label: string; description: string; look: string }[] = [
   {
     key: "storybook",
-    label: "Storybook Painted",
-    description: "Soft watercolor and ink, like a fairy-tale book",
+    label: "Storybook",
+    description: "Simple, hand-drawn animated storybook look",
     look:
-      "vintage storybook illustration in the manner of Arthur Rackham and Beatrix Potter, loose pen-and-ink " +
-      "outlines with pale transparent watercolor washes, muted earthy sepia palette, visible textured watercolor " +
-      "paper grain, whimsical slightly exaggerated proportions, flat and hand-drawn, not 3D, not glossy",
+      "simple animated storybook cartoon, like a classic 2D hand-drawn animated film, clean bold outlines, " +
+      "flat cel colors with soft simple shading, big friendly expressive eyes, rounded simple shapes, cheerful, " +
+      "minimal detail, not realistic, not 3D",
   },
   {
     key: "heroic",
-    label: "Heroic Game Art",
-    description: "Bold, crisp fantasy RPG character art",
+    label: "Heroic",
+    description: "Painterly fantasy book-cover art",
     look:
-      "hyper-detailed fantasy RPG character portrait, painterly digital concept art like a AAA game character card, " +
-      "rich saturated color, dramatic rim lighting, crisp detail on armor and gear, heroic and confident, sharp focus",
+      "painterly fantasy illustration, traditional oil painting with visible brushstrokes, rich warm color, " +
+      "dramatic light, heroic and confident, fantasy book-cover art, hand-painted, not a 3D render, not CGI, not photoreal",
   },
   {
     key: "pixel",
-    label: "Pixel Hero",
-    description: "Chunky 16-bit retro video-game sprite",
+    label: "Pixel",
+    description: "16-bit retro game sprite",
     look:
-      "8-bit NES-era pixel art sprite, extremely low resolution 32x32 sprite scaled up with huge chunky square " +
-      "pixels, only about 8 flat colors, thick 1-pixel black outline, no shading gradients, no anti-aliasing, " +
-      "simple iconic retro video game character",
+      "16-bit SNES-era JRPG character sprite, clearly pixelated with every square pixel visible, limited 16-color " +
+      "palette, dark 1-pixel outline, simple dithered shading, retro game sprite, not smooth, no anti-aliasing",
   },
 ];
 

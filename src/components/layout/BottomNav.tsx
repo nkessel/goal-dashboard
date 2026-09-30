@@ -142,7 +142,11 @@ export function BottomNav({ theme }: { theme: Theme }) {
     e.preventDefault();
     const fromIndex = navIndex(pathname);
     const toIndex = navIndex(href);
-    const direction = fromIndex >= 0 && toIndex >= 0 && toIndex < fromIndex ? "nav-back" : "nav-forward";
+    const direction = pathname.startsWith("/settings")
+      ? "nav-up"
+      : fromIndex >= 0 && toIndex >= 0 && toIndex < fromIndex
+        ? "nav-back"
+        : "nav-forward";
     document.documentElement.setAttribute("data-transition", direction);
     setPendingHref(href);
     navigateWithTransition(href);
@@ -218,6 +222,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
               )}
               <Link
                 href={item.href}
+                prefetch={true}
                 onClick={(e) => navigate(e, item.href)}
                 ref={(el) => {
                   itemRefs.current[i] = el;

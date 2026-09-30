@@ -656,6 +656,7 @@ export async function generateAvatarImageAction(
   const fullPrompt = buildAvatarPrompt(trimmed, { withBackground, look: styleLook(style) });
   const url = await generateAndStoreImage(fullPrompt, `avatars/${ownerId}-${Date.now()}.jpg`, {
     transparentBackground: !withBackground,
+    pixelate: style === "pixel" ? 48 : undefined,
   });
   await profilesData.updateProfileAvatarImage(ownerId, url);
   await avatarLibraryData.addAvatarToLibrary({ imageUrl: url, createdBy: ownerId, prompt: trimmed });
@@ -792,7 +793,7 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
   const { data: existing } = await db.storage.from("ai-images").list("style-examples");
   const have = new Set((existing ?? []).map((f: { name: string }) => f.name));
   for (const style of AVATAR_STYLE_OPTIONS) {
-    const version = style.key === "heroic" ? "v2" : "v4";
+    const version = "v5";
     const name = `${style.key}-${version}.png`;
     if (have.has(name)) {
       out[style.key] = db.storage.from("ai-images").getPublicUrl(`style-examples/${name}`).data.publicUrl;
@@ -801,7 +802,7 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
     out[style.key] = await generateAndStoreImage(
       buildAvatarPrompt(STYLE_EXAMPLE_SUBJECT, { withBackground: false, look: style.look }),
       `style-examples/${style.key}-${version}.jpg`,
-      { transparentBackground: true }
+      { transparentBackground: true, pixelate: style.key === "pixel" ? 48 : undefined }
     );
   }
   return out;
