@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import {
   barDust,
   cardDust,
@@ -129,7 +130,7 @@ export function QuestComplete(props: QuestCompleteProps) {
 
   const remaining = questXp - gained;
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -318,6 +319,7 @@ export function QuestComplete(props: QuestCompleteProps) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

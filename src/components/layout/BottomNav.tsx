@@ -204,7 +204,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
           const label = isAdventure ? item.adventureLabel : item.calmLabel;
 
           return (
-            <div key={item.href} className="relative flex min-w-0 flex-1 items-stretch" style={{ zIndex: 1 }}>
+            <div key={item.href} className="relative flex min-w-0 flex-auto items-stretch" style={{ zIndex: 1 }}>
               {i > 0 && (
                 <div
                   aria-hidden
@@ -222,7 +222,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
                 ref={(el) => {
                   itemRefs.current[i] = el;
                 }}
-                className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-end gap-1 px-0.5 py-1.5 transition-transform duration-150 hover:scale-110 active:scale-95"
+                className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-end gap-1 px-1.5 py-1.5 transition-transform duration-150 hover:scale-110 active:scale-95"
               >
                 {isAdventure ? (
                   <>
