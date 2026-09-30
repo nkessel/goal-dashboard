@@ -1,26 +1,36 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { updateGoalProgressAction } from "@/app/actions";
+import { QuestComplete, type QuestCompleteProps } from "@/components/celebration/QuestComplete";
+
+export type GoalCelebration = Omit<QuestCompleteProps, "onClose">;
 
 export function GoalProgressControl({
   goalId,
   boardId,
   initialProgress,
   theme = "calm",
+  celebration,
 }: {
   goalId: string;
   boardId: string;
   initialProgress: number;
   theme?: "calm" | "adventure";
+  /** Details for the quest-complete screen shown when the goal reaches 100%. */
+  celebration?: GoalCelebration;
 }) {
   const [progress, setProgress] = useState(initialProgress);
+  const [celebrating, setCelebrating] = useState(false);
+  const wasComplete = useRef(initialProgress >= 100);
   const [isPending, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
 
   function commit(next: number) {
     const clamped = Math.max(0, Math.min(100, next));
     setProgress(clamped);
+    if (clamped >= 100 && !wasComplete.current && celebration) setCelebrating(true);
+    wasComplete.current = clamped >= 100;
     startTransition(() => {
       updateGoalProgressAction(goalId, boardId, clamped);
     });
@@ -33,6 +43,7 @@ export function GoalProgressControl({
 
   return (
     <div className="flex flex-col gap-2.5">
+      {celebrating && celebration && <QuestComplete {...celebration} onClose={() => setCelebrating(false)} />}
       <div className="flex items-center gap-2.5">
         <div
           className="h-3 flex-1 overflow-hidden rounded-full"

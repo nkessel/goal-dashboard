@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { getBoard, getBoardAncestors, listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { getProfileById } from "@/lib/data/profiles";
+import { xpToNextLevel } from "@/lib/data/xp";
 import { listGoalsForBoard } from "@/lib/data/goals";
 import { listTasksForGoal } from "@/lib/data/tasks";
 import { BoardFabMenu } from "@/components/boards/BoardFabMenu";
@@ -125,7 +126,22 @@ export default async function BoardDetailPage({
           </div>
         )}
 
-        <GoalList boardId={board.id} boardTitle={board.title} goalsWithTasks={goalsWithTasks} theme={theme} />
+        <GoalList
+          boardId={board.id}
+          boardTitle={board.title}
+          goalsWithTasks={goalsWithTasks}
+          theme={theme}
+          player={
+            profile
+              ? {
+                  level: xpToNextLevel(profile.total_xp).level,
+                  xpIntoLevel: xpToNextLevel(profile.total_xp).xpIntoLevel,
+                  xpForNextLevel: xpToNextLevel(profile.total_xp).xpForNextLevel,
+                  avatarSrc: profile.avatar_image_url ?? undefined,
+                }
+              : undefined
+          }
+        />
 
         <BoardFabMenu boardId={board.id} theme={theme} />
       </div>

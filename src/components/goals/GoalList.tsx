@@ -4,7 +4,7 @@ import type { Goal, Task } from "@/lib/data/types";
 import { reorderGoalsAction } from "@/app/actions";
 import { useDragReorder } from "@/lib/use-drag-reorder";
 import { useFlip } from "@/lib/use-flip";
-import { GoalProgressControl } from "./GoalProgressControl";
+import { GoalProgressControl, type GoalCelebration } from "./GoalProgressControl";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 import { TaskRow } from "@/components/tasks/TaskRow";
 
@@ -19,6 +19,7 @@ export function GoalList({
   boardTitle,
   goalsWithTasks: initial,
   theme,
+  player,
 }: {
   boardId: string;
   /** This board's title, shown as each task's category pill. Every goal on
@@ -27,6 +28,8 @@ export function GoalList({
   boardTitle: string;
   goalsWithTasks: { goal: Goal; tasks: Task[] }[];
   theme: "calm" | "adventure";
+  /** Level/XP/avatar for the quest-complete celebration. */
+  player?: Pick<GoalCelebration, "level" | "xpIntoLevel" | "xpForNextLevel" | "avatarSrc">;
 }) {
   const { items, draggingId, start, moveOver, finish } = useDragReorder({
     items: initial,
@@ -98,6 +101,15 @@ export function GoalList({
               boardId={boardId}
               initialProgress={goal.progress}
               theme={theme}
+              celebration={
+                player && {
+                  ...player,
+                  title: goal.title,
+                  description: goal.description,
+                  tag: boardTitle,
+                  questXp: tasks.reduce((sum, t) => sum + (t.xp_value ?? 0), 0),
+                }
+              }
             />
 
             {tasks.length > 0 && (

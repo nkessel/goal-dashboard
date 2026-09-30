@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
 import { SettingsRow } from "@/components/settings/SettingsRow";
+import { CelebrationSettings } from "@/components/settings/CelebrationSettings";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
 import { getProfileById } from "@/lib/data/profiles";
 import { xpToNextLevel } from "@/lib/data/xp";
@@ -204,6 +205,18 @@ export default async function SettingsPage({
                 Edit avatar
               </ViewTransitionLink>
             </div>
+          </SettingsRow>
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Celebration Effects"
+            rightLabel="Quest complete"
+            icon={<span style={{ fontSize: 14 }}>✨</span>}
+          >
+            <p className="mb-2 text-xs" style={{ color: "var(--t-ink-soft)" }}>
+              The dust and sparks that fly when you complete a quest. Saved on this device.
+            </p>
+            <CelebrationSettings />
           </SettingsRow>
 
           <SettingsRow
