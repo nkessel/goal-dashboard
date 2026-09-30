@@ -820,3 +820,9 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
   }
   return out;
 }
+
+/** Remove one image from the shared quest-icon library (quests already using it keep it). */
+export async function removeTaskIconFromLibraryAction(id: string) {
+  await requireProfileId();
+  await taskIconLibraryData.removeTaskIconFromLibrary(id);
+}

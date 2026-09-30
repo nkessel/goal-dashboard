@@ -494,3 +494,20 @@ html,
 body {
   overflow-x: clip;
 }
+
+/* Daily login toast */
+@keyframes daily-login-pop {
+  0% { opacity: 0; transform: translateY(-16px) scale(.8); }
+  15% { opacity: 1; transform: translateY(0) scale(1.06); }
+  25% { transform: scale(1); }
+  85% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-10px) scale(.96); }
+}
+.daily-login-pop { animation: daily-login-pop 3.2s ease both; }
+@keyframes daily-login-spark {
+  0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(.6); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(-70px) scale(.3); }
+}
+.daily-login-spark { animation: daily-login-spark 1.1s cubic-bezier(.12,.8,.3,1) 150ms both; }
+@media (prefers-reduced-motion: reduce) { .daily-login-pop, .daily-login-spark { animation: none; } }

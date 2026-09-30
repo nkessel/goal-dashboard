@@ -6,6 +6,7 @@ import type { Task } from "@/lib/data/types";
 import { createQuestAction, deleteTaskAction, scheduleTaskAction, updateTaskAction } from "@/app/actions";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
+import { SlotPickerDialog } from "./SlotPickerDialog";
 
 export type QuestDraft = {
   title?: string;
@@ -27,10 +28,6 @@ export type QuestEditorMode =
 const XP_MAX = 150;
 const XP_STEP = 10;
 
-function toLocalInput(d: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 /**
  * One compact dialog for creating and editing quests, laid out like a quest
@@ -69,9 +66,12 @@ export function QuestEditorDialog({
     return v != null ? String(v) : "";
   });
   const [draftIcon, setDraftIcon] = useState<{ url: string; source: "library" | "ai" } | null>(null);
-  const initialSlot = task?.is_on_calendar && task.scheduled_start ? toLocalInput(new Date(task.scheduled_start)) : "";
-  const [slot, setSlot] = useState(initialSlot);
-  const [onCalendar, setOnCalendar] = useState(Boolean(initialSlot));
+  const initialSlot =
+    task?.is_on_calendar && task.scheduled_start && task.scheduled_end
+      ? { start: task.scheduled_start, end: task.scheduled_end }
+      : null;
+  const [slot, setSlot] = useState<{ start: string; end: string } | null>(initialSlot);
+  const [pickingSlot, setPickingSlot] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -124,24 +124,16 @@ export function QuestEditorDialog({
     onClose();
   }
 
-  function slotWindow() {
-    const start = new Date(slot);
-    const minutes = Math.max(15, Number(estimate) || 30);
-    return { startISO: start.toISOString(), endISO: new Date(start.getTime() + minutes * 60000).toISOString() };
-  }
 
   function save() {
     setError(null);
     const est = estimate.trim() ? Math.max(0, Math.round(Number(estimate))) : null;
-    const wantSlot = !fixedSchedule && onCalendar && slot;
+    const newSlot = !fixedSchedule && slot && slot.start !== initialSlot?.start ? slot : null;
     startSaving(async () => {
       try {
         if (task) {
           await updateTaskAction(task.id, { title, description, importance, urgency, xpValue: xp, estimateMinutes: est });
-          if (wantSlot && slot !== initialSlot) {
-            const w = slotWindow();
-            await scheduleTaskAction(task.id, w.startISO, w.endISO);
-          }
+          if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
           close();
         } else if (mode.kind === "create") {
           const id = await createQuestAction({
@@ -155,7 +147,7 @@ export function QuestEditorDialog({
             iconKey: draftIcon?.url ?? null,
             iconSource: draftIcon?.source,
             pinToBattle: mode.pinToBattle,
-            schedule: fixedSchedule ?? (wantSlot ? slotWindow() : undefined),
+            schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
           });
           onCreated?.(id);
           await flyInto(id);
@@ -217,6 +209,27 @@ export function QuestEditorDialog({
           </button>
         </div>
 
+        {/* Time to complete */}
+        <label className="flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element -- same clock glyph as the quest card */}
+          <img src="/design/ui-clock.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+          <span className={`${labelCls} flex-1`}>Time to complete</span>
+          <input
+            type="number"
+            min={0}
+            step={5}
+            value={estimate}
+            onChange={(e) => setEstimate(e.target.value)}
+            placeholder="—"
+            aria-label="Minutes to complete"
+            className="h-9 w-16 rounded-lg border px-2 text-right text-sm tabular-nums"
+            style={fieldStyle}
+          />
+          <span className="w-7 text-sm" style={{ color: "var(--t-ink-soft)" }}>
+            min
+          </span>
+        </label>
+
         {/* Portrait left, title + description right — like the quest card */}
         <div className="flex items-start gap-3">
           <div className="flex shrink-0 flex-col items-center gap-1">
@@ -229,6 +242,7 @@ export function QuestEditorDialog({
                 theme={theme}
                 size={72}
                 emptyContent={empty}
+                showEditHint
               />
             ) : (
               <IconPicker
@@ -238,6 +252,7 @@ export function QuestEditorDialog({
                 theme={theme}
                 size={72}
                 emptyContent={empty}
+                showEditHint
                 onDraftChange={(url, source) => setDraftIcon(url ? { url, source } : null)}
               />
             )}
@@ -267,26 +282,55 @@ export function QuestEditorDialog({
           </div>
         </div>
 
-        {/* Time to complete */}
-        <label className="flex items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element -- same clock glyph as the quest card */}
-          <img src="/design/ui-clock.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-          <span className={`${labelCls} flex-1`}>Time to complete</span>
-          <input
-            type="number"
-            min={0}
-            step={5}
-            value={estimate}
-            onChange={(e) => setEstimate(e.target.value)}
-            placeholder="—"
-            aria-label="Minutes to complete"
-            className="h-9 w-16 rounded-lg border px-2 text-right text-sm tabular-nums"
-            style={fieldStyle}
+        {/* Due date / calendar */}
+        <div className="flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
+          <img src="/design/ui-calendar.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+          <span className={`${labelCls} w-[70px] shrink-0`}>Due</span>
+          {fixedSchedule || slot ? (
+            <span className="min-w-0 flex-1 truncate text-[13px]">
+              {new Date((fixedSchedule?.startISO ?? slot?.start)!).toLocaleString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+              No date yet
+            </span>
+          )}
+          {!fixedSchedule && (
+            <>
+              {slot && slot !== initialSlot && (
+                <button type="button" onClick={() => setSlot(initialSlot)} className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
+                  Undo
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setPickingSlot(true)}
+                className="hover-glow h-8 shrink-0 rounded-full border px-3 text-xs font-semibold"
+                style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", color: "var(--t-ink)" }}
+              >
+                {slot ? "Change" : "Add to calendar"}
+              </button>
+            </>
+          )}
+        </div>
+        {pickingSlot && (
+          <SlotPickerDialog
+            durationMinutes={Math.max(15, Number(estimate) || 30)}
+            isAdventure={isAdventure}
+            onPick={(picked) => {
+              setSlot(picked);
+              setPickingSlot(false);
+            }}
+            onClose={() => setPickingSlot(false)}
           />
-          <span className="w-7 text-sm" style={{ color: "var(--t-ink-soft)" }}>
-            min
-          </span>
-        </label>
+        )}
 
         {/* XP */}
         <div className="flex items-center gap-2.5">
@@ -316,57 +360,6 @@ export function QuestEditorDialog({
 
         <IconScale label="Importance" icon="/design/ui-bolt.png" value={importance} onChange={setImportance} />
         <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
-
-        {/* Calendar */}
-        {fixedSchedule ? (
-          <p className="flex items-center gap-2 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
-            <img src="/design/ui-calendar.png" alt="" width={16} height={16} />
-            On your calendar{" "}
-            {new Date(fixedSchedule.startISO).toLocaleString(undefined, {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
-            })}
-          </p>
-        ) : (
-          <div className="flex items-center gap-2.5">
-            <label className="flex w-[92px] shrink-0 cursor-pointer items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={onCalendar}
-                onChange={(e) => {
-                  setOnCalendar(e.target.checked);
-                  if (e.target.checked && !slot) {
-                    const d = new Date();
-                    d.setMinutes(0, 0, 0);
-                    d.setHours(d.getHours() + 1);
-                    setSlot(toLocalInput(d));
-                  }
-                }}
-                className="h-4 w-4"
-                style={{ accentColor: isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)" }}
-              />
-              <span className={labelCls}>Calendar</span>
-            </label>
-            {onCalendar ? (
-              <input
-                type="datetime-local"
-                value={slot}
-                onChange={(e) => setSlot(e.target.value)}
-                aria-label="When to do it"
-                className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-sm"
-                style={fieldStyle}
-              />
-            ) : (
-              <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-                Add a date and time
-              </span>
-            )}
-          </div>
-        )}
 
         {error && (
           <p className="text-sm" style={{ color: "var(--t-warn)" }}>
@@ -406,7 +399,7 @@ export function QuestEditorDialog({
             <button
               type="button"
               onClick={save}
-              disabled={isSaving || !title.trim() || (onCalendar && !slot && !fixedSchedule)}
+              disabled={isSaving || !title.trim()}
               className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:opacity-50"
               style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
             >

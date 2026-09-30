@@ -42,3 +42,9 @@ export async function addTaskIconToLibrary(input: {
     );
   if (error) throw new Error(`Failed to add task icon to library: ${error.message}`);
 }
+
+export async function removeTaskIconFromLibrary(id: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db.from("task_icon_library").delete().eq("id", id);
+  if (error) throw new Error(`Failed to remove icon from library: ${error.message}`);
+}

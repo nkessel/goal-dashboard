@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { completeTaskAction, toggleManualPriorityAction } from "@/app/actions";
+import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
 import { QuestActionMenu, type QuestAction } from "./QuestActionMenu";
@@ -63,6 +63,7 @@ export function TaskRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState<"icon" | "dots" | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +111,8 @@ export function TaskRow({
       try {
         if (action === "battle") {
           await toggleManualPriorityAction(task.id, !task.is_manual_priority);
+        } else if (action === "delete") {
+          await deleteTaskAction(task.id);
         } else {
           setDone(true);
           // Let the check finish its thud before the card leaves the list.
@@ -131,6 +134,7 @@ export function TaskRow({
       inBattle={task.is_manual_priority}
       onCalendar={task.is_on_calendar}
       align={align}
+      anchor={menuAnchor}
       onPick={pick}
       onClose={() => setMenu(null)}
     />
@@ -161,7 +165,10 @@ export function TaskRow({
           aria-label="Quest actions"
           aria-haspopup="menu"
           aria-expanded={menu === "dots"}
-          onClick={() => setMenu((m) => (m === "dots" ? null : "dots"))}
+          onClick={(e) => {
+            setMenuAnchor(e.currentTarget);
+            setMenu((m) => (m === "dots" ? null : "dots"));
+          }}
           className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"
           style={{ color: "var(--t-ink-soft)" }}
         >
@@ -195,7 +202,10 @@ export function TaskRow({
             aria-label={`Actions for ${task.title}`}
             aria-haspopup="menu"
             aria-expanded={menu === "icon"}
-            onClick={() => setMenu((m) => (m === "icon" ? null : "icon"))}
+            onClick={(e) => {
+              setMenuAnchor(e.currentTarget);
+              setMenu((m) => (m === "icon" ? null : "icon"));
+            }}
             className="hover-glow flex items-center justify-center overflow-hidden rounded-full"
             style={{
               width: avatarSize,

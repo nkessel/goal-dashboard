@@ -3,6 +3,7 @@ import { getProfileById } from "@/lib/data/profiles";
 import { TopRightAvatar } from "@/components/layout/TopRightAvatar";
 import { ThemeOnBody } from "@/components/layout/ThemeOnBody";
 import { NotificationsButton } from "@/components/layout/NotificationsButton";
+import { DailyLogin } from "@/components/xp/DailyLogin";
 import { BottomNav } from "@/components/layout/BottomNav";
 
 /**
@@ -46,6 +47,7 @@ export async function AppShell({
   return (
     <div data-theme={theme} className="flex min-h-screen flex-col items-center">
       <ThemeOnBody theme={theme} />
+      {profileId && <DailyLogin />}
       <div className={`flex w-full flex-1 flex-col ${widthClass}`}>
         <div className="flex items-center justify-end gap-2.5 px-5 pt-3">
           {profileId && (

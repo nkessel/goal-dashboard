@@ -98,10 +98,21 @@ export default async function Home() {
             {isAdventure ? "Victories Today" : "Completed today"}
           </div>
           <ul className="flex flex-col gap-1">
+            {profile?.last_check_in_at?.slice(0, 10) === new Date().toISOString().slice(0, 10) && (
+              <li className="flex items-center justify-between gap-2 py-1 text-sm" style={{ color: "var(--t-ink)" }}>
+                <span className="flex items-center gap-2">
+                  <span aria-hidden>✨</span>
+                  {isAdventure ? "Answered the call (daily login)" : "Daily login"}
+                </span>
+                <span className="font-semibold" style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}>
+                  +5 XP
+                </span>
+              </li>
+            )}
             {completedTasks.map((task) => (
               <CompletedTaskRow key={task.id} task={task} theme={theme} />
             ))}
-            {completedTasks.length === 0 && (
+            {completedTasks.length === 0 && profile?.last_check_in_at?.slice(0, 10) !== new Date().toISOString().slice(0, 10) && (
               <p className="py-1 text-sm" style={{ color: "var(--t-ink-soft)" }}>
                 Nothing completed yet today — you&apos;ve got this.
               </p>
