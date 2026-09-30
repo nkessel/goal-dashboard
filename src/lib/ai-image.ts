@@ -6,7 +6,6 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 // stripChromaBackground() below turns pixels near this color transparent
 // once the image comes back, since the underlying model (Flux 1 Schnell)
 // has no native transparent-background mode.
-const CHROMA_KEY = { r: 57, g: 255, b: 20 }; // #39FF14
 const CHROMA_KEY_HEX = "#39ff14";
 
 /**
@@ -157,7 +156,7 @@ function generateFallbackSvg(prompt: string): string {
 
 /**
  * Turns the chroma-key backdrop the prompt asked for into real alpha
- * transparency: any pixel close to CHROMA_KEY goes fully transparent, with
+ * transparency: the flat backdrop connected to the image border goes fully transparent, with
  * a feathered band just past that so the character's edge doesn't get a
  * hard, jagged cutout. Simple Euclidean color-distance keying — no ML
  * segmentation model involved, but effective against the flat, gradient-free
@@ -166,19 +165,76 @@ function generateFallbackSvg(prompt: string): string {
 async function stripChromaBackground(bytes: Buffer): Promise<Buffer> {
   const { data, info } = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
-  const KEY_THRESHOLD = 55;
+  const KEY_THRESHOLD = 70;
   const FEATHER_BAND = 45;
 
-  for (let i = 0; i < data.length; i += channels) {
-    const dr = data[i] - CHROMA_KEY.r;
-    const dg = data[i + 1] - CHROMA_KEY.g;
-    const db_ = data[i + 2] - CHROMA_KEY.b;
-    const dist = Math.sqrt(dr * dr + dg * dg + db_ * db_);
-    if (dist < KEY_THRESHOLD) {
+  // The model rarely paints the exact key color, so key out whatever flat
+  // color actually fills the border (median of the edge pixels)...
+  const edge: number[][] = [];
+  const px = (x: number, y: number) => (y * width + x) * channels;
+  for (let x = 0; x < width; x += 4) {
+    edge.push([...data.subarray(px(x, 0), px(x, 0) + 3)], [...data.subarray(px(x, height - 1), px(x, height - 1) + 3)]);
+  }
+  for (let y = 0; y < height; y += 4) {
+    edge.push([...data.subarray(px(0, y), px(0, y) + 3)], [...data.subarray(px(width - 1, y), px(width - 1, y) + 3)]);
+  }
+  const median = (k: number) => edge.map((c) => c[k]).sort((m, n) => m - n)[Math.floor(edge.length / 2)];
+  const key = { r: median(0), g: median(1), b: median(2) };
+  const distAt = (i: number) => {
+    const dr = data[i] - key.r;
+    const dg = data[i + 1] - key.g;
+    const db_ = data[i + 2] - key.b;
+    return Math.sqrt(dr * dr + dg * dg + db_ * db_);
+  };
+
+  // ...and only where it's connected to the border (flood fill), so the
+  // same color inside the character — a green cloak — is kept.
+  const removed = new Uint8Array(width * height);
+  const stack: number[] = [];
+  const seed = (x: number, y: number) => {
+    const p = y * width + x;
+    if (!removed[p] && distAt(p * channels) < KEY_THRESHOLD) {
+      removed[p] = 1;
+      stack.push(p);
+    }
+  };
+  for (let x = 0; x < width; x++) {
+    seed(x, 0);
+    seed(x, height - 1);
+  }
+  for (let y = 0; y < height; y++) {
+    seed(0, y);
+    seed(width - 1, y);
+  }
+  while (stack.length) {
+    const p = stack.pop()!;
+    const x = p % width;
+    const y = (p - x) / width;
+    if (x > 0) seed(x - 1, y);
+    if (x < width - 1) seed(x + 1, y);
+    if (y > 0) seed(x, y - 1);
+    if (y < height - 1) seed(x, y + 1);
+  }
+
+  for (let p = 0; p < width * height; p++) {
+    const i = p * channels;
+    if (removed[p]) {
       data[i + 3] = 0;
-    } else if (dist < KEY_THRESHOLD + FEATHER_BAND) {
-      const t = (dist - KEY_THRESHOLD) / FEATHER_BAND;
-      data[i + 3] = Math.round(data[i + 3] * t);
+      continue;
+    }
+    // Soften the fringe right next to the removed area.
+    const x = p % width;
+    const y = (p - x) / width;
+    const touches =
+      (x > 0 && removed[p - 1]) ||
+      (x < width - 1 && removed[p + 1]) ||
+      (y > 0 && removed[p - width]) ||
+      (y < height - 1 && removed[p + width]);
+    if (touches) {
+      const d = distAt(i);
+      if (d < KEY_THRESHOLD + FEATHER_BAND) {
+        data[i + 3] = Math.round(data[i + 3] * ((d - KEY_THRESHOLD) / FEATHER_BAND + 0.35));
+      }
     }
   }
 
