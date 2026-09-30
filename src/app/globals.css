@@ -435,7 +435,7 @@ html[data-nav-pending="fade"] main,
 html[data-nav-pending="settings-open"] main { opacity: .6; transition: opacity 150ms ease; }
 /* Settings unrolls downward when opened and rolls back up when closed — the
    edge moves, the content itself stays put. */
-html[data-enter="settings-open"] main { animation: settings-unroll 420ms cubic-bezier(.2,.8,.2,1) both; }
+html[data-enter="settings-open"] main { animation: settings-unroll 750ms cubic-bezier(.33,.7,.3,1) both; }
 @keyframes settings-unroll { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes settings-roll-up { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 100% 0); } }
 @keyframes nav-exit-left { to { transform: translateX(-12%); opacity: .25; } }

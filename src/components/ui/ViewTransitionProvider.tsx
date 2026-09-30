@@ -55,7 +55,8 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
   // Last screen outside Settings, so closing Settings from any depth
   // (Settings → Avatar → …) returns to the app instead of bouncing between
   // the settings pages.
-  const lastAppPathnameRef = useRef<string | null>(pathname.startsWith("/settings") ? null : pathname);
+  const isOverlayPage = (p: string) => p.startsWith("/settings") || p.startsWith("/notifications");
+  const lastAppPathnameRef = useRef<string | null>(isOverlayPage(pathname) ? null : pathname);
   const pendingRef = useRef<{ direction: string; resolve: () => void } | null>(null);
 
   // Screen-change animation, played on the NEW screen once it has actually
@@ -68,16 +69,19 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     if (currentPathnameRef.current === pathname) return;
     previousPathnameRef.current = currentPathnameRef.current;
     currentPathnameRef.current = pathname;
-    if (!pathname.startsWith("/settings")) lastAppPathnameRef.current = pathname;
+    if (!isOverlayPage(pathname)) lastAppPathnameRef.current = pathname;
     const html = document.documentElement;
     const pending = pendingRef.current;
     pendingRef.current = null;
     html.removeAttribute("data-nav-pending");
     html.setAttribute("data-enter", pending?.direction ?? "fade");
-    const t = setTimeout(() => {
-      html.removeAttribute("data-enter");
-      pending?.resolve();
-    }, 460);
+    const t = setTimeout(
+      () => {
+        html.removeAttribute("data-enter");
+        pending?.resolve();
+      },
+      pending?.direction === "settings-open" ? 800 : 460
+    );
     return () => clearTimeout(t);
   }, [pathname]);
 

@@ -11,7 +11,15 @@ import { useViewTransitionNavigate, useLastAppPathname } from "@/components/ui/V
  * fades out to the destination instead of the default expand/zoom root
  * transition (see the "settings-close" rules in globals.css).
  */
-export function CloseSettingsButton({ isAdventure, size = 32 }: { isAdventure: boolean; size?: number }) {
+export function CloseSettingsButton({
+  isAdventure,
+  size = 32,
+  label = "Close settings",
+}: {
+  isAdventure: boolean;
+  size?: number;
+  label?: string;
+}) {
   const navigate = useViewTransitionNavigate();
   const getLastAppPathname = useLastAppPathname();
 
@@ -34,7 +42,7 @@ export function CloseSettingsButton({ isAdventure, size = 32 }: { isAdventure: b
     <button
       type="button"
       onClick={close}
-      aria-label="Close settings"
+      aria-label={label}
       className="hover-glow flex shrink-0 items-center justify-center rounded-full"
       style={{
         width: size,
