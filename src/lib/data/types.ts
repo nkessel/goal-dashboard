@@ -51,7 +51,16 @@ export type Task = {
   created_at: string;
   updated_at: string;
   reminder_sent_at: string | null;
+  /** "Sometime before this date" (YYYY-MM-DD) — a floating deadline window
+   * instead of a fixed calendar slot. Null when the task has no window. */
+  due_by: string | null;
+  /** Where the task can be done, for batching errands. */
+  context: TaskContext | null;
+  /** Life-upkeep task; Today offers one of these a day. */
+  is_upkeep: boolean;
 };
+
+export type TaskContext = "out" | "home" | "computer" | "phone";
 
 export type Profile = {
   id: string;

@@ -1,9 +1,28 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { logTaskCompletedActivity } from "./activity";
-import type { Task } from "./types";
+import type { Task, TaskContext } from "./types";
 
 const MAX_MANUAL_PRIORITIES = 3;
+
+const CONTEXTS: readonly TaskContext[] = ["out", "home", "computer", "phone"];
+
+/**
+ * DB columns for the flexible-task fields (migration 0012). Only fields
+ * that were actually passed are included, so callers that don't know about
+ * them (and databases where the migration hasn't run yet) are unaffected.
+ */
+function flexibleFields(input: { dueBy?: string | null; context?: TaskContext | null; isUpkeep?: boolean }) {
+  const out: { due_by?: string | null; context?: TaskContext | null; is_upkeep?: boolean } = {};
+  if (input.dueBy !== undefined) {
+    out.due_by = input.dueBy && /^\d{4}-\d{2}-\d{2}$/.test(input.dueBy) ? input.dueBy : null;
+  }
+  if (input.context !== undefined) {
+    out.context = input.context && CONTEXTS.includes(input.context) ? input.context : null;
+  }
+  if (input.isUpkeep !== undefined) out.is_upkeep = input.isUpkeep;
+  return out;
+}
 
 export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
   const db = supabaseAdmin();
@@ -110,6 +129,10 @@ export async function updateTask(
     xpValue: number;
     /** Undefined leaves the existing estimate untouched; null clears it. */
     estimateMinutes?: number | null;
+    /** Same undefined-vs-null convention for the flexible-task fields. */
+    dueBy?: string | null;
+    context?: TaskContext | null;
+    isUpkeep?: boolean;
   }
 ): Promise<Task> {
   const importance = Math.max(0, Math.min(5, Math.round(input.importance * 10) / 10));
@@ -126,6 +149,7 @@ export async function updateTask(
       ...(input.estimateMinutes !== undefined
         ? { estimate_minutes: input.estimateMinutes === null ? null : Math.max(0, Math.round(input.estimateMinutes)) }
         : {}),
+      ...flexibleFields(input),
     })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
@@ -244,12 +268,16 @@ export async function createTask(
     estimateMinutes?: number | null;
     iconKey?: string | null;
     iconSource?: "monster" | "library" | "ai";
+    dueBy?: string | null;
+    context?: TaskContext | null;
+    isUpkeep?: boolean;
   }
 ): Promise<Task> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
     .insert({
+      ...flexibleFields(input),
       ...(input.iconKey ? { icon_key: input.iconKey, icon_source: input.iconSource ?? "library" } : {}),
       owner_id: ownerId,
       goal_id: input.goalId || null,

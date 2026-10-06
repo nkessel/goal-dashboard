@@ -17,7 +17,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt } from "@/lib/ai-image";
 import { styleLook, AVATAR_STYLE_OPTIONS, STYLE_EXAMPLE_SUBJECT } from "@/lib/avatar-prompts";
 import { exportAccountData, type AccountExport } from "@/lib/data/export";
-import type { TaskIconLibraryEntry } from "@/lib/data/types";
+import type { TaskContext, TaskIconLibraryEntry } from "@/lib/data/types";
 import { sendEmail } from "@/lib/email";
 import { findOpenSlots, type Interval } from "@/lib/scheduling";
 import {
@@ -230,6 +230,9 @@ export async function updateTaskAction(
     urgency: number;
     xpValue: number;
     estimateMinutes?: number | null;
+    dueBy?: string | null;
+    context?: TaskContext | null;
+    isUpkeep?: boolean;
   }
 ) {
   const ownerId = await requireProfileId();
@@ -240,6 +243,9 @@ export async function updateTaskAction(
     urgency: input.urgency,
     xpValue: input.xpValue,
     estimateMinutes: input.estimateMinutes,
+    dueBy: input.dueBy,
+    context: input.context,
+    isUpkeep: input.isUpkeep,
   });
   revalidatePath("/");
   revalidatePath("/matrix");
@@ -731,6 +737,9 @@ export async function createQuestAction(input: {
   iconSource?: "library" | "ai";
   pinToBattle?: boolean;
   schedule?: { startISO: string; endISO: string; googleEventId?: string };
+  dueBy?: string | null;
+  context?: TaskContext | null;
+  isUpkeep?: boolean;
 }): Promise<string> {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
@@ -746,6 +755,11 @@ export async function createQuestAction(input: {
     estimateMinutes: input.estimateMinutes ?? null,
     iconKey: input.iconKey ?? null,
     iconSource: input.iconSource,
+    // Only send the flexible fields when set, so creating a plain quest
+    // still works on a database that hasn't run migration 0012 yet.
+    ...(input.dueBy ? { dueBy: input.dueBy } : {}),
+    ...(input.context ? { context: input.context } : {}),
+    ...(input.isUpkeep ? { isUpkeep: true } : {}),
   });
   if (input.schedule) {
     const session = await auth();
@@ -825,4 +839,47 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
 export async function removeTaskIconFromLibraryAction(id: string) {
   await requireProfileId();
   await taskIconLibraryData.removeTaskIconFromLibrary(id);
+}
+
+// ---------------------------------------------------------------------------
+// Smart import (photo or pasted list -> reviewed quests)
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates the quests the user kept after reviewing a smart import. The
+ * parsing itself happens in /api/smart-import (a route handler, since a
+ * photo is too big for a server action's default body limit); this only
+ * writes the reviewed result. Returns how many were created.
+ */
+export async function createImportedQuestsAction(
+  items: {
+    title: string;
+    description?: string | null;
+    estimateMinutes?: number | null;
+    importance?: number;
+    urgency?: number;
+    dueBy?: string | null;
+    context?: TaskContext | null;
+    isUpkeep?: boolean;
+  }[]
+): Promise<number> {
+  const ownerId = await requireProfileId();
+  const clamp = (n: number | undefined) =>
+    n === undefined || Number.isNaN(n) ? 3 : Math.max(0, Math.min(5, Math.round(n)));
+  const kept = items.filter((i) => i.title?.trim()).slice(0, 50);
+  for (const item of kept) {
+    await tasksData.createTask(ownerId, {
+      title: item.title.trim().slice(0, 200),
+      description: item.description?.trim() || undefined,
+      importance: clamp(item.importance),
+      urgency: clamp(item.urgency),
+      estimateMinutes: item.estimateMinutes ?? null,
+      ...(item.dueBy ? { dueBy: item.dueBy } : {}),
+      ...(item.context ? { context: item.context } : {}),
+      ...(item.isUpkeep ? { isUpkeep: true } : {}),
+    });
+  }
+  revalidatePath("/");
+  revalidatePath("/matrix");
+  return kept.length;
 }

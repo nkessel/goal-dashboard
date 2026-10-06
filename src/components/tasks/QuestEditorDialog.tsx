@@ -2,7 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import type { Task } from "@/lib/data/types";
+import type { Task, TaskContext } from "@/lib/data/types";
+import { CONTEXT_OPTIONS, dateKeyInDays, windowLabel } from "@/lib/flexible";
 import { createQuestAction, deleteTaskAction, scheduleTaskAction, updateTaskAction } from "@/app/actions";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
@@ -12,6 +13,9 @@ export type QuestDraft = {
   title?: string;
   description?: string;
   estimateMinutes?: number | null;
+  dueBy?: string | null;
+  context?: TaskContext | null;
+  isUpkeep?: boolean;
 };
 
 export type QuestEditorMode =
@@ -65,6 +69,9 @@ export function QuestEditorDialog({
     const v = task?.estimate_minutes ?? prefill?.estimateMinutes;
     return v != null ? String(v) : "";
   });
+  const [dueBy, setDueBy] = useState<string>(task?.due_by ?? prefill?.dueBy ?? "");
+  const [context, setContext] = useState<TaskContext | null>(task?.context ?? prefill?.context ?? null);
+  const [isUpkeep, setIsUpkeep] = useState<boolean>(task?.is_upkeep ?? prefill?.isUpkeep ?? false);
   const [draftIcon, setDraftIcon] = useState<{ url: string; source: "library" | "ai" } | null>(null);
   const initialSlot =
     task?.is_on_calendar && task.scheduled_start && task.scheduled_end
@@ -132,7 +139,20 @@ export function QuestEditorDialog({
     startSaving(async () => {
       try {
         if (task) {
-          await updateTaskAction(task.id, { title, description, importance, urgency, xpValue: xp, estimateMinutes: est });
+          // Only send flexible fields that actually changed, so editing an
+          // ordinary quest never depends on migration 0012 having run.
+          const nextDue = dueBy || null;
+          await updateTaskAction(task.id, {
+            title,
+            description,
+            importance,
+            urgency,
+            xpValue: xp,
+            estimateMinutes: est,
+            ...(nextDue !== (task.due_by ?? null) ? { dueBy: nextDue } : {}),
+            ...(context !== (task.context ?? null) ? { context } : {}),
+            ...(isUpkeep !== (task.is_upkeep ?? false) ? { isUpkeep } : {}),
+          });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
           close();
         } else if (mode.kind === "create") {
@@ -147,6 +167,9 @@ export function QuestEditorDialog({
             iconKey: draftIcon?.url ?? null,
             iconSource: draftIcon?.source,
             pinToBattle: mode.pinToBattle,
+            dueBy: dueBy || null,
+            context,
+            isUpkeep,
             schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
           });
           onCreated?.(id);
@@ -332,6 +355,88 @@ export function QuestEditorDialog({
           />
         )}
 
+        {/* Floating window: "sometime before…" instead of a fixed slot */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2.5">
+            <span aria-hidden className="w-[18px] shrink-0 text-center text-[15px] leading-none">
+              ⏳
+            </span>
+            <span className={`${labelCls} w-[70px] shrink-0`}>Do by</span>
+            <input
+              type="date"
+              value={dueBy}
+              onChange={(e) => setDueBy(e.target.value)}
+              aria-label="Do by date"
+              className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-sm"
+              style={fieldStyle}
+            />
+            {dueBy && (
+              <button type="button" onClick={() => setDueBy("")} className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 pl-[28px]">
+            {[
+              { label: "Today", days: 0 },
+              { label: "This week", days: 6 },
+              { label: "2 weeks", days: 13 },
+              { label: "This month", days: 29 },
+            ].map((q) => {
+              const key = dateKeyInDays(q.days);
+              const on = dueBy === key;
+              return (
+                <Chip key={q.label} on={on} isAdventure={isAdventure} onClick={() => setDueBy(on ? "" : key)}>
+                  {q.label}
+                </Chip>
+              );
+            })}
+            {dueBy && (
+              <span className="text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                {windowLabel(dueBy)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Where — for batching errands */}
+        <div className="flex items-start gap-2.5">
+          <span aria-hidden className="w-[18px] shrink-0 pt-1.5 text-center text-[15px] leading-none">
+            📍
+          </span>
+          <span className={`${labelCls} w-[70px] shrink-0 pt-1.5`}>Where</span>
+          <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+            {CONTEXT_OPTIONS.map((o) => {
+              const on = context === o.key;
+              return (
+                <Chip key={o.key} on={on} isAdventure={isAdventure} onClick={() => setContext(on ? null : o.key)}>
+                  {o.emoji} {isAdventure ? o.adventureLabel : o.calmLabel}
+                </Chip>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Upkeep */}
+        <label className="flex cursor-pointer items-center gap-2.5">
+          <span aria-hidden className="w-[18px] shrink-0 text-center text-[15px] leading-none">
+            🧹
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className={labelCls}>{isAdventure ? "Keep upkeep" : "Upkeep task"}</span>
+            <span className="text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+              Life maintenance — Today offers one of these a day
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={isUpkeep}
+            onChange={(e) => setIsUpkeep(e.target.checked)}
+            className="h-5 w-5"
+            style={{ accentColor: isAdventure ? "var(--t-gold)" : "var(--t-accent)" }}
+          />
+        </label>
+
         {/* XP */}
         <div className="flex items-center gap-2.5">
           <span className={`${labelCls} w-[92px] shrink-0`}>{isAdventure ? "XP reward" : "Points"}</span>
@@ -494,5 +599,40 @@ function IconScale({
         {value}
       </span>
     </div>
+  );
+}
+
+/** Small pill toggle used by the Do-by quick picks and the Where options. */
+function Chip({
+  on,
+  isAdventure,
+  onClick,
+  children,
+}: {
+  on: boolean;
+  isAdventure: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className="hover-glow h-7 rounded-full border px-2.5 text-xs font-medium"
+      style={{
+        borderColor: on
+          ? isAdventure
+            ? "var(--t-gold)"
+            : "var(--t-accent)"
+          : isAdventure
+            ? "var(--t-panel-border)"
+            : "var(--t-card-border)",
+        background: on ? (isAdventure ? "rgba(217,180,95,.22)" : "var(--t-accent-soft)") : "transparent",
+        color: "var(--t-ink)",
+      }}
+    >
+      {children}
+    </button>
   );
 }

@@ -3,6 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { TodayTaskBoard } from "@/components/tasks/TodayTaskBoard";
 import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
+import { FlexiblePanel } from "@/components/tasks/FlexiblePanel";
 import { XpSummary } from "@/components/xp/XpSummary";
 import {
   listOpenTasksForOwnerWithCategory,
@@ -80,6 +81,8 @@ export default async function Home() {
         )}
 
         <TodayTaskBoard priorityTasks={topPriorities} otherTasks={otherTasks} theme={theme} />
+
+        <FlexiblePanel tasks={openTasks} theme={theme} />
 
         <section>
           <AddTaskForm theme={theme} />
