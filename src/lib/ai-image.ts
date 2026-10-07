@@ -36,8 +36,9 @@ export function buildSketchbookIconPrompt(subject: string) {
   return (
     `colored pencil and watercolor sketchbook illustration of ${subject}, whimsical hand-drawn fantasy storybook art ` +
     "like classic illustrated children's fantasy novels, warm muted colors, loose expressive pencil linework, " +
-    "visible paper texture, single centered object or scene, charming and magical, not photorealistic, not 3D, " +
-    "flat solid #39ff14 green background with no gradient, no scenery, no letters or numbers"
+    "single centered object, charming and magical, not photorealistic, not 3D, " +
+    "isolated on a plain flat bright green background, no table, no shadow, no scenery, " +
+    "absolutely no text, no words, no writing, no labels, no captions, no signature, no letters or numbers"
   );
 }
 
