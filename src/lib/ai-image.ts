@@ -37,7 +37,8 @@ export function buildSketchbookIconPrompt(subject: string) {
     `whimsical painted storybook illustration of ${subject}, soft chalk pastel and gouache painting ` +
     "in the style of late-1990s illustrated children's fantasy novel chapter art, warm glowing golden candlelight, " +
     "rich saturated jewel tones, deep ambers and teals, soft blended edges, visible pastel grain and brush texture, " +
-    "magical cozy enchanted atmosphere, gentle painterly highlights, single centered object, " +
+    "magical cozy enchanted atmosphere, gentle painterly highlights, single small centered object, " +
+    "the whole object fully visible with a wide empty margin on every side, nothing touching the edges, " +
     "isolated on a plain flat bright green background, no table, no shadow, no scenery, " +
     "absolutely no text, no words, no writing, no labels, no captions, no signature, no letters or numbers"
   );
