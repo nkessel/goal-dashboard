@@ -93,12 +93,12 @@ export function TaskRow({
     backgroundColor: isOverdue ? "var(--t-warn-bg)" : cardBase,
     backgroundImage: [
       tint ? `linear-gradient(${tint}, ${tint})` : null,
-      isAdventure && !isOverdue ? "url(/design/tex-parchment.jpg)" : null,
+      isAdventure && !isOverdue ? "url(/design/tex-parchment-2.jpg)" : null,
     ]
       .filter(Boolean)
       .join(", ") || undefined,
-    backgroundSize: "cover",
-    backgroundPosition: "center",
+    backgroundSize: "384px 384px",
+    backgroundRepeat: "repeat",
     borderStyle: "solid",
     borderWidth: isAdventure ? 2 : 1,
     borderColor: isWarnedCard ? "var(--t-warn)" : isAdventure ? "#c7a96f" : "var(--t-card-border)",

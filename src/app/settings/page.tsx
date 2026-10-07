@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { signOut } from "@/auth";
 import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Avatar } from "@/components/settings/Avatar";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
@@ -28,7 +29,7 @@ export default async function SettingsPage({
   const { open } = await searchParams;
   const openAppearance = open === "appearance";
   const isAdventure = profile.theme === "adventure";
-  const iconColor = isAdventure ? "var(--t-gold)" : "var(--t-accent)";
+  const iconColor = isAdventure ? "#7a5f2a" : "var(--t-accent)";
   const { level, nextLevel, xpIntoLevel, xpForNextLevel } = xpToNextLevel(profile.total_xp);
   const pct = xpForNextLevel ? Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100)) : 100;
   const themeLabel = isAdventure ? "Adventure" : "Calm (Default)";
@@ -36,26 +37,24 @@ export default async function SettingsPage({
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <div className="flex flex-col gap-5">
-        <div className="flex items-center gap-2.5">
-          <h1 className="font-display text-xl" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
-            Settings
-          </h1>
-        </div>
+        <PageHeader isAdventure={isAdventure} title="Settings" />
 
         {/* Profile header — avatar, name, level + XP bar */}
         <section
-          className="flex flex-col items-center gap-2.5 rounded-2xl p-5"
-          style={{
-            background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-            border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-          }}
+          className={`flex flex-col items-center gap-2.5 rounded-2xl p-5 ${isAdventure ? "parchment parchment-framed" : ""}`}
+          style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
         >
           <div className="relative" style={{ width: 120, height: 120 }}>
             <Link
               href="/settings/avatar"
               aria-label="Edit avatar"
               className="hover-glow group relative block overflow-hidden rounded-full"
-              style={{ width: 120, height: 120, border: `3px solid ${iconColor}` }}
+              style={{
+                width: 120,
+                height: 120,
+                border: `3px solid ${isAdventure ? "var(--t-gold)" : iconColor}`,
+                boxShadow: isAdventure ? "0 0 0 2px #3a2e14, 0 0 18px rgba(217,180,95,.35), 0 6px 14px rgba(0,0,0,.35)" : undefined,
+              }}
             >
               <Avatar profile={profile} size={30} />
               <span
@@ -69,16 +68,21 @@ export default async function SettingsPage({
               </span>
             </Link>
             <div
-              className="absolute left-1/2 whitespace-nowrap rounded-full px-3 py-0.5 text-xs font-bold"
-              style={{
-                bottom: -6,
-                transform: "translateX(-50%)",
-                background: iconColor,
-                color: isAdventure ? "#2a1c10" : "#fff",
-                border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card)"}`,
-              }}
+              className="font-display absolute left-1/2 whitespace-nowrap rounded-full px-3.5 py-0.5 text-[15px]"
+              style={
+                isAdventure
+                  ? {
+                      bottom: -10,
+                      transform: "translateX(-50%)",
+                      background: "linear-gradient(180deg, #3f4c39, #222b20)",
+                      color: "#f2d27e",
+                      border: "2px solid var(--t-gold)",
+                      boxShadow: "0 3px 8px rgba(0,0,0,.4)",
+                    }
+                  : { bottom: -6, transform: "translateX(-50%)", background: iconColor, color: "#fff", border: "2px solid var(--t-card)" }
+              }
             >
-              {isAdventure ? `LVL ${level}` : `LV ${level}`}
+              {isAdventure ? `Lvl ${level}` : `LV ${level}`}
             </div>
           </div>
           <InlineNameEditor initialName={profile.name ?? session.user.email ?? ""} isAdventure={isAdventure} />
@@ -141,12 +145,12 @@ export default async function SettingsPage({
 
           <Link
             href="/rewards"
-            className="hover-glow flex w-full items-center gap-3 px-4 py-3"
-            style={{
-              background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-              border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-              borderRadius: 14,
-            }}
+            className={`hover-glow flex w-full items-center gap-3 px-4 py-3.5 ${isAdventure ? "parchment" : ""}`}
+            style={
+              isAdventure
+                ? { borderRadius: 14 }
+                : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }
+            }
           >
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
@@ -154,7 +158,7 @@ export default async function SettingsPage({
             >
               <ChestIcon size={18} />
             </span>
-            <span className="flex-1 text-sm font-medium" style={{ color: "var(--t-ink)" }}>
+            <span className="flex-1 text-[16px] font-medium" style={{ color: "var(--t-ink)" }}>
               Treasure Chest
             </span>
             <span className="flex items-center gap-1 text-[13px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
@@ -167,12 +171,12 @@ export default async function SettingsPage({
 
           <Link
             href="/notifications"
-            className="hover-glow flex w-full items-center gap-3 px-4 py-3"
-            style={{
-              background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-              border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-              borderRadius: 14,
-            }}
+            className={`hover-glow flex w-full items-center gap-3 px-4 py-3.5 ${isAdventure ? "parchment" : ""}`}
+            style={
+              isAdventure
+                ? { borderRadius: 14 }
+                : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }
+            }
           >
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
@@ -183,7 +187,7 @@ export default async function SettingsPage({
                 <path d="M10 19a2 2 0 0 0 4 0" strokeLinecap="round" />
               </svg>
             </span>
-            <span className="flex-1 text-sm font-medium" style={{ color: "var(--t-ink)" }}>
+            <span className="flex-1 text-[16px] font-medium" style={{ color: "var(--t-ink)" }}>
               Notifications
             </span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">

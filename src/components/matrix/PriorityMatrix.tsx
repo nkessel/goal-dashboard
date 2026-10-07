@@ -14,6 +14,15 @@ import { TaskViewCard } from "@/components/tasks/TaskViewCard";
 // even after a drag, and this is what tells the two apart.
 const CLICK_MOVE_THRESHOLD = 4;
 
+/** Quadrant washes, in LEGEND order: top-right, top-left, bottom-right, bottom-left. */
+const QUADRANT_TINT = ["rgba(196,72,40,.13)", "rgba(79,109,60,.13)", "rgba(56,104,140,.12)", "rgba(107,98,82,.10)"];
+const QUADRANT_POS: React.CSSProperties[] = [
+  { right: 0, top: 0 },
+  { left: 0, top: 0 },
+  { right: 0, bottom: 0 },
+  { left: 0, bottom: 0 },
+];
+
 const LEGEND = {
   adventure: [
     { title: "Battle Now", desc: "Important & urgent" },
@@ -228,7 +237,7 @@ export function PriorityMatrix({
           {[...boards, ...(hasUnboarded ? [{ id: "none", title: "No board" }] : [])].map((b) => (
             <label
               key={b.id}
-              className="flex min-h-9 cursor-pointer items-center gap-2 text-sm"
+              className="flex min-h-9 cursor-pointer items-center gap-2 text-[15.5px]"
               style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
             >
               <input
@@ -245,24 +254,33 @@ export function PriorityMatrix({
       )}
       {/* Sized to leave room for what's below: never taller than the screen minus the header area. */}
       <div className="mx-auto flex w-full gap-2" style={{ maxWidth: "min(100%, max(260px, calc(100svh - 420px)))" }}>
-        <div
-          className="flex w-6 shrink-0 flex-col items-center justify-between py-1.5 text-[11px]"
-          style={{ ...axisLabelStyle, writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-        >
-          <span>{isAdventure ? "VITAL" : "IMPORTANT"}</span>
-          <span>{isAdventure ? "MINOR" : "NOT IMPORTANT"}</span>
+        {/* Vertical axis: two rotated labels pinned to the top and bottom. */}
+        <div className="relative w-6 shrink-0" style={axisLabelStyle} aria-hidden>
+          <span className="absolute left-1/2 top-2 origin-center whitespace-nowrap text-[14px]" style={{ transform: "translateX(-50%) rotate(180deg)", writingMode: "vertical-rl" }}>
+            {isAdventure ? "Vital ↑" : "Important ↑"}
+          </span>
+          <span className="absolute bottom-2 left-1/2 origin-center whitespace-nowrap text-[14px]" style={{ transform: "translateX(-50%) rotate(180deg)", writingMode: "vertical-rl" }}>
+            {isAdventure ? "Minor" : "Not important"}
+          </span>
         </div>
 
         <div className="flex-1">
           <div
             ref={gridRef}
-            className="relative aspect-square w-full overflow-hidden rounded-xl"
-            style={{
-              background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
-              border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-              borderWidth: isAdventure ? 2 : 1,
-            }}
+            className={`relative aspect-square w-full overflow-hidden rounded-2xl ${isAdventure ? "parchment" : ""}`}
+            style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
           >
+            {/* Quadrant washes + titles */}
+            {legend.map((q, i) => (
+              <div key={q.title} className="pointer-events-none absolute h-1/2 w-1/2" style={{ ...QUADRANT_POS[i], background: QUADRANT_TINT[i] }}>
+                <span
+                  className={`absolute text-[15px] italic ${i % 2 === 0 ? "right-3" : "left-3"} ${i < 2 ? "top-2.5" : "bottom-2.5"}`}
+                  style={{ color: "var(--t-ink-soft)", opacity: 0.85 }}
+                >
+                  {q.title}
+                </span>
+              </div>
+            ))}
             {plotTask && (
               <button
                 type="button"
@@ -273,12 +291,12 @@ export function PriorityMatrix({
               />
             )}
             <div
-              className="absolute bottom-0 top-0 left-1/2 w-px"
-              style={{ background: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", opacity: 0.6 }}
+              className="absolute bottom-0 top-0 left-1/2 w-0"
+              style={{ borderLeft: `1.5px dashed ${isAdventure ? "rgba(139,112,64,.55)" : "var(--t-card-border)"}` }}
             />
             <div
-              className="absolute left-0 right-0 top-1/2 h-px"
-              style={{ background: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", opacity: 0.6 }}
+              className="absolute left-0 right-0 top-1/2 h-0"
+              style={{ borderTop: `1.5px dashed ${isAdventure ? "rgba(139,112,64,.55)" : "var(--t-card-border)"}` }}
             />
 
             {plotted.map(({ task, xPct, yPct }) => {
@@ -287,6 +305,7 @@ export function PriorityMatrix({
               const displayY = isDragging ? dragState.yPct : yPct;
               const tint = rescheduleRedness(task.reschedule_count);
               const dotColor = tint ?? task.color ?? (isAdventure ? "var(--t-gold)" : "var(--t-accent)");
+              const pinImg = task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null;
 
               return (
                 <div
@@ -295,12 +314,18 @@ export function PriorityMatrix({
                   style={{ left: `${displayX}%`, bottom: `${displayY}%`, zIndex: isDragging ? 30 : undefined }}
                 >
                   <div
-                    className="h-4 w-4 cursor-grab touch-none rounded-full shadow active:cursor-grabbing"
+                    className="flex cursor-grab touch-none items-center justify-center overflow-hidden rounded-full active:cursor-grabbing"
                     style={{
-                      backgroundColor: dotColor,
-                      border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "#fff"}`,
-                      transform: isDragging ? "scale(1.4)" : undefined,
-                      boxShadow: isDragging ? "0 4px 10px rgba(0,0,0,.3)" : undefined,
+                      width: isAdventure ? 34 : 16,
+                      height: isAdventure ? 34 : 16,
+                      backgroundColor: isAdventure ? (pinImg ? "#f3e6c8" : dotColor) : dotColor,
+                      border: `2px solid ${isAdventure ? (tint ? "var(--t-warn)" : "#8a6c2c") : "#fff"}`,
+                      transform: isDragging ? "scale(1.3)" : undefined,
+                      boxShadow: isAdventure
+                        ? `0 0 0 2px rgba(217,180,95,.45), 0 ${isDragging ? 6 : 2}px ${isDragging ? 12 : 5}px rgba(0,0,0,.35)`
+                        : isDragging
+                          ? "0 4px 10px rgba(0,0,0,.3)"
+                          : undefined,
                     }}
                     onPointerDown={(e) => {
                       e.preventDefault();
@@ -334,9 +359,14 @@ export function PriorityMatrix({
                       if (movedPastThreshold.current) return; // just finished a real drag, not a click
                       setViewingTaskId(task.id);
                     }}
-                  />
+                  >
+                    {isAdventure && pinImg && (
+                      // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+                      <img src={pinImg} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" />
+                    )}
+                  </div>
                   <div
-                    className="pointer-events-none absolute bottom-6 left-1/2 z-10 hidden w-48 -translate-x-1/2 rounded-lg p-2 text-xs shadow-lg group-hover:block"
+                    className={`pointer-events-none absolute left-1/2 z-10 hidden w-56 -translate-x-1/2 rounded-xl p-2.5 text-[13.5px] shadow-lg group-hover:block ${isAdventure ? "bottom-10 parchment" : "bottom-6"}`}
                     style={{
                       background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
                       border: `1px solid ${isAdventure ? "var(--t-gold)" : "var(--t-card-border)"}`,
@@ -344,7 +374,7 @@ export function PriorityMatrix({
                       display: isDragging ? "block" : undefined,
                     }}
                   >
-                    <p className="font-medium">{task.title}</p>
+                    <p className="text-[15px] font-semibold leading-snug">{task.title}</p>
                     {task.description && (
                       <p className="mt-0.5" style={{ color: "var(--t-ink-soft)" }}>
                         {task.description}
@@ -370,39 +400,36 @@ export function PriorityMatrix({
             )}
           </div>
 
-          <div className="mt-1.5 flex justify-between text-[11px]" style={axisLabelStyle}>
-            <span>{isAdventure ? "NOT URGENT" : "NOT URGENT"}</span>
-            <span>URGENT</span>
+          <div className="mt-1.5 flex justify-between text-[14px]" style={axisLabelStyle}>
+            <span>Not urgent</span>
+            <span>Urgent →</span>
           </div>
         </div>
       </div>
 
-      <p className="text-center text-[11px]" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)", opacity: 0.85 }}>
-        Drag a dot to re-plot its importance and urgency.
+      <p className="m-0 text-center text-[14px] italic" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.8 }}>
+        Drag a quest to re-plot its importance and urgency; click one to open it.
       </p>
 
-      <div className="flex flex-col gap-2">
-        {legend.map((item) => (
+      <div
+        className={`flex flex-col rounded-2xl px-5 py-3 ${isAdventure ? "parchment parchment-framed" : ""}`}
+        style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
+      >
+        {legend.map((item, i) => (
           <div
             key={item.title}
-            className="flex items-start gap-2.5 rounded-lg px-3 py-2"
-            style={{
-              background: isAdventure ? "rgba(0,0,0,.22)" : "var(--t-card)",
-              border: `1px solid ${isAdventure ? "rgba(209,161,60,.3)" : "var(--t-card-border)"}`,
-            }}
+            className="relative z-[1] flex items-center gap-3 py-2"
+            style={i === 0 ? undefined : { borderTop: `1px solid ${isAdventure ? "rgba(139,112,64,.3)" : "var(--t-card-border)"}` }}
           >
             <span
-              className={isAdventure ? "font-display" : ""}
-              style={{
-                minWidth: 118,
-                fontSize: isAdventure ? 13 : 13,
-                fontWeight: isAdventure ? 500 : 700,
-                color: isAdventure ? "var(--t-gold)" : "var(--t-ink)",
-              }}
-            >
+              aria-hidden
+              className="h-5 w-5 shrink-0 rounded-md"
+              style={{ background: QUADRANT_TINT[i].replace(/[\d.]+\)$/, ".55)"), border: "1px solid rgba(80,60,20,.35)" }}
+            />
+            <span className="w-[130px] shrink-0 text-[16.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
               {item.title}
             </span>
-            <span className="text-xs" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.8 : 1 }}>
+            <span className="text-[14.5px]" style={{ color: "var(--t-ink-soft)" }}>
               {item.desc}
             </span>
           </div>

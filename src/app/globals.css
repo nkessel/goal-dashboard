@@ -543,9 +543,9 @@ body {
    read as inked boxes rather than flat inputs. */
 [data-theme="adventure"] .parchment {
   background-color: #ecdab4 !important;
-  background-image: url(/design/tex-parchment.jpg) !important;
-  background-size: cover !important;
-  background-position: center !important;
+  background-image: url(/design/tex-parchment-2.jpg) !important;
+  background-size: 384px 384px !important;
+  background-repeat: repeat !important;
   border: 2px solid #c7a96f !important;
   color: var(--t-ink);
   box-shadow:

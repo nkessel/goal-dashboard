@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { PriorityMatrix } from "@/components/matrix/PriorityMatrix";
 import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
 import { listBoardsForOwner } from "@/lib/data/boards";
@@ -39,35 +40,7 @@ export default async function MatrixPage({
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <h1
-              className={isAdventure ? "font-display text-xl" : "text-lg font-extrabold"}
-              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
-            >
-              {isAdventure ? "War Map" : "Priority Matrix"}
-            </h1>
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold"
-              style={
-                isAdventure
-                  ? {
-                      background: "radial-gradient(circle at 35% 30%, #5f7a52, #24361f)",
-                      border: "2px solid var(--t-gold)",
-                      color: "var(--t-gold)",
-                      fontFamily: "var(--font-display)",
-                    }
-                  : { background: "var(--t-accent-soft)", color: "var(--t-accent)" }
-              }
-            >
-              {isAdventure ? `L${level}` : `LV ${level}`}
-            </div>
-          </div>
-          <p
-            className="text-sm"
-            style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.7 : 1 }}
-          >
-            {isAdventure ? "Plot every quest by importance and urgency" : "See everything by importance and urgency"}
-          </p>
+          <PageHeader isAdventure={isAdventure} title="War Map" calmTitle="Priority Matrix" subtitle={isAdventure ? "Plot every quest by importance and urgency" : "See everything by importance and urgency"} />
         </div>
 
 
@@ -76,11 +49,14 @@ export default async function MatrixPage({
           confirmImports={confirmImports}
         />
 
-        <section className="flex flex-col gap-2.5 rounded-2xl px-4 py-3.5" style={victoriesStyle}>
-          <div className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
+        <section
+          className={`flex flex-col gap-1.5 rounded-2xl px-5 py-4 ${isAdventure ? "parchment parchment-framed" : ""}`}
+          style={isAdventure ? undefined : victoriesStyle}
+        >
+          <h2 className={`relative z-[1] m-0 ${isAdventure ? "font-display text-[20px]" : "text-sm font-semibold"}`} style={{ color: "var(--t-ink)" }}>
             Completed
-          </div>
-          <ul className="flex flex-col">
+          </h2>
+          <ul className="relative z-[1] flex flex-col">
             {completedTasks.map((task) => (
               <CompletedTaskRow key={task.id} task={task} theme={theme} />
             ))}

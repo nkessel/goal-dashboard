@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { CreateBoardForm } from "@/components/boards/CreateBoardForm";
 import { BoardGrid } from "@/components/boards/BoardGrid";
 import { listBoardsWithStatsForOwner } from "@/lib/data/boards";
@@ -20,34 +21,7 @@ export default async function BoardsPage() {
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <h1
-              className={isAdventure ? "font-display text-xl" : "text-lg font-extrabold"}
-              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
-            >
-              {isAdventure ? "Quest Boards" : "Boards"}
-            </h1>
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold"
-              style={
-                isAdventure
-                  ? {
-                      background: "radial-gradient(circle at 35% 30%, #5f7a52, #24361f)",
-                      border: "2px solid var(--t-gold)",
-                      color: "var(--t-gold)",
-                      fontFamily: "var(--font-display)",
-                    }
-                  : { background: "var(--t-accent-soft)", color: "var(--t-accent)" }
-              }
-            >
-              {isAdventure ? `L${level}` : `LV ${level}`}
-            </div>
-          </div>
-          {isAdventure && (
-            <div style={{ color: "var(--t-cream)", opacity: 0.7 }} className="text-sm">
-              Your active campaigns
-            </div>
-          )}
+          <PageHeader isAdventure={isAdventure} title="Quest Boards" calmTitle="Boards" subtitle="Your active campaigns" />
         </div>
 
         <CreateBoardForm theme={theme} />

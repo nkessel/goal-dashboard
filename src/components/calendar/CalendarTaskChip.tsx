@@ -76,7 +76,7 @@ export function CalendarTaskChip({
     opacity: isCompleted && !isAdventure ? 0.65 : 1,
   };
 
-  const iconSize = compact ? (isAdventure ? 22 : 18) : isAdventure ? 32 : 28;
+  const iconSize = compact ? 18 : isAdventure ? 32 : 28;
 
   return (
     <>
@@ -88,13 +88,13 @@ export function CalendarTaskChip({
         e.stopPropagation();
         setEditing(true);
       }}
-      className="hover-glow flex h-full w-full min-w-0 items-center overflow-hidden rounded-lg text-left"
+      className={`hover-glow flex h-full w-full min-w-0 overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
       style={{
         ...cardStyle,
-        flexDirection: compact ? "column" : "row",
-        justifyContent: compact ? "center" : "flex-start",
-        gap: compact ? 2 : 8,
-        padding: compact ? "4px 3px" : "6px 8px",
+        ...(isAdventure ? { borderLeft: `3px solid ${isCompleted ? "var(--t-good)" : isWarned ? "var(--t-warn)" : "#a88a3f"}` } : {}),
+        flexDirection: "row",
+        gap: compact ? 4 : 8,
+        padding: compact ? "3px 4px" : "6px 8px",
       }}
     >
       <div
@@ -119,13 +119,13 @@ export function CalendarTaskChip({
         )}
       </div>
 
-      <div className={compact ? "min-w-0 text-center" : "min-w-0 flex-1"}>
+      <div className="min-w-0 flex-1">
         <p
-          className="truncate leading-tight"
+          className={compact ? "line-clamp-3 break-words leading-[1.15]" : "truncate leading-tight"}
           style={{
             color: "var(--t-ink)",
-            fontSize: compact ? 9 : 12.5,
-            fontWeight: 500,
+            fontSize: compact ? 11.5 : 13.5,
+            fontWeight: 600,
             textDecoration: isCompleted && !isAdventure ? "line-through" : undefined,
           }}
         >
@@ -134,7 +134,7 @@ export function CalendarTaskChip({
         {isCompleted && (
           <p
             className="truncate leading-tight"
-            style={{ color: "var(--t-ink-soft)", fontSize: compact ? 8 : 10.5, opacity: 0.8 }}
+            style={{ color: "var(--t-ink-soft)", fontSize: compact ? 10 : 11.5, opacity: 0.8 }}
           >
             Completed
           </p>

@@ -31,10 +31,9 @@ export function SettingsRow({
 
   return (
     <div
-      className={disabled ? "" : "hover-glow"}
+      className={`${disabled ? "" : "hover-glow"} ${isAdventure ? "parchment" : ""}`}
       style={{
-        background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-        border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+        ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }),
         borderRadius: 14,
         opacity: disabled ? 0.55 : 1,
       }}
@@ -43,7 +42,7 @@ export function SettingsRow({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left"
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
         style={{ cursor: disabled ? "default" : "pointer" }}
       >
         <span
@@ -52,11 +51,11 @@ export function SettingsRow({
         >
           {icon}
         </span>
-        <span className="flex-1 text-sm font-medium" style={{ color: "var(--t-ink)" }}>
+        <span className="flex-1 text-[16px] font-medium" style={{ color: "var(--t-ink)" }}>
           {label}
         </span>
         {rightLabel && (
-          <span className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
+          <span className="text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
             {rightLabel}
           </span>
         )}

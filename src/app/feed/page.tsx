@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { FriendDirectory } from "@/components/social/FriendDirectory";
 import { FriendRequests } from "@/components/social/FriendRequests";
 import { InviteLinkBox } from "@/components/social/InviteLinkBox";
@@ -49,29 +50,7 @@ export default async function FeedPage() {
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <div className="flex flex-col gap-5">
-        <div className="flex items-center justify-between">
-          <h1
-            className={isAdventure ? "font-display text-xl" : "text-lg font-extrabold"}
-            style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
-          >
-            {isAdventure ? "Guild Hall" : "Friends"}
-          </h1>
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold"
-            style={
-              isAdventure
-                ? {
-                    background: "radial-gradient(circle at 35% 30%, #5f7a52, #24361f)",
-                    border: "2px solid var(--t-gold)",
-                    color: "var(--t-gold)",
-                    fontFamily: "var(--font-display)",
-                  }
-                : { background: "var(--t-accent-soft)", color: "var(--t-accent)" }
-            }
-          >
-            {isAdventure ? `L${level}` : `LV ${level}`}
-          </div>
-        </div>
+        <PageHeader isAdventure={isAdventure} title="Guild Hall" calmTitle="Friends" />
 
         <FriendRequests incoming={incomingWithProfiles} theme={theme} />
 

@@ -37,8 +37,8 @@ export function CreateBoardForm({ theme = "calm" }: { theme?: "calm" | "adventur
           setOpen(false);
         });
       }}
-      className="flex flex-col gap-2 rounded-xl p-3"
-      style={{ border: `1px solid ${borderColor}`, background: isAdventure ? "rgba(0,0,0,.22)" : "var(--t-card)" }}
+      className={`flex flex-col gap-2.5 rounded-2xl p-4 ${isAdventure ? "parchment parchment-framed" : ""}`}
+      style={isAdventure ? undefined : { border: `1px solid ${borderColor}`, background: "var(--t-card)" }}
     >
       <input
         name="title"

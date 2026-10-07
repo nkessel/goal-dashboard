@@ -59,7 +59,7 @@ export function ReactionBar({
           type="button"
           disabled={isPending}
           onClick={() => toggle(emoji)}
-          className="rounded-full px-2 py-0.5 text-xs"
+          className="h-8 rounded-full px-2.5 text-[15px]"
           style={chipStyle(mine)}
         >
           {emoji} {count}
@@ -72,7 +72,7 @@ export function ReactionBar({
           type="button"
           disabled={isPending}
           onClick={() => toggle(emoji)}
-          className="rounded-full border border-dashed px-2 py-0.5 text-xs opacity-60 hover:opacity-100"
+          className="h-8 rounded-full border border-dashed px-2.5 text-[15px] opacity-70 hover:opacity-100"
           style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)" }}
         >
           {emoji}

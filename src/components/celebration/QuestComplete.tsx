@@ -232,7 +232,7 @@ export function QuestComplete(props: QuestCompleteProps) {
           {/* Featured quest card */}
           <div
             className="qc-card relative box-border w-full rounded-xl px-4 pb-4 pt-3.5"
-            style={{ border: "2px solid #d9b45f", backgroundColor: "#e2caa2", backgroundImage: "url(/design/tex-parchment.jpg)", backgroundSize: "cover" }}
+            style={{ border: "2px solid #d9b45f", backgroundColor: "#e2caa2", backgroundImage: "url(/design/tex-parchment-2.jpg)", backgroundSize: "384px 384px" }}
           >
             <div className="qc-fade pointer-events-none absolute inset-0" style={{ opacity: spark }}>
               <Dust items={card0} mode="pct" />
@@ -401,8 +401,8 @@ function RewardChest({
   const parchment: React.CSSProperties = {
     border: "2px solid #d9b45f",
     backgroundColor: "#e2caa2",
-    backgroundImage: "url(/design/tex-parchment.jpg)",
-    backgroundSize: "cover",
+    backgroundImage: "url(/design/tex-parchment-2.jpg)",
+    backgroundSize: "384px 384px",
     boxShadow: "inset 0 0 0 1px rgba(255,240,210,.55), 0 10px 24px rgba(0,0,0,.5)",
   };
 

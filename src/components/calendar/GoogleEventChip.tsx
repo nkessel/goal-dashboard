@@ -87,18 +87,18 @@ export function GoogleEventChip({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hover-glow flex h-full w-full items-center overflow-hidden rounded-lg text-left"
+        className={`hover-glow flex h-full w-full overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
         style={{
-          background: isAdventure ? "rgba(78,95,150,.22)" : "#e7ecf9",
-          border: `1px dashed ${isAdventure ? "rgba(150,170,230,.55)" : "#a9b8e6"}`,
-          flexDirection: compact ? "column" : "row",
-          justifyContent: compact ? "center" : "flex-start",
-          gap: compact ? 2 : 8,
-          padding: compact ? "4px 3px" : "6px 8px",
+          background: isAdventure ? "rgba(70,104,138,.16)" : "#e7ecf9",
+          border: compact ? "none" : `1px solid ${isAdventure ? "rgba(70,104,138,.45)" : "#a9b8e6"}`,
+          borderLeft: `3px solid ${isAdventure ? "#46688a" : "#7f95d6"}`,
+          flexDirection: "row",
+          gap: compact ? 0 : 8,
+          padding: compact ? "3px 4px 3px 5px" : "6px 8px",
         }}
       >
         <div
-          className="flex shrink-0 items-center justify-center rounded-full"
+          className={`${compact ? "hidden" : "flex"} shrink-0 items-center justify-center rounded-full`}
           style={{ width: compact ? 16 : 20, height: compact ? 16 : 20, background: isAdventure ? "rgba(150,170,230,.3)" : "#c9d4f5" }}
         >
           <svg width={compact ? 9 : 11} height={compact ? 9 : 11} viewBox="0 0 24 24" fill="none">
@@ -106,10 +106,10 @@ export function GoogleEventChip({
             <path d="M3 9h18M8 3v4M16 3v4" stroke="var(--t-ink)" strokeWidth="2" />
           </svg>
         </div>
-        <div className={compact ? "min-w-0 text-center" : "min-w-0 flex-1"}>
+        <div className="min-w-0 flex-1">
           <p
-            className="truncate leading-tight"
-            style={{ color: "var(--t-ink)", fontSize: compact ? 9 : 12.5, fontWeight: 500 }}
+            className={compact ? "line-clamp-3 break-words leading-[1.15]" : "truncate leading-tight"}
+            style={{ color: isAdventure ? "#22374a" : "var(--t-ink)", fontSize: compact ? 11.5 : 13.5, fontWeight: 500 }}
           >
             {event.title}
           </p>

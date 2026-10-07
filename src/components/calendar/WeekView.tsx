@@ -73,23 +73,50 @@ export function WeekView({
       (x): x is { event: GoogleCalendarEvent; dayIndex: number; startRow: number; endRow: number } => x !== null
     );
 
+  // Side-by-side lanes for overlapping items on the same day.
+  type Span = { key: string; dayIndex: number; startRow: number; endRow: number };
+  const spans: Span[] = [
+    ...placedEvents.map((p) => ({ key: `e-${p.event.id}`, dayIndex: p.dayIndex, startRow: p.startRow, endRow: p.endRow })),
+    ...placed.map((p) => ({ key: `t-${p.task.id}`, dayIndex: p.dayIndex, startRow: p.startRow, endRow: p.endRow })),
+  ];
+  const lanes = new Map<string, { lane: number; count: number }>();
+  for (let d = 0; d < 7; d++) {
+    const items = spans.filter((x) => x.dayIndex === d).sort((a, b) => a.startRow - b.startRow || b.endRow - a.endRow);
+    let cluster: { span: Span; lane: number }[] = [];
+    let clusterEnd = -1;
+    const flush = () => {
+      const count = Math.max(1, ...cluster.map((c) => c.lane + 1));
+      cluster.forEach((c) => lanes.set(c.span.key, { lane: c.lane, count }));
+      cluster = [];
+    };
+    for (const it of items) {
+      if (it.startRow >= clusterEnd && cluster.length) flush();
+      const laneEnds: number[] = [];
+      cluster.forEach((c) => (laneEnds[c.lane] = Math.max(laneEnds[c.lane] ?? -1, c.span.endRow)));
+      let lane = laneEnds.findIndex((end) => end <= it.startRow);
+      if (lane === -1) lane = laneEnds.length;
+      cluster.push({ span: it, lane });
+      clusterEnd = Math.max(clusterEnd, it.endRow);
+    }
+    if (cluster.length) flush();
+  }
+  const laneStyle = (key: string): React.CSSProperties => {
+    const l = lanes.get(key) ?? { lane: 0, count: 1 };
+    return { justifySelf: "start", width: `calc(${100 / l.count}% - 2px)`, marginLeft: `${(100 / l.count) * l.lane}%` };
+  };
+
   const lineColor = isAdventure ? "rgba(122,82,51,.25)" : "var(--t-card-border)";
 
   return (
     <div
-      className="rounded-xl p-2"
-      style={{
-        background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
-        borderStyle: "solid",
-        borderWidth: isAdventure ? 2 : 1,
-        borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
-      }}
+      className={`rounded-2xl p-2.5 ${isAdventure ? "parchment" : ""}`}
+      style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >
       <div
         className="grid"
         style={{
-          gridTemplateColumns: "24px repeat(7, minmax(0, 1fr))",
-          gridTemplateRows: `auto repeat(${hourCount}, 42px)`,
+          gridTemplateColumns: "40px repeat(7, minmax(0, 1fr))",
+          gridTemplateRows: `auto repeat(${hourCount}, 48px)`,
           columnGap: 2,
         }}
       >
@@ -106,12 +133,22 @@ export function WeekView({
               <span
                 className={isAdventure ? "font-display" : ""}
                 style={{
-                  fontSize: 9,
-                  fontWeight: isToday ? 700 : 400,
+                  fontSize: 13.5,
+                  fontWeight: isToday ? 700 : 500,
                   color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : "var(--t-ink-soft)",
                 }}
               >
-                {WEEKDAY_LABELS[i]}
+                {WEEKDAY_LABELS[i].charAt(0) + WEEKDAY_LABELS[i].slice(1).toLowerCase()}
+              </span>
+              <span
+                className="flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[13px] tabular-nums"
+                style={
+                  isToday
+                    ? { background: isAdventure ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", fontWeight: 700 }
+                    : { color: "var(--t-ink)" }
+                }
+              >
+                {day.getDate()}
               </span>
             </Link>
           );
@@ -137,7 +174,7 @@ export function WeekView({
             style={{
               gridColumn: 1,
               gridRow: row + 2,
-              fontSize: 8.5,
+              fontSize: 11.5,
               lineHeight: 1.1,
               whiteSpace: "pre-line",
               color: "var(--t-ink-soft)",
@@ -186,7 +223,7 @@ export function WeekView({
         {placedEvents.map(({ event, dayIndex, startRow, endRow }) => (
           <div
             key={event.id}
-            style={{ gridColumn: dayIndex + 2, gridRow: `${startRow + 2} / ${endRow + 2}`, margin: 2 }}
+            style={{ gridColumn: dayIndex + 2, gridRow: `${startRow + 2} / ${endRow + 2}`, marginTop: 1, marginBottom: 1, ...laneStyle(`e-${event.id}`) }}
           >
             <GoogleEventChip event={event} theme={theme} compact />
           </div>
@@ -194,7 +231,7 @@ export function WeekView({
         {placed.map(({ task, dayIndex, startRow, endRow }) => (
           <div
             key={task.id}
-            style={{ gridColumn: dayIndex + 2, gridRow: `${startRow + 2} / ${endRow + 2}`, margin: 2 }}
+            style={{ gridColumn: dayIndex + 2, gridRow: `${startRow + 2} / ${endRow + 2}`, marginTop: 1, marginBottom: 1, zIndex: 1, ...laneStyle(`t-${task.id}`) }}
           >
             <CalendarTaskChip task={task} theme={theme} compact />
           </div>

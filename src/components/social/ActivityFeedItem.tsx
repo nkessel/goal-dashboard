@@ -39,12 +39,8 @@ export function ActivityFeedItem({
 
   return (
     <li
-      className="flex flex-col gap-2.5 rounded-2xl p-3.5"
-      style={{
-        background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-        border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-        borderWidth: isAdventure ? 2 : 1,
-      }}
+      className={`flex flex-col gap-3 rounded-2xl px-4 py-4 ${isAdventure ? "parchment parchment-framed" : ""}`}
+      style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >
       <div className="flex items-center gap-2.5">
         {author ? (
@@ -53,21 +49,21 @@ export function ActivityFeedItem({
           <span className="h-9 w-9 shrink-0 rounded-full" style={{ background: "var(--t-ink-soft)" }} />
         )}
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
+          <div className="text-[17px] font-semibold leading-tight" style={{ color: "var(--t-ink)" }}>
             {authorName}{" "}
             {author && (
-              <span className="text-xs font-bold" style={{ color: "var(--t-gold-deep)" }}>
+              <span className="ml-1 rounded-full px-2 py-px align-middle text-[12px] font-semibold" style={{ background: "rgba(42,28,16,.82)", color: "#f2d27e" }}>
                 Lvl {author.level}
               </span>
             )}
           </div>
-          <div className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
+          <div className="text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
             {formatRelativeTime(item.created_at)}
           </div>
         </div>
       </div>
 
-      <p className="text-sm" style={{ color: "var(--t-ink)" }}>
+      <p className="m-0 text-[16.5px] leading-snug" style={{ color: "var(--t-ink)" }}>
         {describe(item, authorName)}
       </p>
 
