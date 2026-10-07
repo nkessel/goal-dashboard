@@ -82,7 +82,7 @@ export default async function MatrixPage({
           </div>
           <ul className="flex flex-col">
             {completedTasks.map((task) => (
-              <CompletedTaskRow key={task.id} task={task} />
+              <CompletedTaskRow key={task.id} task={task} theme={theme} />
             ))}
             {completedTasks.length === 0 && (
               <p className="py-1 text-sm" style={{ color: "var(--t-ink-soft)" }}>

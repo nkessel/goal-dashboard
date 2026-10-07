@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
+import type { Reward } from "@/lib/data/types";
+import { claimRewardAction, listAvailableRewardsAction } from "@/app/actions";
 import {
   barDust,
   cardDust,
@@ -29,6 +31,10 @@ export type QuestCompleteProps = {
   iconSrc?: string;
   /** The player's avatar image. */
   avatarSrc?: string;
+  /** The finished quest, so a claimed reward is linked to it. Null for previews/goals. */
+  taskId?: string | null;
+  /** Preview mode (Settings): rewards are shown but not actually claimed. */
+  preview?: boolean;
   onClose: () => void;
 };
 
@@ -67,8 +73,27 @@ function Dust({ items, mode }: { items: Speck[]; mode: "center" | "pct" | "px" }
 }
 
 export function QuestComplete(props: QuestCompleteProps) {
-  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc = "/design/icon-dragon.jpg", avatarSrc = "/design/avatar-ranger.jpg", onClose } = props;
-  const router = useRouter();
+  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc = "/design/icon-dragon.jpg", avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, onClose } = props;
+  const [phase, setPhase] = useState<"celebrate" | "rewards">("celebrate");
+  const [rewards, setRewards] = useState<Reward[] | null>(null);
+  const [claimed, setClaimed] = useState<Reward | null>(null);
+  const [claiming, startClaim] = useTransition();
+
+  function openChest() {
+    setPhase("rewards");
+    if (rewards === null) {
+      listAvailableRewardsAction()
+        .then(setRewards)
+        .catch(() => setRewards([]));
+    }
+  }
+
+  function claim(r: Reward) {
+    startClaim(async () => {
+      if (!preview) await claimRewardAction(r.id, taskId);
+      setClaimed(r);
+    });
+  }
   // Only ever mounted client-side (after a user action), so localStorage is readable up front.
   const [fx] = useState<FxSettings>(() => loadFx());
   const [reduce] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
@@ -179,6 +204,17 @@ export function QuestComplete(props: QuestCompleteProps) {
             <div className="h-px flex-1" style={{ background: "linear-gradient(90deg, rgba(217,180,95,.6), rgba(217,180,95,0))" }} />
           </div>
 
+          {phase === "rewards" ? (
+            <RewardChest
+              questTitle={title}
+              rewards={rewards}
+              claimed={claimed}
+              claiming={claiming}
+              onPick={claim}
+              onContinue={onClose}
+            />
+          ) : (
+          <>
           {/* Featured quest card */}
           <div
             className="qc-card relative box-border w-full rounded-xl px-4 pb-4 pt-3.5"
@@ -299,27 +335,144 @@ export function QuestComplete(props: QuestCompleteProps) {
           <div className="qc-btns mt-1 flex w-full gap-2.5">
             <button
               type="button"
-              onClick={onClose}
+              onClick={openChest}
               className="min-h-14 flex-1 cursor-pointer rounded-[14px] px-2 text-[19px] font-bold tracking-[.01em]"
               style={{ border: "3px solid #31301e", background: "radial-gradient(circle at 32% 28%, #f2c96a, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5), inset 0 -3px 5px rgba(0,0,0,.25), 0 6px 14px rgba(0,0,0,.45)" }}
             >
-              Claim Reward
+              Choose a Reward
             </button>
             <button
               type="button"
-              onClick={() => {
-                onClose();
-                router.push("/");
-              }}
+              onClick={onClose}
               className="min-h-14 flex-1 cursor-pointer rounded-[14px] px-2 text-[17px] font-bold leading-[1.05] tracking-[.01em]"
               style={{ border: "2px solid #d9b45f", background: "linear-gradient(180deg,#3b4636,#232c22)", color: "#efe6cc", boxShadow: "inset 0 1px 0 rgba(255,235,180,.2), 0 6px 14px rgba(0,0,0,.45)" }}
             >
               Continue Your Journey
             </button>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>,
     document.body
+  );
+}
+
+/** The treasure chest inside the celebration: pick one reward, or move on. */
+function RewardChest({
+  questTitle,
+  rewards,
+  claimed,
+  claiming,
+  onPick,
+  onContinue,
+}: {
+  questTitle: string;
+  rewards: Reward[] | null;
+  claimed: Reward | null;
+  claiming: boolean;
+  onPick: (r: Reward) => void;
+  onContinue: () => void;
+}) {
+  const parchment: React.CSSProperties = {
+    border: "2px solid #d9b45f",
+    backgroundColor: "#e2caa2",
+    backgroundImage: "url(/design/tex-parchment.jpg)",
+    backgroundSize: "cover",
+    boxShadow: "inset 0 0 0 1px rgba(255,240,210,.55), 0 10px 24px rgba(0,0,0,.5)",
+  };
+
+  if (claimed) {
+    return (
+      <div className="qc-card flex w-full flex-col items-center gap-3 rounded-2xl px-5 py-6 text-center" style={parchment}>
+        <div className="daily-login-pop h-28 w-28 overflow-hidden rounded-full" style={{ border: "3px solid #d9b45f", boxShadow: "0 0 0 4px rgba(217,180,95,.35), 0 0 24px rgba(242,201,106,.6)", background: "#f3e6c8" }}>
+          {claimed.icon_key ? (
+            // eslint-disable-next-line @next/next/no-img-element -- generated portrait
+            <img src={claimed.icon_key} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-5xl">🎁</span>
+          )}
+        </div>
+        <p className="m-0 text-[26px] font-bold leading-tight" style={{ color: "#2f2a1f" }}>
+          {claimed.title}
+        </p>
+        <p className="m-0 text-[15px]" style={{ color: "#6b6252" }}>
+          Yours to enjoy — earned by “{questTitle}”.
+        </p>
+        <button
+          type="button"
+          onClick={onContinue}
+          className="mt-2 min-h-12 w-full max-w-[280px] cursor-pointer rounded-[14px] text-[17px] font-bold"
+          style={{ border: "2px solid #31301e", background: "radial-gradient(circle at 32% 28%, #f2c96a, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5), 0 6px 14px rgba(0,0,0,.35)" }}
+        >
+          Continue Your Journey
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="qc-card flex w-full flex-col gap-4 rounded-2xl px-4 pb-4 pt-5" style={parchment}>
+      <div className="flex flex-col items-center gap-1 text-center">
+        <p className="m-0 text-[24px] font-bold leading-tight" style={{ color: "#2f2a1f" }}>
+          Choose Your Reward
+        </p>
+        <p className="m-0 text-[14.5px]" style={{ color: "#6b6252" }}>
+          Pick one treasure, or save it and keep going.
+        </p>
+      </div>
+
+      {rewards === null && (
+        <p className="m-0 py-6 text-center text-[15px]" style={{ color: "#6b6252" }}>
+          Opening the chest…
+        </p>
+      )}
+      {rewards && rewards.length === 0 && (
+        <div className="flex flex-col items-center gap-2 py-4 text-center">
+          <p className="m-0 text-[15px]" style={{ color: "#6b6252" }}>
+            Your treasure chest is empty.
+          </p>
+          <Link href="/rewards" onClick={onContinue} className="text-[15px] font-semibold underline" style={{ color: "#4f6d3c" }}>
+            Add some rewards
+          </Link>
+        </div>
+      )}
+      {rewards && rewards.length > 0 && (
+        <div className="grid max-h-[46vh] grid-cols-2 gap-2.5 overflow-y-auto p-0.5 sm:grid-cols-3">
+          {rewards.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              disabled={claiming}
+              onClick={() => onPick(r)}
+              className="reward-tile flex cursor-pointer flex-col items-center gap-2 rounded-xl px-2 pb-2.5 pt-3 text-center disabled:opacity-60"
+              style={{ border: "1.5px solid #b39a6a", background: "rgba(255,248,232,.55)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.6), 0 2px 5px rgba(0,0,0,.12)" }}
+            >
+              <span className="h-[68px] w-[68px] overflow-hidden rounded-full" style={{ border: "2px solid #a58c66", background: "#f3e6c8", boxShadow: "0 0 0 2px rgba(217,180,95,.4)" }}>
+                {r.icon_key ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- generated portrait
+                  <img src={r.icon_key} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-3xl">🎁</span>
+                )}
+              </span>
+              <span className="text-[14.5px] font-semibold leading-tight" style={{ color: "#2f2a1f" }}>
+                {r.title}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onContinue}
+        className="min-h-12 w-full cursor-pointer rounded-[14px] text-[16px] font-bold"
+        style={{ border: "2px solid #d9b45f", background: "linear-gradient(180deg,#3b4636,#232c22)", color: "#efe6cc", boxShadow: "inset 0 1px 0 rgba(255,235,180,.2), 0 4px 10px rgba(0,0,0,.35)" }}
+      >
+        Continue to the next quest
+      </button>
+    </div>
   );
 }

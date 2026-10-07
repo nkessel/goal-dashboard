@@ -110,6 +110,8 @@ export async function updateTask(
     xpValue: number;
     /** Undefined leaves the existing estimate untouched; null clears it. */
     estimateMinutes?: number | null;
+    /** Undefined leaves the goal untouched; null detaches it. */
+    goalId?: string | null;
   }
 ): Promise<Task> {
   const importance = Math.max(0, Math.min(5, Math.round(input.importance * 10) / 10));
@@ -126,6 +128,7 @@ export async function updateTask(
       ...(input.estimateMinutes !== undefined
         ? { estimate_minutes: input.estimateMinutes === null ? null : Math.max(0, Math.round(input.estimateMinutes)) }
         : {}),
+      ...(input.goalId !== undefined ? { goal_id: input.goalId } : {}),
     })
     .eq("id", taskId)
     .eq("owner_id", ownerId)

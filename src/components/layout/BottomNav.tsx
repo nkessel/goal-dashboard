@@ -165,9 +165,10 @@ export function BottomNav({ theme }: { theme: Theme }) {
           : "var(--t-card)",
         backgroundSize: isAdventure ? "auto 100%" : undefined,
         backgroundRepeat: isAdventure ? "repeat-x" : undefined,
-        borderTop: isAdventure ? "1px solid var(--t-nav-line)" : "1px solid var(--t-card-border)",
+        borderTop: isAdventure ? "2px solid #5e5233" : "1px solid var(--t-card-border)",
+        boxShadow: isAdventure ? "0 -1px 0 rgba(217,180,95,.25), 0 -8px 20px rgba(0,0,0,.35)" : undefined,
         paddingBottom: "max(10px, env(safe-area-inset-bottom))",
-        paddingTop: 8,
+        paddingTop: isAdventure ? 9 : 8,
         // AppShell (and therefore this nav) is re-mounted fresh on every
         // route change rather than living in a persistent layout, so
         // without its own name it gets flattened into the page-wide
@@ -180,7 +181,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
         viewTransitionName: "app-bottom-nav",
       }}
     >
-      <div ref={rowRef} className="relative mx-auto flex w-full max-w-md items-stretch justify-between px-1 sm:max-w-lg">
+      <div ref={rowRef} className="relative mx-auto flex w-full max-w-md items-stretch justify-between px-1 sm:max-w-lg md:max-w-xl">
         {highlight && (
           <div
             aria-hidden
@@ -188,16 +189,16 @@ export function BottomNav({ theme }: { theme: Theme }) {
             style={{
               left: highlight.left,
               width: highlight.width,
-              top: isAdventure ? 4 : 6,
-              bottom: isAdventure ? 4 : 6,
-              borderRadius: isAdventure ? 10 : 999,
+              top: isAdventure ? 1 : 6,
+              bottom: isAdventure ? 1 : 6,
+              borderRadius: isAdventure ? 14 : 999,
               zIndex: 0,
               ...(isAdventure
                 ? {
                     border: "2px solid var(--t-gold)",
-                    background: "linear-gradient(180deg, var(--t-active-1), var(--t-active-2))",
+                    background: "linear-gradient(180deg, #7a612d 0%, #4c3d1c 45%, #2c2a19 100%)",
                     boxShadow:
-                      "inset 0 1px 0 rgba(255,235,180,.22), inset 0 -6px 12px rgba(0,0,0,.35), 0 2px 7px rgba(0,0,0,.45)",
+                      "inset 0 0 0 1px rgba(255,235,180,.18), inset 0 1px 0 rgba(255,235,180,.3), inset 0 -8px 14px rgba(0,0,0,.4), 0 0 14px rgba(217,180,95,.3), 0 3px 8px rgba(0,0,0,.5)",
                   }
                 : { background: "var(--t-accent-soft)" }),
             }}
@@ -227,7 +228,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
                 ref={(el) => {
                   itemRefs.current[i] = el;
                 }}
-                className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-end gap-1 px-1.5 py-1.5 transition-transform duration-150 hover:scale-110 active:scale-95"
+                className={`flex min-h-11 min-w-0 flex-1 flex-col items-center justify-end ${isAdventure ? "gap-1 px-2 pb-1.5 pt-2" : "gap-1 px-1.5 py-1.5"} transition-transform duration-150 hover:scale-105 active:scale-95`}
               >
                 {isAdventure ? (
                   <>
@@ -235,16 +236,28 @@ export function BottomNav({ theme }: { theme: Theme }) {
                     <img
                       src={`/design/${item.adventureIcon}`}
                       alt=""
-                      width={active ? 32 : 29}
-                      height={active ? 32 : 29}
-                      style={{ display: "block" }}
+                      width={38}
+                      height={38}
+                      style={{
+                        display: "block",
+                        width: 38,
+                        height: 38,
+                        objectFit: "contain",
+                        filter: active
+                          ? "drop-shadow(0 0 6px rgba(242,210,126,.55)) drop-shadow(0 2px 2px rgba(0,0,0,.5))"
+                          : "drop-shadow(0 2px 2px rgba(0,0,0,.5)) saturate(.85)",
+                        opacity: active ? 1 : 0.88,
+                      }}
                     />
                     <span
-                      className="font-display max-w-full truncate whitespace-nowrap"
+                      className="max-w-full truncate whitespace-nowrap leading-tight"
                       style={{
-                        fontSize: "clamp(9.5px, 2.9vw, 12.5px)",
-                        fontWeight: active ? 700 : 400,
-                        color: active ? "var(--t-cream)" : "var(--t-nav-inactive)",
+                        fontFamily: "var(--font-body)",
+                        fontSize: "clamp(12px, 3.4vw, 16px)",
+                        fontWeight: active ? 600 : 500,
+                        letterSpacing: ".01em",
+                        color: active ? "#f6e7c1" : "var(--t-nav-inactive)",
+                        textShadow: "0 1px 2px rgba(0,0,0,.6)",
                       }}
                     >
                       {label}

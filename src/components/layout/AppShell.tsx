@@ -6,7 +6,8 @@ import { NotificationsButton } from "@/components/layout/NotificationsButton";
 import { DailyLogin } from "@/components/xp/DailyLogin";
 import { ImportsAlert } from "@/components/imports/ImportsAlert";
 import { RewardsButton } from "@/components/rewards/RewardsButton";
-import { RewardChooser } from "@/components/rewards/RewardChooser";
+import { QuestCelebrationHost } from "@/components/celebration/QuestCelebrationHost";
+import { defaultPortraitFor } from "@/components/settings/Avatar";
 import { countImports } from "@/lib/data/rewards";
 import { BottomNav } from "@/components/layout/BottomNav";
 
@@ -53,7 +54,12 @@ export async function AppShell({
     <div data-theme={theme} className="flex min-h-screen flex-col items-center">
       <ThemeOnBody theme={theme} />
       {profileId && <DailyLogin />}
-      {profileId && <RewardChooser theme={theme} />}
+      {profileId && profile && (
+        <QuestCelebrationHost
+          avatarSrc={profile.avatar_image_url ?? defaultPortraitFor(profile.id)}
+          totalXp={profile.total_xp}
+        />
+      )}
       <div className={`flex w-full flex-1 flex-col ${widthClass}`}>
         <div className="flex items-center justify-end gap-2.5 px-5 pt-3">
           {profileId && <ImportsAlert quests={imports.quests} rewards={imports.rewards} theme={theme} />}
@@ -66,7 +72,7 @@ export async function AppShell({
           )}
         </div>
 
-        <main className="flex-1 px-5 pb-28 pt-2">{children}</main>
+        <main className="flex-1 px-5 pb-36 pt-2">{children}</main>
       </div>
 
       {profileId && <BottomNav theme={theme} />}

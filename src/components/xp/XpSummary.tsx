@@ -17,16 +17,16 @@ function StatTile({
   value: number;
   label: React.ReactNode;
 }) {
-  // Sizes follow the Today's Quests mockup: 32px art icon, 19px number, 11px caption.
+  // Sized to the Today's Quests reference: large painted icon, big serif number, two-line caption.
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex items-center gap-3">
       {/* eslint-disable-next-line @next/next/no-img-element -- static /design asset */}
-      <img src={iconSrc} alt="" width={32} height={32} className="h-8 w-8 shrink-0" />
+      <img src={iconSrc} alt="" width={42} height={42} className="h-[42px] w-[42px] shrink-0 object-contain" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45))" }} />
       <div className="flex flex-col">
-        <span className="font-display text-[19px] font-bold leading-none" style={{ color: "var(--t-cream)" }}>
+        <span className="font-display text-[25px] leading-none" style={{ color: "var(--t-cream)" }}>
           {value}
         </span>
-        <span className="mt-[3px] text-[11px] leading-[1.2]" style={{ color: "var(--t-cream)", opacity: 0.85 }}>
+        <span className="mt-1 text-[14px] leading-[1.15]" style={{ color: "var(--t-cream)", opacity: 0.9 }}>
           {label}
         </span>
       </div>
@@ -56,61 +56,72 @@ export function XpSummary({
   if (isAdventure) {
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex items-start justify-between gap-1">
-          <div className="flex min-w-0 flex-1 flex-col gap-[18px] pt-2.5">
-            <StatTile
-              iconSrc="/design/ui-shield.png"
-              value={stats?.questsComplete ?? 0}
-              label={<>Quests<br />Complete</>}
-            />
-            <StatTile iconSrc="/design/ui-flame.png" value={profile.streak_count} label="Quest Streak" />
+        {/* Equal side columns keep the avatar dead center and both stat pairs
+            balanced around it, whatever the screen width. */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <div className="flex flex-col gap-6 justify-self-center">
+            <StatTile iconSrc="/design/ui-shield.png" value={stats?.questsComplete ?? 0} label={<>Quests<br />Complete</>} />
+            <StatTile iconSrc="/design/ui-flame.png" value={profile.streak_count} label={<>Quest<br />Streak</>} />
           </div>
 
-          <div className="flex shrink-0 flex-col items-center gap-2.5">
-            <div className="relative" style={{ width: 104, height: 104 }}>
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative" style={{ width: 124, height: 124 }}>
               <Link
                 href="/settings?open=appearance"
                 aria-label="Edit avatar"
                 className="hover-glow block overflow-hidden rounded-full"
-                style={{ width: 104, height: 104, border: "3px solid var(--t-gold)", boxShadow: "0 0 0 2px var(--t-gold-deep) inset" }}
-              >
-                <Avatar profile={profile} size={26} />
-              </Link>
-              <div
-                className="font-display absolute left-1/2 whitespace-nowrap rounded-full px-3.5 py-0.5 text-[13px] font-bold"
                 style={{
-                  bottom: -10,
-                  transform: "translateX(-50%)",
-                  background: "var(--t-gold)",
-                  color: "#3b2a10",
-                  border: "2px solid var(--t-panel-border)",
+                  width: 124,
+                  height: 124,
+                  padding: 3,
+                  background: "radial-gradient(circle at 35% 25%, #f6dc8e, #d9b45f 45%, #8a6c2c)",
+                  boxShadow: "0 0 0 2px #3a2e14, 0 0 22px rgba(217,180,95,.35), 0 8px 18px rgba(0,0,0,.5)",
                 }}
               >
-                LVL {level}
+                <span className="block h-full w-full overflow-hidden rounded-full" style={{ boxShadow: "inset 0 0 0 2px #3a2e14" }}>
+                  <Avatar profile={profile} size={29.5} />
+                </span>
+              </Link>
+              <div
+                className="font-display absolute left-1/2 whitespace-nowrap rounded-full px-4 py-[3px] text-[16px] leading-tight"
+                style={{
+                  bottom: -12,
+                  transform: "translateX(-50%)",
+                  background: "linear-gradient(180deg, #3f4c39, #222b20)",
+                  color: "#f2d27e",
+                  border: "2px solid var(--t-gold)",
+                  boxShadow: "inset 0 1px 0 rgba(255,235,180,.2), 0 3px 8px rgba(0,0,0,.5)",
+                }}
+              >
+                Lvl {level}
                 {level >= 8 && " · Adventurer"}
               </div>
             </div>
-            <div className="mt-2 flex w-[166px] flex-col gap-[5px]">
+            <div className="mt-3 flex w-[210px] flex-col gap-1.5">
               <div
-                className="h-3 overflow-hidden rounded-full"
-                style={{ background: "#1c231b", border: "1.5px solid var(--t-gold-deep)" }}
+                className="h-[14px] overflow-hidden rounded-full"
+                style={{ background: "#141a13", border: "1.5px solid var(--t-gold-deep)", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}
               >
                 <div
                   className="h-full rounded-full"
-                  style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--t-gold-deep), var(--t-gold))" }}
+                  style={{
+                    width: `${pct}%`,
+                    background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)",
+                    boxShadow: "0 0 8px rgba(242,210,126,.55)",
+                  }}
                 />
               </div>
-              <div className="text-center text-[12.5px] tracking-wide" style={{ color: "var(--t-gold)" }}>
-                {nextLevel ? `${xpIntoLevel} / ${xpForNextLevel} XP` : `${profile.total_xp} XP · Max level`}
+              <div className="text-center text-[15px] tabular-nums tracking-wide" style={{ color: "var(--t-gold)" }}>
+                {nextLevel
+                  ? `${xpIntoLevel.toLocaleString("en-US")} / ${xpForNextLevel!.toLocaleString("en-US")} XP`
+                  : `${profile.total_xp.toLocaleString("en-US")} XP · Max level`}
               </div>
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col items-end gap-[18px] pt-2.5">
-            <div className="flex flex-col gap-[18px]">
-              <StatTile iconSrc="/design/ui-xpshield.png" value={stats?.xpThisWeek ?? 0} label={<>XP this<br />week</>} />
-              <StatTile iconSrc="/design/ui-party-simple.svg" value={stats?.partySize ?? 0} label="Party Size" />
-            </div>
+          <div className="flex flex-col gap-6 justify-self-center">
+            <StatTile iconSrc="/design/ui-xpshield.png" value={stats?.xpThisWeek ?? 0} label={<>XP this<br />week</>} />
+            <StatTile iconSrc="/design/ui-party-simple.svg" value={stats?.partySize ?? 0} label={<>Party<br />Size</>} />
           </div>
         </div>
 

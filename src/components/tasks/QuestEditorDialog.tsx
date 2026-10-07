@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
-import { createQuestAction, deleteTaskAction, scheduleTaskAction, updateTaskAction } from "@/app/actions";
+import { createQuestAction, deleteTaskAction, listGoalOptionsAction, reopenTaskAction, scheduleTaskAction, updateTaskAction } from "@/app/actions";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { SlotPickerDialog } from "./SlotPickerDialog";
@@ -81,12 +81,21 @@ export function QuestEditorDialog({
       : null;
   const [slot, setSlot] = useState<{ start: string; end: string } | null>(initialSlot);
   const [pickingSlot, setPickingSlot] = useState(false);
-  const [grantsReward, setGrantsReward] = useState(Boolean(task?.grants_reward));
+  const initialGoal = task ? task.goal_id : mode.kind === "create" ? (mode.goalId ?? null) : null;
+  const [goalId, setGoalId] = useState<string | null>(initialGoal);
+  const [goalOptions, setGoalOptions] = useState<{ id: string; title: string; boardTitle: string }[] | null>(null);
+  const isCompleted = task?.status === "completed";
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const [phase, setPhase] = useState<"open" | "closing">("open");
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    listGoalOptionsAction()
+      .then(setGoalOptions)
+      .catch(() => setGoalOptions([]));
+  }, []);
 
   const noun = isAdventure ? "quest" : "task";
   const fieldStyle: React.CSSProperties = {
@@ -149,7 +158,7 @@ export function QuestEditorDialog({
             urgency,
             xpValue: xp,
             estimateMinutes: est,
-            grantsReward,
+            goalId: goalId !== initialGoal ? goalId : undefined,
             confirmImport: Boolean(review),
           });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
@@ -163,11 +172,10 @@ export function QuestEditorDialog({
             urgency,
             xpValue: xp,
             estimateMinutes: est,
-            goalId: mode.goalId,
+            goalId,
             iconKey: draftIcon?.url ?? null,
             iconSource: draftIcon?.source,
             pinToBattle: mode.pinToBattle,
-            grantsReward,
             schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
           });
           onCreated?.(id);
@@ -215,7 +223,7 @@ export function QuestEditorDialog({
         onKeyDown={(e) => {
           if (e.key === "Escape") close();
         }}
-        className={`flex max-h-[94vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl p-4 shadow-2xl ${
+        className={`flex max-h-[94vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl p-4 parchment parchment-framed shadow-2xl ${
           phase === "closing" ? exitCls : enterCls
         }`}
         style={{
@@ -225,7 +233,7 @@ export function QuestEditorDialog({
         }}
       >
         <div className="flex items-center justify-between">
-          <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>{review ? `Review import ${review.index} of ${review.total}` : task ? `Edit ${noun}` : `New ${noun}`}</h3>
+          <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>{review ? `Review import ${review.index} of ${review.total}` : isCompleted ? `Completed ${noun}` : task ? `Edit ${noun}` : `New ${noun}`}</h3>
           <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
             ×
           </button>
@@ -383,19 +391,66 @@ export function QuestEditorDialog({
         <IconScale label="Importance" icon="/design/ui-bolt.png" value={importance} onChange={setImportance} />
         <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
 
-        <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
-          <input
-            type="checkbox"
-            checked={grantsReward}
-            onChange={(e) => setGrantsReward(e.target.checked)}
-            className="h-4 w-4"
-            style={{ accentColor: isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)" }}
-          />
-          <span className="font-semibold">Completing this lets me pick a reward</span>
-          <span aria-hidden>🎁</span>
+        {/* Goal (and so the board tag on the card) */}
+        <label className="flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element -- goals glyph */}
+          <img src="/design/ui-shield.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+          <span className={`${labelCls} w-[70px] shrink-0`}>Goal</span>
+          <select
+            value={goalId ?? ""}
+            onChange={(e) => setGoalId(e.target.value || null)}
+            aria-label="Goal"
+            className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[13.5px]"
+            style={fieldStyle}
+          >
+            <option value="">No goal (no board tag)</option>
+            {goalOptions === null && goalId && <option value={goalId}>Loading…</option>}
+            {Object.entries(
+              (goalOptions ?? []).reduce<Record<string, { id: string; title: string }[]>>((acc, g) => {
+                (acc[g.boardTitle] ??= []).push(g);
+                return acc;
+              }, {})
+            ).map(([board, goals]) => (
+              <optgroup key={board} label={board}>
+                {goals.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.title}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
         </label>
 
-        {task && (
+        {isCompleted && task && (
+          <div
+            className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px]"
+            style={{ background: "rgba(79,109,60,.12)", border: "1px solid rgba(79,109,60,.35)" }}
+          >
+            <span>
+              <span style={{ color: "var(--t-good)", fontWeight: 700 }}>✓</span>{" "}
+              {isAdventure ? "Defeated" : "Completed"}
+              {task.completed_at &&
+                ` ${new Date(task.completed_at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`}
+              {" · changing XP updates what you earned"}
+            </span>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() =>
+                startSaving(async () => {
+                  await reopenTaskAction(task.id);
+                  close();
+                })
+              }
+              className="shrink-0 text-[12.5px] font-semibold underline disabled:opacity-50"
+            >
+              Restore to Today
+            </button>
+          </div>
+        )}
+
+        {task && !isCompleted && (
           <button
             type="button"
             onClick={() => {

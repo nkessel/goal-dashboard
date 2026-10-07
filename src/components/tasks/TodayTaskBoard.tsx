@@ -6,6 +6,7 @@ import { reorderTasksAction, toggleManualPriorityAction } from "@/app/actions";
 import { useFlip } from "@/lib/use-flip";
 import { TaskRow } from "./TaskRow";
 import { QuestPickerSheet } from "./QuestPickerSheet";
+import { GoldRule, Leaf, QuestShield } from "@/components/ui/Ornaments";
 
 type ListName = "priority" | "other";
 const MAX_PRIORITY = 3;
@@ -193,34 +194,65 @@ export function TodayTaskBoard({
             heading feel) while the action stays reachable at the trailing
             edge — the same "centered title, trailing button" split as a
             typical mobile nav bar. */}
-        <div className="relative flex items-center justify-center gap-2.5">
-          {isAdventure && (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 3l2 5 5 .5-3.8 3.4 1.1 5.1L12 14.7 7.7 17l1.1-5.1L5 8.5 10 8z" fill="var(--t-gold)" />
-            </svg>
-          )}
-          <h2
-            className={isAdventure ? "font-display text-xl" : "text-lg font-extrabold"}
-            style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
-          >
-            {isAdventure ? "Today's Battle" : "Today's Focus"}
-          </h2>
-          <span className="text-sm" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.7 : 1 }}>
-            {priority.length}/3
-          </span>
+        {isAdventure ? (
+          <div className="flex items-center gap-2">
+            {/* invisible twin of the + button keeps the title truly centered */}
+            <span className="h-8 w-8 shrink-0" aria-hidden />
+            <GoldRule dir="left" />
+            <Leaf flip />
+            <h2 className="font-display m-0 whitespace-nowrap text-[27px] leading-none" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
+              Today&apos;s Battle
+              <span className="ml-2 align-middle text-[14px] font-normal" style={{ color: "var(--t-gold)" }}>
+                {priority.length}/3
+              </span>
+            </h2>
+            <Leaf />
+            <GoldRule dir="right" />
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
             aria-label={isAdventure ? "Add to Today's Battle" : "Add to Today's Focus"}
             title={isAdventure ? "Add to Today's Battle" : "Add to Today's Focus"}
-            className="hover-glow absolute right-0 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-            style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)" }}
+            className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+            style={
+              isAdventure
+                ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 2px 6px rgba(0,0,0,.4)" }
+                : { background: "var(--t-accent)" }
+            }
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M12 5v14M5 12h14" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="2.6" strokeLinecap="round" />
+              <path d="M12 5v14M5 12h14" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="2.8" strokeLinecap="round" />
             </svg>
           </button>
-        </div>
+          </div>
+        ) : (
+          <div className="relative flex items-center justify-center gap-2.5">
+            <h2 className="text-lg font-extrabold" style={{ color: "var(--t-ink)" }}>
+              Today&apos;s Focus
+            </h2>
+            <span className="text-sm" style={{ color: "var(--t-ink-soft)" }}>
+              {priority.length}/3
+            </span>
+            <div className="absolute right-0">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            aria-label={isAdventure ? "Add to Today's Battle" : "Add to Today's Focus"}
+            title={isAdventure ? "Add to Today's Battle" : "Add to Today's Focus"}
+            className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+            style={
+              isAdventure
+                ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 2px 6px rgba(0,0,0,.4)" }
+                : { background: "var(--t-accent)" }
+            }
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5v14M5 12h14" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="2.8" strokeLinecap="round" />
+            </svg>
+          </button>
+            </div>
+          </div>
+        )}
 
         {pickerOpen && (
           <QuestPickerSheet otherTasks={other} theme={theme} onClose={() => setPickerOpen(false)} />
@@ -241,15 +273,15 @@ export function TodayTaskBoard({
               e.preventDefault();
               finish();
             }}
-            className="rounded-xl border border-dashed p-4 text-sm"
+            className="rounded-2xl border-2 border-dashed px-5 py-5 text-center text-[15.5px] leading-snug"
             style={{
-              borderColor: isAdventure ? "rgba(243,233,207,.4)" : "var(--t-ink-soft)",
+              borderColor: isAdventure ? "rgba(217,180,95,.4)" : "var(--t-ink-soft)",
+              background: isAdventure ? "rgba(10,14,9,.22)" : undefined,
               color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)",
-              opacity: isAdventure ? 0.75 : 1,
             }}
           >
             {isAdventure
-              ? "No monsters queued yet — drag a quest here (or join up to 3 below) to enter today's battle."
+              ? "No quests queued yet — drag a quest here, or tap + to choose up to 3 for today's battle."
               : "Nothing pinned yet — drag a task here (or pin up to 3 below) to curate today's focus."}
           </div>
         ) : (
@@ -294,33 +326,43 @@ export function TodayTaskBoard({
         <details className="group rounded-xl" open={otherOpen} onToggle={(e) => setOtherOpen(e.currentTarget.open)}>
           <summary
             data-quest-dropzone="other"
-            className="hover-glow relative flex cursor-pointer list-none items-center justify-center rounded-xl px-4 py-3"
-            style={{
-              background: isAdventure ? "rgba(0,0,0,.28)" : "var(--t-card)",
-              border: isAdventure ? "1px solid rgba(243,233,207,.25)" : "1px solid var(--t-card-border)",
-            }}
+            className="hover-glow relative flex min-h-[58px] cursor-pointer list-none items-center justify-center rounded-2xl px-4 py-2.5"
+            style={
+              isAdventure
+                ? {
+                    background: "linear-gradient(180deg, #34412f 0%, #263022 55%, #1f281c 100%)",
+                    border: "2px solid #8d7642",
+                    boxShadow:
+                      "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
+                  }
+                : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }
+            }
           >
-            <span className="flex items-center gap-2.5 text-sm" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+            <span
+              className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm"}`}
+              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
+            >
               {isAdventure ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2 4 6v6c0 5 3.5 8.7 8 10 4.5-1.3 8-5 8-10V6z" stroke="var(--t-gold)" strokeWidth="1.6" />
-                </svg>
+                <QuestShield size={30} />
               ) : (
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
                   <rect x="3" y="3" width="18" height="18" rx="4" stroke="var(--t-ink-soft)" strokeWidth="1.5" />
                   <path d="M8 12h8" stroke="var(--t-ink-soft)" strokeWidth="1.5" />
                 </svg>
               )}
-              {isAdventure ? "Other Quests" : "More tasks"} <span style={{ opacity: 0.6, fontWeight: 400 }}>({other.length})</span>
+              {isAdventure ? "Additional Quests" : "More tasks"}
+              <span className="text-[15px]" style={{ color: isAdventure ? "var(--t-gold)" : undefined, opacity: isAdventure ? 0.9 : 0.6, fontWeight: 400 }}>
+                {other.length}
+              </span>
             </span>
             <svg
-              width="15"
-              height="15"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
-              className="absolute right-4 transition-transform group-open:rotate-180"
+              className="absolute right-5 transition-transform group-open:rotate-180"
             >
-              <path d="M6 9l6 6 6-6" stroke={isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)"} strokeWidth="2" fill="none" />
+              <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </svg>
           </summary>
           <div

@@ -1,7 +1,7 @@
 import { auth, signIn } from "@/auth";
 import { AppShell } from "@/components/layout/AppShell";
 import { TodayTaskBoard } from "@/components/tasks/TodayTaskBoard";
-import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
+import { VictoriesToday } from "@/components/xp/VictoriesToday";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 import { XpSummary } from "@/components/xp/XpSummary";
 import {
@@ -13,6 +13,11 @@ import { getProfileById } from "@/lib/data/profiles";
 import { getWeeklyXpEarned, currentWeekStart } from "@/lib/data/xp";
 import { listFriendIds } from "@/lib/data/friendships";
 import { listClaimedSince } from "@/lib/data/rewards";
+
+/** Start of a window `n` days back (kept outside render for purity). */
+function daysAgoISO(n: number) {
+  return new Date(Date.now() - n * 86_400_000).toISOString();
+}
 
 export default async function Home() {
   const session = await auth();
@@ -52,22 +57,17 @@ export default async function Home() {
 
   const [openTasks, completedTasks, profile, questsComplete, xpThisWeek, friendIds] = await Promise.all([
     listOpenTasksForOwnerWithCategory(session.user.id),
-    listCompletedTasksForOwner(session.user.id),
+    listCompletedTasksForOwner(session.user.id, 40),
     getProfileById(session.user.id),
     countCompletedTasksForOwner(session.user.id),
     getWeeklyXpEarned(session.user.id, currentWeekStart()),
     listFriendIds(session.user.id),
   ]);
-  const claimedToday = await listClaimedSince(session.user.id, new Date().toISOString().slice(0, 10) + "T00:00:00Z").catch(() => []);
+  // A two-day window; VictoriesToday narrows it to the viewer's own local day.
+  const recentClaims = await listClaimedSince(session.user.id, daysAgoISO(2)).catch(() => []);
   const topPriorities = openTasks.filter((t) => t.is_manual_priority);
   const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
   const theme = profile?.theme ?? "calm";
-  const isAdventure = theme === "adventure";
-
-  const victoriesStyle = {
-    background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
-    border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-  };
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
@@ -87,49 +87,12 @@ export default async function Home() {
           <AddTaskForm theme={theme} />
         </section>
 
-        <section className="flex flex-col gap-2.5 rounded-2xl px-4 py-3.5" style={victoriesStyle}>
-          <div className="flex items-center justify-center gap-2 text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
-            {isAdventure && (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 2l2 5 5 .5-4 3.6 1.1 5.4L12 13.9 7.9 16.5 9 11.1 5 7.5 10 7z"
-                  fill="var(--t-gold-deep)"
-                />
-              </svg>
-            )}
-            {isAdventure ? "Victories Today" : "Completed today"}
-          </div>
-          <ul className="flex flex-col gap-1">
-            {profile?.last_check_in_at?.slice(0, 10) === new Date().toISOString().slice(0, 10) && (
-              <li className="flex items-center justify-between gap-2 py-1 text-sm" style={{ color: "var(--t-ink)" }}>
-                <span className="flex items-center gap-2">
-                  <span aria-hidden>✨</span>
-                  {isAdventure ? "Answered the call (daily login)" : "Daily login"}
-                </span>
-                <span className="font-semibold" style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}>
-                  +5 XP
-                </span>
-              </li>
-            )}
-            {claimedToday.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-2 py-1 text-sm" style={{ color: "var(--t-ink)" }}>
-                <span className="flex items-center gap-2">
-                  <span aria-hidden>🎁</span>
-                  {isAdventure ? "Treasure claimed: " : "Reward: "}
-                  {r.title}
-                </span>
-              </li>
-            ))}
-            {completedTasks.map((task) => (
-              <CompletedTaskRow key={task.id} task={task} theme={theme} />
-            ))}
-            {completedTasks.length === 0 && profile?.last_check_in_at?.slice(0, 10) !== new Date().toISOString().slice(0, 10) && (
-              <p className="py-1 text-sm" style={{ color: "var(--t-ink-soft)" }}>
-                Nothing completed yet today — you&apos;ve got this.
-              </p>
-            )}
-          </ul>
-        </section>
+        <VictoriesToday
+          tasks={completedTasks}
+          claimed={recentClaims.map((r) => ({ id: r.id, title: r.title, claimed_at: r.claimed_at }))}
+          lastCheckInAt={profile?.last_check_in_at ?? null}
+          theme={theme}
+        />
       </div>
     </AppShell>
   );

@@ -65,7 +65,7 @@ body {
   --t-nav-inactive: #d8cfb1;
   --t-glow: rgba(217, 180, 95, 0.65);
   --t-overlay: rgba(10, 8, 4, 0.6);
-  --font-display: var(--font-cinzel), Georgia, serif;
+  --font-display: var(--font-eb-garamond), Georgia, serif;
   --font-body: var(--font-eb-garamond), Georgia, serif;
 
   background:
@@ -115,6 +115,31 @@ body {
 .font-display {
   font-family: var(--font-display);
   letter-spacing: 0.02em;
+}
+/* Adventure headings: the reference's classic Garamond, semibold and sentence case. */
+[data-theme="adventure"] .font-display {
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+/* Quest card: the ⋯ menu stays quiet until you're on the card. */
+.quest-card .quest-dots {
+  opacity: 0.45;
+  transition: opacity 150ms ease;
+}
+.quest-card:hover .quest-dots,
+.quest-card .quest-dots[aria-expanded="true"],
+.quest-card .quest-dots:focus-visible {
+  opacity: 1;
+}
+
+/* Reward tiles in the celebration's treasure chest. */
+.reward-tile {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.reward-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px rgba(217, 180, 95, 0.8), 0 6px 14px rgba(0, 0, 0, 0.25);
 }
 
 /* Tasteful hover glow used on cards and buttons throughout the app. */
@@ -511,3 +536,61 @@ body {
 }
 .daily-login-spark { animation: daily-login-spark 1.1s cubic-bezier(.12,.8,.3,1) 150ms both; }
 @media (prefers-reduced-motion: reduce) { .daily-login-pop, .daily-login-spark { animation: none; } }
+
+/* ---------- Parchment popups (Adventure) ----------
+   Every dialog, sheet and menu shares the reference's look: textured
+   parchment, a gilded double border, a faint inner frame, and fields that
+   read as inked boxes rather than flat inputs. */
+[data-theme="adventure"] .parchment {
+  background-color: #ecdab4 !important;
+  background-image: url(/design/tex-parchment.jpg) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  border: 2px solid #c7a96f !important;
+  color: var(--t-ink);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 244, 220, 0.8),
+    inset 0 0 30px rgba(140, 105, 50, 0.22),
+    0 0 0 1px rgba(40, 30, 10, 0.55),
+    0 20px 44px rgba(0, 0, 0, 0.55) !important;
+}
+[data-theme="adventure"] .parchment-framed {
+  position: relative;
+}
+[data-theme="adventure"] .parchment-framed::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(139, 112, 64, 0.4);
+  border-radius: inherit;
+  pointer-events: none;
+}
+[data-theme="adventure"] .parchment h3.font-display,
+[data-theme="adventure"] .parchment h2.font-display {
+  font-size: 1.4rem;
+  line-height: 1.15;
+}
+[data-theme="adventure"] .parchment input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+[data-theme="adventure"] .parchment textarea,
+[data-theme="adventure"] .parchment select {
+  background: rgba(255, 251, 240, 0.72) !important;
+  border-color: #b39a6a !important;
+  box-shadow: inset 0 1px 3px rgba(80, 60, 20, 0.2);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+[data-theme="adventure"] .parchment input:focus,
+[data-theme="adventure"] .parchment textarea:focus,
+[data-theme="adventure"] .parchment select:focus {
+  outline: 2px solid rgba(168, 138, 63, 0.6);
+  outline-offset: 0;
+}
+
+/* Gold action buttons everywhere get the reference's minted-coin finish. */
+[data-theme="adventure"] button[style*="background: var(--t-gold)"],
+[data-theme="adventure"] a[style*="background: var(--t-gold)"] {
+  background: radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f) !important;
+  border: 1.5px solid #5a4520 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 4px rgba(0, 0, 0, 0.2), 0 3px 8px rgba(0, 0, 0, 0.3);
+  font-weight: 700;
+}

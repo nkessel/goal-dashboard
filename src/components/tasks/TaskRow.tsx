@@ -8,7 +8,7 @@ import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction } from
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
 import { QuestActionMenu, type QuestAction } from "./QuestActionMenu";
-import { offerRewardChoice } from "@/components/rewards/RewardChooser";
+import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
@@ -21,6 +21,19 @@ function isTaskOverdue(task: Task): boolean {
     !!task.scheduled_start &&
     new Date(task.scheduled_start).getTime() < Date.now()
   );
+}
+
+/** "Due today, 3:00 PM" / "Due tomorrow" / "Due Fri, Oct 9" — read like the mockup's "Due today". */
+function dueLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(d) - day(now)) / 86_400_000);
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (diff === 0) return `Due today, ${time}`;
+  if (diff === 1) return `Due tomorrow, ${time}`;
+  if (diff > 1 && diff < 7) return `Due ${d.toLocaleDateString(undefined, { weekday: "long" })}`;
+  return `Due ${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`;
 }
 
 /** "25m" / "1h" / "1h 30m" — compact estimate format for the card's clock row. */
@@ -75,26 +88,29 @@ export function TaskRow({
   const isOverdue = isTaskOverdue(task);
   const isWarnedCard = isWarned || isOverdue;
 
+  const cardBase = isAdventure ? "var(--t-panel)" : "var(--t-card)";
   const cardStyle: React.CSSProperties = {
-    background: isOverdue
-      ? "var(--t-warn-bg)"
-      : tint
-        ? `linear-gradient(${tint}, ${tint}), ${isAdventure ? "var(--t-panel)" : "var(--t-card)"}`
-        : isAdventure
-          ? "var(--t-panel)"
-          : "var(--t-card)",
+    backgroundColor: isOverdue ? "var(--t-warn-bg)" : cardBase,
+    backgroundImage: [
+      tint ? `linear-gradient(${tint}, ${tint})` : null,
+      isAdventure && !isOverdue ? "url(/design/tex-parchment.jpg)" : null,
+    ]
+      .filter(Boolean)
+      .join(", ") || undefined,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
     borderStyle: "solid",
     borderWidth: isAdventure ? 2 : 1,
-    borderColor: isWarnedCard ? "var(--t-warn)" : isAdventure ? "#b39a6a" : "var(--t-card-border)",
+    borderColor: isWarnedCard ? "var(--t-warn)" : isAdventure ? "#c7a96f" : "var(--t-card-border)",
     boxShadow: isAdventure
-      ? "inset 0 0 0 1px #7c6135, inset 0 0 0 2px rgba(255,236,200,.8), 0 3px 8px rgba(0,0,0,.35)"
+      ? "inset 0 0 0 1px rgba(255,244,220,.75), inset 0 0 18px rgba(150,115,60,.18), 0 4px 12px rgba(0,0,0,.35)"
       : undefined,
   };
 
   const xpColor = isAdventure ? "var(--t-xp)" : "var(--t-accent)";
   const metaColor = "var(--t-ink-soft)";
   const dividerColor = isAdventure ? "var(--t-divider)" : "var(--t-card-border)";
-  const avatarSize = 54;
+  const avatarSize = 64;
 
   // Urgency (flames) and importance (bolts), 0–5 each — same icons as the quest editor.
   const urgencyCount = Math.min(5, Math.max(0, Math.round(task.urgency)));
@@ -120,8 +136,16 @@ export function TaskRow({
           await new Promise((r) => setTimeout(r, 800));
           const fd = new FormData();
           fd.set("taskId", task.id);
-          await completeTaskAction(fd);
-          if (task.grants_reward) offerRewardChoice(task.id, task.title);
+          const res = await completeTaskAction(fd);
+          celebrateQuest({
+            taskId: task.id,
+            title: task.title,
+            description: task.description,
+            tag: categoryLabel,
+            xp: task.xp_value,
+            iconSrc: imageUrl,
+            totalXp: res?.totalXp ?? null,
+          });
         }
       } catch (e) {
         setDone(false);
@@ -155,7 +179,7 @@ export function TaskRow({
       onDragEnd={onDragEnd}
       onClick={() => setEditing(true)}
       title="Click to edit"
-      className={`hover-glow relative flex cursor-pointer flex-col rounded-xl px-3 pb-2.5 pt-2 ${
+      className={`quest-card hover-glow relative flex cursor-pointer flex-col rounded-2xl px-3 pb-3 pt-2.5 ${
         draggable ? "active:cursor-grabbing" : ""
       } ${isPending ? "opacity-70" : ""}`}
       style={cardStyle}
@@ -171,7 +195,7 @@ export function TaskRow({
             setMenuAnchor(e.currentTarget);
             setMenu((m) => (m === "dots" ? null : "dots"));
           }}
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"
+          className="quest-dots flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"
           style={{ color: "var(--t-ink-soft)" }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -184,20 +208,36 @@ export function TaskRow({
       </div>
 
       <div className="flex items-stretch gap-3">
-        {/* Left: board tag centered over (and overlapping) the quest icon */}
-        <div className="relative flex shrink-0 flex-col items-center" onClick={(e) => e.stopPropagation()}>
-          {categoryLabel && (
+        {/* Left: board tag centered over (and overlapping) the quest portrait.
+            Quests without a goal get a quiet "+ Goal" tag in the same spot, so
+            every card lines up and filing one is a click away. */}
+        <div className="relative flex w-[80px] shrink-0 flex-col items-center" onClick={(e) => e.stopPropagation()}>
+          {categoryLabel ? (
             <span
-              className="relative z-[2] -mb-2 max-w-[84px] truncate rounded-md px-2 py-px text-[11.5px] leading-tight"
+              className="relative z-[2] -mb-2.5 max-w-[88px] truncate rounded-md px-2.5 py-px text-[13px] leading-snug"
               style={{
-                background: isAdventure ? "#d0b991" : "var(--t-accent-soft)",
+                background: isAdventure ? "linear-gradient(180deg,#e2cfa6,#ccb588)" : "var(--t-accent-soft)",
                 border: `1px solid ${isAdventure ? "#8a7250" : "var(--t-card-border)"}`,
                 color: isAdventure ? "var(--t-ink)" : "var(--t-accent)",
-                boxShadow: isAdventure ? "inset 0 1px 0 rgba(255,240,210,.6), 0 1px 2px rgba(0,0,0,.25)" : undefined,
+                boxShadow: isAdventure ? "inset 0 1px 0 rgba(255,240,210,.7), 0 1px 3px rgba(0,0,0,.3)" : undefined,
               }}
             >
               {categoryLabel}
             </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              title="File this quest under a goal"
+              className="relative z-[2] -mb-2.5 rounded-md border border-dashed px-2 py-px text-[12px] leading-snug opacity-70 hover:opacity-100"
+              style={{
+                background: isAdventure ? "rgba(243,231,203,.92)" : "var(--t-card)",
+                borderColor: isAdventure ? "#a58c66" : "var(--t-card-border)",
+                color: "var(--t-ink-soft)",
+              }}
+            >
+              + Goal
+            </button>
           )}
           <button
             type="button"
@@ -213,55 +253,47 @@ export function TaskRow({
               width: avatarSize,
               height: avatarSize,
               border: imageUrl || emoji ? `2px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}` : "none",
-              background: imageUrl || emoji ? undefined : "transparent",
-              marginTop: categoryLabel ? 0 : 4,
+              background: imageUrl || emoji ? (isAdventure ? "#f3e6c8" : undefined) : "transparent",
+              boxShadow: imageUrl || emoji ? (isAdventure ? "0 0 0 3px rgba(217,180,95,.28), 0 2px 5px rgba(0,0,0,.25)" : undefined) : undefined,
             }}
           >
             {done ? (
-              <CheckMark checked isAdventure={isAdventure} />
+              <CheckMark checked isAdventure={isAdventure} size={avatarSize} />
             ) : imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL or /design asset
               <img src={imageUrl} alt="" className="h-full w-full object-cover" />
             ) : emoji ? (
               <span style={{ fontSize: 26 }}>{emoji}</span>
             ) : (
-              <CheckMark checked={false} isAdventure={isAdventure} />
+              <CheckMark checked={false} isAdventure={isAdventure} size={avatarSize} />
             )}
           </button>
           {menu === "icon" && menuEl("left")}
         </div>
 
         {/* Middle: title, description, due + urgency */}
-        <div className="flex min-w-0 flex-1 flex-col justify-center pr-6 pt-1">
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 pr-1 pt-2">
           <p
-            className={`truncate text-[16.5px] font-bold leading-tight ${isAdventure ? "font-display" : ""}`}
+            className={`line-clamp-3 break-words leading-[1.15] ${isAdventure ? "text-[19px] font-semibold" : "text-[16px] font-bold"}`}
             style={{ color: isOverdue ? "var(--t-warn)" : "var(--t-ink)" }}
           >
             {task.title}
           </p>
           {task.description && (
-            <p className="line-clamp-2 text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+            <p className="line-clamp-2 text-[14px] leading-snug" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
               {task.description}
             </p>
           )}
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: metaColor, fontSize: 12.5 }}>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1" style={{ color: isAdventure ? "#3d3628" : metaColor, fontSize: 13.5 }}>
             {task.is_on_calendar && task.scheduled_start && (
               <span className="flex items-center gap-1.5" style={isOverdue ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
                 {isAdventure ? (
                   // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                  <img src="/design/ui-calendar.png" alt="" width={14} height={14} />
+                  <img src="/design/ui-calendar.png" alt="" width={16} height={16} />
                 ) : (
                   "📅"
                 )}
-                {isOverdue
-                  ? "Overdue"
-                  : new Date(task.scheduled_start).toLocaleString(undefined, {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
+                {isOverdue ? "Overdue" : dueLabel(task.scheduled_start)}
               </span>
             )}
             {task.reschedule_count > 0 && (
@@ -270,35 +302,37 @@ export function TaskRow({
                 {isWarned && " — rescheduled often"}
               </span>
             )}
-            <span className="flex items-center gap-2">
-              {(task.is_on_calendar || task.reschedule_count > 0) && (
-                <span style={{ width: 1, height: 14, background: dividerColor }} aria-hidden />
-              )}
-              <span className="flex items-center gap-0.5" title={`Urgency ${task.urgency.toFixed(1)}`}>
-                {Array.from({ length: urgencyCount }).map((_, i) =>
-                  isAdventure ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                    <img key={i} src="/design/ui-flame-sm.png" alt="" width={13} height={13} />
-                  ) : (
-                    <span key={i} style={{ color: "var(--t-clay)", fontSize: 12 }}>
-                      &#9679;
-                    </span>
-                  )
+            {urgencyCount > 0 && (
+              <span className="flex items-center gap-2.5">
+                {(task.is_on_calendar || task.reschedule_count > 0) && (
+                  <span style={{ width: 1, height: 16, background: dividerColor }} aria-hidden />
                 )}
+                <span className="flex items-center gap-1" title={`Urgency ${task.urgency.toFixed(1)}`}>
+                  {Array.from({ length: urgencyCount }).map((_, i) =>
+                    isAdventure ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
+                      <img key={i} src="/design/ui-flame-sm.png" alt="" width={15} height={15} />
+                    ) : (
+                      <span key={i} style={{ color: "var(--t-clay)", fontSize: 12 }}>
+                        &#9679;
+                      </span>
+                    )
+                  )}
+                </span>
               </span>
-            </span>
+            )}
           </div>
         </div>
 
         <div className="shrink-0" style={{ width: 1, background: dividerColor }} aria-hidden />
 
         {/* Right: time, XP, importance */}
-        <div className="flex w-[76px] shrink-0 flex-col items-start justify-center gap-1 pt-5">
+        <div className="flex w-[84px] shrink-0 flex-col items-start justify-center gap-1.5 pl-1 pt-4">
           {task.estimate_minutes != null && (
-            <span className="flex items-center gap-1" style={{ color: "var(--t-ink)", fontSize: 13.5 }}>
+            <span className="flex items-center gap-1.5" style={{ color: "var(--t-ink)", fontSize: 15 }}>
               {isAdventure ? (
                 // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                <img src="/design/ui-clock.png" alt="" width={15} height={15} />
+                <img src="/design/ui-clock.png" alt="" width={16} height={16} />
               ) : (
                 "⏱"
               )}
@@ -306,28 +340,25 @@ export function TaskRow({
             </span>
           )}
           <span
-            className={`whitespace-nowrap ${isAdventure ? "font-display" : ""}`}
-            style={{ color: xpColor, fontWeight: 700, fontSize: isAdventure ? 17 : 15 }}
+            className="whitespace-nowrap leading-none"
+            style={{ color: xpColor, fontWeight: 700, fontSize: isAdventure ? 21 : 15 }}
           >
             {isAdventure ? `XP ${task.xp_value}` : `${task.xp_value} pts`}
           </span>
-          {task.grants_reward && (
-            <span className="text-[12px] font-semibold" title="Completing this lets you pick a reward" style={{ color: "var(--t-ink-soft)" }}>
-              🎁 Reward
+          {importanceCount > 0 && (
+            <span className="flex items-center gap-1" title={`Importance ${task.importance.toFixed(1)}`}>
+              {Array.from({ length: importanceCount }).map((_, i) =>
+                isAdventure ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
+                  <img key={i} src="/design/ui-bolt.png" alt="" width={15} height={15} />
+                ) : (
+                  <span key={i} style={{ color: "var(--t-accent)", fontSize: 13 }}>
+                    &#9889;
+                  </span>
+                )
+              )}
             </span>
           )}
-          <span className="flex items-center gap-0.5" title={`Importance ${task.importance.toFixed(1)}`}>
-            {Array.from({ length: importanceCount }).map((_, i) =>
-              isAdventure ? (
-                // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                <img key={i} src="/design/ui-bolt.png" alt="" width={13} height={13} />
-              ) : (
-                <span key={i} style={{ color: "var(--t-accent)", fontSize: 13 }}>
-                  &#9889;
-                </span>
-              )
-            )}
-          </span>
         </div>
       </div>
 

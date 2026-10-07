@@ -84,6 +84,7 @@ export function CelebrationSettings() {
 
       {preview && (
         <QuestComplete
+          preview
           title="Train with the Dragon"
           description="Practice 20 minutes of sword drills."
           tag="Preview"

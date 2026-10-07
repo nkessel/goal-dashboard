@@ -94,7 +94,7 @@ export function QuestActionMenu({
       role="menu"
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
-      className="qa-menu fixed z-[70] flex w-60 flex-col overflow-hidden rounded-xl py-1 shadow-2xl"
+      className="qa-menu fixed z-[70] flex w-60 flex-col overflow-hidden rounded-xl py-1 parchment shadow-2xl"
       style={{
         top: pos?.top ?? -9999,
         left: pos?.left ?? -9999,

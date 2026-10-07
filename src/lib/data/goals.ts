@@ -16,6 +16,23 @@ export async function listGoalsForBoard(boardId: string): Promise<Goal[]> {
   return data ?? [];
 }
 
+/** Every goal you own, labelled with its board — for the quest editor's Goal picker. */
+export async function listGoalOptionsForOwner(
+  ownerId: string
+): Promise<{ id: string; title: string; boardTitle: string }[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("goals")
+    .select("id, title, sort_order, boards!inner(title, owner_id, sort_order)")
+    .eq("boards.owner_id", ownerId)
+    .order("sort_order", { ascending: true });
+  if (error) throw new Error(`Failed to list goals: ${error.message}`);
+  type Row = { id: string; title: string; boards: { title: string; sort_order: number } };
+  return ((data ?? []) as unknown as Row[])
+    .sort((a, b) => (a.boards.sort_order ?? 0) - (b.boards.sort_order ?? 0) || a.boards.title.localeCompare(b.boards.title))
+    .map((g) => ({ id: g.id, title: g.title, boardTitle: g.boards.title }));
+}
+
 /**
  * Persists a new drag-and-drop order for a board's goals: `orderedIds` is
  * the full list of that board's goal ids in their new display order, each

@@ -326,7 +326,7 @@ export function AvatarBuilder({
               aria-modal="true"
               aria-label="Delete this image from the library?"
               onClick={(e) => e.stopPropagation()}
-              className="sheet-slide-up-in flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl p-4 text-center shadow-2xl"
+              className="sheet-slide-up-in flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl p-4 text-center parchment parchment-framed shadow-2xl"
               style={{ background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `2px solid ${fieldBorder}`, color: inkColor }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- library image */}

@@ -19,7 +19,7 @@ const PRESET_PORTRAITS = [
   "avatar-ranger.jpg",
 ];
 
-function defaultPortraitFor(profileId: string) {
+export function defaultPortraitFor(profileId: string) {
   let hash = 0;
   for (let i = 0; i < profileId.length; i++) hash = (hash * 31 + profileId.charCodeAt(i)) >>> 0;
   return `/design/${PRESET_PORTRAITS[hash % PRESET_PORTRAITS.length]}`;

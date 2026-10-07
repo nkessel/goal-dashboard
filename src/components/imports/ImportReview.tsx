@@ -101,7 +101,7 @@ export function ImportReview({ theme, onDone }: { theme: "calm" | "adventure"; o
   const list = (
     <nav
       aria-label="Imports to review"
-      className="overlay-fade-in fixed z-[55] flex gap-1.5 overflow-auto rounded-2xl p-2 shadow-2xl max-lg:inset-x-3 max-lg:top-3 max-lg:flex-row lg:left-4 lg:top-1/2 lg:max-h-[80vh] lg:w-60 lg:-translate-y-1/2 lg:flex-col"
+      className="overlay-fade-in fixed z-[55] flex gap-1.5 overflow-auto rounded-2xl p-2 parchment shadow-2xl max-lg:inset-x-3 max-lg:top-3 max-lg:flex-row lg:left-4 lg:top-1/2 lg:max-h-[80vh] lg:w-60 lg:-translate-y-1/2 lg:flex-col"
       style={{
         background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
         border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
@@ -191,7 +191,7 @@ export function ImportReview({ theme, onDone }: { theme: "calm" | "adventure"; o
         createPortal(
           <div className="overlay-fade-in fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }}>
             <div
-              className="sheet-slide-up-in rounded-2xl px-6 py-5 text-center shadow-2xl"
+              className="sheet-slide-up-in rounded-2xl px-6 py-5 text-center parchment shadow-2xl"
               style={{ background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: "2px solid var(--t-gold)", color: "var(--t-ink)" }}
             >
               <p className={isAdventure ? "font-display text-xl" : "text-xl font-bold"}>{total ? "All sorted! ✨" : "Nothing to review"}</p>

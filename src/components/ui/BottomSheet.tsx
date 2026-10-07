@@ -67,7 +67,7 @@ export function BottomSheet({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 shadow-2xl ${
+        className={`flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 parchment parchment-framed shadow-2xl ${
           closing ? "sheet-minimize-out" : "sheet-slide-up-in"
         }`}
         style={{

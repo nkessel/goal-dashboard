@@ -1,21 +1,13 @@
 "use client";
 
-import { createPortal } from "react-dom";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import type { Task } from "@/lib/data/types";
-import { reopenTaskAction } from "@/app/actions";
+import { EditTaskModal } from "./EditTaskModal";
 
+/** A finished quest in a list; click to edit its details or XP, or restore it. */
 export function CompletedTaskRow({ task, theme = "calm" }: { task: Task; theme?: "calm" | "adventure" }) {
-  const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const isAdventure = theme === "adventure";
-
-  function restore() {
-    startTransition(async () => {
-      await reopenTaskAction(task.id);
-      setOpen(false);
-    });
-  }
 
   return (
     <>
@@ -23,80 +15,29 @@ export function CompletedTaskRow({ task, theme = "calm" }: { task: Task; theme?:
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="hover-glow flex w-full items-center justify-between gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm"
+          title="Edit this victory"
+          className="flex min-h-11 w-full items-center gap-3 rounded-md px-1.5 py-1.5 text-left text-[15.5px] hover:bg-black/[.04]"
           style={{ color: "var(--t-ink)" }}
         >
-          <span className="min-w-0 truncate">
-            {task.title}
-            {task.completed_at && (
-              <span className="ml-2 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-                {new Date(task.completed_at).toLocaleString(undefined, {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </span>
-            )}
+          <span
+            aria-hidden
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+            style={{ background: isAdventure ? "radial-gradient(circle at 35% 30%, #6f8f58, #3f5c33 60%, #2c4224)" : "var(--t-good)" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#f3e7cb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </span>
-          <span style={{ color: "var(--t-good)", fontWeight: 700 }}>&#10003;</span>
+          <span className="min-w-0 flex-1 break-words leading-snug">{task.title}</span>
+          {task.completed_at && (
+            <span className="shrink-0 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+              {new Date(task.completed_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </span>
+          )}
+          <span className="w-14 shrink-0 text-right text-[14.5px]">+{task.xp_value} XP</span>
         </button>
       </li>
-
-      {open &&
-        createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "var(--t-overlay)" }}
-          onClick={() => setOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="flex w-full max-w-sm flex-col gap-3 rounded-2xl p-4 shadow-2xl"
-            style={{
-              background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-              border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-              color: "var(--t-ink)",
-            }}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className={isAdventure ? "font-display text-base" : "text-base font-bold"}>{task.title}</h3>
-                {task.description && (
-                  <p className="mt-1 text-sm" style={{ color: "var(--t-ink-soft)" }}>
-                    {task.description}
-                  </p>
-                )}
-              </div>
-              <span style={{ color: "var(--t-good)", fontWeight: 700, fontSize: 18 }}>&#10003;</span>
-            </div>
-
-            {task.completed_at && (
-              <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
-                {isAdventure ? "Defeated" : "Completed"} {new Date(task.completed_at).toLocaleString()}
-                {task.xp_value > 0 && ` · ${task.xp_value} ${isAdventure ? "XP" : "pts"} earned`}
-              </p>
-            )}
-
-            <div className="mt-1 flex justify-end gap-2">
-              <button type="button" onClick={() => setOpen(false)} className="rounded-full px-3 py-1.5 text-sm" style={{ color: "var(--t-ink-soft)" }}>
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={restore}
-                disabled={isPending}
-                className="hover-glow rounded-full px-4 py-1.5 text-sm font-medium disabled:opacity-50"
-                style={{
-                  background: isAdventure ? "var(--t-gold)" : "var(--t-accent)",
-                  color: isAdventure ? "#2a1c10" : "#fff",
-                }}
-              >
-                {isPending ? "…" : "Mark not complete — restore to Today"}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {open && <EditTaskModal task={task} theme={theme} onClose={() => setOpen(false)} />}
     </>
   );
 }

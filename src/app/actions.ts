@@ -214,11 +214,16 @@ export async function completeTaskAction(formData: FormData) {
     : undefined;
 
   const completed = await tasksData.completeTask(taskId, ownerId, completedAt);
+  let totalXp: number | null = null;
   if (completed.xp_value > 0) {
-    await xp.awardXp(ownerId, completed.xp_value, "task_completed", taskId);
+    totalXp = (await xp.awardXp(ownerId, completed.xp_value, "task_completed", taskId)).totalXp;
+  } else {
+    totalXp = (await profilesData.getProfileById(ownerId))?.total_xp ?? null;
   }
   revalidatePath("/");
   revalidatePath("/matrix");
+  // Lets the quest-complete celebration fill the XP bar to the real total.
+  return { totalXp };
 }
 
 /** Full edit from the quest-card edit dialog (title/description/importance/urgency/xp/estimate). */
@@ -231,6 +236,8 @@ export async function updateTaskAction(
     urgency: number;
     xpValue: number;
     estimateMinutes?: number | null;
+    /** Undefined leaves the goal untouched; null detaches it. */
+    goalId?: string | null;
     grantsReward?: boolean;
     /** Also confirm this quest if it was an import awaiting review. */
     confirmImport?: boolean;
@@ -239,6 +246,11 @@ export async function updateTaskAction(
   const ownerId = await requireProfileId();
   if (input.grantsReward !== undefined) await tasksData.setTaskGrantsReward(taskId, ownerId, input.grantsReward);
   if (input.confirmImport) await rewardsData.markReviewed("quest", taskId, ownerId);
+  // Editing a finished quest's XP adjusts the XP you already earned for it.
+  const before = await tasksData.getTask(taskId, ownerId);
+  if (before?.status === "completed" && before.xp_value !== input.xpValue) {
+    await xp.awardXp(ownerId, input.xpValue - before.xp_value, "task_completed", taskId);
+  }
   await tasksData.updateTask(taskId, ownerId, {
     title: input.title,
     description: input.description.trim() || null,
@@ -246,10 +258,17 @@ export async function updateTaskAction(
     urgency: input.urgency,
     xpValue: input.xpValue,
     estimateMinutes: input.estimateMinutes,
+    goalId: input.goalId,
   });
   revalidatePath("/");
   revalidatePath("/matrix");
   revalidatePath("/boards", "layout");
+}
+
+/** Goals to file a quest under, labelled with their board. */
+export async function listGoalOptionsAction() {
+  const ownerId = await requireProfileId();
+  return goalsData.listGoalOptionsForOwner(ownerId);
 }
 
 /** Deletion lives inside the edit dialog, not a separate control. */
@@ -875,7 +894,7 @@ export async function deleteRewardAction(rewardId: string) {
 
 export async function listAvailableRewardsAction() {
   const ownerId = await requireProfileId();
-  return (await rewardsData.listRewards(ownerId)).filter((r) => r.status === "available" && !r.needs_review);
+  return (await rewardsData.listRewards(ownerId)).filter((r) => r.status === "available");
 }
 
 /** Pick a reward after finishing a reward-granting quest (or claim one directly). */

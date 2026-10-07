@@ -112,7 +112,7 @@ export function CalendarAddPopup({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 shadow-2xl"
+        className="flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 parchment parchment-framed shadow-2xl"
         style={panelStyle}
       >
         <div className="flex items-center justify-between">

@@ -220,7 +220,7 @@ export function IconPicker({
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-label="Choose a portrait"
-          className="fixed z-[60] w-72 rounded-xl p-2 shadow-2xl"
+          className="fixed z-[60] w-72 rounded-xl p-2 parchment shadow-2xl"
           style={{
             top: pos.top,
             left: pos.left,

@@ -76,7 +76,7 @@ export function SlotPickerDialog({
         role="dialog"
         aria-label="Add to calendar"
         onClick={(e) => e.stopPropagation()}
-        className="sheet-slide-up-in flex w-full max-w-sm flex-col gap-3 rounded-2xl p-4 shadow-2xl"
+        className="sheet-slide-up-in flex w-full max-w-sm flex-col gap-3 rounded-2xl p-4 parchment parchment-framed shadow-2xl"
         style={{ background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `2px solid ${border}`, color: "var(--t-ink)" }}
       >
         <div className="flex items-center justify-between">

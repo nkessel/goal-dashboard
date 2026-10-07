@@ -81,7 +81,7 @@ export function ImportsAlert({
               role="alertdialog"
               aria-modal="true"
               aria-label="New imports"
-              className="sheet-slide-up-in flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl p-5 text-center shadow-2xl"
+              className="sheet-slide-up-in flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl p-5 text-center parchment parchment-framed shadow-2xl"
               style={{ background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: "2px solid var(--t-gold)", color: "var(--t-ink)" }}
             >
               <span className="text-4xl" aria-hidden>

@@ -51,7 +51,7 @@ export function TaskViewCard({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`relative flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 shadow-2xl ${
+        className={`relative flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 parchment parchment-framed shadow-2xl ${
           closing ? "card-pop-out" : "card-pop-in"
         }`}
         style={panelStyle}

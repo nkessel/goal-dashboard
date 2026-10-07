@@ -36,7 +36,7 @@ export function DailyLogin() {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-16 z-[80] flex justify-center px-4" role="status" aria-live="polite">
       <div
-        className="daily-login-pop relative flex items-center gap-3 overflow-visible rounded-2xl px-5 py-3 shadow-2xl"
+        className="daily-login-pop relative flex items-center gap-3 overflow-visible rounded-2xl px-5 py-3 parchment shadow-2xl"
         style={{ background: "var(--t-panel)", border: "2px solid var(--t-gold)", color: "var(--t-ink)" }}
       >
         {Array.from({ length: 14 }).map((_, i) => (

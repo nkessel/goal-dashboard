@@ -91,7 +91,7 @@ export function RewardEditorDialog({
         aria-modal="true"
         aria-label={reward ? "Edit reward" : "New reward"}
         onClick={(e) => e.stopPropagation()}
-        className={`flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
+        className={`flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 parchment parchment-framed shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
         style={{
           background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
           border: `2px solid ${isAdventure ? "var(--t-gold)" : "var(--t-card-border)"}`,
