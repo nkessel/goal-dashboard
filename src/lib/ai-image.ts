@@ -34,10 +34,25 @@ export function buildAvatarPrompt(subject: string, opts: { withBackground?: bool
  * hand-drawn art in classic children's fantasy novels. */
 export function buildSketchbookIconPrompt(subject: string) {
   return (
-    `colored pencil and watercolor sketchbook illustration of ${subject}, whimsical hand-drawn fantasy storybook art ` +
-    "like classic illustrated children's fantasy novels, warm muted colors, loose expressive pencil linework, " +
-    "single centered object, charming and magical, not photorealistic, not 3D, " +
+    `whimsical painted storybook illustration of ${subject}, soft chalk pastel and gouache painting ` +
+    "in the style of late-1990s illustrated children's fantasy novel chapter art, warm glowing golden candlelight, " +
+    "rich saturated jewel tones, deep ambers and teals, soft blended edges, visible pastel grain and brush texture, " +
+    "magical cozy enchanted atmosphere, gentle painterly highlights, single centered object, " +
     "isolated on a plain flat bright green background, no table, no shadow, no scenery, " +
+    "absolutely no text, no words, no writing, no labels, no captions, no signature, no letters or numbers"
+  );
+}
+
+/** Rewards: the same painted storybook style, but the treasure keeps a
+ * beaming background — golden rays and a glowing halo behind it, like a
+ * found jewel or an opened chest. Not keyed out. */
+export function buildTreasureIconPrompt(subject: string) {
+  return (
+    `enchanted treasure illustration of ${subject}, soft chalk pastel and gouache painting ` +
+    "in the style of late-1990s illustrated children's fantasy novel chapter art, the object glowing at the center, " +
+    "radiant beams of warm golden light bursting outward behind it in a starburst, luminous halo, drifting magical sparkles, " +
+    "background fading from bright gold at the center to deep teal and midnight blue at the edges, rich jewel tones, " +
+    "soft blended edges, visible pastel grain and brush texture, single centered object, " +
     "absolutely no text, no words, no writing, no labels, no captions, no signature, no letters or numbers"
   );
 }

@@ -72,6 +72,8 @@ export type Profile = {
   theme: "calm" | "adventure";
   level: number;
   total_xp: number;
+  /** Spendable on rewards; earned at 1 per 10 XP. Missing before migration 0013. */
+  coins?: number;
   weekly_xp_budget: number;
   streak_count: number;
   streak_protection_tokens: number;
@@ -108,6 +110,10 @@ export type Reward = {
   claimed_at: string | null;
   claimed_with_task_id: string | null;
   needs_review: boolean;
+  /** Price in coins (0 = free). */
+  cost_coins?: number;
+  /** Coins paid when claimed (refunded if put back). */
+  coins_spent?: number | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

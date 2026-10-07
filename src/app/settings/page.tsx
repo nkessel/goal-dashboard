@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
 import { SettingsRow } from "@/components/settings/SettingsRow";
+import { ChestIcon, CoinIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import { CelebrationSettings } from "@/components/settings/CelebrationSettings";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
@@ -137,6 +138,32 @@ export default async function SettingsPage({
               </button>
             </form>
           </SettingsRow>
+
+          <Link
+            href="/rewards"
+            className="hover-glow flex w-full items-center gap-3 px-4 py-3"
+            style={{
+              background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+              border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+              borderRadius: 14,
+            }}
+          >
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+              style={{ background: isAdventure ? "rgba(209,161,60,.16)" : "var(--t-accent-soft)" }}
+            >
+              <ChestIcon size={18} />
+            </span>
+            <span className="flex-1 text-sm font-medium" style={{ color: "var(--t-ink)" }}>
+              Treasure Chest
+            </span>
+            <span className="flex items-center gap-1 text-[13px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+              <CoinIcon size={14} /> {profile.coins ?? 0} coins
+            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M9 5l7 7-7 7" stroke="var(--t-ink-soft)" strokeWidth="2" fill="none" />
+            </svg>
+          </Link>
 
           <Link
             href="/notifications"

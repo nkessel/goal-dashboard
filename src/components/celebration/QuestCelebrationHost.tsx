@@ -13,6 +13,7 @@ export type QuestCelebration = {
   iconSrc?: string | null;
   /** Total XP after this quest's XP was added (null if unknown). */
   totalXp: number | null;
+  coinsEarned?: number;
 };
 
 /** Play the quest-complete celebration (works even after the card unmounts). */
@@ -47,6 +48,7 @@ export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { ava
       iconSrc={current.iconSrc || undefined}
       avatarSrc={avatarSrc}
       taskId={current.taskId}
+      coinsEarned={current.coinsEarned ?? 0}
       onClose={() => setCurrent(null)}
     />
   );

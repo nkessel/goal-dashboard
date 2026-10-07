@@ -570,7 +570,7 @@ body {
   font-size: 1.4rem;
   line-height: 1.15;
 }
-[data-theme="adventure"] .parchment input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+[data-theme="adventure"] .parchment input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not(.price-input),
 [data-theme="adventure"] .parchment textarea,
 [data-theme="adventure"] .parchment select {
   background: rgba(255, 251, 240, 0.72) !important;
@@ -593,4 +593,15 @@ body {
   border: 1.5px solid #5a4520 !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 4px rgba(0, 0, 0, 0.2), 0 3px 8px rgba(0, 0, 0, 0.3);
   font-weight: 700;
+}
+
+/* Hide number spinners on the coin price field (it has its own − / + buttons). */
+.price-input::-webkit-outer-spin-button,
+.price-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.price-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

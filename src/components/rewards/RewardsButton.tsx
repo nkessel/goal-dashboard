@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CloseSettingsButton } from "@/components/settings/CloseSettingsButton";
+import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 
-/** Treasure chest in the top bar → Rewards; becomes the close (X) on that screen. */
-export function RewardsButton({ isAdventure }: { isAdventure: boolean }) {
+/** Diamond + coin purse in the top bar → Rewards; becomes the close (X) on that screen. */
+export function RewardsButton({ isAdventure, coins }: { isAdventure: boolean; coins: number | null }) {
   const pathname = usePathname();
   if (pathname.startsWith("/rewards")) {
     return <CloseSettingsButton isAdventure={isAdventure} size={40} label="Close rewards" />;
@@ -14,19 +15,25 @@ export function RewardsButton({ isAdventure }: { isAdventure: boolean }) {
     <Link
       href="/rewards"
       prefetch={true}
-      aria-label="Rewards"
+      aria-label={coins === null ? "Rewards" : `Rewards — ${coins} coins`}
       title="Rewards"
-      className="hover-glow flex h-10 w-10 items-center justify-center rounded-full"
+      className="hover-glow flex h-10 items-center gap-2 rounded-full pl-2 pr-3"
       style={{
-        background: isAdventure ? "rgba(0,0,0,.22)" : "var(--t-card)",
-        border: isAdventure ? "1px solid rgba(209,161,60,.35)" : "1px solid var(--t-card-border)",
+        background: isAdventure ? "linear-gradient(180deg, rgba(40,48,36,.85), rgba(20,26,18,.85))" : "var(--t-card)",
+        border: isAdventure ? "1.5px solid rgba(217,180,95,.55)" : "1px solid var(--t-card-border)",
+        boxShadow: isAdventure ? "inset 0 1px 0 rgba(255,235,180,.12), 0 2px 6px rgba(0,0,0,.35)" : undefined,
       }}
     >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path d="M3 10a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v1H3z" fill={isAdventure ? "#a8742f" : "var(--t-accent-soft)"} stroke={isAdventure ? "#d9b45f" : "var(--t-ink-soft)"} strokeWidth="1.5" />
-        <rect x="3" y="11" width="18" height="8" rx="1.5" fill={isAdventure ? "#8a5a22" : "var(--t-card)"} stroke={isAdventure ? "#d9b45f" : "var(--t-ink-soft)"} strokeWidth="1.5" />
-        <rect x="10.5" y="9.5" width="3" height="4" rx="0.8" fill={isAdventure ? "#f2d27e" : "var(--t-accent)"} />
-      </svg>
+      <DiamondIcon size={24} />
+      {coins !== null && (
+        <span
+          className="flex items-center gap-1 text-[15px] font-semibold tabular-nums"
+          style={{ color: isAdventure ? "#f2d27e" : "var(--t-ink)" }}
+        >
+          <CoinIcon size={16} />
+          {coins}
+        </span>
+      )}
     </Link>
   );
 }

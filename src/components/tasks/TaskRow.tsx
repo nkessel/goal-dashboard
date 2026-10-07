@@ -145,6 +145,7 @@ export function TaskRow({
             xp: task.xp_value,
             iconSrc: imageUrl,
             totalXp: res?.totalXp ?? null,
+            coinsEarned: res?.coinsEarned ?? 0,
           });
         }
       } catch (e) {

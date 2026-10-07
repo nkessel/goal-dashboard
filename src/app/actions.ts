@@ -15,7 +15,7 @@ import * as taskIconLibraryData from "@/lib/data/task-icon-library";
 import * as rewardsData from "@/lib/data/rewards";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt, buildSketchbookIconPrompt } from "@/lib/ai-image";
+import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt, buildSketchbookIconPrompt, buildTreasureIconPrompt } from "@/lib/ai-image";
 import { styleLook, AVATAR_STYLE_OPTIONS, STYLE_EXAMPLE_SUBJECT } from "@/lib/avatar-prompts";
 import { exportAccountData, type AccountExport } from "@/lib/data/export";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
@@ -215,15 +215,18 @@ export async function completeTaskAction(formData: FormData) {
 
   const completed = await tasksData.completeTask(taskId, ownerId, completedAt);
   let totalXp: number | null = null;
+  let coinsEarned = 0;
   if (completed.xp_value > 0) {
-    totalXp = (await xp.awardXp(ownerId, completed.xp_value, "task_completed", taskId)).totalXp;
+    const award = await xp.awardXp(ownerId, completed.xp_value, "task_completed", taskId);
+    totalXp = award.totalXp;
+    coinsEarned = award.coins === null ? 0 : award.coinsEarned;
   } else {
     totalXp = (await profilesData.getProfileById(ownerId))?.total_xp ?? null;
   }
   revalidatePath("/");
   revalidatePath("/matrix");
   // Lets the quest-complete celebration fill the XP bar to the real total.
-  return { totalXp };
+  return { totalXp, coinsEarned };
 }
 
 /** Full edit from the quest-card edit dialog (title/description/importance/urgency/xp/estimate). */
@@ -812,13 +815,16 @@ export async function createQuestAction(input: {
 
 /** Generate a quest portrait without attaching it to a quest yet (the create
  * dialog, before the quest exists). Added to the shared icon library. */
-export async function generateQuestIconImageAction(prompt: string): Promise<string> {
+export async function generateQuestIconImageAction(prompt: string, artStyle: "monster" | "treasure" = "monster"): Promise<string> {
   const ownerId = await requireProfileId();
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe the monster/icon you want first.");
-  const url = await generateAndStoreImage(buildTaskIconPrompt(trimmed), `tasks/draft-${ownerId}-${Date.now()}.jpg`, {
-    transparentBackground: true,
-  });
+  const url =
+    artStyle === "treasure"
+      ? await generateAndStoreImage(buildTreasureIconPrompt(trimmed), `rewards/draft-${ownerId}-${Date.now()}.jpg`)
+      : await generateAndStoreImage(buildTaskIconPrompt(trimmed), `tasks/draft-${ownerId}-${Date.now()}.jpg`, {
+          transparentBackground: true,
+        });
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: trimmed });
   return url;
 }
@@ -859,18 +865,23 @@ export async function removeTaskIconFromLibraryAction(id: string) {
 // ---------------------------------------------------------------------------
 // Rewards
 // ---------------------------------------------------------------------------
-export async function createRewardAction(input: { title: string; description?: string; iconKey?: string | null }) {
+export async function createRewardAction(input: { title: string; description?: string; iconKey?: string | null; costCoins?: number }) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
   if (!title) throw new Error("Give the reward a name first.");
-  const reward = await rewardsData.createReward(ownerId, { title, description: input.description?.trim() || null, iconKey: input.iconKey });
+  const reward = await rewardsData.createReward(ownerId, {
+    title,
+    description: input.description?.trim() || null,
+    iconKey: input.iconKey,
+    costCoins: input.costCoins,
+  });
   revalidatePath("/rewards");
   return reward.id;
 }
 
 export async function updateRewardAction(
   rewardId: string,
-  input: { title: string; description: string; iconKey?: string | null; confirmImport?: boolean }
+  input: { title: string; description: string; iconKey?: string | null; costCoins?: number; confirmImport?: boolean }
 ) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
@@ -879,6 +890,7 @@ export async function updateRewardAction(
     title,
     description: input.description.trim() || null,
     iconKey: input.iconKey,
+    costCoins: input.costCoins,
     needsReview: input.confirmImport ? false : undefined,
   });
   revalidatePath("/rewards");
@@ -892,24 +904,27 @@ export async function deleteRewardAction(rewardId: string) {
   revalidatePath("/", "layout");
 }
 
+/** Your unclaimed rewards plus your coin balance (for the reward picker). */
 export async function listAvailableRewardsAction() {
   const ownerId = await requireProfileId();
-  return (await rewardsData.listRewards(ownerId)).filter((r) => r.status === "available");
+  const [all, coins] = await Promise.all([rewardsData.listRewards(ownerId), rewardsData.getCoins(ownerId)]);
+  return { rewards: all.filter((r) => r.status === "available"), coins };
 }
 
 /** Pick a reward after finishing a reward-granting quest (or claim one directly). */
 export async function claimRewardAction(rewardId: string, taskId: string | null) {
   const ownerId = await requireProfileId();
-  await rewardsData.claimReward(rewardId, ownerId, taskId);
+  const { coins } = await rewardsData.claimReward(rewardId, ownerId, taskId);
   revalidatePath("/rewards");
-  revalidatePath("/");
+  revalidatePath("/", "layout");
+  return { coins };
 }
 
 export async function unclaimRewardAction(rewardId: string) {
   const ownerId = await requireProfileId();
   await rewardsData.unclaimReward(rewardId, ownerId);
   revalidatePath("/rewards");
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function setTaskGrantsRewardAction(taskId: string, grantsReward: boolean) {
@@ -941,11 +956,14 @@ export async function generateNextImportIconAction(): Promise<{ done: boolean; i
   const ownerId = await requireProfileId();
   const next = await rewardsData.nextImportNeedingIcon(ownerId);
   if (!next) return { done: true };
-  const url = await generateAndStoreImage(
-    buildSketchbookIconPrompt(next.prompt),
-    `${next.kind === "quest" ? "tasks" : "rewards"}/${next.id}-${Date.now()}.jpg`,
-    { transparentBackground: true }
-  );
+  // Quests: painted storybook object, cut out. Rewards: same style, kept on
+  // a beaming golden background.
+  const url =
+    next.kind === "reward"
+      ? await generateAndStoreImage(buildTreasureIconPrompt(next.prompt), `rewards/${next.id}-${Date.now()}.jpg`)
+      : await generateAndStoreImage(buildSketchbookIconPrompt(next.prompt), `tasks/${next.id}-${Date.now()}.jpg`, {
+          transparentBackground: true,
+        });
   await rewardsData.setImportIcon(next.kind, next.id, ownerId, url);
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: next.prompt });
   return { done: false, id: next.id, url };

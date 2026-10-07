@@ -8,7 +8,8 @@ import { ImportsAlert } from "@/components/imports/ImportsAlert";
 import { RewardsButton } from "@/components/rewards/RewardsButton";
 import { QuestCelebrationHost } from "@/components/celebration/QuestCelebrationHost";
 import { defaultPortraitFor } from "@/components/settings/Avatar";
-import { countImports } from "@/lib/data/rewards";
+import { countImports, countMissingPortraits } from "@/lib/data/rewards";
+import { PortraitPainter } from "@/components/imports/PortraitPainter";
 import { BottomNav } from "@/components/layout/BottomNav";
 
 /**
@@ -38,10 +39,11 @@ export async function AppShell({
    */
   wide?: boolean;
 }) {
-  const [unreadCount, profile, imports] = await Promise.all([
+  const [unreadCount, profile, imports, missingPortraits] = await Promise.all([
     profileId ? countUnread(profileId) : Promise.resolve(0),
     profileId ? getProfileById(profileId) : Promise.resolve(null),
     profileId ? countImports(profileId) : Promise.resolve({ quests: 0, rewards: 0 }),
+    profileId ? countMissingPortraits(profileId).catch(() => 0) : Promise.resolve(0),
   ]);
   const theme = profile?.theme === "adventure" ? "adventure" : "calm";
   const isAdventure = theme === "adventure";
@@ -54,6 +56,7 @@ export async function AppShell({
     <div data-theme={theme} className="flex min-h-screen flex-col items-center">
       <ThemeOnBody theme={theme} />
       {profileId && <DailyLogin />}
+      {profileId && missingPortraits > 0 && <PortraitPainter missing={missingPortraits} />}
       {profileId && profile && (
         <QuestCelebrationHost
           avatarSrc={profile.avatar_image_url ?? defaultPortraitFor(profile.id)}
@@ -63,7 +66,7 @@ export async function AppShell({
       <div className={`flex w-full flex-1 flex-col ${widthClass}`}>
         <div className="flex items-center justify-end gap-2.5 px-5 pt-3">
           {profileId && <ImportsAlert quests={imports.quests} rewards={imports.rewards} theme={theme} />}
-          {profileId && <RewardsButton isAdventure={isAdventure} />}
+          {profileId && <RewardsButton isAdventure={isAdventure} coins={typeof profile?.coins === "number" ? profile.coins : null} />}
           {profileId && (
             <NotificationsButton unreadCount={unreadCount} isAdventure={isAdventure} iconColor={iconColor} />
           )}

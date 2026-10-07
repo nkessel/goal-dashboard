@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
 import { claimRewardAction, listAvailableRewardsAction } from "@/app/actions";
+import { CoinIcon } from "@/components/ui/Icons";
 import {
   barDust,
   cardDust,
@@ -35,6 +36,8 @@ export type QuestCompleteProps = {
   taskId?: string | null;
   /** Preview mode (Settings): rewards are shown but not actually claimed. */
   preview?: boolean;
+  /** Coins this quest added to your purse. */
+  coinsEarned?: number;
   onClose: () => void;
 };
 
@@ -73,25 +76,34 @@ function Dust({ items, mode }: { items: Speck[]; mode: "center" | "pct" | "px" }
 }
 
 export function QuestComplete(props: QuestCompleteProps) {
-  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc = "/design/icon-dragon.jpg", avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, onClose } = props;
+  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc = "/design/icon-dragon.jpg", avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, coinsEarned = 0, onClose } = props;
   const [phase, setPhase] = useState<"celebrate" | "rewards">("celebrate");
-  const [rewards, setRewards] = useState<Reward[] | null>(null);
+  const [chest, setChest] = useState<{ rewards: Reward[]; coins: number } | null>(null);
   const [claimed, setClaimed] = useState<Reward | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
   const [claiming, startClaim] = useTransition();
 
   function openChest() {
     setPhase("rewards");
-    if (rewards === null) {
+    if (chest === null) {
       listAvailableRewardsAction()
-        .then(setRewards)
-        .catch(() => setRewards([]));
+        .then(setChest)
+        .catch(() => setChest({ rewards: [], coins: 0 }));
     }
   }
 
   function claim(r: Reward) {
+    setClaimError(null);
     startClaim(async () => {
-      if (!preview) await claimRewardAction(r.id, taskId);
-      setClaimed(r);
+      try {
+        if (!preview) {
+          const res = await claimRewardAction(r.id, taskId);
+          setChest((c) => (c ? { ...c, coins: res.coins } : c));
+        }
+        setClaimed(r);
+      } catch (e) {
+        setClaimError(e instanceof Error ? e.message : "Couldn't claim that one.");
+      }
     });
   }
   // Only ever mounted client-side (after a user action), so localStorage is readable up front.
@@ -207,7 +219,9 @@ export function QuestComplete(props: QuestCompleteProps) {
           {phase === "rewards" ? (
             <RewardChest
               questTitle={title}
-              rewards={rewards}
+              rewards={chest?.rewards ?? null}
+              coins={chest?.coins ?? 0}
+              error={claimError}
               claimed={claimed}
               claiming={claiming}
               onPick={claim}
@@ -313,6 +327,11 @@ export function QuestComplete(props: QuestCompleteProps) {
               <div className="text-center text-xl font-bold leading-none tabular-nums tracking-[.02em]" style={{ color: "#f2d27e", textShadow: "0 0 10px rgba(242,201,106,.55)" }}>
                 +{gained} XP earned ✨
               </div>
+              {coinsEarned > 0 && (
+                <div className="flex items-center justify-center gap-1.5 text-[15px] font-semibold tabular-nums" style={{ color: "#f2d27e" }}>
+                  <CoinIcon size={17} />+{Math.round(coinsEarned * eased)} coin{coinsEarned === 1 ? "" : "s"}
+                </div>
+              )}
               <div className="relative h-4 w-full">
                 <div className="absolute inset-0 overflow-hidden rounded-full" style={{ background: "#1c231b", border: "1.5px solid #a88a3f" }}>
                   <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "linear-gradient(180deg,#f2d27e,#a88a3f)" }} />
@@ -363,6 +382,8 @@ export function QuestComplete(props: QuestCompleteProps) {
 function RewardChest({
   questTitle,
   rewards,
+  coins,
+  error,
   claimed,
   claiming,
   onPick,
@@ -370,6 +391,8 @@ function RewardChest({
 }: {
   questTitle: string;
   rewards: Reward[] | null;
+  coins: number;
+  error: string | null;
   claimed: Reward | null;
   claiming: boolean;
   onPick: (r: Reward) => void;
@@ -419,9 +442,20 @@ function RewardChest({
           Choose Your Reward
         </p>
         <p className="m-0 text-[14.5px]" style={{ color: "#6b6252" }}>
-          Pick one treasure, or save it and keep going.
+          Pick one treasure, or save your coins and keep going.
         </p>
+        <span
+          className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[15px] font-semibold tabular-nums"
+          style={{ background: "rgba(42,28,16,.82)", color: "#f2d27e", border: "1.5px solid #a88a3f" }}
+        >
+          <CoinIcon size={17} /> {coins} in your purse
+        </span>
       </div>
+      {error && (
+        <p className="m-0 text-center text-[14.5px] font-semibold" style={{ color: "#8c3b2a" }}>
+          {error}
+        </p>
+      )}
 
       {rewards === null && (
         <p className="m-0 py-6 text-center text-[15px]" style={{ color: "#6b6252" }}>
@@ -440,11 +474,15 @@ function RewardChest({
       )}
       {rewards && rewards.length > 0 && (
         <div className="grid max-h-[46vh] grid-cols-2 gap-2.5 overflow-y-auto p-0.5 sm:grid-cols-3">
-          {rewards.map((r) => (
+          {rewards.map((r) => {
+            const cost = r.cost_coins ?? 0;
+            const short = Math.max(0, cost - coins);
+            return (
             <button
               key={r.id}
               type="button"
-              disabled={claiming}
+              disabled={claiming || short > 0}
+              title={short > 0 ? `${short} more coin${short === 1 ? "" : "s"} needed` : undefined}
               onClick={() => onPick(r)}
               className="reward-tile flex cursor-pointer flex-col items-center gap-2 rounded-xl px-2 pb-2.5 pt-3 text-center disabled:opacity-60"
               style={{ border: "1.5px solid #b39a6a", background: "rgba(255,248,232,.55)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.6), 0 2px 5px rgba(0,0,0,.12)" }}
@@ -460,8 +498,17 @@ function RewardChest({
               <span className="text-[14.5px] font-semibold leading-tight" style={{ color: "#2f2a1f" }}>
                 {r.title}
               </span>
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-px text-[13px] font-semibold tabular-nums"
+                style={{ background: short > 0 ? "rgba(107,98,82,.15)" : "rgba(42,28,16,.8)", color: short > 0 ? "#6b6252" : "#f2d27e" }}
+              >
+                <CoinIcon size={14} />
+                {cost === 0 ? "Free" : cost}
+                {short > 0 && <span className="font-normal"> · need {short}</span>}
+              </span>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 

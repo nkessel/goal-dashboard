@@ -55,6 +55,9 @@ export type XpAwardResult = {
   level: number;
   leveledUp: boolean;
   unlockedPerks: string[];
+  /** Coin balance after this award (null before the coins migration). */
+  coins: number | null;
+  coinsEarned: number;
 };
 
 /**
@@ -103,12 +106,17 @@ export async function awardXp(
     unlockedPerks.push(...getLevelPerks(newLevel));
   }
 
+  // Coins follow XP at 1 per 10, rounded up per award (and the same amount
+  // back out when an award is reversed).
+  const coinDelta = Math.sign(amount) * Math.ceil(Math.abs(amount) / 10);
+  const hasCoins = typeof profile.coins === "number";
   const { error: updateErr } = await db
     .from("profiles")
     .update({
       total_xp: newTotal,
       level: newLevel,
       streak_protection_tokens: profile.streak_protection_tokens + tokenDelta,
+      ...(hasCoins ? { coins: Math.max(0, (profile.coins ?? 0) + coinDelta) } : {}),
     })
     .eq("id", ownerId);
   if (updateErr) throw new Error(`Failed to update profile XP: ${updateErr.message}`);
@@ -117,7 +125,14 @@ export async function awardXp(
     await logLevelUpActivity(ownerId, profile.is_public);
   }
 
-  return { totalXp: newTotal, level: newLevel, leveledUp, unlockedPerks };
+  return {
+    totalXp: newTotal,
+    level: newLevel,
+    leveledUp,
+    unlockedPerks,
+    coins: hasCoins ? Math.max(0, (profile.coins ?? 0) + coinDelta) : null,
+    coinsEarned: coinDelta,
+  };
 }
 
 export type CheckInResult = {

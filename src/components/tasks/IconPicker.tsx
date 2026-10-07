@@ -25,6 +25,7 @@ export function IconPicker({
   onDraftChange,
   centered = false,
   showEditHint = false,
+  artStyle = "monster",
 }: {
   /** Omit together with `onDraftChange` when the quest doesn't exist yet. */
   taskId?: string;
@@ -47,6 +48,8 @@ export function IconPicker({
   centered?: boolean;
   /** Show an "Edit" overlay on hover. */
   showEditHint?: boolean;
+  /** "treasure" paints rewards on a beaming golden background. */
+  artStyle?: "monster" | "treasure";
 }) {
   const [open, setOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<TaskIconLibraryEntry | null>(null);
@@ -66,7 +69,7 @@ export function IconPicker({
       try {
         let url: string | undefined;
         if (onDraftChange) {
-          url = await generateQuestIconImageAction(aiPrompt);
+          url = await generateQuestIconImageAction(aiPrompt, artStyle);
           onDraftChange(url, "ai");
         } else if (taskId) {
           url = await generateTaskIconAction(taskId, aiPrompt);

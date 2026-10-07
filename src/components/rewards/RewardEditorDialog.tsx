@@ -5,8 +5,11 @@ import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
 import { createRewardAction, deleteRewardAction, updateRewardAction } from "@/app/actions";
 import { IconPicker } from "@/components/tasks/IconPicker";
+import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 
-/** Create or edit a reward: portrait, name, and an optional note. */
+const PRICE_PRESETS = [0, 5, 10, 25, 50, 100];
+
+/** Create or edit a reward: portrait, name, an optional note, and its price in coins. */
 export function RewardEditorDialog({
   reward,
   theme = "adventure",
@@ -31,6 +34,7 @@ export function RewardEditorDialog({
     setSeenIcon(reward?.icon_key ?? null);
     if (!icon) setIcon(reward?.icon_key ?? null);
   }
+  const [price, setPrice] = useState<number>(reward?.cost_coins ?? 10);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -52,9 +56,9 @@ export function RewardEditorDialog({
     startSaving(async () => {
       try {
         if (reward) {
-          await updateRewardAction(reward.id, { title, description, iconKey: icon, confirmImport: Boolean(review) });
+          await updateRewardAction(reward.id, { title, description, iconKey: icon, costCoins: price, confirmImport: Boolean(review) });
         } else {
-          await createRewardAction({ title, description, iconKey: icon });
+          await createRewardAction({ title, description, iconKey: icon, costCoins: price });
         }
         if (onSaved) onSaved();
         else close();
@@ -99,19 +103,14 @@ export function RewardEditorDialog({
         }}
       >
         <div className="flex items-center justify-between">
-          <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>
+          <h3 className={`flex items-center gap-2 ${isAdventure ? "font-display text-lg" : "text-lg font-bold"}`}>
+            <DiamondIcon size={22} />
             {review ? `Review import ${review.index} of ${review.total}` : reward ? "Edit reward" : "New reward"}
           </h3>
           <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
             ×
           </button>
         </div>
-        <span
-          className="self-start rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide"
-          style={{ background: isAdventure ? "rgba(209,161,60,.25)" : "var(--t-accent-soft)", color: isAdventure ? "#6f5a24" : "var(--t-accent)" }}
-        >
-          🎁 Reward
-        </span>
 
         <div className="flex items-start gap-3">
           <div className="flex shrink-0 flex-col items-center gap-1">
@@ -123,6 +122,7 @@ export function RewardEditorDialog({
               size={72}
               emptyContent={<span className="text-3xl">🎁</span>}
               showEditHint
+              artStyle="treasure"
               onDraftChange={(url) => setIcon(url)}
             />
             <span className="text-[10.5px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -149,6 +149,79 @@ export function RewardEditorDialog({
               style={fieldStyle}
             />
           </div>
+        </div>
+
+        {/* Price in coins */}
+        <div
+          className="flex flex-col gap-2.5 rounded-xl px-3.5 py-3"
+          style={{
+            background: isAdventure ? "linear-gradient(180deg, rgba(48,38,18,.9), rgba(30,24,12,.92))" : "var(--t-bg)",
+            border: `1.5px solid ${isAdventure ? "#a88a3f" : "var(--t-card-border)"}`,
+            boxShadow: isAdventure ? "inset 0 1px 0 rgba(255,235,180,.15), inset 0 -6px 12px rgba(0,0,0,.3)" : undefined,
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-[15px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
+              Price
+            </span>
+            <div className="ml-auto flex items-center gap-1.5">
+              <button
+                type="button"
+                aria-label="Lower price"
+                onClick={() => setPrice((p) => Math.max(0, p - (p > 50 ? 10 : p > 10 ? 5 : 1)))}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-xl font-bold leading-none"
+                style={{ background: "rgba(255,235,180,.12)", color: "#f2d27e", border: "1px solid rgba(217,180,95,.45)" }}
+              >
+                −
+              </button>
+              <label
+                className="flex h-10 items-center gap-1.5 rounded-full px-3"
+                style={{ background: "rgba(0,0,0,.35)", border: "1.5px solid #d9b45f" }}
+              >
+                <CoinIcon size={20} />
+                <input
+                  type="number"
+                  min={0}
+                  value={price}
+                  onChange={(e) => setPrice(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                  aria-label="Price in coins"
+                  className="price-input w-12 bg-transparent text-center text-[19px] font-bold tabular-nums outline-none"
+                  style={{ color: "#f8e3a0" }}
+                />
+              </label>
+              <button
+                type="button"
+                aria-label="Raise price"
+                onClick={() => setPrice((p) => p + (p >= 50 ? 10 : p >= 10 ? 5 : 1))}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-xl font-bold leading-none"
+                style={{ background: "rgba(255,235,180,.12)", color: "#f2d27e", border: "1px solid rgba(217,180,95,.45)" }}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {PRICE_PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPrice(p)}
+                className="h-8 rounded-full px-3 text-[13.5px] font-semibold tabular-nums"
+                style={
+                  price === p
+                    ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" }
+                    : { background: "rgba(255,235,180,.08)", color: "#e9dcb8", border: "1px solid rgba(217,180,95,.35)" }
+                }
+              >
+                {p === 0 ? "Free" : p}
+              </button>
+            ))}
+          </div>
+          <p className="m-0 text-[13px]" style={{ color: isAdventure ? "rgba(243,231,203,.75)" : "var(--t-ink-soft)" }}>
+            {price === 0
+              ? "Free — claim it any time you finish a quest."
+              : `About ${(price * 10).toLocaleString("en-US")} XP of quests (you earn 1 coin per 10 XP).`}
+          </p>
         </div>
 
         {error && (
