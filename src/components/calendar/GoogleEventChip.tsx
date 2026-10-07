@@ -108,7 +108,7 @@ export function GoogleEventChip({
         </div>
         <div className="min-w-0 flex-1">
           <p
-            className={compact ? "line-clamp-3 break-words leading-[1.15]" : "truncate leading-tight"}
+            className={compact ? "line-clamp-3 leading-[1.15] [overflow-wrap:normal] [word-break:normal]" : "truncate leading-tight"}
             style={{ color: isAdventure ? "#22374a" : "var(--t-ink)", fontSize: compact ? 11.5 : 13.5, fontWeight: 500 }}
           >
             {event.title}

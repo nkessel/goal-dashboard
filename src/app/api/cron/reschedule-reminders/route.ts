@@ -42,14 +42,22 @@ export async function GET(req: NextRequest) {
     const owner = await getProfileById(task.owner_id);
     if (!owner) continue;
 
+    // Profiles don't store a timezone yet, so reminders use the app's home zone.
     const when = task.scheduled_start
-      ? new Date(task.scheduled_start).toLocaleString()
+      ? new Date(task.scheduled_start).toLocaleString("en-US", {
+          timeZone: process.env.APP_TIMEZONE ?? "America/New_York",
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
       : "soon";
 
     const notification = await createNotification({
       profileId: owner.id,
       kind: "reschedule_reminder",
-      body: `"${task.title}" is scheduled for ${when}.`,
+      body: `“${task.title}” is coming up — ${when}.`,
       taskId: task.id,
     });
 
