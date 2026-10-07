@@ -12,9 +12,10 @@ import * as notificationsData from "@/lib/data/notifications";
 import * as profilesData from "@/lib/data/profiles";
 import * as avatarLibraryData from "@/lib/data/avatar-library";
 import * as taskIconLibraryData from "@/lib/data/task-icon-library";
+import * as rewardsData from "@/lib/data/rewards";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt } from "@/lib/ai-image";
+import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt, buildSketchbookIconPrompt } from "@/lib/ai-image";
 import { styleLook, AVATAR_STYLE_OPTIONS, STYLE_EXAMPLE_SUBJECT } from "@/lib/avatar-prompts";
 import { exportAccountData, type AccountExport } from "@/lib/data/export";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
@@ -230,9 +231,14 @@ export async function updateTaskAction(
     urgency: number;
     xpValue: number;
     estimateMinutes?: number | null;
+    grantsReward?: boolean;
+    /** Also confirm this quest if it was an import awaiting review. */
+    confirmImport?: boolean;
   }
 ) {
   const ownerId = await requireProfileId();
+  if (input.grantsReward !== undefined) await tasksData.setTaskGrantsReward(taskId, ownerId, input.grantsReward);
+  if (input.confirmImport) await rewardsData.markReviewed("quest", taskId, ownerId);
   await tasksData.updateTask(taskId, ownerId, {
     title: input.title,
     description: input.description.trim() || null,
@@ -730,6 +736,7 @@ export async function createQuestAction(input: {
   iconKey?: string | null;
   iconSource?: "library" | "ai";
   pinToBattle?: boolean;
+  grantsReward?: boolean;
   schedule?: { startISO: string; endISO: string; googleEventId?: string };
 }): Promise<string> {
   const ownerId = await requireProfileId();
@@ -770,6 +777,9 @@ export async function createQuestAction(input: {
   }
   if (input.pinToBattle) {
     await tasksData.setManualPriority(task.id, ownerId, true);
+  }
+  if (input.grantsReward) {
+    await tasksData.setTaskGrantsReward(task.id, ownerId, true);
   }
   revalidatePath("/");
   revalidatePath("/matrix");
@@ -825,4 +835,99 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
 export async function removeTaskIconFromLibraryAction(id: string) {
   await requireProfileId();
   await taskIconLibraryData.removeTaskIconFromLibrary(id);
+}
+
+// ---------------------------------------------------------------------------
+// Rewards
+// ---------------------------------------------------------------------------
+export async function createRewardAction(input: { title: string; description?: string; iconKey?: string | null }) {
+  const ownerId = await requireProfileId();
+  const title = input.title.trim();
+  if (!title) throw new Error("Give the reward a name first.");
+  const reward = await rewardsData.createReward(ownerId, { title, description: input.description?.trim() || null, iconKey: input.iconKey });
+  revalidatePath("/rewards");
+  return reward.id;
+}
+
+export async function updateRewardAction(
+  rewardId: string,
+  input: { title: string; description: string; iconKey?: string | null; confirmImport?: boolean }
+) {
+  const ownerId = await requireProfileId();
+  const title = input.title.trim();
+  if (!title) throw new Error("Give the reward a name first.");
+  await rewardsData.updateReward(rewardId, ownerId, {
+    title,
+    description: input.description.trim() || null,
+    iconKey: input.iconKey,
+    needsReview: input.confirmImport ? false : undefined,
+  });
+  revalidatePath("/rewards");
+  revalidatePath("/", "layout");
+}
+
+export async function deleteRewardAction(rewardId: string) {
+  const ownerId = await requireProfileId();
+  await rewardsData.deleteReward(rewardId, ownerId);
+  revalidatePath("/rewards");
+  revalidatePath("/", "layout");
+}
+
+export async function listAvailableRewardsAction() {
+  const ownerId = await requireProfileId();
+  return (await rewardsData.listRewards(ownerId)).filter((r) => r.status === "available" && !r.needs_review);
+}
+
+/** Pick a reward after finishing a reward-granting quest (or claim one directly). */
+export async function claimRewardAction(rewardId: string, taskId: string | null) {
+  const ownerId = await requireProfileId();
+  await rewardsData.claimReward(rewardId, ownerId, taskId);
+  revalidatePath("/rewards");
+  revalidatePath("/");
+}
+
+export async function unclaimRewardAction(rewardId: string) {
+  const ownerId = await requireProfileId();
+  await rewardsData.unclaimReward(rewardId, ownerId);
+  revalidatePath("/rewards");
+  revalidatePath("/");
+}
+
+export async function setTaskGrantsRewardAction(taskId: string, grantsReward: boolean) {
+  const ownerId = await requireProfileId();
+  await tasksData.setTaskGrantsReward(taskId, ownerId, grantsReward);
+  revalidatePath("/");
+}
+
+// ---------------------------------------------------------------------------
+// Imports (quests/rewards added for you, reviewed one by one)
+// ---------------------------------------------------------------------------
+export async function listImportsAction() {
+  const ownerId = await requireProfileId();
+  return rewardsData.listImports(ownerId);
+}
+
+export async function confirmImportAction(kind: "quest" | "reward", id: string) {
+  const ownerId = await requireProfileId();
+  await rewardsData.markReviewed(kind, id, ownerId);
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Makes the sketchbook portrait for ONE import that still needs one, and
+ * returns what's left (the client calls this repeatedly, one image per
+ * request, so no single request runs long).
+ */
+export async function generateNextImportIconAction(): Promise<{ done: boolean; id?: string; url?: string }> {
+  const ownerId = await requireProfileId();
+  const next = await rewardsData.nextImportNeedingIcon(ownerId);
+  if (!next) return { done: true };
+  const url = await generateAndStoreImage(
+    buildSketchbookIconPrompt(next.prompt),
+    `${next.kind === "quest" ? "tasks" : "rewards"}/${next.id}-${Date.now()}.jpg`,
+    { transparentBackground: true }
+  );
+  await rewardsData.setImportIcon(next.kind, next.id, ownerId, url);
+  await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: next.prompt });
+  return { done: false, id: next.id, url };
 }

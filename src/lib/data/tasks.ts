@@ -488,3 +488,9 @@ export async function markReminderSent(taskId: string): Promise<void> {
     .eq("id", taskId);
   if (error) throw new Error(`Failed to mark reminder sent: ${error.message}`);
 }
+
+export async function setTaskGrantsReward(taskId: string, ownerId: string, grantsReward: boolean): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db.from("tasks").update({ grants_reward: grantsReward }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to update quest: ${error.message}`);
+}

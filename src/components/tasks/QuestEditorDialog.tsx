@@ -44,12 +44,21 @@ export function QuestEditorDialog({
   origin = "center",
   onClose,
   onCreated,
+  onSaved,
+  onPlot,
+  review,
 }: {
   mode: QuestEditorMode;
   theme?: "calm" | "adventure";
   origin?: "fab" | "center";
   onClose: () => void;
   onCreated?: (id: string) => void;
+  /** Called after an existing quest is saved (instead of the closing animation when reviewing). */
+  onSaved?: () => void;
+  /** "Plot on Priority Matrix": override where it goes (default: this quest alone). */
+  onPlot?: () => void;
+  /** Reviewing imports one by one: header shows progress, Save confirms the import. */
+  review?: { index: number; total: number; onLater: () => void };
 }) {
   const isAdventure = theme === "adventure";
   const task = mode.kind === "edit" ? mode.task : null;
@@ -72,6 +81,7 @@ export function QuestEditorDialog({
       : null;
   const [slot, setSlot] = useState<{ start: string; end: string } | null>(initialSlot);
   const [pickingSlot, setPickingSlot] = useState(false);
+  const [grantsReward, setGrantsReward] = useState(Boolean(task?.grants_reward));
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -132,9 +142,19 @@ export function QuestEditorDialog({
     startSaving(async () => {
       try {
         if (task) {
-          await updateTaskAction(task.id, { title, description, importance, urgency, xpValue: xp, estimateMinutes: est });
+          await updateTaskAction(task.id, {
+            title,
+            description,
+            importance,
+            urgency,
+            xpValue: xp,
+            estimateMinutes: est,
+            grantsReward,
+            confirmImport: Boolean(review),
+          });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
-          close();
+          if (onSaved) onSaved();
+          else close();
         } else if (mode.kind === "create") {
           const id = await createQuestAction({
             title,
@@ -147,6 +167,7 @@ export function QuestEditorDialog({
             iconKey: draftIcon?.url ?? null,
             iconSource: draftIcon?.source,
             pinToBattle: mode.pinToBattle,
+            grantsReward,
             schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
           });
           onCreated?.(id);
@@ -164,7 +185,8 @@ export function QuestEditorDialog({
     startSaving(async () => {
       try {
         await deleteTaskAction(task.id);
-        close();
+        if (onSaved) onSaved();
+        else close();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't delete.");
       }
@@ -203,7 +225,7 @@ export function QuestEditorDialog({
         }}
       >
         <div className="flex items-center justify-between">
-          <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>{task ? `Edit ${noun}` : `New ${noun}`}</h3>
+          <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>{review ? `Review import ${review.index} of ${review.total}` : task ? `Edit ${noun}` : `New ${noun}`}</h3>
           <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
             ×
           </button>
@@ -361,6 +383,34 @@ export function QuestEditorDialog({
         <IconScale label="Importance" icon="/design/ui-bolt.png" value={importance} onChange={setImportance} />
         <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
 
+        <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+          <input
+            type="checkbox"
+            checked={grantsReward}
+            onChange={(e) => setGrantsReward(e.target.checked)}
+            className="h-4 w-4"
+            style={{ accentColor: isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)" }}
+          />
+          <span className="font-semibold">Completing this lets me pick a reward</span>
+          <span aria-hidden>🎁</span>
+        </label>
+
+        {task && (
+          <button
+            type="button"
+            onClick={() => {
+              if (onPlot) onPlot();
+              else window.location.assign(`/matrix?plot=${task.id}`);
+            }}
+            className="hover-glow flex h-9 items-center justify-center gap-2 rounded-full border text-[13px] font-semibold"
+            style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", color: "var(--t-ink)" }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- matrix glyph */}
+            <img src="/design/ui-target.png" alt="" width={18} height={18} />
+            Plot importance &amp; urgency on the Priority Matrix
+          </button>
+        )}
+
         {error && (
           <p className="text-sm" style={{ color: "var(--t-warn)" }}>
             {error}
@@ -393,9 +443,15 @@ export function QuestEditorDialog({
             <span />
           )}
           <div className="flex gap-2">
-            <button type="button" onClick={close} className="h-10 rounded-full px-4 text-[15px]" style={{ color: "var(--t-ink-soft)" }}>
-              Cancel
-            </button>
+            {review ? (
+              <button type="button" onClick={review.onLater} className="h-10 rounded-full px-3 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
+                Save the rest for later
+              </button>
+            ) : (
+              <button type="button" onClick={close} className="h-10 rounded-full px-4 text-[15px]" style={{ color: "var(--t-ink-soft)" }}>
+                Cancel
+              </button>
+            )}
             <button
               type="button"
               onClick={save}
@@ -403,7 +459,7 @@ export function QuestEditorDialog({
               className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:opacity-50"
               style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
             >
-              {isSaving ? "Saving…" : task ? "Save" : `Create ${noun}`}
+              {isSaving ? "Saving…" : review ? "Confirm" : task ? "Save" : `Create ${noun}`}
             </button>
           </div>
         </div>

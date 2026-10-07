@@ -51,6 +51,12 @@ export type Task = {
   created_at: string;
   updated_at: string;
   reminder_sent_at: string | null;
+  /** Completing this quest lets you pick one of your rewards. */
+  grants_reward?: boolean;
+  /** Imported (e.g. by Claude) and not yet confirmed in the review flow. */
+  needs_review?: boolean;
+  /** Prompt for an auto-generated portrait, made during review. */
+  icon_prompt?: string | null;
 };
 
 export type Profile = {
@@ -91,6 +97,22 @@ export type AvatarLibraryEntry = {
  * generated (every generated task icon is added here automatically, so the
  * whole library grows as people use it). Mirrors AvatarLibraryEntry but
  * scoped to task icons, which use their own generation prompt style. */
+export type Reward = {
+  id: string;
+  owner_id: string;
+  title: string;
+  description: string | null;
+  icon_key: string | null;
+  icon_prompt: string | null;
+  status: "available" | "claimed";
+  claimed_at: string | null;
+  claimed_with_task_id: string | null;
+  needs_review: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type TaskIconLibraryEntry = {
   id: string;
   image_url: string;

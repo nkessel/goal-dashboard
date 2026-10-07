@@ -4,6 +4,10 @@ import { TopRightAvatar } from "@/components/layout/TopRightAvatar";
 import { ThemeOnBody } from "@/components/layout/ThemeOnBody";
 import { NotificationsButton } from "@/components/layout/NotificationsButton";
 import { DailyLogin } from "@/components/xp/DailyLogin";
+import { ImportsAlert } from "@/components/imports/ImportsAlert";
+import { RewardsButton } from "@/components/rewards/RewardsButton";
+import { RewardChooser } from "@/components/rewards/RewardChooser";
+import { countImports } from "@/lib/data/rewards";
 import { BottomNav } from "@/components/layout/BottomNav";
 
 /**
@@ -33,9 +37,10 @@ export async function AppShell({
    */
   wide?: boolean;
 }) {
-  const [unreadCount, profile] = await Promise.all([
+  const [unreadCount, profile, imports] = await Promise.all([
     profileId ? countUnread(profileId) : Promise.resolve(0),
     profileId ? getProfileById(profileId) : Promise.resolve(null),
+    profileId ? countImports(profileId) : Promise.resolve({ quests: 0, rewards: 0 }),
   ]);
   const theme = profile?.theme === "adventure" ? "adventure" : "calm";
   const isAdventure = theme === "adventure";
@@ -48,8 +53,11 @@ export async function AppShell({
     <div data-theme={theme} className="flex min-h-screen flex-col items-center">
       <ThemeOnBody theme={theme} />
       {profileId && <DailyLogin />}
+      {profileId && <RewardChooser theme={theme} />}
       <div className={`flex w-full flex-1 flex-col ${widthClass}`}>
         <div className="flex items-center justify-end gap-2.5 px-5 pt-3">
+          {profileId && <ImportsAlert quests={imports.quests} rewards={imports.rewards} theme={theme} />}
+          {profileId && <RewardsButton isAdventure={isAdventure} />}
           {profileId && (
             <NotificationsButton unreadCount={unreadCount} isAdventure={isAdventure} iconColor={iconColor} />
           )}

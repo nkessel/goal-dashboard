@@ -11,10 +11,14 @@ import {
 } from "@/lib/data/tasks";
 
 export default async function MatrixPage({
+  searchParams,
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
   const session = await requireSession();
+  const sp = await searchParams;
+  const plotIds = typeof sp.plot === "string" ? sp.plot.split(",").filter(Boolean) : undefined;
+  const confirmImports = sp.review === "1";
 
   const [boards, tasks, completedTasks, profile] = await Promise.all([
     listBoardsForOwner(session.user.id),
@@ -67,7 +71,10 @@ export default async function MatrixPage({
         </div>
 
 
-        <PriorityMatrix tasks={tasks} theme={theme} boards={boards.map((b) => ({ id: b.id, title: b.title }))} />
+        <PriorityMatrix tasks={tasks} theme={theme} boards={boards.map((b) => ({ id: b.id, title: b.title }))}
+          plotIds={plotIds}
+          confirmImports={confirmImports}
+        />
 
         <section className="flex flex-col gap-2.5 rounded-2xl px-4 py-3.5" style={victoriesStyle}>
           <div className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>

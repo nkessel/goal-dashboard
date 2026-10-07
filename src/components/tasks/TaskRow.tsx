@@ -8,6 +8,7 @@ import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction } from
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
 import { QuestActionMenu, type QuestAction } from "./QuestActionMenu";
+import { offerRewardChoice } from "@/components/rewards/RewardChooser";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
@@ -120,6 +121,7 @@ export function TaskRow({
           const fd = new FormData();
           fd.set("taskId", task.id);
           await completeTaskAction(fd);
+          if (task.grants_reward) offerRewardChoice(task.id, task.title);
         }
       } catch (e) {
         setDone(false);
@@ -309,6 +311,11 @@ export function TaskRow({
           >
             {isAdventure ? `XP ${task.xp_value}` : `${task.xp_value} pts`}
           </span>
+          {task.grants_reward && (
+            <span className="text-[12px] font-semibold" title="Completing this lets you pick a reward" style={{ color: "var(--t-ink-soft)" }}>
+              🎁 Reward
+            </span>
+          )}
           <span className="flex items-center gap-0.5" title={`Importance ${task.importance.toFixed(1)}`}>
             {Array.from({ length: importanceCount }).map((_, i) =>
               isAdventure ? (

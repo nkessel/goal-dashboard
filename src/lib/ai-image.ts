@@ -30,6 +30,17 @@ export function buildAvatarPrompt(subject: string, opts: { withBackground?: bool
     : `${base}, flat solid ${CHROMA_KEY_HEX} green background with no gradient, no scenery, no vignette, no letters, no numbers, no writing of any kind`;
 }
 
+/** Imported quests/rewards: colored-pencil sketchbook illustration, like the
+ * hand-drawn art in classic children's fantasy novels. */
+export function buildSketchbookIconPrompt(subject: string) {
+  return (
+    `colored pencil and watercolor sketchbook illustration of ${subject}, whimsical hand-drawn fantasy storybook art ` +
+    "like classic illustrated children's fantasy novels, warm muted colors, loose expressive pencil linework, " +
+    "visible paper texture, single centered object or scene, charming and magical, not photorealistic, not 3D, " +
+    "flat solid #39ff14 green background with no gradient, no scenery, no letters or numbers"
+  );
+}
+
 export function buildTaskIconPrompt(subject: string) {
   return (
     `single fantasy monster, ${subject}, hi-res RPG concept art, dramatic lighting, intricate detail, ` +

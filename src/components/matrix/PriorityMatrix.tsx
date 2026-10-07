@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { TaskWithBoard } from "@/lib/data/tasks";
 import { computeMatrixLayout } from "@/lib/matrix-layout";
+import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { updateTaskPriorityAction } from "@/app/actions";
+import { confirmImportAction, updateTaskPriorityAction } from "@/app/actions";
 import { TaskViewCard } from "@/components/tasks/TaskViewCard";
 
 // A pointer that moves less than this (px) between down and up is treated as
@@ -46,9 +47,15 @@ export function PriorityMatrix({
   tasks: initialTasks,
   theme = "calm",
   boards,
+  plotIds,
+  confirmImports = false,
 }: {
   tasks: TaskWithBoard[];
   theme?: "calm" | "adventure";
+  /** Plot mode: place these quests one by one by clicking the map. */
+  plotIds?: string[];
+  /** Placing a quest in plot mode also confirms it as a reviewed import. */
+  confirmImports?: boolean;
   /** When given, shows a checkbox per board to choose which quests are plotted. */
   boards?: { id: string; title: string }[];
 }) {
@@ -116,6 +123,29 @@ export function PriorityMatrix({
     letterSpacing: isAdventure ? "0.02em" : undefined,
   };
 
+  // ---- Plot mode -------------------------------------------------------
+  const [plotIndex, setPlotIndex] = useState(0);
+  const [plotEditing, setPlotEditing] = useState(false);
+  const queue = (plotIds ?? []).filter((id) => tasks.some((t) => t.id === id));
+  const plotting = queue.length > 0 && plotIndex < queue.length;
+  const plotTask = plotting ? (tasks.find((t) => t.id === queue[plotIndex]) ?? null) : null;
+
+  function placeAt(clientX: number, clientY: number) {
+    if (!plotTask || !gridRef.current) return;
+    const r = gridRef.current.getBoundingClientRect();
+    const xPct = ((clientX - r.left) / r.width) * 100;
+    const yPct = ((r.bottom - clientY) / r.height) * 100;
+    const urgency = pctToScale(xPct);
+    const importance = pctToScale(yPct);
+    const id = plotTask.id;
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, importance, urgency } : t)));
+    startTransition(async () => {
+      await updateTaskPriorityAction(id, importance, urgency);
+      if (confirmImports) await confirmImportAction("quest", id);
+    });
+    setPlotIndex((i) => i + 1);
+  }
+
   function commitDrag(taskId: string, xPct: number, yPct: number) {
     const urgency = pctToScale(xPct);
     const importance = pctToScale(yPct);
@@ -128,6 +158,70 @@ export function PriorityMatrix({
 
   return (
     <div className="flex flex-col gap-3">
+      {plotIds && plotIds.length > 0 && (
+        <div
+          className="flex items-center gap-3 rounded-xl p-3"
+          style={{
+            background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+            border: `2px solid ${isAdventure ? "var(--t-gold)" : "var(--t-accent)"}`,
+            color: "var(--t-ink)",
+          }}
+          role="status"
+        >
+          {plotTask ? (
+            <>
+              <span
+                className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full"
+                style={{ border: "2px solid #a58c66", background: "rgba(255,255,255,.35)" }}
+              >
+                {plotTask.icon_key && plotTask.icon_source !== "monster" ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- portrait
+                  <img src={plotTask.icon_key} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  "⚔"
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
+                  Plot {plotIndex + 1} of {queue.length} — click the map where it belongs
+                </span>
+                <span className={`block truncate text-[16px] font-bold ${isAdventure ? "font-display" : ""}`}>{plotTask.title}</span>
+                {plotTask.description && (
+                  <span className="block truncate text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                    {plotTask.description}
+                  </span>
+                )}
+              </span>
+              <span className="flex shrink-0 flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPlotEditing(true)}
+                  className="h-8 rounded-full border px-3 text-xs font-semibold"
+                  style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)" }}
+                >
+                  Edit details
+                </button>
+                <button type="button" onClick={() => setPlotIndex((i) => i + 1)} className="h-7 text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
+                  Skip
+                </button>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-2xl" aria-hidden>
+                ✓
+              </span>
+              <span className="flex-1 text-sm font-semibold">All plotted! Drag any dot to fine-tune.</span>
+              <a href="/matrix" className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
+                Done
+              </a>
+            </>
+          )}
+        </div>
+      )}
+      {plotEditing && plotTask && (
+        <EditTaskModal task={plotTask} theme={theme} onClose={() => setPlotEditing(false)} />
+      )}
       {boards && boards.length > 0 && (
         <fieldset className="flex flex-wrap gap-x-4 gap-y-1.5">
           <legend className="sr-only">Boards shown on the map</legend>
@@ -169,6 +263,15 @@ export function PriorityMatrix({
               borderWidth: isAdventure ? 2 : 1,
             }}
           >
+            {plotTask && (
+              <button
+                type="button"
+                aria-label={`Place “${plotTask.title}” here`}
+                onClick={(e) => placeAt(e.clientX, e.clientY)}
+                className="absolute inset-0 z-30 cursor-crosshair"
+                style={{ background: "rgba(217,180,95,.08)", boxShadow: "inset 0 0 0 3px rgba(217,180,95,.7)" }}
+              />
+            )}
             <div
               className="absolute bottom-0 top-0 left-1/2 w-px"
               style={{ background: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", opacity: 0.6 }}

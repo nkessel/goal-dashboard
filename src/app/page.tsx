@@ -12,6 +12,7 @@ import {
 import { getProfileById } from "@/lib/data/profiles";
 import { getWeeklyXpEarned, currentWeekStart } from "@/lib/data/xp";
 import { listFriendIds } from "@/lib/data/friendships";
+import { listClaimedSince } from "@/lib/data/rewards";
 
 export default async function Home() {
   const session = await auth();
@@ -57,6 +58,7 @@ export default async function Home() {
     getWeeklyXpEarned(session.user.id, currentWeekStart()),
     listFriendIds(session.user.id),
   ]);
+  const claimedToday = await listClaimedSince(session.user.id, new Date().toISOString().slice(0, 10) + "T00:00:00Z").catch(() => []);
   const topPriorities = openTasks.filter((t) => t.is_manual_priority);
   const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
   const theme = profile?.theme ?? "calm";
@@ -109,6 +111,15 @@ export default async function Home() {
                 </span>
               </li>
             )}
+            {claimedToday.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-2 py-1 text-sm" style={{ color: "var(--t-ink)" }}>
+                <span className="flex items-center gap-2">
+                  <span aria-hidden>🎁</span>
+                  {isAdventure ? "Treasure claimed: " : "Reward: "}
+                  {r.title}
+                </span>
+              </li>
+            ))}
             {completedTasks.map((task) => (
               <CompletedTaskRow key={task.id} task={task} theme={theme} />
             ))}
