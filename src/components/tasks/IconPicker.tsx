@@ -18,6 +18,7 @@ export function IconPicker({
   currentIcon,
   currentSource,
   taskTitle = "",
+  taskDescription = "",
   theme = "calm",
   size = 28,
   fallbackEmoji = "➕",
@@ -32,6 +33,8 @@ export function IconPicker({
   currentIcon: string | null;
   currentSource: "monster" | "library" | "ai";
   taskTitle?: string;
+  /** With the title, makes the suggested painting prompt. */
+  taskDescription?: string | null;
   theme?: "calm" | "adventure";
   /** Trigger diameter in px — lets a caller use this as the quest card's
    * actual avatar (bigger) rather than only the small "+" badge under it. */
@@ -55,11 +58,13 @@ export function IconPicker({
   const [confirmRemove, setConfirmRemove] = useState<TaskIconLibraryEntry | null>(null);
   // Fixed-position popover so a scrolling dialog can't clip it.
   const [pos, setPos] = useState({ top: 0, left: 0 });
-  const [tab, setTab] = useState<"library" | "ai">("library");
+  const [tab, setTab] = useState<"library" | "ai">("ai");
   const [query, setQuery] = useState("");
   const [library, setLibrary] = useState<TaskIconLibraryEntry[] | null>(null);
   const [isPending, startTransition] = useTransition();
   const [aiPrompt, setAiPrompt] = useState(taskTitle);
+  const [promptEdited, setPromptEdited] = useState(false);
+  const suggestedPrompt = [taskTitle.trim(), taskDescription?.trim()].filter(Boolean).join(" — ");
   const [isGeneratingIcon, startGeneratingIcon] = useTransition();
   const [genError, setGenError] = useState<string | null>(null);
 
@@ -175,6 +180,8 @@ export function IconPicker({
           const below = r.bottom + 6;
           const top = below + 300 > window.innerHeight ? Math.max(8, r.top - 306) : below;
           setPos({ top, left });
+          // Show the prompt the portrait would be painted from, ready to edit.
+          if (!promptEdited) setAiPrompt(suggestedPrompt);
           setOpen((v) => !v);
         }}
         title="Change the portrait"
@@ -237,7 +244,7 @@ export function IconPicker({
               Library
             </button>
             <button type="button" onClick={() => setTab("ai")} className="rounded-full px-2 py-1" style={tabBtnStyle(tab === "ai")}>
-              ✨ Generate
+              ✨ Paint
             </button>
             <span className="ml-auto flex items-center gap-2">
               {currentIcon && (
@@ -309,23 +316,58 @@ export function IconPicker({
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <input
-                autoFocus
+              <label className="text-[11.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }} htmlFor="portrait-prompt">
+                Painted from this description — change it or clear it
+              </label>
+              <textarea
+                id="portrait-prompt"
+                rows={3}
                 value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Describe the monster to generate…"
-                className="rounded border px-2 py-1 text-xs"
+                onChange={(e) => {
+                  setAiPrompt(e.target.value);
+                  setPromptEdited(true);
+                }}
+                placeholder="Describe the portrait to paint…"
+                className="resize-none rounded border px-2 py-1 text-[13px] leading-snug"
                 style={fieldStyle}
               />
-              <button
-                type="button"
-                onClick={generateIcon}
-                disabled={isGeneratingIcon || !aiPrompt.trim()}
-                className="hover-glow self-start rounded-full px-3 py-1 text-xs font-medium disabled:opacity-50"
-                style={{ background: "var(--t-gold)", color: "#2a1c10" }}
-              >
-                {isGeneratingIcon ? "Generating…" : "Generate"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={generateIcon}
+                  disabled={isGeneratingIcon || !aiPrompt.trim()}
+                  className="hover-glow rounded-full px-3 py-1 text-xs font-medium disabled:opacity-50"
+                  style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                >
+                  {isGeneratingIcon ? "Painting…" : "Paint portrait"}
+                </button>
+                {aiPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiPrompt("");
+                      setPromptEdited(true);
+                    }}
+                    className="text-xs underline"
+                    style={{ color: "var(--t-ink-soft)" }}
+                  >
+                    Clear text
+                  </button>
+                )}
+                {promptEdited && suggestedPrompt && aiPrompt !== suggestedPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiPrompt(suggestedPrompt);
+                      setPromptEdited(false);
+                    }}
+                    className="ml-auto text-xs underline"
+                    style={{ color: "var(--t-ink-soft)" }}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
               {genError && (
                 <p className="text-xs" style={{ color: "var(--t-warn)" }}>
                   {genError}

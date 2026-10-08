@@ -35,6 +35,7 @@ const PIECES = Array.from({ length: 24 }, (_, i) => {
  */
 export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct, steps, onClose }: ProgressCelebrationDetail & { onClose: () => void }) {
   const [shown, setShown] = useState(0);
+  const [leaving, setLeaving] = useState(false);
   const dismiss = useEffectEvent(() => onClose());
 
   useEffect(() => {
@@ -46,15 +47,17 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    const done = setTimeout(() => dismiss(), 3600);
+    const fade = setTimeout(() => setLeaving(true), 2600);
+    const done = setTimeout(() => dismiss(), 3100);
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(fade);
       clearTimeout(done);
     };
   }, [xp]);
 
   return createPortal(
-    <div className="pc-overlay fixed inset-0 z-[60] flex items-center justify-center p-6" onClick={onClose} role="status" aria-live="polite">
+    <div className={`pointer-events-none fixed inset-0 z-[60] flex items-center justify-center p-6 ${leaving ? "pc-leave" : ""}`} role="status" aria-live="polite">
       <div className="relative">
         <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
           {PIECES.map((p, i) => (
@@ -81,7 +84,6 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
 
         <div
           className="pc-card parchment relative flex w-[290px] flex-col items-center gap-2 rounded-2xl px-6 pb-5 pt-5 text-center"
-          onClick={(e) => e.stopPropagation()}
         >
           <p className="font-display m-0 text-[25px] leading-none" style={{ color: "var(--t-ink)" }}>
             Progress made!
@@ -117,9 +119,6 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
               <CoinIcon size={16} /> +{coinsEarned} {coinsEarned === 1 ? "coin" : "coins"}
             </p>
           )}
-          <button type="button" onClick={onClose} className="mt-1 text-[13.5px] underline" style={{ color: "#5a4a30" }}>
-            Onward
-          </button>
         </div>
       </div>
     </div>,

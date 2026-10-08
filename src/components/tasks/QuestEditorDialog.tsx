@@ -377,6 +377,7 @@ export function QuestEditorDialog({
                 currentIcon={task.icon_key}
                 currentSource={task.icon_source}
                 taskTitle={title}
+                taskDescription={description}
                 theme={theme}
                 size={72}
                 emptyContent={empty}
@@ -387,6 +388,7 @@ export function QuestEditorDialog({
                 currentIcon={draftIcon?.url ?? null}
                 currentSource={draftIcon?.source ?? "monster"}
                 taskTitle={title}
+                taskDescription={description}
                 theme={theme}
                 size={72}
                 emptyContent={empty}
@@ -469,7 +471,7 @@ export function QuestEditorDialog({
                       value={st.title}
                       onChange={(e) => renameStep(st.key, e.target.value)}
                       aria-label="Step"
-                      className="h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[14px] focus:outline-none"
+                      className="bare-input h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[14px] focus:outline-none"
                       style={{
                         color: st.done ? "var(--t-ink-soft)" : "var(--t-ink)",
                         textDecoration: st.done ? "line-through" : undefined,
@@ -508,7 +510,7 @@ export function QuestEditorDialog({
                       autoFocus
                       placeholder="Add a step, then Enter"
                       aria-label="Add a step"
-                      className="h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[14px] focus:outline-none"
+                      className="bare-input h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[14px] focus:outline-none"
                       style={{ color: "var(--t-ink)" }}
                     />
                   </li>
@@ -741,7 +743,7 @@ export function QuestEditorDialog({
                     disabled={!progressTracked}
                     onChange={(e) => setProgress(Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))))}
                     aria-label="Progress percent"
-                    className="h-7 w-10 bg-transparent text-right text-[15px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                    className="bare-input h-7 w-10 bg-transparent text-right text-[15px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                     style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}
                   />
                   <span className="text-[14px] font-bold" style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}>
