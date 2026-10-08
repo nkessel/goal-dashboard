@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import type { TaskWithBoard } from "@/lib/data/tasks";
 import { computeMatrixLayout } from "@/lib/matrix-layout";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
+import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { confirmImportAction, updateTaskPriorityAction } from "@/app/actions";
 
@@ -134,6 +135,7 @@ export function PriorityMatrix({
   // ---- Plot mode -------------------------------------------------------
   const [plotIndex, setPlotIndex] = useState(0);
   const [plotEditing, setPlotEditing] = useState(false);
+  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
   const queue = (plotIds ?? []).filter((id) => tasks.some((t) => t.id === id));
   const plotting = queue.length > 0 && plotIndex < queue.length;
   const plotTask = plotting ? (tasks.find((t) => t.id === queue[plotIndex]) ?? null) : null;
@@ -186,7 +188,7 @@ export function PriorityMatrix({
                   // eslint-disable-next-line @next/next/no-img-element -- portrait
                   <img src={plotTask.icon_key} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  "⚔"
+                  <QuestMonogram id={plotTask.id} title={plotTask.title} size={48} />
                 )}
               </span>
               <span className="min-w-0 flex-1">
@@ -285,9 +287,44 @@ export function PriorityMatrix({
                 type="button"
                 aria-label={`Place “${plotTask.title}” here`}
                 onClick={(e) => placeAt(e.clientX, e.clientY)}
-                className="absolute inset-0 z-30 cursor-crosshair"
-                style={{ background: "rgba(217,180,95,.08)", boxShadow: "inset 0 0 0 3px rgba(217,180,95,.7)" }}
-              />
+                onPointerMove={(e) => {
+                  if (e.pointerType !== "mouse") return;
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setGhost({ x: e.clientX - r.left, y: e.clientY - r.top });
+                }}
+                onPointerLeave={() => setGhost(null)}
+                className="absolute inset-0 z-30"
+                style={{
+                  background: "rgba(217,180,95,.08)",
+                  boxShadow: "inset 0 0 0 3px rgba(217,180,95,.7)",
+                  cursor: ghost ? "none" : "pointer",
+                  borderRadius: 14,
+                }}
+              >
+                {ghost && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute flex items-center justify-center overflow-hidden rounded-full"
+                    style={{
+                      left: ghost.x,
+                      top: ghost.y,
+                      width: 40,
+                      height: 40,
+                      transform: "translate(-50%, -50%)",
+                      background: "#f3e6c8",
+                      border: "2px solid #8a6c2c",
+                      boxShadow: "0 0 0 3px rgba(217,180,95,.55), 0 6px 14px rgba(0,0,0,.4)",
+                    }}
+                  >
+                    {plotTask.icon_key && (plotTask.icon_source === "ai" || plotTask.icon_source === "library") ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+                      <img src={plotTask.icon_key} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <QuestMonogram id={plotTask.id} title={plotTask.title} size={36} />
+                    )}
+                  </span>
+                )}
+              </button>
             )}
             <div
               className="absolute bottom-0 top-0 left-1/2 w-0"
@@ -317,7 +354,7 @@ export function PriorityMatrix({
                     style={{
                       width: isAdventure ? 34 : 16,
                       height: isAdventure ? 34 : 16,
-                      backgroundColor: isAdventure ? (pinImg ? "#f3e6c8" : dotColor) : dotColor,
+                      backgroundColor: isAdventure ? "#f3e6c8" : dotColor,
                       border: `2px solid ${isAdventure ? (tint ? "var(--t-warn)" : "#8a6c2c") : "#fff"}`,
                       transform: isDragging ? "scale(1.3)" : undefined,
                       boxShadow: isAdventure
@@ -359,10 +396,15 @@ export function PriorityMatrix({
                       setViewingTaskId(task.id);
                     }}
                   >
-                    {isAdventure && pinImg && (
-                      // eslint-disable-next-line @next/next/no-img-element -- quest portrait
-                      <img src={pinImg} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" />
-                    )}
+                    {isAdventure &&
+                      (pinImg ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+                        <img src={pinImg} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" />
+                      ) : (
+                        <span className="pointer-events-none h-full w-full">
+                          <QuestMonogram id={task.id} title={task.title} size={30} />
+                        </span>
+                      ))}
                   </div>
                   <div
                     className={`pointer-events-none absolute z-10 hidden w-56 rounded-xl p-2.5 text-[13.5px] shadow-lg group-hover:block ${isAdventure ? "parchment" : ""}`}

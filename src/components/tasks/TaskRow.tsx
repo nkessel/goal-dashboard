@@ -10,6 +10,7 @@ import { EditTaskModal } from "./EditTaskModal";
 import { QuestActionMenu, type QuestAction } from "./QuestActionMenu";
 import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
+import { QuestMonogram } from "./QuestMonogram";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
  * Kept as a plain helper (not inlined in the component) so the impure
@@ -269,9 +270,9 @@ export function TaskRow({
             style={{
               width: avatarSize,
               height: avatarSize,
-              border: imageUrl || emoji ? `2px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}` : "none",
-              background: imageUrl || emoji ? (isAdventure ? "#f3e6c8" : undefined) : "transparent",
-              boxShadow: imageUrl || emoji ? (isAdventure ? "0 0 0 3px rgba(217,180,95,.28), 0 2px 5px rgba(0,0,0,.25)" : undefined) : undefined,
+              border: imageUrl || emoji || !done ? `2px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}` : "none",
+              background: imageUrl || emoji || !done ? (isAdventure ? "#f3e6c8" : undefined) : "transparent",
+              boxShadow: imageUrl || emoji || !done ? (isAdventure ? "0 0 0 3px rgba(217,180,95,.28), 0 2px 5px rgba(0,0,0,.25)" : undefined) : undefined,
             }}
           >
             {done ? (
@@ -282,7 +283,7 @@ export function TaskRow({
             ) : emoji ? (
               <span style={{ fontSize: 26 }}>{emoji}</span>
             ) : (
-              <CheckMark checked={false} isAdventure={isAdventure} size={avatarSize} />
+              <QuestMonogram id={task.id} title={task.title} size={avatarSize} />
             )}
           </button>
           {menu === "icon" && menuEl("left")}
