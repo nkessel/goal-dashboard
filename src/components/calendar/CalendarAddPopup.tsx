@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
 import { createScheduledTaskAction, listSchedulableTasksAction, scheduleTaskAction } from "@/app/actions";
 import { formatTimeRange } from "@/lib/calendar-dates";
+import { useEscape } from "@/lib/use-escape";
 
 /**
  * Opened by dragging (or tapping) a time range on the Day/Week calendar —
@@ -24,6 +25,7 @@ export function CalendarAddPopup({
   theme?: "calm" | "adventure";
   onClose: () => void;
 }) {
+  useEscape(() => onClose());
   const isAdventure = theme === "adventure";
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [title, setTitle] = useState("");

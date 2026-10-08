@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { suggestSlotsAction } from "@/app/actions";
+import { useEscape } from "@/lib/use-escape";
 
 type Slot = { start: string; end: string };
 
@@ -39,6 +40,7 @@ export function SlotPickerDialog({
   onPick: (slot: Slot) => void;
   onClose: () => void;
 }) {
+  useEscape(() => onClose());
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState(() => {

@@ -16,6 +16,7 @@ import {
   type FxSettings,
   type Speck,
 } from "@/lib/celebration-fx";
+import { useEscape } from "@/lib/use-escape";
 
 export type QuestCompleteProps = {
   title: string;
@@ -143,11 +144,7 @@ export function QuestComplete(props: QuestCompleteProps) {
     return stop;
   }, [reduce, fx.fill, stop]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useEscape(onClose);
 
   const eased = 1 - Math.pow(1 - p, 3);
   const gained = Math.round(questXp * eased);

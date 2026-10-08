@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useState } from "react";
 import type { Task } from "@/lib/data/types";
 import { EditTaskModal } from "./EditTaskModal";
+import { useEscape } from "@/lib/use-escape";
 
 /**
  * A quick, read-only view of a task/quest — opened by clicking its dot on
@@ -22,6 +23,7 @@ export function TaskViewCard({
   theme?: "calm" | "adventure";
   onClose: () => void;
 }) {
+  useEscape(() => requestClose());
   const isAdventure = theme === "adventure";
   const [editing, setEditing] = useState(false);
   const [closing, setClosing] = useState(false);

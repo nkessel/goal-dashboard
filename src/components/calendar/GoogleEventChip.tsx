@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { formatTimeRange } from "@/lib/calendar-dates";
+import { useEscape } from "@/lib/use-escape";
 
 const HIDDEN_KEY = "hidden-gcal-events-v1";
 
@@ -57,6 +58,7 @@ export function GoogleEventChip({
   // for a purely client-side, per-browser preference like this.
   const [hidden, setHidden] = useState(() => (typeof window !== "undefined" ? readHidden().has(event.id) : false));
   const [open, setOpen] = useState(false);
+  useEscape(() => setOpen(false), open);
   const [converted, setConverted] = useState(false);
   const [creating, setCreating] = useState(false);
 

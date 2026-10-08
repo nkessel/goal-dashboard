@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FloatingActionButton } from "./FloatingActionButton";
+import { useEscape } from "@/lib/use-escape";
 
 export type FabChoice = { key: string; label: string; icon: React.ReactNode; onPick: () => void };
 
@@ -10,12 +11,7 @@ export function FabSpeedDial({ choices, theme = "calm", label }: { choices: FabC
   const [open, setOpen] = useState(false);
   const isAdventure = theme === "adventure";
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  useEscape(() => setOpen(false), open);
 
   return (
     <>

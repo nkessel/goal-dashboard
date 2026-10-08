@@ -6,6 +6,7 @@ import type { Reward } from "@/lib/data/types";
 import { createRewardAction, deleteRewardAction, updateRewardAction } from "@/app/actions";
 import { IconPicker } from "@/components/tasks/IconPicker";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
+import { useEscape } from "@/lib/use-escape";
 
 const PRICE_PRESETS = [0, 5, 10, 25, 50, 100];
 
@@ -24,6 +25,7 @@ export function RewardEditorDialog({
   onSaved?: () => void;
   review?: { index: number; total: number; onLater: () => void };
 }) {
+  useEscape(() => close());
   const isAdventure = theme === "adventure";
   const [title, setTitle] = useState(reward?.title ?? "");
   const [description, setDescription] = useState(reward?.description ?? "");

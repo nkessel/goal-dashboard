@@ -8,6 +8,7 @@ import { celebrateProgress, celebrateQuest } from "@/components/celebration/Ques
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { SlotPickerDialog } from "./SlotPickerDialog";
+import { useEscape } from "@/lib/use-escape";
 
 export type QuestDraft = {
   title?: string;
@@ -65,6 +66,7 @@ export function QuestEditorDialog({
   /** Reviewing imports one by one: header shows progress, Save confirms the import. */
   review?: { index: number; total: number; onLater: () => void };
 }) {
+  useEscape(() => close());
   const isAdventure = theme === "adventure";
   const task = mode.kind === "edit" ? mode.task : null;
   const prefill = mode.kind === "create" ? mode.prefill : undefined;
@@ -332,9 +334,6 @@ export function QuestEditorDialog({
         aria-modal="true"
         aria-label={task ? `Edit ${noun}` : `New ${noun}`}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") close();
-        }}
         className={`flex max-h-[94vh] w-full max-w-md flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl ${
           phase === "closing" ? exitCls : enterCls
         }`}

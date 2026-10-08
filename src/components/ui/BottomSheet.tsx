@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useEscape } from "@/lib/use-escape";
 
 /**
  * Shared popup shell: slides up from the bottom over a darkening backdrop,
@@ -39,14 +40,7 @@ export function BottomSheet({
     });
   }
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") requestClose();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestClose's setClosing updater always reads fresh state, doesn't need to be a dep
-  }, []);
+  useEscape(requestClose);
 
   // Portaled to <body> so no transformed/animated ancestor (page slide-in,
   // hover lift) can trap the "fixed" overlay inside itself, and centered on

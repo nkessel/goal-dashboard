@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEscape } from "@/lib/use-escape";
 
 /**
  * A panel that slides in from the right over the current screen. Closing
@@ -18,16 +19,14 @@ export function SideDrawer({ theme, title, children }: { theme: "calm" | "advent
     setTimeout(() => router.back(), 220);
   }
 
+  useEscape(close);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
-    window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  });
+  }, []);
 
   return (
     <div data-theme={theme} className="fixed inset-0 z-[45]" style={{ background: "transparent", minHeight: 0 }}>

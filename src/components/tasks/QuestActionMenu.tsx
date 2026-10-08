@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useEscape } from "@/lib/use-escape";
 
 export type QuestAction = "edit" | "complete" | "battle" | "calendar" | "delete";
 
@@ -53,20 +54,17 @@ export function QuestActionMenu({
     };
   }, [anchor, align, confirmDelete]);
 
+  useEscape(onClose);
+
   useEffect(() => {
     function onDown(e: PointerEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
     // Defer so the click that opened the menu doesn't immediately close it.
     const t = setTimeout(() => document.addEventListener("pointerdown", onDown), 0);
-    window.addEventListener("keydown", onKey);
     return () => {
       clearTimeout(t);
       document.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
     };
   }, [onClose]);
 

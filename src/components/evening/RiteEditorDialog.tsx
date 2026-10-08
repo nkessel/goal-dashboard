@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { createRiteAction, removeRiteAction, updateRiteAction } from "@/app/actions";
 import type { RiteView } from "./EveningRites";
 import { Moon } from "./BeginEveningButton";
+import { useEscape } from "@/lib/use-escape";
 
 const XP_PRESETS = [0, 5, 10, 15, 25];
 
@@ -18,6 +19,7 @@ export function RiteEditorDialog({
   defaultCore?: boolean;
   onClose: () => void;
 }) {
+  useEscape(() => close());
   const [title, setTitle] = useState(rite?.title ?? "");
   const [description, setDescription] = useState(rite?.description ?? "");
   const [xp, setXp] = useState(rite?.xp_value ?? 5);
@@ -70,7 +72,6 @@ export function RiteEditorDialog({
         aria-modal="true"
         aria-label={rite ? "Edit rite" : "New rite"}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && close()}
         className={`parchment parchment-framed moonlit flex w-full max-w-md flex-col gap-3 rounded-2xl p-5 shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
       >
         <div className="relative z-[1] flex items-center justify-between">

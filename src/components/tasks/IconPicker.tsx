@@ -10,8 +10,10 @@ import {
   removeTaskIconFromLibraryAction,
 } from "@/app/actions";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
+import { useEscape } from "@/lib/use-escape";
 
 export function IconPicker({
   taskId,
@@ -55,9 +57,10 @@ export function IconPicker({
   artStyle?: "monster" | "treasure";
 }) {
   const [open, setOpen] = useState(false);
+  // Shows a new pick right away (the quest prop only updates after a refresh).
+  const [override, setOverride] = useState<{ icon: string | null; source: "monster" | "library" | "ai" } | null>(null);
+  const router = useRouter();
   const [confirmRemove, setConfirmRemove] = useState<TaskIconLibraryEntry | null>(null);
-  // Fixed-position popover so a scrolling dialog can't clip it.
-  const [pos, setPos] = useState({ top: 0, left: 0 });
   const [tab, setTab] = useState<"library" | "ai">("ai");
   const [query, setQuery] = useState("");
   const [library, setLibrary] = useState<TaskIconLibraryEntry[] | null>(null);
@@ -78,6 +81,8 @@ export function IconPicker({
           onDraftChange(url, "ai");
         } else if (taskId) {
           url = await generateTaskIconAction(taskId, aiPrompt);
+          if (url) setOverride({ icon: url, source: "ai" });
+          router.refresh();
         }
         // Saved to the shared library server-side; show it there right away too.
         if (url) {
@@ -96,14 +101,7 @@ export function IconPicker({
     });
   }
 
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  useEscape(() => setOpen(false), open);
 
   function removeEntry(entry: TaskIconLibraryEntry) {
     setConfirmRemove(null);
@@ -126,6 +124,8 @@ export function IconPicker({
     if (!taskId) return;
     startTransition(async () => {
       await pickTaskIconFromLibraryAction(taskId, imageUrl);
+      setOverride({ icon: imageUrl, source: "library" });
+      router.refresh();
       setOpen(false);
     });
   }
@@ -139,6 +139,8 @@ export function IconPicker({
     if (!taskId) return;
     startTransition(async () => {
       await setTaskIconAction(taskId!, null, "monster");
+      setOverride({ icon: null, source: "monster" });
+      router.refresh();
       setOpen(false);
     });
   }
@@ -148,8 +150,10 @@ export function IconPicker({
   // just hold a plain image URL. "monster" is the old emoji picker's source,
   // kept only so any pre-existing data still renders correctly; nothing in
   // this component lets you choose a new emoji any more.
-  const currentImageUrl = currentSource === "ai" || currentSource === "library" ? currentIcon : null;
-  const currentEmoji = currentSource === "monster" ? MONSTER_ICONS.find((m) => m.key === currentIcon)?.emoji : null;
+  const shownIcon = override ? override.icon : currentIcon;
+  const shownSource = override ? override.source : currentSource;
+  const currentImageUrl = shownSource === "ai" || shownSource === "library" ? shownIcon : null;
+  const currentEmoji = shownSource === "monster" ? MONSTER_ICONS.find((m) => m.key === shownIcon)?.emoji : null;
 
   const filteredLibrary =
     library && query.trim()
@@ -174,12 +178,6 @@ export function IconPicker({
         type="button"
         onClick={(e) => {
           e.stopPropagation(); // don't also trigger a card-level "click to edit"
-          const r = e.currentTarget.getBoundingClientRect();
-          const w = 288;
-          const left = Math.max(8, Math.min(window.innerWidth - w - 8, centered ? r.left + r.width / 2 - w / 2 : r.left));
-          const below = r.bottom + 6;
-          const top = below + 300 > window.innerHeight ? Math.max(8, r.top - 306) : below;
-          setPos({ top, left });
           // Show the prompt the portrait would be painted from, ready to edit.
           if (!promptEdited) setAiPrompt(suggestedPrompt);
           setOpen((v) => !v);
@@ -225,20 +223,46 @@ export function IconPicker({
       {open &&
         createPortal(
         <>
-        <div className="fixed inset-0 z-[59]" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+        <div className="fixed inset-0 z-[59] flex items-center justify-center p-4">
+        <div
+          className="overlay-fade-in absolute inset-0"
+          style={{ background: "var(--t-overlay)" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(false);
+          }}
+        />
         <div
           onClick={(e) => e.stopPropagation()}
           role="dialog"
+          aria-modal="true"
           aria-label="Choose a portrait"
-          className="fixed z-[60] w-72 rounded-xl p-2 parchment shadow-2xl"
+          className="card-pop-in relative flex max-h-[86vh] w-full max-w-[380px] flex-col overflow-y-auto rounded-2xl p-3.5 parchment parchment-framed shadow-2xl"
           style={{
-            top: pos.top,
-            left: pos.left,
             background: "var(--t-panel)",
-            border: "1px solid var(--t-panel-border)",
+            border: "2px solid var(--t-panel-border)",
             color: "var(--t-ink)",
           }}
         >
+          <div className="relative z-[1] mb-2 flex items-center gap-3">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ border: "2px solid #a58c66", background: "#f3e6c8" }}>
+              {currentImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- current portrait
+                <img src={currentImageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                (emptyContent ?? fallbackEmoji)
+              )}
+            </span>
+            <span className={isAdventure ? "font-display text-[19px] leading-tight" : "text-base font-bold"}>
+              Portrait
+              {taskTitle && (
+                <span className="block truncate text-[13px] font-normal" style={{ color: "var(--t-ink-soft)", fontFamily: "var(--font-body)" }}>
+                  {taskTitle}
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="relative z-[1]">
           <div className="mb-2 flex gap-1 text-xs">
             <button type="button" onClick={() => setTab("library")} className="rounded-full px-2 py-1" style={tabBtnStyle(tab === "library")}>
               Library
@@ -247,7 +271,7 @@ export function IconPicker({
               ✨ Paint
             </button>
             <span className="ml-auto flex items-center gap-2">
-              {currentIcon && (
+              {shownIcon && (
                 <button type="button" onClick={clear} disabled={isPending} style={{ color: "var(--t-ink-soft)" }}>
                   Clear
                 </button>
@@ -403,6 +427,8 @@ export function IconPicker({
               </div>
             </div>
           )}
+          </div>
+        </div>
         </div>
         </>,
         document.body

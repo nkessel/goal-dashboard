@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useState, useTransition } from "react";
 import type { Board } from "@/lib/data/types";
 import { updateBoardAction } from "@/app/actions";
+import { useEscape } from "@/lib/use-escape";
 
 const COLORS = [null, "#fde8d0", "#dcefe0", "#e0e7fb", "#fbe0e6", "#fff4c2"];
 
@@ -16,6 +17,7 @@ export function EditBoardModal({
   theme?: "calm" | "adventure";
   onClose: () => void;
 }) {
+  useEscape(() => onClose());
   const isAdventure = theme === "adventure";
   const [title, setTitle] = useState(board.title);
   const [description, setDescription] = useState(board.description ?? "");
