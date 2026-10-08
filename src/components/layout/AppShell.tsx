@@ -65,13 +65,15 @@ export async function AppShell({
       )}
       <div className={`flex w-full flex-1 flex-col ${widthClass}`}>
         <div className="flex items-center justify-end gap-2.5 px-5 pt-3">
-          {profileId && <ImportsAlert quests={imports.quests} rewards={imports.rewards} theme={theme} />}
           {profileId && <RewardsButton isAdventure={isAdventure} coins={typeof profile?.coins === "number" ? profile.coins : null} />}
           {profileId && (
             <NotificationsButton unreadCount={unreadCount} isAdventure={isAdventure} iconColor={iconColor} />
           )}
           {profileId && profile && (
-            <TopRightAvatar profile={profile} isAdventure={isAdventure} label={userLabel} />
+            <div className="relative">
+              <TopRightAvatar profile={profile} isAdventure={isAdventure} label={userLabel} />
+              <ImportsAlert quests={imports.quests} rewards={imports.rewards} theme={theme} />
+            </div>
           )}
         </div>
 

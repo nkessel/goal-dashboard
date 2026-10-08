@@ -605,3 +605,147 @@ body {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* Quest progress slider: an invisible range input over the gilded bar, with a coin-like thumb. */
+.progress-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  margin: 0;
+}
+.progress-range::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 20px;
+}
+.progress-range::-moz-range-track {
+  background: transparent;
+}
+.progress-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #fff1b8, #f2c94c 50%, #a87a1c);
+  border: 1.5px solid #5a3f0c;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.progress-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #fff1b8, #f2c94c 50%, #a87a1c);
+  border: 1.5px solid #5a3f0c;
+}
+.progress-range:disabled {
+  cursor: not-allowed;
+}
+
+/* Speed-dial choices rise out of the + button. */
+.fab-choice {
+  animation: fab-choice-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes fab-choice-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- Evening routine ---------- */
+/* The Today's Quest screen turns over like a card. Both keyframes end with
+   no transform, so fixed-position children behave once it settles. */
+.flip-out {
+  transform-origin: 50% 320px;
+  animation: flip-out 300ms cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+}
+.flip-in {
+  transform-origin: 50% 320px;
+  animation: flip-in 420ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+@keyframes flip-out {
+  from {
+    transform: perspective(1600px) rotateY(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: perspective(1600px) rotateY(90deg);
+    opacity: 0.55;
+  }
+}
+@keyframes flip-in {
+  from {
+    transform: perspective(1600px) rotateY(-90deg);
+    opacity: 0.55;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Night sky behind the evening side. */
+html[data-evening] body,
+html[data-evening] [data-theme="adventure"] {
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(242, 210, 126, 0.16), rgba(242, 210, 126, 0) 45%),
+    linear-gradient(180deg, rgba(16, 20, 52, 0.82), rgba(8, 10, 28, 0.9)),
+    url("/design/bg-forest.jpg") top center / cover no-repeat fixed;
+  background-color: #0b0e24;
+}
+
+/* Parchment under moonlight. */
+.moonlit {
+  position: relative;
+}
+.moonlit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(96, 106, 178, 0.1), rgba(36, 46, 110, 0.17));
+  pointer-events: none;
+}
+.rite-done {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 244, 220, 0.8),
+    0 0 0 1px rgba(242, 210, 126, 0.55),
+    0 0 18px rgba(242, 210, 126, 0.28),
+    0 8px 18px rgba(0, 0, 0, 0.45) !important;
+}
+
+.evening-cta {
+  color: #f6ecd0;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(242, 210, 126, 0.28), rgba(242, 210, 126, 0) 60%),
+    linear-gradient(180deg, #2b3266 0%, #1a1f45 55%, #12152f 100%);
+  border: 2px solid #b8975a;
+  box-shadow:
+    inset 0 0 0 1px rgba(242, 210, 126, 0.2),
+    inset 0 1px 0 rgba(255, 235, 180, 0.18),
+    0 4px 14px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.day-cta {
+  color: #2a1c10;
+  background: radial-gradient(circle at 30% 20%, #fff1c2, #f2d27e 45%, #c9a14e);
+  border: 2px solid #5a4520;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.evening-bar {
+  background: linear-gradient(180deg, #2a2f5c 0%, #1d2146 55%, #171a38 100%);
+  border: 2px solid #8d7642;
+  box-shadow:
+    inset 0 0 0 1px rgba(242, 210, 126, 0.16),
+    inset 0 1px 0 rgba(255, 235, 180, 0.14),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.rest-well {
+  background: linear-gradient(180deg, rgba(42, 47, 92, 0.85), rgba(23, 26, 56, 0.9));
+  border: 1.5px solid rgba(217, 180, 95, 0.6);
+  box-shadow: 0 0 22px rgba(242, 210, 126, 0.25);
+  animation: fab-choice-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}

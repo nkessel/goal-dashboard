@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
+import { FabSpeedDial, type FabChoice } from "@/components/ui/FabSpeedDial";
+import { RewardEditorDialog } from "@/components/rewards/RewardEditorDialog";
+import { DiamondIcon } from "@/components/ui/Icons";
+import { QuestShield } from "@/components/ui/Ornaments";
+import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
+import { Moon } from "@/components/evening/BeginEveningButton";
 import { QuestEditorDialog } from "./QuestEditorDialog";
 
 /**
@@ -11,11 +16,16 @@ import { QuestEditorDialog } from "./QuestEditorDialog";
 export function AddTaskForm({
   goalId,
   theme = "calm",
+  extraChoices = [],
 }: {
   goalId?: string;
   theme?: "calm" | "adventure";
+  /** More speed-dial options (e.g. "New rite" on the evening side). */
+  extraChoices?: FabChoice[];
 }) {
   const [open, setOpen] = useState(false);
+  const [rewardOpen, setRewardOpen] = useState(false);
+  const [riteOpen, setRiteOpen] = useState(false);
   const isAdventure = theme === "adventure";
   const dimText = isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)";
   const borderColor = isAdventure ? "rgba(243,233,207,.35)" : "var(--t-card-border)";
@@ -32,8 +42,19 @@ export function AddTaskForm({
           + Add {isAdventure ? "quest" : "task"}
         </button>
       ) : (
-        !open && (
-          <FloatingActionButton onClick={() => setOpen(true)} label={`Add ${isAdventure ? "quest" : "task"}`} theme={theme} />
+        !open &&
+        !rewardOpen &&
+        !riteOpen && (
+          <FabSpeedDial
+            theme={theme}
+            label="Create something new"
+            choices={[
+              ...extraChoices,
+              { key: "rite", label: "New evening rite", icon: <Moon size={20} />, onPick: () => setRiteOpen(true) },
+              { key: "reward", label: "New reward", icon: <DiamondIcon size={20} />, onPick: () => setRewardOpen(true) },
+              { key: "quest", label: isAdventure ? "New quest" : "New task", icon: <QuestShield size={20} />, onPick: () => setOpen(true) },
+            ]}
+          />
         )
       )}
       {open && (
@@ -44,6 +65,8 @@ export function AddTaskForm({
           onClose={() => setOpen(false)}
         />
       )}
+      {rewardOpen && <RewardEditorDialog theme={theme} onClose={() => setRewardOpen(false)} />}
+      {riteOpen && <RiteEditorDialog onClose={() => setRiteOpen(false)} />}
     </>
   );
 }

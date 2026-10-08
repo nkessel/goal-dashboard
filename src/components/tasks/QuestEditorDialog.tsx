@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
-import { createQuestAction, deleteTaskAction, listGoalOptionsAction, reopenTaskAction, scheduleTaskAction, updateTaskAction } from "@/app/actions";
+import { completeTaskAction, createBoardWithGoalAction, createQuestAction, deleteTaskAction, listGoalOptionsAction, reopenTaskAction, scheduleTaskAction, setTaskProgressAction, updateTaskAction } from "@/app/actions";
+import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { SlotPickerDialog } from "./SlotPickerDialog";
@@ -85,6 +86,25 @@ export function QuestEditorDialog({
   const [goalId, setGoalId] = useState<string | null>(initialGoal);
   const [goalOptions, setGoalOptions] = useState<{ id: string; title: string; boardTitle: string }[] | null>(null);
   const isCompleted = task?.status === "completed";
+  const progressTracked = typeof task?.xp_awarded === "number";
+  const initialProgress = task?.progress ?? 0;
+  const [progress, setProgress] = useState(initialProgress);
+  const [newBoard, setNewBoard] = useState<{ board: string; goal: string } | null>(null);
+  const [creatingBoard, startCreatingBoard] = useTransition();
+
+  function createBoard() {
+    if (!newBoard?.board.trim()) return;
+    startCreatingBoard(async () => {
+      try {
+        const res = await createBoardWithGoalAction(newBoard.board, newBoard.goal);
+        setGoalOptions((opts) => [...(opts ?? []), { id: res.goalId, title: res.goalTitle, boardTitle: res.boardTitle }]);
+        setGoalId(res.goalId);
+        setNewBoard(null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't create the board.");
+      }
+    });
+  }
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -162,6 +182,24 @@ export function QuestEditorDialog({
             confirmImport: Boolean(review),
           });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
+          if (progressTracked && !isCompleted && progress !== initialProgress) {
+            if (progress >= 100) {
+              const fd = new FormData();
+              fd.set("taskId", task.id);
+              const res = await completeTaskAction(fd);
+              celebrateQuest({
+                taskId: task.id,
+                title,
+                description,
+                xp: Math.max(0, xp - Math.round((xp * initialProgress) / 100)),
+                iconSrc: task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null,
+                totalXp: res?.totalXp ?? null,
+                coinsEarned: res?.coinsEarned ?? 0,
+              });
+            } else {
+              await setTaskProgressAction(task.id, progress);
+            }
+          }
           if (onSaved) onSaved();
           else close();
         } else if (mode.kind === "create") {
@@ -397,8 +435,12 @@ export function QuestEditorDialog({
           <img src="/design/ui-shield.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
           <span className={`${labelCls} w-[70px] shrink-0`}>Goal</span>
           <select
-            value={goalId ?? ""}
-            onChange={(e) => setGoalId(e.target.value || null)}
+            value={newBoard ? "__new_board" : (goalId ?? "")}
+            onChange={(e) => {
+              if (e.target.value === "__new_board") return setNewBoard({ board: "", goal: "" });
+              setNewBoard(null);
+              setGoalId(e.target.value || null);
+            }}
             aria-label="Goal"
             className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[13.5px]"
             style={fieldStyle}
@@ -419,8 +461,46 @@ export function QuestEditorDialog({
                 ))}
               </optgroup>
             ))}
+            <option value="__new_board">+ New board…</option>
           </select>
         </label>
+        {newBoard && (
+          <div className="-mt-1 flex flex-col gap-2 rounded-lg p-2.5 sm:ml-[98px]" style={{ background: "rgba(255,250,238,.45)", border: "1px dashed #b39a6a" }}>
+            <input
+              autoFocus
+              value={newBoard.board}
+              onChange={(e) => setNewBoard({ ...newBoard, board: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), createBoard())}
+              placeholder="Board name (e.g. Home, Health, Startup)"
+              aria-label="New board name"
+              className="h-9 rounded-lg border px-2.5 text-[14px]"
+              style={fieldStyle}
+            />
+            <input
+              value={newBoard.goal}
+              onChange={(e) => setNewBoard({ ...newBoard, goal: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), createBoard())}
+              placeholder="First goal on it (optional — “General”)"
+              aria-label="First goal"
+              className="h-9 rounded-lg border px-2.5 text-[14px]"
+              style={fieldStyle}
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setNewBoard(null)} className="h-8 px-2 text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={creatingBoard || !newBoard.board.trim()}
+                onClick={createBoard}
+                className="h-8 rounded-full px-4 text-[13.5px] disabled:opacity-50"
+                style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+              >
+                {creatingBoard ? "Creating…" : "Create board"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {isCompleted && task && (
           <div
@@ -464,6 +544,56 @@ export function QuestEditorDialog({
             <img src="/design/ui-target.png" alt="" width={18} height={18} />
             Plot importance &amp; urgency on the Priority Matrix
           </button>
+        )}
+
+        {/* Quest progress: partial progress earns its share of the XP */}
+        {task && !isCompleted && (
+          <div
+            className="flex flex-col gap-1.5 rounded-xl px-3.5 py-2.5"
+            style={{
+              background: isAdventure ? "linear-gradient(180deg, rgba(48,38,18,.9), rgba(30,24,12,.92))" : "var(--t-bg)",
+              border: `1.5px solid ${isAdventure ? "#a88a3f" : "var(--t-card-border)"}`,
+              opacity: progressTracked ? 1 : 0.6,
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[14.5px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
+                Quest progress
+              </span>
+              <span className="text-[15px] font-bold tabular-nums" style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}>
+                {progress}%
+              </span>
+            </div>
+            <div className="relative h-5">
+              <div
+                className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full"
+                style={{ background: "#141a13", border: "1.5px solid #8a6c2c", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}
+              >
+                <div
+                  className="h-full rounded-full transition-[width] duration-150"
+                  style={{ width: `${progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 8px rgba(242,210,126,.5)" }}
+                />
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={progress}
+                disabled={!progressTracked}
+                onChange={(e) => setProgress(Number(e.target.value))}
+                aria-label="Quest progress"
+                className="progress-range absolute inset-0 w-full cursor-pointer"
+              />
+            </div>
+            <p className="m-0 text-[12.5px]" style={{ color: isAdventure ? "rgba(243,231,203,.78)" : "var(--t-ink-soft)" }}>
+              {!progressTracked
+                ? "Available after the next database update."
+                : progress >= 100
+                  ? "Saving at 100% completes the quest."
+                  : `+${Math.round((xp * progress) / 100)} XP for progress so far · ${xp - Math.round((xp * progress) / 100)} more on completion`}
+            </p>
+          </div>
         )}
 
         {error && (

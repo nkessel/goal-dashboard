@@ -57,6 +57,10 @@ export type Task = {
   needs_review?: boolean;
   /** Prompt for an auto-generated portrait, made during review. */
   icon_prompt?: string | null;
+  /** 0–100: how far along the quest is (partial progress earns partial XP). */
+  progress?: number;
+  /** XP already paid out for this quest (partial progress and/or completion). */
+  xp_awarded?: number;
 };
 
 export type Profile = {
@@ -106,7 +110,9 @@ export type Reward = {
   description: string | null;
   icon_key: string | null;
   icon_prompt: string | null;
-  status: "available" | "claimed";
+  /** claimed = accepted (coins spent); completed = done (bonus paid). */
+  status: "available" | "claimed" | "completed";
+  completed_at?: string | null;
   claimed_at: string | null;
   claimed_with_task_id: string | null;
   needs_review: boolean;
@@ -114,6 +120,9 @@ export type Reward = {
   cost_coins?: number;
   /** Coins paid when claimed (refunded if put back). */
   coins_spent?: number | null;
+  /** Completion bonus granted when claimed (reversed if put back). */
+  bonus_xp?: number;
+  bonus_coins?: number;
   sort_order: number;
   created_at: string;
   updated_at: string;

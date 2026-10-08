@@ -110,7 +110,7 @@ export function TaskRow({
   const xpColor = isAdventure ? "var(--t-xp)" : "var(--t-accent)";
   const metaColor = "var(--t-ink-soft)";
   const dividerColor = isAdventure ? "var(--t-divider)" : "var(--t-card-border)";
-  const avatarSize = 64;
+  const avatarSize = 60;
 
   // Urgency (flames) and importance (bolts), 0–5 each — same icons as the quest editor.
   const urgencyCount = Math.min(5, Math.max(0, Math.round(task.urgency)));
@@ -208,14 +208,14 @@ export function TaskRow({
         {menu === "dots" && menuEl("right")}
       </div>
 
-      <div className="flex items-stretch gap-3">
+      <div className="flex items-stretch gap-2 sm:gap-3">
         {/* Left: board tag centered over (and overlapping) the quest portrait.
             Quests without a goal get a quiet "+ Goal" tag in the same spot, so
             every card lines up and filing one is a click away. */}
-        <div className="relative flex w-[80px] shrink-0 flex-col items-center" onClick={(e) => e.stopPropagation()}>
+        <div className="relative flex w-[66px] shrink-0 flex-col items-center sm:w-[80px]" onClick={(e) => e.stopPropagation()}>
           {categoryLabel ? (
             <span
-              className="relative z-[2] -mb-2.5 max-w-[88px] truncate rounded-md px-2.5 py-px text-[13px] leading-snug"
+              className="relative z-[2] -mb-2.5 max-w-[76px] truncate rounded-md px-2 py-px text-[12.5px] leading-snug sm:max-w-[88px] sm:px-2.5 sm:text-[13px]"
               style={{
                 background: isAdventure ? "linear-gradient(180deg,#e2cfa6,#ccb588)" : "var(--t-accent-soft)",
                 border: `1px solid ${isAdventure ? "#8a7250" : "var(--t-card-border)"}`,
@@ -275,13 +275,13 @@ export function TaskRow({
         {/* Middle: title, description, due + urgency */}
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 pr-1 pt-2">
           <p
-            className={`line-clamp-3 break-words leading-[1.15] ${isAdventure ? "text-[19px] font-semibold" : "text-[16px] font-bold"}`}
+            className={`break-words leading-[1.15] ${isAdventure ? "text-[17.5px] font-semibold sm:text-[19px]" : "text-[16px] font-bold"}`}
             style={{ color: isOverdue ? "var(--t-warn)" : "var(--t-ink)" }}
           >
             {task.title}
           </p>
           {task.description && (
-            <p className="line-clamp-2 text-[14px] leading-snug" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
+            <p className="break-words text-[13.5px] leading-snug sm:text-[14px]" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
               {task.description}
             </p>
           )}
@@ -323,12 +323,35 @@ export function TaskRow({
               </span>
             )}
           </div>
+          {(task.progress ?? 0) > 0 && (
+            <div className="mt-2 flex items-center gap-2" title={`${task.progress}% done`}>
+              <div
+                className="h-2 flex-1 overflow-hidden rounded-full"
+                style={{
+                  background: isAdventure ? "#2a2416" : "var(--t-card-border)",
+                  border: isAdventure ? "1px solid #8a6c2c" : undefined,
+                  boxShadow: isAdventure ? "inset 0 1px 2px rgba(0,0,0,.5)" : undefined,
+                }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${task.progress}%`,
+                    background: isAdventure ? "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)" : "var(--t-accent)",
+                  }}
+                />
+              </div>
+              <span className="text-[12.5px] font-semibold tabular-nums" style={{ color: isAdventure ? "#6f5a24" : "var(--t-ink-soft)" }}>
+                {task.progress}%
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="shrink-0" style={{ width: 1, background: dividerColor }} aria-hidden />
 
         {/* Right: time, XP, importance */}
-        <div className="flex w-[84px] shrink-0 flex-col items-start justify-center gap-1.5 pl-1 pt-4">
+        <div className="flex w-[66px] shrink-0 flex-col items-start justify-center gap-1.5 pt-4 sm:w-[84px] sm:pl-1">
           {task.estimate_minutes != null && (
             <span className="flex items-center gap-1.5" style={{ color: "var(--t-ink)", fontSize: 15 }}>
               {isAdventure ? (
@@ -341,17 +364,17 @@ export function TaskRow({
             </span>
           )}
           <span
-            className="whitespace-nowrap leading-none"
-            style={{ color: xpColor, fontWeight: 700, fontSize: isAdventure ? 21 : 15 }}
+            className={`whitespace-nowrap leading-none ${isAdventure ? "text-[18px] sm:text-[21px]" : "text-[15px]"}`}
+            style={{ color: xpColor, fontWeight: 700 }}
           >
             {isAdventure ? `XP ${task.xp_value}` : `${task.xp_value} pts`}
           </span>
           {importanceCount > 0 && (
-            <span className="flex items-center gap-1" title={`Importance ${task.importance.toFixed(1)}`}>
+            <span className="flex flex-wrap items-center gap-0.5 sm:gap-[3px]" title={`Importance ${task.importance.toFixed(1)}`}>
               {Array.from({ length: importanceCount }).map((_, i) =>
                 isAdventure ? (
                   // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                  <img key={i} src="/design/ui-bolt.png" alt="" width={15} height={15} />
+                  <img key={i} src="/design/ui-bolt.png" alt="" width={13} height={13} className="h-[11px] w-[11px] sm:h-[13px] sm:w-[13px]" />
                 ) : (
                   <span key={i} style={{ color: "var(--t-accent)", fontSize: 13 }}>
                     &#9889;

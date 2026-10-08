@@ -421,7 +421,7 @@ function RewardChest({
           {claimed.title}
         </p>
         <p className="m-0 text-[15px]" style={{ color: "#6b6252" }}>
-          Yours to enjoy — earned by “{questTitle}”.
+          Accepted — earned by “{questTitle}”. Mark it complete in the Treasure Chest once you&apos;ve done it.
         </p>
         <button
           type="button"
@@ -442,7 +442,7 @@ function RewardChest({
           Choose Your Reward
         </p>
         <p className="m-0 text-[14.5px]" style={{ color: "#6b6252" }}>
-          Pick one treasure, or save your coins and keep going.
+          Accept one treasure with your coins, or save them and keep going.
         </p>
         <span
           className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[15px] font-semibold tabular-nums"

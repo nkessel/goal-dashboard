@@ -35,6 +35,11 @@ export function RewardEditorDialog({
     if (!icon) setIcon(reward?.icon_key ?? null);
   }
   const [price, setPrice] = useState<number>(reward?.cost_coins ?? 10);
+  const [bonusXp, setBonusXp] = useState<number>(reward?.bonus_xp ?? 0);
+  const [bonusCoins, setBonusCoins] = useState<number>(reward?.bonus_coins ?? 0);
+  // Only send bonus fields once the database has them (or when they're set).
+  const bonusFields = (r?: Reward) =>
+    r?.bonus_xp !== undefined || bonusXp || bonusCoins ? { bonusXp, bonusCoins } : {};
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -56,9 +61,9 @@ export function RewardEditorDialog({
     startSaving(async () => {
       try {
         if (reward) {
-          await updateRewardAction(reward.id, { title, description, iconKey: icon, costCoins: price, confirmImport: Boolean(review) });
+          await updateRewardAction(reward.id, { title, description, iconKey: icon, costCoins: price, ...bonusFields(reward), confirmImport: Boolean(review) });
         } else {
-          await createRewardAction({ title, description, iconKey: icon, costCoins: price });
+          await createRewardAction({ title, description, iconKey: icon, costCoins: price, ...bonusFields() });
         }
         if (onSaved) onSaved();
         else close();
@@ -162,7 +167,7 @@ export function RewardEditorDialog({
         >
           <div className="flex items-center gap-3">
             <span className="text-[15px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
-              Price
+              Price to accept
             </span>
             <div className="ml-auto flex items-center gap-1.5">
               <button
@@ -219,9 +224,68 @@ export function RewardEditorDialog({
           </div>
           <p className="m-0 text-[13px]" style={{ color: isAdventure ? "rgba(243,231,203,.75)" : "var(--t-ink-soft)" }}>
             {price === 0
-              ? "Free — claim it any time you finish a quest."
-              : `About ${(price * 10).toLocaleString("en-US")} XP of quests (you earn 1 coin per 10 XP).`}
+              ? "Free to accept — any time you finish a quest."
+              : `Costs ${price} coin${price === 1 ? "" : "s"} to accept — about ${(price * 10).toLocaleString("en-US")} XP of quests.`}
           </p>
+        </div>
+
+        {/* Completion bonus */}
+        <div className="flex flex-col gap-2 rounded-xl px-3.5 py-3" style={{ background: "rgba(255,250,238,.5)", border: "1.5px dashed #b39a6a" }}>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[15px] font-semibold">Completion bonus</span>
+            <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+              paid when you complete it
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {(
+              [
+                { label: "XP", value: bonusXp, set: setBonusXp, step: 5, icon: <span className="text-[13px] font-bold" style={{ color: "var(--t-xp)" }}>XP</span> },
+                { label: "coins", value: bonusCoins, set: setBonusCoins, step: 1, icon: <CoinIcon size={17} /> },
+              ] as const
+            ).map((f) => (
+              <div key={f.label} className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  aria-label={`Less bonus ${f.label}`}
+                  onClick={() => f.set(Math.max(0, f.value - f.step))}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-lg font-bold leading-none"
+                  style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}
+                >
+                  −
+                </button>
+                <label className="flex h-9 items-center gap-1.5 rounded-full px-3" style={{ background: "rgba(255,251,240,.8)", border: "1.5px solid #b39a6a" }}>
+                  {f.icon}
+                  <input
+                    type="number"
+                    min={0}
+                    value={f.value}
+                    onChange={(e) => f.set(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                    aria-label={`Bonus ${f.label}`}
+                    className="price-input w-10 bg-transparent text-center text-[16px] font-bold tabular-nums outline-none"
+                    style={{ color: "var(--t-ink)" }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  aria-label={`More bonus ${f.label}`}
+                  onClick={() => f.set(f.value + f.step)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-lg font-bold leading-none"
+                  style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}
+                >
+                  +
+                </button>
+              </div>
+            ))}
+          </div>
+          {(bonusXp > 0 || bonusCoins > 0) && (
+            <p className="m-0 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+              Completing it gives{bonusXp > 0 ? ` +${bonusXp} XP` : ""}
+              {bonusXp > 0 && bonusCoins > 0 ? " and" : ""}
+              {bonusCoins > 0 ? ` +${bonusCoins} coin${bonusCoins === 1 ? "" : "s"}` : ""}
+              {bonusXp > 0 ? ` (plus ${Math.ceil(bonusXp / 10)} from the XP)` : ""}.
+            </p>
+          )}
         </div>
 
         {error && (

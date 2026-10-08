@@ -13,6 +13,7 @@ import * as profilesData from "@/lib/data/profiles";
 import * as avatarLibraryData from "@/lib/data/avatar-library";
 import * as taskIconLibraryData from "@/lib/data/task-icon-library";
 import * as rewardsData from "@/lib/data/rewards";
+import * as ritesData from "@/lib/data/rites";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt, buildSketchbookIconPrompt, buildTreasureIconPrompt } from "@/lib/ai-image";
@@ -214,10 +215,14 @@ export async function completeTaskAction(formData: FormData) {
     : undefined;
 
   const completed = await tasksData.completeTask(taskId, ownerId, completedAt);
+  // Partial progress may already have paid some of this quest's XP; pay the rest.
+  const tracked = typeof completed.xp_awarded === "number";
+  const payout = tracked ? completed.xp_value - (completed.xp_awarded ?? 0) : completed.xp_value;
+  if (tracked) await tasksData.setTaskPayout(taskId, ownerId, { progress: 100, xpAwarded: completed.xp_value });
   let totalXp: number | null = null;
   let coinsEarned = 0;
-  if (completed.xp_value > 0) {
-    const award = await xp.awardXp(ownerId, completed.xp_value, "task_completed", taskId);
+  if (payout !== 0) {
+    const award = await xp.awardXp(ownerId, payout, "task_completed", taskId);
     totalXp = award.totalXp;
     coinsEarned = award.coins === null ? 0 : award.coinsEarned;
   } else {
@@ -249,10 +254,23 @@ export async function updateTaskAction(
   const ownerId = await requireProfileId();
   if (input.grantsReward !== undefined) await tasksData.setTaskGrantsReward(taskId, ownerId, input.grantsReward);
   if (input.confirmImport) await rewardsData.markReviewed("quest", taskId, ownerId);
-  // Editing a finished quest's XP adjusts the XP you already earned for it.
+  // Changing a quest's XP adjusts what you've already earned for it: all of
+  // it for a finished quest, its progress share for one in progress.
   const before = await tasksData.getTask(taskId, ownerId);
-  if (before?.status === "completed" && before.xp_value !== input.xpValue) {
-    await xp.awardXp(ownerId, input.xpValue - before.xp_value, "task_completed", taskId);
+  if (before && before.xp_value !== input.xpValue) {
+    if (typeof before.xp_awarded === "number") {
+      const target =
+        before.status === "completed"
+          ? Math.max(0, Math.round(input.xpValue))
+          : Math.round((Math.max(0, input.xpValue) * (before.progress ?? 0)) / 100);
+      const delta = target - before.xp_awarded;
+      if (delta !== 0) {
+        await xp.awardXp(ownerId, delta, "task_completed", taskId);
+        await tasksData.setTaskPayout(taskId, ownerId, { xpAwarded: target });
+      }
+    } else if (before.status === "completed") {
+      await xp.awardXp(ownerId, input.xpValue - before.xp_value, "task_completed", taskId);
+    }
   }
   await tasksData.updateTask(taskId, ownerId, {
     title: input.title,
@@ -268,20 +286,52 @@ export async function updateTaskAction(
   revalidatePath("/boards", "layout");
 }
 
+/** "+ New board" from the quest editor: a board plus its first goal, ready to file quests under. */
+export async function createBoardWithGoalAction(boardTitle: string, goalTitle?: string) {
+  const ownerId = await requireProfileId();
+  const title = boardTitle.trim();
+  if (!title) throw new Error("Name the board first.");
+  const board = await boardsData.createBoard(ownerId, { title });
+  const goal = await goalsData.createGoal(ownerId, board.id, { title: goalTitle?.trim() || "General" });
+  revalidatePath("/boards", "layout");
+  return { goalId: goal.id, goalTitle: goal.title, boardTitle: board.title };
+}
+
 /** Goals to file a quest under, labelled with their board. */
 export async function listGoalOptionsAction() {
   const ownerId = await requireProfileId();
   return goalsData.listGoalOptionsForOwner(ownerId);
 }
 
+/**
+ * Mark partial progress on a quest (0–100%). Pays the matching share of its
+ * XP now; completing it later pays the rest.
+ */
+export async function setTaskProgressAction(taskId: string, progress: number) {
+  const ownerId = await requireProfileId();
+  const task = await tasksData.getTask(taskId, ownerId);
+  if (!task) throw new Error("That quest isn't here anymore.");
+  if (typeof task.xp_awarded !== "number") throw new Error("Quest progress needs a quick database update first.");
+  if (task.status === "completed") return { xpEarned: 0 };
+  const pct = Math.max(0, Math.min(100, Math.round(progress)));
+  const target = Math.round((task.xp_value * pct) / 100);
+  const delta = target - task.xp_awarded;
+  await tasksData.setTaskPayout(taskId, ownerId, { progress: pct, xpAwarded: target });
+  if (delta !== 0) await xp.awardXp(ownerId, delta, "task_completed", taskId);
+  revalidatePath("/");
+  revalidatePath("/matrix");
+  return { xpEarned: delta };
+}
+
 /** Deletion lives inside the edit dialog, not a separate control. */
 export async function deleteTaskAction(taskId: string) {
   const ownerId = await requireProfileId();
   const task = await tasksData.getTask(taskId, ownerId);
-  // Reverse any XP already awarded for a completed task so deleting it
-  // can't be used to farm points and then remove the evidence.
-  if (task?.status === "completed" && task.xp_value > 0) {
-    await xp.awardXp(ownerId, -task.xp_value, "task_completed", taskId);
+  // Reverse any XP already paid for this quest (completion or partial
+  // progress) so deleting it can't be used to farm points.
+  const paid = task ? (typeof task.xp_awarded === "number" ? task.xp_awarded : task.status === "completed" ? task.xp_value : 0) : 0;
+  if (paid > 0) {
+    await xp.awardXp(ownerId, -paid, "task_completed", taskId);
   }
   await tasksData.deleteTask(taskId, ownerId);
   revalidatePath("/");
@@ -293,9 +343,12 @@ export async function reopenTaskAction(taskId: string) {
   const ownerId = await requireProfileId();
   const before = await tasksData.getTask(taskId, ownerId);
   await tasksData.reopenTask(taskId, ownerId);
-  // Undo the completion XP so re-completing later doesn't farm points.
-  if (before?.status === "completed" && before.xp_value > 0) {
-    await xp.awardXp(ownerId, -before.xp_value, "task_completed", taskId);
+  // Undo what the quest paid out so re-completing later doesn't farm points;
+  // progress starts over.
+  if (before?.status === "completed") {
+    const paid = typeof before.xp_awarded === "number" ? before.xp_awarded : before.xp_value;
+    if (paid > 0) await xp.awardXp(ownerId, -paid, "task_completed", taskId);
+    if (typeof before.xp_awarded === "number") await tasksData.setTaskPayout(taskId, ownerId, { progress: 0, xpAwarded: 0 });
   }
   revalidatePath("/");
   revalidatePath("/matrix");
@@ -865,7 +918,14 @@ export async function removeTaskIconFromLibraryAction(id: string) {
 // ---------------------------------------------------------------------------
 // Rewards
 // ---------------------------------------------------------------------------
-export async function createRewardAction(input: { title: string; description?: string; iconKey?: string | null; costCoins?: number }) {
+export async function createRewardAction(input: {
+  title: string;
+  description?: string;
+  iconKey?: string | null;
+  costCoins?: number;
+  bonusXp?: number;
+  bonusCoins?: number;
+}) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
   if (!title) throw new Error("Give the reward a name first.");
@@ -874,6 +934,8 @@ export async function createRewardAction(input: { title: string; description?: s
     description: input.description?.trim() || null,
     iconKey: input.iconKey,
     costCoins: input.costCoins,
+    bonusXp: input.bonusXp,
+    bonusCoins: input.bonusCoins,
   });
   revalidatePath("/rewards");
   return reward.id;
@@ -881,7 +943,15 @@ export async function createRewardAction(input: { title: string; description?: s
 
 export async function updateRewardAction(
   rewardId: string,
-  input: { title: string; description: string; iconKey?: string | null; costCoins?: number; confirmImport?: boolean }
+  input: {
+    title: string;
+    description: string;
+    iconKey?: string | null;
+    costCoins?: number;
+    bonusXp?: number;
+    bonusCoins?: number;
+    confirmImport?: boolean;
+  }
 ) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
@@ -891,6 +961,8 @@ export async function updateRewardAction(
     description: input.description.trim() || null,
     iconKey: input.iconKey,
     costCoins: input.costCoins,
+    bonusXp: input.bonusXp,
+    bonusCoins: input.bonusCoins,
     needsReview: input.confirmImport ? false : undefined,
   });
   revalidatePath("/rewards");
@@ -914,14 +986,44 @@ export async function listAvailableRewardsAction() {
 /** Pick a reward after finishing a reward-granting quest (or claim one directly). */
 export async function claimRewardAction(rewardId: string, taskId: string | null) {
   const ownerId = await requireProfileId();
+  // Accepting spends the reward's coins; its bonus comes when you complete it.
   const { coins } = await rewardsData.claimReward(rewardId, ownerId, taskId);
   revalidatePath("/rewards");
   revalidatePath("/", "layout");
   return { coins };
 }
 
+async function reverseRewardBonus(ownerId: string, was: Awaited<ReturnType<typeof rewardsData.uncompleteReward>>) {
+  if (!was) return;
+  if ((was.bonus_xp ?? 0) > 0) await xp.awardXp(ownerId, -(was.bonus_xp ?? 0), "task_completed");
+  if ((was.bonus_coins ?? 0) > 0) await rewardsData.addCoins(ownerId, -(was.bonus_coins ?? 0));
+}
+
+/** You actually did it (got the haircut, bought the frames): pays the completion bonus. */
+export async function completeRewardAction(rewardId: string) {
+  const ownerId = await requireProfileId();
+  const reward = await rewardsData.completeReward(rewardId, ownerId);
+  const bonusXp = reward.bonus_xp ?? 0;
+  const bonusCoins = reward.bonus_coins ?? 0;
+  if (bonusXp > 0) await xp.awardXp(ownerId, bonusXp, "task_completed");
+  if (bonusCoins > 0) await rewardsData.addCoins(ownerId, bonusCoins);
+  revalidatePath("/rewards");
+  revalidatePath("/", "layout");
+  return { bonusXp, bonusCoins, bonusCoinsFromXp: Math.ceil(bonusXp / 10) };
+}
+
+/** Undo a completion (back to accepted) and take back its bonus. */
+export async function uncompleteRewardAction(rewardId: string) {
+  const ownerId = await requireProfileId();
+  await reverseRewardBonus(ownerId, await rewardsData.uncompleteReward(rewardId, ownerId));
+  revalidatePath("/rewards");
+  revalidatePath("/", "layout");
+}
+
 export async function unclaimRewardAction(rewardId: string) {
   const ownerId = await requireProfileId();
+  // A completed reward first gives back its bonus, then refunds as usual.
+  await reverseRewardBonus(ownerId, await rewardsData.uncompleteReward(rewardId, ownerId));
   await rewardsData.unclaimReward(rewardId, ownerId);
   revalidatePath("/rewards");
   revalidatePath("/", "layout");
@@ -967,4 +1069,60 @@ export async function generateNextImportIconAction(): Promise<{ done: boolean; i
   await rewardsData.setImportIcon(next.kind, next.id, ownerId, url);
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: next.prompt });
   return { done: false, id: next.id, url };
+}
+
+// ---------------------------------------------------------------------------
+// Evening routine (rites)
+// ---------------------------------------------------------------------------
+function assertDay(day: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("Bad day.");
+}
+
+/** Complete a rite for your local `day` (YYYY-MM-DD); pays its XP once per day. */
+export async function completeRiteAction(riteId: string, day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rite = await ritesData.getRite(riteId, ownerId);
+  if (!rite) throw new Error("That rite isn't here anymore.");
+  const added = await ritesData.addRiteCompletion(ownerId, riteId, day, rite.xp_value);
+  let coinsEarned = 0;
+  if (added && rite.xp_value > 0) coinsEarned = (await xp.awardXp(ownerId, rite.xp_value, "task_completed")).coinsEarned;
+  revalidatePath("/");
+  return { xp: added ? rite.xp_value : 0, coinsEarned };
+}
+
+/** Undo a rite completion for `day` and take back its XP. */
+export async function uncompleteRiteAction(riteId: string, day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const paid = await ritesData.removeRiteCompletion(ownerId, riteId, day);
+  if (paid && paid > 0) await xp.awardXp(ownerId, -paid, "task_completed");
+  revalidatePath("/");
+}
+
+export async function createRiteAction(input: { title: string; description?: string; isCore: boolean; xpValue?: number }) {
+  const ownerId = await requireProfileId();
+  const title = input.title.trim();
+  if (!title) throw new Error("Name the rite first.");
+  const rite = await ritesData.createRite(ownerId, { title, description: input.description?.trim() || null, isCore: input.isCore, xpValue: input.xpValue });
+  revalidatePath("/");
+  return rite.id;
+}
+
+export async function updateRiteAction(riteId: string, input: { title?: string; description?: string; isCore?: boolean; xpValue?: number }) {
+  const ownerId = await requireProfileId();
+  if (input.title !== undefined && !input.title.trim()) throw new Error("Name the rite first.");
+  await ritesData.updateRite(riteId, ownerId, {
+    title: input.title?.trim(),
+    description: input.description === undefined ? undefined : input.description.trim() || null,
+    isCore: input.isCore,
+    xpValue: input.xpValue,
+  });
+  revalidatePath("/");
+}
+
+export async function removeRiteAction(riteId: string) {
+  const ownerId = await requireProfileId();
+  await ritesData.archiveRite(riteId, ownerId);
+  revalidatePath("/");
 }

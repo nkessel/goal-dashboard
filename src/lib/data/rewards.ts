@@ -17,7 +17,7 @@ export async function listRewards(ownerId: string): Promise<Reward[]> {
 
 export async function createReward(
   ownerId: string,
-  input: { title: string; description?: string | null; iconKey?: string | null; costCoins?: number }
+  input: { title: string; description?: string | null; iconKey?: string | null; costCoins?: number; bonusXp?: number; bonusCoins?: number }
 ): Promise<Reward> {
   const db = supabaseAdmin();
   const { data, error } = await db
@@ -28,6 +28,8 @@ export async function createReward(
       description: input.description || null,
       icon_key: input.iconKey ?? null,
       ...(input.costCoins !== undefined ? { cost_coins: Math.max(0, Math.round(input.costCoins)) } : {}),
+      ...(input.bonusXp ? { bonus_xp: Math.max(0, Math.round(input.bonusXp)) } : {}),
+      ...(input.bonusCoins ? { bonus_coins: Math.max(0, Math.round(input.bonusCoins)) } : {}),
     })
     .select("*")
     .single();
@@ -38,7 +40,15 @@ export async function createReward(
 export async function updateReward(
   rewardId: string,
   ownerId: string,
-  input: { title: string; description: string | null; iconKey?: string | null; needsReview?: boolean; costCoins?: number }
+  input: {
+    title: string;
+    description: string | null;
+    iconKey?: string | null;
+    needsReview?: boolean;
+    costCoins?: number;
+    bonusXp?: number;
+    bonusCoins?: number;
+  }
 ): Promise<void> {
   const db = supabaseAdmin();
   const { error } = await db
@@ -49,6 +59,8 @@ export async function updateReward(
       ...(input.iconKey !== undefined ? { icon_key: input.iconKey } : {}),
       ...(input.needsReview !== undefined ? { needs_review: input.needsReview } : {}),
       ...(input.costCoins !== undefined ? { cost_coins: Math.max(0, Math.round(input.costCoins)) } : {}),
+      ...(input.bonusXp !== undefined ? { bonus_xp: Math.max(0, Math.round(input.bonusXp)) } : {}),
+      ...(input.bonusCoins !== undefined ? { bonus_coins: Math.max(0, Math.round(input.bonusCoins)) } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", rewardId)
@@ -69,6 +81,13 @@ export async function getCoins(ownerId: string): Promise<number> {
   return data?.coins ?? 0;
 }
 
+/** Add (or, if negative, take away) coins, never going below zero. */
+export async function addCoins(ownerId: string, delta: number): Promise<number> {
+  const next = Math.max(0, (await getCoins(ownerId)) + delta);
+  await setCoins(ownerId, next);
+  return next;
+}
+
 async function setCoins(ownerId: string, coins: number) {
   const db = supabaseAdmin();
   const { error } = await db.from("profiles").update({ coins: Math.max(0, coins) }).eq("id", ownerId);
@@ -76,7 +95,7 @@ async function setCoins(ownerId: string, coins: number) {
 }
 
 /** Spend the reward's price in coins and mark it claimed. */
-export async function claimReward(rewardId: string, ownerId: string, taskId: string | null): Promise<{ coins: number }> {
+export async function claimReward(rewardId: string, ownerId: string, taskId: string | null): Promise<{ coins: number; reward: Reward }> {
   const db = supabaseAdmin();
   const { data: reward, error: readErr } = await db
     .from("rewards")
@@ -107,11 +126,11 @@ export async function claimReward(rewardId: string, ownerId: string, taskId: str
     if (cost > 0) await setCoins(ownerId, balance);
     throw new Error(`Failed to claim reward: ${error.message}`);
   }
-  return { coins: balance - cost };
+  return { coins: balance - cost, reward };
 }
 
 /** Put a claimed reward back in the chest and refund what was paid. */
-export async function unclaimReward(rewardId: string, ownerId: string): Promise<void> {
+export async function unclaimReward(rewardId: string, ownerId: string): Promise<Reward | null> {
   const db = supabaseAdmin();
   const { data: reward } = await db.from("rewards").select("*").eq("id", rewardId).eq("owner_id", ownerId).single<Reward>();
   const { error } = await db
@@ -128,6 +147,36 @@ export async function unclaimReward(rewardId: string, ownerId: string): Promise<
   if (error) throw new Error(`Failed to restore reward: ${error.message}`);
   const refund = reward?.status === "claimed" ? (reward.coins_spent ?? 0) : 0;
   if (refund > 0) await setCoins(ownerId, (await getCoins(ownerId)) + refund);
+  return reward?.status === "claimed" ? reward : null;
+}
+
+/** Mark an accepted reward as done. Returns it (for paying its bonus). */
+export async function completeReward(rewardId: string, ownerId: string): Promise<Reward> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("rewards")
+    .update({ status: "completed", completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", rewardId)
+    .eq("owner_id", ownerId)
+    .eq("status", "claimed")
+    .select("*")
+    .single<Reward>();
+  if (error || !data) throw new Error("Accept the reward before completing it.");
+  return data;
+}
+
+/** Undo "completed" (back to accepted). Returns the reward if it was completed. */
+export async function uncompleteReward(rewardId: string, ownerId: string): Promise<Reward | null> {
+  const db = supabaseAdmin();
+  const { data } = await db
+    .from("rewards")
+    .update({ status: "claimed", completed_at: null, updated_at: new Date().toISOString() })
+    .eq("id", rewardId)
+    .eq("owner_id", ownerId)
+    .eq("status", "completed")
+    .select("*")
+    .maybeSingle<Reward>();
+  return data ?? null;
 }
 
 /** Rewards claimed since `sinceISO` (for Victories Today). */
@@ -137,7 +186,7 @@ export async function listClaimedSince(ownerId: string, sinceISO: string): Promi
     .from("rewards")
     .select("*")
     .eq("owner_id", ownerId)
-    .eq("status", "claimed")
+    .in("status", ["claimed", "completed"])
     .gte("claimed_at", sinceISO)
     .order("claimed_at", { ascending: false });
   if (error) throw new Error(`Failed to list claimed rewards: ${error.message}`);

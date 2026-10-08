@@ -198,16 +198,22 @@ export function TodayTaskBoard({
           <div className="flex items-center gap-2">
             {/* invisible twin of the + button keeps the title truly centered */}
             <span className="h-8 w-8 shrink-0" aria-hidden />
-            <GoldRule dir="left" />
+            <span className="hidden flex-1 sm:flex">
+              <GoldRule dir="left" />
+            </span>
+            <span className="flex-1 sm:hidden" />
             <Leaf flip />
-            <h2 className="font-display m-0 whitespace-nowrap text-[27px] leading-none" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
+            <h2 className="font-display m-0 whitespace-nowrap text-[23px] leading-none sm:text-[27px]" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
               Today&apos;s Battle
               <span className="ml-2 align-middle text-[14px] font-normal" style={{ color: "var(--t-gold)" }}>
                 {priority.length}/3
               </span>
             </h2>
             <Leaf />
-            <GoldRule dir="right" />
+            <span className="hidden flex-1 sm:flex">
+              <GoldRule dir="right" />
+            </span>
+            <span className="flex-1 sm:hidden" />
           <button
             type="button"
             onClick={() => setPickerOpen(true)}

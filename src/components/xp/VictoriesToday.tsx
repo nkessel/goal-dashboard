@@ -79,13 +79,18 @@ export function VictoriesToday({
           tone="ink"
           size={23}
           aside={
-            <span className="shrink-0 whitespace-nowrap pl-1 text-[15px]" style={{ color: "var(--t-ink)" }}>
+            <span className="hidden shrink-0 whitespace-nowrap pl-1 text-[15px] sm:inline" style={{ color: "var(--t-ink)" }}>
               Today&apos;s XP: <span className="font-semibold">{totalXp}</span>
             </span>
           }
         >
           Victories Today
         </SectionTitle>
+      ) : null}
+      {isAdventure ? (
+        <p className="m-0 mt-1 text-center text-[14.5px] sm:hidden" style={{ color: "var(--t-ink)" }}>
+          Today&apos;s XP: <span className="font-semibold">{totalXp}</span>
+        </p>
       ) : (
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
@@ -100,7 +105,7 @@ export function VictoriesToday({
       <ul className="mt-2 flex flex-col">
         {loginToday && (
           <li className={rowCls} style={{ color: "var(--t-ink)" }}>
-            <Seal kind="star" />
+            <Seal kind="check" />
             <span className="min-w-0 flex-1">{isAdventure ? "Answered the call (daily login)" : "Daily login"}</span>
             <span style={xpStyle}>+5 XP</span>
           </li>
@@ -126,7 +131,7 @@ export function VictoriesToday({
           <li key={r.id} className={rowCls} style={{ ...divider, color: "var(--t-ink)" }}>
             <Seal kind="gift" />
             <span className="min-w-0 flex-1">
-              {isAdventure ? "Treasure claimed: " : "Reward: "}
+              {isAdventure ? "Treasure accepted: " : "Reward: "}
               {r.title}
             </span>
           </li>

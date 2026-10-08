@@ -346,6 +346,24 @@ export async function completeTask(
   return data;
 }
 
+/** Records quest progress and XP already paid out (needs migration 0014). */
+export async function setTaskPayout(
+  taskId: string,
+  ownerId: string,
+  input: { progress?: number; xpAwarded?: number }
+): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db
+    .from("tasks")
+    .update({
+      ...(input.progress !== undefined ? { progress: Math.max(0, Math.min(100, Math.round(input.progress))) } : {}),
+      ...(input.xpAwarded !== undefined ? { xp_awarded: Math.max(0, Math.round(input.xpAwarded)) } : {}),
+    })
+    .eq("id", taskId)
+    .eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to save quest progress: ${error.message}`);
+}
+
 export async function reopenTask(taskId: string, ownerId: string): Promise<Task> {
   const db = supabaseAdmin();
   const { data, error } = await db

@@ -13,6 +13,10 @@ import { getProfileById } from "@/lib/data/profiles";
 import { getWeeklyXpEarned, currentWeekStart } from "@/lib/data/xp";
 import { listFriendIds } from "@/lib/data/friendships";
 import { listClaimedSince } from "@/lib/data/rewards";
+import { listRites, listRiteCompletions } from "@/lib/data/rites";
+import { DayNightFlip } from "@/components/evening/DayNightFlip";
+import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
+import { EveningRites } from "@/components/evening/EveningRites";
 
 /** Start of a window `n` days back (kept outside render for purity). */
 function daysAgoISO(n: number) {
@@ -64,36 +68,50 @@ export default async function Home() {
     listFriendIds(session.user.id),
   ]);
   // A two-day window; VictoriesToday narrows it to the viewer's own local day.
-  const recentClaims = await listClaimedSince(session.user.id, daysAgoISO(2)).catch(() => []);
+  const [recentClaims, rites, riteCompletions] = await Promise.all([
+    listClaimedSince(session.user.id, daysAgoISO(2)).catch(() => []),
+    listRites(session.user.id).catch(() => null),
+    listRiteCompletions(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => []),
+  ]);
   const topPriorities = openTasks.filter((t) => t.is_manual_priority);
   const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
   const theme = profile?.theme ?? "calm";
+  const stats = profile && (
+    <section>
+      <XpSummary profile={profile} stats={{ questsComplete, xpThisWeek, partySize: friendIds.length }} />
+    </section>
+  );
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
-      <div className="flex flex-col gap-6">
-        {profile && (
-          <section>
-            <XpSummary
-              profile={profile}
-              stats={{ questsComplete, xpThisWeek, partySize: friendIds.length }}
+      <DayNightFlip
+        day={
+          <div className="flex flex-col gap-6">
+            {stats}
+            <TodayTaskBoard priorityTasks={topPriorities} otherTasks={otherTasks} theme={theme} />
+            <BeginEveningButton />
+            <section>
+              <AddTaskForm theme={theme} />
+            </section>
+            <VictoriesToday
+              tasks={completedTasks}
+              claimed={recentClaims.map((r) => ({ id: r.id, title: r.title, claimed_at: r.claimed_at }))}
+              lastCheckInAt={profile?.last_check_in_at ?? null}
+              theme={theme}
             />
-          </section>
-        )}
-
-        <TodayTaskBoard priorityTasks={topPriorities} otherTasks={otherTasks} theme={theme} />
-
-        <section>
-          <AddTaskForm theme={theme} />
-        </section>
-
-        <VictoriesToday
-          tasks={completedTasks}
-          claimed={recentClaims.map((r) => ({ id: r.id, title: r.title, claimed_at: r.claimed_at }))}
-          lastCheckInAt={profile?.last_check_in_at ?? null}
-          theme={theme}
-        />
-      </div>
+          </div>
+        }
+        evening={
+          <div className="flex flex-col gap-6">
+            {stats}
+            <EveningRites
+              rites={rites?.map((r) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value })) ?? null}
+              completions={riteCompletions.map((c) => ({ rite_id: c.rite_id, day: c.day }))}
+              theme={theme}
+            />
+          </div>
+        }
+      />
     </AppShell>
   );
 }

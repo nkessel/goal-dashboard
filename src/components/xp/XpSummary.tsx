@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/data/types";
 import { xpToNextLevel } from "@/lib/data/xp";
-import { Avatar } from "@/components/settings/Avatar";
+import { Avatar, defaultPortraitFor } from "@/components/settings/Avatar";
 
 /** One flanking stat tile in the Adventure-theme header (Quests Complete,
  * Quest Streak, XP this week, Party Size) — icon + big number + caption,
@@ -19,14 +19,14 @@ function StatTile({
 }) {
   // Sized to the Today's Quests reference: large painted icon, big serif number, two-line caption.
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2 sm:gap-3">
       {/* eslint-disable-next-line @next/next/no-img-element -- static /design asset */}
-      <img src={iconSrc} alt="" width={42} height={42} className="h-[42px] w-[42px] shrink-0 object-contain" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45))" }} />
+      <img src={iconSrc} alt="" width={42} height={42} className="h-8 w-8 shrink-0 object-contain sm:h-[42px] sm:w-[42px]" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45))" }} />
       <div className="flex flex-col">
-        <span className="font-display text-[25px] leading-none" style={{ color: "var(--t-cream)" }}>
+        <span className="font-display text-[21px] leading-none sm:text-[25px]" style={{ color: "var(--t-cream)" }}>
           {value}
         </span>
-        <span className="mt-1 text-[14px] leading-[1.15]" style={{ color: "var(--t-cream)", opacity: 0.9 }}>
+        <span className="mt-1 text-[12.5px] leading-[1.15] sm:text-[14px]" style={{ color: "var(--t-cream)", opacity: 0.9 }}>
           {label}
         </span>
       </div>
@@ -58,32 +58,31 @@ export function XpSummary({
       <div className="flex flex-col gap-2">
         {/* Equal side columns keep the avatar dead center and both stat pairs
             balanced around it, whatever the screen width. */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <div className="flex flex-col gap-6 justify-self-center">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 sm:gap-2">
+          <div className="flex flex-col gap-5 justify-self-center sm:gap-6">
             <StatTile iconSrc="/design/ui-shield.png" value={stats?.questsComplete ?? 0} label={<>Quests<br />Complete</>} />
             <StatTile iconSrc="/design/ui-flame.png" value={profile.streak_count} label={<>Quest<br />Streak</>} />
           </div>
 
           <div className="flex flex-col items-center gap-3">
-            <div className="relative" style={{ width: 124, height: 124 }}>
+            <div className="relative h-[100px] w-[100px] sm:h-[124px] sm:w-[124px]">
               <Link
                 href="/settings?open=appearance"
                 aria-label="Edit avatar"
-                className="hover-glow block overflow-hidden rounded-full"
+                className="hover-glow block h-full w-full overflow-hidden rounded-full"
                 style={{
-                  width: 124,
-                  height: 124,
                   padding: 3,
                   background: "radial-gradient(circle at 35% 25%, #f6dc8e, #d9b45f 45%, #8a6c2c)",
                   boxShadow: "0 0 0 2px #3a2e14, 0 0 22px rgba(217,180,95,.35), 0 8px 18px rgba(0,0,0,.5)",
                 }}
               >
                 <span className="block h-full w-full overflow-hidden rounded-full" style={{ boxShadow: "inset 0 0 0 2px #3a2e14" }}>
-                  <Avatar profile={profile} size={29.5} />
+                  {/* eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL or /design default */}
+                  <img src={profile.avatar_image_url ?? defaultPortraitFor(profile.id)} alt="Avatar" className="h-full w-full object-cover" />
                 </span>
               </Link>
               <div
-                className="font-display absolute left-1/2 whitespace-nowrap rounded-full px-4 py-[3px] text-[16px] leading-tight"
+                className="font-display absolute left-1/2 whitespace-nowrap rounded-full px-3 py-[2px] text-[14.5px] leading-tight sm:px-4 sm:py-[3px] sm:text-[16px]"
                 style={{
                   bottom: -12,
                   transform: "translateX(-50%)",
@@ -97,7 +96,7 @@ export function XpSummary({
                 {level >= 8 && " · Adventurer"}
               </div>
             </div>
-            <div className="mt-3 flex w-[210px] flex-col gap-1.5">
+            <div className="mt-3 flex w-[150px] flex-col gap-1.5 sm:w-[210px]">
               <div
                 className="h-[14px] overflow-hidden rounded-full"
                 style={{ background: "#141a13", border: "1.5px solid var(--t-gold-deep)", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}
@@ -111,7 +110,7 @@ export function XpSummary({
                   }}
                 />
               </div>
-              <div className="text-center text-[15px] tabular-nums tracking-wide" style={{ color: "var(--t-gold)" }}>
+              <div className="text-center text-[13.5px] tabular-nums tracking-wide sm:text-[15px]" style={{ color: "var(--t-gold)" }}>
                 {nextLevel
                   ? `${xpIntoLevel.toLocaleString("en-US")} / ${xpForNextLevel!.toLocaleString("en-US")} XP`
                   : `${profile.total_xp.toLocaleString("en-US")} XP · Max level`}
@@ -119,7 +118,7 @@ export function XpSummary({
             </div>
           </div>
 
-          <div className="flex flex-col gap-6 justify-self-center">
+          <div className="flex flex-col gap-5 justify-self-center sm:gap-6">
             <StatTile iconSrc="/design/ui-xpshield.png" value={stats?.xpThisWeek ?? 0} label={<>XP this<br />week</>} />
             <StatTile iconSrc="/design/ui-party-simple.svg" value={stats?.partySize ?? 0} label={<>Party<br />Size</>} />
           </div>
