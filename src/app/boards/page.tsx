@@ -35,7 +35,7 @@ export default async function BoardsPage() {
               opacity: isAdventure ? 0.75 : 1,
             }}
           >
-            No boards yet. Create one to start grouping goals — e.g. &quot;Dreaming&quot;,
+            No quest boards yet. Create one to start grouping quests — e.g. &quot;Dreaming&quot;,
             &quot;Startup&quot;, &quot;Daily Tasks&quot;.
           </p>
         ) : (

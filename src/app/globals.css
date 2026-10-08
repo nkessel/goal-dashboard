@@ -798,3 +798,75 @@ html[data-evening] [data-theme="adventure"] {
     transform: translate(-50%, -16px) scale(1);
   }
 }
+
+/* ── Quest board scroll cards ───────────────────────────────────────── */
+.board-scroll {
+  position: relative;
+  padding: 10px 7px;
+  height: 100%;
+}
+.scroll-sheet {
+  position: relative;
+  height: 100%;
+  border-radius: 3px;
+  background-color: #ecdab4;
+  background-image: url(/design/tex-parchment-2.jpg);
+  background-size: 384px 384px;
+  color: var(--t-ink);
+  border-left: 1px solid #b9965a;
+  border-right: 1px solid #b9965a;
+  /* the paper darkens where it curls into each rod */
+  box-shadow:
+    inset 0 14px 12px -10px rgba(96, 62, 18, 0.5),
+    inset 0 -14px 12px -10px rgba(96, 62, 18, 0.5),
+    inset 10px 0 18px -14px rgba(96, 62, 18, 0.35),
+    inset -10px 0 18px -14px rgba(96, 62, 18, 0.35),
+    0 14px 28px rgba(0, 0, 0, 0.45);
+}
+.scroll-rod {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 17px;
+  border-radius: 9px;
+  z-index: 2;
+  background: linear-gradient(180deg, #f6e6bb 0%, #dcbb76 30%, #a87d3a 70%, #6f4d1d 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 250, 230, 0.7);
+  pointer-events: none;
+}
+.scroll-rod::before,
+.scroll-rod::after {
+  /* turned wooden knobs at each end */
+  content: "";
+  position: absolute;
+  top: -2px;
+  width: 9px;
+  height: 21px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #a06a2c 0%, #6a4214 60%, #3f270b 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 160, 0.45);
+}
+.scroll-rod::before { left: -4px; }
+.scroll-rod::after { right: -4px; }
+.scroll-rod.top { top: 2px; }
+.scroll-rod.bottom { bottom: 2px; }
+
+.board-edit-btn {
+  opacity: 1;
+  transition: opacity 140ms ease;
+}
+@media (hover: hover) {
+  .board-card .board-edit-btn { opacity: 0; }
+  .board-card:hover .board-edit-btn,
+  .board-card:focus-within .board-edit-btn { opacity: 1; }
+}
+.board-quest {
+  transition: background-color 120ms ease;
+}
+.board-quest:hover,
+.board-quest:focus-visible {
+  background-color: rgba(120, 84, 30, 0.12);
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-edit-btn, .board-quest { transition: none; }
+}

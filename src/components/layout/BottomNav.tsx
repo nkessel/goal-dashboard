@@ -66,7 +66,7 @@ const ITEMS: {
   calmLabel: string;
 }[] = [
   { href: "/calendar", key: "calendar", adventureIcon: "ui-scroll.png", adventureLabel: "Calendar", calmLabel: "Calendar" },
-  { href: "/boards", key: "grid", adventureIcon: "ui-grid.png", adventureLabel: "Goals", calmLabel: "Boards" },
+  { href: "/boards", key: "grid", adventureIcon: "ui-grid.png", adventureLabel: "Quest Boards", calmLabel: "Boards" },
   { href: "/", key: "now", adventureIcon: "ui-compass.png", adventureLabel: "Today's Quest", calmLabel: "Now" },
   { href: "/matrix", key: "target", adventureIcon: "ui-target.png", adventureLabel: "Priority", calmLabel: "Priority" },
   { href: "/feed", key: "party", adventureIcon: "ui-party-simple.svg", adventureLabel: "Party", calmLabel: "Friends" },

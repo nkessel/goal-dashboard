@@ -9,6 +9,7 @@ import { BoardFabMenu } from "@/components/boards/BoardFabMenu";
 import { BoardGrid } from "@/components/boards/BoardGrid";
 import { BoardQuestList } from "@/components/boards/BoardQuestList";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
+import { BoardSeal } from "@/components/boards/BoardSeal";
 
 export default async function BoardDetailPage({
   params,
@@ -70,15 +71,7 @@ export default async function BoardDetailPage({
               />
             </svg>
           </ViewTransitionLink>
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm"
-            style={{
-              border: isAdventure ? "2px solid var(--t-panel-border)" : undefined,
-              background: isAdventure ? undefined : "var(--t-accent-soft)",
-            }}
-          >
-            {isAdventure ? "🗺️" : "✦"}
-          </div>
+          <BoardSeal color={board.color} size={28} />
           <div className="min-w-0 flex-1">
             <h1
               className={isAdventure ? "font-display truncate text-lg" : "truncate text-lg font-extrabold"}

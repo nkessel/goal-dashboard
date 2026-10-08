@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import type { Board } from "./types";
+import type { Board, Task } from "./types";
 
 export async function listBoardsForOwner(ownerId: string): Promise<Board[]> {
   const db = supabaseAdmin();
@@ -60,13 +60,17 @@ export type BoardWithStats = Board & {
   xpEarned: number;
   lastUpdatedAt: string;
   isComplete: boolean;
+  /** Open quests on the board, in their saved order — for the card's previews. */
+  openQuests: Task[];
+  /** How many quest boards sit directly inside this one. */
+  subBoardCount: number;
 };
 
 /**
  * Boards annotated with quest (task) counts, earned XP, and a
  * last-updated timestamp — the numbers the Quest Boards / Goal Boards
  * grid card needs (progress bar, "12/18 quests", XP total, "Updated Xh
- * ago"). Aggregated in JS from goals+tasks rather than a SQL view, since
+ * ago"). Aggregated in JS from tasks rather than a SQL view, since
  * the dataset per owner is small.
  */
 export async function listBoardsWithStatsForOwner(
@@ -79,50 +83,52 @@ export async function listBoardsWithStatsForOwner(
   parentBoardId: string | null = null
 ): Promise<BoardWithStats[]> {
   const db = supabaseAdmin();
-  const [boardsRes, goalsRes, tasksRes] = await Promise.all([
+  const [boardsRes, childrenRes, tasksRes] = await Promise.all([
     (() => {
       let q = db.from("boards").select("*").eq("owner_id", ownerId);
       q = parentBoardId === null ? q.is("parent_board_id", null) : q.eq("parent_board_id", parentBoardId);
       return q.order("sort_order", { ascending: true }).order("created_at", { ascending: true });
     })(),
-    db.from("goals").select("id, board_id, updated_at").eq("owner_id", ownerId),
+    db.from("boards").select("parent_board_id").eq("owner_id", ownerId).not("parent_board_id", "is", null),
     db
       .from("tasks")
-      .select("board_id, status, xp_value, updated_at")
+      .select("*")
       .eq("owner_id", ownerId)
-      .not("board_id", "is", null),
+      .not("board_id", "is", null)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false }),
   ]);
 
   if (boardsRes.error) throw new Error(`Failed to list boards: ${boardsRes.error.message}`);
-  if (goalsRes.error) throw new Error(`Failed to list goals: ${goalsRes.error.message}`);
+  if (childrenRes.error) throw new Error(`Failed to list sub-boards: ${childrenRes.error.message}`);
   if (tasksRes.error) throw new Error(`Failed to list tasks: ${tasksRes.error.message}`);
 
-  const goalToBoard = new Map<string, string>();
+  const subBoards = new Map<string, number>();
+  for (const c of childrenRes.data ?? []) {
+    const id = c.parent_board_id as string;
+    subBoards.set(id, (subBoards.get(id) ?? 0) + 1);
+  }
+
   const lastUpdated = new Map<string, string>();
-  const bump = (boardId: string | null | undefined, at: string) => {
-    if (!boardId) return;
-    const current = lastUpdated.get(boardId);
-    if (!current || new Date(at) > new Date(current)) lastUpdated.set(boardId, at);
-  };
-
-  for (const g of goalsRes.data ?? []) goalToBoard.set(g.id, g.board_id);
-
-  const stats = new Map<string, { total: number; done: number; xp: number }>();
-  for (const t of tasksRes.data ?? []) {
-    const boardId = t.board_id as string | null;
+  const stats = new Map<string, { total: number; done: number; xp: number; open: Task[] }>();
+  for (const t of (tasksRes.data ?? []) as Task[]) {
+    const boardId = t.board_id;
     if (!boardId) continue;
-    const s = stats.get(boardId) ?? { total: 0, done: 0, xp: 0 };
+    const s = stats.get(boardId) ?? { total: 0, done: 0, xp: 0, open: [] };
     s.total += 1;
     if (t.status === "completed") {
       s.done += 1;
       s.xp += t.xp_value ?? 0;
+    } else if (t.status === "open") {
+      s.open.push(t);
     }
     stats.set(boardId, s);
-    bump(boardId, t.updated_at);
+    const current = lastUpdated.get(boardId);
+    if (!current || new Date(t.updated_at) > new Date(current)) lastUpdated.set(boardId, t.updated_at);
   }
 
   return (boardsRes.data ?? []).map((board) => {
-    const s = stats.get(board.id) ?? { total: 0, done: 0, xp: 0 };
+    const s = stats.get(board.id) ?? { total: 0, done: 0, xp: 0, open: [] };
     return {
       ...board,
       questTotal: s.total,
@@ -130,6 +136,8 @@ export async function listBoardsWithStatsForOwner(
       xpEarned: s.xp,
       lastUpdatedAt: lastUpdated.get(board.id) ?? board.updated_at,
       isComplete: s.total > 0 && s.done === s.total,
+      openQuests: s.open,
+      subBoardCount: subBoards.get(board.id) ?? 0,
     };
   });
 }
