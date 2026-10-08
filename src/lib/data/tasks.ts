@@ -1,4 +1,5 @@
 import "server-only";
+import { attachStepCounts } from "./steps";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { logTaskCompletedActivity } from "./activity";
 import type { Task } from "./types";
@@ -53,10 +54,13 @@ export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promis
     const { data: boards } = await db.from("boards").select("id, title").in("id", boardIds);
     for (const b of boards ?? []) titles.set(b.id as string, b.title as string);
   }
-  return tasks.map((task) => ({
-    ...task,
-    categoryLabel: task.board_id ? titles.get(task.board_id) ?? null : null,
-  }));
+  return attachStepCounts(
+    tasks.map((task) => ({
+      ...task,
+      categoryLabel: task.board_id ? titles.get(task.board_id) ?? null : null,
+    })),
+    ownerId
+  );
 }
 
 /**
@@ -236,7 +240,7 @@ export async function listTasksForBoard(boardId: string, ownerId: string): Promi
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw new Error(`Failed to list board quests: ${error.message}`);
-  return (data ?? []) as Task[];
+  return attachStepCounts((data ?? []) as Task[], ownerId);
 }
 
 export async function listTasksForGoal(goalId: string): Promise<Task[]> {

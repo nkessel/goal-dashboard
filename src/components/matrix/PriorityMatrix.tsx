@@ -6,7 +6,6 @@ import { computeMatrixLayout } from "@/lib/matrix-layout";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { confirmImportAction, updateTaskPriorityAction } from "@/app/actions";
-import { TaskViewCard } from "@/components/tasks/TaskViewCard";
 
 // A pointer that moves less than this (px) between down and up is treated as
 // a click/tap that opens the view card, not a drag — the dot ends up
@@ -17,10 +16,10 @@ const CLICK_MOVE_THRESHOLD = 4;
 /** Quadrant washes, in LEGEND order: top-right, top-left, bottom-right, bottom-left. */
 const QUADRANT_TINT = ["rgba(196,72,40,.13)", "rgba(79,109,60,.13)", "rgba(56,104,140,.12)", "rgba(107,98,82,.10)"];
 const QUADRANT_POS: React.CSSProperties[] = [
-  { right: 0, top: 0 },
-  { left: 0, top: 0 },
-  { right: 0, bottom: 0 },
-  { left: 0, bottom: 0 },
+  { right: 0, top: 0, borderTopRightRadius: 14 },
+  { left: 0, top: 0, borderTopLeftRadius: 14 },
+  { right: 0, bottom: 0, borderBottomRightRadius: 14 },
+  { left: 0, bottom: 0, borderBottomLeftRadius: 14 },
 ];
 
 const LEGEND = {
@@ -267,7 +266,7 @@ export function PriorityMatrix({
         <div className="flex-1">
           <div
             ref={gridRef}
-            className={`relative aspect-square w-full overflow-hidden rounded-2xl ${isAdventure ? "parchment" : ""}`}
+            className={`relative aspect-square w-full rounded-2xl ${isAdventure ? "parchment" : ""}`}
             style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
           >
             {/* Quadrant washes + titles */}
@@ -310,8 +309,8 @@ export function PriorityMatrix({
               return (
                 <div
                   key={task.id}
-                  className="group absolute -translate-x-1/2 translate-y-1/2"
-                  style={{ left: `${displayX}%`, bottom: `${displayY}%`, zIndex: isDragging ? 30 : undefined }}
+                  className="group absolute -translate-x-1/2 translate-y-1/2 hover:z-40"
+                  style={{ left: `${displayX}%`, bottom: `${displayY}%`, zIndex: isDragging ? 40 : undefined }}
                 >
                   <div
                     className="flex cursor-grab touch-none items-center justify-center overflow-hidden rounded-full active:cursor-grabbing"
@@ -366,8 +365,10 @@ export function PriorityMatrix({
                     )}
                   </div>
                   <div
-                    className={`pointer-events-none absolute left-1/2 z-10 hidden w-56 -translate-x-1/2 rounded-xl p-2.5 text-[13.5px] shadow-lg group-hover:block ${isAdventure ? "bottom-10 parchment" : "bottom-6"}`}
+                    className={`pointer-events-none absolute z-10 hidden w-56 rounded-xl p-2.5 text-[13.5px] shadow-lg group-hover:block ${isAdventure ? "parchment" : ""}`}
                     style={{
+                      ...(displayY > 62 ? { top: isAdventure ? 40 : 22 } : { bottom: isAdventure ? 40 : 22 }),
+                      ...(displayX < 28 ? { left: -8 } : displayX > 72 ? { right: -8 } : { left: "50%", transform: "translateX(-50%)" }),
                       background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
                       border: `1px solid ${isAdventure ? "var(--t-gold)" : "var(--t-card-border)"}`,
                       color: "var(--t-ink)",
@@ -437,7 +438,7 @@ export function PriorityMatrix({
       </div>
 
       {viewingTask && (
-        <TaskViewCard task={viewingTask} theme={theme} onClose={() => setViewingTaskId(null)} />
+        <EditTaskModal task={viewingTask} theme={theme} onClose={() => setViewingTaskId(null)} />
       )}
     </div>
   );

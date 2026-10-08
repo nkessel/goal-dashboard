@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
-import { completeTaskAction, createBoardFromEditorAction, createQuestAction, deleteTaskAction, listBoardOptionsAction, reopenTaskAction, scheduleTaskAction, setTaskProgressAction, updateTaskAction } from "@/app/actions";
-import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
+import { completeTaskAction, createBoardFromEditorAction, createQuestAction, deleteTaskAction, listBoardOptionsAction, listQuestStepsAction, reopenTaskAction, saveQuestStepsAction, scheduleTaskAction, setTaskProgressAction, updateTaskAction } from "@/app/actions";
+import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { SlotPickerDialog } from "./SlotPickerDialog";
@@ -27,6 +27,8 @@ export type QuestEditorMode =
       schedule?: { startISO: string; endISO: string; googleEventId?: string };
       prefill?: QuestDraft;
     };
+
+type StepDraft = { key: string; id?: string; title: string; done: boolean };
 
 const XP_MAX = 150;
 const XP_STEP = 10;
@@ -93,6 +95,11 @@ export function QuestEditorDialog({
   const progressTracked = typeof task?.xp_awarded === "number";
   const initialProgress = task?.progress ?? 0;
   const [progress, setProgress] = useState(initialProgress);
+  // Steps: a small checklist inside the quest. null while loading an existing quest's steps.
+  const [steps, setSteps] = useState<StepDraft[] | null>(task ? null : []);
+  const [stepsUnavailable, setStepsUnavailable] = useState(false);
+  const [stepsDirty, setStepsDirty] = useState(false);
+  const [newStep, setNewStep] = useState("");
   const [newBoard, setNewBoard] = useState<{ board: string } | null>(null);
   const [creatingBoard, startCreatingBoard] = useTransition();
 
@@ -120,6 +127,46 @@ export function QuestEditorDialog({
       .then(setBoardOptions)
       .catch(() => setBoardOptions([]));
   }, []);
+
+  const taskId = task?.id;
+  useEffect(() => {
+    if (!taskId) return;
+    listQuestStepsAction(taskId)
+      .then((rows) => {
+        if (rows === null) setStepsUnavailable(true);
+        setSteps((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done })));
+      })
+      .catch(() => {
+        setStepsUnavailable(true);
+        setSteps([]);
+      });
+  }, [taskId]);
+
+  /** Ticking a step pulls the progress bar up to the share of steps done (never down); unticking caps it. */
+  function setStepDone(key: string, done: boolean) {
+    if (!steps) return;
+    const next = steps.map((st) => (st.key === key ? { ...st, done } : st));
+    setSteps(next);
+    setStepsDirty(true);
+    const share = Math.round((next.filter((st) => st.done).length / next.length) * 100);
+    setProgress((p) => (done ? Math.max(p, share) : Math.min(p, share)));
+  }
+  function addStep() {
+    const t = newStep.trim();
+    if (!t) return;
+    setSteps((list) => [...(list ?? []), { key: `new-${Date.now()}`, title: t, done: false }]);
+    setStepsDirty(true);
+    setNewStep("");
+  }
+  function renameStep(key: string, title: string) {
+    setSteps((list) => (list ?? []).map((st) => (st.key === key ? { ...st, title } : st)));
+    setStepsDirty(true);
+  }
+  function removeStep(key: string) {
+    setSteps((list) => (list ?? []).filter((st) => st.key !== key));
+    setStepsDirty(true);
+  }
+  const stepsDone = (steps ?? []).filter((st) => st.done).length;
 
   const noun = isAdventure ? "quest" : "task";
   const fieldStyle: React.CSSProperties = {
@@ -187,6 +234,7 @@ export function QuestEditorDialog({
             confirmImport: Boolean(review),
           });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
+          if (stepsDirty && steps) await saveQuestStepsAction(task.id, steps.map(({ id, title, done }) => ({ id, title, done })));
           if (progressTracked && !isCompleted && progress !== initialProgress) {
             if (progress >= 100) {
               const fd = new FormData();
@@ -202,7 +250,17 @@ export function QuestEditorDialog({
                 coinsEarned: res?.coinsEarned ?? 0,
               });
             } else {
-              await setTaskProgressAction(task.id, progress);
+              const res = await setTaskProgressAction(task.id, progress);
+              if (res.xpEarned > 0) {
+                celebrateProgress({
+                  title,
+                  xp: res.xpEarned,
+                  coinsEarned: res.coinsEarned,
+                  fromPct: initialProgress,
+                  toPct: progress,
+                  steps: steps && steps.length > 0 ? { done: stepsDone, total: steps.length } : undefined,
+                });
+              }
             }
           }
           if (onSaved) onSaved();
@@ -222,6 +280,8 @@ export function QuestEditorDialog({
             pinToBattle: mode.pinToBattle,
             schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
           });
+          const newSteps = (steps ?? []).filter((st) => st.title.trim());
+          if (newSteps.length > 0) await saveQuestStepsAction(id, newSteps.map(({ title, done }) => ({ title, done })));
           onCreated?.(id);
           await flyInto(id);
         }
@@ -356,6 +416,94 @@ export function QuestEditorDialog({
           </div>
         </div>
 
+        {/* Steps: a checklist inside the quest */}
+        {!stepsUnavailable && (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2.5">
+              <StepsGlyph />
+              <span className={labelCls}>Steps</span>
+              {steps && steps.length > 0 && (
+                <span className="text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+                  {stepsDone} of {steps.length} done
+                </span>
+              )}
+            </div>
+            {steps === null ? (
+              <p className="m-0 pl-7 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+                Loading steps…
+              </p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col p-0 pl-[22px]">
+                {steps.map((st) => (
+                  <li key={st.key} className="quest-step flex items-center gap-2 rounded-md py-0.5 pl-1">
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={st.done}
+                      aria-label={st.done ? `Untick ${st.title}` : `Tick ${st.title}`}
+                      disabled={isCompleted}
+                      onClick={() => setStepDone(st.key, !st.done)}
+                      className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px]"
+                      style={{
+                        border: `1.5px solid ${st.done ? "var(--t-good)" : isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
+                        background: st.done ? "var(--t-good)" : "transparent",
+                      }}
+                    >
+                      {st.done && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </button>
+                    <input
+                      value={st.title}
+                      onChange={(e) => renameStep(st.key, e.target.value)}
+                      aria-label="Step"
+                      className="h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[14px] focus:outline-none"
+                      style={{
+                        color: st.done ? "var(--t-ink-soft)" : "var(--t-ink)",
+                        textDecoration: st.done ? "line-through" : undefined,
+                        textDecorationColor: "rgba(80,60,20,.45)",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeStep(st.key)}
+                      aria-label={`Remove step ${st.title}`}
+                      className="step-remove h-7 w-7 shrink-0 text-[18px] leading-none"
+                      style={{ color: "var(--t-ink-soft)" }}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+                {!isCompleted && (
+                  <li className="flex items-center gap-2 py-0.5 pl-1">
+                    <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#a88a3f" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
+                      +
+                    </span>
+                    <input
+                      value={newStep}
+                      onChange={(e) => setNewStep(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addStep();
+                        }
+                      }}
+                      onBlur={addStep}
+                      placeholder={steps.length === 0 ? "Break it into steps (optional)" : "Add a step"}
+                      aria-label="Add a step"
+                      className="h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[14px] focus:outline-none"
+                      style={{ color: "var(--t-ink)" }}
+                    />
+                  </li>
+                )}
+              </ul>
+            )}
+          </div>
+        )}
+
         {/* Due date / calendar */}
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
@@ -431,6 +579,37 @@ export function QuestEditorDialog({
           />
           <span className="w-7" />
         </div>
+
+        {/* Progress: partial progress earns its share of the XP */}
+        {task && !isCompleted && progressTracked && (
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2.5">
+              <span className={`${labelCls} w-[92px] shrink-0`}>Progress</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={progress}
+                onChange={(e) => setProgress(Number(e.target.value))}
+                aria-label="Quest progress"
+                className="h-7 min-w-0 flex-1"
+                style={{ accentColor: "var(--t-good)" }}
+              />
+              <span className="w-16 text-right text-sm font-bold tabular-nums" style={{ color: progress > 0 ? "var(--t-good)" : "var(--t-ink-soft)" }}>
+                {progress}%
+              </span>
+              <span className="w-7" />
+            </div>
+            {(progress > 0 || initialProgress > 0) && (
+              <p className="m-0 pl-[102px] text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+                {progress >= 100
+                  ? "Saving at 100% completes the quest."
+                  : `${Math.round((xp * progress) / 100)} XP earned so far, ${xp - Math.round((xp * progress) / 100)} more on completion`}
+              </p>
+            )}
+          </div>
+        )}
 
         <IconScale label="Importance" icon="/design/ui-bolt.png" value={importance} onChange={setImportance} />
         <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
@@ -531,56 +710,6 @@ export function QuestEditorDialog({
             <img src="/design/ui-target.png" alt="" width={18} height={18} />
             Plot importance &amp; urgency on the Priority Matrix
           </button>
-        )}
-
-        {/* Quest progress: partial progress earns its share of the XP */}
-        {task && !isCompleted && (
-          <div
-            className="flex flex-col gap-1.5 rounded-xl px-3.5 py-2.5"
-            style={{
-              background: isAdventure ? "linear-gradient(180deg, rgba(48,38,18,.9), rgba(30,24,12,.92))" : "var(--t-bg)",
-              border: `1.5px solid ${isAdventure ? "#a88a3f" : "var(--t-card-border)"}`,
-              opacity: progressTracked ? 1 : 0.6,
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[14.5px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
-                Quest progress
-              </span>
-              <span className="text-[15px] font-bold tabular-nums" style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}>
-                {progress}%
-              </span>
-            </div>
-            <div className="relative h-5">
-              <div
-                className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full"
-                style={{ background: "#141a13", border: "1.5px solid #8a6c2c", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}
-              >
-                <div
-                  className="h-full rounded-full transition-[width] duration-150"
-                  style={{ width: `${progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 8px rgba(242,210,126,.5)" }}
-                />
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={progress}
-                disabled={!progressTracked}
-                onChange={(e) => setProgress(Number(e.target.value))}
-                aria-label="Quest progress"
-                className="progress-range absolute inset-0 w-full cursor-pointer"
-              />
-            </div>
-            <p className="m-0 text-[12.5px]" style={{ color: isAdventure ? "rgba(243,231,203,.78)" : "var(--t-ink-soft)" }}>
-              {!progressTracked
-                ? "Available after the next database update."
-                : progress >= 100
-                  ? "Saving at 100% completes the quest."
-                  : `+${Math.round((xp * progress) / 100)} XP for progress so far · ${xp - Math.round((xp * progress) / 100)} more on completion`}
-            </p>
-          </div>
         )}
 
         {error && (
@@ -722,5 +851,17 @@ function IconScale({
         {value}
       </span>
     </div>
+  );
+}
+
+/** A tiny ticked list: the Steps label glyph. */
+function StepsGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0" style={{ color: "#7a5f2a" }}>
+      <rect x="3" y="4" width="5" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M4.3 6.6l1.2 1.2 2.1-2.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="3" y="14" width="5" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M11 6.5h10M11 16.5h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   );
 }

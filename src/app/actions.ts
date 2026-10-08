@@ -14,6 +14,7 @@ import * as avatarLibraryData from "@/lib/data/avatar-library";
 import * as taskIconLibraryData from "@/lib/data/task-icon-library";
 import * as rewardsData from "@/lib/data/rewards";
 import * as ritesData from "@/lib/data/rites";
+import * as stepsData from "@/lib/data/steps";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt, buildSketchbookIconPrompt, buildTreasureIconPrompt } from "@/lib/ai-image";
@@ -341,15 +342,32 @@ export async function setTaskProgressAction(taskId: string, progress: number) {
   const task = await tasksData.getTask(taskId, ownerId);
   if (!task) throw new Error("That quest isn't here anymore.");
   if (typeof task.xp_awarded !== "number") throw new Error("Quest progress needs a quick database update first.");
-  if (task.status === "completed") return { xpEarned: 0 };
+  if (task.status === "completed") return { xpEarned: 0, coinsEarned: 0, totalXp: null };
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
   const target = Math.round((task.xp_value * pct) / 100);
   const delta = target - task.xp_awarded;
   await tasksData.setTaskPayout(taskId, ownerId, { progress: pct, xpAwarded: target });
-  if (delta !== 0) await xp.awardXp(ownerId, delta, "task_completed", taskId);
+  const award = delta !== 0 ? await xp.awardXp(ownerId, delta, "task_completed", taskId) : null;
   revalidatePath("/");
   revalidatePath("/matrix");
-  return { xpEarned: delta };
+  revalidatePath("/boards", "layout");
+  return { xpEarned: delta, coinsEarned: award?.coinsEarned ?? 0, totalXp: award?.totalXp ?? null };
+}
+
+/** A quest's steps for the editor; null when steps aren't available yet. */
+export async function listQuestStepsAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  return stepsData.listStepsForTask(taskId, ownerId);
+}
+
+/** Saves the editor's step list for a quest. */
+export async function saveQuestStepsAction(taskId: string, steps: { id?: string; title: string; done: boolean }[]) {
+  const ownerId = await requireProfileId();
+  const task = await tasksData.getTask(taskId, ownerId);
+  if (!task) throw new Error("That quest isn't here anymore.");
+  await stepsData.replaceSteps(taskId, ownerId, steps.slice(0, 50));
+  revalidatePath("/");
+  revalidatePath("/boards", "layout");
 }
 
 /** Deletion lives inside the edit dialog, not a separate control. */

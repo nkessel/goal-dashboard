@@ -96,7 +96,7 @@ export function BoardGrid({
               <BoardSeal color={board.color} size={20} />
             </span>
             <span
-              className={`min-w-0 break-words leading-tight ${isAdventure ? "font-display text-[19px] font-semibold" : "text-[15px] font-bold"}`}
+              className={`min-w-0 leading-tight [overflow-wrap:break-word] [hyphens:auto] ${isAdventure ? "font-display text-[19px] font-semibold" : "text-[15px] font-bold"}`}
               style={{ color: "var(--t-ink)" }}
             >
               {board.title}
@@ -223,7 +223,7 @@ export function BoardGrid({
 
   return (
     <>
-      <ul className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 270px), 1fr))" }}>
         {boards.map((board) => (
           <li
             key={board.id}

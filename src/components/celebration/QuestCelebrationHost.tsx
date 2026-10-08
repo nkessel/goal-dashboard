@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { QuestComplete } from "./QuestComplete";
+import { ProgressCelebration, type ProgressCelebrationDetail } from "./ProgressCelebration";
 import { xpToNextLevel } from "@/lib/levels";
 
 export type QuestCelebration = {
@@ -23,17 +24,31 @@ export function celebrateQuest(detail: QuestCelebration) {
   window.dispatchEvent(new CustomEvent("quest-complete", { detail }));
 }
 
+/** Play the small "progress made" party (XP from partial progress or steps). */
+export function celebrateProgress(detail: ProgressCelebrationDetail) {
+  window.dispatchEvent(new CustomEvent("quest-progress", { detail }));
+}
+
 /** App-wide: shows the Quest Complete scene, then Choose a Reward / Continue. */
 export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { avatarSrc: string; totalXp: number }) {
   const [current, setCurrent] = useState<QuestCelebration | null>(null);
+  const [progress, setProgress] = useState<(ProgressCelebrationDetail & { n: number }) | null>(null);
 
   useEffect(() => {
     const on = (e: Event) => setCurrent((e as CustomEvent<QuestCelebration>).detail);
+    let n = 0;
+    const onProgress = (e: Event) => setProgress({ ...(e as CustomEvent<ProgressCelebrationDetail>).detail, n: ++n });
     window.addEventListener("quest-complete", on);
-    return () => window.removeEventListener("quest-complete", on);
+    window.addEventListener("quest-progress", onProgress);
+    return () => {
+      window.removeEventListener("quest-complete", on);
+      window.removeEventListener("quest-progress", onProgress);
+    };
   }, []);
 
-  if (!current) return null;
+  if (!current) {
+    return progress ? <ProgressCelebration key={progress.n} {...progress} onClose={() => setProgress(null)} /> : null;
+  }
   const total = current.totalXp ?? shellTotalXp + current.xp;
   const { level, xpIntoLevel, xpForNextLevel } = xpToNextLevel(total);
 

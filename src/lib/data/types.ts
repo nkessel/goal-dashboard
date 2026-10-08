@@ -71,6 +71,9 @@ export type Task = {
   board_id?: string | null;
   /** 0–5: how much energy it takes (0 = unrated). */
   effort?: number;
+  /** Step checklist counts, attached when listed for a card (not a column). */
+  steps_total?: number;
+  steps_done?: number;
 };
 
 export type Profile = {
