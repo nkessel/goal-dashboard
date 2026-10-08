@@ -888,6 +888,12 @@ export async function createQuestAction(input: {
     iconKey: input.iconKey ?? null,
     iconSource: input.iconSource,
   });
+  // No portrait picked: paint one in the background (the monogram shows until then).
+  if (!input.iconKey) {
+    await tasksData
+      .queuePortrait(task.id, ownerId, [title, input.description?.trim()].filter(Boolean).join(" — "))
+      .catch(() => undefined);
+  }
   revalidatePath("/power-ups");
   if (input.schedule) {
     const session = await auth();

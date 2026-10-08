@@ -4,7 +4,9 @@ import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { getBoard, getBoardAncestors, listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { getProfileById } from "@/lib/data/profiles";
-import { listTasksForBoard } from "@/lib/data/tasks";
+import { listTasksForBoard, listUnboardedTasks } from "@/lib/data/tasks";
+import { UNCATEGORIZED_ID } from "@/lib/board-ids";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { BoardFabMenu } from "@/components/boards/BoardFabMenu";
 import { BoardGrid } from "@/components/boards/BoardGrid";
 import { BoardQuestList } from "@/components/boards/BoardQuestList";
@@ -18,6 +20,19 @@ export default async function BoardDetailPage({
 }) {
   const { boardId } = await params;
   const session = await requireSession();
+
+  if (boardId === UNCATEGORIZED_ID) {
+    const [tasks, me] = await Promise.all([listUnboardedTasks(session.user.id), getProfileById(session.user.id)]);
+    const t = me?.theme ?? "calm";
+    return (
+      <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
+        <div className="flex flex-col gap-5">
+          <PageHeader isAdventure={t === "adventure"} title="Uncategorized" calmTitle="Uncategorized" subtitle="Quests on no board yet — open one to give it a home" />
+          <BoardQuestList tasks={tasks} theme={t} />
+        </div>
+      </AppShell>
+    );
+  }
 
   const [board, profile] = await Promise.all([
     getBoard(boardId, session.user.id),

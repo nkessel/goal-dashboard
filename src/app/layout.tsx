@@ -38,14 +38,17 @@ export const metadata: Metadata = {
   description: "Personal + social goal & task dashboard",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${ebGaramond.variable} ${manrope.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ViewTransitionProvider>{children}</ViewTransitionProvider>
+        <ViewTransitionProvider>
+          {children}
+          {drawer}
+        </ViewTransitionProvider>
       </body>
     </html>
   );

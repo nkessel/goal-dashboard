@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { Profile } from "@/lib/data/types";
 import { Avatar } from "@/components/settings/Avatar";
 import { CloseSettingsButton } from "@/components/settings/CloseSettingsButton";
-import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
+import Link from "next/link";
 
 /** Top-right corner: your avatar opens Settings; inside Settings it turns into
  * the close (X) button, which returns to the screen you came from. */
@@ -30,8 +30,8 @@ export function TopRightAvatar({
   }, [router]);
   if (pathname.startsWith("/settings")) return <CloseSettingsButton isAdventure={isAdventure} size={40} />;
   return (
-    <ViewTransitionLink href="/settings" transition="settings-open" ariaLabel={`Settings — signed in as ${label}`} className="hover-glow rounded-full">
+    <Link href="/settings" scroll={false} aria-label={`Menu — signed in as ${label}`} className="hover-glow rounded-full">
       <Avatar profile={profile} size={10} />
-    </ViewTransitionLink>
+    </Link>
   );
 }

@@ -248,6 +248,32 @@ export async function listTasksForBoard(boardId: string, ownerId: string): Promi
   return attachStepCounts((data ?? []) as Task[], ownerId);
 }
 
+/** Queue a quest for a background-painted portrait (see PortraitPainter). */
+export async function queuePortrait(taskId: string, ownerId: string, prompt: string): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("tasks")
+    .update({ icon_prompt: prompt.slice(0, 400) })
+    .eq("id", taskId)
+    .eq("owner_id", ownerId)
+    .is("icon_key", null);
+  if (error) throw new Error(`Failed to queue a portrait: ${error.message}`);
+}
+
+/** Quests on no board — the stand-in "Uncategorized" board. */
+export async function listUnboardedTasks(ownerId: string): Promise<Task[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("tasks")
+    .select("*")
+    .eq("owner_id", ownerId)
+    .is("board_id", null)
+    .is("reward_id", null)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`Failed to list uncategorized quests: ${error.message}`);
+  return attachStepCounts((data ?? []) as Task[], ownerId);
+}
+
 export async function listTasksForGoal(goalId: string): Promise<Task[]> {
   const db = supabaseAdmin();
   const { data, error } = await db

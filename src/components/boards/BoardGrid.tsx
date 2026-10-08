@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BoardWithStats } from "@/lib/data/boards";
+import { UNCATEGORIZED_ID } from "@/lib/board-ids";
 import type { Task } from "@/lib/data/types";
 import { reorderBoardsAction } from "@/app/actions";
 import { useDragReorder } from "@/lib/use-drag-reorder";
 import { useFlip } from "@/lib/use-flip";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
-import { EditTaskModal } from "@/components/tasks/EditTaskModal";
+import { QuestCardPopup } from "@/components/tasks/QuestCardPopup";
 import { EditBoardModal } from "./EditBoardModal";
 import { BoardSeal } from "./BoardSeal";
 
@@ -19,15 +20,6 @@ function OpenIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
       <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2.4" />
-    </svg>
-  );
-}
-
-function DoneIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="10" fill="var(--t-good)" />
-      <path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -72,7 +64,7 @@ export function BoardGrid({
   const { items: boards, draggingId, start, moveOver, finish } = useDragReorder({
     items: initialBoards,
     getId: (b) => b.id,
-    onCommit: (orderedIds) => reorderBoardsAction(orderedIds, parentBoardId),
+    onCommit: (orderedIds) => reorderBoardsAction(orderedIds.filter((id) => id !== UNCATEGORIZED_ID), parentBoardId),
   });
   const register = useFlip(boards, (b) => b.id);
   const [editingBoard, setEditingBoard] = useState<BoardWithStats | null>(null);
@@ -81,22 +73,20 @@ export function BoardGrid({
   const soft = isAdventure ? "#5a4a30" : "var(--t-ink-soft)";
 
   function card(board: BoardWithStats) {
-    const pct = board.questTotal > 0 ? Math.round((board.questDone / board.questTotal) * 100) : 0;
-    const open = board.questTotal - board.questDone;
     const previews = board.openQuests.slice(0, PREVIEW_COUNT);
     const more = board.openQuests.length - previews.length;
     const href = `/boards/${board.id}`;
 
     const body = (
-      <div className="flex h-full flex-col gap-2.5 px-3.5 pb-3 pt-3">
-        {/* Header: seal, title, progress and counts — opens the board */}
-        <ViewTransitionLink href={href} draggable={false} className="flex flex-col gap-2 rounded-md pr-8">
-          <span className="flex items-start gap-2">
-            <span className="mt-[3px]">
-              <BoardSeal color={board.color} size={20} />
-            </span>
+      <div className="flex h-full flex-col gap-2 px-3 pb-2.5 pt-2.5">
+        {/* Header: seal, title and completed count — opens the board */}
+        <ViewTransitionLink href={href} draggable={false} className="flex items-start gap-1.5 rounded-md pr-7">
+          <span className="mt-[2px]">
+            <BoardSeal color={board.color} size={18} />
+          </span>
+          <span className="min-w-0">
             <span
-              className={`min-w-0 leading-tight [overflow-wrap:break-word] [hyphens:auto] ${isAdventure ? "font-display text-[19px] font-semibold" : "text-[15px] font-bold"}`}
+              className={`block leading-tight [overflow-wrap:break-word] [hyphens:auto] ${isAdventure ? "font-display text-[17px] font-semibold sm:text-[19px]" : "text-[15px] font-bold"}`}
               style={{ color: "var(--t-ink)" }}
             >
               {board.title}
@@ -106,60 +96,22 @@ export function BoardGrid({
                 </span>
               )}
             </span>
-          </span>
-
-          <span className="flex items-center gap-2" title={`${board.questDone} of ${board.questTotal} quests complete`}>
-            <span
-              className="h-1.5 flex-1 overflow-hidden rounded-full"
-              style={{ background: isAdventure ? "rgba(70,50,20,.18)" : "var(--t-card-border)" }}
-            >
-              <span
-                className="block h-full rounded-full"
-                style={{
-                  width: `${pct}%`,
-                  background: board.isComplete ? "var(--t-good)" : isAdventure ? "linear-gradient(90deg, #b8913f, #e2bf63)" : "var(--t-accent)",
-                }}
-              />
+            <span className="block text-[12px] tabular-nums" style={{ color: board.isComplete ? "var(--t-good)" : soft }}>
+              ({board.questDone}/{board.questTotal} completed)
             </span>
-            <span className="text-[12.5px] font-semibold tabular-nums" style={{ color: soft }}>
-              {board.questDone}/{board.questTotal}
-            </span>
-          </span>
-
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" style={{ color: soft }}>
-            <span className="flex items-center gap-1" title={`${open} quests to go`}>
-              <OpenIcon />
-              {open} open
-            </span>
-            <span className="flex items-center gap-1" title={`${board.questDone} quests complete`}>
-              <DoneIcon />
-              {board.questDone} done
-            </span>
-            {board.aspirationCount > 0 && (
-              <span className="flex items-center gap-1" title={`${board.aspirationCount} aspirations, not actionable yet`}>
-                <span aria-hidden className="text-[14px] leading-none" style={{ color: "#a88a3f" }}>✧</span>
-                {board.aspirationCount} {board.aspirationCount === 1 ? "aspiration" : "aspirations"}
-              </span>
-            )}
-            {board.subBoardCount > 0 && (
-              <span className="flex items-center gap-1" title={`${board.subBoardCount} quest boards inside this one`}>
-                <SubBoardsIcon />
-                {board.subBoardCount} {board.subBoardCount === 1 ? "sub-board" : "sub-boards"}
-              </span>
-            )}
           </span>
         </ViewTransitionLink>
 
-        {/* Quest previews — each opens that quest */}
-        {previews.length > 0 ? (
-          <ul className="-mx-1.5 flex flex-col border-t pt-1.5" style={{ borderColor: isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)" }}>
+        {/* Quest previews — each opens that quest's card */}
+        {previews.length > 0 && (
+          <ul className="-mx-1 flex flex-col border-t pt-1" style={{ borderColor: isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)" }}>
             {previews.map((q) => (
               <li key={q.id}>
                 <button
                   type="button"
                   draggable={false}
                   onClick={() => setOpenQuest(q)}
-                  className="board-quest flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[14px]"
+                  className="board-quest flex w-full items-center gap-1.5 rounded-md px-1 py-[3px] text-left text-[13.5px]"
                   style={{ color: "var(--t-ink)" }}
                   title={q.title}
                 >
@@ -167,25 +119,55 @@ export function BoardGrid({
                     <OpenIcon />
                   </span>
                   <span className="min-w-0 flex-1 truncate">{q.title}</span>
-                  {q.estimate_minutes ? (
-                    <span className="shrink-0 text-[12px] tabular-nums" style={{ color: soft }}>
-                      {q.estimate_minutes}m
-                    </span>
-                  ) : null}
                 </button>
               </li>
             ))}
             {more > 0 && (
               <li>
-                <ViewTransitionLink href={href} draggable={false} className="board-quest block rounded-md px-1.5 py-1 text-[13px]" >
-                  <span style={{ color: soft }}>+{more} more on this board</span>
+                <ViewTransitionLink href={href} draggable={false} className="board-quest block rounded-md px-1 py-[3px] text-[12.5px]">
+                  <span style={{ color: soft }}>+{more} more</span>
                 </ViewTransitionLink>
               </li>
             )}
           </ul>
-        ) : (
-          <p className="m-0 border-t pt-2 text-[13.5px]" style={{ borderColor: isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)", color: soft }}>
-            {board.isComplete ? "Every quest here is complete." : board.subBoardCount > 0 ? "Quests live on the boards inside." : "No quests yet — open the board to add one."}
+        )}
+
+        {/* Sub-boards by name, each with its quest count */}
+        {board.subBoards.length > 0 && (
+          <ul className="-mx-1 flex flex-wrap gap-1 border-t pt-1.5" style={{ borderColor: isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)" }}>
+            {board.subBoards.map((sb) => (
+              <li key={sb.id} className="min-w-0 max-w-full">
+                <ViewTransitionLink
+                  href={`/boards/${sb.id}`}
+                  draggable={false}
+                  className="board-quest flex min-w-0 items-center gap-1 rounded-md px-1 py-[2px] text-[12.5px]"
+                  style={{ color: "var(--t-ink)" }}
+                >
+                  <span className="shrink-0" style={{ color: soft }}>
+                    <SubBoardsIcon />
+                  </span>
+                  <span className="truncate">{sb.title}</span>
+                  <span className="shrink-0 tabular-nums" style={{ color: soft }}>
+                    ({sb.questCount})
+                  </span>
+                </ViewTransitionLink>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {board.aspirationCount > 0 && (
+          <ViewTransitionLink href={href} draggable={false} className="flex items-center gap-1 text-[12px]" style={{ color: soft }}>
+            <span aria-hidden style={{ color: "#a88a3f" }}>
+              ✧
+            </span>
+            {board.aspirationCount} {board.aspirationCount === 1 ? "aspiration" : "aspirations"}
+          </ViewTransitionLink>
+        )}
+
+        {previews.length === 0 && board.subBoards.length === 0 && board.aspirationCount === 0 && (
+          <p className="m-0 border-t pt-1.5 text-[12.5px]" style={{ borderColor: isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)", color: soft }}>
+            {board.isComplete ? "Every quest here is complete." : "No quests yet."}
           </p>
         )}
       </div>
@@ -206,6 +188,7 @@ export function BoardGrid({
           }
         >
           {body}
+          {!board.isVirtual && (
           <button
             type="button"
             onClick={() => setEditingBoard(board)}
@@ -221,6 +204,7 @@ export function BoardGrid({
           >
             <PencilIcon />
           </button>
+          )}
         </div>
         {isAdventure && <span aria-hidden className="scroll-rod bottom" />}
       </div>
@@ -229,12 +213,12 @@ export function BoardGrid({
 
   return (
     <>
-      <ul className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 270px), 1fr))" }}>
+      <ul className="grid grid-cols-2 gap-x-2 gap-y-3 sm:gap-x-3 lg:grid-cols-3">
         {boards.map((board) => (
           <li
             key={board.id}
             ref={register(board.id)}
-            draggable
+            draggable={!board.isVirtual}
             onDragStart={(e) => {
               start(board.id);
               e.dataTransfer.effectAllowed = "move";
@@ -259,7 +243,7 @@ export function BoardGrid({
 
       {editingBoard && <EditBoardModal board={editingBoard} theme={theme} onClose={() => setEditingBoard(null)} />}
       {openQuest && (
-        <EditTaskModal
+        <QuestCardPopup
           task={openQuest}
           theme={theme}
           onClose={() => {

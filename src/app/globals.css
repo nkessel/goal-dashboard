@@ -895,3 +895,15 @@ html[data-evening] [data-theme="adventure"] {
   .quest-step:hover .step-remove, .quest-step:focus-within .step-remove { opacity: 1; }
 }
 .quest-step input:focus { background: rgba(255, 250, 235, 0.6); border-color: rgba(138, 108, 44, 0.45); }
+
+/* ── Slide-out menu ─────────────────────────────────────────────────── */
+.drawer-slide-in { animation: drawer-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.drawer-slide-out { animation: drawer-out 0.22s ease-in both; }
+.drawer-fade-in { animation: qc-overlayIn 0.25s ease-out both; }
+.drawer-fade-out { animation: drawer-fade 0.22s ease-in both; }
+@keyframes drawer-in { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes drawer-out { from { transform: none; } to { transform: translateX(100%); } }
+@keyframes drawer-fade { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .drawer-slide-in, .drawer-slide-out { animation-duration: 1ms; }
+}

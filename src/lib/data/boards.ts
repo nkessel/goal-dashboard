@@ -66,7 +66,14 @@ export type BoardWithStats = Board & {
   subBoardCount: number;
   /** Aspirations kept on the board (not counted as quests). */
   aspirationCount: number;
+  /** The boards directly inside this one, with how many quests each holds. */
+  subBoards: { id: string; title: string; questCount: number }[];
+  /** The stand-in "Uncategorized" board (quests on no board): not editable or reorderable. */
+  isVirtual?: boolean;
 };
+
+import { UNCATEGORIZED_ID } from "@/lib/board-ids";
+export { UNCATEGORIZED_ID };
 
 /**
  * Boards annotated with quest (task) counts, earned XP, and a
@@ -91,12 +98,17 @@ export async function listBoardsWithStatsForOwner(
       q = parentBoardId === null ? q.is("parent_board_id", null) : q.eq("parent_board_id", parentBoardId);
       return q.order("sort_order", { ascending: true }).order("created_at", { ascending: true });
     })(),
-    db.from("boards").select("parent_board_id").eq("owner_id", ownerId).not("parent_board_id", "is", null),
+    db
+      .from("boards")
+      .select("id, title, parent_board_id, sort_order, created_at")
+      .eq("owner_id", ownerId)
+      .not("parent_board_id", "is", null)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
     db
       .from("tasks")
       .select("*")
       .eq("owner_id", ownerId)
-      .not("board_id", "is", null)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false }),
   ]);
@@ -105,17 +117,12 @@ export async function listBoardsWithStatsForOwner(
   if (childrenRes.error) throw new Error(`Failed to list sub-boards: ${childrenRes.error.message}`);
   if (tasksRes.error) throw new Error(`Failed to list tasks: ${tasksRes.error.message}`);
 
-  const subBoards = new Map<string, number>();
-  for (const c of childrenRes.data ?? []) {
-    const id = c.parent_board_id as string;
-    subBoards.set(id, (subBoards.get(id) ?? 0) + 1);
-  }
 
   const lastUpdated = new Map<string, string>();
   const stats = new Map<string, { total: number; done: number; xp: number; open: Task[]; dreams: number }>();
   for (const t of (tasksRes.data ?? []) as Task[]) {
-    const boardId = t.board_id;
-    if (!boardId) continue;
+    if (!t.board_id && t.reward_id) continue; // a reward's own quest isn't uncategorized work
+    const boardId = t.board_id ?? UNCATEGORIZED_ID;
     const s = stats.get(boardId) ?? { total: 0, done: 0, xp: 0, open: [], dreams: 0 };
     if (t.is_aspiration && t.status === "open") {
       s.dreams += 1;
@@ -134,7 +141,14 @@ export async function listBoardsWithStatsForOwner(
     if (!current || new Date(t.updated_at) > new Date(current)) lastUpdated.set(boardId, t.updated_at);
   }
 
-  return (boardsRes.data ?? []).map((board) => {
+  const subBoards = new Map<string, { id: string; title: string; questCount: number }[]>();
+  for (const c of childrenRes.data ?? []) {
+    const list = subBoards.get(c.parent_board_id as string) ?? [];
+    list.push({ id: c.id as string, title: c.title as string, questCount: stats.get(c.id as string)?.total ?? 0 });
+    subBoards.set(c.parent_board_id as string, list);
+  }
+
+  const toCard = (board: Board): BoardWithStats => {
     const s = stats.get(board.id) ?? { total: 0, done: 0, xp: 0, open: [], dreams: 0 };
     return {
       ...board,
@@ -144,10 +158,23 @@ export async function listBoardsWithStatsForOwner(
       lastUpdatedAt: lastUpdated.get(board.id) ?? board.updated_at,
       isComplete: s.total > 0 && s.done === s.total,
       openQuests: s.open,
-      subBoardCount: subBoards.get(board.id) ?? 0,
+      subBoardCount: subBoards.get(board.id)?.length ?? 0,
       aspirationCount: s.dreams,
+      subBoards: subBoards.get(board.id) ?? [],
     };
-  });
+  };
+  const cards = (boardsRes.data ?? []).map(toCard);
+
+  // Top level: quests on no board gather on a stand-in "Uncategorized" board.
+  const loose = stats.get(UNCATEGORIZED_ID);
+  if (parentBoardId === null && loose && (loose.open.length > 0 || loose.dreams > 0)) {
+    const now = new Date().toISOString();
+    cards.push({
+      ...toCard({ id: UNCATEGORIZED_ID, owner_id: ownerId, title: "Uncategorized", description: null, color: "#b9a77f", is_private: false, parent_board_id: null, sort_order: 9999, created_at: now, updated_at: now } as Board),
+      isVirtual: true,
+    });
+  }
+  return cards;
 }
 
 export async function getBoard(

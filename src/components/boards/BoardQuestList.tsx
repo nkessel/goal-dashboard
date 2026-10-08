@@ -9,7 +9,7 @@ import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 
 /** A quest board's quests: open ones as quest cards, finished ones below. */
-export function BoardQuestList({ tasks, boardId, theme }: { tasks: Task[]; boardId: string; theme: "calm" | "adventure" }) {
+export function BoardQuestList({ tasks, boardId, theme }: { tasks: Task[]; boardId?: string; theme: "calm" | "adventure" }) {
   const isAdventure = theme === "adventure";
   const open = tasks.filter((t) => t.status === "open" && !t.is_aspiration);
   const dreams = tasks.filter((t) => t.status === "open" && t.is_aspiration);
