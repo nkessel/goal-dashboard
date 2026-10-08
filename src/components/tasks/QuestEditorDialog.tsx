@@ -170,6 +170,11 @@ export function QuestEditorDialog({
   }
   const stepsDone = (steps ?? []).filter((st) => st.done).length;
 
+  // Save lights up only once something has changed (a new quest just needs a title).
+  const snapshot = JSON.stringify([title, description, importance, urgency, xp, effort, estimate, slot?.start ?? null, boardId, progress, aspiration]);
+  const [initialSnapshot] = useState(snapshot);
+  const hasChanges = !task || Boolean(review) || stepsDirty || snapshot !== initialSnapshot;
+
   const noun = isAdventure ? "quest" : "task";
   const fieldStyle: React.CSSProperties = {
     borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
@@ -838,8 +843,8 @@ export function QuestEditorDialog({
             <button
               type="button"
               onClick={save}
-              disabled={isSaving || !title.trim()}
-              className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:opacity-50"
+              disabled={isSaving || !title.trim() || !hasChanges}
+              className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:cursor-default disabled:opacity-45 disabled:saturate-0"
               style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
             >
               {isSaving ? "Saving…" : review ? "Confirm" : task ? "Save" : `Create ${noun}`}

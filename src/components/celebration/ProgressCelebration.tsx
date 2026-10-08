@@ -36,6 +36,7 @@ const PIECES = Array.from({ length: 24 }, (_, i) => {
 export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct, steps, onClose }: ProgressCelebrationDetail & { onClose: () => void }) {
   const [shown, setShown] = useState(0);
   const [leaving, setLeaving] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const dismiss = useEffectEvent(() => onClose());
 
   useEffect(() => {
@@ -47,14 +48,19 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    const fade = setTimeout(() => setLeaving(true), 2600);
-    const done = setTimeout(() => dismiss(), 3100);
+    return () => cancelAnimationFrame(raf);
+  }, [xp]);
+
+  // Fades away on its own, unless kept open.
+  useEffect(() => {
+    if (pinned) return;
+    const fade = setTimeout(() => setLeaving(true), 2800);
+    const done = setTimeout(() => dismiss(), 3300);
     return () => {
-      cancelAnimationFrame(raf);
       clearTimeout(fade);
       clearTimeout(done);
     };
-  }, [xp]);
+  }, [pinned]);
 
   return createPortal(
     <div className={`pointer-events-none fixed inset-0 z-[60] flex items-center justify-center p-6 ${leaving ? "pc-leave" : ""}`} role="status" aria-live="polite">
@@ -119,6 +125,14 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
               <CoinIcon size={16} /> +{coinsEarned} {coinsEarned === 1 ? "coin" : "coins"}
             </p>
           )}
+          <button
+            type="button"
+            onClick={() => (pinned ? onClose() : (setPinned(true), setLeaving(false)))}
+            className="pointer-events-auto mt-1 rounded-full border px-3 py-1 text-[13px]"
+            style={{ borderColor: "#b39a6a", color: "#5a4a30" }}
+          >
+            {pinned ? "Close" : "Keep this open"}
+          </button>
         </div>
       </div>
     </div>,

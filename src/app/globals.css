@@ -908,3 +908,23 @@ html[data-evening] [data-theme="adventure"] {
 @media (prefers-reduced-motion: reduce) {
   .drawer-slide-in, .drawer-slide-out { animation-duration: 1ms; }
 }
+
+/* Everything you can click answers the pointer: a soft brighten on hover,
+   a slight dim when pressed. (.hover-glow adds a glow on top for cards.) */
+:where(a[href], button:not(:disabled), [role="button"], summary, select, label:has(> input[type="checkbox"])) {
+  cursor: pointer;
+  transition: filter 140ms ease, box-shadow 150ms ease, border-color 150ms ease, color 140ms ease;
+}
+@media (hover: hover) {
+  :where(a[href], button:not(:disabled), [role="button"], summary):hover {
+    filter: brightness(1.12) saturate(1.06);
+  }
+  /* Plain text links also get an underline, so they read as links. */
+  :where(a[href].underline, a[href]:not([class])):hover {
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+}
+:where(a[href], button:not(:disabled), [role="button"]):active {
+  filter: brightness(0.94);
+}
