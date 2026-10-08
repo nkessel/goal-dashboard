@@ -24,10 +24,21 @@ import {
   startOfWeek,
 } from "@/lib/calendar-dates";
 
-type ViewKind = "day" | "week" | "month";
+type ViewKind = "day" | "week" | "next7" | "month";
+const VIEW_LABELS: Record<ViewKind, string> = { day: "Day", week: "Week", next7: "7 days", month: "Month" };
 
 function parseView(v: string | undefined): ViewKind {
-  return v === "day" || v === "month" ? v : "week";
+  return v === "day" || v === "month" || v === "next7" ? v : "week";
+}
+
+/** Today's date in the app's home time zone (the server itself runs on UTC). */
+function todayKey() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: process.env.APP_TIMEZONE || "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 export default async function CalendarPage({
@@ -38,8 +49,8 @@ export default async function CalendarPage({
   const session = await requireSession();
   const { view: viewParam, date: dateParam } = await searchParams;
   const view = parseView(viewParam);
-  const date = parseDateParam(dateParam);
-  const today = startOfDay(new Date());
+  const date = parseDateParam(dateParam ?? todayKey());
+  const today = parseDateParam(todayKey());
 
   const profile = await getProfileById(session.user.id);
   const theme = profile?.theme ?? "calm";
@@ -66,6 +77,12 @@ export default async function CalendarPage({
     heading = formatMonthHeading(monthStart);
     prevHref = `/calendar?view=month&date=${formatDateParam(addMonths(monthStart, -1))}`;
     nextHref = `/calendar?view=month&date=${formatDateParam(addMonths(monthStart, 1))}`;
+  } else if (view === "next7") {
+    rangeStart = startOfDay(date);
+    rangeEnd = addDays(rangeStart, 7);
+    heading = formatWeekRangeHeading(rangeStart);
+    prevHref = `/calendar?view=next7&date=${formatDateParam(addDays(date, -7))}`;
+    nextHref = `/calendar?view=next7&date=${formatDateParam(addDays(date, 7))}`;
   } else {
     const weekStart = startOfWeek(date);
     rangeStart = weekStart;
@@ -75,6 +92,10 @@ export default async function CalendarPage({
     nextHref = `/calendar?view=week&date=${formatDateParam(addDays(date, 7))}`;
   }
 
+  // The server runs on UTC; fetch a day either side so evening items in the
+  // viewer's time zone aren't cut off (the views place items by local day).
+  rangeStart = addDays(rangeStart, -1);
+  rangeEnd = addDays(rangeEnd, 1);
   const tasks = await listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd);
   const todayHref = `/calendar?view=${view}&date=${formatDateParam(today)}`;
 
@@ -131,7 +152,7 @@ export default async function CalendarPage({
             border: isAdventure ? "1px solid rgba(209,161,60,.35)" : undefined,
           }}
         >
-          {(["day", "week", "month"] as const).map((v) => {
+          {(["day", "week", "next7", "month"] as const).map((v) => {
             const active = v === view;
             return (
               <Link
@@ -143,7 +164,7 @@ export default async function CalendarPage({
                   color: active ? (isAdventure ? "#2a1c10" : "#fff") : isAdventure ? "var(--t-nav-inactive)" : "var(--t-ink-soft)",
                 }}
               >
-                {v}
+                {VIEW_LABELS[v]}
               </Link>
             );
           })}
@@ -188,9 +209,14 @@ export default async function CalendarPage({
           </Link>
         </div>
 
-        {view === "day" && <DayView date={date} today={today} tasks={tasks} events={events} theme={theme} />}
-        {view === "week" && (
-          <WeekView weekStart={startOfWeek(date)} today={today} tasks={tasks} events={events} theme={theme} />
+        {view === "day" && <DayView dateKey={formatDateParam(date)} tasks={tasks} events={events} theme={theme} />}
+        {(view === "week" || view === "next7") && (
+          <WeekView
+            dayKeys={Array.from({ length: 7 }, (_, i) => formatDateParam(addDays(view === "week" ? startOfWeek(date) : date, i)))}
+            tasks={tasks}
+            events={events}
+            theme={theme}
+          />
         )}
         {view === "month" && (
           <MonthView month={startOfMonth(date)} today={today} tasks={tasks} events={events} theme={theme} />

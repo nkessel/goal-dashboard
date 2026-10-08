@@ -26,11 +26,17 @@ export function CalendarTaskChip({
   theme = "calm",
   showTime = false,
   compact = false,
+  timeLabel,
+  oneLine = false,
 }: {
   task: Task;
   theme?: "calm" | "adventure";
   showTime?: boolean;
   compact?: boolean;
+  /** Shown under the title in the grid (Google-style "9 – 10am"). */
+  timeLabel?: string;
+  /** Too short for two lines: "Title, 9am" on one line. */
+  oneLine?: boolean;
 }) {
   const isAdventure = theme === "adventure";
   const [editing, setEditing] = useState(false);
@@ -98,7 +104,7 @@ export function CalendarTaskChip({
       }}
     >
       <div
-        className="flex shrink-0 items-center justify-center overflow-hidden rounded-full"
+        className={`${compact ? "hidden" : "flex"} shrink-0 items-center justify-center overflow-hidden rounded-full`}
         style={{
           width: iconSize,
           height: iconSize,
@@ -121,7 +127,7 @@ export function CalendarTaskChip({
 
       <div className="min-w-0 flex-1">
         <p
-          className={compact ? "line-clamp-3 leading-[1.15] [overflow-wrap:normal] [word-break:normal]" : "truncate leading-tight"}
+          className={oneLine ? "truncate leading-tight" : compact ? "line-clamp-2 leading-[1.15] [overflow-wrap:normal] [word-break:normal]" : "truncate leading-tight"}
           style={{
             color: "var(--t-ink)",
             fontSize: compact ? 11.5 : 13.5,
@@ -129,8 +135,20 @@ export function CalendarTaskChip({
             textDecoration: isCompleted && !isAdventure ? "line-through" : undefined,
           }}
         >
-          {task.title}
+          {oneLine && timeLabel ? (
+            <>
+              {task.title}
+              <span style={{ fontWeight: 400, color: "var(--t-ink-soft)" }}>, {timeLabel}</span>
+            </>
+          ) : (
+            task.title
+          )}
         </p>
+        {timeLabel && !oneLine && (
+          <p className="truncate leading-tight" style={{ color: "var(--t-ink-soft)", fontSize: 10.5 }}>
+            {timeLabel}
+          </p>
+        )}
         {isCompleted && (
           <p
             className="truncate leading-tight"

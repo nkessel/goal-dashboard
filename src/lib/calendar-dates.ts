@@ -143,3 +143,19 @@ export function hourRowSpan(start: Date, end: Date): { startRow: number; endRow:
   const endHour = clamp(Math.max(rawEndHour, startHour + 1));
   return { startRow: startHour - HOUR_START, endRow: endHour - HOUR_START };
 }
+
+/** Google-Calendar-style time: "9am", "9:30am". */
+export function formatShortTime(d: Date): string {
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}${m ? `:${String(m).padStart(2, "0")}` : ""}${h < 12 ? "am" : "pm"}`;
+}
+
+/** Google-Calendar-style range: "9 – 10am", "9:30 – 11am", "11am – 1pm". */
+export function formatShortTimeRange(start: Date, end: Date): string {
+  const a = formatShortTime(start);
+  const b = formatShortTime(end);
+  const sameHalf = start.getHours() < 12 === end.getHours() < 12;
+  return `${sameHalf ? a.replace(/(am|pm)$/, "") : a} – ${b}`;
+}

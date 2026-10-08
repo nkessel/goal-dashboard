@@ -37,10 +37,16 @@ export function GoogleEventChip({
   event,
   theme = "calm",
   compact = false,
+  timeLabel,
+  oneLine = false,
 }: {
   event: GoogleCalendarEvent;
   theme?: "calm" | "adventure";
   compact?: boolean;
+  /** Shown under the title in the grid (Google-style "9 – 10am"). */
+  timeLabel?: string;
+  /** Too short for two lines: "Title, 9am" on one line. */
+  oneLine?: boolean;
 }) {
   const isAdventure = theme === "adventure";
   const router = useRouter();
@@ -108,11 +114,23 @@ export function GoogleEventChip({
         </div>
         <div className="min-w-0 flex-1">
           <p
-            className={compact ? "line-clamp-3 leading-[1.15] [overflow-wrap:normal] [word-break:normal]" : "truncate leading-tight"}
+            className={oneLine ? "truncate leading-tight" : compact ? "line-clamp-2 leading-[1.15] [overflow-wrap:normal] [word-break:normal]" : "truncate leading-tight"}
             style={{ color: isAdventure ? "#22374a" : "var(--t-ink)", fontSize: compact ? 11.5 : 13.5, fontWeight: 500 }}
           >
-            {event.title}
+            {oneLine && timeLabel ? (
+              <>
+                {event.title}
+                <span style={{ fontWeight: 400, opacity: 0.75 }}>, {timeLabel}</span>
+              </>
+            ) : (
+              event.title
+            )}
           </p>
+          {timeLabel && !oneLine && (
+            <p className="truncate leading-tight" style={{ color: isAdventure ? "#22374a" : "var(--t-ink-soft)", fontSize: 10.5, opacity: 0.8 }}>
+              {timeLabel}
+            </p>
+          )}
           {!compact && !event.isAllDay && (
             <p className="truncate leading-tight" style={{ color: "var(--t-ink-soft)", fontSize: 10.5 }}>
               {formatTimeRange(start, end)}
