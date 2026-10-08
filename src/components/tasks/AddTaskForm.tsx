@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FabSpeedDial, type FabChoice } from "@/components/ui/FabSpeedDial";
 import { RewardEditorDialog } from "@/components/rewards/RewardEditorDialog";
-import { DiamondIcon } from "@/components/ui/Icons";
+import { BoltIcon, DiamondIcon } from "@/components/ui/Icons";
 import { QuestShield } from "@/components/ui/Ornaments";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
 import { Moon } from "@/components/evening/BeginEveningButton";
@@ -23,7 +23,7 @@ export function AddTaskForm({
   /** More speed-dial options (e.g. "New rite" on the evening side). */
   extraChoices?: FabChoice[];
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<false | "quest" | "power">(false);
   const [rewardOpen, setRewardOpen] = useState(false);
   const [riteOpen, setRiteOpen] = useState(false);
   const isAdventure = theme === "adventure";
@@ -35,7 +35,7 @@ export function AddTaskForm({
       {goalId ? (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => setOpen("quest")}
           className="hover-glow w-full rounded-xl border border-dashed py-3 text-sm font-medium transition-colors"
           style={{ borderColor, color: dimText, opacity: isAdventure ? 0.85 : 1 }}
         >
@@ -52,14 +52,15 @@ export function AddTaskForm({
               ...extraChoices,
               { key: "rite", label: "New evening rite", icon: <Moon size={20} />, onPick: () => setRiteOpen(true) },
               { key: "reward", label: "New reward", icon: <DiamondIcon size={20} />, onPick: () => setRewardOpen(true) },
-              { key: "quest", label: isAdventure ? "New quest" : "New task", icon: <QuestShield size={20} />, onPick: () => setOpen(true) },
+              { key: "power", label: "New power-up", icon: <BoltIcon size={20} />, onPick: () => setOpen("power") },
+              { key: "quest", label: isAdventure ? "New quest" : "New task", icon: <QuestShield size={20} />, onPick: () => setOpen("quest") },
             ]}
           />
         )
       )}
       {open && (
         <QuestEditorDialog
-          mode={{ kind: "create", goalId }}
+          mode={{ kind: "create", goalId, powerUp: open === "power" }}
           theme={theme}
           origin={goalId ? "center" : "fab"}
           onClose={() => setOpen(false)}

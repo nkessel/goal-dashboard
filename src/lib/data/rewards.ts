@@ -17,7 +17,16 @@ export async function listRewards(ownerId: string): Promise<Reward[]> {
 
 export async function createReward(
   ownerId: string,
-  input: { title: string; description?: string | null; iconKey?: string | null; costCoins?: number; bonusXp?: number; bonusCoins?: number }
+  input: {
+    title: string;
+    description?: string | null;
+    iconKey?: string | null;
+    costCoins?: number;
+    bonusXp?: number;
+    bonusCoins?: number;
+    prereqTitle?: string | null;
+    prereqXp?: number;
+  }
 ): Promise<Reward> {
   const db = supabaseAdmin();
   const { data, error } = await db
@@ -30,6 +39,7 @@ export async function createReward(
       ...(input.costCoins !== undefined ? { cost_coins: Math.max(0, Math.round(input.costCoins)) } : {}),
       ...(input.bonusXp ? { bonus_xp: Math.max(0, Math.round(input.bonusXp)) } : {}),
       ...(input.bonusCoins ? { bonus_coins: Math.max(0, Math.round(input.bonusCoins)) } : {}),
+      ...(input.prereqTitle ? { prereq_title: input.prereqTitle, prereq_xp: Math.max(0, Math.round(input.prereqXp ?? 10)) } : {}),
     })
     .select("*")
     .single();
@@ -48,6 +58,9 @@ export async function updateReward(
     costCoins?: number;
     bonusXp?: number;
     bonusCoins?: number;
+    /** Undefined leaves it; null/"" clears the prerequisite. */
+    prereqTitle?: string | null;
+    prereqXp?: number;
   }
 ): Promise<void> {
   const db = supabaseAdmin();
@@ -61,6 +74,8 @@ export async function updateReward(
       ...(input.costCoins !== undefined ? { cost_coins: Math.max(0, Math.round(input.costCoins)) } : {}),
       ...(input.bonusXp !== undefined ? { bonus_xp: Math.max(0, Math.round(input.bonusXp)) } : {}),
       ...(input.bonusCoins !== undefined ? { bonus_coins: Math.max(0, Math.round(input.bonusCoins)) } : {}),
+      ...(input.prereqTitle !== undefined ? { prereq_title: input.prereqTitle || null } : {}),
+      ...(input.prereqXp !== undefined ? { prereq_xp: Math.max(0, Math.round(input.prereqXp)) } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", rewardId)

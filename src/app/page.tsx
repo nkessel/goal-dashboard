@@ -74,7 +74,8 @@ export default async function Home() {
     listRiteCompletions(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => []),
   ]);
   const topPriorities = openTasks.filter((t) => t.is_manual_priority);
-  const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
+  // Power-ups live in their own menu (⚡) unless pinned to Today's Battle.
+  const otherTasks = openTasks.filter((t) => !t.is_manual_priority && !t.is_power_up);
   const theme = profile?.theme ?? "calm";
   const stats = profile && (
     <section>

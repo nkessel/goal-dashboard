@@ -121,6 +121,11 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
                   </span>
                 )}
               </button>
+              {r.prereq_title && (
+                <span className="relative z-[1] text-[13px] italic" style={{ color: "var(--t-ink-soft)" }}>
+                  First: {r.prereq_title}
+                </span>
+              )}
               {((r.bonus_xp ?? 0) > 0 || (r.bonus_coins ?? 0) > 0) && (
                 <span className="relative z-[1] text-[13px] font-semibold" style={{ color: "var(--t-xp)" }}>
                   Complete it for{(r.bonus_xp ?? 0) > 0 ? ` +${r.bonus_xp} XP` : ""}

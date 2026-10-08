@@ -35,11 +35,15 @@ export function RewardEditorDialog({
     if (!icon) setIcon(reward?.icon_key ?? null);
   }
   const [price, setPrice] = useState<number>(reward?.cost_coins ?? 10);
+  const [prereq, setPrereq] = useState(reward?.prereq_title ?? "");
+  const [prereqXp, setPrereqXp] = useState<number>(reward?.prereq_xp ?? 10);
   const [bonusXp, setBonusXp] = useState<number>(reward?.bonus_xp ?? 0);
   const [bonusCoins, setBonusCoins] = useState<number>(reward?.bonus_coins ?? 0);
   // Only send bonus fields once the database has them (or when they're set).
-  const bonusFields = (r?: Reward) =>
-    r?.bonus_xp !== undefined || bonusXp || bonusCoins ? { bonusXp, bonusCoins } : {};
+  const bonusFields = (r?: Reward) => ({
+    ...(r?.bonus_xp !== undefined || bonusXp || bonusCoins ? { bonusXp, bonusCoins } : {}),
+    ...(r?.prereq_xp !== undefined || prereq.trim() ? { prereqTitle: prereq, prereqXp } : {}),
+  });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -100,7 +104,7 @@ export function RewardEditorDialog({
         aria-modal="true"
         aria-label={reward ? "Edit reward" : "New reward"}
         onClick={(e) => e.stopPropagation()}
-        className={`flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 parchment parchment-framed shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
+        className={`flex max-h-[94vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl p-4 parchment parchment-framed shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
         style={{
           background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
           border: `2px solid ${isAdventure ? "var(--t-gold)" : "var(--t-card-border)"}`,
@@ -154,6 +158,46 @@ export function RewardEditorDialog({
               style={fieldStyle}
             />
           </div>
+        </div>
+
+        {/* Prerequisite quest */}
+        <div className="flex flex-col gap-1.5 rounded-xl px-3.5 py-3" style={{ background: "rgba(255,250,238,.5)", border: "1.5px dashed #b39a6a" }}>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[15px] font-semibold">First, a quest</span>
+            <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+              optional — unlocks the reward
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              value={prereq}
+              onChange={(e) => setPrereq(e.target.value)}
+              placeholder="e.g. Completely empty the car of all things"
+              aria-label="Prerequisite quest"
+              className="h-10 min-w-0 flex-1 rounded-lg border px-2.5 text-[14.5px]"
+              style={fieldStyle}
+            />
+            {prereq.trim() && (
+              <label className="flex h-10 shrink-0 items-center gap-1 rounded-lg border px-2" style={fieldStyle}>
+                <span className="text-[12px] font-bold" style={{ color: "var(--t-xp)" }}>
+                  XP
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={prereqXp}
+                  onChange={(e) => setPrereqXp(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                  aria-label="Prerequisite XP"
+                  className="price-input w-9 bg-transparent text-center text-[15px] font-bold tabular-nums outline-none"
+                />
+              </label>
+            )}
+          </div>
+          {prereq.trim() && (
+            <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+              Accepting puts both in Today&apos;s Battle — this quest in front, the reward locked behind it until it&apos;s done.
+            </p>
+          )}
         </div>
 
         {/* Price in coins */}

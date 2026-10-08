@@ -54,8 +54,11 @@ export function TaskRow({
   onDrop,
   onDragEnd,
   innerRef,
+  behind,
 }: {
   task: Task;
+  /** A reward locked behind this quest: drawn as a card stacked behind it. */
+  behind?: Task | null;
   theme?: "calm" | "adventure";
   /** The title of the board the task's goal belongs to — shown as a pill on
    * the card (HANDOFF.md §4 "category pill"). Omitted or null when the
@@ -146,6 +149,7 @@ export function TaskRow({
             iconSrc: imageUrl,
             totalXp: res?.totalXp ?? null,
             coinsEarned: res?.coinsEarned ?? 0,
+            isReward: Boolean(task.reward_id),
           });
         }
       } catch (e) {
@@ -178,9 +182,14 @@ export function TaskRow({
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
+      className={behind ? "relative pt-7" : "relative"}
+    >
+      {/* A locked reward peeks out from behind its prerequisite quest. */}
+      {behind && <LockedRewardCard reward={behind} />}
+      <div
       onClick={() => setEditing(true)}
       title="Click to edit"
-      className={`quest-card hover-glow relative flex cursor-pointer flex-col rounded-2xl px-3 pb-3 pt-2.5 ${
+      className={`quest-card hover-glow relative flex cursor-pointer flex-col rounded-2xl px-3 pb-3 pt-2.5 ${behind ? "z-[1]" : ""} ${task.reward_id ? "reward-quest" : ""} ${
         draggable ? "active:cursor-grabbing" : ""
       } ${isPending ? "opacity-70" : ""}`}
       style={cardStyle}
@@ -213,7 +222,14 @@ export function TaskRow({
             Quests without a goal get a quiet "+ Goal" tag in the same spot, so
             every card lines up and filing one is a click away. */}
         <div className="relative flex w-[66px] shrink-0 flex-col items-center sm:w-[80px]" onClick={(e) => e.stopPropagation()}>
-          {categoryLabel ? (
+          {task.reward_id ? (
+            <span
+              className="relative z-[2] -mb-2.5 flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-px text-[11.5px] font-semibold leading-snug sm:px-2 sm:text-[12.5px]"
+              style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 60%, #a88a3f)", border: "1px solid #5a4520", color: "#2a1c10", boxShadow: "0 1px 3px rgba(0,0,0,.3)" }}
+            >
+              ◆ Reward
+            </span>
+          ) : categoryLabel ? (
             <span
               className="relative z-[2] -mb-2.5 max-w-[76px] truncate rounded-md px-2 py-px text-[12.5px] leading-snug sm:max-w-[88px] sm:px-2.5 sm:text-[13px]"
               style={{
@@ -410,6 +426,7 @@ export function TaskRow({
         )}
 
       {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
+    </div>
     </li>
   );
 }
@@ -452,5 +469,39 @@ export function CheckMark({ checked, isAdventure, size = 54 }: { checked: boolea
         </svg>
       </span>
     </span>
+  );
+}
+
+/** The reward waiting behind its prerequisite: a card peeking out above and to the right. */
+function LockedRewardCard({ reward }: { reward: Task }) {
+  const img = reward.icon_source === "ai" || reward.icon_source === "library" ? reward.icon_key : null;
+  return (
+    <div
+      aria-label={`Locked reward: ${reward.title}`}
+      className="parchment pointer-events-none absolute flex items-start gap-2 rounded-2xl px-3 pt-1.5"
+      style={{
+        zIndex: 0,
+        top: 0,
+        left: 14,
+        right: -6,
+        bottom: 26,
+        transform: "rotate(1.4deg)",
+        borderRadius: 16,
+        filter: "saturate(.9) brightness(.94)",
+      }}
+    >
+      <span className="h-5 w-5 shrink-0 overflow-hidden rounded-full" style={{ border: "1px solid #8a6c2c", background: "#f3e6c8" }}>
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element -- reward portrait
+          <img src={img} alt="" className="h-full w-full object-cover" />
+        ) : null}
+      </span>
+      <span className="min-w-0 truncate text-[13.5px] font-semibold" style={{ color: "#4d4535" }}>
+        🔒 {reward.title}
+      </span>
+      <span className="ml-auto shrink-0 text-[12px] italic" style={{ color: "#6b6252" }}>
+        unlocks next
+      </span>
+    </div>
   );
 }

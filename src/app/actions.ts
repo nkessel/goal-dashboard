@@ -210,10 +210,15 @@ export async function completeTaskAction(formData: FormData) {
   const ownerId = await requireProfileId();
   const taskId = String(formData.get("taskId") || "");
   const completedAtRaw = String(formData.get("completedAt") || "");
-  const completedAt = completedAtRaw
-    ? new Date(completedAtRaw).toISOString()
-    : undefined;
+  const completedAt = completedAtRaw ? new Date(completedAtRaw).toISOString() : undefined;
+  return finishTask(ownerId, taskId, completedAt);
+}
 
+/**
+ * Complete a quest and pay what it still owes. A reward's own quest also
+ * completes the reward and pays its bonus coins.
+ */
+async function finishTask(ownerId: string, taskId: string, completedAt?: string) {
   const completed = await tasksData.completeTask(taskId, ownerId, completedAt);
   // Partial progress may already have paid some of this quest's XP; pay the rest.
   const tracked = typeof completed.xp_awarded === "number";
@@ -228,10 +233,24 @@ export async function completeTaskAction(formData: FormData) {
   } else {
     totalXp = (await profilesData.getProfileById(ownerId))?.total_xp ?? null;
   }
+  let rewardCompleted = false;
+  if (completed.reward_id) {
+    try {
+      const reward = await rewardsData.completeReward(completed.reward_id, ownerId);
+      rewardCompleted = true;
+      if ((reward.bonus_coins ?? 0) > 0) {
+        await rewardsData.addCoins(ownerId, reward.bonus_coins ?? 0);
+        coinsEarned += reward.bonus_coins ?? 0;
+      }
+    } catch {
+      /* reward already completed or removed — the quest still counts */
+    }
+    revalidatePath("/rewards");
+  }
   revalidatePath("/");
   revalidatePath("/matrix");
   // Lets the quest-complete celebration fill the XP bar to the real total.
-  return { totalXp, coinsEarned };
+  return { totalXp, coinsEarned, rewardCompleted };
 }
 
 /** Full edit from the quest-card edit dialog (title/description/importance/urgency/xp/estimate). */
@@ -246,6 +265,7 @@ export async function updateTaskAction(
     estimateMinutes?: number | null;
     /** Undefined leaves the goal untouched; null detaches it. */
     goalId?: string | null;
+    isPowerUp?: boolean;
     grantsReward?: boolean;
     /** Also confirm this quest if it was an import awaiting review. */
     confirmImport?: boolean;
@@ -254,6 +274,10 @@ export async function updateTaskAction(
   const ownerId = await requireProfileId();
   if (input.grantsReward !== undefined) await tasksData.setTaskGrantsReward(taskId, ownerId, input.grantsReward);
   if (input.confirmImport) await rewardsData.markReviewed("quest", taskId, ownerId);
+  if (input.isPowerUp !== undefined) {
+    await tasksData.setPowerUp(taskId, ownerId, input.isPowerUp);
+    revalidatePath("/power-ups");
+  }
   // Changing a quest's XP adjusts what you've already earned for it: all of
   // it for a finished quest, its progress share for one in progress.
   const before = await tasksData.getTask(taskId, ownerId);
@@ -345,6 +369,12 @@ export async function reopenTaskAction(taskId: string) {
   await tasksData.reopenTask(taskId, ownerId);
   // Undo what the quest paid out so re-completing later doesn't farm points;
   // progress starts over.
+  if (before?.status === "completed" && before.reward_id) {
+    // Reopening a reward's quest puts the reward back to accepted (bonus coins back out).
+    const was = await rewardsData.uncompleteReward(before.reward_id, ownerId);
+    if (was && (was.bonus_coins ?? 0) > 0) await rewardsData.addCoins(ownerId, -(was.bonus_coins ?? 0));
+    revalidatePath("/rewards");
+  }
   if (before?.status === "completed") {
     const paid = typeof before.xp_awarded === "number" ? before.xp_awarded : before.xp_value;
     if (paid > 0) await xp.awardXp(ownerId, -paid, "task_completed", taskId);
@@ -812,6 +842,7 @@ export async function createQuestAction(input: {
   iconSource?: "library" | "ai";
   pinToBattle?: boolean;
   grantsReward?: boolean;
+  isPowerUp?: boolean;
   schedule?: { startISO: string; endISO: string; googleEventId?: string };
 }): Promise<string> {
   const ownerId = await requireProfileId();
@@ -828,7 +859,9 @@ export async function createQuestAction(input: {
     estimateMinutes: input.estimateMinutes ?? null,
     iconKey: input.iconKey ?? null,
     iconSource: input.iconSource,
+    isPowerUp: input.isPowerUp,
   });
+  if (input.isPowerUp) revalidatePath("/power-ups");
   if (input.schedule) {
     const session = await auth();
     if (!input.schedule.googleEventId && session?.googleAccessToken) {
@@ -925,6 +958,8 @@ export async function createRewardAction(input: {
   costCoins?: number;
   bonusXp?: number;
   bonusCoins?: number;
+  prereqTitle?: string;
+  prereqXp?: number;
 }) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
@@ -936,6 +971,8 @@ export async function createRewardAction(input: {
     costCoins: input.costCoins,
     bonusXp: input.bonusXp,
     bonusCoins: input.bonusCoins,
+    prereqTitle: input.prereqTitle?.trim() || null,
+    prereqXp: input.prereqXp,
   });
   revalidatePath("/rewards");
   return reward.id;
@@ -950,6 +987,8 @@ export async function updateRewardAction(
     costCoins?: number;
     bonusXp?: number;
     bonusCoins?: number;
+    prereqTitle?: string;
+    prereqXp?: number;
     confirmImport?: boolean;
   }
 ) {
@@ -963,6 +1002,8 @@ export async function updateRewardAction(
     costCoins: input.costCoins,
     bonusXp: input.bonusXp,
     bonusCoins: input.bonusCoins,
+    prereqTitle: input.prereqTitle === undefined ? undefined : input.prereqTitle.trim() || null,
+    prereqXp: input.prereqXp,
     needsReview: input.confirmImport ? false : undefined,
   });
   revalidatePath("/rewards");
@@ -987,7 +1028,29 @@ export async function listAvailableRewardsAction() {
 export async function claimRewardAction(rewardId: string, taskId: string | null) {
   const ownerId = await requireProfileId();
   // Accepting spends the reward's coins; its bonus comes when you complete it.
-  const { coins } = await rewardsData.claimReward(rewardId, ownerId, taskId);
+  const { coins, reward } = await rewardsData.claimReward(rewardId, ownerId, taskId);
+  // It goes straight into Today's Battle: the reward's own quest, stacked
+  // behind its prerequisite quest when it has one.
+  if (reward.prereq_xp !== undefined) {
+    const prereq = reward.prereq_title
+      ? await tasksData.createTask(ownerId, {
+          title: reward.prereq_title,
+          description: reward.prereq_description || `Do this first to unlock: ${reward.title}`,
+          xpValue: reward.prereq_xp ?? 10,
+          isManualPriority: true,
+        })
+      : null;
+    await tasksData.createTask(ownerId, {
+      title: reward.title,
+      description: reward.description || "Your reward — enjoy it!",
+      xpValue: reward.bonus_xp ?? 0,
+      iconKey: reward.icon_key,
+      iconSource: "library",
+      rewardId: reward.id,
+      lockedByTaskId: prereq?.id ?? null,
+      isManualPriority: true,
+    });
+  }
   revalidatePath("/rewards");
   revalidatePath("/", "layout");
   return { coins };
@@ -1002,6 +1065,17 @@ async function reverseRewardBonus(ownerId: string, was: Awaited<ReturnType<typeo
 /** You actually did it (got the haircut, bought the frames): pays the completion bonus. */
 export async function completeRewardAction(rewardId: string) {
   const ownerId = await requireProfileId();
+  // Accepted with its own quest: completing that quest completes the reward.
+  const quest = await tasksData.findOpenRewardTask(rewardId, ownerId);
+  if (quest) {
+    if (quest.locked_by_task_id) {
+      const prereq = await tasksData.getTask(quest.locked_by_task_id, ownerId);
+      if (prereq && prereq.status === "open") throw new Error(`Finish “${prereq.title}” first to unlock this reward.`);
+    }
+    const before = await rewardsData.listRewards(ownerId).then((rs) => rs.find((r) => r.id === rewardId));
+    await finishTask(ownerId, quest.id);
+    return { bonusXp: quest.xp_value, bonusCoins: before?.bonus_coins ?? 0, bonusCoinsFromXp: Math.ceil(quest.xp_value / 10) };
+  }
   const reward = await rewardsData.completeReward(rewardId, ownerId);
   const bonusXp = reward.bonus_xp ?? 0;
   const bonusCoins = reward.bonus_coins ?? 0;
@@ -1022,8 +1096,10 @@ export async function uncompleteRewardAction(rewardId: string) {
 
 export async function unclaimRewardAction(rewardId: string) {
   const ownerId = await requireProfileId();
-  // A completed reward first gives back its bonus, then refunds as usual.
+  // A completed reward first gives back its bonus, then refunds as usual;
+  // its still-open quests leave Today's Battle.
   await reverseRewardBonus(ownerId, await rewardsData.uncompleteReward(rewardId, ownerId));
+  await tasksData.deleteOpenRewardTasks(rewardId, ownerId).catch(() => {});
   await rewardsData.unclaimReward(rewardId, ownerId);
   revalidatePath("/rewards");
   revalidatePath("/", "layout");

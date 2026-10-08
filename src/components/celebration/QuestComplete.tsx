@@ -38,6 +38,8 @@ export type QuestCompleteProps = {
   preview?: boolean;
   /** Coins this quest added to your purse. */
   coinsEarned?: number;
+  /** A reward's own quest: "Reward Complete!" and no reward picker. */
+  isReward?: boolean;
   onClose: () => void;
 };
 
@@ -76,7 +78,7 @@ function Dust({ items, mode }: { items: Speck[]; mode: "center" | "pct" | "px" }
 }
 
 export function QuestComplete(props: QuestCompleteProps) {
-  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc = "/design/icon-dragon.jpg", avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, coinsEarned = 0, onClose } = props;
+  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc = "/design/icon-dragon.jpg", avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, coinsEarned = 0, isReward = false, onClose } = props;
   const [phase, setPhase] = useState<"celebrate" | "rewards">("celebrate");
   const [chest, setChest] = useState<{ rewards: Reward[]; coins: number } | null>(null);
   const [claimed, setClaimed] = useState<Reward | null>(null);
@@ -209,7 +211,7 @@ export function QuestComplete(props: QuestCompleteProps) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/design/ui-leaf.png" alt="" className="h-5 w-[26px] shrink-0" />
             <h1 className="m-0 whitespace-nowrap text-[32px] font-semibold tracking-[.01em]" style={{ color: "#efe6cc", textShadow: "0 2px 10px rgba(0,0,0,.6)" }}>
-              Quest Complete!
+              {isReward ? "Reward Complete!" : "Quest Complete!"}
             </h1>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/design/ui-leaf.png" alt="" className="h-5 w-[26px] shrink-0 -scale-x-100" />
@@ -352,6 +354,7 @@ export function QuestComplete(props: QuestCompleteProps) {
 
           {/* Actions */}
           <div className="qc-btns mt-1 flex w-full gap-2.5">
+            {!isReward && (
             <button
               type="button"
               onClick={openChest}
@@ -360,6 +363,7 @@ export function QuestComplete(props: QuestCompleteProps) {
             >
               Choose a Reward
             </button>
+            )}
             <button
               type="button"
               onClick={onClose}

@@ -14,6 +14,8 @@ export type QuestCelebration = {
   /** Total XP after this quest's XP was added (null if unknown). */
   totalXp: number | null;
   coinsEarned?: number;
+  /** Finishing a reward's own quest: celebrate the reward, no reward picker. */
+  isReward?: boolean;
 };
 
 /** Play the quest-complete celebration (works even after the card unmounts). */
@@ -49,6 +51,7 @@ export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { ava
       avatarSrc={avatarSrc}
       taskId={current.taskId}
       coinsEarned={current.coinsEarned ?? 0}
+      isReward={current.isReward}
       onClose={() => setCurrent(null)}
     />
   );

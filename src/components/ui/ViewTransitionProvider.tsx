@@ -55,7 +55,7 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
   // Last screen outside Settings, so closing Settings from any depth
   // (Settings → Avatar → …) returns to the app instead of bouncing between
   // the settings pages.
-  const isOverlayPage = (p: string) => p.startsWith("/settings") || p.startsWith("/notifications") || p.startsWith("/rewards");
+  const isOverlayPage = (p: string) => p.startsWith("/settings") || p.startsWith("/notifications") || p.startsWith("/rewards") || p.startsWith("/power-ups");
   const lastAppPathnameRef = useRef<string | null>(isOverlayPage(pathname) ? null : pathname);
   const pendingRef = useRef<{ direction: string; resolve: () => void } | null>(null);
 

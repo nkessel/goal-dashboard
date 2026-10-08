@@ -51,8 +51,14 @@ export function TodayTaskBoard({
   const [localOther, setLocalOther] = useState<TaskWithCategory[] | null>(null);
   const [seenPriorityTasks, setSeenPriorityTasks] = useState(priorityTasks);
   const [seenOtherTasks, setSeenOtherTasks] = useState(otherTasks);
-  const priority = localPriority ?? priorityTasks;
-  const other = localOther ?? otherTasks;
+  // A reward quest still locked behind an open prerequisite isn't its own card:
+  // it's drawn stacked behind that prerequisite.
+  const openIds = new Set([...priorityTasks, ...otherTasks].map((t) => t.id));
+  const isLocked = (t: TaskWithCategory) => !!t.locked_by_task_id && openIds.has(t.locked_by_task_id);
+  const lockedBehind = new Map<string, TaskWithCategory>();
+  for (const t of [...priorityTasks, ...otherTasks]) if (isLocked(t)) lockedBehind.set(t.locked_by_task_id!, t);
+  const priority = (localPriority ?? priorityTasks).filter((t) => !isLocked(t));
+  const other = (localOther ?? otherTasks).filter((t) => !isLocked(t));
 
   const [otherOpen, setOtherOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -298,6 +304,7 @@ export function TodayTaskBoard({
                 task={task}
                 theme={theme}
                 categoryLabel={task.categoryLabel}
+                behind={lockedBehind.get(task.id)}
                 draggable
                 innerRef={registerPriority(task.id)}
                 onDragStart={(e) => {
@@ -394,6 +401,7 @@ export function TodayTaskBoard({
                     task={task}
                     theme={theme}
                     categoryLabel={task.categoryLabel}
+                    behind={lockedBehind.get(task.id)}
                     draggable
                     innerRef={registerOther(task.id)}
                     onDragStart={(e) => {

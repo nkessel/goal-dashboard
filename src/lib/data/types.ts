@@ -61,6 +61,12 @@ export type Task = {
   progress?: number;
   /** XP already paid out for this quest (partial progress and/or completion). */
   xp_awarded?: number;
+  /** This quest is the reward itself (created when the reward was accepted). */
+  reward_id?: string | null;
+  /** Hidden behind this (prerequisite) quest until it's completed. */
+  locked_by_task_id?: string | null;
+  /** A quick-win, low-energy quest kept in the Power-ups menu. */
+  is_power_up?: boolean;
 };
 
 export type Profile = {
@@ -120,9 +126,13 @@ export type Reward = {
   cost_coins?: number;
   /** Coins paid when claimed (refunded if put back). */
   coins_spent?: number | null;
-  /** Completion bonus granted when claimed (reversed if put back). */
+  /** Completion bonus granted when completed (reversed if undone). */
   bonus_xp?: number;
   bonus_coins?: number;
+  /** Optional quest that must be done before the reward is revealed. */
+  prereq_title?: string | null;
+  prereq_description?: string | null;
+  prereq_xp?: number;
   sort_order: number;
   created_at: string;
   updated_at: string;

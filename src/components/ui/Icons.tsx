@@ -64,3 +64,20 @@ export function ChestIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
+
+/** A gilded lightning bolt — Power-ups. */
+export function BoltIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id="bolt-gold" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff3c0" />
+          <stop offset=".45" stopColor="#f2c94c" />
+          <stop offset="1" stopColor="#b07a16" />
+        </linearGradient>
+      </defs>
+      <path d="M13.6 1.8 4.4 13.4h6.1l-1.6 8.8 9.7-12.2h-6.3z" fill="url(#bolt-gold)" stroke="#5a3f0c" strokeWidth="1.1" strokeLinejoin="round" />
+      <path d="M12.4 4.6 7.6 11.2" stroke="#fffbe6" strokeWidth="1" strokeLinecap="round" opacity=".8" />
+    </svg>
+  );
+}

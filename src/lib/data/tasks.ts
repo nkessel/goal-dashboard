@@ -247,12 +247,21 @@ export async function createTask(
     estimateMinutes?: number | null;
     iconKey?: string | null;
     iconSource?: "monster" | "library" | "ai";
+    /** Straight into Today's Battle (skips the 3-quest cap — used for reward stacks). */
+    isManualPriority?: boolean;
+    rewardId?: string | null;
+    lockedByTaskId?: string | null;
+    isPowerUp?: boolean;
   }
 ): Promise<Task> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
     .insert({
+      ...(input.isManualPriority ? { is_manual_priority: true } : {}),
+      ...(input.rewardId ? { reward_id: input.rewardId } : {}),
+      ...(input.lockedByTaskId ? { locked_by_task_id: input.lockedByTaskId } : {}),
+      ...(input.isPowerUp ? { is_power_up: true } : {}),
       ...(input.iconKey ? { icon_key: input.iconKey, icon_source: input.iconSource ?? "library" } : {}),
       owner_id: ownerId,
       goal_id: input.goalId || null,
@@ -514,4 +523,64 @@ export async function setTaskGrantsReward(taskId: string, ownerId: string, grant
   const db = supabaseAdmin();
   const { error } = await db.from("tasks").update({ grants_reward: grantsReward }).eq("id", taskId).eq("owner_id", ownerId);
   if (error) throw new Error(`Failed to update quest: ${error.message}`);
+}
+
+/** The open quest that is this reward itself, if the reward was accepted with one. */
+export async function findOpenRewardTask(rewardId: string, ownerId: string): Promise<Task | null> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("tasks")
+    .select("*")
+    .eq("owner_id", ownerId)
+    .eq("reward_id", rewardId)
+    .eq("status", "open")
+    .limit(1);
+  if (error) return null;
+  return (data?.[0] as Task) ?? null;
+}
+
+/** Remove a reward's still-open quests (and its open prerequisite) when it's put back. */
+export async function deleteOpenRewardTasks(rewardId: string, ownerId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("tasks")
+    .select("id, locked_by_task_id")
+    .eq("owner_id", ownerId)
+    .eq("reward_id", rewardId)
+    .eq("status", "open");
+  if (error || !data?.length) return;
+  const ids = new Set<string>();
+  for (const t of data as { id: string; locked_by_task_id: string | null }[]) {
+    ids.add(t.id);
+    if (t.locked_by_task_id) ids.add(t.locked_by_task_id);
+  }
+  await db.from("tasks").delete().eq("owner_id", ownerId).eq("status", "open").in("id", Array.from(ids));
+}
+
+export async function setPowerUp(taskId: string, ownerId: string, isPowerUp: boolean): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db.from("tasks").update({ is_power_up: isPowerUp }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to update power-up: ${error.message}`);
+}
+
+/** Power-ups: open ones, plus ones finished since `sinceISO` (for "done today"). */
+export async function listPowerUps(ownerId: string, sinceISO: string): Promise<{ open: Task[]; done: Task[] }> {
+  const db = supabaseAdmin();
+  const [open, done] = await Promise.all([
+    db.from("tasks").select("*").eq("owner_id", ownerId).eq("is_power_up", true).eq("status", "open").order("sort_order").order("created_at"),
+    db.from("tasks").select("*").eq("owner_id", ownerId).eq("is_power_up", true).eq("status", "completed").gte("completed_at", sinceISO).order("completed_at", { ascending: false }),
+  ]);
+  if (open.error) return { open: [], done: [] };
+  return { open: (open.data ?? []) as Task[], done: (done.data ?? []) as Task[] };
+}
+
+export async function countOpenPowerUps(ownerId: string): Promise<number> {
+  const db = supabaseAdmin();
+  const { count, error } = await db
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", ownerId)
+    .eq("is_power_up", true)
+    .eq("status", "open");
+  return error ? 0 : (count ?? 0);
 }

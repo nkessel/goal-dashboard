@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { completeTaskAction, createBoardWithGoalAction, createQuestAction, deleteTaskAction, listGoalOptionsAction, reopenTaskAction, scheduleTaskAction, setTaskProgressAction, updateTaskAction } from "@/app/actions";
 import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
+import { BoltIcon } from "@/components/ui/Icons";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { SlotPickerDialog } from "./SlotPickerDialog";
@@ -21,6 +22,8 @@ export type QuestEditorMode =
       kind: "create";
       goalId?: string | null;
       pinToBattle?: boolean;
+      /** Start as a power-up (quick win). */
+      powerUp?: boolean;
       /** Place the new quest on the calendar (e.g. from a Google event). */
       schedule?: { startISO: string; endISO: string; googleEventId?: string };
       prefill?: QuestDraft;
@@ -86,6 +89,9 @@ export function QuestEditorDialog({
   const [goalId, setGoalId] = useState<string | null>(initialGoal);
   const [goalOptions, setGoalOptions] = useState<{ id: string; title: string; boardTitle: string }[] | null>(null);
   const isCompleted = task?.status === "completed";
+  const initialPowerUp = task ? Boolean(task.is_power_up) : mode.kind === "create" && Boolean(mode.powerUp);
+  const [isPowerUp, setIsPowerUp] = useState(initialPowerUp);
+  const powerUpSupported = !task || task.is_power_up !== undefined;
   const progressTracked = typeof task?.xp_awarded === "number";
   const initialProgress = task?.progress ?? 0;
   const [progress, setProgress] = useState(initialProgress);
@@ -179,6 +185,7 @@ export function QuestEditorDialog({
             xpValue: xp,
             estimateMinutes: est,
             goalId: goalId !== initialGoal ? goalId : undefined,
+            isPowerUp: isPowerUp !== initialPowerUp ? isPowerUp : undefined,
             confirmImport: Boolean(review),
           });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
@@ -214,6 +221,7 @@ export function QuestEditorDialog({
             iconKey: draftIcon?.url ?? null,
             iconSource: draftIcon?.source,
             pinToBattle: mode.pinToBattle,
+            isPowerUp: isPowerUp || undefined,
             schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
           });
           onCreated?.(id);
@@ -271,7 +279,7 @@ export function QuestEditorDialog({
         }}
       >
         <div className="flex items-center justify-between">
-          <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>{review ? `Review import ${review.index} of ${review.total}` : isCompleted ? `Completed ${noun}` : task ? `Edit ${noun}` : `New ${noun}`}</h3>
+          <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>{review ? `Review import ${review.index} of ${review.total}` : isCompleted ? `Completed ${noun}` : task ? `Edit ${noun}` : isPowerUp ? "New power-up" : `New ${noun}`}</h3>
           <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
             ×
           </button>
@@ -500,6 +508,23 @@ export function QuestEditorDialog({
               </button>
             </div>
           </div>
+        )}
+
+        {powerUpSupported && !isCompleted && (
+          <label className="flex cursor-pointer items-center gap-2.5 text-[13.5px]">
+            <input
+              type="checkbox"
+              checked={isPowerUp}
+              onChange={(e) => setIsPowerUp(e.target.checked)}
+              className="h-4 w-4"
+              style={{ accentColor: isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)" }}
+            />
+            <BoltIcon size={18} />
+            <span>
+              <span className="font-semibold">Power-up</span>
+              <span style={{ color: "var(--t-ink-soft)" }}> — a quick, low-energy win (lives in the ⚡ menu)</span>
+            </span>
+          </label>
         )}
 
         {isCompleted && task && (
