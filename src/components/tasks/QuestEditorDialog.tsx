@@ -76,6 +76,7 @@ export function QuestEditorDialog({
   const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : 0);
   const [xp, setXp] = useState(task?.xp_value ?? 0);
   const [effort, setEffort] = useState(task?.effort ?? 0);
+  const [aspiration, setAspiration] = useState(Boolean(task?.is_aspiration));
   const [estimate, setEstimate] = useState<string>(() => {
     const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (mode.kind === "create" && mode.powerUp ? 5 : undefined);
     return v != null ? String(v) : "";
@@ -100,6 +101,7 @@ export function QuestEditorDialog({
   const [stepsUnavailable, setStepsUnavailable] = useState(false);
   const [stepsDirty, setStepsDirty] = useState(false);
   const [newStep, setNewStep] = useState("");
+  const [addingStep, setAddingStep] = useState(false);
   const [newBoard, setNewBoard] = useState<{ board: string } | null>(null);
   const [creatingBoard, startCreatingBoard] = useTransition();
 
@@ -231,6 +233,7 @@ export function QuestEditorDialog({
             estimateMinutes: est,
             boardId: boardId !== initialBoard ? boardId : undefined,
             effort: task.effort !== undefined || effort ? effort : undefined,
+            isAspiration: aspiration !== Boolean(task.is_aspiration) ? aspiration : undefined,
             confirmImport: Boolean(review),
           });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
@@ -327,7 +330,7 @@ export function QuestEditorDialog({
         onKeyDown={(e) => {
           if (e.key === "Escape") close();
         }}
-        className={`flex max-h-[94vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl p-4 parchment parchment-framed shadow-2xl ${
+        className={`flex max-h-[94vh] w-full max-w-md flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl ${
           phase === "closing" ? exitCls : enterCls
         }`}
         style={{
@@ -336,6 +339,7 @@ export function QuestEditorDialog({
           color: "var(--t-ink)",
         }}
       >
+        <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
         <div className="flex items-center justify-between">
           <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>{review ? `Review import ${review.index} of ${review.total}` : isCompleted ? `Completed ${noun}` : task ? `Edit ${noun}` : isPowerUp ? "New power-up" : `New ${noun}`}</h3>
           <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
@@ -427,12 +431,18 @@ export function QuestEditorDialog({
                   {stepsDone} of {steps.length} done
                 </span>
               )}
+              {!isCompleted && steps !== null && !addingStep && (
+                <button
+                  type="button"
+                  onClick={() => setAddingStep(true)}
+                  className="hover-glow ml-auto h-7 rounded-full border px-3 text-[12.5px] font-semibold"
+                  style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", color: "var(--t-ink)" }}
+                >
+                  + Add steps
+                </button>
+              )}
             </div>
-            {steps === null ? (
-              <p className="m-0 pl-7 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-                Loading steps…
-              </p>
-            ) : (
+            {steps === null || (steps.length === 0 && !addingStep) ? null : (
               <ul className="m-0 flex list-none flex-col p-0 pl-[22px]">
                 {steps.map((st) => (
                   <li key={st.key} className="quest-step flex items-center gap-2 rounded-md py-0.5 pl-1">
@@ -477,7 +487,7 @@ export function QuestEditorDialog({
                     </button>
                   </li>
                 ))}
-                {!isCompleted && (
+                {!isCompleted && addingStep && (
                   <li className="flex items-center gap-2 py-0.5 pl-1">
                     <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#a88a3f" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
                       +
@@ -491,8 +501,12 @@ export function QuestEditorDialog({
                           addStep();
                         }
                       }}
-                      onBlur={addStep}
-                      placeholder={steps.length === 0 ? "Break it into steps (optional)" : "Add a step"}
+                      onBlur={() => {
+                        addStep();
+                        setAddingStep(false);
+                      }}
+                      autoFocus
+                      placeholder="Add a step, then Enter"
                       aria-label="Add a step"
                       className="h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[14px] focus:outline-none"
                       style={{ color: "var(--t-ink)" }}
@@ -580,37 +594,6 @@ export function QuestEditorDialog({
           <span className="w-7" />
         </div>
 
-        {/* Progress: partial progress earns its share of the XP */}
-        {task && !isCompleted && progressTracked && (
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-2.5">
-              <span className={`${labelCls} w-[92px] shrink-0`}>Progress</span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={progress}
-                onChange={(e) => setProgress(Number(e.target.value))}
-                aria-label="Quest progress"
-                className="h-7 min-w-0 flex-1"
-                style={{ accentColor: "var(--t-good)" }}
-              />
-              <span className="w-16 text-right text-sm font-bold tabular-nums" style={{ color: progress > 0 ? "var(--t-good)" : "var(--t-ink-soft)" }}>
-                {progress}%
-              </span>
-              <span className="w-7" />
-            </div>
-            {(progress > 0 || initialProgress > 0) && (
-              <p className="m-0 pl-[102px] text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                {progress >= 100
-                  ? "Saving at 100% completes the quest."
-                  : `${Math.round((xp * progress) / 100)} XP earned so far, ${xp - Math.round((xp * progress) / 100)} more on completion`}
-              </p>
-            )}
-          </div>
-        )}
-
         <IconScale label="Importance" icon="/design/ui-bolt.png" value={importance} onChange={setImportance} />
         <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
         <IconScale label="Effort" icon="/design/ui-effort.svg" value={effort} onChange={setEffort} />
@@ -668,6 +651,17 @@ export function QuestEditorDialog({
           </div>
         )}
 
+        {/* Aspiration: keep it on its board, out of today's lists */}
+        {task && !isCompleted && (
+          <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+            <input type="checkbox" checked={aspiration} onChange={(e) => setAspiration(e.target.checked)} className="h-4 w-4 shrink-0" style={{ accentColor: isAdventure ? "#8a6c2c" : "var(--t-accent)" }} />
+            <span>
+              <span className="font-semibold">Not actionable yet</span>
+              <span style={{ color: "var(--t-ink-soft)" }}> — keep it as an aspiration on its board, off Today and the map</span>
+            </span>
+          </label>
+        )}
+
         {isCompleted && task && (
           <div
             className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px]"
@@ -710,6 +704,92 @@ export function QuestEditorDialog({
             <img src="/design/ui-target.png" alt="" width={18} height={18} />
             Plot importance &amp; urgency on the Priority Matrix
           </button>
+        )}
+
+        {/* Quest progress: partial progress earns its share of the XP */}
+        {task && !isCompleted && (
+          <div
+            className="flex flex-col gap-1.5 rounded-xl px-3.5 py-2.5"
+            style={{
+              background: isAdventure ? "linear-gradient(180deg, rgba(48,38,18,.9), rgba(30,24,12,.92))" : "var(--t-bg)",
+              border: `1.5px solid ${isAdventure ? "#a88a3f" : "var(--t-card-border)"}`,
+              opacity: progressTracked ? 1 : 0.6,
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[14.5px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
+                Quest progress
+              </span>
+              <span className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={!progressTracked || progress <= 0}
+                  onClick={() => setProgress((p) => Math.max(0, Math.ceil(p / 5) * 5 - 5))}
+                  aria-label="Less progress"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none disabled:opacity-40"
+                  style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}
+                >
+                  −
+                </button>
+                <span className="flex items-center rounded-md px-1" style={{ border: "1px solid rgba(168,138,63,.6)", background: "rgba(0,0,0,.25)" }}>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={100}
+                    value={progress}
+                    disabled={!progressTracked}
+                    onChange={(e) => setProgress(Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))))}
+                    aria-label="Progress percent"
+                    className="h-7 w-10 bg-transparent text-right text-[15px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                    style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}
+                  />
+                  <span className="text-[14px] font-bold" style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}>
+                    %
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={!progressTracked || progress >= 100}
+                  onClick={() => setProgress((p) => Math.min(100, Math.floor(p / 5) * 5 + 5))}
+                  aria-label="More progress"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none disabled:opacity-40"
+                  style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}
+                >
+                  +
+                </button>
+              </span>
+            </div>
+            <div className="relative h-5">
+              <div
+                className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full"
+                style={{ background: "#141a13", border: "1.5px solid #8a6c2c", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}
+              >
+                <div
+                  className="h-full rounded-full transition-[width] duration-150"
+                  style={{ width: `${progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 8px rgba(242,210,126,.5)" }}
+                />
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={progress}
+                disabled={!progressTracked}
+                onChange={(e) => setProgress(Number(e.target.value))}
+                aria-label="Quest progress"
+                className="progress-range absolute inset-0 w-full cursor-pointer"
+              />
+            </div>
+            <p className="m-0 text-[12.5px]" style={{ color: isAdventure ? "rgba(243,231,203,.78)" : "var(--t-ink-soft)" }}>
+              {!progressTracked
+                ? "Available after the next database update."
+                : progress >= 100
+                  ? "Saving at 100% completes the quest."
+                  : `+${Math.round((xp * progress) / 100)} XP for progress so far · ${xp - Math.round((xp * progress) / 100)} more on completion`}
+            </p>
+          </div>
         )}
 
         {error && (
@@ -763,6 +843,7 @@ export function QuestEditorDialog({
               {isSaving ? "Saving…" : review ? "Confirm" : task ? "Save" : `Create ${noun}`}
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>,

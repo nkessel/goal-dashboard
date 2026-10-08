@@ -64,6 +64,8 @@ export type BoardWithStats = Board & {
   openQuests: Task[];
   /** How many quest boards sit directly inside this one. */
   subBoardCount: number;
+  /** Aspirations kept on the board (not counted as quests). */
+  aspirationCount: number;
 };
 
 /**
@@ -110,11 +112,16 @@ export async function listBoardsWithStatsForOwner(
   }
 
   const lastUpdated = new Map<string, string>();
-  const stats = new Map<string, { total: number; done: number; xp: number; open: Task[] }>();
+  const stats = new Map<string, { total: number; done: number; xp: number; open: Task[]; dreams: number }>();
   for (const t of (tasksRes.data ?? []) as Task[]) {
     const boardId = t.board_id;
     if (!boardId) continue;
-    const s = stats.get(boardId) ?? { total: 0, done: 0, xp: 0, open: [] };
+    const s = stats.get(boardId) ?? { total: 0, done: 0, xp: 0, open: [], dreams: 0 };
+    if (t.is_aspiration && t.status === "open") {
+      s.dreams += 1;
+      stats.set(boardId, s);
+      continue;
+    }
     s.total += 1;
     if (t.status === "completed") {
       s.done += 1;
@@ -128,7 +135,7 @@ export async function listBoardsWithStatsForOwner(
   }
 
   return (boardsRes.data ?? []).map((board) => {
-    const s = stats.get(board.id) ?? { total: 0, done: 0, xp: 0, open: [] };
+    const s = stats.get(board.id) ?? { total: 0, done: 0, xp: 0, open: [], dreams: 0 };
     return {
       ...board,
       questTotal: s.total,
@@ -138,6 +145,7 @@ export async function listBoardsWithStatsForOwner(
       isComplete: s.total > 0 && s.done === s.total,
       openQuests: s.open,
       subBoardCount: subBoards.get(board.id) ?? 0,
+      aspirationCount: s.dreams,
     };
   });
 }

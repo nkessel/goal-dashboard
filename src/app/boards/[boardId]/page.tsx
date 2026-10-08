@@ -33,7 +33,8 @@ export default async function BoardDetailPage({
 
   const theme = profile?.theme ?? "calm";
   const isAdventure = theme === "adventure";
-  const doneCount = allTasks.filter((t) => t.status === "completed").length;
+  const quests = allTasks.filter((t) => !(t.is_aspiration && t.status === "open"));
+  const doneCount = quests.filter((t) => t.status === "completed").length;
   const xpEarned = allTasks
     .filter((t) => t.status === "completed")
     .reduce((sum, t) => sum + t.xp_value, 0);
@@ -84,7 +85,7 @@ export default async function BoardDetailPage({
               className="text-[11.5px]"
               style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.65 : 1 }}
             >
-              {doneCount} of {allTasks.length} quests · {xpEarned} {isAdventure ? "XP" : "pts"} earned
+              {doneCount} of {quests.length} quests · {xpEarned} {isAdventure ? "XP" : "pts"} earned
             </div>
           </div>
         </div>

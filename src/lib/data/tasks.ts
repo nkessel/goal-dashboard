@@ -13,6 +13,7 @@ export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
     .select("*")
     .eq("owner_id", ownerId)
     .eq("status", "open")
+    .eq("is_aspiration", false)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
@@ -40,6 +41,7 @@ export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promis
     .select("*")
     .eq("owner_id", ownerId)
     .eq("status", "open")
+    .eq("is_aspiration", false)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
@@ -124,6 +126,7 @@ export async function updateTask(
     /** Undefined leaves the board untouched; null takes it off its board. */
     boardId?: string | null;
     effort?: number;
+    isAspiration?: boolean;
   }
 ): Promise<Task> {
   const importance = Math.max(0, Math.min(5, Math.round(input.importance * 10) / 10));
@@ -142,6 +145,7 @@ export async function updateTask(
         : {}),
       ...(input.boardId !== undefined ? { board_id: input.boardId } : {}),
       ...(input.effort !== undefined ? { effort: Math.max(0, Math.min(5, Math.round(input.effort))) } : {}),
+      ...(input.isAspiration !== undefined ? { is_aspiration: input.isAspiration } : {}),
     })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
@@ -223,6 +227,7 @@ export async function listOpenTasksWithBoardForOwner(
     .select("*")
     .eq("owner_id", ownerId)
     .eq("status", "open")
+    .eq("is_aspiration", false)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
@@ -595,7 +600,7 @@ export async function listPowerUps(ownerId: string, sinceISO: string): Promise<{
   const quick = () =>
     db.from("tasks").select("*").eq("owner_id", ownerId).not("estimate_minutes", "is", null).lte("estimate_minutes", POWER_UP_MAX_MINUTES);
   const [open, done] = await Promise.all([
-    quick().eq("status", "open").order("estimate_minutes").order("created_at"),
+    quick().eq("status", "open").eq("is_aspiration", false).order("estimate_minutes").order("created_at"),
     quick().eq("status", "completed").gte("completed_at", sinceISO).order("completed_at", { ascending: false }),
   ]);
   if (open.error) return { open: [], done: [] };
@@ -610,6 +615,7 @@ export async function countOpenPowerUps(ownerId: string): Promise<number> {
     .eq("owner_id", ownerId)
     .not("estimate_minutes", "is", null)
     .lte("estimate_minutes", POWER_UP_MAX_MINUTES)
-    .eq("status", "open");
+    .eq("status", "open")
+    .eq("is_aspiration", false);
   return error ? 0 : (count ?? 0);
 }

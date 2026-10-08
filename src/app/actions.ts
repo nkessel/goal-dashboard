@@ -268,6 +268,8 @@ export async function updateTaskAction(
     boardId?: string | null;
     /** 0–5 energy it takes (0 = unrated). */
     effort?: number;
+    /** Keep it as an aspiration (not actionable yet). */
+    isAspiration?: boolean;
     grantsReward?: boolean;
     /** Also confirm this quest if it was an import awaiting review. */
     confirmImport?: boolean;
@@ -303,6 +305,7 @@ export async function updateTaskAction(
     estimateMinutes: input.estimateMinutes,
     boardId: input.boardId,
     effort: input.effort,
+    isAspiration: input.isAspiration,
   });
   revalidatePath("/");
   revalidatePath("/matrix");

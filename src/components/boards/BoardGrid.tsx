@@ -135,6 +135,12 @@ export function BoardGrid({
               <DoneIcon />
               {board.questDone} done
             </span>
+            {board.aspirationCount > 0 && (
+              <span className="flex items-center gap-1" title={`${board.aspirationCount} aspirations, not actionable yet`}>
+                <span aria-hidden className="text-[14px] leading-none" style={{ color: "#a88a3f" }}>✧</span>
+                {board.aspirationCount} {board.aspirationCount === 1 ? "aspiration" : "aspirations"}
+              </span>
+            )}
             {board.subBoardCount > 0 && (
               <span className="flex items-center gap-1" title={`${board.subBoardCount} quest boards inside this one`}>
                 <SubBoardsIcon />

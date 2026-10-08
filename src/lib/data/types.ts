@@ -71,6 +71,8 @@ export type Task = {
   board_id?: string | null;
   /** 0–5: how much energy it takes (0 = unrated). */
   effort?: number;
+  /** Kept in view on its board, but not actionable yet (off Today, the map and Power-ups). */
+  is_aspiration?: boolean;
   /** Step checklist counts, attached when listed for a card (not a column). */
   steps_total?: number;
   steps_done?: number;
