@@ -267,8 +267,8 @@ export async function createTask(
       goal_id: input.goalId || null,
       title: input.title,
       description: input.description || null,
-      importance: input.importance ?? 3,
-      urgency: input.urgency ?? 3,
+      importance: input.importance ?? 0,
+      urgency: input.urgency ?? 0,
       xp_value: input.xpValue ?? 0,
       color: input.color || null,
       estimate_minutes:

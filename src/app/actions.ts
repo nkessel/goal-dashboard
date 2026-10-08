@@ -150,8 +150,8 @@ export async function createTaskAction(formData: FormData) {
   await tasksData.createTask(ownerId, {
     title,
     description: String(formData.get("description") || "").trim() || undefined,
-    importance: Number(formData.get("importance") || 3),
-    urgency: Number(formData.get("urgency") || 3),
+    importance: Number(formData.get("importance") || 0),
+    urgency: Number(formData.get("urgency") || 0),
     xpValue,
     goalId,
     estimateMinutes,
@@ -488,8 +488,8 @@ export async function createScheduledTaskAction(formData: FormData) {
   const task = await tasksData.createTask(profileId, {
     title,
     description: String(formData.get("description") || "").trim() || undefined,
-    importance: Number(formData.get("importance") || 3),
-    urgency: Number(formData.get("urgency") || 3),
+    importance: Number(formData.get("importance") || 0),
+    urgency: Number(formData.get("urgency") || 0),
     xpValue,
     goalId,
     estimateMinutes,

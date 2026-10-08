@@ -50,7 +50,7 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
     setError(null);
     startTransition(async () => {
       try {
-        await createQuestAction({ title, importance: 2, urgency: 2, xpValue: xp, estimateMinutes: minutes, isPowerUp: true });
+        await createQuestAction({ title, importance: 0, urgency: 0, xpValue: xp, estimateMinutes: minutes, isPowerUp: true });
         setTitle("");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't add that.");

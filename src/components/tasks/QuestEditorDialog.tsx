@@ -71,8 +71,8 @@ export function QuestEditorDialog({
 
   const [title, setTitle] = useState(task?.title ?? prefill?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? prefill?.description ?? "");
-  const [importance, setImportance] = useState(task ? Math.round(task.importance) : 3);
-  const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : 3);
+  const [importance, setImportance] = useState(task ? Math.round(task.importance) : 0);
+  const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : 0);
   const [xp, setXp] = useState(task?.xp_value ?? 0);
   const [estimate, setEstimate] = useState<string>(() => {
     const v = task?.estimate_minutes ?? prefill?.estimateMinutes;

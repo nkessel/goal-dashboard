@@ -11,3 +11,7 @@ alter table tasks add column if not exists locked_by_task_id uuid references tas
 
 -- Power-ups: quick-win, low-energy quests kept in their own menu.
 alter table tasks add column if not exists is_power_up boolean not null default false;
+
+-- New quests start unrated: 0 importance, 0 urgency.
+alter table tasks alter column importance set default 0;
+alter table tasks alter column urgency set default 0;
