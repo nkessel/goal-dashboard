@@ -88,9 +88,9 @@ export async function listBoardsWithStatsForOwner(
     db.from("goals").select("id, board_id, updated_at").eq("owner_id", ownerId),
     db
       .from("tasks")
-      .select("goal_id, status, xp_value, updated_at")
+      .select("board_id, status, xp_value, updated_at")
       .eq("owner_id", ownerId)
-      .not("goal_id", "is", null),
+      .not("board_id", "is", null),
   ]);
 
   if (boardsRes.error) throw new Error(`Failed to list boards: ${boardsRes.error.message}`);
@@ -105,14 +105,11 @@ export async function listBoardsWithStatsForOwner(
     if (!current || new Date(at) > new Date(current)) lastUpdated.set(boardId, at);
   };
 
-  for (const g of goalsRes.data ?? []) {
-    goalToBoard.set(g.id, g.board_id);
-    bump(g.board_id, g.updated_at);
-  }
+  for (const g of goalsRes.data ?? []) goalToBoard.set(g.id, g.board_id);
 
   const stats = new Map<string, { total: number; done: number; xp: number }>();
   for (const t of tasksRes.data ?? []) {
-    const boardId = t.goal_id ? goalToBoard.get(t.goal_id) : undefined;
+    const boardId = t.board_id as string | null;
     if (!boardId) continue;
     const s = stats.get(boardId) ?? { total: 0, done: 0, xp: 0 };
     s.total += 1;

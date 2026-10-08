@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { createBoardAction, createGoalAction } from "@/app/actions";
+import { createBoardAction } from "@/app/actions";
+import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 
-type Mode = "closed" | "menu" | "goal" | "subboard";
+type Mode = "closed" | "menu" | "quest" | "subboard";
 
 /**
  * Board Detail page's floating action button. Used to be a single-purpose
@@ -27,15 +28,18 @@ export function BoardFabMenu({ boardId, theme = "calm" }: { boardId: string; the
     color: "var(--t-ink)",
   };
 
-  if (mode === "goal" || mode === "subboard") {
-    const isGoal = mode === "goal";
+  if (mode === "quest") {
+    return <QuestEditorDialog mode={{ kind: "create", boardId }} theme={theme} origin="fab" onClose={() => setMode("closed")} />;
+  }
+
+  if (mode === "subboard") {
+    const isGoal = false;
     return (
       <form
         ref={formRef}
         action={(formData) => {
           startTransition(async () => {
-            if (isGoal) await createGoalAction(formData);
-            else await createBoardAction(formData);
+            await createBoardAction(formData);
             formRef.current?.reset();
             setMode("closed");
           });
@@ -108,7 +112,7 @@ export function BoardFabMenu({ boardId, theme = "calm" }: { boardId: string; the
             </button>
             <button
               type="button"
-              onClick={() => setMode("goal")}
+              onClick={() => setMode("quest")}
               className="hover-glow rounded-full px-4 py-2 text-right text-sm font-medium"
               style={{
                 background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
@@ -117,14 +121,14 @@ export function BoardFabMenu({ boardId, theme = "calm" }: { boardId: string; the
                 boxShadow: "0 4px 14px rgba(0,0,0,.22)",
               }}
             >
-              + {isAdventure ? "Quest goal" : "Goal"}
+              + {isAdventure ? "Quest" : "Task"}
             </button>
           </div>
         </div>
       )}
       <FloatingActionButton
         onClick={() => setMode(mode === "menu" ? "closed" : "menu")}
-        label={mode === "menu" ? "Close" : `Add ${isAdventure ? "quest goal or sub quest-board" : "goal or sub-board"}`}
+        label={mode === "menu" ? "Close" : `Add ${isAdventure ? "a quest or sub quest-board" : "a task or sub-board"}`}
         theme={theme}
         expanded={mode === "menu"}
       />

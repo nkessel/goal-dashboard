@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
-import { completeTaskAction, createBoardWithGoalAction, createQuestAction, deleteTaskAction, listGoalOptionsAction, reopenTaskAction, scheduleTaskAction, setTaskProgressAction, updateTaskAction } from "@/app/actions";
+import { completeTaskAction, createBoardFromEditorAction, createQuestAction, deleteTaskAction, listBoardOptionsAction, reopenTaskAction, scheduleTaskAction, setTaskProgressAction, updateTaskAction } from "@/app/actions";
 import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
-import { BoltIcon } from "@/components/ui/Icons";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { SlotPickerDialog } from "./SlotPickerDialog";
@@ -20,9 +19,9 @@ export type QuestEditorMode =
   | { kind: "edit"; task: Task }
   | {
       kind: "create";
-      goalId?: string | null;
+      boardId?: string | null;
       pinToBattle?: boolean;
-      /** Start as a power-up (quick win). */
+      /** Start as a quick power-up (prefills a short time). */
       powerUp?: boolean;
       /** Place the new quest on the calendar (e.g. from a Google event). */
       schedule?: { startISO: string; endISO: string; googleEventId?: string };
@@ -74,8 +73,9 @@ export function QuestEditorDialog({
   const [importance, setImportance] = useState(task ? Math.round(task.importance) : 0);
   const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : 0);
   const [xp, setXp] = useState(task?.xp_value ?? 0);
+  const [effort, setEffort] = useState(task?.effort ?? 0);
   const [estimate, setEstimate] = useState<string>(() => {
-    const v = task?.estimate_minutes ?? prefill?.estimateMinutes;
+    const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (mode.kind === "create" && mode.powerUp ? 5 : undefined);
     return v != null ? String(v) : "";
   });
   const [draftIcon, setDraftIcon] = useState<{ url: string; source: "library" | "ai" } | null>(null);
@@ -85,26 +85,24 @@ export function QuestEditorDialog({
       : null;
   const [slot, setSlot] = useState<{ start: string; end: string } | null>(initialSlot);
   const [pickingSlot, setPickingSlot] = useState(false);
-  const initialGoal = task ? task.goal_id : mode.kind === "create" ? (mode.goalId ?? null) : null;
-  const [goalId, setGoalId] = useState<string | null>(initialGoal);
-  const [goalOptions, setGoalOptions] = useState<{ id: string; title: string; boardTitle: string }[] | null>(null);
+  const initialBoard = task ? (task.board_id ?? null) : mode.kind === "create" ? (mode.boardId ?? null) : null;
+  const [boardId, setBoardId] = useState<string | null>(initialBoard);
+  const [boardOptions, setBoardOptions] = useState<{ id: string; label: string }[] | null>(null);
   const isCompleted = task?.status === "completed";
-  const initialPowerUp = task ? Boolean(task.is_power_up) : mode.kind === "create" && Boolean(mode.powerUp);
-  const [isPowerUp, setIsPowerUp] = useState(initialPowerUp);
-  const powerUpSupported = !task || task.is_power_up !== undefined;
+  const isPowerUp = mode.kind === "create" && Boolean(mode.powerUp);
   const progressTracked = typeof task?.xp_awarded === "number";
   const initialProgress = task?.progress ?? 0;
   const [progress, setProgress] = useState(initialProgress);
-  const [newBoard, setNewBoard] = useState<{ board: string; goal: string } | null>(null);
+  const [newBoard, setNewBoard] = useState<{ board: string } | null>(null);
   const [creatingBoard, startCreatingBoard] = useTransition();
 
   function createBoard() {
     if (!newBoard?.board.trim()) return;
     startCreatingBoard(async () => {
       try {
-        const res = await createBoardWithGoalAction(newBoard.board, newBoard.goal);
-        setGoalOptions((opts) => [...(opts ?? []), { id: res.goalId, title: res.goalTitle, boardTitle: res.boardTitle }]);
-        setGoalId(res.goalId);
+        const res = await createBoardFromEditorAction(newBoard.board);
+        setBoardOptions((opts) => [...(opts ?? []), { id: res.id, label: res.title }]);
+        setBoardId(res.id);
         setNewBoard(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't create the board.");
@@ -118,9 +116,9 @@ export function QuestEditorDialog({
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    listGoalOptionsAction()
-      .then(setGoalOptions)
-      .catch(() => setGoalOptions([]));
+    listBoardOptionsAction()
+      .then(setBoardOptions)
+      .catch(() => setBoardOptions([]));
   }, []);
 
   const noun = isAdventure ? "quest" : "task";
@@ -184,8 +182,8 @@ export function QuestEditorDialog({
             urgency,
             xpValue: xp,
             estimateMinutes: est,
-            goalId: goalId !== initialGoal ? goalId : undefined,
-            isPowerUp: isPowerUp !== initialPowerUp ? isPowerUp : undefined,
+            boardId: boardId !== initialBoard ? boardId : undefined,
+            effort: task.effort !== undefined || effort ? effort : undefined,
             confirmImport: Boolean(review),
           });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
@@ -217,11 +215,11 @@ export function QuestEditorDialog({
             urgency,
             xpValue: xp,
             estimateMinutes: est,
-            goalId,
+            boardId,
+            effort: effort || undefined,
             iconKey: draftIcon?.url ?? null,
             iconSource: draftIcon?.source,
             pinToBattle: mode.pinToBattle,
-            isPowerUp: isPowerUp || undefined,
             schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
           });
           onCreated?.(id);
@@ -436,95 +434,59 @@ export function QuestEditorDialog({
 
         <IconScale label="Importance" icon="/design/ui-bolt.png" value={importance} onChange={setImportance} />
         <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
+        <IconScale label="Effort" icon="/design/ui-effort.svg" value={effort} onChange={setEffort} />
 
-        {/* Goal (and so the board tag on the card) */}
+        {/* Quest board (the tag on the card) */}
         <label className="flex items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element -- goals glyph */}
-          <img src="/design/ui-shield.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-          <span className={`${labelCls} w-[70px] shrink-0`}>Goal</span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- boards glyph */}
+          <img src="/design/ui-grid.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+          <span className={`${labelCls} w-[70px] shrink-0`}>Board</span>
           <select
-            value={newBoard ? "__new_board" : (goalId ?? "")}
+            value={newBoard ? "__new_board" : (boardId ?? "")}
             onChange={(e) => {
-              if (e.target.value === "__new_board") return setNewBoard({ board: "", goal: "" });
+              if (e.target.value === "__new_board") return setNewBoard({ board: "" });
               setNewBoard(null);
-              setGoalId(e.target.value || null);
+              setBoardId(e.target.value || null);
             }}
-            aria-label="Goal"
+            aria-label="Quest board"
             className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[13.5px]"
             style={fieldStyle}
           >
-            <option value="">No goal (no board tag)</option>
-            {goalOptions === null && goalId && <option value={goalId}>Loading…</option>}
-            {Object.entries(
-              (goalOptions ?? []).reduce<Record<string, { id: string; title: string }[]>>((acc, g) => {
-                (acc[g.boardTitle] ??= []).push(g);
-                return acc;
-              }, {})
-            ).map(([board, goals]) => (
-              <optgroup key={board} label={board}>
-                {goals.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.title}
-                  </option>
-                ))}
-              </optgroup>
+            <option value="">No board</option>
+            {boardOptions === null && boardId && <option value={boardId}>Loading…</option>}
+            {(boardOptions ?? []).map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.label}
+              </option>
             ))}
-            <option value="__new_board">+ New board…</option>
+            <option value="__new_board">+ New quest board…</option>
           </select>
         </label>
         {newBoard && (
-          <div className="-mt-1 flex flex-col gap-2 rounded-lg p-2.5 sm:ml-[98px]" style={{ background: "rgba(255,250,238,.45)", border: "1px dashed #b39a6a" }}>
+          <div className="-mt-1 flex items-center gap-2 rounded-lg p-2.5 sm:ml-[98px]" style={{ background: "rgba(255,250,238,.45)", border: "1px dashed #b39a6a" }}>
             <input
               autoFocus
               value={newBoard.board}
-              onChange={(e) => setNewBoard({ ...newBoard, board: e.target.value })}
+              onChange={(e) => setNewBoard({ board: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), createBoard())}
-              placeholder="Board name (e.g. Home, Health, Startup)"
+              placeholder="New board name (e.g. Home, Health)"
               aria-label="New board name"
-              className="h-9 rounded-lg border px-2.5 text-[14px]"
+              className="h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-[14px]"
               style={fieldStyle}
             />
-            <input
-              value={newBoard.goal}
-              onChange={(e) => setNewBoard({ ...newBoard, goal: e.target.value })}
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), createBoard())}
-              placeholder="First goal on it (optional — “General”)"
-              aria-label="First goal"
-              className="h-9 rounded-lg border px-2.5 text-[14px]"
-              style={fieldStyle}
-            />
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setNewBoard(null)} className="h-8 px-2 text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={creatingBoard || !newBoard.board.trim()}
-                onClick={createBoard}
-                className="h-8 rounded-full px-4 text-[13.5px] disabled:opacity-50"
-                style={{ background: "var(--t-gold)", color: "#2a1c10" }}
-              >
-                {creatingBoard ? "Creating…" : "Create board"}
-              </button>
-            </div>
+            <button type="button" onClick={() => setNewBoard(null)} className="h-8 px-1.5 text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={creatingBoard || !newBoard.board.trim()}
+              onClick={createBoard}
+              className="h-8 shrink-0 rounded-full px-4 text-[13.5px] disabled:opacity-50"
+              style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+            >
+              {creatingBoard ? "…" : "Create"}
+            </button>
           </div>
-        )}
-
-        {powerUpSupported && !isCompleted && (
-          <label className="flex cursor-pointer items-center gap-2.5 text-[13.5px]">
-            <input
-              type="checkbox"
-              checked={isPowerUp}
-              onChange={(e) => setIsPowerUp(e.target.checked)}
-              className="h-4 w-4"
-              style={{ accentColor: isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)" }}
-            />
-            <BoltIcon size={18} />
-            <span>
-              <span className="font-semibold">Power-up</span>
-              <span style={{ color: "var(--t-ink-soft)" }}> — a quick, low-energy win (lives in the ⚡ menu)</span>
-            </span>
-          </label>
         )}
 
         {isCompleted && task && (

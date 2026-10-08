@@ -14,11 +14,12 @@ import { QuestEditorDialog } from "./QuestEditorDialog";
  * row inside a goal card. Both open the shared quest editor in create mode.
  */
 export function AddTaskForm({
-  goalId,
+  boardId,
   theme = "calm",
   extraChoices = [],
 }: {
-  goalId?: string;
+  /** Inside a quest board: a dashed "+ Add quest" row that files it there. */
+  boardId?: string;
   theme?: "calm" | "adventure";
   /** More speed-dial options (e.g. "New rite" on the evening side). */
   extraChoices?: FabChoice[];
@@ -32,7 +33,7 @@ export function AddTaskForm({
 
   return (
     <>
-      {goalId ? (
+      {boardId ? (
         <button
           type="button"
           onClick={() => setOpen("quest")}
@@ -60,9 +61,9 @@ export function AddTaskForm({
       )}
       {open && (
         <QuestEditorDialog
-          mode={{ kind: "create", goalId, powerUp: open === "power" }}
+          mode={{ kind: "create", boardId, powerUp: open === "power" }}
           theme={theme}
-          origin={goalId ? "center" : "fab"}
+          origin={boardId ? "center" : "fab"}
           onClose={() => setOpen(false)}
         />
       )}

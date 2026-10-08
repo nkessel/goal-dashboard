@@ -26,7 +26,7 @@ export default async function PowerUpsPage() {
         <PageHeader
           isAdventure={isAdventure}
           title="Power-Ups"
-          subtitle="Quick wins for a quick spark — little time, little energy, instant momentum."
+          subtitle="Every quest of 15 minutes or less — quick wins for a quick spark."
         />
         <PowerUpsList open={powerUps.open} done={powerUps.done} theme={profile.theme} />
       </div>

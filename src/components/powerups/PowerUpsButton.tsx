@@ -6,7 +6,7 @@ import { CloseSettingsButton } from "@/components/settings/CloseSettingsButton";
 import { BoltIcon } from "@/components/ui/Icons";
 
 /** ⚡ in the top bar → Power-ups (quick wins); becomes the close (X) on that screen. */
-export function PowerUpsButton({ isAdventure, count }: { isAdventure: boolean; count: number }) {
+export function PowerUpsButton({ isAdventure }: { isAdventure: boolean }) {
   const pathname = usePathname();
   if (pathname.startsWith("/power-ups")) {
     return <CloseSettingsButton isAdventure={isAdventure} size={40} label="Close power-ups" />;
@@ -15,7 +15,7 @@ export function PowerUpsButton({ isAdventure, count }: { isAdventure: boolean; c
     <Link
       href="/power-ups"
       prefetch={true}
-      aria-label={`Power-ups${count ? ` — ${count} ready` : ""}`}
+      aria-label="Power-ups"
       title="Power-ups: quick wins"
       className="hover-glow relative flex h-10 w-10 items-center justify-center rounded-full"
       style={{
@@ -25,14 +25,6 @@ export function PowerUpsButton({ isAdventure, count }: { isAdventure: boolean; c
       }}
     >
       <BoltIcon size={24} />
-      {count > 0 && (
-        <span
-          className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-bold tabular-nums"
-          style={{ background: "#2a2416", color: "#f8e3a0", border: "1px solid #d9b45f" }}
-        >
-          {count}
-        </span>
-      )}
     </Link>
   );
 }

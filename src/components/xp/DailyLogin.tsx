@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { dailyCheckInAction } from "@/app/actions";
+import { eveningDayKey } from "@/components/evening/evening-clock";
 
 /**
  * First visit of the day: records the daily check-in (+5 XP, streak) and
@@ -14,14 +15,15 @@ export function DailyLogin() {
   const [award, setAward] = useState<{ xp: number; streak: number } | null>(null);
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    // The app's day turns over at 5:30am local time.
+    const today = eveningDayKey();
     try {
       if (window.localStorage.getItem("daily-login") === today) return;
       window.localStorage.setItem("daily-login", today);
     } catch {
       /* storage unavailable — the server still guards against double awards */
     }
-    dailyCheckInAction()
+    dailyCheckInAction(new Date().getTimezoneOffset())
       .then((r) => {
         if (!r.alreadyCheckedInToday && r.xpAwarded > 0) {
           setAward({ xp: r.xpAwarded, streak: r.streakCount });

@@ -74,8 +74,7 @@ export default async function Home() {
     listRiteCompletions(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => []),
   ]);
   const topPriorities = openTasks.filter((t) => t.is_manual_priority);
-  // Power-ups live in their own menu (⚡) unless pinned to Today's Battle.
-  const otherTasks = openTasks.filter((t) => !t.is_manual_priority && !t.is_power_up);
+  const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
   const theme = profile?.theme ?? "calm";
   const stats = profile && (
     <section>
@@ -98,6 +97,10 @@ export default async function Home() {
               tasks={completedTasks}
               claimed={recentClaims.map((r) => ({ id: r.id, title: r.title, claimed_at: r.claimed_at }))}
               lastCheckInAt={profile?.last_check_in_at ?? null}
+              rites={riteCompletions.flatMap((c) => {
+                const r = rites?.find((x) => x.id === c.rite_id);
+                return r ? [{ id: c.id, title: r.title, day: c.day, xp: c.xp_awarded }] : [];
+              })}
               theme={theme}
             />
           </div>

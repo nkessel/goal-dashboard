@@ -4,12 +4,10 @@ import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { getBoard, getBoardAncestors, listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { getProfileById } from "@/lib/data/profiles";
-import { xpToNextLevel } from "@/lib/data/xp";
-import { listGoalsForBoard } from "@/lib/data/goals";
-import { listTasksForGoal } from "@/lib/data/tasks";
+import { listTasksForBoard } from "@/lib/data/tasks";
 import { BoardFabMenu } from "@/components/boards/BoardFabMenu";
 import { BoardGrid } from "@/components/boards/BoardGrid";
-import { GoalList } from "@/components/goals/GoalList";
+import { BoardQuestList } from "@/components/boards/BoardQuestList";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
 
 export default async function BoardDetailPage({
@@ -26,21 +24,14 @@ export default async function BoardDetailPage({
   ]);
   if (!board) notFound();
 
-  const [goals, ancestors, subBoards] = await Promise.all([
-    listGoalsForBoard(boardId),
+  const [allTasks, ancestors, subBoards] = await Promise.all([
+    listTasksForBoard(boardId, session.user.id),
     getBoardAncestors(boardId, session.user.id),
     listBoardsWithStatsForOwner(session.user.id, boardId),
   ]);
-  const goalsWithTasks = await Promise.all(
-    goals.map(async (goal) => ({
-      goal,
-      tasks: await listTasksForGoal(goal.id),
-    }))
-  );
 
   const theme = profile?.theme ?? "calm";
   const isAdventure = theme === "adventure";
-  const allTasks = goalsWithTasks.flatMap((g) => g.tasks);
   const doneCount = allTasks.filter((t) => t.status === "completed").length;
   const xpEarned = allTasks
     .filter((t) => t.status === "completed")
@@ -126,22 +117,7 @@ export default async function BoardDetailPage({
           </div>
         )}
 
-        <GoalList
-          boardId={board.id}
-          boardTitle={board.title}
-          goalsWithTasks={goalsWithTasks}
-          theme={theme}
-          player={
-            profile
-              ? {
-                  level: xpToNextLevel(profile.total_xp).level,
-                  xpIntoLevel: xpToNextLevel(profile.total_xp).xpIntoLevel,
-                  xpForNextLevel: xpToNextLevel(profile.total_xp).xpForNextLevel,
-                  avatarSrc: profile.avatar_image_url ?? undefined,
-                }
-              : undefined
-          }
-        />
+        <BoardQuestList tasks={allTasks} boardId={board.id} theme={theme} />
 
         <BoardFabMenu boardId={board.id} theme={theme} />
       </div>

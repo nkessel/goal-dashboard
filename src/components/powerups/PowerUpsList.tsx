@@ -7,6 +7,19 @@ import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { BoltIcon } from "@/components/ui/Icons";
 
 const QUICK_MINUTES = [2, 5, 10, 15];
+const EFFORT_CAPS = [1, 2, 3, 5];
+
+/** 1–5 little dumbbells for effort. */
+function EffortPips({ n, size = 13 }: { n: number; size?: number }) {
+  return (
+    <span className="inline-flex items-center gap-px" aria-label={`Effort ${n}`}>
+      {Array.from({ length: n }).map((_, i) => (
+        // eslint-disable-next-line @next/next/no-img-element -- effort glyph
+        <img key={i} src="/design/ui-effort.svg" alt="" width={size} height={size} />
+      ))}
+    </span>
+  );
+}
 
 /**
  * Quick wins: little time, little energy, instant momentum. One tap completes
@@ -20,6 +33,10 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
   const [title, setTitle] = useState("");
   const [minutes, setMinutes] = useState(5);
   const [xp, setXp] = useState(10);
+  const [effort, setEffort] = useState(1);
+  // Filters: quests up to this many minutes, and up to this effort (unrated always shows).
+  const [maxMinutes, setMaxMinutes] = useState(15);
+  const [maxEffort, setMaxEffort] = useState(5);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
@@ -50,7 +67,7 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
     setError(null);
     startTransition(async () => {
       try {
-        await createQuestAction({ title, importance: 0, urgency: 0, xpValue: xp, estimateMinutes: minutes, isPowerUp: true });
+        await createQuestAction({ title, importance: 0, urgency: 0, xpValue: xp, estimateMinutes: minutes, effort });
         setTitle("");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't add that.");
@@ -101,6 +118,7 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
               {t.estimate_minutes}m
             </span>
           )}
+          {(t.effort ?? 0) > 0 && <EffortPips n={t.effort ?? 0} />}
           {t.description && <span className="truncate">{t.description}</span>}
         </span>
       </button>
@@ -115,7 +133,7 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
             className="text-[12.5px] underline"
             style={{ color: "var(--t-ink-soft)" }}
           >
-            {t.is_manual_priority ? "In today's battle" : "⚔ Add to battle"}
+            {t.is_manual_priority ? "In Today's Battle" : "⚔ Add to today"}
           </button>
         )}
         {isDone && (
@@ -127,7 +145,13 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
     </li>
   );
 
-  const openNow = open.filter((t) => !finished.has(t.id));
+  const fits = (t: Task) => (t.estimate_minutes ?? 0) <= maxMinutes && (t.effort ?? 0) <= maxEffort;
+  const openNow = open.filter((t) => !finished.has(t.id) && fits(t));
+  const hiddenByFilter = open.filter((t) => !finished.has(t.id) && !fits(t)).length;
+  const chip = (active: boolean): React.CSSProperties =>
+    active
+      ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" }
+      : { background: isAdventure ? "rgba(10,14,9,.35)" : "var(--t-card)", color: isAdventure ? "var(--t-cream)" : "var(--t-ink)", border: "1px solid rgba(217,180,95,.45)" };
   const doneNow = [...open.filter((t) => finished.has(t.id)), ...done];
 
   return (
@@ -138,11 +162,45 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
         </p>
       )}
 
+      {/* Filters */}
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          <span className="mr-1 text-[14px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}>
+            Up to
+          </span>
+          {QUICK_MINUTES.map((m) => (
+            <button key={m} type="button" onClick={() => setMaxMinutes(m)} className="h-8 rounded-full px-3 text-[13.5px] font-semibold" style={chip(maxMinutes === m)}>
+              {m} min
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          <span className="mr-1 text-[14px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}>
+            Effort
+          </span>
+          {EFFORT_CAPS.map((e) => (
+            <button key={e} type="button" onClick={() => setMaxEffort(e)} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px] font-semibold" style={chip(maxEffort === e)}>
+              {e === 5 ? "Any" : <>≤ <EffortPips n={e} size={12} /></>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {hiddenByFilter > 0 && (
+        <p className="m-0 -mb-1 text-center text-[13.5px] italic" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.75 }}>
+          {hiddenByFilter} more {hiddenByFilter === 1 ? "is" : "are"} outside these filters
+        </p>
+      )}
+
       {openNow.length > 0 ? (
         <ul className="flex flex-col gap-2.5">{openNow.map((t) => row(t, false))}</ul>
       ) : (
         <p className="parchment rounded-2xl p-5 text-center text-[16px] italic" style={{ color: "var(--t-ink-soft)" }}>
-          {done.length || finished.size ? "All charged up. Add another spark below." : "No power-ups yet — add a two-minute win below."}
+          {hiddenByFilter
+            ? "Nothing fits these filters — loosen them above."
+            : done.length || finished.size
+              ? "All charged up. Add another spark below."
+              : "No quick quests yet — any quest of 15 minutes or less shows up here. Add one below."}
         </p>
       )}
 
@@ -158,6 +216,21 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
             aria-label="Power-up"
             className="relative z-[1] h-11 rounded-lg border px-3 font-semibold"
           />
+          <div className="relative z-[1] flex flex-wrap items-center gap-2">
+            <span className="text-[13.5px] font-semibold">Effort</span>
+            {[1, 2, 3].map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => setEffort(e)}
+                className="flex h-8 items-center rounded-full px-2.5"
+                style={effort === e ? { background: "var(--t-gold)" } : { border: "1px solid #b39a6a" }}
+                aria-label={`Effort ${e}`}
+              >
+                <EffortPips n={e} size={12} />
+              </button>
+            ))}
+          </div>
           <div className="relative z-[1] flex flex-wrap items-center gap-2">
             {QUICK_MINUTES.map((m) => (
               <button

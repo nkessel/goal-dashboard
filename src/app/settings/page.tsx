@@ -4,6 +4,8 @@ import { requireSession } from "@/lib/session";
 import { signOut } from "@/auth";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
+import { countImports } from "@/lib/data/rewards";
 import { Avatar } from "@/components/settings/Avatar";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
@@ -24,7 +26,10 @@ export default async function SettingsPage({
   searchParams: Promise<{ open?: string }>;
 }) {
   const session = await requireSession();
-  const profile = await getProfileById(session.user.id);
+  const [profile, imports] = await Promise.all([
+    getProfileById(session.user.id),
+    countImports(session.user.id).catch(() => ({ quests: 0, rewards: 0 })),
+  ]);
   if (!profile) notFound();
   const { open } = await searchParams;
   const openAppearance = open === "appearance";
@@ -110,6 +115,7 @@ export default async function SettingsPage({
 
         {/* Expandable settings rows */}
         <div className="flex flex-col gap-2.5">
+          <ImportsInboxRow quests={imports.quests} rewards={imports.rewards} theme={profile.theme} />
           <SettingsRow
             theme={profile.theme}
             label="Account"

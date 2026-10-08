@@ -263,9 +263,10 @@ export async function updateTaskAction(
     urgency: number;
     xpValue: number;
     estimateMinutes?: number | null;
-    /** Undefined leaves the goal untouched; null detaches it. */
-    goalId?: string | null;
-    isPowerUp?: boolean;
+    /** Undefined leaves the board untouched; null takes it off its board. */
+    boardId?: string | null;
+    /** 0–5 energy it takes (0 = unrated). */
+    effort?: number;
     grantsReward?: boolean;
     /** Also confirm this quest if it was an import awaiting review. */
     confirmImport?: boolean;
@@ -274,10 +275,6 @@ export async function updateTaskAction(
   const ownerId = await requireProfileId();
   if (input.grantsReward !== undefined) await tasksData.setTaskGrantsReward(taskId, ownerId, input.grantsReward);
   if (input.confirmImport) await rewardsData.markReviewed("quest", taskId, ownerId);
-  if (input.isPowerUp !== undefined) {
-    await tasksData.setPowerUp(taskId, ownerId, input.isPowerUp);
-    revalidatePath("/power-ups");
-  }
   // Changing a quest's XP adjusts what you've already earned for it: all of
   // it for a finished quest, its progress share for one in progress.
   const before = await tasksData.getTask(taskId, ownerId);
@@ -303,28 +300,36 @@ export async function updateTaskAction(
     urgency: input.urgency,
     xpValue: input.xpValue,
     estimateMinutes: input.estimateMinutes,
-    goalId: input.goalId,
+    boardId: input.boardId,
+    effort: input.effort,
   });
   revalidatePath("/");
   revalidatePath("/matrix");
+  revalidatePath("/power-ups");
   revalidatePath("/boards", "layout");
 }
 
-/** "+ New board" from the quest editor: a board plus its first goal, ready to file quests under. */
-export async function createBoardWithGoalAction(boardTitle: string, goalTitle?: string) {
+/** "+ New board" from the quest editor. */
+export async function createBoardFromEditorAction(boardTitle: string, parentBoardId?: string | null) {
   const ownerId = await requireProfileId();
   const title = boardTitle.trim();
   if (!title) throw new Error("Name the board first.");
-  const board = await boardsData.createBoard(ownerId, { title });
-  const goal = await goalsData.createGoal(ownerId, board.id, { title: goalTitle?.trim() || "General" });
+  const board = await boardsData.createBoard(ownerId, { title, parentBoardId: parentBoardId || null });
   revalidatePath("/boards", "layout");
-  return { goalId: goal.id, goalTitle: goal.title, boardTitle: board.title };
+  return { id: board.id, title: board.title };
 }
 
-/** Goals to file a quest under, labelled with their board. */
-export async function listGoalOptionsAction() {
+/** Quest boards to file a quest under, nested ones labelled "Parent › Child". */
+export async function listBoardOptionsAction() {
   const ownerId = await requireProfileId();
-  return goalsData.listGoalOptionsForOwner(ownerId);
+  const boards = await boardsData.listBoardsForOwner(ownerId);
+  const byId = new Map(boards.map((b) => [b.id, b]));
+  const label = (id: string): string => {
+    const b = byId.get(id);
+    if (!b) return "";
+    return b.parent_board_id && byId.has(b.parent_board_id) ? `${label(b.parent_board_id)} › ${b.title}` : b.title;
+  };
+  return boards.map((b) => ({ id: b.id, label: label(b.id) })).sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /**
@@ -668,9 +673,10 @@ function escapeHtml(s: string): string {
 // ---------------------------------------------------------------------------
 // XP / leveling (Priority #8)
 // ---------------------------------------------------------------------------
-export async function dailyCheckInAction(): Promise<xp.CheckInResult> {
+export async function dailyCheckInAction(tzOffsetMinutes?: number): Promise<xp.CheckInResult> {
   const ownerId = await requireProfileId();
-  const result = await xp.dailyCheckIn(ownerId);
+  const offset = Number.isFinite(tzOffsetMinutes) ? Math.max(-840, Math.min(840, Math.round(tzOffsetMinutes!))) : 0;
+  const result = await xp.dailyCheckIn(ownerId, offset);
   revalidatePath("/");
   return result;
 }
@@ -837,12 +843,12 @@ export async function createQuestAction(input: {
   urgency: number;
   xpValue: number;
   estimateMinutes?: number | null;
-  goalId?: string | null;
+  boardId?: string | null;
+  effort?: number;
   iconKey?: string | null;
   iconSource?: "library" | "ai";
   pinToBattle?: boolean;
   grantsReward?: boolean;
-  isPowerUp?: boolean;
   schedule?: { startISO: string; endISO: string; googleEventId?: string };
 }): Promise<string> {
   const ownerId = await requireProfileId();
@@ -855,13 +861,13 @@ export async function createQuestAction(input: {
     importance: clamp(input.importance),
     urgency: clamp(input.urgency),
     xpValue: Math.max(0, Math.round(input.xpValue)),
-    goalId: input.goalId ?? null,
+    boardId: input.boardId ?? null,
+    effort: input.effort,
     estimateMinutes: input.estimateMinutes ?? null,
     iconKey: input.iconKey ?? null,
     iconSource: input.iconSource,
-    isPowerUp: input.isPowerUp,
   });
-  if (input.isPowerUp) revalidatePath("/power-ups");
+  revalidatePath("/power-ups");
   if (input.schedule) {
     const session = await auth();
     if (!input.schedule.googleEventId && session?.googleAccessToken) {
@@ -892,10 +898,7 @@ export async function createQuestAction(input: {
   revalidatePath("/");
   revalidatePath("/matrix");
   revalidatePath("/calendar");
-  if (input.goalId) {
-    const goal = await goalsData.getGoal(input.goalId, ownerId);
-    if (goal) revalidatePath(`/boards/${goal.board_id}`);
-  }
+  if (input.boardId) revalidatePath(`/boards/${input.boardId}`);
   return task.id;
 }
 

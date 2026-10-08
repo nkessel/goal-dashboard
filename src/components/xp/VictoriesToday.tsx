@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import type { Task } from "@/lib/data/types";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { SectionTitle } from "@/components/ui/Ornaments";
+import { eveningDayKey } from "@/components/evening/evening-clock";
 
 const noop = () => () => {};
 
@@ -46,23 +47,29 @@ export function VictoriesToday({
   tasks,
   claimed,
   lastCheckInAt,
+  rites = [],
   theme,
 }: {
   tasks: Task[];
   claimed: { id: string; title: string; claimed_at: string | null }[];
   lastCheckInAt: string | null;
+  /** Evening rite completions (with the evening's day key). */
+  rites?: { id: string; title: string; day: string; xp: number }[];
   theme: "calm" | "adventure";
 }) {
   const isAdventure = theme === "adventure";
-  const today = useSyncExternalStore(noop, () => new Date().toDateString(), () => null);
+  // "Today" runs 5:30am to 5:30am, so a late night still counts.
+  const today = useSyncExternalStore(noop, () => eveningDayKey(), () => null);
   const [editing, setEditing] = useState<Task | null>(null);
 
-  const isToday = (iso: string | null) => !!iso && today !== null && new Date(iso).toDateString() === today;
+  const isToday = (iso: string | null) => !!iso && today !== null && eveningDayKey(new Date(iso)) === today;
   const loginToday = isToday(lastCheckInAt);
   const todays = tasks.filter((t) => isToday(t.completed_at));
   const todaysRewards = claimed.filter((r) => isToday(r.claimed_at));
-  const totalXp = (loginToday ? 5 : 0) + todays.reduce((n, t) => n + t.xp_value, 0);
-  const empty = !loginToday && todays.length === 0 && todaysRewards.length === 0;
+  const todaysRites = rites.filter((r) => today !== null && r.day === today);
+  const totalXp =
+    (loginToday ? 5 : 0) + todays.reduce((n, t) => n + t.xp_value, 0) + todaysRites.reduce((n, r) => n + r.xp, 0);
+  const empty = !loginToday && todays.length === 0 && todaysRewards.length === 0 && todaysRites.length === 0;
 
   const rowCls = "flex min-h-[44px] items-center gap-3 py-2 text-[16.5px]";
   const divider = { borderTop: `1px solid ${isAdventure ? "rgba(139,112,64,.35)" : "var(--t-card-border)"}` };
@@ -125,6 +132,18 @@ export function VictoriesToday({
                 +{t.xp_value} XP
               </span>
             </button>
+          </li>
+        ))}
+        {todaysRites.map((r, i) => (
+          <li key={`rite-${r.id}`} className={rowCls} style={loginToday || todays.length > 0 || i > 0 ? { ...divider, color: "var(--t-ink)" } : { color: "var(--t-ink)" }}>
+            <Seal kind="check" />
+            <span className="min-w-0 flex-1 break-words leading-snug">
+              <span style={{ color: "var(--t-ink-soft)" }}>{isAdventure ? "Evening rite: " : "Evening: "}</span>
+              {r.title}
+            </span>
+            <span className="shrink-0" style={xpStyle}>
+              +{r.xp} XP
+            </span>
           </li>
         ))}
         {todaysRewards.map((r) => (

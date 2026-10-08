@@ -157,7 +157,16 @@ function dateOnly(iso: string): string {
  * streak unless the user has a streak-protection token banked (a level 4-7
  * perk), in which case one token is spent to preserve it instead.
  */
-export async function dailyCheckIn(ownerId: string): Promise<CheckInResult> {
+/**
+ * The app's day for an instant: the viewer's local date, where the day turns
+ * over at 5:30am (late nights still count toward the evening before).
+ * `tzOffsetMinutes` is the browser's getTimezoneOffset() (minutes behind UTC).
+ */
+function appDay(iso: string, tzOffsetMinutes: number): string {
+  return new Date(Date.parse(iso) - tzOffsetMinutes * 60_000 - 330 * 60_000).toISOString().slice(0, 10);
+}
+
+export async function dailyCheckIn(ownerId: string, tzOffsetMinutes = 0): Promise<CheckInResult> {
   const db = supabaseAdmin();
   const { data: profile, error } = await db
     .from("profiles")
@@ -166,8 +175,8 @@ export async function dailyCheckIn(ownerId: string): Promise<CheckInResult> {
     .single<Profile>();
   if (error) throw new Error(`Failed to load profile: ${error.message}`);
 
-  const todayStr = dateOnly(new Date().toISOString());
-  if (profile.last_check_in_at && dateOnly(profile.last_check_in_at) === todayStr) {
+  const todayStr = appDay(new Date().toISOString(), tzOffsetMinutes);
+  if (profile.last_check_in_at && appDay(profile.last_check_in_at, tzOffsetMinutes) === todayStr) {
     return { alreadyCheckedInToday: true, streakCount: profile.streak_count, usedProtectionToken: false, xpAwarded: 0 };
   }
 
@@ -178,7 +187,7 @@ export async function dailyCheckIn(ownerId: string): Promise<CheckInResult> {
   if (!profile.last_check_in_at) {
     newStreak = 1;
   } else {
-    const last = new Date(dateOnly(profile.last_check_in_at) + "T00:00:00Z");
+    const last = new Date(appDay(profile.last_check_in_at, tzOffsetMinutes) + "T00:00:00Z");
     const today = new Date(todayStr + "T00:00:00Z");
     const daysSince = Math.round((today.getTime() - last.getTime()) / 86_400_000);
 

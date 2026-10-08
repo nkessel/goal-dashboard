@@ -36,7 +36,7 @@ export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promis
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
-    .select("*, goals(boards(title))")
+    .select("*, boards(title)")
     .eq("owner_id", ownerId)
     .eq("status", "open")
     .order("sort_order", { ascending: true })
@@ -45,10 +45,8 @@ export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promis
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
 
   return (data ?? []).map((row) => {
-    const { goals, ...task } = row as Task & {
-      goals: { boards: { title: string } | null } | null;
-    };
-    return { ...task, categoryLabel: goals?.boards?.title ?? null };
+    const { boards, ...task } = row as Task & { boards: { title: string } | null };
+    return { ...task, categoryLabel: boards?.title ?? null };
   });
 }
 
@@ -110,8 +108,9 @@ export async function updateTask(
     xpValue: number;
     /** Undefined leaves the existing estimate untouched; null clears it. */
     estimateMinutes?: number | null;
-    /** Undefined leaves the goal untouched; null detaches it. */
-    goalId?: string | null;
+    /** Undefined leaves the board untouched; null takes it off its board. */
+    boardId?: string | null;
+    effort?: number;
   }
 ): Promise<Task> {
   const importance = Math.max(0, Math.min(5, Math.round(input.importance * 10) / 10));
@@ -128,7 +127,8 @@ export async function updateTask(
       ...(input.estimateMinutes !== undefined
         ? { estimate_minutes: input.estimateMinutes === null ? null : Math.max(0, Math.round(input.estimateMinutes)) }
         : {}),
-      ...(input.goalId !== undefined ? { goal_id: input.goalId } : {}),
+      ...(input.boardId !== undefined ? { board_id: input.boardId } : {}),
+      ...(input.effort !== undefined ? { effort: Math.max(0, Math.min(5, Math.round(input.effort))) } : {}),
     })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
@@ -207,19 +207,27 @@ export async function listOpenTasksWithBoardForOwner(
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
-    .select("*, goals(board_id)")
+    .select("*")
     .eq("owner_id", ownerId)
     .eq("status", "open")
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
+  return ((data ?? []) as Task[]).map((t) => ({ ...t, board_id: t.board_id ?? null }));
+}
 
-  return (data ?? []).map((row) => {
-    const { goals, ...task } = row as Task & {
-      goals: { board_id: string } | null;
-    };
-    return { ...task, board_id: goals?.board_id ?? null };
-  });
+/** A quest board's own quests (open first, then finished). */
+export async function listTasksForBoard(boardId: string, ownerId: string): Promise<Task[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("tasks")
+    .select("*")
+    .eq("owner_id", ownerId)
+    .eq("board_id", boardId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`Failed to list board quests: ${error.message}`);
+  return (data ?? []) as Task[];
 }
 
 export async function listTasksForGoal(goalId: string): Promise<Task[]> {
@@ -243,6 +251,8 @@ export async function createTask(
     urgency?: number;
     xpValue?: number;
     goalId?: string | null;
+    boardId?: string | null;
+    effort?: number;
     color?: string;
     estimateMinutes?: number | null;
     iconKey?: string | null;
@@ -265,6 +275,8 @@ export async function createTask(
       ...(input.iconKey ? { icon_key: input.iconKey, icon_source: input.iconSource ?? "library" } : {}),
       owner_id: ownerId,
       goal_id: input.goalId || null,
+      ...(input.boardId ? { board_id: input.boardId } : {}),
+      ...(input.effort ? { effort: Math.max(0, Math.min(5, Math.round(input.effort))) } : {}),
       title: input.title,
       description: input.description || null,
       importance: input.importance ?? 0,
@@ -350,7 +362,7 @@ export async function completeTask(
 
   // Log an activity event for the friend feed, respecting the owning
   // goal/board's privacy (or the profile default for standalone tasks).
-  await logTaskCompletedActivity(ownerId, { id: taskId, goal_id: data.goal_id });
+  await logTaskCompletedActivity(ownerId, { id: taskId, goal_id: data.goal_id, board_id: data.board_id ?? null });
 
   return data;
 }
@@ -563,12 +575,15 @@ export async function setPowerUp(taskId: string, ownerId: string, isPowerUp: boo
   if (error) throw new Error(`Failed to update power-up: ${error.message}`);
 }
 
-/** Power-ups: open ones, plus ones finished since `sinceISO` (for "done today"). */
+/** Power-ups: any quest that takes 15 minutes or less — open ones, plus ones finished since `sinceISO`. */
+export const POWER_UP_MAX_MINUTES = 15;
 export async function listPowerUps(ownerId: string, sinceISO: string): Promise<{ open: Task[]; done: Task[] }> {
   const db = supabaseAdmin();
+  const quick = () =>
+    db.from("tasks").select("*").eq("owner_id", ownerId).not("estimate_minutes", "is", null).lte("estimate_minutes", POWER_UP_MAX_MINUTES);
   const [open, done] = await Promise.all([
-    db.from("tasks").select("*").eq("owner_id", ownerId).eq("is_power_up", true).eq("status", "open").order("sort_order").order("created_at"),
-    db.from("tasks").select("*").eq("owner_id", ownerId).eq("is_power_up", true).eq("status", "completed").gte("completed_at", sinceISO).order("completed_at", { ascending: false }),
+    quick().eq("status", "open").order("estimate_minutes").order("created_at"),
+    quick().eq("status", "completed").gte("completed_at", sinceISO).order("completed_at", { ascending: false }),
   ]);
   if (open.error) return { open: [], done: [] };
   return { open: (open.data ?? []) as Task[], done: (done.data ?? []) as Task[] };
@@ -580,7 +595,8 @@ export async function countOpenPowerUps(ownerId: string): Promise<number> {
     .from("tasks")
     .select("id", { count: "exact", head: true })
     .eq("owner_id", ownerId)
-    .eq("is_power_up", true)
+    .not("estimate_minutes", "is", null)
+    .lte("estimate_minutes", POWER_UP_MAX_MINUTES)
     .eq("status", "open");
   return error ? 0 : (count ?? 0);
 }

@@ -67,6 +67,10 @@ export type Task = {
   locked_by_task_id?: string | null;
   /** A quick-win, low-energy quest kept in the Power-ups menu. */
   is_power_up?: boolean;
+  /** The quest board this quest belongs to (null = no board). */
+  board_id?: string | null;
+  /** 0–5: how much energy it takes (0 = unrated). */
+  effort?: number;
 };
 
 export type Profile = {

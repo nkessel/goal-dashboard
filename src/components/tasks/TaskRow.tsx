@@ -245,7 +245,7 @@ export function TaskRow({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              title="File this quest under a goal"
+              title="Put this quest on a quest board"
               className="relative z-[2] -mb-2.5 rounded-md border border-dashed px-2 py-px text-[12px] leading-snug opacity-70 hover:opacity-100"
               style={{
                 background: isAdventure ? "rgba(243,231,203,.92)" : "var(--t-card)",
@@ -253,7 +253,7 @@ export function TaskRow({
                 color: "var(--t-ink-soft)",
               }}
             >
-              + Goal
+              + Board
             </button>
           )}
           <button

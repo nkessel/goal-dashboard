@@ -8,8 +8,12 @@ import type { ActivityEvent, ActivityReaction, ActivityComment, Task, Goal } fro
  * overrides the board default when explicitly set), standalone tasks fall
  * back to the owner's profile-level default.
  */
-async function resolveTaskVisibility(ownerId: string, task: Pick<Task, "goal_id">): Promise<boolean> {
+async function resolveTaskVisibility(ownerId: string, task: Pick<Task, "goal_id" | "board_id">): Promise<boolean> {
   const db = supabaseAdmin();
+  if (task.board_id) {
+    const { data: board } = await db.from("boards").select("is_private").eq("id", task.board_id).maybeSingle();
+    return !(board?.is_private ?? false);
+  }
   if (task.goal_id) {
     const { data: goal } = await db
       .from("goals")
@@ -46,7 +50,7 @@ async function resolveGoalVisibility(goal: Pick<Goal, "is_private" | "board_id">
 
 export async function logTaskCompletedActivity(
   ownerId: string,
-  task: Pick<Task, "id" | "goal_id">
+  task: Pick<Task, "id" | "goal_id" | "board_id">
 ): Promise<ActivityEvent> {
   const isPublic = await resolveTaskVisibility(ownerId, task);
   const db = supabaseAdmin();

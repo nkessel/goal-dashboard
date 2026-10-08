@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { ImportReview } from "./ImportReview";
 
@@ -27,20 +27,6 @@ export function ImportsAlert({
   const isAdventure = theme === "adventure";
 
   const [dontShow, setDontShow] = useState(false);
-
-  useEffect(() => {
-    if (!total || reviewing) return;
-    let show = true;
-    try {
-      const seen = Number(window.sessionStorage.getItem(SEEN_KEY) ?? "0");
-      // Confirming items lowers the count — only a higher count is news.
-      show = total > seen && window.localStorage.getItem(OFF_KEY) !== "1";
-    } catch {
-      /* storage unavailable */
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- storage is only readable after hydration
-    if (show) setAlertOpen(true);
-  }, [total, reviewing]);
 
   function remember() {
     try {
