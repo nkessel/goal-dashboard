@@ -36,18 +36,27 @@ export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promis
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
-    .select("*, boards(title)")
+    .select("*")
     .eq("owner_id", ownerId)
     .eq("status", "open")
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
+  const tasks = (data ?? []) as Task[];
 
-  return (data ?? []).map((row) => {
-    const { boards, ...task } = row as Task & { boards: { title: string } | null };
-    return { ...task, categoryLabel: boards?.title ?? null };
-  });
+  // Board titles are looked up separately: an embedded boards(...) select is
+  // ambiguous to PostgREST because other tables also link tasks and boards.
+  const boardIds = [...new Set(tasks.map((t) => t.board_id).filter((id): id is string => !!id))];
+  const titles = new Map<string, string>();
+  if (boardIds.length > 0) {
+    const { data: boards } = await db.from("boards").select("id, title").in("id", boardIds);
+    for (const b of boards ?? []) titles.set(b.id as string, b.title as string);
+  }
+  return tasks.map((task) => ({
+    ...task,
+    categoryLabel: task.board_id ? titles.get(task.board_id) ?? null : null,
+  }));
 }
 
 /**
