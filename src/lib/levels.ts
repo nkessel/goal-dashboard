@@ -13,7 +13,7 @@ export const LEVEL_THRESHOLDS: Record<number, number> = {
   7: 10500,
   8: 14000,
   9: 18000,
-  10: 23000,
+  10: 20000,
 };
 
 export function computeLevelForXp(totalXp: number): number {
