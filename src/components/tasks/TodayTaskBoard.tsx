@@ -337,7 +337,7 @@ export function TodayTaskBoard({
         <div className="drawer-body" data-open={otherOpen ? "true" : "false"}>
           <div className="drawer-inner -mx-2 px-2">
             <div
-              className="quest-tray mt-2.5 max-h-[min(62vh,560px)] overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
+              className="quest-tray mt-2.5 max-h-[min(54vh,440px)] overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
               style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}
             >
               {other.length === 0 ? (

@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { markNotificationReadAction, markAllNotificationsReadAction, snoozeNotificationAction } from "@/app/actions";
 import type { AppNotification } from "@/lib/data/types";
+import { ImportReview } from "@/components/imports/ImportReview";
 
 type Item = AppNotification & { icon: string };
 
@@ -40,6 +41,7 @@ export function NotificationList({
 }) {
   const [isPending, startTransition] = useTransition();
   const [snoozing, setSnoozing] = useState<string | null>(null);
+  const [sorting, setSorting] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   // Times are shown in the viewer's own clock, so only once we're in the browser.
   const now = useSyncExternalStore(noop, () => Math.floor(Date.now() / 60_000) * 60_000, () => null);
@@ -194,6 +196,7 @@ export function NotificationList({
           </>
         )}
       </section>
+      {sorting && <ImportReview theme={theme} onDone={() => setSorting(false)} />}
     </div>
   );
 }

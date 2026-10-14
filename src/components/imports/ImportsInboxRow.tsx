@@ -26,16 +26,17 @@ export function ImportsInboxRow({ quests, rewards, theme }: { quests: number; re
           📜
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[16px] font-medium" style={{ color: "var(--t-ink)" }}>
-            New arrivals to sort
+          <span className="text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
+            New Quests to Prioritize
           </span>
           <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-            {parts.join(" and ")} waiting for you to confirm
+            {parts.join(" and ")} waiting for you to sort and categorize
           </span>
         </span>
         <span
-          className="flex h-[24px] min-w-[24px] items-center justify-center rounded-full px-1.5 text-[13px] font-bold tabular-nums"
-          style={{ background: isAdventure ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
+          className="badge-pulse flex h-[32px] min-w-[32px] items-center justify-center rounded-full px-2 text-[16px] font-extrabold tabular-nums"
+          style={{ background: "radial-gradient(circle at 35% 30%, #f07a5c, #c43a22 60%, #8e2414)", color: "#fff", border: "2px solid #fff3dc", boxShadow: "0 2px 6px rgba(0,0,0,.4)" }}
+          aria-label={`${total} waiting`}
         >
           {total}
         </span>

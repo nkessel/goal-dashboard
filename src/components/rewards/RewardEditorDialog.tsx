@@ -379,6 +379,7 @@ export function RewardEditorDialog({
             )}
             <button
               type="button"
+              data-submit
               onClick={save}
               disabled={isSaving || !title.trim()}
               className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:opacity-50"

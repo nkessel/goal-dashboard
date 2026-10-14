@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 
-export type QuestAction = "edit" | "complete" | "battle" | "offtoday" | "calendar" | "delete";
+export type QuestAction = "edit" | "complete" | "focus" | "battle" | "offtoday" | "calendar" | "delete";
 
 /**
  * The quest card's action list — opened from the card's icon (the blank
@@ -13,6 +13,7 @@ export type QuestAction = "edit" | "complete" | "battle" | "offtoday" | "calenda
 export function QuestActionMenu({
   isAdventure,
   inBattle,
+  isReward = false,
   onToday = true,
   onCalendar,
   align,
@@ -22,6 +23,8 @@ export function QuestActionMenu({
 }: {
   isAdventure: boolean;
   inBattle: boolean;
+  /** The quest is a reward being claimed: "Complete this reward". */
+  isReward?: boolean;
   /** Shown on the Today screen (Today's or Additional Quests) — offers taking it off. */
   onToday?: boolean;
   onCalendar: boolean;
@@ -71,12 +74,13 @@ export function QuestActionMenu({
     };
   }, [onClose]);
 
-  const items: { key: QuestAction; icon: string; label: string }[] = [
-    { key: "edit", icon: "✎", label: isAdventure ? "Edit quest" : "Edit task" },
-    { key: "complete", icon: "✓", label: isAdventure ? "Complete this quest" : "Complete this task" },
+  const items: { key: QuestAction; icon: React.ReactNode; label: string }[] = [
+    { key: "edit", icon: <Glyph d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />, label: isReward ? "Edit reward" : isAdventure ? "Edit quest" : "Edit task" },
+    { key: "complete", icon: "✓", label: isReward ? "Complete this reward" : isAdventure ? "Complete this quest" : "Complete this task" },
+    { key: "focus", icon: <Glyph d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 3.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />, label: "Focus mode" },
     {
       key: "battle",
-      icon: inBattle ? "✕" : "⚔",
+      icon: inBattle ? <Glyph d="M6 6l12 12M18 6L6 18" /> : <Glyph d="M5 19l9-9M14 5l5 0 0 5-9 9-5 0 0-5zM15 15l4 4" />,
       label: isAdventure
         ? inBattle
           ? "Remove from Today's Quests"
@@ -85,9 +89,9 @@ export function QuestActionMenu({
           ? "Remove from Today's Focus"
           : "Add to Today's Focus",
     },
-    ...(onToday ? [{ key: "offtoday" as const, icon: "↧", label: "Take off the Today screen" }] : []),
-    { key: "calendar", icon: "📅", label: onCalendar ? "Reschedule on calendar" : "Add to calendar" },
-    { key: "delete", icon: "🗑", label: isAdventure ? "Delete quest" : "Delete task" },
+    ...(onToday ? [{ key: "offtoday" as const, icon: <SnoozeGlyph />, label: "Take off the Today screen" }] : []),
+    { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule on calendar" : "Add to calendar" },
+    { key: "delete", icon: <Glyph d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, label: isReward ? "Delete reward" : isAdventure ? "Delete quest" : "Delete task" },
   ];
 
   return createPortal(
@@ -139,8 +143,8 @@ export function QuestActionMenu({
               aria-hidden
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm"
               style={{
-                background: it.key === "complete" ? (isAdventure ? "var(--t-xp)" : "var(--t-good)") : "rgba(0,0,0,.06)",
-                color: it.key === "complete" ? "#fff" : "var(--t-ink)",
+                background: it.key === "complete" ? (isAdventure ? "var(--t-xp)" : "var(--t-good)") : "transparent",
+                color: it.key === "complete" ? "#fff" : "var(--t-ink-soft)",
               }}
             >
               {it.icon}
@@ -151,5 +155,25 @@ export function QuestActionMenu({
       )}
     </div>,
     document.body
+  );
+}
+
+/** A flat line icon in the menu's ink colour. */
+function Glyph({ d }: { d: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d={d} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Snooze: a little clock with "z"s. */
+function SnoozeGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="10" cy="13" r="7" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M10 9.5V13l2.2 1.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15.5 3h4l-4 4h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

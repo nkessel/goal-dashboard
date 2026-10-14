@@ -21,22 +21,21 @@ export function BossLine({ boss, level, heldByBoss }: { boss: BossView | null; l
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hover-glow mx-auto mt-0.5 flex max-w-[300px] items-start justify-center gap-1.5 rounded-lg px-2 py-1 text-center text-[13.5px] italic leading-snug"
+        title={boss && heldByBoss ? `Defeat it to reach level ${level + 1}` : undefined}
+        className="hover-glow mx-auto mt-0.5 block max-w-[min(100%,360px)] truncate whitespace-nowrap rounded-lg px-2 py-1 text-center text-[13.5px] italic leading-snug"
         style={{ color: "var(--t-cream)", opacity: boss ? 0.95 : 0.55 }}
       >
-        <span aria-hidden className="not-italic">⚔</span>
         {boss ? (
-          <span>
-            <span style={{ color: "var(--t-gold)" }}>Boss:</span> {boss.title}
+          <>
+            <span style={{ color: "var(--t-gold)" }}>Final Boss:</span> {boss.title}
             {boss.target > 1 && (
               <span className="ml-1 not-italic tabular-nums" style={{ color: "var(--t-gold)" }}>
                 {boss.progress}/{boss.target}
               </span>
             )}
-            {heldByBoss && <span className="block text-[12.5px]" style={{ color: "#f8e3a0" }}>Defeat it to reach level {level + 1}</span>}
-          </span>
+          </>
         ) : (
-          <span>Set a boss for level {level}</span>
+          <>Set a final boss for level {level}</>
         )}
       </button>
       {open && <BossDialog boss={boss} level={boss?.level ?? level} onClose={() => setOpen(false)} />}

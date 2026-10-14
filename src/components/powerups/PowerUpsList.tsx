@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
-import { completeTaskAction, createQuestAction, reopenTaskAction, toggleManualPriorityAction } from "@/app/actions";
+import { addToTopOfTodayAction, completeTaskAction, createQuestAction, reopenTaskAction, toggleManualPriorityAction } from "@/app/actions";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { BoltIcon } from "@/components/ui/Icons";
 
@@ -129,7 +129,17 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
         {!isDone && (
           <button
             type="button"
-            onClick={() => startTransition(() => toggleManualPriorityAction(t.id, !t.is_manual_priority))}
+            onClick={() =>
+              startTransition(async () => {
+                setError(null);
+                try {
+                  if (t.is_manual_priority) await toggleManualPriorityAction(t.id, false);
+                  else await addToTopOfTodayAction(t.id);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Couldn't change that.");
+                }
+              })
+            }
             className="text-[12.5px] underline"
             style={{ color: "var(--t-ink-soft)" }}
           >

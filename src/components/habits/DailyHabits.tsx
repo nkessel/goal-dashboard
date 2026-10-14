@@ -53,28 +53,39 @@ export function DailyHabits({
   }
 
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex min-h-10 items-center gap-2 px-2 text-left"
-        style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
+        className="drawer-header relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-4 py-2.5"
+        style={
+          isAdventure
+            ? {
+                background: "linear-gradient(180deg, #3a3524 0%, #2b281b 55%, #221f15 100%)",
+                border: "2px solid #8d7642",
+                boxShadow: "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
+              }
+            : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }
+        }
       >
-        <HabitIcon />
-        <span className={isAdventure ? "font-display text-[20px]" : "text-base font-bold"}>Daily Habits</span>
-        {habits.length > 0 && (
-          <span className="text-[14px] tabular-nums" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)" }}>
-            {doneCount}/{habits.length}
-          </span>
-        )}
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="ml-auto transition-transform duration-300" style={{ transform: open ? "rotate(180deg)" : undefined, opacity: 0.7 }}>
-          <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        <span className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+          <HabitIcon />
+          Daily Habits
+          {habits.length > 0 && (
+            <span className="text-[15px] tabular-nums" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)", fontWeight: 400 }}>
+              ({doneCount}/{habits.length})
+            </span>
+          )}
+        </span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="absolute right-5 transition-transform duration-300" style={{ transform: open ? "rotate(180deg)" : undefined }}>
+          <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
       <div className="drawer-body" data-open={open ? "true" : "false"}>
-        <div className="drawer-inner -mx-1 px-1">
+        <div className="drawer-inner">
+          <div className="mt-2.5 rounded-2xl px-2 pb-2.5 pt-2.5" style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}>
           {error && (
             <p className="m-0 px-2 pb-1 text-[13.5px]" style={{ color: "var(--t-warn)" }}>
               {error}
@@ -135,7 +146,7 @@ export function DailyHabits({
               <button
                 type="button"
                 onClick={() => setEditing("new")}
-                className="hover-glow flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-[14.5px]"
+                className="habit-add flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-[14.5px]"
                 style={{ borderColor: isAdventure ? "rgba(217,180,95,.4)" : "var(--t-card-border)", color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}
               >
                 <span aria-hidden className="text-[18px] leading-none" style={{ color: "var(--t-gold)" }}>
@@ -145,6 +156,7 @@ export function DailyHabits({
               </button>
             </li>
           </ul>
+          </div>
         </div>
       </div>
 

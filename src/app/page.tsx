@@ -18,7 +18,8 @@ import { DayNightFlip } from "@/components/evening/DayNightFlip";
 import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
 import { DailyHabits } from "@/components/habits/DailyHabits";
-import { listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
+import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
+import { latestEnergy } from "@/lib/data/energy";
 import { bossesTableExists, getActiveBoss } from "@/lib/data/bosses";
 import { OneThing } from "@/components/one-thing/OneThing";
 
@@ -74,14 +75,16 @@ export default async function Home() {
     listFriendIds(session.user.id),
   ]);
   // A two-day window; VictoriesToday narrows it to the viewer's own local day.
-  const [recentClaims, rites, riteCompletions, tomorrowRows, boss, bossesEnabled] = await Promise.all([
+  const [recentClaims, rites, riteCompletions, tomorrowRows, boss, bossesEnabled, lastEnergy] = await Promise.all([
     listClaimedSince(session.user.id, daysAgoISO(2)).catch(() => []),
     listRites(session.user.id).catch(() => null),
     listRiteCompletions(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => []),
     listTomorrowQueue(session.user.id).catch(() => null),
     getActiveBoss(session.user.id),
     bossesTableExists(),
+    latestEnergy(session.user.id),
   ]);
+  const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
   const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening" });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
@@ -99,6 +102,7 @@ export default async function Home() {
         stats={{ questsComplete, xpThisWeek, partySize: friendIds.length }}
         boss={boss ? { id: boss.id, level: boss.level, title: boss.title, target: boss.target, progress: boss.progress } : null}
         bossesEnabled={bossesEnabled}
+        energyToday={energyToday}
       />
     </section>
   );

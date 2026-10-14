@@ -424,6 +424,26 @@ export async function setManualPriority(
   return data;
 }
 
+/** Put a quest at the very top of Today's Quests, even past the usual three. */
+export async function pinToTopOfToday(taskId: string, ownerId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: top } = await db
+    .from("tasks")
+    .select("sort_order")
+    .eq("owner_id", ownerId)
+    .eq("status", "open")
+    .order("sort_order", { ascending: true })
+    .limit(1);
+  const first = (top?.[0]?.sort_order as number | undefined) ?? 0;
+  const patch: Record<string, unknown> = { is_manual_priority: true, sort_order: first - 1, in_additional: true };
+  let { error } = await db.from("tasks").update(patch).eq("id", taskId).eq("owner_id", ownerId);
+  if (error && /in_additional/.test(error.message)) {
+    delete patch.in_additional;
+    ({ error } = await db.from("tasks").update(patch).eq("id", taskId).eq("owner_id", ownerId));
+  }
+  if (error) throw new Error(`Couldn't add it to today: ${error.message}`);
+}
+
 /**
  * Mark a task complete, optionally backdated (retroactive completion).
  * Defaults to "now" when no completedAt is supplied.

@@ -18,6 +18,7 @@ import * as stepsData from "@/lib/data/steps";
 import * as journalData from "@/lib/data/journal";
 import * as tomorrowData from "@/lib/data/tomorrow";
 import * as bossesData from "@/lib/data/bosses";
+import * as energyData from "@/lib/data/energy";
 import { computeLevelForXp } from "@/lib/levels";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -191,6 +192,14 @@ export async function toggleManualPriorityAction(
   const ownerId = await requireProfileId();
   await tasksData.setManualPriority(taskId, ownerId, nextValue);
   revalidatePath("/");
+}
+
+/** Power-ups and low-energy picks: straight to the top of Today's Quests. */
+export async function addToTopOfTodayAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  await tasksData.pinToTopOfToday(taskId, ownerId);
+  revalidatePath("/");
+  revalidatePath("/power-ups");
 }
 
 export async function reorderTasksAction(orderedIds: string[]) {
@@ -1456,4 +1465,27 @@ export async function setBossAction(level: number, title: string, target: number
 export async function getQuestForEditAction(taskId: string) {
   const ownerId = await requireProfileId();
   return tasksData.getTask(taskId, ownerId);
+}
+
+/** Energy check-in (1–10, half steps). */
+export async function logEnergyAction(level: number) {
+  const ownerId = await requireProfileId();
+  const entry = await energyData.logEnergy(ownerId, level);
+  revalidatePath("/");
+  return entry;
+}
+
+/** Low-energy picks: power-ups first, then light quests that matter. */
+export async function listTakeoffQuestsAction() {
+  const ownerId = await requireProfileId();
+  const db = supabaseAdmin();
+  const { data, error } = await db.from("tasks").select("*").eq("owner_id", ownerId).eq("status", "open").eq("is_aspiration", false);
+  if (error) throw new Error(`Couldn't load quests: ${error.message}`);
+  const tasks = (data ?? []) as import("@/lib/data/types").Task[];
+  const light = (t: (typeof tasks)[number]) => (t.effort ?? 0) > 0 ? (t.effort ?? 0) <= 2 : t.estimate_minutes != null && t.estimate_minutes <= 20;
+  return tasks
+    .filter((t) => !t.needs_review && !t.locked_by_task_id && !t.reward_id && (t.is_power_up || light(t)))
+    .sort((a, b) => Number(!!b.is_power_up) - Number(!!a.is_power_up) || (b.importance || 0) - (a.importance || 0))
+    .slice(0, 15)
+    .map((t) => ({ id: t.id, title: t.title, description: t.description, estimate_minutes: t.estimate_minutes, xp_value: t.xp_value, is_power_up: !!t.is_power_up, is_manual_priority: t.is_manual_priority, icon_key: t.icon_key, icon_source: t.icon_source }));
 }

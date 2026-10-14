@@ -104,3 +104,34 @@ export async function markEmailSent(id: string): Promise<void> {
   const db = supabaseAdmin();
   await db.from("notifications").update({ email_sent: true }).eq("id", id);
 }
+
+/**
+ * Keep one "new quests to prioritize" notification in step with the number
+ * of imports waiting: created when new ones arrive, its count kept current,
+ * and quietly marked read once nothing is left to sort.
+ */
+export async function syncImportsNotification(profileId: string, waiting: number): Promise<void> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("notifications")
+    .select("id, body, is_read")
+    .eq("profile_id", profileId)
+    .eq("kind", "imports")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) return;
+  const latest = data?.[0] as { id: string; body: string; is_read: boolean } | undefined;
+  const body = `${waiting} new ${waiting === 1 ? "quest" : "quests"} waiting for you to sort and prioritize`;
+  if (waiting === 0) {
+    if (latest && !latest.is_read) await db.from("notifications").update({ is_read: true }).eq("id", latest.id);
+    return;
+  }
+  const lastCount = latest ? parseInt(latest.body, 10) || 0 : 0;
+  if (latest && !latest.is_read) {
+    if (lastCount !== waiting) await db.from("notifications").update({ body }).eq("id", latest.id);
+    return;
+  }
+  if (!latest || waiting > lastCount) {
+    await db.from("notifications").insert({ profile_id: profileId, kind: "imports", body });
+  }
+}

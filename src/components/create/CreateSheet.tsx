@@ -12,7 +12,7 @@ import { Moon } from "@/components/evening/BeginEveningButton";
 import { DiamondIcon } from "@/components/ui/Icons";
 import { QuestShield } from "@/components/ui/Ornaments";
 import { useEscape } from "@/lib/use-escape";
-import { JOURNAL_KINDS, type JournalKind } from "@/lib/journal-kinds";
+import { EVERYDAY_JOURNAL_KINDS, JOURNAL_KINDS, type JournalKind } from "@/lib/journal-kinds";
 
 export type CreateKind = "quest" | "now" | "habit" | "reward" | "rite" | "journal" | "board" | "subboard";
 
@@ -51,7 +51,13 @@ export function CreateSheet({
   // With both making-things and the journal on offer, the first screen asks which.
   const makeKinds = kinds.filter((k) => k !== "journal");
   const offersChoice = initial !== "journal" && makeKinds.length > 0 && kinds.includes("journal");
-  const [stage, setStage] = useState<"choose" | "make" | "journal">(offersChoice ? "choose" : initial === "journal" ? "journal" : "make");
+  const [stage, setStage] = useState<"choose" | "make" | "journal" | "feedback">(offersChoice ? "choose" : initial === "journal" ? "journal" : "make");
+  // The feedback form can be moved aside or tucked away to look at the screen.
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [minimized, setMinimized] = useState(false);
+  const dragFrom = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const tailRef = useRef<HTMLSpanElement>(null);
   const [kind, setKind] = useState<CreateKind>(initial ?? makeKinds[0] ?? kinds[0]);
   const [leaving, setLeaving] = useState(false);
   const keyboard = useKeyboardViewport();
@@ -65,8 +71,26 @@ export function CreateSheet({
     setTimeout(onClose, 190);
   }
 
-  const shownKind: CreateKind = stage === "journal" ? "journal" : kind;
-  const tabKinds = stage === "journal" ? [] : makeKinds;
+  const shownKind: CreateKind = stage === "journal" || stage === "feedback" ? "journal" : kind;
+  const tabKinds = stage === "journal" || stage === "feedback" ? [] : makeKinds;
+  const isFeedback = stage === "feedback";
+  const moved = offset.x !== 0 || offset.y !== 0;
+
+  // Point the little tail exactly at the + (measured, so scrollbars and
+  // centring can't throw it off).
+  useEffect(() => {
+    const place = () => {
+      const tail = tailRef.current;
+      const sheet = sheetRef.current;
+      if (!tail || !sheet) return;
+      const fabX = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fab-x")) || window.innerWidth / 2;
+      const left = fabX - sheet.getBoundingClientRect().left - 6;
+      tail.style.marginLeft = `${Math.max(14, Math.min(sheet.offsetWidth - 26, left))}px`;
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  });
   const editorKey = shownKind;
   const editor =
     shownKind === "quest" || shownKind === "now" ? (
@@ -76,33 +100,56 @@ export function CreateSheet({
     ) : shownKind === "rite" || shownKind === "habit" ? (
       <RiteEditorDialog key={editorKey} slot={shownKind === "habit" ? "day" : "evening"} onClose={close} />
     ) : shownKind === "journal" ? (
-      <JournalComposer key={editorKey} isAdventure={isAdventure} onDone={close} />
+      <JournalComposer key={isFeedback ? "feedback" : "journal"} feedback={isFeedback} isAdventure={isAdventure} onDone={close} />
     ) : (
       <BoardComposer key={editorKey} parentBoardId={shownKind === "subboard" ? boardId : undefined} isAdventure={isAdventure} onDone={close} />
     );
 
   return createPortal(
     <>
+      {!minimized && (
+        <div
+          className={`fixed inset-0 z-[48] ${leaving ? "overlay-fade-out" : "overlay-fade-in"}`}
+          style={isFeedback ? { background: "rgba(8,6,3,.2)" } : { background: "rgba(8,6,3,.55)", backdropFilter: "blur(1.5px)" }}
+          onClick={close}
+          aria-hidden
+        />
+      )}
+      {minimized && (
+        <button
+          type="button"
+          onClick={() => setMinimized(false)}
+          className="create-sheet-in fixed left-1/2 z-[49] flex h-12 -translate-x-1/2 items-center gap-2 rounded-full px-5 text-[15px] font-semibold shadow-xl"
+          style={{ bottom: "calc(5rem + 70px + env(safe-area-inset-bottom))", background: "linear-gradient(180deg,#f2d58a,#d9b45f)", color: "#2a1c10", border: "1.5px solid #8a6116" }}
+        >
+          <span aria-hidden>🛠</span> Feedback draft · tap to finish
+        </button>
+      )}
       <div
-        className={`fixed inset-0 z-[48] ${leaving ? "overlay-fade-out" : "overlay-fade-in"}`}
-        style={{ background: "rgba(8,6,3,.55)", backdropFilter: "blur(1.5px)" }}
-        onClick={close}
-        aria-hidden
-      />
-      <div
+        ref={sheetRef}
         role="dialog"
-        aria-modal="true"
-        aria-label="Create something new"
-        className={`create-sheet fixed inset-x-0 z-[49] mx-auto flex w-[calc(100%-16px)] max-w-md flex-col ${leaving ? "create-sheet-out" : "create-sheet-in"}`}
-        style={
-          keyboard
+        aria-modal={!isFeedback}
+        aria-label={isFeedback ? "App feedback" : "Create something new"}
+        onKeyDown={(e) => {
+          // Ctrl/⌘ + Enter submits whatever form is open.
+          if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+          const btn = e.currentTarget.querySelector<HTMLButtonElement>("[data-submit]:not(:disabled)");
+          if (btn) {
+            e.preventDefault();
+            btn.click();
+          }
+        }}
+        className={`create-sheet fixed inset-x-0 z-[49] mx-auto flex w-[calc(100%-16px)] max-w-md flex-col ${minimized ? "hidden" : ""} ${leaving ? "create-sheet-out" : "create-sheet-in"}`}
+        style={{
+          ...(keyboard
             ? // Keyboard up: use all the room left above it.
               { top: keyboard.top + 6, height: keyboard.height - 12, bottom: "auto" }
             : {
                 bottom: "calc(5rem + 66px + env(safe-area-inset-bottom))",
                 maxHeight: "calc(100dvh - 5rem - 66px - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
-              }
-        }
+              }),
+          translate: moved ? `${offset.x}px ${offset.y}px` : undefined,
+        }}
       >
         <div
           className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl"
@@ -114,16 +161,51 @@ export function CreateSheet({
         >
         {stage === "choose" ? (
           <div className="relative z-[1] flex flex-col gap-2.5 p-4">
-            <p className={`m-0 text-center ${isAdventure ? "font-display text-[20px]" : "text-lg font-bold"}`}>What would you like to add?</p>
             <ChoiceButton
               icon={<QuestShield size={26} />}
-              title={makeKinds.includes("board") ? "A quest or quest board" : makeKinds.includes("subboard") ? "A quest or sub-board" : "A quest, habit, rite or reward"}
+              title={makeKinds.includes("board") ? "New quest or board" : makeKinds.includes("subboard") ? "New quest or sub-board" : "New quest"}
               hint={makeKinds.map((k) => KIND_META[k].label).join(" · ")}
               special
               isAdventure={isAdventure}
               onClick={() => setStage("make")}
             />
-            <ChoiceButton icon={<QuillGlyph />} title="A journal entry" hint="Gratitude, reflections, feedback on the app…" isAdventure={isAdventure} onClick={() => setStage("journal")} />
+            <ChoiceButton icon={<span className="text-[20px]">🛠</span>} title="App feedback" hint="What to change in the next update, or an idea for the future" isAdventure={isAdventure} onClick={() => setStage("feedback")} />
+            <ChoiceButton icon={<QuillGlyph />} title="Journal entry" hint="Gratitude, reflections, wins, ideas" isAdventure={isAdventure} onClick={() => setStage("journal")} />
+          </div>
+        ) : isFeedback ? (
+          <div
+            className="relative z-[1] flex shrink-0 cursor-move touch-none select-none items-center gap-1 px-2 pt-2"
+            onPointerDown={(e) => {
+              if ((e.target as HTMLElement).closest("button")) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              dragFrom.current = { px: e.clientX, py: e.clientY, x: offset.x, y: offset.y };
+            }}
+            onPointerMove={(e) => {
+              const d = dragFrom.current;
+              if (!d) return;
+              setOffset({ x: d.x + e.clientX - d.px, y: d.y + e.clientY - d.py });
+            }}
+            onPointerUp={() => (dragFrom.current = null)}
+            onPointerCancel={() => (dragFrom.current = null)}
+            title="Drag to move"
+          >
+            <button type="button" onClick={() => setStage("choose")} aria-label="Back" className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full" style={{ color: "var(--t-ink-soft)" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M14.5 5.5 8 12l6.5 6.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <span aria-hidden className="text-[15px] tracking-[-2px]" style={{ color: "var(--t-ink-soft)" }}>
+              ⋮⋮
+            </span>
+            <span className={`flex-1 py-1.5 pl-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>App feedback</span>
+            <button type="button" onClick={() => setMinimized(true)} aria-label="Minimize" title="Minimize" className="flex h-9 w-9 items-center justify-center rounded-full" style={{ color: "var(--t-ink-soft)" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M6 17h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+              </svg>
+            </button>
+            <button type="button" onClick={close} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
+              ×
+            </button>
           </div>
         ) : (
           <div className="relative z-[1] flex shrink-0 items-center gap-1 px-2 pt-2.5">
@@ -185,7 +267,7 @@ export function CreateSheet({
         )}
         </div>
         {/* A small tail pointing down at the + it came from. */}
-        {!keyboard && <span aria-hidden className="-mt-[7px] block h-3 w-3 shrink-0 rotate-45 self-start" style={{ background: isAdventure ? "#e4cfa3" : "var(--t-card)", borderRight: "2px solid #c7a96f", borderBottom: "2px solid #c7a96f", marginLeft: "calc(var(--fab-x, 50vw) - max(8px, (100vw - 28rem) / 2) - 7px)" }} />}
+        {!keyboard && !moved && <span ref={tailRef} aria-hidden className="-mt-[7px] block h-3 w-3 shrink-0 rotate-45 self-start" style={{ background: isAdventure ? "#e4cfa3" : "var(--t-card)", borderRight: "2px solid #c7a96f", borderBottom: "2px solid #c7a96f" }} />}
       </div>
     </>,
     document.body
@@ -201,10 +283,10 @@ const MOODS = [
 ];
 
 /** A quick private journal entry, with an optional mood. */
-function JournalComposer({ isAdventure, onDone }: { isAdventure: boolean; onDone: () => void }) {
+function JournalComposer({ feedback = false, isAdventure, onDone }: { feedback?: boolean; isAdventure: boolean; onDone: () => void }) {
   const [body, setBody] = useState("");
   const [mood, setMood] = useState<number | null>(null);
-  const [kind, setKind] = useState<JournalKind | null>(null);
+  const [kind, setKind] = useState<JournalKind | null>(feedback ? "feedback" : null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [isSaving, startSaving] = useTransition();
@@ -213,7 +295,7 @@ function JournalComposer({ isAdventure, onDone }: { isAdventure: boolean; onDone
     setError(null);
     startSaving(async () => {
       try {
-        await addJournalEntryAction(body, mood, kind);
+        await addJournalEntryAction(body, feedback ? null : mood, kind);
         setSaved(true);
         setTimeout(onDone, 900);
       } catch (e) {
@@ -228,15 +310,45 @@ function JournalComposer({ isAdventure, onDone }: { isAdventure: boolean; onDone
         <span className="text-3xl" aria-hidden>
           ✒️
         </span>
-        <p className={`m-0 ${isAdventure ? "font-display text-xl" : "text-lg font-bold"}`}>Written in your journal</p>
+        <p className={`m-0 ${isAdventure ? "font-display text-xl" : "text-lg font-bold"}`}>
+          {!feedback ? "Written in your journal" : kind === "future" ? "Saved to the future ideas log" : "Feedback sent — it goes into the next update"}
+        </p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-4 pt-1.5">
+      {feedback ? (
+        <div role="radiogroup" aria-label="When" className="grid grid-cols-2 gap-1.5">
+          {(
+            [
+              ["feedback", "Next iteration", "Build it in the next update"],
+              ["future", "For the future", "Keep it in the ideas log"],
+            ] as const
+          ).map(([k, label, hint]) => {
+            const on = kind === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setKind(k)}
+                className="create-kind flex flex-col items-start rounded-xl px-3 py-2 text-left"
+                style={{ background: on ? "rgba(217,180,95,.45)" : "rgba(70,50,20,.07)", border: `1.5px solid ${on ? "#a88a3f" : "transparent"}`, color: "var(--t-ink)" }}
+              >
+                <span className="text-[14.5px] font-semibold">{label}</span>
+                <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+                  {hint}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
       <div role="radiogroup" aria-label="Kind of entry" className="flex flex-wrap gap-1.5">
-        {JOURNAL_KINDS.map((k) => {
+        {EVERYDAY_JOURNAL_KINDS.map((k) => {
           const on = kind === k.key;
           return (
             <button
@@ -258,6 +370,7 @@ function JournalComposer({ isAdventure, onDone }: { isAdventure: boolean; onDone
           );
         })}
       </div>
+      )}
       <textarea
         autoFocus
         value={body}
@@ -268,6 +381,7 @@ function JournalComposer({ isAdventure, onDone }: { isAdventure: boolean; onDone
         className="resize-y rounded-lg border px-3 py-2 text-[16px] leading-relaxed"
         style={{ borderColor: "var(--t-panel-border)" }}
       />
+      {!feedback && (
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] font-semibold">How are you feeling? <span className="font-normal" style={{ color: "var(--t-ink-soft)" }}>(optional)</span></span>
         <div role="radiogroup" aria-label="Mood" className="grid grid-cols-5 gap-1.5">
@@ -292,6 +406,7 @@ function JournalComposer({ isAdventure, onDone }: { isAdventure: boolean; onDone
           ))}
         </div>
       </div>
+      )}
       {error && (
         <p className="m-0 text-sm" style={{ color: "var(--t-warn)" }}>
           {error}
@@ -301,14 +416,18 @@ function JournalComposer({ isAdventure, onDone }: { isAdventure: boolean; onDone
         <Link href="/journal" onClick={onDone} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
           Open journal
         </Link>
+        <span className="ml-auto hidden text-[12px] sm:inline" style={{ color: "var(--t-ink-soft)" }}>
+          Ctrl + Enter
+        </span>
         <button
           type="button"
+          data-submit
           onClick={save}
           disabled={isSaving || !body.trim()}
           className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:opacity-45"
           style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
         >
-          {isSaving ? "Saving…" : "Save entry"}
+          {isSaving ? "Saving…" : feedback ? "Submit Feedback" : "Save entry"}
         </button>
       </div>
     </div>
@@ -361,6 +480,7 @@ function BoardComposer({ parentBoardId, isAdventure, onDone }: { parentBoardId?:
       <div className="flex justify-end">
         <button
           type="submit"
+          data-submit
           disabled={isPending}
           className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:opacity-50"
           style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}

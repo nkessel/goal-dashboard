@@ -11,6 +11,7 @@ import { QuestActionMenu, type QuestAction } from "./QuestActionMenu";
 import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { QuestMonogram } from "./QuestMonogram";
+import { FocusMode } from "@/components/one-thing/OneThing";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
  * Kept as a plain helper (not inlined in the component) so the impure
@@ -89,6 +90,7 @@ export function TaskRow({
   const [menu, setMenu] = useState<"icon" | "dots" | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [scheduling, setScheduling] = useState(false);
+  const [focusing, setFocusing] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -134,6 +136,7 @@ export function TaskRow({
     setError(null);
     if (action === "edit") return setEditing(true);
     if (action === "calendar") return setScheduling(true);
+    if (action === "focus") return setFocusing(true);
     startTransition(async () => {
       try {
         if (action === "battle") {
@@ -172,6 +175,7 @@ export function TaskRow({
     <QuestActionMenu
       isAdventure={isAdventure}
       inBattle={task.is_manual_priority}
+      isReward={Boolean(task.reward_id)}
       onToday={task.is_manual_priority || task.in_additional !== false}
       onCalendar={task.is_on_calendar}
       align={align}
@@ -460,6 +464,7 @@ export function TaskRow({
         )}
 
       {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
+      {focusing && <FocusMode task={{ ...task, categoryLabel }} theme={theme} onClose={() => setFocusing(false)} />}
     </div>
     </li>
   );

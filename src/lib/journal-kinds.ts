@@ -5,6 +5,7 @@ export const JOURNAL_KINDS = [
   { key: "win", label: "Win", icon: "🏆", prompt: "What went well?" },
   { key: "idea", label: "Idea", icon: "💡", prompt: "What's the idea?" },
   { key: "feedback", label: "App feedback", icon: "🛠", prompt: "What would make this app better? (It goes into the next update.)" },
+  { key: "future", label: "Future idea", icon: "🔭", prompt: "An idea for later — kept in the future enhancements log." },
 ] as const;
 export type JournalKind = (typeof JOURNAL_KINDS)[number]["key"];
 
@@ -18,3 +19,6 @@ export function splitKindPrefix(body: string): { kind: JournalKind | null; body:
   const k = m ? JOURNAL_KINDS.find((x) => x.label === m[1]) : undefined;
   return k ? { kind: k.key, body: body.slice(m![0].length) } : { kind: null, body };
 }
+
+/** Kinds offered in the everyday journal composer (feedback has its own form). */
+export const EVERYDAY_JOURNAL_KINDS = JOURNAL_KINDS.filter((k) => k.key !== "feedback" && k.key !== "future");

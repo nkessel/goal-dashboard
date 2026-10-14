@@ -13,6 +13,7 @@ const ICONS: Record<string, string> = {
   reschedule_reminder: "⏰",
   level_up: "🎉",
   daily_check_in: "☀️",
+  imports: "📜",
 };
 
 export default async function NotificationsPage() {

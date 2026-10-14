@@ -107,7 +107,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
         {/* Quick ways in: Power-ups and the Treasure Chest */}
         <div className="grid grid-cols-2 gap-2.5">
           <Link
-            href="/power-ups"
+            href="/power-ups?from=settings"
             className={`hover-glow flex items-center gap-2.5 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}
             style={isAdventure ? { borderRadius: 14 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }}
           >
@@ -122,7 +122,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             </span>
           </Link>
           <Link
-            href="/rewards"
+            href="/rewards?from=settings"
             className={`hover-glow flex items-center gap-2.5 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}
             style={isAdventure ? { borderRadius: 14 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }}
           >
@@ -138,7 +138,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </Link>
           <EveningRoutineTile isAdventure={isAdventure} />
           <Link
-            href="/journal"
+            href="/journal?from=settings"
             className={`hover-glow flex items-center gap-2.5 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}
             style={isAdventure ? { borderRadius: 14 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }}
           >
@@ -194,7 +194,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
 
 
           <Link
-            href="/notifications"
+            href="/notifications?from=settings"
             className={`hover-glow flex w-full items-center gap-3 px-4 py-3.5 ${isAdventure ? "parchment" : ""}`}
             style={
               isAdventure

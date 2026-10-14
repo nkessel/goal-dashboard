@@ -1,16 +1,17 @@
-import { countUnread } from "@/lib/data/notifications";
+import { countUnread, syncImportsNotification } from "@/lib/data/notifications";
 import { getProfileById } from "@/lib/data/profiles";
 import { TopRightAvatar } from "@/components/layout/TopRightAvatar";
 import { ThemeOnBody } from "@/components/layout/ThemeOnBody";
 import { NotificationsButton } from "@/components/layout/NotificationsButton";
 import { DailyLogin } from "@/components/xp/DailyLogin";
-import { ImportsAlert } from "@/components/imports/ImportsAlert";
 import { QuestCelebrationHost } from "@/components/celebration/QuestCelebrationHost";
 import { defaultPortraitFor } from "@/components/settings/Avatar";
 import { countImports, countMissingPortraits } from "@/lib/data/rewards";
 import { PortraitPainter } from "@/components/imports/PortraitPainter";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BackToToday } from "@/components/layout/BackToToday";
+import { BackToSettings } from "@/components/layout/BackToSettings";
+import { Suspense } from "react";
 
 /**
  * App shell for the mobile-app-style redesign (matches the Productivity RPG
@@ -39,12 +40,14 @@ export async function AppShell({
    */
   wide?: boolean;
 }) {
-  const [unreadCount, profile, imports, missingPortraits] = await Promise.all([
-    profileId ? countUnread(profileId) : Promise.resolve(0),
+  const [profile, imports, missingPortraits] = await Promise.all([
     profileId ? getProfileById(profileId) : Promise.resolve(null),
     profileId ? countImports(profileId) : Promise.resolve({ quests: 0, rewards: 0 }),
     profileId ? countMissingPortraits(profileId).catch(() => 0) : Promise.resolve(0),
   ]);
+  // Imports waiting to be sorted show up as a notification (no popup, no badge on the avatar).
+  if (profileId) await syncImportsNotification(profileId, imports.quests + imports.rewards).catch(() => {});
+  const unreadCount = profileId ? await countUnread(profileId) : 0;
   const theme = profile?.theme === "adventure" ? "adventure" : "calm";
   const isAdventure = theme === "adventure";
   const iconColor = isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)";
@@ -66,6 +69,11 @@ export async function AppShell({
       <div className={`flex w-full flex-1 flex-col ${widthClass}`}>
         <div className="flex items-center gap-2.5 px-5 pt-3">
           {profileId && <BackToToday isAdventure={isAdventure} />}
+          {profileId && (
+            <Suspense fallback={null}>
+              <BackToSettings isAdventure={isAdventure} />
+            </Suspense>
+          )}
           <span className="flex-1" />
           {profileId && (
             <NotificationsButton unreadCount={unreadCount} isAdventure={isAdventure} iconColor={iconColor} />
@@ -73,7 +81,6 @@ export async function AppShell({
           {profileId && profile && (
             <div className="relative">
               <TopRightAvatar profile={profile} isAdventure={isAdventure} label={userLabel} />
-              <ImportsAlert quests={imports.quests} rewards={imports.rewards} theme={theme} />
             </div>
           )}
         </div>

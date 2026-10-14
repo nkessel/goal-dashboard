@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 /**
  * The round floating "+" action button from the Claude Design mockups
  * (Goals/Quest Board, Matrix, Calendar) — pinned above the bottom nav,
@@ -24,9 +26,43 @@ export function FloatingActionButton({
   raised?: boolean;
 }) {
   const isAdventure = theme === "adventure";
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Pinch-zoom: keep the button at the same spot and size on screen instead
+  // of letting it drift with the zoomed page.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const el = wrapRef.current;
+    if (!vv || !el) return;
+    const place = () => {
+      const s = vv.scale;
+      if (s <= 1.02) {
+        el.style.left = "var(--fab-x, 50%)";
+        el.style.top = "";
+        el.style.bottom = "";
+        el.style.transform = "translateX(-50%)";
+        el.style.transformOrigin = "";
+        return;
+      }
+      const fabX = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fab-x")) || window.innerWidth / 2;
+      el.style.left = `${vv.offsetLeft + fabX / s}px`;
+      el.style.top = `${vv.offsetTop + vv.height - (80 + 56) / s}px`;
+      el.style.bottom = "auto";
+      el.style.transformOrigin = "top left";
+      el.style.transform = `scale(${1 / s}) translateX(-50%)`;
+    };
+    place();
+    vv.addEventListener("resize", place);
+    vv.addEventListener("scroll", place);
+    return () => {
+      vv.removeEventListener("resize", place);
+      vv.removeEventListener("scroll", place);
+    };
+  }, []);
 
   return (
     <div
+      ref={wrapRef}
       className={`pointer-events-none fixed bottom-20 flex justify-center ${expanded ? "z-[49]" : raised ? "z-[48]" : "z-[46]"}`}
       // Same fixed-chrome-in-a-remounted-shell issue as BottomNav (see the
       // comment there) — without its own view-transition-name the FAB gets

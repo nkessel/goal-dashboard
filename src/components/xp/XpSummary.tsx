@@ -3,6 +3,7 @@ import type { Profile } from "@/lib/data/types";
 import { xpToNextLevel } from "@/lib/data/xp";
 import { Avatar, defaultPortraitFor } from "@/components/settings/Avatar";
 import { BossLine, type BossView } from "./BossLine";
+import { EnergyCheck } from "./EnergyCheck";
 
 /** One flanking stat tile in the Adventure-theme header (Quests Complete,
  * Quest Streak, XP this week, Party Size) — icon + big number + caption,
@@ -40,7 +41,10 @@ export function XpSummary({
   stats,
   boss = null,
   bossesEnabled = false,
+  energyToday,
 }: {
+  /** Today's latest energy check-in (undefined = don't show the meter). */
+  energyToday?: number | null;
   /** The boss standing in the way of the next level (null = none set). */
   boss?: BossView | null;
   /** False before the bosses table exists (no "set a boss" prompt then). */
@@ -132,6 +136,7 @@ export function XpSummary({
         </div>
 
         {(boss || bossesEnabled) && nextLevel && <BossLine boss={boss && boss.level === level ? boss : null} level={level} heldByBoss={heldByBoss} />}
+        {energyToday !== undefined && <EnergyCheck today={energyToday} />}
 
         {profile.streak_protection_tokens > 0 && (
           <div className="text-center text-xs" style={{ color: "var(--t-cream)", opacity: 0.75 }}>
