@@ -77,6 +77,8 @@ export type Task = {
   due_at?: string | null;
   /** Planned for this day in the evening routine (moves into Today's Quests then). */
   queued_for?: string | null;
+  /** False = not listed in Additional Quests (lives on its board only). */
+  in_additional?: boolean;
   queue_rank?: number | null;
   /** Can be worked on in chunks of this many minutes (filler time). */
   chunk_minutes?: number | null;
@@ -163,6 +165,8 @@ export type TaskIconLibraryEntry = {
   prompt: string | null;
   is_preset: boolean;
   created_at: string;
+  /** Which shelf it sits on in the picker. */
+  category?: "quest" | "reward" | "character";
 };
 
 export type FriendshipStatus = "pending" | "accepted" | "declined" | "blocked";

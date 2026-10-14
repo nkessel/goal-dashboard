@@ -17,9 +17,11 @@ import * as ritesData from "@/lib/data/rites";
 import * as stepsData from "@/lib/data/steps";
 import * as journalData from "@/lib/data/journal";
 import * as tomorrowData from "@/lib/data/tomorrow";
+import * as bossesData from "@/lib/data/bosses";
+import { computeLevelForXp } from "@/lib/levels";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt, buildSketchbookIconPrompt, buildTreasureIconPrompt } from "@/lib/ai-image";
+import { generateAndStoreImage, buildAvatarPrompt, buildSketchbookIconPrompt, buildTreasureIconPrompt, visualSubjectFor } from "@/lib/ai-image";
 import { styleLook, AVATAR_STYLE_OPTIONS, STYLE_EXAMPLE_SUBJECT } from "@/lib/avatar-prompts";
 import { exportAccountData, type AccountExport } from "@/lib/data/export";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
@@ -789,8 +791,8 @@ export async function setTaskIconAction(
  * plumbed as a prop, since IconPicker is mounted deep inside every task
  * card across several pages. */
 export async function listTaskIconLibraryAction(): Promise<TaskIconLibraryEntry[]> {
-  await requireProfileId();
-  return taskIconLibraryData.listTaskIconLibrary();
+  const ownerId = await requireProfileId();
+  return taskIconLibraryData.listAllPortraits(ownerId);
 }
 
 /** Picking a task icon straight from the shared library (a preset or
@@ -864,8 +866,9 @@ export async function generateTaskIconAction(taskId: string, prompt: string) {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe the monster/icon you want first.");
 
+  // A concrete picture of the task, in the same painted storybook style as imports.
   const url = await generateAndStoreImage(
-    buildTaskIconPrompt(trimmed),
+    buildSketchbookIconPrompt(await visualSubjectFor(trimmed)),
     `tasks/${taskId}-${Date.now()}.jpg`,
     { transparentBackground: true }
   );
@@ -907,6 +910,8 @@ export async function createQuestAction(input: {
   dueAt?: string | null;
   chunkMinutes?: number | null;
   coinValue?: number | null;
+  /** Where it shows on Today ("none" = just on its board). */
+  placement?: "today" | "additional" | "none";
 }): Promise<string> {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
@@ -953,6 +958,7 @@ export async function createQuestAction(input: {
     // Today's Quests full: it simply lands in Additional Quests.
     await tasksData.setManualPriority(task.id, ownerId, true).catch(() => null);
   }
+  if (input.placement === "none") await tasksData.setTaskInAdditional(task.id, ownerId, false).catch(() => null);
   if (input.grantsReward) {
     await tasksData.setTaskGrantsReward(task.id, ownerId, true);
   }
@@ -972,7 +978,7 @@ export async function generateQuestIconImageAction(prompt: string, artStyle: "mo
   const url =
     artStyle === "treasure"
       ? await generateAndStoreImage(buildTreasureIconPrompt(trimmed), `rewards/draft-${ownerId}-${Date.now()}.jpg`)
-      : await generateAndStoreImage(buildTaskIconPrompt(trimmed), `tasks/draft-${ownerId}-${Date.now()}.jpg`, {
+      : await generateAndStoreImage(buildSketchbookIconPrompt(await visualSubjectFor(trimmed)), `tasks/draft-${ownerId}-${Date.now()}.jpg`, {
           transparentBackground: true,
         });
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: trimmed });
@@ -1202,8 +1208,8 @@ export async function generateNextImportIconAction(): Promise<{ done: boolean; i
   // a beaming golden background.
   const url =
     next.kind === "reward"
-      ? await generateAndStoreImage(buildTreasureIconPrompt(next.prompt), `rewards/${next.id}-${Date.now()}.jpg`)
-      : await generateAndStoreImage(buildSketchbookIconPrompt(next.prompt), `tasks/${next.id}-${Date.now()}.jpg`, {
+      ? await generateAndStoreImage(buildTreasureIconPrompt(await visualSubjectFor(next.prompt)), `rewards/${next.id}-${Date.now()}.jpg`)
+      : await generateAndStoreImage(buildSketchbookIconPrompt(await visualSubjectFor(next.prompt)), `tasks/${next.id}-${Date.now()}.jpg`, {
           transparentBackground: true,
         });
   await rewardsData.setImportIcon(next.kind, next.id, ownerId, url);
@@ -1240,11 +1246,11 @@ export async function uncompleteRiteAction(riteId: string, day: string) {
   revalidatePath("/");
 }
 
-export async function createRiteAction(input: { title: string; description?: string; isCore: boolean; xpValue?: number }) {
+export async function createRiteAction(input: { title: string; description?: string; isCore: boolean; xpValue?: number; slot?: "evening" | "day" }) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
-  if (!title) throw new Error("Name the rite first.");
-  const rite = await ritesData.createRite(ownerId, { title, description: input.description?.trim() || null, isCore: input.isCore, xpValue: input.xpValue });
+  if (!title) throw new Error(input.slot === "day" ? "Name the habit first." : "Name the rite first.");
+  const rite = await ritesData.createRite(ownerId, { title, description: input.description?.trim() || null, isCore: input.isCore, xpValue: input.xpValue, slot: input.slot });
   revalidatePath("/");
   return rite.id;
 }
@@ -1301,11 +1307,12 @@ export async function listJournalAction() {
   return journalData.listJournalEntries(ownerId);
 }
 
-export async function addJournalEntryAction(body: string, mood: number | null) {
+export async function addJournalEntryAction(body: string, mood: number | null, kind: string | null = null) {
   const ownerId = await requireProfileId();
   const text = body.trim();
   if (!text) throw new Error("Write something first.");
-  const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null);
+  const k = kind && /^[a-z]{2,20}$/.test(kind) ? kind : null;
+  const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null, k);
   revalidatePath("/journal");
   return entry;
 }
@@ -1333,4 +1340,54 @@ export async function moveTaskToBoardAction(taskId: string, boardId: string | nu
   await tasksData.setTaskBoard(taskId, ownerId, boardId);
   revalidatePath("/boards", "layout");
   revalidatePath("/");
+}
+
+/** Where a quest shows on the Today screen: Today's Quests, Additional Quests, or neither. */
+export async function setTaskPlacementAction(taskId: string, placement: "today" | "additional" | "none") {
+  const ownerId = await requireProfileId();
+  const task = await tasksData.getTask(taskId, ownerId);
+  if (!task) throw new Error("That quest isn't here anymore.");
+  if (placement === "today") {
+    if (!task.is_manual_priority) await tasksData.setManualPriority(taskId, ownerId, true);
+    if (task.in_additional === false) await tasksData.setTaskInAdditional(taskId, ownerId, true).catch(() => null);
+  } else {
+    if (task.is_manual_priority) await tasksData.setManualPriority(taskId, ownerId, false);
+    if ((placement === "none") !== (task.in_additional === false)) await tasksData.setTaskInAdditional(taskId, ownerId, placement !== "none");
+  }
+  revalidatePath("/");
+  revalidatePath("/boards", "layout");
+}
+
+/** Chip away at the current level's boss (+1 / −1). Beating it lets you level up. */
+export async function bossProgressAction(bossId: string, delta: number) {
+  const ownerId = await requireProfileId();
+  const boss = await bossesData.getBoss(ownerId, bossId);
+  if (!boss) throw new Error("That boss isn't here anymore.");
+  const wasDefeated = !!boss.defeated_at;
+  const updated = await bossesData.setBossProgress(ownerId, bossId, boss.progress + Math.sign(delta), boss.target);
+  let leveledUp = false;
+  let level: number | null = null;
+  if (!!updated.defeated_at !== wasDefeated) {
+    // The cap moved: settle the level the XP has already earned.
+    const profile = await profilesData.getProfileById(ownerId);
+    if (profile) {
+      level = Math.min(computeLevelForXp(profile.total_xp), await bossesData.levelCap(ownerId));
+      if (level !== profile.level) {
+        await supabaseAdmin().from("profiles").update({ level }).eq("id", ownerId);
+        leveledUp = level > profile.level;
+      }
+    }
+  }
+  revalidatePath("/", "layout");
+  return { progress: updated.progress, target: updated.target, defeated: !!updated.defeated_at, leveledUp, level };
+}
+
+/** Name (or rename) the boss guarding a level. */
+export async function setBossAction(level: number, title: string, target: number) {
+  const ownerId = await requireProfileId();
+  const t = title.trim();
+  if (!t) throw new Error("Describe the boss first.");
+  if (!Number.isInteger(level) || level < 1 || level > 9) throw new Error("Bosses guard levels 1 to 9.");
+  await bossesData.upsertBoss(ownerId, level, t.slice(0, 200), Math.max(1, Math.min(99, target)));
+  revalidatePath("/", "layout");
 }

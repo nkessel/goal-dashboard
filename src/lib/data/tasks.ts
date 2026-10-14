@@ -664,3 +664,10 @@ export async function setTaskBoard(taskId: string, ownerId: string, boardId: str
   const { error } = await supabaseAdmin().from("tasks").update({ board_id: boardId }).eq("id", taskId).eq("owner_id", ownerId);
   if (error) throw new Error(`Failed to move the quest: ${error.message}`);
 }
+
+/** Whether a quest is listed in Additional Quests (false = only on its board). */
+export async function setTaskInAdditional(taskId: string, ownerId: string, value: boolean): Promise<void> {
+  const { error } = await supabaseAdmin().from("tasks").update({ in_additional: value }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error && /in_additional/.test(error.message)) throw new Error("Taking quests off the Today screen needs a quick database update first.");
+  if (error) throw new Error(`Failed to update the quest: ${error.message}`);
+}

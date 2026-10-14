@@ -10,6 +10,8 @@ export type Rite = {
   /** Non-negotiable (shown where Today's Battle sits) vs. an optional mini-quest. */
   is_core: boolean;
   xp_value: number;
+  /** "day" for a daily habit; "evening" (or missing) for an evening rite. */
+  slot?: string | null;
   sort_order: number;
   archived: boolean;
   created_at: string;
@@ -77,7 +79,7 @@ export async function getRite(riteId: string, ownerId: string): Promise<Rite | n
 
 export async function createRite(
   ownerId: string,
-  input: { title: string; description?: string | null; isCore: boolean; xpValue?: number }
+  input: { title: string; description?: string | null; isCore: boolean; xpValue?: number; slot?: "evening" | "day" }
 ): Promise<Rite> {
   const db = supabaseAdmin();
   const { data: last } = await db
@@ -95,9 +97,11 @@ export async function createRite(
       is_core: input.isCore,
       xp_value: Math.max(0, Math.round(input.xpValue ?? 5)),
       sort_order: (last?.[0]?.sort_order ?? 0) + 1,
+      ...(input.slot === "day" ? { slot: "day" } : {}),
     })
     .select("*")
     .single<Rite>();
+  if (error && /slot/.test(error.message)) throw new Error("Daily habits need a quick database update first.");
   if (error || !data) throw new Error(`Failed to add rite: ${error?.message}`);
   return data;
 }

@@ -17,7 +17,9 @@ import { listRites, listRiteCompletions } from "@/lib/data/rites";
 import { DayNightFlip } from "@/components/evening/DayNightFlip";
 import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
+import { DailyHabits } from "@/components/habits/DailyHabits";
 import { listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
+import { bossesTableExists, getActiveBoss } from "@/lib/data/bosses";
 
 /** Start of a window `n` days back (kept outside render for purity). */
 function daysAgoISO(n: number) {
@@ -71,19 +73,32 @@ export default async function Home() {
     listFriendIds(session.user.id),
   ]);
   // A two-day window; VictoriesToday narrows it to the viewer's own local day.
-  const [recentClaims, rites, riteCompletions, tomorrowRows] = await Promise.all([
+  const [recentClaims, rites, riteCompletions, tomorrowRows, boss, bossesEnabled] = await Promise.all([
     listClaimedSince(session.user.id, daysAgoISO(2)).catch(() => []),
     listRites(session.user.id).catch(() => null),
     listRiteCompletions(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => []),
     listTomorrowQueue(session.user.id).catch(() => null),
+    getActiveBoss(session.user.id),
+    bossesTableExists(),
   ]);
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
-  const topPriorities = openTasks.filter((t) => t.is_manual_priority);
-  const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
+  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening" });
+  const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
+  const eveningRites = rites?.filter((r) => r.slot !== "day").map(riteView) ?? null;
+  // Imports wait for approval before they show here at all; quests taken off
+  // the Today screen live only on their boards.
+  const onToday = openTasks.filter((t) => !t.needs_review);
+  const topPriorities = onToday.filter((t) => t.is_manual_priority);
+  const otherTasks = onToday.filter((t) => !t.is_manual_priority && t.in_additional !== false);
   const theme = profile?.theme ?? "calm";
   const stats = profile && (
     <section>
-      <XpSummary profile={profile} stats={{ questsComplete, xpThisWeek, partySize: friendIds.length }} />
+      <XpSummary
+        profile={profile}
+        stats={{ questsComplete, xpThisWeek, partySize: friendIds.length }}
+        boss={boss ? { id: boss.id, level: boss.level, title: boss.title, target: boss.target, progress: boss.progress } : null}
+        bossesEnabled={bossesEnabled}
+      />
     </section>
   );
 
@@ -93,7 +108,16 @@ export default async function Home() {
         day={
           <div className="flex flex-col gap-6">
             {stats}
-            <TodayTaskBoard priorityTasks={topPriorities} otherTasks={otherTasks} theme={theme} />
+            <TodayTaskBoard
+              priorityTasks={topPriorities}
+              otherTasks={otherTasks}
+              theme={theme}
+              between={
+                habits && rites?.some((r) => "slot" in r) ? (
+                  <DailyHabits habits={habits} completions={riteCompletions.map((c) => ({ rite_id: c.rite_id, day: c.day }))} theme={theme} />
+                ) : null
+              }
+            />
             <BeginEveningButton />
             <section>
               <AddTaskForm theme={theme} todayFull={topPriorities.length >= 3} />
@@ -114,11 +138,11 @@ export default async function Home() {
           <div className="flex flex-col gap-6">
             {stats}
             <EveningRites
-              rites={rites?.map((r) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value })) ?? null}
+              rites={eveningRites}
               completions={riteCompletions.map((c) => ({ rite_id: c.rite_id, day: c.day }))}
               theme={theme}
               tomorrow={tomorrow}
-              openQuests={openTasks.filter((t) => !t.reward_id)}
+              openQuests={openTasks.filter((t) => !t.reward_id && !t.needs_review)}
             />
           </div>
         }

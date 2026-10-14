@@ -4,6 +4,7 @@ import { logLevelUpActivity } from "./activity";
 import type { Profile } from "./types";
 
 import { LEVEL_THRESHOLDS, computeLevelForXp, xpToNextLevel } from "@/lib/levels";
+import * as bossesData from "./bosses";
 export { LEVEL_THRESHOLDS, computeLevelForXp, xpToNextLevel };
 
 
@@ -92,7 +93,8 @@ export async function awardXp(
   if (profileErr) throw new Error(`Failed to load profile: ${profileErr.message}`);
 
   const newTotal = profile.total_xp + amount;
-  const newLevel = computeLevelForXp(newTotal);
+  // An undefeated boss holds you at its level, however much XP you have.
+  const newLevel = Math.min(computeLevelForXp(newTotal), await bossesData.levelCap(ownerId));
   const leveledUp = newLevel > profile.level;
 
   let tokenDelta = 0;

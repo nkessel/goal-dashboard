@@ -27,7 +27,7 @@ export function AddTaskForm({
   const isAdventure = theme === "adventure";
 
   if (!boardId) {
-    return <CreateFab kinds={["quest", "now", "reward", "rite", "journal"]} initial={initial} todayFull={todayFull} theme={theme} />;
+    return <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} initial={initial} todayFull={todayFull} theme={theme} />;
   }
 
   return (

@@ -62,6 +62,8 @@ export type BoardWithStats = Board & {
   isComplete: boolean;
   /** Open quests on the board, in their saved order — for the card's previews. */
   openQuests: Task[];
+  /** Most recently completed quests — shown when the card has nothing else to show. */
+  doneQuests: Task[];
   /** How many quest boards sit directly inside this one. */
   subBoardCount: number;
   /** Aspirations kept on the board (not counted as quests). */
@@ -119,11 +121,11 @@ export async function listBoardsWithStatsForOwner(
 
 
   const lastUpdated = new Map<string, string>();
-  const stats = new Map<string, { total: number; done: number; xp: number; open: Task[]; dreams: number }>();
+  const stats = new Map<string, { total: number; done: number; xp: number; open: Task[]; finished: Task[]; dreams: number }>();
   for (const t of (tasksRes.data ?? []) as Task[]) {
     if (!t.board_id && t.reward_id) continue; // a reward's own quest isn't uncategorized work
     const boardId = t.board_id ?? UNCATEGORIZED_ID;
-    const s = stats.get(boardId) ?? { total: 0, done: 0, xp: 0, open: [], dreams: 0 };
+    const s = stats.get(boardId) ?? { total: 0, done: 0, xp: 0, open: [], finished: [], dreams: 0 };
     if (t.is_aspiration && t.status === "open") {
       s.dreams += 1;
       stats.set(boardId, s);
@@ -133,6 +135,7 @@ export async function listBoardsWithStatsForOwner(
     if (t.status === "completed") {
       s.done += 1;
       s.xp += t.xp_value ?? 0;
+      s.finished.push(t);
     } else if (t.status === "open") {
       s.open.push(t);
     }
@@ -149,7 +152,8 @@ export async function listBoardsWithStatsForOwner(
   }
 
   const toCard = (board: Board): BoardWithStats => {
-    const s = stats.get(board.id) ?? { total: 0, done: 0, xp: 0, open: [], dreams: 0 };
+    const s = stats.get(board.id) ?? { total: 0, done: 0, xp: 0, open: [], finished: [], dreams: 0 };
+    const doneQuests = [...s.finished].sort((a, b) => (b.completed_at ?? "").localeCompare(a.completed_at ?? "")).slice(0, 3);
     return {
       ...board,
       questTotal: s.total,
@@ -158,6 +162,7 @@ export async function listBoardsWithStatsForOwner(
       lastUpdatedAt: lastUpdated.get(board.id) ?? board.updated_at,
       isComplete: s.total > 0 && s.done === s.total,
       openQuests: s.open,
+      doneQuests,
       subBoardCount: subBoards.get(board.id)?.length ?? 0,
       aspirationCount: s.dreams,
       subBoards: subBoards.get(board.id) ?? [],

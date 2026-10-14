@@ -348,3 +348,43 @@ export async function generateAndStoreImage(
   const { data } = db.storage.from("ai-images").getPublicUrl(finalPath);
   return data.publicUrl;
 }
+
+/**
+ * Turns a quest's own words ("Session 3 reading · Ch 10 + Appendices") into
+ * one concrete thing to paint ("an open book with bookmarks and a lit
+ * candle"), using a small Workers AI text model. Painting the raw title
+ * often gives art that has little to do with the quest; this step keeps the
+ * picture about the task. Falls back to the original text on any failure.
+ */
+export async function visualSubjectFor(text: string): Promise<string> {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+  const raw = text.trim().slice(0, 600);
+  if (!accountId || !apiToken || !raw) return raw;
+  try {
+    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct-fast`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        max_tokens: 48,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You pick the picture for a small icon of a to-do item. Reply with ONE concrete, easily drawn object or tiny scene " +
+              "that someone would instantly connect to the task (e.g. 'Sign up for personal training' -> 'a pair of dumbbells and a clipboard'; " +
+              "'Call Martin' -> 'an old telephone handset with a heart'). Under 15 words. Nouns and simple details only. " +
+              "No style words, no people's names, no text or lettering, no quotes.",
+          },
+          { role: "user", content: raw },
+        ],
+      }),
+    });
+    if (!res.ok) return raw;
+    const json = await res.json();
+    const out = String(json?.result?.response ?? "").trim().replace(/^["'\s]+|["'.\s]+$/g, "");
+    return out && out.length < 160 ? out : raw;
+  } catch {
+    return raw;
+  }
+}

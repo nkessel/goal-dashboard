@@ -8,6 +8,8 @@ import {
   MouseSensor,
   TouchSensor,
   closestCenter,
+  pointerWithin,
+  type CollisionDetection,
   useDroppable,
   useSensor,
   useSensors,
@@ -20,7 +22,6 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "@/lib/data/types";
 import { reorderTasksAction, toggleManualPriorityAction } from "@/app/actions";
 import { TaskRow } from "./TaskRow";
-import { QuestPickerSheet } from "./QuestPickerSheet";
 import { GoldRule, Leaf, QuestShield } from "@/components/ui/Ornaments";
 
 type ListName = "priority" | "other";
@@ -94,10 +95,13 @@ export function TodayTaskBoard({
   priorityTasks,
   otherTasks,
   theme = "calm",
+  between,
 }: {
   priorityTasks: TaskWithCategory[];
   otherTasks: TaskWithCategory[];
   theme?: "calm" | "adventure";
+  /** Shown between Today's Quests and Additional Quests (Daily habits). */
+  between?: React.ReactNode;
 }) {
   const [localPriority, setLocalPriority] = useState<TaskWithCategory[] | null>(null);
   const [localOther, setLocalOther] = useState<TaskWithCategory[] | null>(null);
@@ -106,7 +110,7 @@ export function TodayTaskBoard({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [startList, setStartList] = useState<ListName | null>(null);
   const [otherOpen, setOtherOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [todayOpen, setTodayOpen] = useState(true);
   const [dragError, setDragError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
@@ -134,6 +138,16 @@ export function TodayTaskBoard({
     useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // The pointer over a section header (e.g. the closed Additional Quests bar)
+  // wins outright, so a card can be dropped straight onto it.
+  const collision: CollisionDetection = (args) => {
+    const zones = pointerWithin({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id === OTHER_ZONE || c.id === PRIORITY_ZONE) });
+    const header = zones.find((z) => z.id === OTHER_ZONE);
+    if (header) return [header];
+    const cards = closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id !== OTHER_ZONE && c.id !== PRIORITY_ZONE) });
+    return cards.length ? cards : zones;
+  };
 
   const listOf = (id: string | null | undefined): ListName | null => {
     if (!id) return null;
@@ -225,7 +239,7 @@ export function TodayTaskBoard({
     : { background: "var(--t-bg)", border: "1px solid var(--t-card-border)" };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
+    <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
       {/* Today's Quests: a subtle section of its own */}
       <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
         {isAdventure ? (
@@ -236,10 +250,9 @@ export function TodayTaskBoard({
             <span className="flex-1 sm:hidden" />
             <Leaf flip />
             <h2 className="font-display m-0 whitespace-nowrap text-[23px] leading-none sm:text-[27px]" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
-              Today&apos;s Quests
-              <span className="ml-2 align-middle text-[14px] font-normal" style={{ color: "var(--t-gold)" }}>
-                ({priority.length}/{MAX_PRIORITY})
-              </span>
+              <button type="button" onClick={() => setTodayOpen((v) => !v)} aria-expanded={todayOpen} className="cursor-pointer select-none">
+                Today&apos;s Quests
+              </button>
             </h2>
             <Leaf />
             <span className="hidden flex-1 sm:flex">
@@ -250,11 +263,10 @@ export function TodayTaskBoard({
         ) : (
           <div className="flex items-center justify-center gap-2.5">
             <h2 className="text-lg font-extrabold" style={{ color: "var(--t-ink)" }}>
-              Today&apos;s Focus
+              <button type="button" onClick={() => setTodayOpen((v) => !v)} aria-expanded={todayOpen}>
+                Today&apos;s Focus
+              </button>
             </h2>
-            <span className="text-sm" style={{ color: "var(--t-ink-soft)" }}>
-              ({priority.length}/{MAX_PRIORITY})
-            </span>
           </div>
         )}
 
@@ -264,43 +276,34 @@ export function TodayTaskBoard({
           </p>
         )}
 
-        <SortableContext id="priority" items={priority.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          <ul className="flex flex-col gap-3">
-            {priority.map((task) => (
-              <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} />
-            ))}
-          </ul>
-        </SortableContext>
-
-        {/* An empty slot: tap to add a quest, or drop one here */}
-        {priority.length < MAX_PRIORITY && (
-          <Zone id={PRIORITY_ZONE} className="rounded-2xl">
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              className="add-slot flex min-h-[84px] w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-4 text-[16px]"
-              style={{
-                borderColor: isAdventure ? "rgba(217,180,95,.45)" : "var(--t-card-border)",
-                color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)",
-                background: isAdventure ? "rgba(243,231,203,.04)" : "transparent",
-              }}
-            >
-              <span
-                aria-hidden
-                className="flex h-10 w-10 items-center justify-center rounded-full text-[24px] leading-none"
-                style={{ border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.6)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-gold)" : "var(--t-accent)" }}
-              >
-                +
-              </span>
-              <span className={isAdventure ? "font-display" : ""}>
-                {priority.length === 0 ? "Choose a quest for today" : "Add another quest"}
-              </span>
-            </button>
-          </Zone>
+        <div className="drawer-body" data-open={todayOpen ? "true" : "false"}>
+          <div className="drawer-inner -mx-1 px-1">
+            <Zone id={PRIORITY_ZONE} className="rounded-2xl">
+              <SortableContext id="priority" items={priority.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                <ul className="flex min-h-[40px] flex-col gap-3 pb-0.5 pt-0.5">
+                  {priority.map((task) => (
+                    <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!todayOpen} />
+                  ))}
+                </ul>
+              </SortableContext>
+              {priority.length === 0 && (
+                <p className="-mt-8 px-2 pb-1 text-center text-[14.5px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.75 }}>
+                  Drag a quest up here, or tap + to make one.
+                </p>
+              )}
+            </Zone>
+          </div>
+        </div>
+        {!todayOpen && priority.length > 0 && (
+          <button type="button" onClick={() => setTodayOpen(true)} className="-mt-1.5 text-center text-[13px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.6 }}>
+            {priority.length} {priority.length === 1 ? "quest" : "quests"} tucked away
+          </button>
         )}
       </section>
 
-      {/* Additional Quests: a drawer that slides open */}
+      {between}
+
+      {/* Additional Quests: a drawer that slides open into a scrollable tray */}
       <section>
         <Zone id={OTHER_ZONE} className="rounded-2xl">
           <button
@@ -333,7 +336,10 @@ export function TodayTaskBoard({
         </Zone>
         <div className="drawer-body" data-open={otherOpen ? "true" : "false"}>
           <div className="drawer-inner -mx-2 px-2">
-            <div className="pb-3 pt-3">
+            <div
+              className="quest-tray mt-2.5 max-h-[min(62vh,560px)] overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
+              style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}
+            >
               {other.length === 0 ? (
                 <p className="px-1 text-sm" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.7 }}>
                   Nothing here — nice.
@@ -360,7 +366,6 @@ export function TodayTaskBoard({
         ) : null}
       </DragOverlay>
 
-      {pickerOpen && <QuestPickerSheet otherTasks={other} theme={theme} onClose={() => setPickerOpen(false)} />}
     </DndContext>
   );
 }

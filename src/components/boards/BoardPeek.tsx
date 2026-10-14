@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useEscape } from "@/lib/use-escape";
-import { CreateSheet } from "@/components/create/CreateSheet";
+import { setFabTarget } from "@/lib/fab-target";
 
 // Which boards this peek has walked through (so × can step all the way back
 // out) and how deep the last one was (so moving down zooms in, up zooms out).
@@ -45,7 +45,6 @@ export function BoardPeek({
   const isAdventure = theme === "adventure";
   const [closing, setClosing] = useState(false);
   const [max, setMax] = useState(readMax);
-  const [adding, setAdding] = useState(false);
   const [motion] = useState(() => (lastDepth === null ? "peek-open" : depth > lastDepth ? "peek-zoom-in" : depth < lastDepth ? "peek-zoom-out" : "peek-open"));
   const [opening] = useState(() => lastDepth === null);
 
@@ -55,6 +54,8 @@ export function BoardPeek({
     if (i >= 0) trail = trail.slice(0, i + 1);
     else trail = [...trail, boardId];
     lastDepth = depth;
+    // The page's own + now adds to this board.
+    setFabTarget(canAdd ? { kinds: ["quest", "subboard", "journal"], boardId, label: `Add to ${title}` } : { kinds: ["quest", "habit", "rite", "reward", "journal"], label: "Create something new" });
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -63,9 +64,10 @@ export function BoardPeek({
       resetTimer = setTimeout(() => {
         trail = [];
         lastDepth = null;
+        setFabTarget(null);
       }, 500);
     };
-  }, [boardId, depth]);
+  }, [boardId, depth, canAdd, title]);
 
   function close() {
     if (closing) return;
@@ -74,6 +76,7 @@ export function BoardPeek({
     setTimeout(() => {
       trail = [];
       lastDepth = null;
+      setFabTarget(null);
       window.history.go(-steps);
     }, 200);
   }
@@ -94,14 +97,13 @@ export function BoardPeek({
     : { top: "max(10px, 3dvh)", bottom: "max(8px, 2dvh)", left: "max(6px, calc(50% - 390px))", right: "max(6px, calc(50% - 390px))", borderRadius: 18 };
 
   return (
-    <div data-theme={theme} className="fixed inset-0 z-[47]" style={{ background: "transparent", minHeight: 0 }}>
-      {opening && <div className={`absolute inset-0 ${closing ? "overlay-fade-out" : "overlay-fade-in"}`} style={{ background: "rgba(6,9,5,.62)" }} onClick={close} />}
-      {!opening && <div className={`absolute inset-0 ${closing ? "overlay-fade-out" : ""}`} style={{ background: "rgba(6,9,5,.62)" }} onClick={close} />}
+    <div data-theme={theme} style={{ background: "transparent", minHeight: 0 }}>
+      <div className={`fixed inset-0 z-[47] ${closing ? "overlay-fade-out" : opening ? "overlay-fade-in" : ""}`} style={{ background: "rgba(6,9,5,.62)" }} onClick={close} />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`board-peek absolute flex flex-col overflow-hidden ${closing ? "peek-close" : opening ? "peek-open" : ""}`}
+        className={`board-peek fixed z-[47] flex flex-col overflow-hidden ${closing ? "peek-close" : opening ? "peek-open" : ""}`}
         style={{
           ...frame,
           transition: "top 280ms cubic-bezier(.2,.8,.2,1), bottom 280ms cubic-bezier(.2,.8,.2,1), left 280ms cubic-bezier(.2,.8,.2,1), right 280ms cubic-bezier(.2,.8,.2,1), border-radius 280ms",
@@ -117,20 +119,6 @@ export function BoardPeek({
           style={{ borderColor: isAdventure ? "rgba(217,180,95,.28)" : "var(--t-card-border)", background: isAdventure ? "rgba(15,19,13,.45)" : "var(--t-card)", paddingTop: max ? "max(8px, env(safe-area-inset-top))" : undefined }}
         >
           <div className="min-w-0 flex-1">{trailNode}</div>
-          {canAdd && (
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              className="hover-glow flex h-9 shrink-0 items-center gap-1 rounded-full px-3 text-[13.5px] font-semibold"
-              style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
-              aria-label={`Add to ${title}`}
-            >
-              <span className="text-[17px] leading-none" aria-hidden>
-                +
-              </span>
-              Add
-            </button>
-          )}
           <button
             type="button"
             onClick={toggleMax}
@@ -163,7 +151,6 @@ export function BoardPeek({
           </div>
         </div>
       </div>
-      {adding && <CreateSheet kinds={["quest", "subboard"]} boardId={boardId} theme={theme} onClose={() => setAdding(false)} />}
     </div>
   );
 }

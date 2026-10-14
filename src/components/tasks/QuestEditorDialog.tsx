@@ -15,6 +15,7 @@ import {
   reopenTaskAction,
   saveQuestStepsAction,
   scheduleTaskAction,
+  setTaskPlacementAction,
   setTaskProgressAction,
   updateTaskAction,
 } from "@/app/actions";
@@ -117,7 +118,7 @@ export function QuestEditorDialog({
   const create = mode.kind === "create" ? mode : null;
   const prefill = create?.prefill;
   const fixedSchedule = create?.schedule;
-  const doingNow = Boolean(create?.doingNow);
+  const [doingNow, setDoingNow] = useState(Boolean(create?.doingNow));
 
   const [title, setTitle] = useState(task?.title ?? prefill?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? prefill?.description ?? "");
@@ -134,7 +135,19 @@ export function QuestEditorDialog({
   const [chunk, setChunk] = useState<string>(task?.chunk_minutes ? String(task.chunk_minutes) : "");
   const [dueDate, setDueDate] = useState(localDate(task?.due_at));
   const [dueTime, setDueTime] = useState(localTime(task?.due_at));
-  const [pinToday, setPinToday] = useState(create ? (create.pinToBattle ?? !create.todayFull) : false);
+  type Placement = "today" | "additional" | "none";
+  const initialPlacement: Placement = task
+    ? task.is_manual_priority
+      ? "today"
+      : task.in_additional === false
+        ? "none"
+        : "additional"
+    : create?.pinToBattle === false || create?.todayFull
+      ? "additional"
+      : "today";
+  const [placement, setPlacement] = useState<Placement>(initialPlacement);
+  const savedPlacement = useRef<Placement>(initialPlacement);
+  const todayFull = Boolean(create?.todayFull) && placement !== "today";
   const [draftIcon, setDraftIcon] = useState<{ url: string; source: "library" | "ai" } | null>(null);
   const initialSlot =
     task?.is_on_calendar && task.scheduled_start && task.scheduled_end
@@ -214,7 +227,7 @@ export function QuestEditorDialog({
 
   // ---- Saving as you go (existing quests) ----------------------------------
   const autosave = Boolean(task) && !review;
-  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, effort, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration]);
+  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, effort, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration, placement]);
   const [savedFields, setSavedFields] = useState(fields);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const dirty = fields !== savedFields || stepsDirty;
@@ -246,12 +259,17 @@ export function QuestEditorDialog({
       coinValue,
     };
     const newSlot = !fixedSchedule && slot && slot.start !== savedSlotStart.current ? slot : null;
+    const newPlacement = placement !== savedPlacement.current ? placement : null;
     const sendSteps = stepsDirty;
     if (sendSteps) setStepsDirty(false);
     setSaveState("saving");
     const run = async () => {
       if (deleted.current) return;
       await updateTaskAction(task.id, input);
+      if (newPlacement) {
+        await setTaskPlacementAction(task.id, newPlacement);
+        savedPlacement.current = newPlacement;
+      }
       if (newSlot) {
         await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
         savedSlotStart.current = newSlot.start;
@@ -411,6 +429,7 @@ export function QuestEditorDialog({
           });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
           if (stepsDirty && steps) await saveQuestStepsAction(task.id, steps.map(({ id, title, done }) => ({ id, title, done })));
+          await setTaskPlacementAction(task.id, placement).catch(() => {});
           if (onSaved) onSaved();
           else close();
           return;
@@ -443,7 +462,8 @@ export function QuestEditorDialog({
           effort: effort || undefined,
           iconKey: draftIcon?.url ?? null,
           iconSource: draftIcon?.source,
-          pinToBattle: pinToday,
+          pinToBattle: placement === "today",
+          placement,
           schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
           dueAt,
           chunkMinutes,
@@ -604,6 +624,59 @@ export function QuestEditorDialog({
             <p className="-mt-1.5 m-0 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
               A portrait is painted from the title once it&apos;s saved — or tap the circle to choose one.
             </p>
+          )}
+
+          {/* Where it shows on Today: Today's Quests, Additional Quests, or neither */}
+          {!doingNow && !isCompleted && !fixedSchedule && (
+            <div className="flex flex-col gap-1">
+              <span className={labelCls}>On the Today screen</span>
+              <div role="radiogroup" aria-label="Where it shows on the Today screen" className="grid grid-cols-2 gap-1.5">
+                {(
+                  [
+                    { v: "today" as const, label: `Today's ${isAdventure ? "Quests" : "Tasks"}`, hint: todayFull ? "full" : null },
+                    { v: "additional" as const, label: `Additional ${isAdventure ? "Quests" : "Tasks"}`, hint: null },
+                  ]
+                ).map((o) => {
+                  const on = placement === o.v;
+                  return (
+                    <button
+                      key={o.v}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      disabled={o.v === "today" && todayFull}
+                      // Tap the chosen one again to leave it off both (just on its board).
+                      onClick={() => setPlacement(on ? "none" : o.v)}
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl border px-2 text-[13.5px] font-semibold transition-colors disabled:opacity-45"
+                      style={
+                        on
+                          ? { background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", borderColor: "#8a6116", boxShadow: "0 1px 3px rgba(0,0,0,.25)" }
+                          : { borderColor: chipBorder, color: "var(--t-ink-soft)" }
+                      }
+                    >
+                      <span
+                        aria-hidden
+                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px]"
+                        style={{ border: `1.5px solid ${on ? "#2a1c10" : chipBorder}`, background: on ? "rgba(255,255,255,.35)" : "transparent" }}
+                      >
+                        {on && (
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#2a1c10" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                      {o.label}
+                      {o.hint && <span className="font-normal"> ({o.hint})</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              {placement === "none" && (
+                <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+                  Neither — it stays on its board until you add it to Today.
+                </span>
+              )}
+            </div>
           )}
 
           {/* Time to complete, power-up, and whether it can be done in pieces */}
@@ -963,33 +1036,6 @@ export function QuestEditorDialog({
             />
           </div>
 
-          {/* New quests: straight into Today's Quests, or into Additional Quests */}
-          {create && !doingNow && !fixedSchedule && (
-            <div className="flex flex-col gap-1">
-              <span className={labelCls}>Put it in</span>
-              <div role="radiogroup" aria-label="Where the new quest goes" className="grid grid-cols-2 gap-1.5 rounded-full p-1" style={{ background: "rgba(70,50,20,.12)" }}>
-                {[
-                  { on: true, label: `Today's ${isAdventure ? "Quests" : "Tasks"}`, hint: create.todayFull ? "full" : null },
-                  { on: false, label: `Additional ${isAdventure ? "Quests" : "Tasks"}`, hint: null },
-                ].map((o) => (
-                  <button
-                    key={String(o.on)}
-                    type="button"
-                    role="radio"
-                    aria-checked={pinToday === o.on}
-                    disabled={o.on && create.todayFull}
-                    onClick={() => setPinToday(o.on)}
-                    className="h-9 rounded-full px-2 text-[13px] font-semibold transition-colors disabled:opacity-45"
-                    style={pinToday === o.on ? { background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.25)" } : { color: "var(--t-ink-soft)" }}
-                  >
-                    {o.label}
-                    {o.hint && <span className="font-normal"> ({o.hint})</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Aspiration: keep it on its board, out of today's lists */}
           {task && !isCompleted && (
             <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
@@ -1130,6 +1176,20 @@ export function QuestEditorDialog({
                       : `${Math.round((xp * progress) / 100)} XP earned so far · ${xp - Math.round((xp * progress) / 100)} more on completion`}
               </p>
             </div>
+          )}
+
+          {create && !fixedSchedule && (
+            <button
+              type="button"
+              onClick={() => {
+                setDoingNow(!doingNow);
+                if (!doingNow && xp === 0) setXp(30);
+              }}
+              className="self-start text-[13px] underline underline-offset-2"
+              style={{ color: "var(--t-ink-soft)" }}
+            >
+              {doingNow ? "← Back to a regular quest" : "Already doing it? Log it as done now (+XP)"}
+            </button>
           )}
 
           {error && (

@@ -87,12 +87,12 @@ export function BeginEveningButton() {
     <button
       type="button"
       onClick={() => flip(true)}
-      className="hover-glow evening-cta relative flex min-h-[58px] w-full items-center justify-center gap-3 rounded-2xl px-5 text-[21px]"
+      className="hover-glow evening-cta shimmer-edge relative flex min-h-[58px] w-full items-center justify-center gap-3 rounded-2xl px-5 text-[21px]"
     >
       <NightSky />
       <span className="relative flex items-center gap-3">
         <Moon size={26} />
-        <span className="font-display">Begin Evening Routine</span>
+        <span className="font-display">Evening Routine</span>
       </span>
     </button>
   );

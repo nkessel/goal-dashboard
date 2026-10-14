@@ -10,16 +10,22 @@ import { usePortalTarget } from "@/components/ui/EmbedHost";
 
 const XP_PRESETS = [0, 5, 10, 15, 25];
 
-/** Create or edit an evening rite: name, note, XP, and whether it's non-negotiable. */
+/**
+ * Create or edit an evening rite (name, note, XP, whether it's non-negotiable)
+ * or, with slot="day", a daily habit — the same thing on the day side.
+ */
 export function RiteEditorDialog({
   rite,
   defaultCore = true,
+  slot = rite?.slot === "day" ? "day" : "evening",
   onClose,
 }: {
   rite?: RiteView;
   defaultCore?: boolean;
+  slot?: "evening" | "day";
   onClose: () => void;
 }) {
+  const isHabit = slot === "day";
   useEscape(() => close());
   const [title, setTitle] = useState(rite?.title ?? "");
   const [description, setDescription] = useState(rite?.description ?? "");
@@ -39,8 +45,8 @@ export function RiteEditorDialog({
     setError(null);
     startSaving(async () => {
       try {
-        if (rite) await updateRiteAction(rite.id, { title, description, isCore, xpValue: xp });
-        else await createRiteAction({ title, description, isCore, xpValue: xp });
+        if (rite) await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp });
+        else await createRiteAction({ title, description, isCore: isHabit ? true : isCore, xpValue: xp, slot });
         close();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
@@ -74,12 +80,12 @@ export function RiteEditorDialog({
         aria-modal="true"
         aria-label={rite ? "Edit rite" : "New rite"}
         onClick={(e) => e.stopPropagation()}
-        className={`parchment parchment-framed moonlit flex w-full max-w-md flex-col gap-3 rounded-2xl p-5 shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
+        className={`parchment parchment-framed ${isHabit ? "" : "moonlit"} flex w-full max-w-md flex-col gap-3 rounded-2xl p-5 shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
       >
         <div data-embed-hide className="relative z-[1] flex items-center justify-between">
           <h3 className="font-display flex items-center gap-2 text-lg">
             <Moon size={22} />
-            {rite ? "Edit rite" : isCore ? "New evening rite" : "New mini-quest"}
+            {isHabit ? (rite ? "Edit habit" : "New daily habit") : rite ? "Edit rite" : isCore ? "New evening rite" : "New mini-quest"}
           </h3>
           <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
             ×
@@ -91,8 +97,8 @@ export function RiteEditorDialog({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && save()}
-          placeholder="What's the rite? (e.g. Lay out tomorrow's clothes)"
-          aria-label="Rite"
+          placeholder={isHabit ? "What's the habit? (e.g. Tell Tiffany what she's doing right)" : "What's the rite? (e.g. Lay out tomorrow's clothes)"}
+          aria-label={isHabit ? "Habit" : "Rite"}
           className={`${field} relative z-[1] h-11 font-semibold`}
         />
         <textarea
@@ -104,14 +110,14 @@ export function RiteEditorDialog({
           className={`${field} relative z-[1] resize-none py-1.5`}
         />
 
-        <div className="relative z-[1] flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[14.5px] font-semibold">XP</span>
+        <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
+          <span className="mr-0.5 text-[14.5px] font-semibold">XP</span>
           {XP_PRESETS.map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => setXp(v)}
-              className="h-8 min-w-10 rounded-full px-3 text-[13.5px] font-semibold tabular-nums"
+              className="h-8 min-w-9 rounded-full px-2.5 text-[13.5px] font-semibold tabular-nums"
               style={
                 xp === v
                   ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" }
@@ -121,8 +127,21 @@ export function RiteEditorDialog({
               {v}
             </button>
           ))}
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={500}
+            value={XP_PRESETS.includes(xp) ? "" : xp}
+            placeholder="other"
+            onChange={(e) => setXp(Math.max(0, Math.min(500, Math.round(Number(e.target.value) || 0))))}
+            aria-label="XP (any amount)"
+            className="h-8 w-[60px] rounded-full border px-1.5 text-center text-[16px] font-semibold tabular-nums"
+            style={{ borderColor: XP_PRESETS.includes(xp) ? "#b39a6a" : "#5a4520", background: XP_PRESETS.includes(xp) ? undefined : "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" }}
+          />
         </div>
 
+        {!isHabit && (
         <label className="relative z-[1] flex cursor-pointer items-start gap-2.5 rounded-lg px-3 py-2.5" style={{ background: "rgba(255,250,238,.5)", border: "1px solid #b39a6a" }}>
           <input
             type="checkbox"
@@ -138,6 +157,7 @@ export function RiteEditorDialog({
             </span>
           </span>
         </label>
+        )}
 
         {error && (
           <p className="relative z-[1] text-sm" style={{ color: "var(--t-warn)" }}>
@@ -149,7 +169,7 @@ export function RiteEditorDialog({
           {rite ? (
             !confirmingDelete ? (
               <button type="button" onClick={() => setConfirmingDelete(true)} className="text-sm underline" style={{ color: "var(--t-warn)" }}>
-                Remove rite
+                {isHabit ? "Remove habit" : "Remove rite"}
               </button>
             ) : (
               <span className="flex items-center gap-2 text-sm">
@@ -175,7 +195,7 @@ export function RiteEditorDialog({
               className="hover-glow h-10 rounded-full px-5 text-[15px] disabled:opacity-50"
               style={{ background: "var(--t-gold)", color: "#2a1c10" }}
             >
-              {isSaving ? "Saving…" : rite ? "Save" : "Add rite"}
+              {isSaving ? "Saving…" : rite ? "Save" : isHabit ? "Add habit" : "Add rite"}
             </button>
           </span>
         </div>

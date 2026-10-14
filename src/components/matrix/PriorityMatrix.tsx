@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { TaskWithBoard } from "@/lib/data/tasks";
 import { computeMatrixLayout } from "@/lib/matrix-layout";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
+import { QuestCardPopup } from "@/components/tasks/QuestCardPopup";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { confirmImportAction, updateTaskPriorityAction } from "@/app/actions";
@@ -132,7 +133,10 @@ export function PriorityMatrix({
     });
   }
   const visibleTasks = boards ? tasks.filter((t) => !hiddenBoards.has(t.board_id ?? "none")) : tasks;
-  const plotted = computeMatrixLayout(visibleTasks);
+  // Quests never rated (importance and urgency both 0) wait in a tray below
+  // instead of piling up along the bottom edge.
+  const unrated = visibleTasks.filter((t) => !t.importance && !t.urgency);
+  const plotted = computeMatrixLayout(visibleTasks.filter((t) => t.importance || t.urgency));
   const hasUnboarded = tasks.some((t) => !t.board_id);
   // Looked up by id (rather than holding the task object itself) so the
   // popped-up card always reflects the latest data, including right after
@@ -149,7 +153,8 @@ export function PriorityMatrix({
   const [plotIndex, setPlotIndex] = useState(0);
   const [plotEditing, setPlotEditing] = useState(false);
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
-  const queue = (plotIds ?? []).filter((id) => tasks.some((t) => t.id === id));
+  const [localPlot, setLocalPlot] = useState<string[] | null>(null);
+  const queue = (localPlot ?? plotIds ?? []).filter((id) => tasks.some((t) => t.id === id));
   const plotting = queue.length > 0 && plotIndex < queue.length;
   const plotTask = plotting ? (tasks.find((t) => t.id === queue[plotIndex]) ?? null) : null;
 
@@ -484,8 +489,61 @@ export function PriorityMatrix({
         </div>
       </div>
 
+      {unrated.length > 0 && !plotting && (
+        <section className="flex flex-col gap-2 rounded-2xl px-3 py-3" style={{ background: isAdventure ? "rgba(14,18,10,.4)" : "var(--t-card)", border: `1px solid ${isAdventure ? "rgba(217,180,95,.3)" : "var(--t-card-border)"}` }}>
+          <div className="flex items-center gap-2">
+            <h2 className={`m-0 flex-1 ${isAdventure ? "font-display text-[17px]" : "text-sm font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+              Not yet plotted <span className="font-normal opacity-70">({unrated.length})</span>
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                setLocalPlot(unrated.map((t) => t.id));
+                setPlotIndex(0);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="hover-glow h-9 rounded-full px-3.5 text-[13.5px] font-semibold"
+              style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
+            >
+              Plot them one by one
+            </button>
+          </div>
+          <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1 [scrollbar-width:thin]">
+            {unrated.map((t) => {
+              const img = (t.icon_source === "ai" || t.icon_source === "library") && t.icon_key ? t.icon_key : null;
+              return (
+                <li key={t.id} className="shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalPlot([t.id]);
+                      setPlotIndex(0);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    title={`Plot “${t.title}”`}
+                    className="flex w-[72px] flex-col items-center gap-1 rounded-xl p-1 text-center"
+                  >
+                    <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full" style={{ border: "2px solid #8a6c2c", background: "#f3e6c8" }}>
+                      {img ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+                        <img src={img} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <QuestMonogram id={t.id} title={t.title} size={44} />
+                      )}
+                    </span>
+                    <span className="line-clamp-2 text-[11.5px] leading-tight" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+                      {t.title}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       <p className="m-0 text-center text-[14px] italic" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.8 }}>
-        Drag a quest to re-plot its importance and urgency; click one to open it.
+        Drag a quest to re-plot it; tap one to see it.
       </p>
 
       <div
@@ -513,9 +571,7 @@ export function PriorityMatrix({
         ))}
       </div>
 
-      {viewingTask && (
-        <EditTaskModal task={viewingTask} theme={theme} onClose={() => setViewingTaskId(null)} />
-      )}
+      {viewingTask && <QuestCardPopup task={viewingTask} theme={theme} onClose={() => setViewingTaskId(null)} />}
     </div>
   );
 }

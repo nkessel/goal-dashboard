@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 
-export type QuestAction = "edit" | "complete" | "battle" | "calendar" | "delete";
+export type QuestAction = "edit" | "complete" | "battle" | "offtoday" | "calendar" | "delete";
 
 /**
  * The quest card's action list — opened from the card's icon (the blank
@@ -13,6 +13,7 @@ export type QuestAction = "edit" | "complete" | "battle" | "calendar" | "delete"
 export function QuestActionMenu({
   isAdventure,
   inBattle,
+  onToday = true,
   onCalendar,
   align,
   anchor,
@@ -21,6 +22,8 @@ export function QuestActionMenu({
 }: {
   isAdventure: boolean;
   inBattle: boolean;
+  /** Shown on the Today screen (Today's or Additional Quests) — offers taking it off. */
+  onToday?: boolean;
   onCalendar: boolean;
   /** Which edge of the anchor the menu lines up with. */
   align: "left" | "right";
@@ -82,6 +85,7 @@ export function QuestActionMenu({
           ? "Remove from Today's Focus"
           : "Add to Today's Focus",
     },
+    ...(onToday ? [{ key: "offtoday" as const, icon: "↧", label: "Take off the Today screen" }] : []),
     { key: "calendar", icon: "📅", label: onCalendar ? "Reschedule on calendar" : "Add to calendar" },
     { key: "delete", icon: "🗑", label: isAdventure ? "Delete quest" : "Delete task" },
   ];

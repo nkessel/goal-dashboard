@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Profile } from "@/lib/data/types";
 import { xpToNextLevel } from "@/lib/data/xp";
 import { Avatar, defaultPortraitFor } from "@/components/settings/Avatar";
+import { BossLine, type BossView } from "./BossLine";
 
 /** One flanking stat tile in the Adventure-theme header (Quests Complete,
  * Quest Streak, XP this week, Party Size) — icon + big number + caption,
@@ -37,13 +38,19 @@ function StatTile({
 export function XpSummary({
   profile,
   stats,
+  boss = null,
+  bossesEnabled = false,
 }: {
+  /** The boss standing in the way of the next level (null = none set). */
+  boss?: BossView | null;
+  /** False before the bosses table exists (no "set a boss" prompt then). */
+  bossesEnabled?: boolean;
   profile: Profile;
   /** Adventure-theme header stats (Quests Complete / XP this week / Party
    * Size) — the calm theme's simpler layout doesn't use these. */
   stats?: { questsComplete: number; xpThisWeek: number; partySize: number };
 }) {
-  const { level, nextLevel, xpIntoLevel, xpForNextLevel } = xpToNextLevel(profile.total_xp);
+  const { level, nextLevel, xpIntoLevel, xpForNextLevel, heldByBoss } = xpToNextLevel(profile.total_xp, boss?.level ?? 10);
   const pct = xpForNextLevel ? Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100)) : 100;
   const isAdventure = profile.theme === "adventure";
   const streakLine = (
@@ -112,7 +119,7 @@ export function XpSummary({
               </div>
               <div className="text-center text-[13.5px] tabular-nums tracking-wide sm:text-[15px]" style={{ color: "var(--t-gold)" }}>
                 {nextLevel
-                  ? `${xpIntoLevel.toLocaleString("en-US")} / ${xpForNextLevel!.toLocaleString("en-US")} XP`
+                  ? `${Math.min(xpIntoLevel, xpForNextLevel!).toLocaleString("en-US")} / ${xpForNextLevel!.toLocaleString("en-US")} XP`
                   : `${profile.total_xp.toLocaleString("en-US")} XP · Max level`}
               </div>
             </div>
@@ -123,6 +130,8 @@ export function XpSummary({
             <StatTile iconSrc="/design/ui-party-simple.svg" value={stats?.partySize ?? 0} label={<>Party<br />Size</>} />
           </div>
         </div>
+
+        {(boss || bossesEnabled) && nextLevel && <BossLine boss={boss && boss.level === level ? boss : null} level={level} heldByBoss={heldByBoss} />}
 
         {profile.streak_protection_tokens > 0 && (
           <div className="text-center text-xs" style={{ color: "var(--t-cream)", opacity: 0.75 }}>

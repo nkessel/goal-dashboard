@@ -265,11 +265,36 @@ export function BoardGrid({
           </Link>
         )}
 
-        {previews.length === 0 && board.subBoards.length === 0 && board.aspirationCount === 0 && (
-          <p className="m-0 border-t pt-1.5 text-[12.5px]" style={{ borderColor: rule, color: soft }}>
-            {board.isComplete ? "Every quest here is complete." : "No quests yet."}
-          </p>
-        )}
+        {previews.length === 0 && board.subBoards.length === 0 && board.aspirationCount === 0 &&
+          ((board.doneQuests ?? []).length > 0 ? (
+            // Nothing open: show what's been done here instead.
+            <ul className="-mx-1 flex flex-col border-t pt-1" style={{ borderColor: rule }}>
+              {(board.doneQuests ?? []).map((q) => (
+                <li key={q.id}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={() => setOpenQuest(q)}
+                    className="board-quest flex min-h-[28px] w-full items-center gap-1.5 rounded-md px-1 py-[3px] text-left text-[13.5px]"
+                    style={{ color: "var(--t-ink-soft)" }}
+                    title={q.title}
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--t-good)" }} aria-hidden>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                    <span className="min-w-0 flex-1 truncate line-through decoration-[rgba(80,60,20,.4)]">{q.title}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="m-0 border-t pt-1.5 text-[12.5px]" style={{ borderColor: rule, color: soft }}>
+              No quests yet.
+            </p>
+          ))}
 
         {/* Add to this board (and, on touch screens, edit it) */}
         {!board.isVirtual && (

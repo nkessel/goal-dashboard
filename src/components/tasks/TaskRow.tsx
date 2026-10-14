@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction } from "@/app/actions";
+import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
 import { QuestActionMenu, type QuestAction } from "./QuestActionMenu";
@@ -138,6 +138,8 @@ export function TaskRow({
       try {
         if (action === "battle") {
           await toggleManualPriorityAction(task.id, !task.is_manual_priority);
+        } else if (action === "offtoday") {
+          await setTaskPlacementAction(task.id, "none");
         } else if (action === "delete") {
           await deleteTaskAction(task.id);
         } else {
@@ -170,6 +172,7 @@ export function TaskRow({
     <QuestActionMenu
       isAdventure={isAdventure}
       inBattle={task.is_manual_priority}
+      onToday={task.is_manual_priority || task.in_additional !== false}
       onCalendar={task.is_on_calendar}
       align={align}
       anchor={menuAnchor}

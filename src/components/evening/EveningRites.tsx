@@ -18,6 +18,8 @@ export type RiteView = {
   description: string | null;
   is_core: boolean;
   xp_value: number;
+  /** "day" = a daily habit (day side); otherwise an evening rite. */
+  slot?: string | null;
 };
 
 /** A moon-and-check seal: empty ring until the rite is done tonight. */

@@ -24,13 +24,19 @@ export function computeLevelForXp(totalXp: number): number {
   return level;
 }
 
-export function xpToNextLevel(totalXp: number): { level: number; nextLevel: number | null; xpIntoLevel: number; xpForNextLevel: number | null } {
-  const level = computeLevelForXp(totalXp);
+export function xpToNextLevel(
+  totalXp: number,
+  /** Highest level allowed right now (an undefeated boss holds you there). */
+  cap = 10
+): { level: number; nextLevel: number | null; xpIntoLevel: number; xpForNextLevel: number | null; heldByBoss: boolean } {
+  const earned = computeLevelForXp(totalXp);
+  const level = Math.min(earned, Math.max(1, cap));
   const nextLevel = level < 10 ? level + 1 : null;
   return {
     level,
     nextLevel,
     xpIntoLevel: totalXp - LEVEL_THRESHOLDS[level],
     xpForNextLevel: nextLevel ? LEVEL_THRESHOLDS[nextLevel] - LEVEL_THRESHOLDS[level] : null,
+    heldByBoss: earned > level,
   };
 }

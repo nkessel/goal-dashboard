@@ -2,14 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { deleteJournalEntryAction } from "@/app/actions";
+import { JOURNAL_KINDS, journalKindMeta } from "@/lib/journal-kinds";
 
-type Entry = { id: string; body: string; mood: number | null; created_at: string };
+type Entry = { id: string; body: string; mood: number | null; kind?: string | null; created_at: string };
 const FACES = ["", "😞", "🙁", "😐", "🙂", "😄"];
 
 /** Entries newest first, grouped by day. */
 export function JournalList({ entries, isAdventure }: { entries: Entry[] | null; isAdventure: boolean }) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   if (entries === null) {
@@ -19,7 +21,8 @@ export function JournalList({ entries, isAdventure }: { entries: Entry[] | null;
       </p>
     );
   }
-  const shown = entries.filter((e) => !hidden.has(e.id));
+  const shown = entries.filter((e) => !hidden.has(e.id) && (!filter || e.kind === filter));
+  const kindsUsed = JOURNAL_KINDS.filter((k) => entries.some((e) => e.kind === k.key));
   if (shown.length === 0) {
     return (
       <div className={`flex flex-col items-center gap-2 rounded-2xl px-5 py-8 text-center ${isAdventure ? "parchment" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)" }}>
@@ -43,6 +46,24 @@ export function JournalList({ entries, isAdventure }: { entries: Entry[] | null;
 
   return (
     <div className="flex flex-col gap-5">
+      {kindsUsed.length > 0 && (
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Show entries of kind">
+          {[{ key: null as string | null, label: "All", icon: "" }, ...kindsUsed].map((k) => (
+            <button
+              key={k.key ?? "all"}
+              type="button"
+              role="radio"
+              aria-checked={filter === k.key}
+              onClick={() => setFilter(k.key)}
+              className="hover-glow flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px]"
+              style={{ background: filter === k.key ? "var(--t-gold)" : "rgba(15,19,13,.5)", color: filter === k.key ? "#2a1c10" : "var(--t-cream)", border: "1px solid rgba(217,180,95,.45)" }}
+            >
+              {k.icon && <span aria-hidden>{k.icon}</span>}
+              {k.label}
+            </button>
+          ))}
+        </div>
+      )}
       {groups.map((g) => (
         <section key={g.day} className="flex flex-col gap-2">
           <h2 className={`m-0 text-[15px] ${isAdventure ? "font-display" : "font-semibold"}`} style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)" }}>
@@ -51,6 +72,11 @@ export function JournalList({ entries, isAdventure }: { entries: Entry[] | null;
           {g.items.map((e) => (
             <article key={e.id} className={`group relative flex flex-col gap-1.5 rounded-2xl px-4 py-3 ${isAdventure ? "parchment" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
               <div className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                {journalKindMeta(e.kind) && (
+                  <span className="rounded-full px-2 py-0.5 font-semibold" style={{ background: "rgba(217,180,95,.3)", color: "var(--t-ink)" }}>
+                    {journalKindMeta(e.kind)!.icon} {journalKindMeta(e.kind)!.label}
+                  </span>
+                )}
                 {e.mood && (
                   <span className="text-[17px] leading-none" aria-label={`Mood ${e.mood} of 5`}>
                     {FACES[e.mood]}

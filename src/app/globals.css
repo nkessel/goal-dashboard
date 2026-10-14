@@ -171,21 +171,21 @@ body {
 /* Board-detail navigation transition (progressively enhanced — a no-op in
    browsers without the View Transitions API). */
 ::view-transition-old(root) {
-  animation: board-fade-out 200ms ease both;
+  animation: board-fade-out 220ms ease both;
 }
 ::view-transition-new(root) {
-  animation: board-expand-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: board-expand-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 @keyframes board-fade-out {
   to {
     opacity: 0;
-    transform: scale(1.01);
+    transform: scale(1.04);
   }
 }
 @keyframes board-expand-in {
   from {
     opacity: 0;
-    transform: scale(0.97);
+    transform: scale(0.92) translateY(14px);
   }
   to {
     opacity: 1;
@@ -199,21 +199,21 @@ body {
    default board-detail expand/fade transition above, which stays the
    fallback for navigations that don't go through the bottom nav. */
 html[data-transition="nav-forward"]::view-transition-old(root) {
-  animation: nav-slide-out-left 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: nav-slide-out-left 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 html[data-transition="nav-forward"]::view-transition-new(root) {
-  animation: nav-slide-in-right 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: nav-slide-in-right 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 html[data-transition="nav-back"]::view-transition-old(root) {
-  animation: nav-slide-out-right 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: nav-slide-out-right 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 html[data-transition="nav-back"]::view-transition-new(root) {
-  animation: nav-slide-in-left 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: nav-slide-in-left 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 @keyframes nav-slide-out-left {
   to {
-    transform: translateX(-28%);
-    opacity: 0.6;
+    transform: translateX(-35%) scale(0.94);
+    opacity: 0.35;
   }
 }
 @keyframes nav-slide-in-right {
@@ -226,8 +226,8 @@ html[data-transition="nav-back"]::view-transition-new(root) {
 }
 @keyframes nav-slide-out-right {
   to {
-    transform: translateX(28%);
-    opacity: 0.6;
+    transform: translateX(35%) scale(0.94);
+    opacity: 0.35;
   }
 }
 @keyframes nav-slide-in-left {
@@ -660,11 +660,11 @@ body {
 /* The Today's Quest screen turns over like a card. Both keyframes end with
    no transform, so fixed-position children behave once it settles. */
 .flip-out {
-  transform-origin: 50% 320px;
+  transform-origin: 50% var(--flip-y, 320px);
   animation: flip-out 300ms cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
 }
 .flip-in {
-  transform-origin: 50% 320px;
+  transform-origin: 50% var(--flip-y, 320px);
   animation: flip-in 420ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
 }
 @keyframes flip-out {
@@ -1135,7 +1135,8 @@ html[data-evening] [data-theme="adventure"] {
 /* Rewards: a slow sweep of light around a gilded edge. */
 .reward-shimmer { isolation: isolate; }
 .reward-shimmer::after,
-.reward-quest::before {
+.reward-quest::before,
+.shimmer-edge::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -1154,7 +1155,7 @@ html[data-evening] [data-theme="adventure"] {
   to { background-position: -200% 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .reward-shimmer::after, .reward-quest::before { animation: none; }
+  .reward-shimmer::after, .reward-quest::before, .shimmer-edge::after { animation: none; }
 }
 
 /* Small controls get a finger-sized invisible hit area around them. */
@@ -1172,4 +1173,16 @@ html[data-evening] [data-theme="adventure"] {
   .board-title-pad { padding-right: 0; }
   .board-card .board-edit-btn { display: none; }
   .board-edit-foot { display: flex; }
+}
+
+/* Browsers without view transitions (older iPhones) still get a page entrance. */
+@supports not (view-transition-name: none) {
+  /* Opacity only: a transform here would make the fixed + button relative to the page. */
+  .page-enter { animation: page-fade-in 320ms ease-out backwards; }
+}
+@keyframes page-fade-in {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
 }

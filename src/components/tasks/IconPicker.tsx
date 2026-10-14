@@ -63,6 +63,7 @@ export function IconPicker({
   const [confirmRemove, setConfirmRemove] = useState<TaskIconLibraryEntry | null>(null);
   const [tab, setTab] = useState<"library" | "ai">("ai");
   const [query, setQuery] = useState("");
+  const [shelf, setShelf] = useState<"all" | "quest" | "reward" | "character">(artStyle === "treasure" ? "reward" : "all");
   const [library, setLibrary] = useState<TaskIconLibraryEntry[] | null>(null);
   const [isPending, startTransition] = useTransition();
   const [aiPrompt, setAiPrompt] = useState(taskTitle);
@@ -109,7 +110,7 @@ export function IconPicker({
   function removeEntry(entry: TaskIconLibraryEntry) {
     setConfirmRemove(null);
     setLibrary((prev) => prev?.filter((e) => e.id !== entry.id) ?? prev);
-    if (!entry.id.startsWith("new-")) void removeTaskIconFromLibraryAction(entry.id).catch(() => {});
+    if (!entry.id.startsWith("new-") && !entry.id.includes(":")) void removeTaskIconFromLibraryAction(entry.id).catch(() => {});
   }
 
   useEffect(() => {
@@ -158,10 +159,9 @@ export function IconPicker({
   const currentImageUrl = shownSource === "ai" || shownSource === "library" ? shownIcon : null;
   const currentEmoji = shownSource === "monster" ? MONSTER_ICONS.find((m) => m.key === shownIcon)?.emoji : null;
 
-  const filteredLibrary =
-    library && query.trim()
-      ? library.filter((e) => e.prompt?.toLowerCase().includes(query.trim().toLowerCase()))
-      : library;
+  const filteredLibrary = library?.filter(
+    (e) => (shelf === "all" || (e.category ?? "quest") === shelf) && (!query.trim() || e.prompt?.toLowerCase().includes(query.trim().toLowerCase()))
+  );
 
   const tabBtnStyle = (active: boolean) => ({
     background: active ? "var(--t-gold)" : "transparent",
@@ -306,10 +306,32 @@ export function IconPicker({
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by prompt, e.g. dragon, fire…"
-                className="rounded border px-2 py-1 text-xs"
+                placeholder="Search, e.g. book, dragon, fire…"
+                className="h-9 rounded-lg border px-2.5 text-[16px]"
                 style={fieldStyle}
               />
+              <div role="radiogroup" aria-label="Which portraits" className="flex flex-wrap gap-1">
+                {(
+                  [
+                    ["all", "All"],
+                    ["quest", "Quests"],
+                    ["reward", "Rewards"],
+                    ["character", "Characters"],
+                  ] as const
+                ).map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="radio"
+                    aria-checked={shelf === k}
+                    onClick={() => setShelf(k)}
+                    className="h-8 rounded-full px-3 text-[12.5px] font-semibold"
+                    style={shelf === k ? { background: "var(--t-gold)", color: "#2a1c10" } : { border: "1px solid var(--t-panel-border)", color: "var(--t-ink-soft)" }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               {!library && (
                 <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
                   Loading icon library…
@@ -330,6 +352,7 @@ export function IconPicker({
                         {/* eslint-disable-next-line @next/next/no-img-element -- static /design asset or external Supabase Storage URL */}
                         <img src={entry.image_url} alt="" className="h-full w-full object-cover" />
                       </button>
+                      {!entry.id.includes(":") && (
                       <button
                         type="button"
                         onClick={() => setConfirmRemove(entry)}
@@ -340,6 +363,7 @@ export function IconPicker({
                       >
                         ×
                       </button>
+                      )}
                     </div>
                   ))}
                   {filteredLibrary?.length === 0 && (

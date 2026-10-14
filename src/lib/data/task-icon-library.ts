@@ -48,3 +48,41 @@ export async function removeTaskIconFromLibrary(id: string): Promise<void> {
   const { error } = await db.from("task_icon_library").delete().eq("id", id);
   if (error) throw new Error(`Failed to remove icon from library: ${error.message}`);
 }
+
+/** Built-in quest icons that live in /public/design rather than the table. */
+const STATIC_QUEST_ICONS = [
+  { url: "/design/icon-reading-book.svg", prompt: "Reading — an open book glowing with light" },
+  { url: "/design/icon-course-laptop.svg", prompt: "Course work — a laptop with a beating heart" },
+];
+
+const categoryOf = (url: string): "quest" | "reward" =>
+  /\/rewards\//.test(url) ? "reward" : "quest";
+
+/**
+ * Everything the portrait picker can offer: the shared library, every
+ * portrait this person's quests and rewards already use (some were set
+ * directly and never added), the built-in icons, and character avatars —
+ * each tagged with its shelf (quest / reward / character).
+ */
+export async function listAllPortraits(ownerId: string): Promise<TaskIconLibraryEntry[]> {
+  const db = supabaseAdmin();
+  const [lib, tasks, rewards, avatars] = await Promise.all([
+    listTaskIconLibrary().catch(() => [] as TaskIconLibraryEntry[]),
+    db.from("tasks").select("icon_key, title, created_at").eq("owner_id", ownerId).in("icon_source", ["ai", "library"]).not("icon_key", "is", null),
+    db.from("rewards").select("icon_key, title, created_at").eq("owner_id", ownerId).not("icon_key", "is", null),
+    db.from("avatar_library").select("*").order("created_at", { ascending: false }),
+  ]);
+  const out: TaskIconLibraryEntry[] = [];
+  const seen = new Set<string>();
+  const push = (e: TaskIconLibraryEntry) => {
+    if (!e.image_url || seen.has(e.image_url)) return;
+    seen.add(e.image_url);
+    out.push(e);
+  };
+  for (const e of lib) push({ ...e, category: categoryOf(e.image_url) });
+  for (const r of rewards.data ?? []) push({ id: `reward:${r.icon_key}`, image_url: r.icon_key as string, prompt: r.title as string, created_by: ownerId, is_preset: false, created_at: r.created_at as string, category: "reward" });
+  for (const t of tasks.data ?? []) push({ id: `used:${t.icon_key}`, image_url: t.icon_key as string, prompt: t.title as string, created_by: ownerId, is_preset: false, created_at: t.created_at as string, category: categoryOf(t.icon_key as string) });
+  for (const st of STATIC_QUEST_ICONS) push({ id: `static:${st.url}`, image_url: st.url, prompt: st.prompt, created_by: null, is_preset: true, created_at: "2026-01-01T00:00:00Z", category: "quest" });
+  for (const a of (avatars.data ?? []) as TaskIconLibraryEntry[]) push({ ...a, id: `avatar:${a.id}`, category: "character" });
+  return out;
+}

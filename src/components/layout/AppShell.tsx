@@ -78,7 +78,7 @@ export async function AppShell({
           )}
         </div>
 
-        <main className="flex-1 px-5 pb-36 pt-2">{children}</main>
+        <main className="page-enter flex-1 px-5 pb-36 pt-2">{children}</main>
       </div>
 
       {profileId && <BottomNav theme={theme} />}

@@ -12,6 +12,7 @@ export function FloatingActionButton({
   label,
   theme = "calm",
   expanded = false,
+  raised = false,
 }: {
   onClick: () => void;
   label: string;
@@ -19,12 +20,14 @@ export function FloatingActionButton({
   /** True to rotate the "+" into an "×" — for a FAB that toggles a small
    * speed-dial menu open (see BoardFabMenu) rather than a form directly. */
   expanded?: boolean;
+  /** Above a board popup (z 47) rather than under it. */
+  raised?: boolean;
 }) {
   const isAdventure = theme === "adventure";
 
   return (
     <div
-      className={`pointer-events-none fixed bottom-20 flex justify-center ${expanded ? "z-[49]" : "z-[46]"}`}
+      className={`pointer-events-none fixed bottom-20 flex justify-center ${expanded ? "z-[49]" : raised ? "z-[48]" : "z-[46]"}`}
       // Same fixed-chrome-in-a-remounted-shell issue as BottomNav (see the
       // comment there) — without its own view-transition-name the FAB gets
       // dragged along with the page-level slide/fade on every navigation.
