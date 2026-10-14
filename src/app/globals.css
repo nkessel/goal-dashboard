@@ -1186,3 +1186,65 @@ html[data-evening] [data-theme="adventure"] {
 @media (prefers-reduced-motion: reduce) {
   .page-enter { animation: none; }
 }
+
+/* ---------- One Thing (single quest, full screen) ---------- */
+.one-thing {
+  --ot-text: var(--t-ink);
+  --ot-soft: var(--t-ink-soft);
+  --ot-gold: var(--t-accent);
+  background: var(--t-bg);
+}
+.one-thing[data-theme="adventure"] {
+  --ot-text: #f1ead2;
+  --ot-soft: rgba(241, 234, 210, 0.72);
+  --ot-gold: var(--t-gold);
+  background:
+    radial-gradient(1.5px 1.5px at 12% 18%, rgba(255, 246, 214, 0.9), transparent 60%),
+    radial-gradient(1px 1px at 78% 12%, rgba(255, 246, 214, 0.8), transparent 60%),
+    radial-gradient(1.2px 1.2px at 64% 82%, rgba(255, 246, 214, 0.7), transparent 60%),
+    radial-gradient(1px 1px at 30% 70%, rgba(255, 246, 214, 0.6), transparent 60%),
+    radial-gradient(1.4px 1.4px at 90% 55%, rgba(255, 246, 214, 0.7), transparent 60%),
+    radial-gradient(ellipse at 50% 40%, rgba(217, 180, 95, 0.16), transparent 62%),
+    linear-gradient(180deg, #0c1020, #141a30 55%, #0b0e1a);
+}
+.one-thing:not([data-theme="adventure"]) .one-thing-card {
+  background: var(--t-card);
+  border: 1px solid var(--t-card-border);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+[data-theme="adventure"] .parchment.one-thing-card h2.font-display {
+  font-size: 28px;
+  line-height: 1.15;
+}
+.one-thing-primary {
+  background: linear-gradient(180deg, #f6dc8e, #d9b45f 55%, #a88a3f);
+  color: #2a1c10;
+  border: 1.5px solid #4a3913;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 250, 230, 0.7);
+}
+.one-thing-secondary {
+  background: transparent;
+  color: var(--ot-text);
+  border: 1.5px solid color-mix(in srgb, var(--ot-gold) 55%, transparent);
+}
+.one-thing-primary:disabled,
+.one-thing-secondary:disabled {
+  opacity: 0.6;
+}
+@keyframes one-thing-in {
+  from { opacity: 0; transform: translateY(26px) scale(0.96) rotate(-1.5deg); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes one-thing-out {
+  to { opacity: 0; transform: translateX(-60%) rotate(-8deg) scale(0.92); }
+}
+@keyframes one-thing-done {
+  50% { transform: scale(1.03); }
+  to { opacity: 0.55; transform: scale(0.98); }
+}
+.one-thing-in { animation: one-thing-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both; }
+.one-thing-out { animation: one-thing-out 260ms ease-in both; }
+.one-thing-done { animation: one-thing-done 600ms ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .one-thing-in, .one-thing-out, .one-thing-done { animation-duration: 1ms; }
+}

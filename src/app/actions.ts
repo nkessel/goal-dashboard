@@ -211,6 +211,60 @@ export async function updateTaskPriorityAction(
   revalidatePath("/");
 }
 
+/** Move a quest or board between the map and the matrix lots. */
+export async function setMatrixStateAction(
+  kind: "task" | "board",
+  id: string,
+  state: "unplotted" | "later" | "hidden" | "plot" | null
+) {
+  const ownerId = await requireProfileId();
+  if (kind === "task") {
+    if (state === "plot") state = null;
+    await tasksData.setTaskMatrixState([id], ownerId, state as tasksData.MatrixState);
+  } else {
+    // A board "removed" from the matrix simply isn't on it any more.
+    await boardsData.updateBoardMatrix(id, ownerId, { matrix_state: state === "hidden" ? null : (state as "plot" | "unplotted" | "later" | null) ?? "plot" });
+  }
+  revalidatePath("/matrix");
+}
+
+/** Drop a quest or board onto the map at these values. */
+export async function placeOnMatrixAction(
+  kind: "task" | "board",
+  id: string,
+  values: { importance: number; urgency?: number; effort?: number }
+) {
+  const ownerId = await requireProfileId();
+  if (kind === "task") await tasksData.placeTaskOnMatrix(id, ownerId, values);
+  else await boardsData.updateBoardMatrix(id, ownerId, { ...values, matrix_state: "plot" });
+  revalidatePath("/matrix");
+  if (kind === "task") revalidatePath("/");
+}
+
+/** Bring quests and boards (back) onto the matrix, optionally taking a board's own quests off it. */
+export async function addToMatrixAction(input: { taskIds: string[]; boardIds: string[]; hideQuestsOfBoards?: boolean }) {
+  const ownerId = await requireProfileId();
+  await tasksData.setTaskMatrixState(input.taskIds, ownerId, null);
+  for (const b of input.boardIds) await boardsData.updateBoardMatrix(b, ownerId, { matrix_state: "plot" });
+  if (input.hideQuestsOfBoards && input.boardIds.length) {
+    const db = supabaseAdmin();
+    const { data } = await db.from("tasks").select("id").eq("owner_id", ownerId).eq("status", "open").in("board_id", input.boardIds);
+    await tasksData.setTaskMatrixState((data ?? []).map((r) => r.id as string), ownerId, "hidden");
+  }
+  revalidatePath("/matrix");
+}
+
+/** Edit a board as a matrix item: title, notes, ratings, portrait. */
+export async function updateBoardMatrixAction(
+  boardId: string,
+  patch: { title: string; description: string | null; importance: number; urgency: number; effort: number; icon_key: string | null; icon_source: "library" | "ai" }
+) {
+  const ownerId = await requireProfileId();
+  await boardsData.updateBoardMatrix(boardId, ownerId, patch);
+  revalidatePath("/matrix");
+  revalidatePath("/boards");
+}
+
 export async function completeTaskAction(formData: FormData) {
   const ownerId = await requireProfileId();
   const taskId = String(formData.get("taskId") || "");

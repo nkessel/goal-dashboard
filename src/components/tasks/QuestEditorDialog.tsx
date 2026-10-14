@@ -1321,7 +1321,7 @@ function AutoGrowText({
  * Five icons for a 0–5 value: tap an icon, or drag across the row like a
  * slider. Tapping the current top icon again sets it to 0. Arrow keys work too.
  */
-function IconScale({
+export function IconScale({
   label,
   icon,
   value,

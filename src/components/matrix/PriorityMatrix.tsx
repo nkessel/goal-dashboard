@@ -1,68 +1,105 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { TaskWithBoard } from "@/lib/data/tasks";
-import { computeMatrixLayout } from "@/lib/matrix-layout";
+import type { Board } from "@/lib/data/types";
+import { layoutMatrix } from "@/lib/matrix-layout";
+import { effortOf } from "@/lib/one-thing";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { QuestCardPopup } from "@/components/tasks/QuestCardPopup";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
+import { BoardSeal } from "@/components/boards/BoardSeal";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { confirmImportAction, updateTaskPriorityAction } from "@/app/actions";
+import { useEscape } from "@/lib/use-escape";
+import { confirmImportAction, placeOnMatrixAction, setMatrixStateAction } from "@/app/actions";
+import { BoardMatrixDialog } from "./BoardMatrixDialog";
+import { AddToMatrixSheet } from "./AddToMatrixSheet";
 
-// A pointer that moves less than this (px) between down and up is treated as
-// a click/tap that opens the view card, not a drag — the dot ends up
-// getting pointer capture either way, so a real click event still fires
-// even after a drag, and this is what tells the two apart.
-const CLICK_MOVE_THRESHOLD = 4;
+type Mode = "priority" | "impact";
+type Lot = "map" | "unplotted" | "later";
+type Target = "map" | "unplotted" | "later" | "trash" | null;
+type MatrixBoard = Pick<Board, "id" | "title"> & Partial<Board>;
 
-/**
- * Quadrant washes, in LEGEND order. Importance runs along X (right = more
- * important) and urgency along Y (top = more urgent), so: important & urgent
- * = top-right, important only = bottom-right, urgent only = top-left,
- * neither = bottom-left.
- */
-const QUADRANT_TINT = ["rgba(196,72,40,.13)", "rgba(79,109,60,.13)", "rgba(56,104,140,.12)", "rgba(107,98,82,.10)"];
-const QUADRANT_CORNER: { side: "left" | "right"; edge: "top" | "bottom" }[] = [
-  { side: "right", edge: "top" },
-  { side: "right", edge: "bottom" },
-  { side: "left", edge: "top" },
-  { side: "left", edge: "bottom" },
-];
-const QUADRANT_POS: React.CSSProperties[] = [
-  { right: 0, top: 0, borderTopRightRadius: 14 },
-  { right: 0, bottom: 0, borderBottomRightRadius: 14 },
-  { left: 0, top: 0, borderTopLeftRadius: 14 },
-  { left: 0, bottom: 0, borderBottomLeftRadius: 14 },
-];
-
-const LEGEND = {
-  adventure: [
-    { title: "Battle Now", desc: "Important & urgent" },
-    { title: "Plan the Siege", desc: "Important, not urgent" },
-    { title: "Send a Scout", desc: "Urgent, not important" },
-    { title: "Abandon Quest", desc: "Neither important nor urgent" },
-  ],
-  calm: [
-    { title: "Do now", desc: "Important & urgent" },
-    { title: "Plan for later", desc: "Important, not urgent" },
-    { title: "Delegate", desc: "Urgent, not important" },
-    { title: "Let go", desc: "Neither important nor urgent" },
-  ],
+/** One icon on the matrix screen: a quest, or a whole board plotted as one. */
+type Item = {
+  key: string;
+  kind: "task" | "board";
+  id: string;
+  title: string;
+  description: string | null;
+  importance: number;
+  urgency: number;
+  /** Effort used for plotting (falls back to the time estimate for quests). */
+  effort: number;
+  effortKnown: boolean;
+  img: string | null;
+  lot: Lot;
+  task?: TaskWithBoard;
+  board?: MatrixBoard;
+  boardTitle: string | null;
+  openQuests?: number;
 };
 
-function clampPct(n: number) {
-  return Math.min(96, Math.max(4, n));
-}
+type Override = { importance?: number; urgency?: number; effort?: number; state?: string | null };
 
 /**
- * Inverts computeMatrixLayout's 10-90% mapping back to a 1-5 value with one
- * decimal place of precision (e.g. 3.4), so a quest can be dropped almost
- * anywhere in the grid rather than snapping to 5 coarse steps per axis.
+ * Quadrants in LEGEND order, with where each sits. Priority mode: importance
+ * along X, urgency up Y. Impact mode: effort along X (easy on the left),
+ * impact (importance) up Y — quick wins top-left.
  */
+const QUADRANTS = {
+  priority: {
+    pos: ["tr", "br", "tl", "bl"],
+    adventure: [
+      { title: "Battle Now", desc: "Important & urgent" },
+      { title: "Plan the Siege", desc: "Important, not urgent" },
+      { title: "Send a Scout", desc: "Urgent, not important" },
+      { title: "Abandon Quest", desc: "Neither important nor urgent" },
+    ],
+    calm: [
+      { title: "Do now", desc: "Important & urgent" },
+      { title: "Plan for later", desc: "Important, not urgent" },
+      { title: "Delegate", desc: "Urgent, not important" },
+      { title: "Let go", desc: "Neither important nor urgent" },
+    ],
+    tint: ["rgba(196,72,40,.13)", "rgba(79,109,60,.13)", "rgba(56,104,140,.12)", "rgba(107,98,82,.10)"],
+    axes: { up: "Urgent ↑", down: { adventure: "Can wait", calm: "Not urgent" }, left: { adventure: "Minor", calm: "Not important" }, right: "Important →" },
+  },
+  impact: {
+    pos: ["tl", "tr", "bl", "br"],
+    adventure: [
+      { title: "Quick Victories", desc: "Big impact, little effort — start here" },
+      { title: "Grand Campaigns", desc: "Big impact, big effort — plan them" },
+      { title: "Side Errands", desc: "Small impact, little effort — fill gaps" },
+      { title: "The Swamp", desc: "Small impact, big effort — avoid" },
+    ],
+    calm: [
+      { title: "Quick wins", desc: "High impact, low effort — start here" },
+      { title: "Big projects", desc: "High impact, high effort — plan them" },
+      { title: "Fill-ins", desc: "Low impact, low effort — fill gaps" },
+      { title: "Time sinks", desc: "Low impact, high effort — avoid" },
+    ],
+    tint: ["rgba(79,140,60,.15)", "rgba(56,104,140,.12)", "rgba(190,150,60,.12)", "rgba(150,70,50,.11)"],
+    axes: { up: "High impact ↑", down: { adventure: "Low impact", calm: "Low impact" }, left: { adventure: "Easy", calm: "Easy" }, right: "Hard →" },
+  },
+} as const;
+
+const CORNER: Record<string, React.CSSProperties> = {
+  tr: { right: 0, top: 0, borderTopRightRadius: 14 },
+  br: { right: 0, bottom: 0, borderBottomRightRadius: 14 },
+  tl: { left: 0, top: 0, borderTopLeftRadius: 14 },
+  bl: { left: 0, bottom: 0, borderBottomLeftRadius: 14 },
+};
+
+/** Inverts the 10–90% mapping back to a 0–5 value (one decimal place). */
 function pctToScale(pct: number) {
   const value = Math.round(((pct - 10) / 80) * 5 * 10) / 10;
   return Math.min(5, Math.max(0, value));
+}
+
+function artOf(t: { icon_source?: string | null; icon_key?: string | null }) {
+  return (t.icon_source === "ai" || t.icon_source === "library") && t.icon_key ? t.icon_key : null;
 }
 
 export function PriorityMatrix({
@@ -78,47 +115,45 @@ export function PriorityMatrix({
   plotIds?: string[];
   /** Placing a quest in plot mode also confirms it as a reviewed import. */
   confirmImports?: boolean;
-  /** When given, shows a checkbox per board to choose which quests are plotted. */
-  boards?: { id: string; title: string }[];
+  /** Boards: for the filter, and to plot a board as one item. */
+  boards?: MatrixBoard[];
 }) {
-  const [tasks, setTasks] = useState(initialTasks);
-  const [seenInitialTasks, setSeenInitialTasks] = useState(initialTasks);
-  // Re-sync from fresh server props (e.g. after an edit or a revalidation)
-  // whenever the prop reference changes — done during render, React's
-  // recommended pattern for resetting state from props, rather than in a
-  // useEffect. A drag's own optimistic update happens via commitDrag below,
-  // never mid-gesture, so there's no in-progress state this could clobber.
-  if (initialTasks !== seenInitialTasks) {
-    setSeenInitialTasks(initialTasks);
-    setTasks(initialTasks);
-  }
-  const [, startTransition] = useTransition();
-  const gridRef = useRef<HTMLDivElement>(null);
-  // While dragging, the dot follows the pointer freely (not snapped to a
-  // quadrant cell) so the motion feels smooth; the 1-5 importance/urgency
-  // value is only computed — and persisted — on release.
-  const [dragState, setDragState] = useState<{ taskId: string; xPct: number; yPct: number } | null>(null);
-  // Click-vs-drag detection: reset on pointerdown, flipped once the pointer
-  // has moved past CLICK_MOVE_THRESHOLD from its down position.
-  const pointerDownAt = useRef<{ x: number; y: number } | null>(null);
-  const movedPastThreshold = useRef(false);
-  const [viewingTaskId, setViewingTaskId] = useState<string | null>(null);
-
+  const router = useRouter();
   const isAdventure = theme === "adventure";
-  const legend = LEGEND[theme];
-  // Board filter: unchecked board ids ("none" = quests without a board).
-  // Remembered per browser.
+  const [, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  // Optimistic moves, cleared whenever fresh data arrives from the server.
+  const [overrides, setOverrides] = useState<Record<string, Override>>({});
+  const [seen, setSeen] = useState({ initialTasks, boards });
+  if (seen.initialTasks !== initialTasks || seen.boards !== boards) {
+    setSeen({ initialTasks, boards });
+    setOverrides({});
+  }
+
+  // ---- Mode and board filter (remembered per browser) -------------------
+  const [mode, setMode] = useState<Mode>("priority");
   const [hiddenBoards, setHiddenBoards] = useState<Set<string>>(() => new Set());
   const [filterOpen, setFilterOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(false);
   useEffect(() => {
     try {
       const saved = JSON.parse(window.localStorage.getItem("matrix-hidden-boards") ?? "[]");
       // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
       if (Array.isArray(saved) && saved.length) setHiddenBoards(new Set(saved));
+      if (window.localStorage.getItem("matrix-mode") === "impact") setMode("impact");
     } catch {
       /* storage unavailable */
     }
   }, []);
+  function pickMode(m: Mode) {
+    setMode(m);
+    try {
+      window.localStorage.setItem("matrix-mode", m);
+    } catch {
+      /* storage unavailable */
+    }
+  }
   function toggleBoard(id: string) {
     setHiddenBoards((prev) => {
       const next = new Set(prev);
@@ -132,200 +167,553 @@ export function PriorityMatrix({
       return next;
     });
   }
-  const visibleTasks = boards ? tasks.filter((t) => !hiddenBoards.has(t.board_id ?? "none")) : tasks;
-  // Quests never rated (importance and urgency both 0) wait in a tray below
-  // instead of piling up along the bottom edge.
-  const unrated = visibleTasks.filter((t) => !t.importance && !t.urgency);
-  const plotted = computeMatrixLayout(visibleTasks.filter((t) => t.importance || t.urgency));
-  const hasUnboarded = tasks.some((t) => !t.board_id);
-  // Looked up by id (rather than holding the task object itself) so the
-  // popped-up card always reflects the latest data, including right after
-  // an edit made from its own Edit button.
-  const viewingTask = viewingTaskId ? (tasks.find((t) => t.id === viewingTaskId) ?? null) : null;
+
+  // ---- Items ------------------------------------------------------------
+  const boardTitle = new Map((boards ?? []).map((b) => [b.id, b.title]));
+  const openCount = new Map<string, number>();
+  for (const t of initialTasks) if (t.board_id) openCount.set(t.board_id, (openCount.get(t.board_id) ?? 0) + 1);
+
+  const rated = (importance: number, urgency: number, effortKnown: boolean) =>
+    mode === "priority" ? importance > 0 || urgency > 0 : importance > 0 && effortKnown;
+
+  const items: Item[] = [];
+  const hiddenQuests: TaskWithBoard[] = [];
+  for (const t of initialTasks) {
+    const key = `t:${t.id}`;
+    const ov = overrides[key] ?? {};
+    const state = ov.state !== undefined ? ov.state : (t.matrix_state ?? null);
+    if (state === "hidden") {
+      hiddenQuests.push(t);
+      continue;
+    }
+    if (boards && hiddenBoards.has(t.board_id ?? "none")) continue;
+    const importance = ov.importance ?? t.importance;
+    const urgency = ov.urgency ?? t.urgency;
+    const rawEffort = ov.effort ?? t.effort ?? 0;
+    const effortKnown = rawEffort > 0 || t.estimate_minutes != null;
+    const lot: Lot = state === "later" ? "later" : state === "unplotted" ? "unplotted" : rated(importance, urgency, effortKnown) ? "map" : "unplotted";
+    items.push({
+      key,
+      kind: "task",
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      importance,
+      urgency,
+      effort: rawEffort > 0 ? rawEffort : effortOf(t),
+      effortKnown,
+      img: artOf(t),
+      lot,
+      task: t,
+      boardTitle: t.board_id ? (boardTitle.get(t.board_id) ?? null) : null,
+    });
+  }
+  const offMatrixBoards: MatrixBoard[] = [];
+  for (const b of boards ?? []) {
+    const key = `b:${b.id}`;
+    const ov = overrides[key] ?? {};
+    const state = ov.state !== undefined ? ov.state : (b.matrix_state ?? null);
+    if (!state) {
+      offMatrixBoards.push(b);
+      continue;
+    }
+    if (hiddenBoards.has(b.id)) continue;
+    const importance = ov.importance ?? b.importance ?? 0;
+    const urgency = ov.urgency ?? b.urgency ?? 0;
+    const effort = ov.effort ?? b.effort ?? 0;
+    const lot: Lot = state === "later" ? "later" : state === "unplotted" ? "unplotted" : rated(importance, urgency, effort > 0) ? "map" : "unplotted";
+    items.push({
+      key,
+      kind: "board",
+      id: b.id,
+      title: b.title,
+      description: b.description ?? null,
+      importance,
+      urgency,
+      effort: effort || 2.5,
+      effortKnown: effort > 0,
+      img: artOf(b),
+      lot,
+      board: b,
+      boardTitle: null,
+      openQuests: openCount.get(b.id) ?? 0,
+    });
+  }
+  const byKey = new Map(items.map((i) => [i.key, i]));
+  const xy = (i: Item) => (mode === "priority" ? { x: i.importance, y: i.urgency } : { x: i.effort, y: i.importance });
+  const plotted = layoutMatrix(items.filter((i) => i.lot === "map").map((i) => ({ item: i, key: i.key, ...xy(i) })));
+  const later = items.filter((i) => i.lot === "later");
+  const unplotted = items.filter((i) => i.lot === "unplotted");
+  const hasUnboarded = initialTasks.some((t) => !t.board_id);
+
+  // ---- Popups -----------------------------------------------------------
+  const [viewingTaskId, setViewingTaskId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const viewingTask = viewingTaskId ? (initialTasks.find((t) => t.id === viewingTaskId) ?? null) : null;
+  const editingTask = editingTaskId ? (initialTasks.find((t) => t.id === editingTaskId) ?? null) : null;
+  const editingBoard = editingBoardId ? ((boards ?? []).find((b) => b.id === editingBoardId) ?? null) : null;
+  const dialogOpen = !!(viewingTask || editingTask || editingBoard || adding);
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  const laterRef = useRef<HTMLDivElement>(null);
+  const unplottedRef = useRef<HTMLDivElement>(null);
+  const trashRef = useRef<HTMLDivElement>(null);
+
+  const [hover, setHover] = useState<{ key: string; left: number; top: number; above: boolean } | null>(null);
+
+  // ---- Plot mode ----------------------------------------------------------
+  const [localPlot, setLocalPlot] = useState<string[] | null>(null);
+  const [plotIndex, setPlotIndex] = useState(0);
+  const [plotStopped, setPlotStopped] = useState(false);
+  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+  const [descOpen, setDescOpen] = useState(false);
+  const urlQueue = plotStopped ? [] : (plotIds ?? []).map((id) => `t:${id}`);
+  const queue = (localPlot ?? urlQueue).filter((k) => byKey.has(k) || (localPlot ?? urlQueue).indexOf(k) < plotIndex);
+  const plotting = queue.length > 0 && plotIndex < queue.length;
+  const plotItem = plotting ? byKey.get(queue[plotIndex]) : undefined;
+  const showBanner = queue.length > 0;
+
+  function startPlot(keys: string[]) {
+    setLocalPlot(keys);
+    setPlotIndex(0);
+    setPlotStopped(false);
+    setDescOpen(false);
+    window.setTimeout(() => gridRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }), 30);
+  }
+  function stopPlot() {
+    setLocalPlot(null);
+    setPlotIndex(0);
+    setPlotStopped(true);
+    setGhost(null);
+    if (plotIds?.length) router.replace("/matrix", { scroll: false });
+  }
+  function nextPlot() {
+    setPlotIndex((i) => i + 1);
+    setDescOpen(false);
+  }
+  function tap(item: Item, source: Lot) {
+    if (source === "map") {
+      if (item.kind === "task") setViewingTaskId(item.id);
+      else setEditingBoardId(item.id);
+    } else {
+      startPlot([item.key]);
+    }
+  }
+
+  // ---- Moving things ----------------------------------------------------
+
+  function valuesAt(clientX: number, clientY: number) {
+    const r = gridRef.current!.getBoundingClientRect();
+    const xPct = ((clientX - r.left) / r.width) * 100;
+    const yPct = ((r.bottom - clientY) / r.height) * 100;
+    const x = Math.max(0.1, pctToScale(xPct));
+    const y = Math.max(0.1, pctToScale(yPct));
+    return mode === "priority" ? { importance: x, urgency: y } : { effort: x, importance: y };
+  }
+
+  function move(item: Item, target: Exclude<Target, null>, clientX?: number, clientY?: number) {
+    setError(null);
+    if (target === "map") {
+      if (clientX === undefined || clientY === undefined || !gridRef.current) return;
+      const values = valuesAt(clientX, clientY);
+      setOverrides((o) => ({ ...o, [item.key]: { ...o[item.key], ...values, state: item.kind === "task" ? null : "plot" } }));
+      startTransition(async () => {
+        try {
+          await placeOnMatrixAction(item.kind, item.id, values);
+          if (confirmImports && item.kind === "task" && item.task?.needs_review) await confirmImportAction("quest", item.id);
+        } catch (e) {
+          setOverrides((o) => ({ ...o, [item.key]: {} }));
+          setError(e instanceof Error ? e.message : "Couldn't plot that.");
+        }
+      });
+      return;
+    }
+    if (target === item.lot) return;
+    const state = target === "trash" ? (item.kind === "task" ? "hidden" : null) : target;
+    setOverrides((o) => ({ ...o, [item.key]: { ...o[item.key], state } }));
+    startTransition(async () => {
+      try {
+        await setMatrixStateAction(item.kind, item.id, target === "trash" ? "hidden" : target);
+      } catch (e) {
+        setOverrides((o) => ({ ...o, [item.key]: {} }));
+        setError(e instanceof Error ? e.message : "Couldn't move that.");
+      }
+    });
+  }
+
+  // Pointer drag shared by map pins and lot icons. Mouse drags after a few
+  // pixels; touch drags pins at once and lot icons after a short hold (so
+  // the lots still scroll).
+  const press = useRef<{ key: string; source: Lot; pointerId: number; touch: boolean; sx: number; sy: number; active: boolean; timer?: number } | null>(null);
+  const [drag, setDrag] = useState<{ key: string; x: number; y: number; target: Target; label: string } | null>(null);
+
+  function targetAt(x: number, y: number): Target {
+    const inside = (el: HTMLElement | null) => {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    };
+    if (inside(trashRef.current)) return "trash";
+    if (inside(laterRef.current)) return "later";
+    if (inside(unplottedRef.current)) return "unplotted";
+    if (inside(gridRef.current)) return "map";
+    return null;
+  }
+
+  function labelFor(target: Target, x: number, y: number) {
+    if (target === "trash") return "Remove from priority matrix";
+    if (target === "later") return "Save for later";
+    if (target === "unplotted") return "Not yet plotted";
+    if (target === "map" && gridRef.current) {
+      const v = valuesAt(x, y);
+      return mode === "priority"
+        ? `Importance ${v.importance.toFixed(1)} · Urgency ${v.urgency!.toFixed(1)}`
+        : `Impact ${v.importance.toFixed(1)} · Effort ${v.effort!.toFixed(1)}`;
+    }
+    return "";
+  }
+
+  function startPress(e: React.PointerEvent, item: Item, source: Lot) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (e.pointerType === "mouse") e.preventDefault();
+    setHover(null);
+    const touch = e.pointerType !== "mouse";
+    const p = { key: item.key, source, pointerId: e.pointerId, touch, sx: e.clientX, sy: e.clientY, active: false, timer: undefined as number | undefined };
+    if (touch && source !== "map") {
+      p.timer = window.setTimeout(() => {
+        if (press.current !== p) return;
+        p.active = true;
+        navigator.vibrate?.(8);
+        const t = targetAt(p.sx, p.sy);
+        setDrag({ key: p.key, x: p.sx, y: p.sy, target: t, label: labelFor(t, p.sx, p.sy) });
+      }, 260);
+    }
+    press.current = p;
+  }
+
+  const onWindowMove = useEffectEvent((e: PointerEvent) => {
+    const p = press.current;
+    if (!p || e.pointerId !== p.pointerId) return;
+    const dist = Math.hypot(e.clientX - p.sx, e.clientY - p.sy);
+    if (!p.active) {
+      if (p.touch && p.source !== "map") {
+        if (dist > 8) {
+          window.clearTimeout(p.timer);
+          press.current = null; // a scroll, not a drag
+        }
+        return;
+      }
+      if (dist <= 4) return;
+      p.active = true;
+    }
+    const t = targetAt(e.clientX, e.clientY);
+    setDrag({ key: p.key, x: e.clientX, y: e.clientY, target: t, label: labelFor(t, e.clientX, e.clientY) });
+  });
+
+  const onWindowUp = useEffectEvent((e: PointerEvent) => {
+    const p = press.current;
+    if (!p || e.pointerId !== p.pointerId) return;
+    window.clearTimeout(p.timer);
+    press.current = null;
+    const item = byKey.get(p.key);
+    setDrag(null);
+    if (!item) return;
+    if (p.active) {
+      const t = targetAt(e.clientX, e.clientY);
+      if (t) move(item, t, e.clientX, e.clientY);
+    } else {
+      tap(item, p.source);
+    }
+  });
+
+  const onWindowCancel = useEffectEvent((e: PointerEvent) => {
+    const p = press.current;
+    if (!p || e.pointerId !== p.pointerId) return;
+    window.clearTimeout(p.timer);
+    press.current = null;
+    setDrag(null);
+  });
+
+  useEffect(() => {
+    const mv = (e: PointerEvent) => onWindowMove(e);
+    const up = (e: PointerEvent) => onWindowUp(e);
+    const cancel = (e: PointerEvent) => onWindowCancel(e);
+    // Once a touch drag is live, keep the page from scrolling under it.
+    const tm = (e: TouchEvent) => {
+      if (press.current?.active) e.preventDefault();
+    };
+    const scroll = () => setHover(null);
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    document.addEventListener("touchmove", tm, { passive: false });
+    window.addEventListener("scroll", scroll, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", mv);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      document.removeEventListener("touchmove", tm);
+      window.removeEventListener("scroll", scroll);
+    };
+  }, []);
+
+  // ---- Hover preview (mouse) -------------------------------------------
+  function hoverOn(e: React.PointerEvent, item: Item) {
+    if (e.pointerType !== "mouse" || press.current) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const width = 280;
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - width / 2), window.innerWidth - width - 8);
+    const above = r.top > 240;
+    setHover({ key: item.key, left, top: above ? r.top - 10 : r.bottom + 10, above });
+  }
+  const hoverItem = hover && !drag ? byKey.get(hover.key) : undefined;
+
+  useEscape(() => stopPlot(), showBanner && !dialogOpen);
+
+  const legend = QUADRANTS[mode][theme];
+  const axes = QUADRANTS[mode].axes;
   const axisLabelStyle = {
     color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)",
     fontFamily: isAdventure ? "var(--font-display)" : undefined,
     fontWeight: isAdventure ? 500 : 600,
     letterSpacing: isAdventure ? "0.02em" : undefined,
   };
-
-  // ---- Plot mode -------------------------------------------------------
-  const [plotIndex, setPlotIndex] = useState(0);
-  const [plotEditing, setPlotEditing] = useState(false);
-  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
-  const [localPlot, setLocalPlot] = useState<string[] | null>(null);
-  const queue = (localPlot ?? plotIds ?? []).filter((id) => tasks.some((t) => t.id === id));
-  const plotting = queue.length > 0 && plotIndex < queue.length;
-  const plotTask = plotting ? (tasks.find((t) => t.id === queue[plotIndex]) ?? null) : null;
-
-  function placeAt(clientX: number, clientY: number) {
-    if (!plotTask || !gridRef.current) return;
-    const r = gridRef.current.getBoundingClientRect();
-    const xPct = ((clientX - r.left) / r.width) * 100;
-    const yPct = ((r.bottom - clientY) / r.height) * 100;
-    const importance = pctToScale(xPct);
-    const urgency = pctToScale(yPct);
-    const id = plotTask.id;
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, importance, urgency } : t)));
-    startTransition(async () => {
-      await updateTaskPriorityAction(id, importance, urgency);
-      if (confirmImports) await confirmImportAction("quest", id);
-    });
-    setPlotIndex((i) => i + 1);
-  }
-
-  function commitDrag(taskId: string, xPct: number, yPct: number) {
-    const importance = pctToScale(xPct);
-    const urgency = pctToScale(yPct);
-    setDragState(null);
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, importance, urgency } : t)));
-    startTransition(() => {
-      updateTaskPriorityAction(taskId, importance, urgency);
-    });
-  }
+  const chipBg = isAdventure ? "rgba(15,19,13,.55)" : "var(--t-card)";
+  const chipBorder = `1px solid ${isAdventure ? "rgba(217,180,95,.45)" : "var(--t-card-border)"}`;
+  const chipInk = isAdventure ? "var(--t-cream)" : "var(--t-ink)";
+  const dragItem = drag ? byKey.get(drag.key) : undefined;
 
   return (
     <div className="flex flex-col gap-3">
-      {plotIds && plotIds.length > 0 && (
+      {/* ---- Plot mode banner ---- */}
+      {showBanner && (
         <div
-          className="flex items-center gap-3 rounded-xl p-3"
-          style={{
-            background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-            border: `2px solid ${isAdventure ? "var(--t-gold)" : "var(--t-accent)"}`,
-            color: "var(--t-ink)",
-          }}
+          className="sticky top-2 z-40 flex flex-col gap-2 rounded-2xl p-3 shadow-xl"
+          style={{ background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `2px solid ${isAdventure ? "var(--t-gold)" : "var(--t-accent)"}`, color: "var(--t-ink)" }}
           role="status"
         >
-          {plotTask ? (
+          <button
+            type="button"
+            onClick={stopPlot}
+            aria-label="Stop plotting"
+            title="Stop plotting (Esc)"
+            className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[24px] leading-none"
+            style={{ color: "var(--t-ink-soft)" }}
+          >
+            ×
+          </button>
+          {plotItem ? (
             <>
-              <span
-                className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full"
-                style={{ border: "2px solid #a58c66", background: "rgba(255,255,255,.35)" }}
-              >
-                {plotTask.icon_key && plotTask.icon_source !== "monster" ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- portrait
-                  <img src={plotTask.icon_key} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <QuestMonogram id={plotTask.id} title={plotTask.title} size={48} />
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
-                  Plot {plotIndex + 1} of {queue.length} — click the map where it belongs
-                </span>
-                <span className={`block truncate text-[16px] font-bold ${isAdventure ? "font-display" : ""}`}>{plotTask.title}</span>
-                {plotTask.description && (
-                  <span className="block truncate text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                    {plotTask.description}
+              <div className="flex items-start gap-3 pr-8">
+                <Portrait item={plotItem} size={56} />
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[11.5px] font-bold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
+                    Plot {plotIndex + 1} of {queue.length} · tap the map where it belongs
                   </span>
-                )}
-              </span>
-              <span className="flex shrink-0 flex-col gap-1">
+                  <span className={`block text-[18px] font-bold leading-snug ${isAdventure ? "font-display" : ""}`}>{plotItem.title}</span>
+                  <Facts item={plotItem} theme={theme} />
+                </div>
+              </div>
+              {plotItem.description && (
+                <button type="button" onClick={() => setDescOpen((v) => !v)} className="text-left text-[14.5px] leading-snug" style={{ color: "#4a3c26" }}>
+                  <span className={descOpen ? "whitespace-pre-line" : "line-clamp-3"}>{plotItem.description}</span>
+                </button>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setPlotEditing(true)}
-                  className="h-8 rounded-full border px-3 text-xs font-semibold"
+                  onClick={() => (plotItem.kind === "task" ? setEditingTaskId(plotItem.id) : setEditingBoardId(plotItem.id))}
+                  className="h-9 rounded-full border px-3.5 text-[13.5px] font-semibold"
                   style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)" }}
                 >
                   Edit details
                 </button>
-                <button type="button" onClick={() => setPlotIndex((i) => i + 1)} className="h-7 text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    move(plotItem, "later");
+                    nextPlot();
+                  }}
+                  className="h-9 rounded-full border px-3.5 text-[13.5px] font-semibold"
+                  style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)" }}
+                >
+                  Save for later
+                </button>
+                <button type="button" onClick={nextPlot} className="h-9 px-2 text-[13.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
                   Skip
                 </button>
-              </span>
+                <span className="ml-auto hidden text-[12px] sm:inline" style={{ color: "var(--t-ink-soft)" }}>
+                  Esc to stop
+                </span>
+              </div>
             </>
           ) : (
-            <>
+            <div className="flex items-center gap-3 pr-8">
               <span className="text-2xl" aria-hidden>
                 ✓
               </span>
-              <span className="flex-1 text-sm font-semibold">All plotted! Drag any dot to fine-tune.</span>
-              <Link href="/matrix" className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
+              <span className="flex-1 text-[15px] font-semibold">All plotted! Drag any icon to fine-tune.</span>
+              <button
+                type="button"
+                onClick={stopPlot}
+                className="h-9 rounded-full px-4 text-[14px] font-bold"
+                style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
+              >
                 Done
-              </Link>
-            </>
+              </button>
+            </div>
           )}
         </div>
       )}
-      {plotEditing && plotTask && (
-        <EditTaskModal task={plotTask} theme={theme} onClose={() => setPlotEditing(false)} />
-      )}
-      {boards && boards.length > 0 && (() => {
-        const all = [...boards, ...(hasUnboarded ? [{ id: "none", title: "No board" }] : [])];
-        const shown = all.filter((b) => !hiddenBoards.has(b.id)).length;
-        return (
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setFilterOpen((v) => !v)}
-              aria-expanded={filterOpen}
-              className="hover-glow flex min-h-10 items-center gap-2 self-start rounded-full px-4 text-[14.5px]"
-              style={{ background: isAdventure ? "rgba(15,19,13,.55)" : "var(--t-card)", border: `1px solid ${isAdventure ? "rgba(217,180,95,.45)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M4 5h16l-6 7.5V19l-4-2v-4.5z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
-              </svg>
-              <span>
-                {isAdventure ? "Showing quests from " : "Showing tasks from "}
-                <b style={{ color: isAdventure ? "var(--t-gold)" : undefined }}>{shown === all.length ? "all boards" : `${shown} of ${all.length} boards`}</b>
-              </span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: filterOpen ? "rotate(180deg)" : undefined, transition: "transform 160ms" }}>
-                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <div className="drawer-body" data-open={filterOpen ? "true" : "false"}>
-              <div className="drawer-inner">
-                <fieldset className={`board-filter ${isAdventure ? "board-filter-adventure" : "board-filter-calm"} flex flex-wrap items-center gap-x-2 gap-y-2 pb-1 pt-1`}>
-                  <legend className="sr-only">Show quests from these boards</legend>
-                  {all.map((b) => (
-                    <label key={b.id} className="board-chip">
-                      <input type="checkbox" className="sr-only" checked={!hiddenBoards.has(b.id)} onChange={() => toggleBoard(b.id)} />
-                      <svg className="board-chip-check" width="12" height="12" viewBox="0 0 12 12" aria-hidden>
-                        <path d="M2.5 6.4 5 8.8 9.6 3.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <span>{b.title}</span>
-                    </label>
-                  ))}
-                </fieldset>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-      {/* Sized to leave room for what's below: never taller than the screen minus the header area. */}
-      <div className="mx-auto flex w-full gap-2" style={{ maxWidth: "min(100%, max(260px, calc(100svh - 420px)))" }}>
-        {/* Vertical axis: two rotated labels pinned to the top and bottom. */}
-        <div className="relative w-6 shrink-0" style={axisLabelStyle} aria-hidden>
-          <span className="absolute left-1/2 top-2 origin-center whitespace-nowrap text-[14px]" style={{ transform: "translateX(-50%) rotate(180deg)", writingMode: "vertical-rl" }}>
-            Urgent ↑
-          </span>
-          <span className="absolute bottom-2 left-1/2 origin-center whitespace-nowrap text-[14px]" style={{ transform: "translateX(-50%) rotate(180deg)", writingMode: "vertical-rl" }}>
-            {isAdventure ? "Can wait" : "Not urgent"}
-          </span>
-        </div>
 
-        <div className="flex-1">
+      {/* ---- Controls: mode, filter, legend ---- */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div role="radiogroup" aria-label="Matrix" className="flex rounded-full p-0.5" style={{ background: chipBg, border: chipBorder }}>
+          {(
+            [
+              ["priority", "Urgent × Important"],
+              ["impact", "Impact × Effort"],
+            ] as const
+          ).map(([m, label]) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={mode === m}
+              onClick={() => pickMode(m)}
+              className="min-h-9 rounded-full px-3.5 text-[14px] font-semibold transition-colors"
+              style={mode === m ? { background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" } : { color: chipInk }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {boards && boards.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setFilterOpen((v) => !v)}
+            aria-expanded={filterOpen}
+            className="hover-glow flex min-h-10 items-center gap-2 rounded-full px-3.5 text-[14px]"
+            style={{ background: chipBg, border: chipBorder, color: chipInk }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M4 5h16l-6 7.5V19l-4-2v-4.5z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+            </svg>
+            {(() => {
+              const all = boards.length + (hasUnboarded ? 1 : 0);
+              const shown = boards.filter((b) => !hiddenBoards.has(b.id)).length + (hasUnboarded && !hiddenBoards.has("none") ? 1 : 0);
+              return <span>{shown === all ? "All boards" : `${shown} of ${all} boards`}</span>;
+            })()}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setLegendOpen((v) => !v)}
+          aria-expanded={legendOpen}
+          aria-label="What the corners mean"
+          className="hover-glow flex h-10 w-10 items-center justify-center rounded-full font-display text-[18px] italic"
+          style={{ background: chipBg, border: chipBorder, color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)" }}
+        >
+          i
+        </button>
+      </div>
+
+      {boards && boards.length > 0 && (
+        <div className="drawer-body" data-open={filterOpen ? "true" : "false"}>
+          <div className="drawer-inner">
+            <fieldset className={`board-filter ${isAdventure ? "board-filter-adventure" : "board-filter-calm"} flex flex-wrap items-center gap-x-2 gap-y-2 pb-1 pt-1`}>
+              <legend className="sr-only">Show quests from these boards</legend>
+              {[...boards, ...(hasUnboarded ? [{ id: "none", title: "No board" }] : [])].map((b) => (
+                <label key={b.id} className="board-chip">
+                  <input type="checkbox" className="sr-only" checked={!hiddenBoards.has(b.id)} onChange={() => toggleBoard(b.id)} />
+                  <svg className="board-chip-check" width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+                    <path d="M2.5 6.4 5 8.8 9.6 3.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>{b.title}</span>
+                </label>
+              ))}
+            </fieldset>
+          </div>
+        </div>
+      )}
+
+      <div className="drawer-body" data-open={legendOpen ? "true" : "false"}>
+        <div className="drawer-inner">
           <div
-            ref={gridRef}
-            className={`relative aspect-square w-full rounded-2xl ${isAdventure ? "parchment" : ""}`}
+            className={`flex flex-col rounded-2xl px-4 py-2 ${isAdventure ? "parchment parchment-framed" : ""}`}
             style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
           >
-            {/* Quadrant washes + titles */}
-            {legend.map((q, i) => (
-              <div key={q.title} className="pointer-events-none absolute h-1/2 w-1/2" style={{ ...QUADRANT_POS[i], background: QUADRANT_TINT[i] }}>
-                <span
-                  className={`absolute text-[15px] italic ${QUADRANT_CORNER[i].side === "right" ? "right-3" : "left-3"} ${QUADRANT_CORNER[i].edge === "top" ? "top-2.5" : "bottom-2.5"}`}
-                  style={{ color: "var(--t-ink-soft)", opacity: 0.85 }}
-                >
-                  {q.title}
+            {legend.map((item, i) => (
+              <div key={item.title} className="relative z-[1] flex items-center gap-3 py-1.5" style={i === 0 ? undefined : { borderTop: `1px solid ${isAdventure ? "rgba(139,112,64,.3)" : "var(--t-card-border)"}` }}>
+                <span aria-hidden className="h-4 w-4 shrink-0 rounded" style={{ background: QUADRANTS[mode].tint[i].replace(/[\d.]+\)$/, ".55)"), border: "1px solid rgba(80,60,20,.35)" }} />
+                <span className="w-[128px] shrink-0 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                  {item.title}
+                </span>
+                <span className="text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                  {item.desc}
                 </span>
               </div>
             ))}
-            {plotTask && (
+            <p className="relative z-[1] m-0 py-1.5 text-[13px] italic" style={{ color: "var(--t-ink-soft)", borderTop: `1px solid ${isAdventure ? "rgba(139,112,64,.3)" : "var(--t-card-border)"}` }}>
+              Drag an icon to re-plot it, or down into the lots. Hover over one (or tap it) to see the quest.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <p className="m-0 rounded-lg px-3 py-2 text-[14px] font-semibold" style={{ background: "var(--t-warn-bg)", color: "var(--t-warn)" }}>
+          {error}
+        </p>
+      )}
+
+      {/* ---- The map ---- */}
+      <div className="mx-auto flex w-full gap-2" style={{ maxWidth: "min(100%, max(260px, calc(100svh - 360px)))" }}>
+        <div className="relative w-6 shrink-0" style={axisLabelStyle} aria-hidden>
+          <span className="absolute left-1/2 top-2 origin-center whitespace-nowrap text-[14px]" style={{ transform: "translateX(-50%) rotate(180deg)", writingMode: "vertical-rl" }}>
+            {axes.up}
+          </span>
+          <span className="absolute bottom-2 left-1/2 origin-center whitespace-nowrap text-[14px]" style={{ transform: "translateX(-50%) rotate(180deg)", writingMode: "vertical-rl" }}>
+            {axes.down[theme]}
+          </span>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div
+            ref={gridRef}
+            className={`relative aspect-square w-full rounded-2xl ${isAdventure ? "parchment" : ""}`}
+            style={{
+              ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }),
+              outline: drag?.target === "map" ? "3px solid rgba(217,180,95,.75)" : undefined,
+              outlineOffset: 2,
+            }}
+          >
+            {legend.map((q, i) => {
+              const corner = QUADRANTS[mode].pos[i];
+              return (
+                <div key={q.title} className="pointer-events-none absolute h-1/2 w-1/2" style={{ ...CORNER[corner], background: QUADRANTS[mode].tint[i] }}>
+                  <span
+                    className={`absolute text-[14px] italic sm:text-[15px] ${corner.endsWith("r") ? "right-3 text-right" : "left-3"} ${corner.startsWith("t") ? "top-2.5" : "bottom-2.5"}`}
+                    style={{ color: "var(--t-ink-soft)", opacity: 0.85 }}
+                  >
+                    {q.title}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="absolute bottom-0 left-1/2 top-0 w-0" style={{ borderLeft: `1.5px dashed ${isAdventure ? "rgba(139,112,64,.55)" : "var(--t-card-border)"}` }} />
+            <div className="absolute left-0 right-0 top-1/2 h-0" style={{ borderTop: `1.5px dashed ${isAdventure ? "rgba(139,112,64,.55)" : "var(--t-card-border)"}` }} />
+
+            {plotItem && (
               <button
                 type="button"
-                aria-label={`Place “${plotTask.title}” here`}
-                onClick={(e) => placeAt(e.clientX, e.clientY)}
+                aria-label={`Place “${plotItem.title}” here`}
+                onClick={(e) => {
+                  move(plotItem, "map", e.clientX, e.clientY);
+                  nextPlot();
+                }}
                 onPointerMove={(e) => {
                   if (e.pointerType !== "mouse") return;
                   const r = e.currentTarget.getBoundingClientRect();
@@ -333,245 +721,333 @@ export function PriorityMatrix({
                 }}
                 onPointerLeave={() => setGhost(null)}
                 className="absolute inset-0 z-30"
-                style={{
-                  background: "rgba(217,180,95,.08)",
-                  boxShadow: "inset 0 0 0 3px rgba(217,180,95,.7)",
-                  cursor: ghost ? "none" : "pointer",
-                  borderRadius: 14,
-                }}
+                style={{ background: "rgba(217,180,95,.08)", boxShadow: "inset 0 0 0 3px rgba(217,180,95,.7)", cursor: ghost ? "none" : "pointer", borderRadius: 14 }}
               >
                 {ghost && (
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute flex items-center justify-center overflow-hidden rounded-full"
-                    style={{
-                      left: ghost.x,
-                      top: ghost.y,
-                      width: 40,
-                      height: 40,
-                      transform: "translate(-50%, -50%)",
-                      background: "#f3e6c8",
-                      border: "2px solid #8a6c2c",
-                      boxShadow: "0 0 0 3px rgba(217,180,95,.55), 0 6px 14px rgba(0,0,0,.4)",
-                    }}
-                  >
-                    {plotTask.icon_key && (plotTask.icon_source === "ai" || plotTask.icon_source === "library") ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- quest portrait
-                      <img src={plotTask.icon_key} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <QuestMonogram id={plotTask.id} title={plotTask.title} size={36} />
-                    )}
+                  <span aria-hidden className="pointer-events-none absolute" style={{ left: ghost.x, top: ghost.y, transform: "translate(-50%, -50%)" }}>
+                    <Portrait item={plotItem} size={40} ring />
                   </span>
                 )}
               </button>
             )}
-            <div
-              className="absolute bottom-0 top-0 left-1/2 w-0"
-              style={{ borderLeft: `1.5px dashed ${isAdventure ? "rgba(139,112,64,.55)" : "var(--t-card-border)"}` }}
-            />
-            <div
-              className="absolute left-0 right-0 top-1/2 h-0"
-              style={{ borderTop: `1.5px dashed ${isAdventure ? "rgba(139,112,64,.55)" : "var(--t-card-border)"}` }}
-            />
 
-            {plotted.map(({ task, xPct, yPct }) => {
-              const isDragging = dragState?.taskId === task.id;
-              const displayX = isDragging ? dragState.xPct : xPct;
-              const displayY = isDragging ? dragState.yPct : yPct;
-              const tint = rescheduleRedness(task.reschedule_count);
-              const dotColor = tint ?? task.color ?? (isAdventure ? "var(--t-gold)" : "var(--t-accent)");
-              const pinImg = task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null;
-
+            {plotted.map(({ item, key, xPct, yPct }) => {
+              const tint = item.task ? rescheduleRedness(item.task.reschedule_count) : null;
+              const dragging = drag?.key === key;
               return (
-                <div
-                  key={task.id}
-                  className="group absolute -translate-x-1/2 translate-y-1/2 hover:z-40"
-                  style={{ left: `${displayX}%`, bottom: `${displayY}%`, zIndex: isDragging ? 40 : undefined }}
+                <button
+                  key={key}
+                  type="button"
+                  aria-label={`${item.title} — drag to move, tap to open`}
+                  onPointerDown={(e) => startPress(e, item, "map")}
+                  onPointerEnter={(e) => hoverOn(e, item)}
+                  onPointerLeave={() => setHover(null)}
+                  onClick={(e) => e.detail === 0 && tap(item, "map")}
+                  onContextMenu={(e) => e.preventDefault()}
+                  className="matrix-pin absolute -translate-x-1/2 translate-y-1/2 cursor-grab touch-none select-none hover:z-20 active:cursor-grabbing"
+                  style={{ left: `${xPct}%`, bottom: `${yPct}%`, opacity: dragging ? 0.3 : 1 }}
                 >
-                  <div
-                    className="flex cursor-grab touch-none items-center justify-center overflow-hidden rounded-full active:cursor-grabbing"
-                    style={{
-                      width: isAdventure ? 34 : 16,
-                      height: isAdventure ? 34 : 16,
-                      backgroundColor: isAdventure ? "#f3e6c8" : dotColor,
-                      border: `2px solid ${isAdventure ? (tint ? "var(--t-warn)" : "#8a6c2c") : "#fff"}`,
-                      transform: isDragging ? "scale(1.3)" : undefined,
-                      boxShadow: isAdventure
-                        ? `0 0 0 2px rgba(217,180,95,.45), 0 ${isDragging ? 6 : 2}px ${isDragging ? 12 : 5}px rgba(0,0,0,.35)`
-                        : isDragging
-                          ? "0 4px 10px rgba(0,0,0,.3)"
-                          : undefined,
-                    }}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.setPointerCapture(e.pointerId);
-                      pointerDownAt.current = { x: e.clientX, y: e.clientY };
-                      movedPastThreshold.current = false;
-                      setDragState({ taskId: task.id, xPct, yPct });
-                    }}
-                    onPointerMove={(e) => {
-                      if (dragState?.taskId !== task.id || !gridRef.current) return;
-                      if (pointerDownAt.current) {
-                        const dx = e.clientX - pointerDownAt.current.x;
-                        const dy = e.clientY - pointerDownAt.current.y;
-                        if (Math.hypot(dx, dy) > CLICK_MOVE_THRESHOLD) movedPastThreshold.current = true;
-                      }
-                      const rect = gridRef.current.getBoundingClientRect();
-                      const nx = clampPct(((e.clientX - rect.left) / rect.width) * 100);
-                      const nyFromTop = ((e.clientY - rect.top) / rect.height) * 100;
-                      const ny = clampPct(100 - nyFromTop);
-                      setDragState({ taskId: task.id, xPct: nx, yPct: ny });
-                    }}
-                    onPointerUp={() => {
-                      if (dragState?.taskId !== task.id) return;
-                      if (movedPastThreshold.current) {
-                        commitDrag(task.id, dragState.xPct, dragState.yPct);
-                      } else {
-                        setDragState(null); // no-op drag — just a click, handled by onClick below
-                      }
-                    }}
-                    onClick={() => {
-                      if (movedPastThreshold.current) return; // just finished a real drag, not a click
-                      setViewingTaskId(task.id);
-                    }}
-                  >
-                    {isAdventure &&
-                      (pinImg ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- quest portrait
-                        <img src={pinImg} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" />
-                      ) : (
-                        <span className="pointer-events-none h-full w-full">
-                          <QuestMonogram id={task.id} title={task.title} size={30} />
-                        </span>
-                      ))}
-                  </div>
-                  <div
-                    className={`pointer-events-none absolute z-10 hidden w-56 rounded-xl p-2.5 text-[13.5px] shadow-lg group-hover:block ${isAdventure ? "parchment" : ""}`}
-                    style={{
-                      ...(displayY > 62 ? { top: isAdventure ? 40 : 22 } : { bottom: isAdventure ? 40 : 22 }),
-                      ...(displayX < 28 ? { left: -8 } : displayX > 72 ? { right: -8 } : { left: "50%", transform: "translateX(-50%)" }),
-                      background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-                      border: `1px solid ${isAdventure ? "var(--t-gold)" : "var(--t-card-border)"}`,
-                      color: "var(--t-ink)",
-                      display: isDragging ? "block" : undefined,
-                    }}
-                  >
-                    <p className="text-[15px] font-semibold leading-snug">{task.title}</p>
-                    {task.description && (
-                      <p className="mt-0.5" style={{ color: "var(--t-ink-soft)" }}>
-                        {task.description}
-                      </p>
-                    )}
-                    <p className="mt-1" style={{ color: "var(--t-ink-soft)" }}>
-                      Importance {(isDragging ? pctToScale(dragState.xPct) : task.importance).toFixed(1)} · Urgency{" "}
-                      {(isDragging ? pctToScale(dragState.yPct) : task.urgency).toFixed(1)}
-                      {task.xp_value > 0 && ` · ${task.xp_value} ${isAdventure ? "XP" : "pts"}`}
-                    </p>
-                  </div>
-                </div>
+                  <Portrait item={item} size={34} ring warn={!!tint} />
+                </button>
               );
             })}
 
             {plotted.length === 0 && (
-              <p
-                className="absolute inset-0 flex items-center justify-center text-sm"
-                style={{ color: "var(--t-ink-soft)" }}
-              >
-                No open tasks to plot yet.
+              <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-sm" style={{ color: "var(--t-ink-soft)" }}>
+                {mode === "impact" ? "Rate a quest's importance and effort to see it here." : "No plotted quests yet."}
               </p>
             )}
           </div>
 
           <div className="mt-1.5 flex justify-between text-[14px]" style={axisLabelStyle}>
-            <span>{isAdventure ? "Minor" : "Not important"}</span>
-            <span>Important →</span>
+            <span>{axes.left[theme]}</span>
+            <span>{axes.right}</span>
           </div>
         </div>
       </div>
 
-      {unrated.length > 0 && !plotting && (
-        <section className="flex flex-col gap-2 rounded-2xl px-3 py-3" style={{ background: isAdventure ? "rgba(14,18,10,.4)" : "var(--t-card)", border: `1px solid ${isAdventure ? "rgba(217,180,95,.3)" : "var(--t-card-border)"}` }}>
-          <div className="flex items-center gap-2">
-            <h2 className={`m-0 flex-1 ${isAdventure ? "font-display text-[17px]" : "text-sm font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
-              Not yet plotted <span className="font-normal opacity-70">({unrated.length})</span>
-            </h2>
-            <button
-              type="button"
-              onClick={() => {
-                setLocalPlot(unrated.map((t) => t.id));
-                setPlotIndex(0);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className="hover-glow h-9 rounded-full px-3.5 text-[13.5px] font-semibold"
-              style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
-            >
-              Plot them one by one
-            </button>
-          </div>
-          <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1 [scrollbar-width:thin]">
-            {unrated.map((t) => {
-              const img = (t.icon_source === "ai" || t.icon_source === "library") && t.icon_key ? t.icon_key : null;
-              return (
-                <li key={t.id} className="shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLocalPlot([t.id]);
-                      setPlotIndex(0);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    title={`Plot “${t.title}”`}
-                    className="flex w-[72px] flex-col items-center gap-1 rounded-xl p-1 text-center"
-                  >
-                    <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full" style={{ border: "2px solid #8a6c2c", background: "#f3e6c8" }}>
-                      {img ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- quest portrait
-                        <img src={img} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <QuestMonogram id={t.id} title={t.title} size={44} />
-                      )}
-                    </span>
-                    <span className="line-clamp-2 text-[11.5px] leading-tight" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
-                      {t.title}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      {/* ---- Parking lots, with the trash zone between them while dragging ---- */}
+      <div className="grid items-stretch gap-x-2" style={{ gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)" }}>
+        <LotBox
+          refEl={laterRef}
+          title="Save for later"
+          count={later.length}
+          empty="Drag quests here to park them."
+          highlight={drag?.target === "later"}
+          theme={theme}
+        >
+          {later.map((i) => (
+            <LotIcon key={i.key} item={i} theme={theme} dimmed={drag?.key === i.key} onPointerDown={(e) => startPress(e, i, "later")} onHover={(e) => hoverOn(e, i)} onLeave={() => setHover(null)} onKey={() => tap(i, "later")} />
+          ))}
+        </LotBox>
 
-      <p className="m-0 text-center text-[14px] italic" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.8 }}>
-        Drag a quest to re-plot it; tap one to see it.
-      </p>
+        <div
+          ref={trashRef}
+          aria-hidden={!drag}
+          className="flex flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl text-center transition-all duration-200"
+          style={{
+            width: drag ? 84 : 0,
+            opacity: drag ? 1 : 0,
+            border: drag ? `2px dashed ${drag.target === "trash" ? "#c0412c" : "rgba(192,65,44,.55)"}` : "none",
+            background: drag?.target === "trash" ? "rgba(192,65,44,.22)" : "rgba(192,65,44,.08)",
+            color: isAdventure ? "#f3c9b8" : "#9a3322",
+          }}
+        >
+          <TrashGlyph open={drag?.target === "trash"} />
+          <span className="px-1 text-[11.5px] font-semibold leading-tight">remove from priority matrix</span>
+        </div>
 
-      <div
-        className={`flex flex-col rounded-2xl px-5 py-3 ${isAdventure ? "parchment parchment-framed" : ""}`}
-        style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
-      >
-        {legend.map((item, i) => (
-          <div
-            key={item.title}
-            className="relative z-[1] flex items-center gap-3 py-2"
-            style={i === 0 ? undefined : { borderTop: `1px solid ${isAdventure ? "rgba(139,112,64,.3)" : "var(--t-card-border)"}` }}
-          >
-            <span
-              aria-hidden
-              className="h-5 w-5 shrink-0 rounded-md"
-              style={{ background: QUADRANT_TINT[i].replace(/[\d.]+\)$/, ".55)"), border: "1px solid rgba(80,60,20,.35)" }}
-            />
-            <span className="w-[130px] shrink-0 text-[16.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
-              {item.title}
-            </span>
-            <span className="text-[14.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              {item.desc}
-            </span>
-          </div>
-        ))}
+        <LotBox
+          refEl={unplottedRef}
+          title="Not yet plotted"
+          count={unplotted.length}
+          empty="Everything is on the map."
+          highlight={drag?.target === "unplotted"}
+          theme={theme}
+          actions={
+            <>
+              {unplotted.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => startPlot(unplotted.map((i) => i.key))}
+                  className="hover-glow h-8 rounded-full px-3 text-[13px] font-semibold"
+                  style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
+                >
+                  Plot all
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                aria-label="Add boards or quests to the matrix"
+                title="Add boards or quests"
+                className="hover-glow flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none"
+                style={{ border: `1.5px solid ${isAdventure ? "var(--t-gold)" : "var(--t-accent)"}`, color: isAdventure ? "var(--t-gold)" : "var(--t-accent)" }}
+              >
+                +
+              </button>
+            </>
+          }
+        >
+          {unplotted.map((i) => (
+            <LotIcon key={i.key} item={i} theme={theme} dimmed={drag?.key === i.key} onPointerDown={(e) => startPress(e, i, "unplotted")} onHover={(e) => hoverOn(e, i)} onLeave={() => setHover(null)} onKey={() => tap(i, "unplotted")} />
+          ))}
+        </LotBox>
       </div>
 
-      {viewingTask && <QuestCardPopup task={viewingTask} theme={theme} onClose={() => setViewingTaskId(null)} />}
+      {/* ---- Floating bits ---- */}
+      {drag && dragItem && (
+        <div className="pointer-events-none fixed z-[60] flex flex-col items-center gap-1" style={{ left: drag.x, top: drag.y, transform: "translate(-50%, -50%)" }}>
+          <span style={{ transform: "scale(1.15)", filter: "drop-shadow(0 8px 14px rgba(0,0,0,.45))" }}>
+            <Portrait item={dragItem} size={44} ring />
+          </span>
+          {drag.label && (
+            <span
+              className="whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold"
+              style={{ background: drag.target === "trash" ? "#8e2b25" : "rgba(20,16,8,.85)", color: "#f6ecd2" }}
+            >
+              {drag.label}
+            </span>
+          )}
+        </div>
+      )}
+      {hover && hoverItem && <Preview item={hoverItem} left={hover.left} top={hover.top} above={hover.above} theme={theme} />}
+
+      {viewingTask && <QuestCardPopup task={viewingTask} theme={theme} categoryLabel={viewingTask.board_id ? boardTitle.get(viewingTask.board_id) : null} onClose={() => setViewingTaskId(null)} />}
+      {editingTask && <EditTaskModal task={editingTask} theme={theme} onClose={() => setEditingTaskId(null)} />}
+      {editingBoard && editingBoard.created_at && (
+        <BoardMatrixDialog board={editingBoard as Board} openQuests={openCount.get(editingBoard.id) ?? 0} theme={theme} onClose={() => setEditingBoardId(null)} />
+      )}
+      {adding && (
+        <AddToMatrixSheet
+          boards={offMatrixBoards as Board[]}
+          quests={hiddenQuests}
+          openCountByBoard={openCount}
+          theme={theme}
+          onClose={() => setAdding(false)}
+          onAdded={() => router.refresh()}
+        />
+      )}
     </div>
+  );
+}
+
+function Portrait({ item, size, ring = false, warn = false }: { item: Item; size: number; ring?: boolean; warn?: boolean }) {
+  const isBoard = item.kind === "board";
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center overflow-hidden ${isBoard ? "rounded-[28%]" : "rounded-full"}`}
+      style={{
+        width: size,
+        height: size,
+        background: "#f3e6c8",
+        border: `2px solid ${warn ? "var(--t-warn)" : isBoard ? "#6d4f1d" : "#8a6c2c"}`,
+        boxShadow: ring ? `0 0 0 2px ${isBoard ? "rgba(217,180,95,.85)" : "rgba(217,180,95,.45)"}, 0 2px 5px rgba(0,0,0,.35)` : undefined,
+      }}
+    >
+      {item.img ? (
+        // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+        <img src={item.img} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" />
+      ) : isBoard ? (
+        <BoardSeal color={item.board?.color} size={Math.round(size * 0.7)} />
+      ) : (
+        <span className="pointer-events-none">
+          <QuestMonogram id={item.id} title={item.title} size={size} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Facts({ item, theme }: { item: Item; theme: "calm" | "adventure" }) {
+  const t = item.task;
+  const facts: string[] = [];
+  if (item.kind === "board") facts.push(`Board · ${item.openQuests ?? 0} open quests`);
+  else if (item.boardTitle) facts.push(item.boardTitle);
+  if (t?.due_at) facts.push(`Due ${new Date(t.due_at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`);
+  if (t?.estimate_minutes != null) facts.push(`⏱ ${t.estimate_minutes < 60 ? `${t.estimate_minutes}m` : `${Math.round((t.estimate_minutes / 60) * 10) / 10}h`}`);
+  if (t?.steps_total) facts.push(`${t.steps_done ?? 0}/${t.steps_total} steps`);
+  if (t && t.xp_value > 0) facts.push(`${t.xp_value} ${theme === "adventure" ? "XP" : "pts"}`);
+  const ratings: string[] = [];
+  if (item.importance > 0) ratings.push(`Importance ${item.importance.toFixed(1)}`);
+  if (item.urgency > 0) ratings.push(`Urgency ${item.urgency.toFixed(1)}`);
+  if (item.effortKnown) ratings.push(`Effort ${item.effort.toFixed(1)}`);
+  return (
+    <span className="mt-0.5 flex flex-col gap-0.5 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+      {facts.length > 0 && <span>{facts.join(" · ")}</span>}
+      {ratings.length > 0 && <span>{ratings.join(" · ")}</span>}
+    </span>
+  );
+}
+
+function Preview({ item, left, top, above, theme }: { item: Item; left: number; top: number; above: boolean; theme: "calm" | "adventure" }) {
+  const isAdventure = theme === "adventure";
+  return (
+    <div
+      className={`pointer-events-none fixed z-[58] flex w-[280px] flex-col gap-1.5 rounded-xl p-3 shadow-2xl ${isAdventure ? "parchment" : ""}`}
+      style={{
+        left,
+        top,
+        transform: above ? "translateY(-100%)" : undefined,
+        background: isAdventure ? undefined : "var(--t-card)",
+        border: isAdventure ? undefined : "1px solid var(--t-card-border)",
+        color: "var(--t-ink)",
+      }}
+    >
+      <div className="relative z-[1] flex items-start gap-2.5">
+        <Portrait item={item} size={40} />
+        <div className="min-w-0 flex-1">
+          <p className="m-0 text-[15px] font-semibold leading-snug">{item.title}</p>
+          <Facts item={item} theme={theme} />
+        </div>
+      </div>
+      {item.description && (
+        <p className="relative z-[1] m-0 line-clamp-4 whitespace-pre-line text-[13.5px] leading-snug" style={{ color: "#4a3c26" }}>
+          {item.description}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function LotBox({
+  refEl,
+  title,
+  count,
+  empty,
+  highlight,
+  theme,
+  actions,
+  children,
+}: {
+  refEl: React.RefObject<HTMLDivElement | null>;
+  title: string;
+  count: number;
+  empty: string;
+  highlight: boolean;
+  theme: "calm" | "adventure";
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const isAdventure = theme === "adventure";
+  return (
+    <section
+      ref={refEl}
+      className="flex min-w-0 flex-col gap-2 rounded-2xl px-2.5 py-2.5 transition-colors"
+      style={{
+        background: highlight ? "rgba(217,180,95,.2)" : isAdventure ? "rgba(14,18,10,.4)" : "var(--t-card)",
+        border: `${highlight ? 2 : 1}px ${highlight ? "solid" : "solid"} ${highlight ? "var(--t-gold)" : isAdventure ? "rgba(217,180,95,.3)" : "var(--t-card-border)"}`,
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <h2 className={`m-0 mr-auto ${isAdventure ? "font-display text-[17px]" : "text-sm font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+          {title} <span className="font-normal opacity-70">({count})</span>
+        </h2>
+        {actions && <div className="flex items-center gap-1.5">{actions}</div>}
+      </div>
+      {count === 0 ? (
+        <p className="m-0 text-[13px] italic" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.7 }}>
+          {empty}
+        </p>
+      ) : (
+        <ul className="lot-scroll m-0 flex max-h-[232px] list-none flex-wrap content-start gap-1 overflow-y-auto p-0">{children}</ul>
+      )}
+    </section>
+  );
+}
+
+function LotIcon({
+  item,
+  theme,
+  dimmed,
+  onPointerDown,
+  onHover,
+  onLeave,
+  onKey,
+}: {
+  item: Item;
+  theme: "calm" | "adventure";
+  dimmed: boolean;
+  onPointerDown: (e: React.PointerEvent) => void;
+  onHover: (e: React.PointerEvent) => void;
+  onLeave: () => void;
+  onKey: () => void;
+}) {
+  return (
+    <li className="shrink-0">
+      <button
+        type="button"
+        aria-label={`${item.title} — tap to plot, hold and drag to move`}
+        onPointerDown={onPointerDown}
+        onPointerEnter={onHover}
+        onPointerLeave={onLeave}
+        onClick={(e) => e.detail === 0 && onKey()}
+        onContextMenu={(e) => e.preventDefault()}
+        className="matrix-pin flex w-[62px] cursor-grab select-none flex-col items-center gap-1 rounded-xl p-1 text-center active:cursor-grabbing"
+        style={{ opacity: dimmed ? 0.3 : 1 }}
+      >
+        <Portrait item={item} size={42} ring={item.kind === "board"} />
+        <span className="line-clamp-2 text-[11px] leading-tight" style={{ color: theme === "adventure" ? "var(--t-cream)" : "var(--t-ink)" }}>
+          {item.title}
+        </span>
+      </button>
+    </li>
+  );
+}
+
+function TrashGlyph({ open }: { open?: boolean }) {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M5 7.5h14l-1.1 12a1.8 1.8 0 0 1-1.8 1.6H7.9a1.8 1.8 0 0 1-1.8-1.6z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M9.5 11v6.5M14.5 11v6.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M3.5 6h17M9 6V4.3c0-.7.5-1.2 1.2-1.2h3.6c.7 0 1.2.5 1.2 1.2V6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ transformOrigin: "20px 6px", transform: open ? "rotate(18deg)" : undefined, transition: "transform 160ms" }}
+      />
+    </svg>
   );
 }

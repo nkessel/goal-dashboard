@@ -20,6 +20,7 @@ import { EveningRites } from "@/components/evening/EveningRites";
 import { DailyHabits } from "@/components/habits/DailyHabits";
 import { listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
 import { bossesTableExists, getActiveBoss } from "@/lib/data/bosses";
+import { OneThing } from "@/components/one-thing/OneThing";
 
 /** Start of a window `n` days back (kept outside render for purity). */
 function daysAgoISO(n: number) {
@@ -108,6 +109,7 @@ export default async function Home() {
         day={
           <div className="flex flex-col gap-6">
             {stats}
+            <OneThing tasks={onToday} theme={theme} />
             <TodayTaskBoard
               priorityTasks={topPriorities}
               otherTasks={otherTasks}

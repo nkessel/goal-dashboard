@@ -8,6 +8,13 @@ export type Board = {
   sort_order: number;
   /** Null for a top-level board; another board's id for a nested sub-board. */
   parent_board_id: string | null;
+  /** On the Priority Matrix as one item: 'plot' (map), 'unplotted', 'later'; null = not on it. */
+  matrix_state?: "plot" | "unplotted" | "later" | null;
+  importance?: number;
+  urgency?: number;
+  effort?: number;
+  icon_key?: string | null;
+  icon_source?: "library" | "ai" | null;
   created_at: string;
   updated_at: string;
 };
@@ -84,6 +91,8 @@ export type Task = {
   chunk_minutes?: number | null;
   /** Custom coin payout; null = automatic from XP. */
   coin_value?: number | null;
+  /** Matrix screen placement: 'unplotted' / 'later' lots, or 'hidden' (off the matrix). */
+  matrix_state?: "unplotted" | "later" | "hidden" | null;
   /** Step checklist counts, attached when listed for a card (not a column). */
   steps_total?: number;
   steps_done?: number;

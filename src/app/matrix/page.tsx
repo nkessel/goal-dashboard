@@ -45,7 +45,7 @@ export default async function MatrixPage({
         </div>
 
 
-        <PriorityMatrix tasks={tasks} theme={theme} boards={boards.map((b) => ({ id: b.id, title: b.title }))}
+        <PriorityMatrix tasks={tasks} theme={theme} boards={boards}
           plotIds={plotIds}
           confirmImports={confirmImports}
         />

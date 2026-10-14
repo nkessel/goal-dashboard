@@ -267,3 +267,35 @@ export async function createBoard(
   if (error) throw new Error(`Failed to create board: ${error.message}`);
   return data;
 }
+
+/** A board's own matrix fields (migration 0026). */
+export async function updateBoardMatrix(
+  boardId: string,
+  ownerId: string,
+  patch: {
+    matrix_state?: "plot" | "unplotted" | "later" | null;
+    importance?: number;
+    urgency?: number;
+    effort?: number;
+    icon_key?: string | null;
+    icon_source?: "library" | "ai";
+    title?: string;
+    description?: string | null;
+  }
+): Promise<void> {
+  const r = (n: number) => Math.max(0, Math.min(5, Math.round(n * 10) / 10));
+  const row: Record<string, unknown> = { ...patch };
+  for (const k of ["importance", "urgency", "effort"] as const) if (typeof patch[k] === "number") row[k] = r(patch[k]!);
+  if (typeof patch.title === "string") {
+    const t = patch.title.trim();
+    if (!t) throw new Error("Give the board a title.");
+    row.title = t;
+  }
+  const db = supabaseAdmin();
+  const { error } = await db.from("boards").update(row).eq("id", boardId).eq("owner_id", ownerId);
+  if (error) {
+    if (/matrix_state|importance|urgency|effort|icon_key|icon_source/.test(error.message))
+      throw new Error("Boards on the matrix need a quick database update first.");
+    throw new Error(`Failed to update board: ${error.message}`);
+  }
+}

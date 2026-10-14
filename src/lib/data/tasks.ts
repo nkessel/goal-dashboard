@@ -107,6 +107,37 @@ export async function updateTaskPriority(
   return data;
 }
 
+export type MatrixState = "unplotted" | "later" | "hidden" | null;
+
+const MATRIX_MIGRATION_MSG = "The matrix lots need a quick database update first.";
+
+/** Where a quest sits on the matrix screen (see migration 0026). */
+export async function setTaskMatrixState(taskIds: string[], ownerId: string, state: MatrixState): Promise<void> {
+  if (!taskIds.length) return;
+  const db = supabaseAdmin();
+  const { error } = await db.from("tasks").update({ matrix_state: state }).in("id", taskIds).eq("owner_id", ownerId);
+  if (error) throw new Error(/matrix_state/.test(error.message) ? MATRIX_MIGRATION_MSG : `Failed to move quest: ${error.message}`);
+}
+
+/** Drop a quest on the map: set the plotted values and take it out of any lot. */
+export async function placeTaskOnMatrix(
+  taskId: string,
+  ownerId: string,
+  values: { importance: number; urgency?: number; effort?: number }
+): Promise<void> {
+  const r = (n: number) => Math.max(0, Math.min(5, Math.round(n * 10) / 10));
+  const patch: Record<string, unknown> = { importance: r(values.importance), matrix_state: null };
+  if (values.urgency !== undefined) patch.urgency = r(values.urgency);
+  if (values.effort !== undefined) patch.effort = r(values.effort);
+  const db = supabaseAdmin();
+  let { error } = await db.from("tasks").update(patch).eq("id", taskId).eq("owner_id", ownerId);
+  if (error && /matrix_state/.test(error.message)) {
+    delete patch.matrix_state;
+    ({ error } = await db.from("tasks").update(patch).eq("id", taskId).eq("owner_id", ownerId));
+  }
+  if (error) throw new Error(`Failed to plot quest: ${error.message}`);
+}
+
 /**
  * Full edit of a task's own fields (title/description/importance/urgency/xp)
  * — used by the click-to-edit dialog on a quest card. Does not touch status,
