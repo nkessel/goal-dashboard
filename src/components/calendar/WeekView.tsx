@@ -56,7 +56,7 @@ export function WeekView({
   // Pick a time to the quarter hour: drag with a mouse for a range, or tap
   // (mouse or finger) for a 30-minute slot. Touch still scrolls the page.
   const [sel, setSel] = useState<{ dayIndex: number; lo: number; hi: number } | null>(null);
-  const pick = useRef<{ dayIndex: number; startMin: number; x: number; y: number; mouse: boolean; moved: boolean } | null>(null);
+  const pick = useRef<{ dayIndex: number; startMin: number; x: number; y: number; mouse: boolean; moved: boolean; lo: number; hi: number } | null>(null);
   const SNAP = 15;
   const minuteAt = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -71,10 +71,14 @@ export function WeekView({
   function pickDown(e: React.PointerEvent<HTMLDivElement>, dayIndex: number) {
     const m = minuteAt(e);
     const mouse = e.pointerType === "mouse";
-    pick.current = { dayIndex, startMin: m, x: e.clientX, y: e.clientY, mouse, moved: false };
+    pick.current = { dayIndex, startMin: m, x: e.clientX, y: e.clientY, mouse, moved: false, lo: m, hi: m + SNAP };
     if (mouse) {
       e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture unavailable — moves within the column still track */
+      }
       setSel({ dayIndex, lo: m, hi: m + SNAP });
     }
   }
@@ -84,7 +88,9 @@ export function WeekView({
     if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 6) p.moved = true;
     if (!p.mouse) return;
     const m = minuteAt(e);
-    setSel({ dayIndex, lo: Math.min(p.startMin, m), hi: Math.max(p.startMin, m) + SNAP });
+    p.lo = Math.min(p.startMin, m);
+    p.hi = Math.max(p.startMin, m) + SNAP;
+    setSel({ dayIndex, lo: p.lo, hi: p.hi });
   }
   function pickUp(e: React.PointerEvent<HTMLDivElement>, dayIndex: number) {
     const p = pick.current;
@@ -94,9 +100,9 @@ export function WeekView({
     if (!day) return;
     let lo = p.startMin;
     let hi = p.startMin + 30;
-    if (p.mouse && p.moved && sel) {
-      lo = sel.lo;
-      hi = sel.hi;
+    if (p.mouse && p.moved) {
+      lo = p.lo;
+      hi = p.hi;
     } else if (!p.mouse && p.moved) {
       setSel(null);
       return; // a scroll, not a tap
