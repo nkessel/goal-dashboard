@@ -152,15 +152,19 @@ export function CreateSheet({
         }}
       >
         <div
-          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl"
-          style={{
-            background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-            border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-            color: "var(--t-ink)",
-          }}
+          className={stage === "choose" ? "flex min-h-0 flex-1 flex-col" : "flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl"}
+          style={
+            stage === "choose"
+              ? { color: "var(--t-ink)" }
+              : {
+                  background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+                  border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+                  color: "var(--t-ink)",
+                }
+          }
         >
         {stage === "choose" ? (
-          <div className="relative z-[1] flex flex-col gap-2.5 p-4">
+          <div className="relative z-[1] flex flex-col gap-2.5 px-2 pb-2">
             <ChoiceButton
               icon={<QuestShield size={26} />}
               title={makeKinds.includes("board") ? "New quest or board" : makeKinds.includes("subboard") ? "New quest or sub-board" : "New quest"}
@@ -267,7 +271,7 @@ export function CreateSheet({
         )}
         </div>
         {/* A small tail pointing down at the + it came from. */}
-        {!keyboard && !moved && <span ref={tailRef} aria-hidden className="-mt-[7px] block h-3 w-3 shrink-0 rotate-45 self-start" style={{ background: isAdventure ? "#e4cfa3" : "var(--t-card)", borderRight: "2px solid #c7a96f", borderBottom: "2px solid #c7a96f" }} />}
+        {!keyboard && !moved && stage !== "choose" && <span ref={tailRef} aria-hidden className="-mt-[7px] block h-3 w-3 shrink-0 rotate-45 self-start" style={{ background: isAdventure ? "#e4cfa3" : "var(--t-card)", borderRight: "2px solid #c7a96f", borderBottom: "2px solid #c7a96f" }} />}
       </div>
     </>,
     document.body
@@ -307,9 +311,16 @@ function JournalComposer({ feedback = false, isAdventure, onDone }: { feedback?:
   if (saved) {
     return (
       <div className="flex flex-col items-center gap-1 px-4 py-8 text-center" role="status">
-        <span className="text-3xl" aria-hidden>
-          ✒️
-        </span>
+        {feedback ? (
+          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden className="card-pop-in">
+            <circle cx="12" cy="12" r="10.5" fill="#58a04a" stroke="#2f5a26" strokeWidth="1.2" />
+            <path d="M6.8 12.4l3.4 3.4 7-7.6" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <span className="text-3xl" aria-hidden>
+            ✒️
+          </span>
+        )}
         <p className={`m-0 ${isAdventure ? "font-display text-xl" : "text-lg font-bold"}`}>
           {!feedback ? "Written in your journal" : kind === "future" ? "Saved to the future ideas log" : "Feedback sent — it goes into the next update"}
         </p>
@@ -545,11 +556,17 @@ function ChoiceButton({ icon, title, hint, special = false, isAdventure, onClick
     <button
       type="button"
       onClick={onClick}
-      className="create-kind hover-glow flex min-h-[68px] items-center gap-3 rounded-2xl px-4 py-3 text-left"
+      className="create-kind choice-float hover-glow flex min-h-[64px] items-center gap-3 rounded-full px-3 py-2.5 text-left"
       style={{
-        background: special ? (isAdventure ? "linear-gradient(180deg, rgba(242,213,138,.55), rgba(217,180,95,.4))" : "var(--t-accent-soft)") : "rgba(70,50,20,.07)",
-        border: `1.5px solid ${special ? "#c99a2e" : "rgba(120,90,40,.3)"}`,
-        boxShadow: special ? "0 0 0 2px rgba(242,201,76,.22)" : undefined,
+        background: special
+          ? isAdventure
+            ? "linear-gradient(180deg, #f6e2a6, #e2c47a)"
+            : "var(--t-accent-soft)"
+          : isAdventure
+            ? "linear-gradient(180deg, #f4e7c8, #e6d3a8)"
+            : "var(--t-card)",
+        border: `1.5px solid ${special ? "#a8822a" : "#b39a6a"}`,
+        boxShadow: "0 8px 20px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.6)",
         color: "var(--t-ink)",
       }}
     >

@@ -363,7 +363,7 @@ export function EveningRites({
           The evening rites need a quick database update before they can be saved. Once it&apos;s run, your rites appear here.
         </p>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={() => (setActiveId(null), setLocal(null))}>
+        <DndContext id="dnd-EveningRites" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={() => (setActiveId(null), setLocal(null))}>
           {error && (
             <p className="rounded-lg px-3 py-2 text-center text-[14.5px] font-semibold" style={{ background: "var(--t-warn-bg)", color: "var(--t-warn)" }}>
               {error}

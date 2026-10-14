@@ -103,7 +103,7 @@ export function TomorrowQuests({
         </p>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <DndContext id="dnd-TomorrowQuests" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={filled} strategy={verticalListSortingStrategy}>
           <ol className="m-0 flex list-none flex-col gap-2 p-0">
             {filled.map((id, i) => {

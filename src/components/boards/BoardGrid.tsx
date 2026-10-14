@@ -376,7 +376,7 @@ export function BoardGrid({
           {error}
         </p>
       )}
-      <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActive(null)}>
+      <DndContext id="dnd-BoardGrid" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActive(null)}>
         <SortableContext items={boards.map((b) => BOARD + b.id)} strategy={rectSortingStrategy}>
           <ul className={`grid gap-x-2 gap-y-3 sm:gap-x-3 ${boards.length === 1 ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3"}`}>
             {boards.map((board) => (

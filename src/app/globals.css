@@ -1329,3 +1329,14 @@ html {
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(190, 150, 70, 0.65); }
+
+/* + menu first screen: three floating choices that rise one after another. */
+@keyframes choice-float-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.choice-float { animation: choice-float-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both; }
+.choice-float:nth-child(1) { animation-delay: 90ms; }
+.choice-float:nth-child(2) { animation-delay: 45ms; }
+.choice-float:nth-child(3) { animation-delay: 0ms; }
+@media (prefers-reduced-motion: reduce) { .choice-float { animation: none; } }
