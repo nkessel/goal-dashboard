@@ -67,7 +67,7 @@ export async function AppShell({
         />
       )}
       <div className={`flex w-full flex-1 flex-col ${widthClass}`}>
-        <div className="flex items-center gap-2.5 px-5 pt-3">
+        <div className="relative flex items-center gap-2.5 px-5 pt-3">
           {profileId && <BackToToday isAdventure={isAdventure} />}
           {profileId && (
             <Suspense fallback={null}>

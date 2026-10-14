@@ -8,6 +8,7 @@ export function BackToSettings({ isAdventure }: { isAdventure: boolean }) {
   const router = useRouter();
   if (params.get("from") !== "settings") return null;
   return (
+    <>
     <button
       type="button"
       onClick={() => (window.history.length > 1 ? router.back() : router.push("/settings"))}
@@ -24,5 +25,19 @@ export function BackToSettings({ isAdventure }: { isAdventure: boolean }) {
       </svg>
       <span className={isAdventure ? "font-display" : "font-semibold"}>Settings</span>
     </button>
+    {/* Skip the Settings menu: straight back to the page you were on before it. */}
+    <button
+      type="button"
+      onClick={() => (window.history.length > 2 ? window.history.go(-2) : router.push("/"))}
+      className="hover-glow absolute left-[calc(50%+8px)] top-3 flex h-10 -translate-x-1/2 items-center whitespace-nowrap rounded-full px-3 text-[13.5px] sm:left-1/2 sm:px-3.5 sm:text-[14px]"
+      style={{
+        background: isAdventure ? "rgba(10,12,32,.6)" : "var(--t-card)",
+        border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.45)" : "var(--t-card-border)"}`,
+        color: isAdventure ? "var(--t-cream)" : "var(--t-ink)",
+      }}
+    >
+      <span className={isAdventure ? "font-display" : "font-semibold"}>Return to main view</span>
+    </button>
+    </>
   );
 }
