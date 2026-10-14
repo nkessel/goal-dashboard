@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
+import { CreateFab } from "@/components/create/CreateFab";
 import { getProfileById } from "@/lib/data/profiles";
 import { listRewards } from "@/lib/data/rewards";
 import { RewardsList } from "@/components/rewards/RewardsList";
@@ -41,6 +42,7 @@ export default async function RewardsPage() {
           </p>
         </div>
         <RewardsList rewards={rewards} coins={coins} theme={profile.theme} />
+        <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={profile.theme} />
       </div>
     </AppShell>
   );

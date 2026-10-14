@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
+import { CreateFab } from "@/components/create/CreateFab";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PriorityMatrix } from "@/components/matrix/PriorityMatrix";
 import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
@@ -67,6 +68,7 @@ export default async function MatrixPage({
             )}
           </ul>
         </section>
+        <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
     </AppShell>
   );

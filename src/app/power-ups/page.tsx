@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
+import { CreateFab } from "@/components/create/CreateFab";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getProfileById } from "@/lib/data/profiles";
 import { listPowerUps } from "@/lib/data/tasks";
@@ -29,6 +30,7 @@ export default async function PowerUpsPage() {
           subtitle="Every quest of 15 minutes or less — quick wins for a quick spark."
         />
         <PowerUpsList open={powerUps.open} done={powerUps.done} theme={profile.theme} />
+        <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={profile.theme} />
       </div>
     </AppShell>
   );

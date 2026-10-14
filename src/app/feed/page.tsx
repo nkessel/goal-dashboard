@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
+import { CreateFab } from "@/components/create/CreateFab";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { FriendDirectory } from "@/components/social/FriendDirectory";
 import { FriendRequests } from "@/components/social/FriendRequests";
@@ -92,6 +93,7 @@ export default async function FeedPage() {
           </h2>
           <FriendDirectory profileId={profileId} rows={directoryRows} theme={theme} />
         </section>
+        <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
     </AppShell>
   );

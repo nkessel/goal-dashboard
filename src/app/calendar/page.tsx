@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
+import { CreateFab } from "@/components/create/CreateFab";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getProfileById } from "@/lib/data/profiles";
 import { xpToNextLevel } from "@/lib/data/xp";
@@ -221,6 +222,7 @@ export default async function CalendarPage({
         {view === "month" && (
           <MonthView monthKey={formatDateParam(startOfMonth(date))} todayKey={formatDateParam(today)} tasks={tasks} events={events} theme={theme} />
         )}
+        <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
     </AppShell>
   );

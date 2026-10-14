@@ -98,7 +98,10 @@ export function QuestEditorDialog({
   onSaved,
   onPlot,
   review,
+  altAction,
 }: {
+  /** A secondary choice shown under the header (e.g. "Put an existing quest here instead"). */
+  altAction?: { label: string; onClick: () => void };
   mode: QuestEditorMode;
   theme?: "calm" | "adventure";
   origin?: "fab" | "center";
@@ -142,7 +145,7 @@ export function QuestEditorDialog({
       : task.in_additional === false
         ? "none"
         : "additional"
-    : create?.pinToBattle === false || create?.todayFull
+    : create?.pinToBattle === false || create?.todayFull || create?.schedule
       ? "additional"
       : "today";
   const [placement, setPlacement] = useState<Placement>(initialPlacement);
@@ -559,6 +562,12 @@ export function QuestEditorDialog({
               ×
             </button>
           </div>
+
+          {altAction && (
+            <button type="button" onClick={altAction.onClick} className="-mt-1.5 self-start text-[13.5px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+              {altAction.label}
+            </button>
+          )}
 
           {doingNow && (
             <p className="m-0 text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>

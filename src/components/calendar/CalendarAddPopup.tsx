@@ -3,9 +3,10 @@
 import { createPortal } from "react-dom";
 import { useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
-import { createScheduledTaskAction, listSchedulableTasksAction, scheduleTaskAction } from "@/app/actions";
+import { listSchedulableTasksAction, scheduleTaskAction } from "@/app/actions";
 import { formatTimeRange } from "@/lib/calendar-dates";
 import { useEscape } from "@/lib/use-escape";
+import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 
 /**
  * Opened by dragging (or tapping) a time range on the Day/Week calendar —
@@ -28,11 +29,6 @@ export function CalendarAddPopup({
   useEscape(() => onClose());
   const isAdventure = theme === "adventure";
   const [mode, setMode] = useState<"new" | "existing">("new");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [importance, setImportance] = useState(3);
-  const [urgency, setUrgency] = useState(3);
-  const [xpValue, setXpValue] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -63,27 +59,6 @@ export function CalendarAddPopup({
     }
   }
 
-  function createNew() {
-    if (!title.trim() || isPending) return;
-    setError(null);
-    startTransition(async () => {
-      try {
-        const fd = new FormData();
-        fd.set("title", title);
-        fd.set("description", description);
-        fd.set("importance", String(importance));
-        fd.set("urgency", String(urgency));
-        fd.set("xpValue", String(xpValue));
-        fd.set("startISO", start.toISOString());
-        fd.set("endISO", end.toISOString());
-        await createScheduledTaskAction(fd);
-        onClose();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't create that quest");
-      }
-    });
-  }
-
   function pickExisting(task: Task) {
     if (isPending) return;
     setError(null);
@@ -102,6 +77,22 @@ export function CalendarAddPopup({
   );
 
   const dayLabel = start.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+
+  // A new quest gets the full quest editor, already scheduled for this slot.
+  if (mode === "new") {
+    return (
+      <QuestEditorDialog
+        mode={{
+          kind: "create",
+          schedule: { startISO: start.toISOString(), endISO: end.toISOString() },
+          prefill: { estimateMinutes: Math.round((end.getTime() - start.getTime()) / 60_000) },
+        }}
+        theme={theme}
+        onClose={onClose}
+        altAction={{ label: `Put an existing ${isAdventure ? "quest" : "task"} here instead`, onClick: switchToExisting }}
+      />
+    );
+  }
 
   return createPortal(
     <div
@@ -131,122 +122,11 @@ export function CalendarAddPopup({
           </button>
         </div>
 
-        <div
-          className="flex rounded-full p-1 text-xs"
-          style={{
-            background: isAdventure ? "var(--t-nav-bg)" : "var(--t-accent-soft)",
-            border: isAdventure ? "1px solid rgba(209,161,60,.35)" : undefined,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setMode("new")}
-            className="flex-1 rounded-full py-1.5 text-center font-semibold"
-            style={{
-              background: mode === "new" ? (isAdventure ? "var(--t-gold)" : "var(--t-accent)") : "transparent",
-              color: mode === "new" ? (isAdventure ? "#2a1c10" : "#fff") : isAdventure ? "var(--t-nav-inactive)" : "var(--t-ink-soft)",
-            }}
-          >
-            New {isAdventure ? "quest" : "task"}
-          </button>
-          <button
-            type="button"
-            onClick={switchToExisting}
-            className="flex-1 rounded-full py-1.5 text-center font-semibold"
-            style={{
-              background: mode === "existing" ? (isAdventure ? "var(--t-gold)" : "var(--t-accent)") : "transparent",
-              color: mode === "existing" ? (isAdventure ? "#2a1c10" : "#fff") : isAdventure ? "var(--t-nav-inactive)" : "var(--t-ink-soft)",
-            }}
-          >
-            Add existing instead
-          </button>
-        </div>
+        <button type="button" onClick={() => setMode("new")} className="self-start text-[13.5px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+          ← Create a new {isAdventure ? "quest" : "task"} instead
+        </button>
 
-        {mode === "new" ? (
-          <>
-            <label className="flex flex-col gap-1 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-              Title
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                autoFocus
-                placeholder={isAdventure ? "Quest title" : "Task title"}
-                className="rounded border px-2 py-1.5 text-sm"
-                style={fieldStyle}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-              Description
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                className="rounded border px-2 py-1.5 text-sm"
-                style={fieldStyle}
-              />
-            </label>
-            <div className="flex flex-wrap gap-3 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-              <label className="flex items-center gap-1.5">
-                Importance
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  step={0.1}
-                  value={importance}
-                  onChange={(e) => setImportance(Number(e.target.value))}
-                  className="w-16 rounded border px-1.5 py-0.5"
-                  style={fieldStyle}
-                />
-              </label>
-              <label className="flex items-center gap-1.5">
-                Urgency
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  step={0.1}
-                  value={urgency}
-                  onChange={(e) => setUrgency(Number(e.target.value))}
-                  className="w-16 rounded border px-1.5 py-0.5"
-                  style={fieldStyle}
-                />
-              </label>
-              <label className="flex items-center gap-1.5">
-                XP
-                <input
-                  type="number"
-                  min={0}
-                  value={xpValue}
-                  onChange={(e) => setXpValue(Number(e.target.value))}
-                  className="w-16 rounded border px-1.5 py-0.5"
-                  style={fieldStyle}
-                />
-              </label>
-            </div>
-
-            {error && (
-              <p className="text-xs" style={{ color: "var(--t-warn)" }}>
-                {error}
-              </p>
-            )}
-
-            <div className="mt-1 flex justify-end gap-2">
-              <button type="button" onClick={onClose} className="rounded-full px-3 py-1.5 text-sm" style={{ color: "var(--t-ink-soft)" }}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={createNew}
-                disabled={isPending || !title.trim()}
-                className="hover-glow rounded-full px-4 py-1.5 text-sm font-medium disabled:opacity-50"
-                style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
-              >
-                {isPending ? "Adding…" : "Add"}
-              </button>
-            </div>
-          </>
-        ) : (
+        {(
           <>
             <input
               value={query}

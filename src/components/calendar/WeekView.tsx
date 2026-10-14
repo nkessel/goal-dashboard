@@ -7,14 +7,12 @@ import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import {
   HOUR_START,
   HOUR_END,
-  dateAtHour,
   formatDateParam,
   formatHourLabel,
   formatShortTimeRange,
   isSameDay,
   parseDateParam,
 } from "@/lib/calendar-dates";
-import { useCalendarDragSelect } from "@/lib/use-calendar-drag-select";
 import { CalendarAddPopup } from "./CalendarAddPopup";
 import { CalendarTaskChip, getTaskDisplayWindow } from "./CalendarTaskChip";
 import { GoogleEventChip } from "./GoogleEventChip";
@@ -55,14 +53,57 @@ export function WeekView({
   // popup — either creating a new quest already scheduled there, or
   // searching existing quests to drop into that slot instead.
   const [addRange, setAddRange] = useState<{ start: Date; end: Date } | null>(null);
-  const { startDrag, enterCell, isSelected } = useCalendarDragSelect(({ dayIndex, lowRow, highRow }) => {
+  // Pick a time to the quarter hour: drag with a mouse for a range, or tap
+  // (mouse or finger) for a 30-minute slot. Touch still scrolls the page.
+  const [sel, setSel] = useState<{ dayIndex: number; lo: number; hi: number } | null>(null);
+  const pick = useRef<{ dayIndex: number; startMin: number; x: number; y: number; mouse: boolean; moved: boolean } | null>(null);
+  const SNAP = 15;
+  const minuteAt = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const m = ((e.clientY - r.top) / HOUR_PX) * 60;
+    return Math.max(0, Math.min(hourCount * 60 - SNAP, Math.floor(m / SNAP) * SNAP));
+  };
+  const minuteDate = (day: Date, minutes: number) => {
+    const d = new Date(day);
+    d.setHours(HOUR_START, 0, 0, 0);
+    return new Date(d.getTime() + minutes * 60_000);
+  };
+  function pickDown(e: React.PointerEvent<HTMLDivElement>, dayIndex: number) {
+    const m = minuteAt(e);
+    const mouse = e.pointerType === "mouse";
+    pick.current = { dayIndex, startMin: m, x: e.clientX, y: e.clientY, mouse, moved: false };
+    if (mouse) {
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setSel({ dayIndex, lo: m, hi: m + SNAP });
+    }
+  }
+  function pickMove(e: React.PointerEvent<HTMLDivElement>, dayIndex: number) {
+    const p = pick.current;
+    if (!p || p.dayIndex !== dayIndex) return;
+    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 6) p.moved = true;
+    if (!p.mouse) return;
+    const m = minuteAt(e);
+    setSel({ dayIndex, lo: Math.min(p.startMin, m), hi: Math.max(p.startMin, m) + SNAP });
+  }
+  function pickUp(e: React.PointerEvent<HTMLDivElement>, dayIndex: number) {
+    const p = pick.current;
+    pick.current = null;
+    if (!p || p.dayIndex !== dayIndex) return;
     const day = days[dayIndex];
     if (!day) return;
-    setAddRange({
-      start: dateAtHour(day, HOUR_START + lowRow),
-      end: dateAtHour(day, HOUR_START + highRow + 1),
-    });
-  });
+    let lo = p.startMin;
+    let hi = p.startMin + 30;
+    if (p.mouse && p.moved && sel) {
+      lo = sel.lo;
+      hi = sel.hi;
+    } else if (!p.mouse && p.moved) {
+      setSel(null);
+      return; // a scroll, not a tap
+    }
+    setSel({ dayIndex, lo, hi });
+    setAddRange({ start: minuteDate(day, lo), end: minuteDate(day, hi) });
+  }
 
   // How wide one day's column is: overlapping items split it into lanes when
   // there's room, and fan out (overlapping, slightly offset) when there isn't.
@@ -223,29 +264,33 @@ export function WeekView({
             task/event chips below so a chip occupying the same cell stacks
             visually on top and keeps first claim on pointer events there;
             dragging must start from genuinely empty space. */}
-        {days.map((_, dayIndex) =>
-          Array.from({ length: hourCount }, (_, row) => (
-            <div
-              key={`hit-${dayIndex}-${row}`}
-              className="touch-none select-none"
-              style={{
-                gridColumn: dayIndex + 2,
-                gridRow: row + 2,
-                cursor: "pointer",
-                background: isSelected(dayIndex, row)
-                  ? isAdventure
-                    ? "rgba(209,161,60,.35)"
-                    : "var(--t-accent-soft)"
-                  : undefined,
-              }}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                startDrag(dayIndex, row);
-              }}
-              onPointerEnter={() => enterCell(dayIndex, row)}
-            />
-          ))
-        )}
+        {days.map((_, dayIndex) => (
+          <div
+            key={`hit-${dayIndex}`}
+            className="relative select-none"
+            style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}`, cursor: "pointer", touchAction: "pan-y" }}
+            onPointerDown={(e) => pickDown(e, dayIndex)}
+            onPointerMove={(e) => pickMove(e, dayIndex)}
+            onPointerUp={(e) => pickUp(e, dayIndex)}
+            onPointerCancel={() => (pick.current = null, setSel(null))}
+          >
+            {sel && sel.dayIndex === dayIndex && (
+              <div
+                className="pointer-events-none absolute inset-x-0.5 rounded-md"
+                style={{
+                  top: (sel.lo / 60) * HOUR_PX,
+                  height: ((sel.hi - sel.lo) / 60) * HOUR_PX,
+                  background: isAdventure ? "rgba(209,161,60,.35)" : "var(--t-accent-soft)",
+                  border: `1.5px solid ${isAdventure ? "rgba(168,138,63,.8)" : "var(--t-accent)"}`,
+                }}
+              >
+                <span className="absolute left-1 top-0.5 text-[10.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                  {formatShortTimeRange(minuteDate(days[dayIndex], sel.lo), minuteDate(days[dayIndex], sel.hi))}
+                </span>
+              </div>
+            )}
+          </div>
+        ))}
 
         {/* Items, placed to the minute, plus the current-time line */}
         {days.map((day, dayIndex) => {
@@ -304,7 +349,7 @@ export function WeekView({
           start={addRange.start}
           end={addRange.end}
           theme={theme}
-          onClose={() => setAddRange(null)}
+          onClose={() => (setAddRange(null), setSel(null))}
         />
       )}
     </div>
