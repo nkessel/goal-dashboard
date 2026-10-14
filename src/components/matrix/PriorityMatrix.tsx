@@ -12,7 +12,8 @@ import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { BoardSeal } from "@/components/boards/BoardSeal";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { useEscape } from "@/lib/use-escape";
-import { confirmImportAction, placeOnMatrixAction, setMatrixStateAction } from "@/app/actions";
+import { collapseBoardOnMatrixAction, confirmImportAction, expandBoardOnMatrixAction, placeOnMatrixAction, setMatrixStateAction } from "@/app/actions";
+import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { BoardMatrixDialog } from "./BoardMatrixDialog";
 import { AddToMatrixSheet } from "./AddToMatrixSheet";
 
@@ -251,10 +252,14 @@ export function PriorityMatrix({
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  // Right-click menu on an icon, and a new quest started by clicking an empty spot.
+  const [ctx, setCtx] = useState<{ key: string; x: number; y: number; expand?: boolean } | null>(null);
+  const [newAt, setNewAt] = useState<{ importance: number; urgency?: number; effort?: number } | null>(null);
+  const lastDragEnd = useRef(0);
   const viewingTask = viewingTaskId ? (initialTasks.find((t) => t.id === viewingTaskId) ?? null) : null;
   const editingTask = editingTaskId ? (initialTasks.find((t) => t.id === editingTaskId) ?? null) : null;
   const editingBoard = editingBoardId ? ((boards ?? []).find((b) => b.id === editingBoardId) ?? null) : null;
-  const dialogOpen = !!(viewingTask || editingTask || editingBoard || adding);
+  const dialogOpen = !!(viewingTask || editingTask || editingBoard || adding || newAt || ctx);
 
   const gridRef = useRef<HTMLDivElement>(null);
   const laterRef = useRef<HTMLDivElement>(null);
@@ -421,6 +426,7 @@ export function PriorityMatrix({
     setDrag(null);
     if (!item) return;
     if (p.active) {
+      lastDragEnd.current = e.timeStamp;
       const t = targetAt(e.clientX, e.clientY);
       if (t) move(item, t, e.clientX, e.clientY);
     } else {
@@ -683,7 +689,14 @@ export function PriorityMatrix({
         <div className="min-w-0 flex-1">
           <div
             ref={gridRef}
-            className={`relative aspect-square w-full rounded-2xl ${isAdventure ? "parchment" : ""}`}
+            onClick={(e) => {
+              // An empty spot: start a new quest right there.
+              if (plotItem || e.timeStamp - lastDragEnd.current < 400) return;
+              if ((e.target as HTMLElement).closest("button")) return;
+              setNewAt(valuesAt(e.clientX, e.clientY));
+            }}
+            title="Click an empty spot to add a quest there"
+            className={`relative aspect-square w-full cursor-crosshair rounded-2xl ${isAdventure ? "parchment" : ""}`}
             style={{
               ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }),
               outline: drag?.target === "map" ? "3px solid rgba(217,180,95,.75)" : undefined,
@@ -743,7 +756,13 @@ export function PriorityMatrix({
                   onPointerEnter={(e) => hoverOn(e, item)}
                   onPointerLeave={() => setHover(null)}
                   onClick={(e) => e.detail === 0 && tap(item, "map")}
-                  onContextMenu={(e) => e.preventDefault()}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (press.current?.active) return;
+                    press.current = null;
+                    setHover(null);
+                    setCtx({ key: item.key, x: e.clientX, y: e.clientY });
+                  }}
                   className="matrix-pin absolute -translate-x-1/2 translate-y-1/2 cursor-grab touch-none select-none hover:z-20 active:cursor-grabbing"
                   style={{ left: `${xPct}%`, bottom: `${yPct}%`, opacity: dragging ? 0.3 : 1 }}
                 >
@@ -777,7 +796,7 @@ export function PriorityMatrix({
           theme={theme}
         >
           {later.map((i) => (
-            <LotIcon key={i.key} item={i} theme={theme} dimmed={drag?.key === i.key} onPointerDown={(e) => startPress(e, i, "later")} onHover={(e) => hoverOn(e, i)} onLeave={() => setHover(null)} onKey={() => tap(i, "later")} />
+            <LotIcon key={i.key} item={i} theme={theme} dimmed={drag?.key === i.key} onPointerDown={(e) => startPress(e, i, "later")} onHover={(e) => hoverOn(e, i)} onLeave={() => setHover(null)} onKey={() => tap(i, "later")} onMenu={(x, y) => { press.current = null; setHover(null); setCtx({ key: i.key, x, y }); }} />
           ))}
         </LotBox>
 
@@ -830,7 +849,7 @@ export function PriorityMatrix({
           }
         >
           {unplotted.map((i) => (
-            <LotIcon key={i.key} item={i} theme={theme} dimmed={drag?.key === i.key} onPointerDown={(e) => startPress(e, i, "unplotted")} onHover={(e) => hoverOn(e, i)} onLeave={() => setHover(null)} onKey={() => tap(i, "unplotted")} />
+            <LotIcon key={i.key} item={i} theme={theme} dimmed={drag?.key === i.key} onPointerDown={(e) => startPress(e, i, "unplotted")} onHover={(e) => hoverOn(e, i)} onLeave={() => setHover(null)} onKey={() => tap(i, "unplotted")} onMenu={(x, y) => { press.current = null; setHover(null); setCtx({ key: i.key, x, y }); }} />
           ))}
         </LotBox>
       </div>
@@ -853,6 +872,43 @@ export function PriorityMatrix({
       )}
       {hover && hoverItem && <Preview item={hoverItem} left={hover.left} top={hover.top} above={hover.above} theme={theme} />}
 
+      {ctx && byKey.get(ctx.key) && (
+        <ContextMenu
+          item={byKey.get(ctx.key)!}
+          x={ctx.x}
+          y={ctx.y}
+          expand={!!ctx.expand}
+          boardOf={(id) => (boards ?? []).find((b) => b.id === id)}
+          boardOnMatrix={(id) => items.some((i) => i.kind === "board" && i.id === id)}
+          theme={theme}
+          onClose={() => setCtx(null)}
+          onPick={(action) => {
+            const item = byKey.get(ctx.key)!;
+            if (action === "expand-ask") return setCtx({ ...ctx, expand: true });
+            setCtx(null);
+            setError(null);
+            if (action === "open") return item.kind === "task" ? setViewingTaskId(item.id) : setEditingBoardId(item.id);
+            if (action === "later" || action === "unplotted" || action === "trash") return move(item, action);
+            startTransition(async () => {
+              try {
+                if (action === "collapse") await collapseBoardOnMatrixAction(item.kind === "board" ? item.id : item.task!.board_id!);
+                else if (action === "expand-here") await expandBoardOnMatrixAction(item.id, "here");
+                else if (action === "expand-unplotted") await expandBoardOnMatrixAction(item.id, "unplotted");
+                router.refresh();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Couldn't do that.");
+              }
+            });
+          }}
+        />
+      )}
+      {newAt && (
+        <QuestEditorDialog
+          mode={{ kind: "create", prefill: { importance: newAt.importance, urgency: newAt.urgency, effort: newAt.effort } }}
+          theme={theme}
+          onClose={() => setNewAt(null)}
+        />
+      )}
       {viewingTask && <QuestCardPopup task={viewingTask} theme={theme} categoryLabel={viewingTask.board_id ? boardTitle.get(viewingTask.board_id) : null} onClose={() => setViewingTaskId(null)} />}
       {editingTask && <EditTaskModal task={editingTask} theme={theme} onClose={() => setEditingTaskId(null)} />}
       {editingBoard && editingBoard.created_at && (
@@ -1004,10 +1060,12 @@ function LotIcon({
   onHover,
   onLeave,
   onKey,
+  onMenu,
 }: {
   item: Item;
   theme: "calm" | "adventure";
   dimmed: boolean;
+  onMenu: (x: number, y: number) => void;
   onPointerDown: (e: React.PointerEvent) => void;
   onHover: (e: React.PointerEvent) => void;
   onLeave: () => void;
@@ -1022,7 +1080,10 @@ function LotIcon({
         onPointerEnter={onHover}
         onPointerLeave={onLeave}
         onClick={(e) => e.detail === 0 && onKey()}
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onMenu(e.clientX, e.clientY);
+        }}
         className="matrix-pin flex w-[62px] cursor-grab select-none flex-col items-center gap-1 rounded-xl p-1 text-center active:cursor-grabbing"
         style={{ opacity: dimmed ? 0.3 : 1 }}
       >
@@ -1049,5 +1110,83 @@ function TrashGlyph({ open }: { open?: boolean }) {
         style={{ transformOrigin: "20px 6px", transform: open ? "rotate(18deg)" : undefined, transition: "transform 160ms" }}
       />
     </svg>
+  );
+}
+
+type CtxAction = "open" | "collapse" | "expand-ask" | "expand-here" | "expand-unplotted" | "later" | "unplotted" | "trash";
+
+/** Right-click on a quest or board icon. */
+function ContextMenu({
+  item,
+  x,
+  y,
+  expand,
+  boardOf,
+  boardOnMatrix,
+  theme,
+  onClose,
+  onPick,
+}: {
+  item: Item;
+  x: number;
+  y: number;
+  expand: boolean;
+  boardOf: (id: string) => MatrixBoard | undefined;
+  boardOnMatrix: (id: string) => boolean;
+  theme: "calm" | "adventure";
+  onClose: () => void;
+  onPick: (a: CtxAction) => void;
+}) {
+  useEscape(onClose);
+  const board = item.kind === "task" && item.task?.board_id ? boardOf(item.task.board_id) : undefined;
+  const rows: { a: CtxAction; label: string; hint?: string }[] = [];
+  if (expand) {
+    rows.push({ a: "expand-here", label: "Plot them all where the board is", hint: "You can drag them apart afterwards" });
+    rows.push({ a: "expand-unplotted", label: "Put them all in Not yet plotted", hint: "Then plot them one by one" });
+  } else if (item.kind === "board") {
+    rows.push({ a: "open", label: "Edit board" });
+    rows.push({ a: "expand-ask", label: `Show all ${item.openQuests ?? 0} quests on the matrix`, hint: "Replaces this board icon" });
+  } else {
+    rows.push({ a: "open", label: "Open quest" });
+    if (board) rows.push({ a: "collapse", label: `Collapse all “${board.title}” quests`, hint: boardOnMatrix(board.id) ? "Into its board icon" : "Into one board icon" });
+  }
+  if (!expand) {
+    if (item.lot !== "later") rows.push({ a: "later", label: "Save for later" });
+    if (item.lot !== "unplotted") rows.push({ a: "unplotted", label: "Move to Not yet plotted" });
+    rows.push({ a: "trash", label: "Remove from priority matrix" });
+  }
+  const width = 260;
+  const left = typeof window === "undefined" ? x : Math.min(Math.max(8, x), window.innerWidth - width - 8);
+  const top = typeof window === "undefined" ? y : Math.min(y, window.innerHeight - rows.length * 52 - 24);
+  return (
+    <>
+      <div className="fixed inset-0 z-[57]" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
+      <div
+        role="menu"
+        className={`card-pop-in fixed z-[58] flex flex-col overflow-hidden rounded-xl py-1 shadow-2xl ${theme === "adventure" ? "parchment" : ""}`}
+        style={{ left, top, width, background: theme === "adventure" ? "var(--t-panel-2)" : "var(--t-card)", border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}
+      >
+        <p className="relative z-[1] m-0 truncate px-3.5 pb-1 pt-1.5 text-[12px] font-bold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
+          {expand ? `Show “${item.title}” quests` : item.title}
+        </p>
+        {rows.map((r) => (
+          <button
+            key={r.a}
+            type="button"
+            role="menuitem"
+            onClick={() => onPick(r.a)}
+            className="relative z-[1] flex min-h-11 flex-col justify-center px-3.5 py-1.5 text-left hover:bg-black/5"
+            style={{ color: r.a === "trash" ? "var(--t-warn)" : undefined }}
+          >
+            <span className="text-[15px]">{r.label}</span>
+            {r.hint && (
+              <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+                {r.hint}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }

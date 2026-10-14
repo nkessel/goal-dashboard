@@ -263,6 +263,49 @@ export async function addToMatrixAction(input: { taskIds: string[]; boardIds: st
   revalidatePath("/matrix");
 }
 
+/** Fold a board's quests into one board icon on the matrix (placed where its quests sat on average). */
+export async function collapseBoardOnMatrixAction(boardId: string) {
+  const ownerId = await requireProfileId();
+  const db = supabaseAdmin();
+  const [{ data: quests }, board] = await Promise.all([
+    db.from("tasks").select("id, importance, urgency, effort, matrix_state").eq("owner_id", ownerId).eq("status", "open").eq("board_id", boardId),
+    boardsData.getBoard(boardId, ownerId),
+  ]);
+  if (!board) throw new Error("That board isn't here anymore.");
+  const rows = (quests ?? []) as { id: string; importance: number; urgency: number; effort: number; matrix_state: string | null }[];
+  const rated = rows.filter((r) => r.matrix_state !== "hidden" && (r.importance || r.urgency));
+  const avg = (k: "importance" | "urgency" | "effort") => (rated.length ? rated.reduce((n, r) => n + Number(r[k] || 0), 0) / rated.length : 0);
+  const b = board as typeof board & { importance?: number; urgency?: number };
+  const boardRated = (b.importance ?? 0) > 0 || (b.urgency ?? 0) > 0;
+  await boardsData.updateBoardMatrix(boardId, ownerId, {
+    matrix_state: "plot",
+    ...(boardRated ? {} : { importance: avg("importance"), urgency: avg("urgency"), effort: avg("effort") }),
+  });
+  await tasksData.setTaskMatrixState(rows.map((r) => r.id), ownerId, "hidden");
+  revalidatePath("/matrix");
+}
+
+/** Put a board's quests back on the matrix: all at the board's spot, or all in Not yet plotted. */
+export async function expandBoardOnMatrixAction(boardId: string, where: "here" | "unplotted") {
+  const ownerId = await requireProfileId();
+  const db = supabaseAdmin();
+  const board = (await boardsData.getBoard(boardId, ownerId)) as (Awaited<ReturnType<typeof boardsData.getBoard>> & { importance?: number; urgency?: number; effort?: number }) | null;
+  if (!board) throw new Error("That board isn't here anymore.");
+  const { data: quests } = await db.from("tasks").select("id").eq("owner_id", ownerId).eq("status", "open").eq("board_id", boardId);
+  const ids = (quests ?? []).map((r) => r.id as string);
+  if (ids.length) {
+    const patch: Record<string, unknown> =
+      where === "here"
+        ? { matrix_state: null, importance: board.importance ?? 0, urgency: board.urgency ?? 0, ...((board.effort ?? 0) > 0 ? { effort: board.effort } : {}) }
+        : { matrix_state: "unplotted" };
+    const { error } = await db.from("tasks").update(patch).in("id", ids).eq("owner_id", ownerId);
+    if (error) throw new Error(`Couldn't move the quests: ${error.message}`);
+  }
+  await boardsData.updateBoardMatrix(boardId, ownerId, { matrix_state: null });
+  revalidatePath("/matrix");
+  revalidatePath("/");
+}
+
 /** Edit a board as a matrix item: title, notes, ratings, portrait. */
 export async function updateBoardMatrixAction(
   boardId: string,

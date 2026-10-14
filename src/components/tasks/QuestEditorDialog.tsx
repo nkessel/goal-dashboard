@@ -32,6 +32,10 @@ export type QuestDraft = {
   title?: string;
   description?: string;
   estimateMinutes?: number | null;
+  /** 0–5, e.g. from clicking a spot on the Priority Matrix. */
+  importance?: number;
+  urgency?: number;
+  effort?: number;
 };
 
 export type QuestEditorMode =
@@ -125,11 +129,11 @@ export function QuestEditorDialog({
 
   const [title, setTitle] = useState(task?.title ?? prefill?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? prefill?.description ?? "");
-  const [importance, setImportance] = useState(task ? Math.round(task.importance) : 0);
-  const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : 0);
+  const [importance, setImportance] = useState(task ? Math.round(task.importance) : Math.round(prefill?.importance ?? 0));
+  const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : Math.round(prefill?.urgency ?? 0));
   const [xp, setXp] = useState(task?.xp_value ?? (doingNow ? 30 : 0));
   const [coinValue, setCoinValue] = useState<number | null>(task?.coin_value ?? null);
-  const [effort, setEffort] = useState(task?.effort ?? 0);
+  const [effort, setEffort] = useState(task?.effort ?? Math.round(prefill?.effort ?? 0));
   const [aspiration, setAspiration] = useState(Boolean(task?.is_aspiration));
   const [estimate, setEstimate] = useState<string>(() => {
     const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (create?.powerUp ? 5 : undefined);
