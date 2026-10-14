@@ -8,6 +8,8 @@ import { RiteEditorDialog } from "./RiteEditorDialog";
 import { Moon } from "./BeginEveningButton";
 import { useFlipToEvening } from "./DayNightFlip";
 import { useLocalDay } from "./evening-clock";
+import { TomorrowQuests } from "./TomorrowQuests";
+import type { Task } from "@/lib/data/types";
 
 /** Client-side copy of a rite (the data module is server-only). */
 export type RiteView = {
@@ -50,11 +52,17 @@ export function EveningRites({
   rites,
   completions,
   theme,
+  tomorrow = null,
+  openQuests = [],
 }: {
   /** Null when the rites tables haven't been created yet. */
   rites: RiteView[] | null;
   completions: { rite_id: string; day: string }[];
   theme: "calm" | "adventure";
+  /** Quests already planned for tomorrow (null before that database update). */
+  tomorrow?: (Task & { categoryLabel?: string | null })[] | null;
+  /** Open quests to plan tomorrow from. */
+  openQuests?: (Task & { categoryLabel?: string | null })[];
 }) {
   const flip = useFlipToEvening();
   const day = useLocalDay();
@@ -188,6 +196,8 @@ export function EveningRites({
             </div>
           )}
 
+          <TomorrowQuests queued={tomorrow} candidates={openQuests} theme={theme} />
+
           {/* Additional Mini-Quests */}
           <section>
             <button
@@ -238,7 +248,7 @@ export function EveningRites({
         <span className="font-display">Return to the day</span>
       </button>
 
-      <AddTaskForm theme={theme} />
+      <AddTaskForm theme={theme} initial="rite" />
 
       {editing && (
         <RiteEditorDialog

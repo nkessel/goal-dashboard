@@ -577,7 +577,8 @@ body {
   border-color: #b39a6a !important;
   box-shadow: inset 0 1px 3px rgba(80, 60, 20, 0.2);
   font-family: var(--font-body);
-  font-size: 15px;
+  /* 16px: anything smaller makes iOS zoom the page when a field is tapped. */
+  font-size: 16px;
 }
 [data-theme="adventure"] .parchment input:not(.bare-input):focus,
 [data-theme="adventure"] .parchment textarea:focus,
@@ -1045,3 +1046,88 @@ html[data-evening] [data-theme="adventure"] {
 /* Avatar / menu button: a clean round ring on hover, nothing in the corners. */
 .avatar-link { transition: box-shadow 150ms ease, filter 150ms ease; }
 .avatar-link:hover { box-shadow: 0 0 0 2px rgba(242, 210, 126, 0.75), 0 0 12px rgba(242, 210, 126, 0.35); }
+
+/* Portrait being painted in the background: a soft golden shimmer + bobbing brush. */
+.portrait-painting {
+  background: conic-gradient(from 0deg, rgba(248, 227, 160, 0.15), rgba(217, 180, 95, 0.75), rgba(248, 227, 160, 0.15));
+  animation: portrait-spin 1.6s linear infinite;
+}
+.portrait-painting .portrait-brush {
+  animation: portrait-spin 1.6s linear infinite reverse, portrait-bob 0.8s ease-in-out infinite alternate;
+}
+@keyframes portrait-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes portrait-bob {
+  from {
+    translate: 0 -1px;
+  }
+  to {
+    translate: 0 2px;
+  }
+}
+
+/* ---------- The + sheet ----------
+   Editors (quest, reward, rite) render inside it in place: their own
+   overlay, frame, header and enter/exit animations are switched off. */
+.create-sheet-in { animation: create-sheet-in 300ms cubic-bezier(.2,.8,.2,1) both; transform-origin: 50% 100%; }
+.create-sheet-out { animation: create-sheet-out 200ms ease-in both; transform-origin: 50% 100%; }
+@keyframes create-sheet-in {
+  from { opacity: 0; transform: translateY(28px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes create-sheet-out {
+  to { opacity: 0; transform: translateY(24px) scale(.97); }
+}
+@media (prefers-reduced-motion: reduce) { .create-sheet-in, .create-sheet-out { animation: none; } }
+.embed-host > div {
+  position: static !important;
+  inset: auto !important;
+  padding: 0 !important;
+  background: none !important;
+  display: block !important;
+  animation: none !important;
+  z-index: auto !important;
+}
+.embed-host [role="dialog"] {
+  max-height: none !important;
+  max-width: none !important;
+  width: 100% !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  animation: none !important;
+  overflow: visible !important;
+}
+.embed-host [role="dialog"]::before,
+.embed-host [role="dialog"]::after { display: none !important; }
+.embed-host .qe-body { overflow: visible !important; padding-top: 6px !important; }
+.embed-host [data-embed-hide] { display: none !important; }
+.create-kind {
+  transition: background-color 160ms, color 160ms, box-shadow 160ms, transform 120ms;
+}
+.create-kind:active { transform: scale(.96); }
+
+/* Long-press to drag: no iOS text-selection or link callout in the way. */
+.board-sortable,
+.board-sortable a {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Board peek: opens rising from below; going into a sub-board zooms in, up zooms out. */
+.peek-open { animation: peek-open 300ms cubic-bezier(.2,.8,.2,1) both; }
+.peek-close { animation: peek-close 200ms ease-in both; }
+.peek-zoom-in { animation: peek-zoom-in 320ms cubic-bezier(.2,.8,.2,1) both; }
+.peek-zoom-out { animation: peek-zoom-out 320ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes peek-open { from { opacity: 0; transform: translateY(26px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes peek-close { to { opacity: 0; transform: translateY(18px) scale(.97); } }
+@keyframes peek-zoom-in { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
+@keyframes peek-zoom-out { from { opacity: 0; transform: scale(1.08); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .peek-open, .peek-close, .peek-zoom-in, .peek-zoom-out { animation: none; }
+}

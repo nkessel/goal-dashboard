@@ -17,6 +17,7 @@ import { listRites, listRiteCompletions } from "@/lib/data/rites";
 import { DayNightFlip } from "@/components/evening/DayNightFlip";
 import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
+import { listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
 
 /** Start of a window `n` days back (kept outside render for purity). */
 function daysAgoISO(n: number) {
@@ -59,6 +60,8 @@ export default async function Home() {
     );
   }
 
+  // A new day: last evening's plan moves into Today's Quests first.
+  await promoteQueuedQuests(session.user.id).catch(() => false);
   const [openTasks, completedTasks, profile, questsComplete, xpThisWeek, friendIds] = await Promise.all([
     listOpenTasksForOwnerWithCategory(session.user.id),
     listCompletedTasksForOwner(session.user.id, 40),
@@ -68,11 +71,13 @@ export default async function Home() {
     listFriendIds(session.user.id),
   ]);
   // A two-day window; VictoriesToday narrows it to the viewer's own local day.
-  const [recentClaims, rites, riteCompletions] = await Promise.all([
+  const [recentClaims, rites, riteCompletions, tomorrowRows] = await Promise.all([
     listClaimedSince(session.user.id, daysAgoISO(2)).catch(() => []),
     listRites(session.user.id).catch(() => null),
     listRiteCompletions(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => []),
+    listTomorrowQueue(session.user.id).catch(() => null),
   ]);
+  const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
   const topPriorities = openTasks.filter((t) => t.is_manual_priority);
   const otherTasks = openTasks.filter((t) => !t.is_manual_priority);
   const theme = profile?.theme ?? "calm";
@@ -91,7 +96,7 @@ export default async function Home() {
             <TodayTaskBoard priorityTasks={topPriorities} otherTasks={otherTasks} theme={theme} />
             <BeginEveningButton />
             <section>
-              <AddTaskForm theme={theme} />
+              <AddTaskForm theme={theme} todayFull={topPriorities.length >= 3} />
             </section>
             <VictoriesToday
               tasks={completedTasks}
@@ -112,6 +117,8 @@ export default async function Home() {
               rites={rites?.map((r) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value })) ?? null}
               completions={riteCompletions.map((c) => ({ rite_id: c.rite_id, day: c.day }))}
               theme={theme}
+              tomorrow={tomorrow}
+              openQuests={openTasks.filter((t) => !t.reward_id)}
             />
           </div>
         }

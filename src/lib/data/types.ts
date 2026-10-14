@@ -75,6 +75,9 @@ export type Task = {
   is_aspiration?: boolean;
   /** A deadline (separate from a calendar slot). */
   due_at?: string | null;
+  /** Planned for this day in the evening routine (moves into Today's Quests then). */
+  queued_for?: string | null;
+  queue_rank?: number | null;
   /** Can be worked on in chunks of this many minutes (filler time). */
   chunk_minutes?: number | null;
   /** Custom coin payout; null = automatic from XP. */

@@ -15,6 +15,8 @@ import * as taskIconLibraryData from "@/lib/data/task-icon-library";
 import * as rewardsData from "@/lib/data/rewards";
 import * as ritesData from "@/lib/data/rites";
 import * as stepsData from "@/lib/data/steps";
+import * as journalData from "@/lib/data/journal";
+import * as tomorrowData from "@/lib/data/tomorrow";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { generateAndStoreImage, buildAvatarPrompt, buildTaskIconPrompt, buildSketchbookIconPrompt, buildTreasureIconPrompt } from "@/lib/ai-image";
@@ -215,6 +217,12 @@ export async function completeTaskAction(formData: FormData) {
   return finishTask(ownerId, taskId, completedAt);
 }
 
+/** Coins to add on completion so the quest pays exactly its custom coin value. */
+function customCoinAdjustment(task: { coin_value?: number | null; xp_value: number }) {
+  if (task.coin_value == null) return 0;
+  return Math.max(0, Math.round(task.coin_value)) - Math.ceil(Math.max(0, task.xp_value) / 10);
+}
+
 /**
  * Complete a quest and pay what it still owes. A reward's own quest also
  * completes the reward and pays its bonus coins.
@@ -233,6 +241,12 @@ async function finishTask(ownerId: string, taskId: string, completedAt?: string)
     coinsEarned = award.coins === null ? 0 : award.coinsEarned;
   } else {
     totalXp = (await profilesData.getProfileById(ownerId))?.total_xp ?? null;
+  }
+  // A custom coin payout tops up (or trims) the automatic 1-per-10-XP coins.
+  const coinAdjust = customCoinAdjustment(completed);
+  if (coinAdjust !== 0) {
+    await rewardsData.addCoins(ownerId, coinAdjust);
+    coinsEarned += coinAdjust;
   }
   let rewardCompleted = false;
   if (completed.reward_id) {
@@ -273,6 +287,10 @@ export async function updateTaskAction(
     grantsReward?: boolean;
     /** Also confirm this quest if it was an import awaiting review. */
     confirmImport?: boolean;
+    dueAt?: string | null;
+    chunkMinutes?: number | null;
+    /** Coins paid on completion; null = automatic (1 per 10 XP). */
+    coinValue?: number | null;
   }
 ) {
   const ownerId = await requireProfileId();
@@ -306,6 +324,9 @@ export async function updateTaskAction(
     boardId: input.boardId,
     effort: input.effort,
     isAspiration: input.isAspiration,
+    dueAt: input.dueAt,
+    chunkMinutes: input.chunkMinutes,
+    coinValue: input.coinValue,
   });
   revalidatePath("/");
   revalidatePath("/matrix");
@@ -368,9 +389,10 @@ export async function saveQuestStepsAction(taskId: string, steps: { id?: string;
   const ownerId = await requireProfileId();
   const task = await tasksData.getTask(taskId, ownerId);
   if (!task) throw new Error("That quest isn't here anymore.");
-  await stepsData.replaceSteps(taskId, ownerId, steps.slice(0, 50));
+  const saved = await stepsData.replaceSteps(taskId, ownerId, steps.slice(0, 50));
   revalidatePath("/");
   revalidatePath("/boards", "layout");
+  return saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order }));
 }
 
 /** Deletion lives inside the edit dialog, not a separate control. */
@@ -404,6 +426,8 @@ export async function reopenTaskAction(taskId: string) {
   if (before?.status === "completed") {
     const paid = typeof before.xp_awarded === "number" ? before.xp_awarded : before.xp_value;
     if (paid > 0) await xp.awardXp(ownerId, -paid, "task_completed", taskId);
+    const coinAdjust = customCoinAdjustment(before);
+    if (coinAdjust !== 0) await rewardsData.addCoins(ownerId, -coinAdjust);
     if (typeof before.xp_awarded === "number") await tasksData.setTaskPayout(taskId, ownerId, { progress: 0, xpAwarded: 0 });
   }
   revalidatePath("/");
@@ -841,6 +865,7 @@ export async function generateTaskIconAction(taskId: string, prompt: string) {
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: trimmed });
   revalidatePath("/");
   revalidatePath("/matrix");
+  revalidatePath("/boards", "layout");
   return url;
 }
 
@@ -871,6 +896,9 @@ export async function createQuestAction(input: {
   pinToBattle?: boolean;
   grantsReward?: boolean;
   schedule?: { startISO: string; endISO: string; googleEventId?: string };
+  dueAt?: string | null;
+  chunkMinutes?: number | null;
+  coinValue?: number | null;
 }): Promise<string> {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
@@ -887,6 +915,9 @@ export async function createQuestAction(input: {
     estimateMinutes: input.estimateMinutes ?? null,
     iconKey: input.iconKey ?? null,
     iconSource: input.iconSource,
+    dueAt: input.dueAt ?? null,
+    chunkMinutes: input.chunkMinutes ?? null,
+    coinValue: input.coinValue ?? null,
   });
   revalidatePath("/power-ups");
   if (input.schedule) {
@@ -911,7 +942,8 @@ export async function createQuestAction(input: {
     }
   }
   if (input.pinToBattle) {
-    await tasksData.setManualPriority(task.id, ownerId, true);
+    // Today's Quests full: it simply lands in Additional Quests.
+    await tasksData.setManualPriority(task.id, ownerId, true).catch(() => null);
   }
   if (input.grantsReward) {
     await tasksData.setTaskGrantsReward(task.id, ownerId, true);
@@ -1224,5 +1256,73 @@ export async function updateRiteAction(riteId: string, input: { title?: string; 
 export async function removeRiteAction(riteId: string) {
   const ownerId = await requireProfileId();
   await ritesData.archiveRite(riteId, ownerId);
+  revalidatePath("/");
+}
+
+// ---------------------------------------------------------------------------
+// "Doing now" and the journal (both from the + sheet)
+// ---------------------------------------------------------------------------
+
+/** Log something you're doing right now: creates the quest and completes it at once. */
+export async function logDoingNowAction(input: {
+  title: string;
+  description?: string;
+  xpValue: number;
+  boardId?: string | null;
+  iconKey?: string | null;
+  iconSource?: "library" | "ai";
+}) {
+  const ownerId = await requireProfileId();
+  const title = input.title.trim();
+  if (!title) throw new Error("What are you doing? Give it a name first.");
+  const task = await tasksData.createTask(ownerId, {
+    title,
+    description: input.description?.trim() || undefined,
+    xpValue: Math.max(0, Math.min(1000, Math.round(input.xpValue))),
+    boardId: input.boardId ?? null,
+    iconKey: input.iconKey ?? null,
+    iconSource: input.iconSource,
+  });
+  const res = await finishTask(ownerId, task.id);
+  revalidatePath("/boards", "layout");
+  return { id: task.id, ...res };
+}
+
+export async function listJournalAction() {
+  const ownerId = await requireProfileId();
+  return journalData.listJournalEntries(ownerId);
+}
+
+export async function addJournalEntryAction(body: string, mood: number | null) {
+  const ownerId = await requireProfileId();
+  const text = body.trim();
+  if (!text) throw new Error("Write something first.");
+  const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null);
+  revalidatePath("/journal");
+  return entry;
+}
+
+export async function deleteJournalEntryAction(id: string) {
+  const ownerId = await requireProfileId();
+  await journalData.deleteJournalEntry(ownerId, id);
+  revalidatePath("/journal");
+}
+
+/** The evening routine's "Tomorrow's Quests": up to three, in slot order. */
+export async function setTomorrowQueueAction(ids: string[]) {
+  const ownerId = await requireProfileId();
+  await tomorrowData.setTomorrowQueue(ownerId, ids);
+  revalidatePath("/");
+}
+
+/** Drag a quest onto another board. */
+export async function moveTaskToBoardAction(taskId: string, boardId: string | null) {
+  const ownerId = await requireProfileId();
+  if (boardId) {
+    const board = await boardsData.getBoard(boardId, ownerId);
+    if (!board) throw new Error("That board isn't here anymore.");
+  }
+  await tasksData.setTaskBoard(taskId, ownerId, boardId);
+  revalidatePath("/boards", "layout");
   revalidatePath("/");
 }

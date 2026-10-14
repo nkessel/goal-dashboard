@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EveningRoutineTile } from "./EveningRoutineTile";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
@@ -132,6 +133,24 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </span>
               <span className="flex items-center gap-1 text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
                 <CoinIcon size={13} /> {profile.coins ?? 0} coins
+              </span>
+            </span>
+          </Link>
+          <EveningRoutineTile isAdventure={isAdventure} />
+          <Link
+            href="/journal"
+            className={`hover-glow flex items-center gap-2.5 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}
+            style={isAdventure ? { borderRadius: 14 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }}
+          >
+            <span aria-hidden className="text-[20px] leading-none">
+              ✒️
+            </span>
+            <span className="flex flex-col leading-tight">
+              <span className="text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                Journal
+              </span>
+              <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                Your entries
               </span>
             </span>
           </Link>

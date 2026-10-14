@@ -59,7 +59,7 @@ export async function replaceSteps(
   taskId: string,
   ownerId: string,
   steps: { id?: string; title: string; done: boolean }[]
-): Promise<void> {
+): Promise<QuestStep[]> {
   const db = supabaseAdmin();
   const existing = await listStepsForTask(taskId, ownerId);
   if (existing === null) throw new Error("Quest steps need a quick database update first.");
@@ -90,4 +90,5 @@ export async function replaceSteps(
       if (error) throw new Error(`Failed to add a step: ${error.message}`);
     }
   }
+  return (await listStepsForTask(taskId, ownerId)) ?? [];
 }

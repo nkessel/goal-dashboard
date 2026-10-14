@@ -73,6 +73,9 @@ export function IconPicker({
 
   function generateIcon() {
     setGenError(null);
+    // Painting takes a few seconds: close the picker straight away and let the
+    // portrait shimmer while it paints, so nothing waits on it.
+    setOpen(false);
     startGeneratingIcon(async () => {
       try {
         let url: string | undefined;
@@ -94,9 +97,9 @@ export function IconPicker({
           );
         }
         setTab("library");
-        setOpen(false);
       } catch (e) {
         setGenError(e instanceof Error ? e.message : "Couldn't generate an icon.");
+        setOpen(true);
       }
     });
   }
@@ -206,7 +209,16 @@ export function IconPicker({
         ) : (
           emptyContent ?? fallbackEmoji
         )}
-        {showEditHint && (
+        {isGeneratingIcon && (
+          <span aria-hidden className="portrait-painting absolute inset-0 flex items-center justify-center rounded-full">
+            <svg width={Math.max(14, size * 0.3)} height={Math.max(14, size * 0.3)} viewBox="0 0 24 24" fill="none" className="portrait-brush">
+              <path d="M14.5 3.5l6 6-8.2 8.2a3 3 0 01-2.1.9H6.5v-3.7a3 3 0 01.9-2.1l7.1-9.3z" fill="#f8e3a0" stroke="#5a4214" strokeWidth="1.4" strokeLinejoin="round" />
+              <path d="M6.5 18.6c-1 1.6-2.4 2.2-3.5 2 .4-1.3.4-2.7 1.6-3.6" stroke="#5a4214" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </span>
+        )}
+        {isGeneratingIcon && <span className="sr-only">Painting the portrait…</span>}
+        {showEditHint && !isGeneratingIcon && (
           <span
             aria-hidden
             className="absolute inset-0 flex items-center justify-center gap-1 rounded-full text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -343,28 +355,19 @@ export function IconPicker({
               <label className="text-[11.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }} htmlFor="portrait-prompt">
                 Painted from this description — change it or clear it
               </label>
-              <textarea
-                id="portrait-prompt"
-                rows={3}
-                value={aiPrompt}
-                onChange={(e) => {
-                  setAiPrompt(e.target.value);
-                  setPromptEdited(true);
-                }}
-                placeholder="Describe the portrait to paint…"
-                className="resize-none rounded border px-2 py-1 text-[13px] leading-snug"
-                style={fieldStyle}
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={generateIcon}
-                  disabled={isGeneratingIcon || !aiPrompt.trim()}
-                  className="hover-glow rounded-full px-3 py-1 text-xs font-medium disabled:opacity-50"
-                  style={{ background: "var(--t-gold)", color: "#2a1c10" }}
-                >
-                  {isGeneratingIcon ? "Painting…" : "Paint portrait"}
-                </button>
+              <div className="relative">
+                <textarea
+                  id="portrait-prompt"
+                  rows={3}
+                  value={aiPrompt}
+                  onChange={(e) => {
+                    setAiPrompt(e.target.value);
+                    setPromptEdited(true);
+                  }}
+                  placeholder="Describe the portrait to paint…"
+                  className="w-full resize-none rounded border py-1 pl-2 pr-8 text-[13px] leading-snug"
+                  style={fieldStyle}
+                />
                 {aiPrompt && (
                   <button
                     type="button"
@@ -372,26 +375,47 @@ export function IconPicker({
                       setAiPrompt("");
                       setPromptEdited(true);
                     }}
-                    className="text-xs underline"
+                    aria-label="Clear the description"
+                    title="Clear"
+                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-[15px] leading-none"
                     style={{ color: "var(--t-ink-soft)" }}
                   >
-                    Clear text
+                    ×
                   </button>
                 )}
-                {promptEdited && suggestedPrompt && aiPrompt !== suggestedPrompt && (
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={generateIcon}
+                  disabled={isGeneratingIcon || !aiPrompt.trim()}
+                  className="hover-glow h-9 rounded-full px-4 text-[13px] font-semibold disabled:opacity-50"
+                  style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                >
+                  {isGeneratingIcon ? "Painting…" : "Paint portrait"}
+                </button>
+                {suggestedPrompt && aiPrompt !== suggestedPrompt && (
                   <button
                     type="button"
                     onClick={() => {
                       setAiPrompt(suggestedPrompt);
                       setPromptEdited(false);
                     }}
-                    className="ml-auto text-xs underline"
-                    style={{ color: "var(--t-ink-soft)" }}
+                    aria-label="Reset to the quest's own description"
+                    title="Reset to the quest's description"
+                    className="hover-glow ml-auto flex h-9 w-9 items-center justify-center rounded-full border"
+                    style={{ borderColor: "var(--t-panel-border)", color: "var(--t-ink-soft)" }}
                   >
-                    Reset
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M4 3.8v4.6h4.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </button>
                 )}
               </div>
+              <p className="m-0 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                Takes a few seconds — you can keep editing while it paints.
+              </p>
               {genError && (
                 <p className="text-xs" style={{ color: "var(--t-warn)" }}>
                   {genError}

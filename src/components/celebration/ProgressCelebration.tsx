@@ -13,6 +13,10 @@ export type ProgressCelebrationDetail = {
   toPct: number;
   /** When the quest has steps: how many are ticked now. */
   steps?: { done: number; total: number };
+  /** Big heading (default "Progress made!"). */
+  heading?: string;
+  /** Replaces the line under the bar. */
+  barCaption?: string;
 };
 
 const CONFETTI_COLORS = ["#f2c94c", "#e2bf63", "#58a04a", "#c0503a", "#4d7fc0", "#f6e6bb"];
@@ -33,7 +37,7 @@ const PIECES = Array.from({ length: 24 }, (_, i) => {
  * A small party for partial progress: confetti, the bar filling from where it
  * was to where it is now, and the XP counting up. Dismisses itself.
  */
-export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct, steps, onClose }: ProgressCelebrationDetail & { onClose: () => void }) {
+export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct, steps, heading = "Progress made!", barCaption, onClose }: ProgressCelebrationDetail & { onClose: () => void }) {
   const [shown, setShown] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -92,7 +96,7 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
           className="pc-card parchment relative flex w-[290px] flex-col items-center gap-2 rounded-2xl px-6 pb-5 pt-5 text-center"
         >
           <p className="font-display m-0 text-[25px] leading-none" style={{ color: "var(--t-ink)" }}>
-            Progress made!
+            {heading}
           </p>
           <p className="m-0 line-clamp-2 text-[14.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
             {title}
@@ -113,7 +117,7 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
               />
             </div>
             <p className="m-0 mt-1 text-[12.5px] tabular-nums" style={{ color: "#5a4a30" }}>
-              {steps ? `${steps.done} of ${steps.total} steps · ${toPct}%` : `${fromPct}% → ${toPct}%`}
+              {barCaption ?? (steps ? `${steps.done} of ${steps.total} steps · ${toPct}%` : `${fromPct}% → ${toPct}%`)}
             </p>
           </div>
 

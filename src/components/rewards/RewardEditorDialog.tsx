@@ -115,7 +115,7 @@ export function RewardEditorDialog({
           color: "var(--t-ink)",
         }}
       >
-        <div className="flex items-center justify-between">
+        <div data-embed-hide className="flex items-center justify-between">
           <h3 className={`flex items-center gap-2 ${isAdventure ? "font-display text-lg" : "text-lg font-bold"}`}>
             <DiamondIcon size={22} />
             {review ? `Review import ${review.index} of ${review.total}` : reward ? "Edit reward" : "New reward"}

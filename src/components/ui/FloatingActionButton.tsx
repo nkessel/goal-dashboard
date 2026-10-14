@@ -24,7 +24,7 @@ export function FloatingActionButton({
 
   return (
     <div
-      className="pointer-events-none fixed bottom-20 z-[46] flex justify-center"
+      className={`pointer-events-none fixed bottom-20 flex justify-center ${expanded ? "z-[49]" : "z-[46]"}`}
       // Same fixed-chrome-in-a-remounted-shell issue as BottomNav (see the
       // comment there) — without its own view-transition-name the FAB gets
       // dragged along with the page-level slide/fade on every navigation.

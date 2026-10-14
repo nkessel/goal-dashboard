@@ -186,7 +186,7 @@ export function TaskRow({
       }}
       {...(sortable ? sortable.attributes : {})}
       {...((sortable?.listeners ?? {}) as React.HTMLAttributes<HTMLLIElement>)}
-      style={sortable ? { ...sortable.style, opacity: sortable.isDragging ? 0.35 : 1, touchAction: "manipulation" } : undefined}
+      style={sortable ? { ...sortable.style, opacity: sortable.isDragging ? 0.35 : 1, touchAction: "manipulation", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" } : undefined}
       data-task-id={task.id}
       // Explicitly false when this row isn't itself a drag source, so a press
       // inside a goal card on Board Detail doesn't start dragging the goal.

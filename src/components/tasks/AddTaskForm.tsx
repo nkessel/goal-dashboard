@@ -1,74 +1,46 @@
 "use client";
 
 import { useState } from "react";
-import { FabSpeedDial, type FabChoice } from "@/components/ui/FabSpeedDial";
-import { RewardEditorDialog } from "@/components/rewards/RewardEditorDialog";
-import { BoltIcon, DiamondIcon } from "@/components/ui/Icons";
-import { QuestShield } from "@/components/ui/Ornaments";
-import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
-import { Moon } from "@/components/evening/BeginEveningButton";
+import { CreateFab } from "@/components/create/CreateFab";
+import type { CreateKind } from "@/components/create/CreateSheet";
 import { QuestEditorDialog } from "./QuestEditorDialog";
 
 /**
- * "Add quest": the floating + button (top level) or a dashed "+ Add quest"
- * row inside a goal card. Both open the shared quest editor in create mode.
+ * "Add quest": the floating + button (top level, opening the create sheet)
+ * or a dashed "+ Add quest" row inside a quest board.
  */
 export function AddTaskForm({
   boardId,
   theme = "calm",
-  extraChoices = [],
+  todayFull = false,
+  initial,
 }: {
   /** Inside a quest board: a dashed "+ Add quest" row that files it there. */
   boardId?: string;
   theme?: "calm" | "adventure";
-  /** More speed-dial options (e.g. "New rite" on the evening side). */
-  extraChoices?: FabChoice[];
+  /** Today's Quests already holds 3. */
+  todayFull?: boolean;
+  /** Which kind the + sheet opens on (e.g. "rite" in the evening). */
+  initial?: CreateKind;
 }) {
-  const [open, setOpen] = useState<false | "quest" | "power">(false);
-  const [rewardOpen, setRewardOpen] = useState(false);
-  const [riteOpen, setRiteOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const isAdventure = theme === "adventure";
-  const dimText = isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)";
-  const borderColor = isAdventure ? "rgba(243,233,207,.35)" : "var(--t-card-border)";
+
+  if (!boardId) {
+    return <CreateFab kinds={["quest", "now", "reward", "rite", "journal"]} initial={initial} todayFull={todayFull} theme={theme} />;
+  }
 
   return (
     <>
-      {boardId ? (
-        <button
-          type="button"
-          onClick={() => setOpen("quest")}
-          className="hover-glow w-full rounded-xl border border-dashed py-3 text-sm font-medium transition-colors"
-          style={{ borderColor, color: dimText, opacity: isAdventure ? 0.85 : 1 }}
-        >
-          + Add {isAdventure ? "quest" : "task"}
-        </button>
-      ) : (
-        !open &&
-        !rewardOpen &&
-        !riteOpen && (
-          <FabSpeedDial
-            theme={theme}
-            label="Create something new"
-            choices={[
-              ...extraChoices,
-              { key: "rite", label: "New evening rite", icon: <Moon size={20} />, onPick: () => setRiteOpen(true) },
-              { key: "reward", label: "New reward", icon: <DiamondIcon size={20} />, onPick: () => setRewardOpen(true) },
-              { key: "power", label: "New power-up", icon: <BoltIcon size={20} />, onPick: () => setOpen("power") },
-              { key: "quest", label: isAdventure ? "New quest" : "New task", icon: <QuestShield size={20} />, onPick: () => setOpen("quest") },
-            ]}
-          />
-        )
-      )}
-      {open && (
-        <QuestEditorDialog
-          mode={{ kind: "create", boardId, powerUp: open === "power" }}
-          theme={theme}
-          origin={boardId ? "center" : "fab"}
-          onClose={() => setOpen(false)}
-        />
-      )}
-      {rewardOpen && <RewardEditorDialog theme={theme} onClose={() => setRewardOpen(false)} />}
-      {riteOpen && <RiteEditorDialog onClose={() => setRiteOpen(false)} />}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="hover-glow w-full rounded-xl border border-dashed py-3 text-sm font-medium transition-colors"
+        style={{ borderColor: isAdventure ? "rgba(243,233,207,.35)" : "var(--t-card-border)", color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.85 : 1 }}
+      >
+        + Add {isAdventure ? "quest" : "task"}
+      </button>
+      {open && <QuestEditorDialog mode={{ kind: "create", boardId }} theme={theme} onClose={() => setOpen(false)} />}
     </>
   );
 }

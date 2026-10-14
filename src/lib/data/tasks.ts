@@ -127,6 +127,10 @@ export async function updateTask(
     boardId?: string | null;
     effort?: number;
     isAspiration?: boolean;
+    /** Undefined leaves these untouched; null clears them. */
+    dueAt?: string | null;
+    chunkMinutes?: number | null;
+    coinValue?: number | null;
   }
 ): Promise<Task> {
   const importance = Math.max(0, Math.min(5, Math.round(input.importance * 10) / 10));
@@ -146,6 +150,9 @@ export async function updateTask(
       ...(input.boardId !== undefined ? { board_id: input.boardId } : {}),
       ...(input.effort !== undefined ? { effort: Math.max(0, Math.min(5, Math.round(input.effort))) } : {}),
       ...(input.isAspiration !== undefined ? { is_aspiration: input.isAspiration } : {}),
+      ...(input.dueAt !== undefined ? { due_at: input.dueAt } : {}),
+      ...(input.chunkMinutes !== undefined ? { chunk_minutes: input.chunkMinutes === null ? null : Math.max(1, Math.round(input.chunkMinutes)) } : {}),
+      ...(input.coinValue !== undefined ? { coin_value: input.coinValue === null ? null : Math.max(0, Math.round(input.coinValue)) } : {}),
     })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
@@ -306,6 +313,9 @@ export async function createTask(
     rewardId?: string | null;
     lockedByTaskId?: string | null;
     isPowerUp?: boolean;
+    dueAt?: string | null;
+    chunkMinutes?: number | null;
+    coinValue?: number | null;
   }
 ): Promise<Task> {
   const db = supabaseAdmin();
@@ -316,6 +326,9 @@ export async function createTask(
       ...(input.rewardId ? { reward_id: input.rewardId } : {}),
       ...(input.lockedByTaskId ? { locked_by_task_id: input.lockedByTaskId } : {}),
       ...(input.isPowerUp ? { is_power_up: true } : {}),
+      ...(input.dueAt ? { due_at: input.dueAt } : {}),
+      ...(input.chunkMinutes ? { chunk_minutes: Math.max(1, Math.round(input.chunkMinutes)) } : {}),
+      ...(input.coinValue != null ? { coin_value: Math.max(0, Math.round(input.coinValue)) } : {}),
       ...(input.iconKey ? { icon_key: input.iconKey, icon_source: input.iconSource ?? "library" } : {}),
       owner_id: ownerId,
       goal_id: input.goalId || null,
@@ -644,4 +657,10 @@ export async function countOpenPowerUps(ownerId: string): Promise<number> {
     .eq("status", "open")
     .eq("is_aspiration", false);
   return error ? 0 : (count ?? 0);
+}
+
+/** File a quest on another board (null = no board). */
+export async function setTaskBoard(taskId: string, ownerId: string, boardId: string | null): Promise<void> {
+  const { error } = await supabaseAdmin().from("tasks").update({ board_id: boardId }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to move the quest: ${error.message}`);
 }

@@ -1,15 +1,31 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
-import { completeTaskAction, createBoardFromEditorAction, createQuestAction, deleteTaskAction, listBoardOptionsAction, listQuestStepsAction, reopenTaskAction, saveQuestStepsAction, scheduleTaskAction, setTaskProgressAction, updateTaskAction } from "@/app/actions";
+import {
+  completeTaskAction,
+  createBoardFromEditorAction,
+  createQuestAction,
+  deleteTaskAction,
+  generateTaskIconAction,
+  listBoardOptionsAction,
+  listQuestStepsAction,
+  logDoingNowAction,
+  reopenTaskAction,
+  saveQuestStepsAction,
+  scheduleTaskAction,
+  setTaskProgressAction,
+  updateTaskAction,
+} from "@/app/actions";
 import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { SlotPickerDialog } from "./SlotPickerDialog";
+import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
-import { usePortalTarget } from "@/components/ui/EmbedHost";
+import { useIsEmbedded, usePortalTarget } from "@/components/ui/EmbedHost";
+import { BoltIcon, CoinIcon } from "@/components/ui/Icons";
 
 export type QuestDraft = {
   title?: string;
@@ -23,8 +39,12 @@ export type QuestEditorMode =
       kind: "create";
       boardId?: string | null;
       pinToBattle?: boolean;
+      /** Today's Quests already holds 3 — new quests default to Additional Quests. */
+      todayFull?: boolean;
       /** Start as a quick power-up (prefills a short time). */
       powerUp?: boolean;
+      /** "Doing now": log something already under way — created and completed at once. */
+      doingNow?: boolean;
       /** Place the new quest on the calendar (e.g. from a Google event). */
       schedule?: { startISO: string; endISO: string; googleEventId?: string };
       prefill?: QuestDraft;
@@ -32,18 +52,41 @@ export type QuestEditorMode =
 
 type StepDraft = { key: string; id?: string; title: string; done: boolean };
 
-const XP_MAX = 150;
+const XP_MAX = 350;
 const XP_STEP = 10;
+const POWER_UP_MINUTES = 15;
+/** Coins follow XP at 1 per 10 unless a quest sets its own. */
+const autoCoins = (xp: number) => Math.ceil(Math.max(0, xp) / 10);
 
+const pad = (n: number) => String(n).padStart(2, "0");
+function localDate(iso: string | null | undefined) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+/** "" for an end-of-day deadline (no particular time). */
+function localTime(iso: string | null | undefined) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const t = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return t === "23:59" ? "" : t;
+}
+function dueIso(date: string, time: string): string | null {
+  if (!date) return null;
+  const d = new Date(`${date}T${time || "23:59"}`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
 
 /**
  * One compact dialog for creating and editing quests, laid out like a quest
  * card: portrait on the left, title + description on the right; then time to
- * complete, XP, importance and urgency (tap or drag), and an optional
- * calendar slot.
+ * complete, steps, due date, XP and coins, importance / urgency / effort, and
+ * the board it lives on.
  *
- * `origin="fab"` makes it rise out of the floating + button and sink back
- * into it on cancel; after creating, it shrinks into the new quest's card.
+ * Editing an existing quest saves as you go (the button shows "Saved"); its
+ * progress bar is committed when the dialog closes, so the XP party plays
+ * once. `origin="fab"` makes it rise out of the + button; inside the + sheet
+ * (EmbedHost) it renders in place without its own overlay or header.
  */
 export function QuestEditorDialog({
   mode,
@@ -60,7 +103,7 @@ export function QuestEditorDialog({
   origin?: "fab" | "center";
   onClose: () => void;
   onCreated?: (id: string) => void;
-  /** Called after an existing quest is saved (instead of the closing animation when reviewing). */
+  /** Review mode: called after the import is confirmed. */
   onSaved?: () => void;
   /** "Plot on Priority Matrix": override where it goes (default: this quest alone). */
   onPlot?: () => void;
@@ -68,22 +111,30 @@ export function QuestEditorDialog({
   review?: { index: number; total: number; onLater: () => void };
 }) {
   useEscape(() => close());
+  const embedded = useIsEmbedded();
   const isAdventure = theme === "adventure";
   const task = mode.kind === "edit" ? mode.task : null;
-  const prefill = mode.kind === "create" ? mode.prefill : undefined;
-  const fixedSchedule = mode.kind === "create" ? mode.schedule : undefined;
+  const create = mode.kind === "create" ? mode : null;
+  const prefill = create?.prefill;
+  const fixedSchedule = create?.schedule;
+  const doingNow = Boolean(create?.doingNow);
 
   const [title, setTitle] = useState(task?.title ?? prefill?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? prefill?.description ?? "");
   const [importance, setImportance] = useState(task ? Math.round(task.importance) : 0);
   const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : 0);
-  const [xp, setXp] = useState(task?.xp_value ?? 0);
+  const [xp, setXp] = useState(task?.xp_value ?? (doingNow ? 30 : 0));
+  const [coinValue, setCoinValue] = useState<number | null>(task?.coin_value ?? null);
   const [effort, setEffort] = useState(task?.effort ?? 0);
   const [aspiration, setAspiration] = useState(Boolean(task?.is_aspiration));
   const [estimate, setEstimate] = useState<string>(() => {
-    const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (mode.kind === "create" && mode.powerUp ? 5 : undefined);
+    const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (create?.powerUp ? 5 : undefined);
     return v != null ? String(v) : "";
   });
+  const [chunk, setChunk] = useState<string>(task?.chunk_minutes ? String(task.chunk_minutes) : "");
+  const [dueDate, setDueDate] = useState(localDate(task?.due_at));
+  const [dueTime, setDueTime] = useState(localTime(task?.due_at));
+  const [pinToday, setPinToday] = useState(create ? (create.pinToBattle ?? !create.todayFull) : false);
   const [draftIcon, setDraftIcon] = useState<{ url: string; source: "library" | "ai" } | null>(null);
   const initialSlot =
     task?.is_on_calendar && task.scheduled_start && task.scheduled_end
@@ -91,11 +142,10 @@ export function QuestEditorDialog({
       : null;
   const [slot, setSlot] = useState<{ start: string; end: string } | null>(initialSlot);
   const [pickingSlot, setPickingSlot] = useState(false);
-  const initialBoard = task ? (task.board_id ?? null) : mode.kind === "create" ? (mode.boardId ?? null) : null;
+  const initialBoard = task ? (task.board_id ?? null) : (create?.boardId ?? null);
   const [boardId, setBoardId] = useState<string | null>(initialBoard);
   const [boardOptions, setBoardOptions] = useState<{ id: string; label: string }[] | null>(null);
   const isCompleted = task?.status === "completed";
-  const isPowerUp = mode.kind === "create" && Boolean(mode.powerUp);
   const progressTracked = typeof task?.xp_awarded === "number";
   const initialProgress = task?.progress ?? 0;
   const [progress, setProgress] = useState(initialProgress);
@@ -105,22 +155,6 @@ export function QuestEditorDialog({
   const [stepsDirty, setStepsDirty] = useState(false);
   const [newStep, setNewStep] = useState("");
   const [addingStep, setAddingStep] = useState(false);
-  const [newBoard, setNewBoard] = useState<{ board: string } | null>(null);
-  const [creatingBoard, startCreatingBoard] = useTransition();
-
-  function createBoard() {
-    if (!newBoard?.board.trim()) return;
-    startCreatingBoard(async () => {
-      try {
-        const res = await createBoardFromEditorAction(newBoard.board);
-        setBoardOptions((opts) => [...(opts ?? []), { id: res.id, label: res.title }]);
-        setBoardId(res.id);
-        setNewBoard(null);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't create the board.");
-      }
-    });
-  }
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -173,10 +207,124 @@ export function QuestEditorDialog({
   }
   const stepsDone = (steps ?? []).filter((st) => st.done).length;
 
-  // Save lights up only once something has changed (a new quest just needs a title).
-  const snapshot = JSON.stringify([title, description, importance, urgency, xp, effort, estimate, slot?.start ?? null, boardId, progress, aspiration]);
-  const [initialSnapshot] = useState(snapshot);
-  const hasChanges = !task || Boolean(review) || stepsDirty || snapshot !== initialSnapshot;
+  const est = estimate.trim() ? Math.max(0, Math.round(Number(estimate))) : null;
+  const chunkMinutes = chunk.trim() && Number(chunk) > 0 ? Math.round(Number(chunk)) : null;
+  const dueAt = dueIso(dueDate, dueTime);
+  const isPowerUp = est !== null && est > 0 && est <= POWER_UP_MINUTES;
+
+  // ---- Saving as you go (existing quests) ----------------------------------
+  const autosave = Boolean(task) && !review;
+  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, effort, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration]);
+  const [savedFields, setSavedFields] = useState(fields);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const dirty = fields !== savedFields || stepsDirty;
+  const stepsRef = useRef(steps);
+  const stepIds = useRef(new Map<string, string>());
+  const savedSlotStart = useRef(initialSlot?.start ?? null);
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
+  const deleted = useRef(false);
+  useEffect(() => {
+    stepsRef.current = steps;
+  });
+
+  /** Queue one save of everything that changed (saves never overlap). */
+  function persist() {
+    if (!task || deleted.current || !title.trim()) return chain.current;
+    const snap = fields;
+    const input = {
+      title,
+      description,
+      importance,
+      urgency,
+      xpValue: xp,
+      estimateMinutes: est,
+      boardId,
+      effort: task.effort !== undefined || effort ? effort : undefined,
+      isAspiration: aspiration,
+      dueAt,
+      chunkMinutes,
+      coinValue,
+    };
+    const newSlot = !fixedSchedule && slot && slot.start !== savedSlotStart.current ? slot : null;
+    const sendSteps = stepsDirty;
+    if (sendSteps) setStepsDirty(false);
+    setSaveState("saving");
+    const run = async () => {
+      if (deleted.current) return;
+      await updateTaskAction(task.id, input);
+      if (newSlot) {
+        await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
+        savedSlotStart.current = newSlot.start;
+      }
+      if (sendSteps && stepsRef.current) {
+        const list = stepsRef.current;
+        const rows = await saveQuestStepsAction(
+          task.id,
+          list.map((st) => ({ id: st.id ?? stepIds.current.get(st.key), title: st.title, done: st.done }))
+        );
+        for (const r of rows) {
+          const sent = list[r.sort_order];
+          if (sent && !sent.id) stepIds.current.set(sent.key, r.id);
+        }
+        setSteps((cur) => cur?.map((st) => (st.id || !stepIds.current.has(st.key) ? st : { ...st, id: stepIds.current.get(st.key) })) ?? cur);
+      }
+    };
+    chain.current = chain.current
+      .then(run)
+      .then(() => {
+        setSavedFields(snap);
+        setSaveState("idle");
+      })
+      .catch((e) => {
+        if (sendSteps) setStepsDirty(true);
+        setSaveState("error");
+        setError(e instanceof Error ? e.message : "Couldn't save.");
+      });
+    return chain.current;
+  }
+  const autosaveNow = useEffectEvent(() => void persist());
+
+  useEffect(() => {
+    if (!autosave || !dirty) return;
+    const t = setTimeout(() => autosaveNow(), 800);
+    return () => clearTimeout(t);
+  }, [autosave, dirty, fields, stepsDirty]);
+
+  /** Progress is paid out once, when the dialog closes (one XP party, not one per +5%). */
+  function commitProgress() {
+    if (!task || !progressTracked || isCompleted || progress === initialProgress || deleted.current) return;
+    const pct = progress;
+    chain.current = chain.current
+      .then(async () => {
+        if (pct >= 100) {
+          const fd = new FormData();
+          fd.set("taskId", task.id);
+          const res = await completeTaskAction(fd);
+          celebrateQuest({
+            taskId: task.id,
+            title,
+            description,
+            xp: Math.max(0, xp - Math.round((xp * initialProgress) / 100)),
+            iconSrc: task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null,
+            totalXp: res?.totalXp ?? null,
+            coinsEarned: res?.coinsEarned ?? 0,
+          });
+        } else {
+          const res = await setTaskProgressAction(task.id, pct);
+          if (res.xpEarned > 0) {
+            celebrateProgress({
+              title,
+              xp: res.xpEarned,
+              coinsEarned: res.coinsEarned,
+              fromPct: initialProgress,
+              toPct: pct,
+              steps: steps && steps.length > 0 ? { done: stepsDone, total: steps.length } : undefined,
+            });
+          }
+        }
+      })
+      .catch(() => {});
+  }
 
   const noun = isAdventure ? "quest" : "task";
   const fieldStyle: React.CSSProperties = {
@@ -184,11 +332,17 @@ export function QuestEditorDialog({
     background: isAdventure ? "var(--t-panel-2)" : "var(--t-bg)",
     color: "var(--t-ink)",
   };
+  const chipBorder = isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)";
   const labelCls = "text-[13px] font-semibold";
 
   function close() {
+    if (phase === "closing") return;
+    if (autosave) {
+      if (dirty) void persist();
+      commitProgress();
+    }
     setPhase("closing");
-    setTimeout(onClose, origin === "fab" ? 260 : 180);
+    setTimeout(onClose, embedded ? 0 : origin === "fab" ? 260 : 180);
   }
 
   /** Shrink the dialog into the newly created quest's card, if it's on screen. */
@@ -200,7 +354,7 @@ export function QuestEditorDialog({
       const el = document.querySelector(`[data-task-id="${id}"]`);
       if (el && el.getBoundingClientRect().height > 0) target = el;
     }
-    // Card hidden (e.g. Other Quests collapsed): shrink into that section instead.
+    // Card hidden (e.g. Additional Quests collapsed): shrink into that section instead.
     if (!target) target = document.querySelector('[data-quest-dropzone="other"]');
     if (!panel || !target || !panel.animate) return close();
     const from = panel.getBoundingClientRect();
@@ -218,20 +372,28 @@ export function QuestEditorDialog({
       ],
       { duration: 380, easing: "cubic-bezier(.4,0,.2,1)", fill: "forwards" }
     ).finished;
-    target.animate([{ boxShadow: "0 0 0 3px rgba(217,180,95,.9)" }, { boxShadow: "0 0 0 0 rgba(217,180,95,0)" }], {
-      duration: 700,
-    });
+    glow(target);
     onClose();
   }
 
+  function glow(el: Element) {
+    el.animate([{ boxShadow: "0 0 0 3px rgba(217,180,95,.9)" }, { boxShadow: "0 0 0 0 rgba(217,180,95,0)" }], { duration: 900 });
+  }
 
+  /** New quests without a picked portrait get one painted in the background. */
+  function paintPortrait(id: string) {
+    const prompt = [title.trim(), description.trim()].filter(Boolean).join(" — ");
+    if (!draftIcon && prompt) void generateTaskIconAction(id, prompt).catch(() => {});
+  }
+
+  /** Create (or confirm a reviewed import). Existing quests save themselves. */
   function save() {
     setError(null);
-    const est = estimate.trim() ? Math.max(0, Math.round(Number(estimate))) : null;
     const newSlot = !fixedSchedule && slot && slot.start !== initialSlot?.start ? slot : null;
     startSaving(async () => {
       try {
         if (task) {
+          // Review mode: confirm the import with whatever was edited.
           await updateTaskAction(task.id, {
             title,
             description,
@@ -239,63 +401,69 @@ export function QuestEditorDialog({
             urgency,
             xpValue: xp,
             estimateMinutes: est,
-            boardId: boardId !== initialBoard ? boardId : undefined,
+            boardId,
             effort: task.effort !== undefined || effort ? effort : undefined,
-            isAspiration: aspiration !== Boolean(task.is_aspiration) ? aspiration : undefined,
+            isAspiration: aspiration,
+            dueAt,
+            chunkMinutes,
+            coinValue,
             confirmImport: Boolean(review),
           });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
           if (stepsDirty && steps) await saveQuestStepsAction(task.id, steps.map(({ id, title, done }) => ({ id, title, done })));
-          if (progressTracked && !isCompleted && progress !== initialProgress) {
-            if (progress >= 100) {
-              const fd = new FormData();
-              fd.set("taskId", task.id);
-              const res = await completeTaskAction(fd);
-              celebrateQuest({
-                taskId: task.id,
-                title,
-                description,
-                xp: Math.max(0, xp - Math.round((xp * initialProgress) / 100)),
-                iconSrc: task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null,
-                totalXp: res?.totalXp ?? null,
-                coinsEarned: res?.coinsEarned ?? 0,
-              });
-            } else {
-              const res = await setTaskProgressAction(task.id, progress);
-              if (res.xpEarned > 0) {
-                celebrateProgress({
-                  title,
-                  xp: res.xpEarned,
-                  coinsEarned: res.coinsEarned,
-                  fromPct: initialProgress,
-                  toPct: progress,
-                  steps: steps && steps.length > 0 ? { done: stepsDone, total: steps.length } : undefined,
-                });
-              }
-            }
-          }
           if (onSaved) onSaved();
           else close();
-        } else if (mode.kind === "create") {
-          const id = await createQuestAction({
+          return;
+        }
+        if (doingNow) {
+          const res = await logDoingNowAction({ title, description, xpValue: xp, boardId, iconKey: draftIcon?.url ?? null, iconSource: draftIcon?.source });
+          paintPortrait(res.id);
+          celebrateQuest({
+            taskId: res.id,
             title,
             description,
-            importance,
-            urgency,
-            xpValue: xp,
-            estimateMinutes: est,
-            boardId,
-            effort: effort || undefined,
-            iconKey: draftIcon?.url ?? null,
-            iconSource: draftIcon?.source,
-            pinToBattle: mode.pinToBattle,
-            schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
+            xp,
+            iconSrc: draftIcon?.url ?? null,
+            totalXp: res.totalXp ?? null,
+            coinsEarned: res.coinsEarned ?? 0,
           });
-          const newSteps = (steps ?? []).filter((st) => st.title.trim());
-          if (newSteps.length > 0) await saveQuestStepsAction(id, newSteps.map(({ title, done }) => ({ title, done })));
-          onCreated?.(id);
-          await flyInto(id);
+          onCreated?.(res.id);
+          setPhase("closing");
+          setTimeout(onClose, embedded ? 0 : 180);
+          return;
         }
+        const id = await createQuestAction({
+          title,
+          description,
+          importance,
+          urgency,
+          xpValue: xp,
+          estimateMinutes: est,
+          boardId,
+          effort: effort || undefined,
+          iconKey: draftIcon?.url ?? null,
+          iconSource: draftIcon?.source,
+          pinToBattle: pinToday,
+          schedule: fixedSchedule ?? (newSlot ? { startISO: newSlot.start, endISO: newSlot.end } : undefined),
+          dueAt,
+          chunkMinutes,
+          coinValue,
+        });
+        const newSteps = (steps ?? []).filter((st) => st.title.trim());
+        if (newSteps.length > 0) await saveQuestStepsAction(id, newSteps.map(({ title, done }) => ({ title, done })));
+        paintPortrait(id);
+        onCreated?.(id);
+        if (embedded) {
+          // The + sheet closes itself; then light up the new card where it landed.
+          onClose();
+          setTimeout(() => {
+            const el = document.querySelector(`[data-task-id="${id}"]`);
+            if (el) {
+              el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              glow(el);
+            }
+          }, 500);
+        } else await flyInto(id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
       }
@@ -305,20 +473,39 @@ export function QuestEditorDialog({
   function remove() {
     if (!task) return;
     setError(null);
+    deleted.current = true;
     startSaving(async () => {
       try {
         await deleteTaskAction(task.id);
-        if (onSaved) onSaved();
-        else close();
+        setPhase("closing");
+        setTimeout(onClose, 180);
       } catch (e) {
+        deleted.current = false;
         setError(e instanceof Error ? e.message : "Couldn't delete.");
       }
     });
   }
 
+  /** iOS: keep the field you're typing in above the keyboard. */
+  function keepInView(e: React.FocusEvent<HTMLDivElement>) {
+    const el = e.target as HTMLElement;
+    if (!(el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && !["range", "checkbox", "radio"].includes(el.type)))) return;
+    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 320);
+  }
+
   const enterCls = origin === "fab" ? "qe-rise-in" : "sheet-slide-up-in";
   const exitCls = origin === "fab" ? "qe-sink-out" : "sheet-minimize-out";
   const empty = <CheckMark checked={false} isAdventure={isAdventure} size={72} />;
+  const heading = review
+    ? `Review import ${review.index} of ${review.total}`
+    : isCompleted
+      ? `Completed ${noun}`
+      : task
+        ? `Edit ${noun}`
+        : doingNow
+          ? "Doing now"
+          : `New ${noun}`;
+  const coinsShown = coinValue ?? autoCoins(xp);
 
   const portalTarget = usePortalTarget();
   return createPortal(
@@ -334,9 +521,9 @@ export function QuestEditorDialog({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={task ? `Edit ${noun}` : `New ${noun}`}
+        aria-label={heading}
         onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[94vh] w-full max-w-md flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl ${
+        className={`flex max-h-[94dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl ${
           phase === "closing" ? exitCls : enterCls
         }`}
         style={{
@@ -345,517 +532,719 @@ export function QuestEditorDialog({
           color: "var(--t-ink)",
         }}
       >
-        <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-        <div className="flex items-center justify-between">
-          <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>{review ? `Review import ${review.index} of ${review.total}` : isCompleted ? `Completed ${noun}` : task ? `Edit ${noun}` : isPowerUp ? "New power-up" : `New ${noun}`}</h3>
-          <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
-            ×
-          </button>
-        </div>
-
-        {/* Time to complete */}
-        <label className="flex items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element -- same clock glyph as the quest card */}
-          <img src="/design/ui-clock.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-          <span className={`${labelCls} flex-1`}>Time to complete</span>
-          <input
-            type="number"
-            min={0}
-            step={5}
-            value={estimate}
-            onChange={(e) => setEstimate(e.target.value)}
-            placeholder="—"
-            aria-label="Minutes to complete"
-            className="h-9 w-16 rounded-lg border px-2 text-right text-sm tabular-nums"
-            style={fieldStyle}
-          />
-          <span className="w-7 text-sm" style={{ color: "var(--t-ink-soft)" }}>
-            min
-          </span>
-        </label>
-
-        {/* Portrait left, title + description right — like the quest card */}
-        <div className="flex items-start gap-3">
-          <div className="flex shrink-0 flex-col items-center gap-1">
-            {task ? (
-              <IconPicker
-                taskId={task.id}
-                currentIcon={task.icon_key}
-                currentSource={task.icon_source}
-                taskTitle={title}
-                taskDescription={description}
-                theme={theme}
-                size={72}
-                emptyContent={empty}
-                showEditHint
-              />
-            ) : (
-              <IconPicker
-                currentIcon={draftIcon?.url ?? null}
-                currentSource={draftIcon?.source ?? "monster"}
-                taskTitle={title}
-                taskDescription={description}
-                theme={theme}
-                size={72}
-                emptyContent={empty}
-                showEditHint
-                onDraftChange={(url, source) => setDraftIcon(url ? { url, source } : null)}
-              />
-            )}
-            <span className="text-[10.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              Portrait
-            </span>
+        <div onFocus={keepInView} className="qe-body relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
+          <div data-embed-hide className="flex items-center justify-between">
+            <h3 className={isAdventure ? "font-display text-lg" : "text-lg font-bold"}>{heading}</h3>
+            <button type="button" onClick={close} aria-label="Close" className="h-9 w-9 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
+              ×
+            </button>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={isAdventure ? "Quest title" : "Task title"}
-              aria-label="Title"
-              autoFocus={!task}
-              className="h-10 rounded-lg border px-2.5 text-[15px] font-semibold"
-              style={fieldStyle}
-            />
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Description (optional)"
-              aria-label="Description"
-              className="resize-none rounded-lg border px-2.5 py-1.5 text-[13.5px]"
-              style={fieldStyle}
-            />
-          </div>
-        </div>
 
-        {/* Steps: a checklist inside the quest */}
-        {!stepsUnavailable && (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2.5">
-              <StepsGlyph />
-              <span className={labelCls}>Steps</span>
-              {steps && steps.length > 0 && (
-                <span className="text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                  {stepsDone} of {steps.length} done
-                </span>
+          {doingNow && (
+            <p className="m-0 text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+              Something you&apos;re doing right now — it&apos;s logged as done and the XP is yours straight away.
+            </p>
+          )}
+
+          {/* Portrait left, title + description right — like the quest card */}
+          <div className="flex items-start gap-3">
+            <div className="flex shrink-0 flex-col items-center gap-1">
+              {task ? (
+                <IconPicker
+                  taskId={task.id}
+                  currentIcon={task.icon_key}
+                  currentSource={task.icon_source}
+                  taskTitle={title}
+                  taskDescription={description}
+                  theme={theme}
+                  size={72}
+                  emptyContent={empty}
+                  showEditHint
+                />
+              ) : (
+                <IconPicker
+                  currentIcon={draftIcon?.url ?? null}
+                  currentSource={draftIcon?.source ?? "monster"}
+                  taskTitle={title}
+                  taskDescription={description}
+                  theme={theme}
+                  size={72}
+                  emptyContent={empty}
+                  showEditHint
+                  onDraftChange={(url, source) => setDraftIcon(url ? { url, source } : null)}
+                />
               )}
-              {!isCompleted && steps !== null && !addingStep && (
+              <span className="text-[10.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                Portrait
+              </span>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={doingNow ? "What are you doing?" : isAdventure ? "Quest title" : "Task title"}
+                aria-label="Title"
+                autoFocus={!task}
+                enterKeyHint="next"
+                className="h-10 rounded-lg border px-2.5 text-[16px] font-semibold"
+                style={fieldStyle}
+              />
+              <AutoGrowText
+                value={description}
+                onChange={setDescription}
+                minRows={2}
+                placeholder="Description (optional)"
+                ariaLabel="Description"
+                className="rounded-lg border px-2.5 py-1.5 text-[15px]"
+                style={fieldStyle}
+              />
+            </div>
+          </div>
+          {!task && !draftIcon && (
+            <p className="-mt-1.5 m-0 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+              A portrait is painted from the title once it&apos;s saved — or tap the circle to choose one.
+            </p>
+          )}
+
+          {/* Time to complete, power-up, and whether it can be done in pieces */}
+          {!doingNow && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2.5">
+                {/* eslint-disable-next-line @next/next/no-img-element -- same clock glyph as the quest card */}
+                <img src="/design/ui-clock.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+                <span className={`${labelCls} min-w-0 flex-1`}>Time to complete</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={5}
+                  value={estimate}
+                  onChange={(e) => setEstimate(e.target.value)}
+                  placeholder="—"
+                  aria-label="Minutes to complete"
+                  className="h-9 w-16 rounded-lg border px-2 text-right text-[16px] tabular-nums"
+                  style={fieldStyle}
+                />
+                <span className="text-sm" style={{ color: "var(--t-ink-soft)" }}>
+                  min
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pl-[28px]">
                 <button
                   type="button"
-                  onClick={() => setAddingStep(true)}
-                  className="hover-glow ml-auto h-7 rounded-full border px-3 text-[12.5px] font-semibold"
-                  style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", color: "var(--t-ink)" }}
+                  role="switch"
+                  aria-checked={isPowerUp}
+                  onClick={() => setEstimate(isPowerUp ? "" : "5")}
+                  title={`Power-ups are quick wins — ${POWER_UP_MINUTES} minutes or less`}
+                  className="hover-glow flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-semibold"
+                  style={{
+                    borderColor: isPowerUp ? "#c99a2e" : chipBorder,
+                    background: isPowerUp ? "rgba(242,201,76,.35)" : "transparent",
+                    color: "var(--t-ink)",
+                  }}
                 >
-                  + Add steps
+                  <BoltIcon size={15} />
+                  Power-up{isPowerUp ? " ✓" : ""}
                 </button>
+                <label className="flex min-h-8 cursor-pointer items-center gap-1.5 text-[12.5px]">
+                  <input
+                    type="checkbox"
+                    checked={chunk !== ""}
+                    onChange={(e) => setChunk(e.target.checked ? "15" : "")}
+                    className="h-4 w-4 shrink-0"
+                    style={{ accentColor: isAdventure ? "#8a6c2c" : "var(--t-accent)" }}
+                  />
+                  <span>Can be done in</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={5}
+                    value={chunk || "15"}
+                    disabled={chunk === ""}
+                    onChange={(e) => setChunk(e.target.value)}
+                    aria-label="Minutes per piece"
+                    className="h-8 w-12 rounded-md border px-1 text-right text-[16px] tabular-nums disabled:opacity-50"
+                    style={fieldStyle}
+                  />
+                  <span>-minute pieces</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Steps: a checklist inside the quest */}
+          {!doingNow && !stepsUnavailable && (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2.5">
+                <StepsGlyph />
+                <span className={labelCls}>Steps</span>
+                {steps && steps.length > 0 && (
+                  <span className="text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+                    {stepsDone} of {steps.length} done
+                  </span>
+                )}
+                {!isCompleted && steps !== null && !addingStep && (
+                  <button
+                    type="button"
+                    onClick={() => setAddingStep(true)}
+                    className="hover-glow ml-auto h-8 rounded-full border px-3 text-[12.5px] font-semibold"
+                    style={{ borderColor: chipBorder, color: "var(--t-ink)" }}
+                  >
+                    + Add steps
+                  </button>
+                )}
+              </div>
+              {steps === null || (steps.length === 0 && !addingStep) ? null : (
+                <ul className="m-0 flex list-none flex-col p-0 pl-[22px]">
+                  {steps.map((st) => (
+                    <li key={st.key} className="quest-step flex items-start gap-2 rounded-md py-0.5 pl-1">
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={st.done}
+                        aria-label={st.done ? `Untick ${st.title}` : `Tick ${st.title}`}
+                        disabled={isCompleted}
+                        onClick={() => setStepDone(st.key, !st.done)}
+                        className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px]"
+                        style={{
+                          border: `1.5px solid ${st.done ? "var(--t-good)" : isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
+                          background: st.done ? "var(--t-good)" : "transparent",
+                        }}
+                      >
+                        {st.done && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </button>
+                      <AutoGrowText
+                        value={st.title}
+                        onChange={(v) => renameStep(st.key, v.replace(/\n/g, " "))}
+                        ariaLabel="Step"
+                        className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[15px] leading-snug focus:outline-none"
+                        style={{
+                          color: st.done ? "var(--t-ink-soft)" : "var(--t-ink)",
+                          textDecoration: st.done ? "line-through" : undefined,
+                          textDecorationColor: "rgba(80,60,20,.45)",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeStep(st.key)}
+                        aria-label={`Remove step ${st.title}`}
+                        className="step-remove h-7 w-7 shrink-0 text-[18px] leading-none"
+                        style={{ color: "var(--t-ink-soft)" }}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                  {!isCompleted && addingStep && (
+                    <li className="flex items-center gap-2 py-0.5 pl-1">
+                      <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#a88a3f" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
+                        +
+                      </span>
+                      <input
+                        value={newStep}
+                        onChange={(e) => setNewStep(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addStep();
+                          }
+                        }}
+                        onBlur={() => {
+                          addStep();
+                          setAddingStep(false);
+                        }}
+                        autoFocus
+                        enterKeyHint="enter"
+                        placeholder="Add a step, then Enter"
+                        aria-label="Add a step"
+                        className="bare-input h-8 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[16px] focus:outline-none"
+                        style={{ color: "var(--t-ink)" }}
+                      />
+                    </li>
+                  )}
+                </ul>
               )}
             </div>
-            {steps === null || (steps.length === 0 && !addingStep) ? null : (
-              <ul className="m-0 flex list-none flex-col p-0 pl-[22px]">
-                {steps.map((st) => (
-                  <li key={st.key} className="quest-step flex items-center gap-2 rounded-md py-0.5 pl-1">
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={st.done}
-                      aria-label={st.done ? `Untick ${st.title}` : `Tick ${st.title}`}
-                      disabled={isCompleted}
-                      onClick={() => setStepDone(st.key, !st.done)}
-                      className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px]"
-                      style={{
-                        border: `1.5px solid ${st.done ? "var(--t-good)" : isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
-                        background: st.done ? "var(--t-good)" : "transparent",
-                      }}
-                    >
-                      {st.done && (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </button>
-                    <input
-                      value={st.title}
-                      onChange={(e) => renameStep(st.key, e.target.value)}
-                      aria-label="Step"
-                      className="bare-input h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[14px] focus:outline-none"
-                      style={{
-                        color: st.done ? "var(--t-ink-soft)" : "var(--t-ink)",
-                        textDecoration: st.done ? "line-through" : undefined,
-                        textDecorationColor: "rgba(80,60,20,.45)",
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeStep(st.key)}
-                      aria-label={`Remove step ${st.title}`}
-                      className="step-remove h-7 w-7 shrink-0 text-[18px] leading-none"
-                      style={{ color: "var(--t-ink-soft)" }}
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-                {!isCompleted && addingStep && (
-                  <li className="flex items-center gap-2 py-0.5 pl-1">
-                    <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#a88a3f" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
-                      +
-                    </span>
-                    <input
-                      value={newStep}
-                      onChange={(e) => setNewStep(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addStep();
-                        }
-                      }}
-                      onBlur={() => {
-                        addStep();
-                        setAddingStep(false);
-                      }}
-                      autoFocus
-                      placeholder="Add a step, then Enter"
-                      aria-label="Add a step"
-                      className="bare-input h-7 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[14px] focus:outline-none"
-                      style={{ color: "var(--t-ink)" }}
-                    />
-                  </li>
-                )}
-              </ul>
-            )}
-          </div>
-        )}
-
-        {/* Due date / calendar */}
-        <div className="flex items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
-          <img src="/design/ui-calendar.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-          <span className={`${labelCls} w-[70px] shrink-0`}>Due</span>
-          {fixedSchedule || slot ? (
-            <span className="min-w-0 flex-1 truncate text-[13px]">
-              {new Date((fixedSchedule?.startISO ?? slot?.start)!).toLocaleString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-            </span>
-          ) : (
-            <span className="min-w-0 flex-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-              No date yet
-            </span>
           )}
-          {!fixedSchedule && (
-            <>
-              {slot && slot !== initialSlot && (
-                <button type="button" onClick={() => setSlot(initialSlot)} className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
-                  Undo
-                </button>
+
+          {/* Due date */}
+          {!doingNow && (
+            <div className="flex items-center gap-2.5">
+              {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
+              <img src="/design/ui-calendar.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+              <span className={`${labelCls} w-[58px] shrink-0`}>Due</span>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                aria-label="Due date"
+                className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[15px]"
+                style={{ ...fieldStyle, color: dueDate ? "var(--t-ink)" : "var(--t-ink-soft)" }}
+              />
+              {dueDate && (
+                <>
+                  <input
+                    type="time"
+                    value={dueTime}
+                    onChange={(e) => setDueTime(e.target.value)}
+                    aria-label="Due time (optional)"
+                    className="h-9 w-[92px] shrink-0 rounded-lg border px-1.5 text-[15px]"
+                    style={fieldStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => (setDueDate(""), setDueTime(""))}
+                    aria-label="Clear the due date"
+                    className="h-8 w-6 shrink-0 text-[18px] leading-none"
+                    style={{ color: "var(--t-ink-soft)" }}
+                  >
+                    ×
+                  </button>
+                </>
               )}
-              <button
-                type="button"
-                onClick={() => setPickingSlot(true)}
-                className="hover-glow h-8 shrink-0 rounded-full border px-3 text-xs font-semibold"
-                style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", color: "var(--t-ink)" }}
-              >
-                {slot ? "Change" : "Add to calendar"}
-              </button>
-            </>
+            </div>
           )}
-        </div>
-        {pickingSlot && (
-          <SlotPickerDialog
-            durationMinutes={Math.max(15, Number(estimate) || 30)}
-            isAdventure={isAdventure}
-            onPick={(picked) => {
-              setSlot(picked);
-              setPickingSlot(false);
-            }}
-            onClose={() => setPickingSlot(false)}
-          />
-        )}
 
-        {/* XP */}
-        <div className="flex items-center gap-2.5">
-          <span className={`${labelCls} w-[92px] shrink-0`}>{isAdventure ? "XP reward" : "Points"}</span>
-          <input
-            type="range"
-            min={0}
-            max={XP_MAX}
-            step={XP_STEP}
-            value={Math.min(XP_MAX, xp)}
-            onChange={(e) => setXp(Number(e.target.value))}
-            aria-label="XP reward"
-            className="h-7 min-w-0 flex-1"
-            style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
-          />
-          <input
-            type="number"
-            min={0}
-            value={xp}
-            onChange={(e) => setXp(Math.max(0, Number(e.target.value) || 0))}
-            aria-label="XP amount"
-            className="h-9 w-16 rounded-lg border px-2 text-right text-sm font-bold tabular-nums"
-            style={{ ...fieldStyle, color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
-          />
-          <span className="w-7" />
-        </div>
-
-        <IconScale label="Importance" icon="/design/ui-bolt.png" value={importance} onChange={setImportance} />
-        <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
-        <IconScale label="Effort" icon="/design/ui-effort.svg" value={effort} onChange={setEffort} />
-
-        {/* Quest board (the tag on the card) */}
-        <label className="flex items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element -- boards glyph */}
-          <img src="/design/ui-grid.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-          <span className={`${labelCls} w-[70px] shrink-0`}>Board</span>
-          <select
-            value={newBoard ? "__new_board" : (boardId ?? "")}
-            onChange={(e) => {
-              if (e.target.value === "__new_board") return setNewBoard({ board: "" });
-              setNewBoard(null);
-              setBoardId(e.target.value || null);
-            }}
-            aria-label="Quest board"
-            className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[13.5px]"
-            style={fieldStyle}
-          >
-            <option value="">No board</option>
-            {boardOptions === null && boardId && <option value={boardId}>Loading…</option>}
-            {(boardOptions ?? []).map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.label}
-              </option>
-            ))}
-            <option value="__new_board">+ New quest board…</option>
-          </select>
-        </label>
-        {newBoard && (
-          <div className="-mt-1 flex items-center gap-2 rounded-lg p-2.5 sm:ml-[98px]" style={{ background: "rgba(255,250,238,.45)", border: "1px dashed #b39a6a" }}>
-            <input
-              autoFocus
-              value={newBoard.board}
-              onChange={(e) => setNewBoard({ board: e.target.value })}
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), createBoard())}
-              placeholder="New board name (e.g. Home, Health)"
-              aria-label="New board name"
-              className="h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-[14px]"
-              style={fieldStyle}
+          {/* Calendar slot */}
+          {!doingNow && (
+            <div className="flex items-center gap-2.5">
+              <span aria-hidden className="w-[18px] shrink-0" />
+              <span className={`${labelCls} w-[58px] shrink-0`}>Calendar</span>
+              {fixedSchedule || slot ? (
+                <span className="min-w-0 flex-1 truncate text-[13px]">
+                  {new Date((fixedSchedule?.startISO ?? slot?.start)!).toLocaleString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              ) : (
+                <span className="min-w-0 flex-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+                  Not scheduled
+                </span>
+              )}
+              {!fixedSchedule && (
+                <>
+                  {slot && slot !== initialSlot && (
+                    <button type="button" onClick={() => setSlot(initialSlot)} className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
+                      Undo
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPickingSlot(true)}
+                    className="hover-glow h-8 shrink-0 rounded-full border px-3 text-xs font-semibold"
+                    style={{ borderColor: chipBorder, color: "var(--t-ink)" }}
+                  >
+                    {slot ? "Change" : "Find a time"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {pickingSlot && (
+            <SlotPickerDialog
+              durationMinutes={Math.max(15, Number(estimate) || 30)}
+              isAdventure={isAdventure}
+              onPick={(picked) => {
+                setSlot(picked);
+                setPickingSlot(false);
+              }}
+              onClose={() => setPickingSlot(false)}
             />
-            <button type="button" onClick={() => setNewBoard(null)} className="h-8 px-1.5 text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={creatingBoard || !newBoard.board.trim()}
-              onClick={createBoard}
-              className="h-8 shrink-0 rounded-full px-4 text-[13.5px] disabled:opacity-50"
-              style={{ background: "var(--t-gold)", color: "#2a1c10" }}
-            >
-              {creatingBoard ? "…" : "Create"}
-            </button>
-          </div>
-        )}
+          )}
 
-        {/* Aspiration: keep it on its board, out of today's lists */}
-        {task && !isCompleted && (
-          <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
-            <input type="checkbox" checked={aspiration} onChange={(e) => setAspiration(e.target.checked)} className="h-4 w-4 shrink-0" style={{ accentColor: isAdventure ? "#8a6c2c" : "var(--t-accent)" }} />
-            <span>
-              <span className="font-semibold">Not actionable yet</span>
-              <span style={{ color: "var(--t-ink-soft)" }}> — keep it as an aspiration on its board, off Today and the map</span>
-            </span>
-          </label>
-        )}
-
-        {isCompleted && task && (
-          <div
-            className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px]"
-            style={{ background: "rgba(79,109,60,.12)", border: "1px solid rgba(79,109,60,.35)" }}
-          >
-            <span>
-              <span style={{ color: "var(--t-good)", fontWeight: 700 }}>✓</span>{" "}
-              {isAdventure ? "Defeated" : "Completed"}
-              {task.completed_at &&
-                ` ${new Date(task.completed_at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`}
-              {" · changing XP updates what you earned"}
-            </span>
-            <button
-              type="button"
-              disabled={isSaving}
-              onClick={() =>
-                startSaving(async () => {
-                  await reopenTaskAction(task.id);
-                  close();
-                })
-              }
-              className="shrink-0 text-[12.5px] font-semibold underline disabled:opacity-50"
-            >
-              Restore to Today
-            </button>
-          </div>
-        )}
-
-        {task && !isCompleted && (
-          <button
-            type="button"
-            onClick={() => {
-              if (onPlot) onPlot();
-              else window.location.assign(`/matrix?plot=${task.id}`);
-            }}
-            className="hover-glow flex h-9 items-center justify-center gap-2 rounded-full border text-[13px] font-semibold"
-            style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", color: "var(--t-ink)" }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element -- matrix glyph */}
-            <img src="/design/ui-target.png" alt="" width={18} height={18} />
-            Plot importance &amp; urgency on the Priority Matrix
-          </button>
-        )}
-
-        {/* Quest progress: partial progress earns its share of the XP */}
-        {task && !isCompleted && (
-          <div
-            className="flex flex-col gap-1.5 rounded-xl px-3.5 py-2.5"
-            style={{
-              background: isAdventure ? "linear-gradient(180deg, rgba(48,38,18,.9), rgba(30,24,12,.92))" : "var(--t-bg)",
-              border: `1.5px solid ${isAdventure ? "#a88a3f" : "var(--t-card-border)"}`,
-              opacity: progressTracked ? 1 : 0.6,
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[14.5px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
-                Quest progress
+          {/* XP and coins */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className={labelCls}>{isAdventure ? "XP reward" : "Points"}</span>
+              <span className="ml-auto text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                {coinValue === null ? "coins follow XP (1 per 10)" : (
+                  <button type="button" onClick={() => setCoinValue(null)} className="underline">
+                    custom coins · reset to auto
+                  </button>
+                )}
               </span>
-              <span className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={!progressTracked || progress <= 0}
-                  onClick={() => setProgress((p) => Math.max(0, Math.ceil(p / 5) * 5 - 5))}
-                  aria-label="Less progress"
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none disabled:opacity-40"
-                  style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}
-                >
-                  −
-                </button>
-                <span className="flex items-center rounded-md px-1" style={{ border: "1px solid rgba(168,138,63,.6)", background: "rgba(0,0,0,.25)" }}>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={0}
+                max={XP_MAX}
+                step={XP_STEP}
+                value={Math.min(XP_MAX, xp)}
+                onChange={(e) => setXp(Number(e.target.value))}
+                aria-label="XP reward"
+                className="h-8 min-w-0 flex-1"
+                style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
+              />
+              <span className="flex h-9 shrink-0 items-center rounded-lg border pr-1.5" style={fieldStyle}>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={xp}
+                  onChange={(e) => setXp(Math.max(0, Math.min(1000, Number(e.target.value) || 0)))}
+                  aria-label="XP amount"
+                  className="bare-input h-full w-11 bg-transparent px-1 text-right text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                  style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
+                />
+                <span className="text-[12px] font-bold" style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}>
+                  XP
+                </span>
+              </span>
+              {!doingNow && (
+                <span className="flex h-9 shrink-0 items-center gap-0.5 rounded-lg border px-1" style={fieldStyle} title="Coins earned on completion">
+                  <button
+                    type="button"
+                    onClick={() => setCoinValue(Math.max(0, coinsShown - 1))}
+                    aria-label="Fewer coins"
+                    className="flex h-7 w-6 items-center justify-center text-[17px] leading-none"
+                    style={{ color: "var(--t-ink-soft)" }}
+                  >
+                    −
+                  </button>
+                  <CoinIcon size={16} />
                   <input
                     type="number"
                     inputMode="numeric"
                     min={0}
-                    max={100}
-                    value={progress}
-                    disabled={!progressTracked}
-                    onChange={(e) => setProgress(Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))))}
-                    aria-label="Progress percent"
-                    className="bare-input h-7 w-10 bg-transparent text-right text-[15px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                    style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}
+                    value={coinsShown}
+                    onChange={(e) => setCoinValue(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                    aria-label="Coins"
+                    className="bare-input h-full w-8 bg-transparent text-center text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                    style={{ color: coinValue === null ? "var(--t-ink-soft)" : "#8a6116" }}
                   />
-                  <span className="text-[14px] font-bold" style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}>
-                    %
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCoinValue(coinsShown + 1)}
+                    aria-label="More coins"
+                    className="flex h-7 w-6 items-center justify-center text-[17px] leading-none"
+                    style={{ color: "var(--t-ink-soft)" }}
+                  >
+                    +
+                  </button>
                 </span>
-                <button
-                  type="button"
-                  disabled={!progressTracked || progress >= 100}
-                  onClick={() => setProgress((p) => Math.min(100, Math.floor(p / 5) * 5 + 5))}
-                  aria-label="More progress"
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none disabled:opacity-40"
-                  style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}
-                >
-                  +
-                </button>
-              </span>
+              )}
             </div>
-            <div className="relative h-5">
-              <div
-                className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full"
-                style={{ background: "#141a13", border: "1.5px solid #8a6c2c", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}
-              >
-                <div
-                  className="h-full rounded-full transition-[width] duration-150"
-                  style={{ width: `${progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 8px rgba(242,210,126,.5)" }}
-                />
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={progress}
-                disabled={!progressTracked}
-                onChange={(e) => setProgress(Number(e.target.value))}
-                aria-label="Quest progress"
-                className="progress-range absolute inset-0 w-full cursor-pointer"
-              />
-            </div>
-            <p className="m-0 text-[12.5px]" style={{ color: isAdventure ? "rgba(243,231,203,.78)" : "var(--t-ink-soft)" }}>
-              {!progressTracked
-                ? "Available after the next database update."
-                : progress >= 100
-                  ? "Saving at 100% completes the quest."
-                  : `+${Math.round((xp * progress) / 100)} XP for progress so far · ${xp - Math.round((xp * progress) / 100)} more on completion`}
-            </p>
           </div>
-        )}
 
-        {error && (
-          <p className="text-sm" style={{ color: "var(--t-warn)" }}>
-            {error}
-          </p>
-        )}
-
-        <div className="flex items-center justify-between gap-2 pt-1">
-          {task ? (
-            !confirmingDelete ? (
-              <button type="button" onClick={() => setConfirmingDelete(true)} className="text-sm underline" style={{ color: "var(--t-warn)" }}>
-                Delete {noun}
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 text-sm">
-                <button
-                  type="button"
-                  onClick={remove}
-                  disabled={isSaving}
-                  className="rounded-full px-3 py-1.5 font-semibold disabled:opacity-50"
-                  style={{ background: "var(--t-warn)", color: "#fff" }}
-                >
-                  Yes, delete
-                </button>
-                <button type="button" onClick={() => setConfirmingDelete(false)} style={{ color: "var(--t-ink-soft)" }}>
-                  Keep
-                </button>
-              </div>
-            )
-          ) : (
-            <span />
+          {!doingNow && (
+            <>
+              <IconScale label="Importance" icon="/design/ui-bolt.png" value={importance} onChange={setImportance} />
+              <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
+              <IconScale label="Effort" icon="/design/ui-effort.svg" value={effort} onChange={setEffort} />
+            </>
           )}
-          <div className="flex gap-2">
-            {review ? (
-              <button type="button" onClick={review.onLater} className="h-10 rounded-full px-3 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
-                Save the rest for later
+
+          {/* Quest board (the tag on the card) */}
+          <div className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element -- boards glyph */}
+            <img src="/design/ui-grid.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+            <span className={`${labelCls} w-[58px] shrink-0`}>Board</span>
+            <BoardPicker
+              value={boardId}
+              options={boardOptions}
+              onChange={setBoardId}
+              onCreate={async (name) => {
+                const res = await createBoardFromEditorAction(name);
+                setBoardOptions((opts) => [...(opts ?? []), { id: res.id, label: res.title }].sort((a, b) => a.label.localeCompare(b.label)));
+                setBoardId(res.id);
+              }}
+              isAdventure={isAdventure}
+              fieldStyle={fieldStyle}
+            />
+          </div>
+
+          {/* New quests: straight into Today's Quests, or into Additional Quests */}
+          {create && !doingNow && !fixedSchedule && (
+            <div className="flex flex-col gap-1">
+              <span className={labelCls}>Put it in</span>
+              <div role="radiogroup" aria-label="Where the new quest goes" className="grid grid-cols-2 gap-1.5 rounded-full p-1" style={{ background: "rgba(70,50,20,.12)" }}>
+                {[
+                  { on: true, label: `Today's ${isAdventure ? "Quests" : "Tasks"}`, hint: create.todayFull ? "full" : null },
+                  { on: false, label: `Additional ${isAdventure ? "Quests" : "Tasks"}`, hint: null },
+                ].map((o) => (
+                  <button
+                    key={String(o.on)}
+                    type="button"
+                    role="radio"
+                    aria-checked={pinToday === o.on}
+                    disabled={o.on && create.todayFull}
+                    onClick={() => setPinToday(o.on)}
+                    className="h-9 rounded-full px-2 text-[13px] font-semibold transition-colors disabled:opacity-45"
+                    style={pinToday === o.on ? { background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.25)" } : { color: "var(--t-ink-soft)" }}
+                  >
+                    {o.label}
+                    {o.hint && <span className="font-normal"> ({o.hint})</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Aspiration: keep it on its board, out of today's lists */}
+          {task && !isCompleted && (
+            <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+              <input type="checkbox" checked={aspiration} onChange={(e) => setAspiration(e.target.checked)} className="h-4 w-4 shrink-0" style={{ accentColor: isAdventure ? "#8a6c2c" : "var(--t-accent)" }} />
+              <span>
+                <span className="font-semibold">Not actionable yet</span>
+                <span style={{ color: "var(--t-ink-soft)" }}> — keep it as an aspiration on its board, off Today and the map</span>
+              </span>
+            </label>
+          )}
+
+          {isCompleted && task && (
+            <div
+              className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px]"
+              style={{ background: "rgba(79,109,60,.12)", border: "1px solid rgba(79,109,60,.35)" }}
+            >
+              <span>
+                <span style={{ color: "var(--t-good)", fontWeight: 700 }}>✓</span> {isAdventure ? "Defeated" : "Completed"}
+                {task.completed_at && ` ${new Date(task.completed_at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`}
+                {" · changing XP updates what you earned"}
+              </span>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() =>
+                  startSaving(async () => {
+                    await chain.current;
+                    await reopenTaskAction(task.id);
+                    close();
+                  })
+                }
+                className="shrink-0 text-[12.5px] font-semibold underline disabled:opacity-50"
+              >
+                Restore to Today
               </button>
-            ) : (
-              <button type="button" onClick={close} className="h-10 rounded-full px-4 text-[15px]" style={{ color: "var(--t-ink-soft)" }}>
-                Cancel
-              </button>
-            )}
+            </div>
+          )}
+
+          {task && !isCompleted && (
             <button
               type="button"
-              onClick={save}
-              disabled={isSaving || !title.trim() || !hasChanges}
-              className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:cursor-default disabled:opacity-45 disabled:saturate-0"
-              style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
+              onClick={() => {
+                if (onPlot) onPlot();
+                else window.location.assign(`/matrix?plot=${task.id}`);
+              }}
+              className="hover-glow flex min-h-9 items-center justify-center gap-2 rounded-full border px-3 text-[13px] font-semibold"
+              style={{ borderColor: chipBorder, color: "var(--t-ink)" }}
             >
-              {isSaving ? "Saving…" : review ? "Confirm" : task ? "Save" : `Create ${noun}`}
+              {/* eslint-disable-next-line @next/next/no-img-element -- matrix glyph */}
+              <img src="/design/ui-target.png" alt="" width={18} height={18} />
+              Plot on the Priority Matrix
             </button>
+          )}
+
+          {/* Quest progress: partial progress earns its share of the XP */}
+          {task && !isCompleted && (
+            <div
+              className="flex flex-col gap-1.5 rounded-xl px-3.5 py-2.5"
+              style={{
+                background: isAdventure ? "linear-gradient(180deg, rgba(48,38,18,.9), rgba(30,24,12,.92))" : "var(--t-bg)",
+                border: `1.5px solid ${isAdventure ? "#a88a3f" : "var(--t-card-border)"}`,
+                opacity: progressTracked ? 1 : 0.6,
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[14.5px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
+                  Quest progress
+                </span>
+                <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={!progressTracked || progress <= 0}
+                    onClick={() => setProgress((p) => Math.max(0, Math.ceil(p / 5) * 5 - 5))}
+                    aria-label="Less progress"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-[17px] leading-none disabled:opacity-40"
+                    style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}
+                  >
+                    −
+                  </button>
+                  <span className="flex items-center rounded-md px-1" style={{ border: "1px solid rgba(168,138,63,.6)", background: "rgba(0,0,0,.25)" }}>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={100}
+                      value={progress}
+                      disabled={!progressTracked}
+                      onChange={(e) => setProgress(Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))))}
+                      aria-label="Progress percent"
+                      className="bare-input h-7 w-10 bg-transparent text-right text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                      style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}
+                    />
+                    <span className="text-[14px] font-bold" style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}>
+                      %
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!progressTracked || progress >= 100}
+                    onClick={() => setProgress((p) => Math.min(100, Math.floor(p / 5) * 5 + 5))}
+                    aria-label="More progress"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-[17px] leading-none disabled:opacity-40"
+                    style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}
+                  >
+                    +
+                  </button>
+                </span>
+              </div>
+              <div className="relative h-5">
+                <div
+                  className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full"
+                  style={{ background: "#141a13", border: "1.5px solid #8a6c2c", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-[width] duration-150"
+                    style={{ width: `${progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 8px rgba(242,210,126,.5)" }}
+                  />
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={progress}
+                  disabled={!progressTracked}
+                  onChange={(e) => setProgress(Number(e.target.value))}
+                  aria-label="Quest progress"
+                  className="progress-range absolute inset-0 w-full cursor-pointer"
+                />
+              </div>
+              <p className="m-0 text-[12.5px]" style={{ color: isAdventure ? "rgba(243,231,203,.78)" : "var(--t-ink-soft)" }}>
+                {!progressTracked
+                  ? "Available after the next database update."
+                  : progress >= 100
+                    ? "Closing at 100% completes the quest."
+                    : progress !== initialProgress
+                      ? `+${Math.round((xp * (progress - initialProgress)) / 100)} XP when you close this · ${xp - Math.round((xp * progress) / 100)} more on completion`
+                      : `${Math.round((xp * progress) / 100)} XP earned so far · ${xp - Math.round((xp * progress) / 100)} more on completion`}
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <p className="text-sm" style={{ color: "var(--t-warn)" }}>
+              {error}
+            </p>
+          )}
+
+          <div className="qe-actions flex items-center justify-between gap-2 pt-1">
+            {task ? (
+              !confirmingDelete ? (
+                <button type="button" onClick={() => setConfirmingDelete(true)} className="min-h-9 text-sm underline" style={{ color: "var(--t-warn)" }}>
+                  Delete {noun}
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 text-sm">
+                  <button
+                    type="button"
+                    onClick={remove}
+                    disabled={isSaving}
+                    className="rounded-full px-3 py-1.5 font-semibold disabled:opacity-50"
+                    style={{ background: "var(--t-warn)", color: "#fff" }}
+                  >
+                    Yes, delete
+                  </button>
+                  <button type="button" onClick={() => setConfirmingDelete(false)} style={{ color: "var(--t-ink-soft)" }}>
+                    Keep
+                  </button>
+                </div>
+              )
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-2">
+              {autosave ? (
+                <>
+                  <span className="text-[12.5px]" style={{ color: saveState === "error" ? "var(--t-warn)" : "var(--t-ink-soft)" }} aria-live="polite">
+                    {saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : dirty ? "Editing…" : "✓ Saved"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold"
+                    style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
+                  >
+                    Done
+                  </button>
+                </>
+              ) : (
+                <>
+                  {review ? (
+                    <button type="button" onClick={review.onLater} className="h-10 rounded-full px-3 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
+                      Save the rest for later
+                    </button>
+                  ) : (
+                    <button type="button" onClick={close} className="h-10 rounded-full px-4 text-[15px]" style={{ color: "var(--t-ink-soft)" }}>
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={isSaving || !title.trim()}
+                    className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:cursor-default disabled:opacity-45 disabled:saturate-0"
+                    style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
+                  >
+                    {isSaving ? "Saving…" : review ? "Confirm" : doingNow ? `Log it · +${xp} XP` : `Create ${noun}`}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
         </div>
       </div>
     </div>,
     portalTarget
+  );
+}
+
+/** A textarea that grows with its text, so nothing is cut off after one line. */
+function AutoGrowText({
+  value,
+  onChange,
+  minRows = 1,
+  placeholder,
+  ariaLabel,
+  className,
+  style,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  minRows?: number;
+  placeholder?: string;
+  ariaLabel: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      rows={minRows}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      className={`resize-none overflow-hidden ${className ?? ""}`}
+      style={style}
+    />
   );
 }
 

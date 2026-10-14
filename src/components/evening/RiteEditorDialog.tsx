@@ -76,7 +76,7 @@ export function RiteEditorDialog({
         onClick={(e) => e.stopPropagation()}
         className={`parchment parchment-framed moonlit flex w-full max-w-md flex-col gap-3 rounded-2xl p-5 shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
       >
-        <div className="relative z-[1] flex items-center justify-between">
+        <div data-embed-hide className="relative z-[1] flex items-center justify-between">
           <h3 className="font-display flex items-center gap-2 text-lg">
             <Moon size={22} />
             {rite ? "Edit rite" : isCore ? "New evening rite" : "New mini-quest"}
