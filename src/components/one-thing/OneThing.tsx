@@ -201,7 +201,7 @@ function OneThingView({
                 {whyThisOne(task, now)}
               </p>
             )}
-            <FocusTimer key={`timer-${task.id}`} minutes={task.estimate_minutes ?? 25} />
+            <FocusTimer key={`timer-${task.id}`} minutes={task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25} />
             <FocusSteps key={`steps-${task.id}`} taskId={task.id} />
             {error && (
               <p className="relative z-[1] m-0 text-[14px] font-semibold" style={{ color: "var(--t-warn)" }}>
@@ -326,9 +326,14 @@ function Facts({ task, now }: { task: Task; now: number }) {
   );
 }
 
-/** A count-down you can start, pause and reset; it keeps counting past zero. */
+/**
+ * Countdown (5 / 10 / 25 minutes or any length) or a stopwatch that counts
+ * up. Either pauses at any time; the countdown keeps going past zero.
+ */
 function FocusTimer({ minutes }: { minutes: number }) {
-  const total = Math.max(1, minutes) * 60;
+  const [mode, setMode] = useState<"countdown" | "stopwatch">("countdown");
+  const [length, setLength] = useState(Math.max(1, Math.min(240, minutes)));
+  const [custom, setCustom] = useState("");
   const [elapsed, setElapsed] = useState(0); // seconds banked before the current run
   const [runStart, setRunStart] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
@@ -339,12 +344,17 @@ function FocusTimer({ minutes }: { minutes: number }) {
   }, [runStart]);
   const running = runStart !== null;
   const spent = elapsed + (running ? Math.max(0, (tick || runStart) - runStart) / 1000 : 0);
+  const total = length * 60;
+  const counting = mode === "countdown";
   const left = total - spent;
-  const over = left < 0;
-  const abs = Math.abs(Math.round(left));
-  const mm = Math.floor(abs / 60);
-  const ss = String(abs % 60).padStart(2, "0");
-  const pct = Math.min(1, spent / total);
+  const over = counting && left < 0;
+  const shownSecs = Math.abs(Math.round(counting ? left : spent));
+  const hh = Math.floor(shownSecs / 3600);
+  const mm = Math.floor((shownSecs % 3600) / 60);
+  const ss = String(shownSecs % 60).padStart(2, "0");
+  const clock = hh ? `${hh}:${String(mm).padStart(2, "0")}:${ss}` : `${mm}:${ss}`;
+  const pct = counting ? Math.min(1, spent / total) : (spent % 3600) / 3600;
+  const started = spent > 0 || running;
 
   function toggle() {
     if (running) {
@@ -356,48 +366,105 @@ function FocusTimer({ minutes }: { minutes: number }) {
       setRunStart(t);
     }
   }
+  function reset() {
+    setElapsed(0);
+    setRunStart(null);
+  }
+  function pickLength(m: number) {
+    setLength(m);
+    reset();
+  }
+
+  const chip = (on: boolean): React.CSSProperties =>
+    on ? { background: "rgba(217,180,95,.55)", border: "1px solid #5a4520", color: "#2a1c10" } : { border: "1px solid rgba(139,112,64,.45)", color: "#4a3c26" };
 
   return (
-    <div className="relative z-[1] flex w-full items-center gap-3 rounded-2xl px-3 py-2" style={{ background: "rgba(120,90,40,.1)", border: "1px solid rgba(139,112,64,.35)" }}>
-      <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden className="shrink-0">
-        <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(120,90,40,.2)" strokeWidth="4" />
-        <circle
-          cx="22"
-          cy="22"
-          r="18"
-          fill="none"
-          stroke={over ? "#b5462e" : "#a88a3f"}
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={`${(pct * 113.1).toFixed(1)} 113.1`}
-          transform="rotate(-90 22 22)"
-        />
-      </svg>
-      <div className="flex min-w-0 flex-1 flex-col items-start">
-        <span className="font-display text-[26px] leading-none tabular-nums" style={{ color: over ? "#b5462e" : "var(--t-ink)" }}>
-          {over ? "+" : ""}
-          {mm}:{ss}
-        </span>
-        <span className="text-[12px]" style={{ color: "#6b5534" }}>
-          {over ? "Past your estimate — keep going or call it" : running ? "Focusing…" : spent > 0 ? "Paused" : `${minutes}-minute timer`}
-        </span>
-      </div>
-      {spent > 0 && !running && (
-        <button
-          type="button"
-          onClick={() => {
-            setElapsed(0);
-            setRunStart(null);
-          }}
-          className="h-10 rounded-full px-3 text-[14px] underline"
-          style={{ color: "#6b5534" }}
-        >
-          Reset
+    <div className="relative z-[1] flex w-full flex-col gap-2 rounded-2xl px-3 py-2.5" style={{ background: "rgba(120,90,40,.1)", border: "1px solid rgba(139,112,64,.35)" }}>
+      <div className="flex items-center gap-3">
+        <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden className="shrink-0">
+          <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(120,90,40,.2)" strokeWidth="4" />
+          <circle
+            cx="22"
+            cy="22"
+            r="18"
+            fill="none"
+            stroke={over ? "#b5462e" : "#a88a3f"}
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={`${(pct * 113.1).toFixed(1)} 113.1`}
+            transform="rotate(-90 22 22)"
+          />
+        </svg>
+        <div className="flex min-w-0 flex-1 flex-col items-start">
+          <span className="font-display text-[26px] leading-none tabular-nums" style={{ color: over ? "#b5462e" : "var(--t-ink)" }}>
+            {over ? "+" : ""}
+            {clock}
+          </span>
+          <span className="text-[12px]" style={{ color: "#6b5534" }}>
+            {over ? "Past your time — keep going or call it" : running ? "Focusing…" : spent > 0 ? "Paused" : counting ? `${length}-minute countdown` : "Stopwatch"}
+          </span>
+        </div>
+        {spent > 0 && !running && (
+          <button type="button" onClick={reset} className="h-10 rounded-full px-2 text-[14px] underline" style={{ color: "#6b5534" }}>
+            Reset
+          </button>
+        )}
+        <button type="button" onClick={toggle} className="one-thing-primary h-10 min-w-[84px] rounded-full px-4 text-[15px] font-bold">
+          {running ? "Pause" : spent > 0 ? "Resume" : "Start"}
         </button>
+      </div>
+      {!started && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div role="radiogroup" aria-label="Timer type" className="flex rounded-full p-0.5" style={{ border: "1px solid rgba(139,112,64,.45)" }}>
+            {(
+              [
+                ["countdown", "Countdown"],
+                ["stopwatch", "Stopwatch"],
+              ] as const
+            ).map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => setMode(m)}
+                className="h-8 rounded-full px-3 text-[13px] font-semibold"
+                style={mode === m ? { background: "rgba(217,180,95,.6)", color: "#2a1c10" } : { color: "#4a3c26" }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {counting && (
+            <>
+              {[5, 10, 25].map((m) => (
+                <button key={m} type="button" onClick={() => { setCustom(""); pickLength(m); }} className="h-8 rounded-full px-2.5 text-[13px] font-semibold tabular-nums" style={chip(length === m && !custom)}>
+                  {m}m
+                </button>
+              ))}
+              <label className="flex h-8 items-center gap-1 rounded-full px-2 text-[13px]" style={chip(!!custom)}>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={240}
+                  value={custom}
+                  placeholder={[5, 10, 25].includes(length) ? "other" : String(length)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => {
+                    setCustom(e.target.value);
+                    const n = Math.round(Number(e.target.value));
+                    if (n >= 1 && n <= 240) pickLength(n);
+                  }}
+                  aria-label="Minutes"
+                  className="w-10 bg-transparent text-center text-[16px] font-semibold tabular-nums outline-none"
+                />
+                min
+              </label>
+            </>
+          )}
+        </div>
       )}
-      <button type="button" onClick={toggle} className="one-thing-primary h-10 min-w-[84px] rounded-full px-4 text-[15px] font-bold">
-        {running ? "Pause" : spent > 0 ? "Resume" : "Start"}
-      </button>
     </div>
   );
 }
