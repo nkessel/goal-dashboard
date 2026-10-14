@@ -133,7 +133,7 @@ export function RewardEditorDialog({
               taskTitle={title}
               theme={theme}
               size={72}
-              emptyContent={<span className="text-3xl">🎁</span>}
+              emptyContent={<DiamondIcon size={36} />}
               showEditHint
               artStyle="treasure"
               onDraftChange={(url) => setIcon(url)}

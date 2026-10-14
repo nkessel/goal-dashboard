@@ -257,9 +257,12 @@ export function TaskRow({
           ) : task.board_id ? null : (
             <button
               type="button"
-              onClick={() => setEditing(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditing(true);
+              }}
               title="Put this quest on a quest board"
-              className="relative z-[2] -mb-2.5 rounded-md border border-dashed px-2 py-px text-[12px] leading-snug opacity-70 hover:opacity-100"
+              className="tap-pad relative z-[2] -mb-2.5 rounded-md border border-dashed px-2 py-px text-[12px] leading-snug opacity-70 hover:opacity-100"
               style={{
                 background: isAdventure ? "rgba(243,231,203,.92)" : "var(--t-card)",
                 borderColor: isAdventure ? "#a58c66" : "var(--t-card-border)",

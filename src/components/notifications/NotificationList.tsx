@@ -1,12 +1,23 @@
 "use client";
 
-import { useSyncExternalStore, useTransition } from "react";
-import { markNotificationReadAction, markAllNotificationsReadAction } from "@/app/actions";
+import { useState, useSyncExternalStore, useTransition } from "react";
+import { markNotificationReadAction, markAllNotificationsReadAction, snoozeNotificationAction } from "@/app/actions";
 import type { AppNotification } from "@/lib/data/types";
 
 type Item = AppNotification & { icon: string };
 
 const noop = () => () => {};
+
+const SNOOZE_OPTIONS: { label: string; minutes: number }[] = [
+  { label: "15 min", minutes: 15 },
+  { label: "30 min", minutes: 30 },
+  { label: "1 hour", minutes: 60 },
+  { label: "2 hours", minutes: 120 },
+  { label: "4 hours", minutes: 240 },
+  { label: "8 hours", minutes: 480 },
+  { label: "1 day", minutes: 1440 },
+  { label: "3 days", minutes: 4320 },
+];
 
 function when(iso: string, now: number): string {
   const mins = Math.round((now - new Date(iso).getTime()) / 60_000);
@@ -28,10 +39,14 @@ export function NotificationList({
   theme?: "calm" | "adventure";
 }) {
   const [isPending, startTransition] = useTransition();
+  const [snoozing, setSnoozing] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
   // Times are shown in the viewer's own clock, so only once we're in the browser.
   const now = useSyncExternalStore(noop, () => Math.floor(Date.now() / 60_000) * 60_000, () => null);
-  const unread = notifications.filter((n) => !n.is_read);
-  const read = notifications.filter((n) => n.is_read);
+  const asleep = (n: Item) => hidden.has(n.id) || (!!n.snoozed_until && now !== null && new Date(n.snoozed_until).getTime() > now);
+  const unread = notifications.filter((n) => !n.is_read && !asleep(n));
+  const read = notifications.filter((n) => n.is_read && !asleep(n));
+  const snoozed = notifications.filter((n) => asleep(n) && !hidden.has(n.id));
   const isAdventure = theme === "adventure";
 
   const panelCls = isAdventure ? "parchment parchment-framed" : "";
@@ -40,7 +55,8 @@ export function NotificationList({
 
   function renderRow(n: Item, first: boolean) {
     return (
-      <li key={n.id} className="flex items-start gap-3 py-3" style={first ? undefined : { borderTop: divider }}>
+      <li key={n.id} className="flex flex-col py-3" style={first ? undefined : { borderTop: divider }}>
+        <div className="flex items-start gap-3">
         <span
           aria-hidden
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[19px]"
@@ -63,24 +79,69 @@ export function NotificationList({
           </time>
         </div>
         {!n.is_read && (
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => startTransition(() => markNotificationReadAction(n.id))}
-            aria-label="Mark as read"
-            title="Mark as read"
-            className="hover-glow mt-1 flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold disabled:opacity-50"
-            style={{
-              border: `1.5px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}`,
-              background: isAdventure ? "rgba(255,250,238,.6)" : "transparent",
-              color: "var(--t-ink)",
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Read
-          </button>
+          <div className="mt-1 flex shrink-0 flex-col items-stretch gap-1.5">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => startTransition(() => markNotificationReadAction(n.id))}
+              aria-label="Mark as read"
+              title="Mark as read"
+              className="hover-glow flex h-9 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-semibold disabled:opacity-50"
+              style={{
+                border: `1.5px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}`,
+                background: isAdventure ? "rgba(255,250,238,.6)" : "transparent",
+                color: "var(--t-ink)",
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Read
+            </button>
+            <button
+              type="button"
+              onClick={() => setSnoozing(snoozing === n.id ? null : n.id)}
+              aria-expanded={snoozing === n.id}
+              className="hover-glow flex h-9 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] disabled:opacity-50"
+              style={{ color: "var(--t-ink-soft)" }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle cx="12" cy="13" r="7.5" stroke="currentColor" strokeWidth="2" />
+                <path d="M12 9.5V13l2.5 1.6M5 4.5L3 6.5M19 4.5l2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              Snooze
+            </button>
+          </div>
+        )}
+        </div>
+        {snoozing === n.id && (
+          <div role="group" aria-label="Snooze for" className="mt-2 flex flex-wrap gap-1.5 pl-[52px]">
+            {SNOOZE_OPTIONS.map((o) => (
+              <button
+                key={o.minutes}
+                type="button"
+                onClick={() => {
+                  setSnoozing(null);
+                  setHidden((h) => new Set(h).add(n.id));
+                  startTransition(async () => {
+                    try {
+                      await snoozeNotificationAction(n.id, o.minutes);
+                    } catch {
+                      setHidden((h) => {
+                        const x = new Set(h);
+                        x.delete(n.id);
+                        return x;
+                      });
+                    }
+                  });
+                }}
+                className="hover-glow h-9 rounded-full px-3 text-[13.5px]"
+                style={{ border: `1px solid ${isAdventure ? "#b39a6a" : "var(--t-card-border)"}`, color: "var(--t-ink)", background: isAdventure ? "rgba(255,250,238,.55)" : "transparent" }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
         )}
       </li>
     );
@@ -123,6 +184,13 @@ export function NotificationList({
           <>
             {renderGroup("New", unread)}
             {renderGroup("Earlier", read)}
+            {snoozed.length > 0 && (
+              <p className="m-0 text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                {snoozed.length} snoozed — {snoozed.length === 1 ? "it comes" : "they come"} back on{" "}
+                {new Date(snoozed[0].snoozed_until!).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}
+                {snoozed.length > 1 ? " and later" : ""}.
+              </p>
+            )}
           </>
         )}
       </section>

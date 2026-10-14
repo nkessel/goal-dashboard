@@ -7,19 +7,8 @@ import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { formatTimeRange } from "@/lib/calendar-dates";
 
-/**
- * The time window a task should be plotted at on the calendar: its real
- * scheduled window when it has one, otherwise a short marker at its
- * completion time (spec: completed tasks show "at their scheduled (or
- * completed) time").
- */
-export function getTaskDisplayWindow(task: Task): { start: Date; end: Date } {
-  if (task.scheduled_start && task.scheduled_end) {
-    return { start: new Date(task.scheduled_start), end: new Date(task.scheduled_end) };
-  }
-  const completed = task.completed_at ? new Date(task.completed_at) : new Date();
-  return { start: completed, end: new Date(completed.getTime() + 30 * 60_000) };
-}
+import { getTaskDisplayWindow } from "@/lib/calendar-task-window";
+export { getTaskDisplayWindow };
 
 export function CalendarTaskChip({
   task,

@@ -1,5 +1,7 @@
 "use client";
 
+import { DiamondIcon } from "@/components/ui/Icons";
+
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -142,7 +144,7 @@ export function ImportReview({ theme, onDone }: { theme: "calm" | "adventure"; o
                   ✎
                 </span>
               ) : it.kind === "reward" ? (
-                "🎁"
+                <DiamondIcon size={22} />
               ) : (
                 "⚔"
               )}

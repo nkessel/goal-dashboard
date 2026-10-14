@@ -1,8 +1,11 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { WEEKDAY_LABELS, formatDateParam, getMonthGridWeeks, isSameDay } from "@/lib/calendar-dates";
-import { getTaskDisplayWindow } from "./CalendarTaskChip";
+import { getTaskDisplayWindow } from "@/lib/calendar-task-window";
 
 export function MonthView({
   month,
@@ -19,6 +22,8 @@ export function MonthView({
 }) {
   const isAdventure = theme === "adventure";
   const weeks = getMonthGridWeeks(month);
+  // Items are placed by the viewer's own local day, so only after mounting.
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   return (
     <div
@@ -50,8 +55,8 @@ export function MonthView({
           week.map((day) => {
             const inMonth = day.getMonth() === month.getMonth();
             const isToday = isSameDay(day, today);
-            const dayTasks = tasks.filter((t) => isSameDay(getTaskDisplayWindow(t).start, day));
-            const dayEvents = events.filter((e) => isSameDay(new Date(e.start), day));
+            const dayTasks = mounted ? tasks.filter((t) => isSameDay(getTaskDisplayWindow(t).start, day)) : [];
+            const dayEvents = mounted ? events.filter((e) => isSameDay(new Date(e.start), day)) : [];
             const dots = dayTasks.slice(0, 3);
             const eventDots = dayEvents.slice(0, Math.max(0, 3 - dots.length));
             const overflow = dayTasks.length + dayEvents.length - dots.length - eventDots.length;

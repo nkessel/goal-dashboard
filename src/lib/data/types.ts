@@ -235,6 +235,8 @@ export type AppNotification = {
   is_read: boolean;
   email_sent: boolean;
   created_at: string;
+  /** Hidden until then, when it comes back unread. */
+  snoozed_until?: string | null;
 };
 
 export type XpEventKind =

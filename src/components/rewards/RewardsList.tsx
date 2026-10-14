@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import type { Reward } from "@/lib/data/types";
 import { claimRewardAction, completeRewardAction, unclaimRewardAction, uncompleteRewardAction } from "@/app/actions";
 import { RewardEditorDialog } from "./RewardEditorDialog";
-import { CoinIcon } from "@/components/ui/Icons";
+import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 
 /** The Treasure Chest: rewards to buy with coins, plus what you've claimed. */
 export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coins: number; theme: "calm" | "adventure" }) {
@@ -68,7 +68,7 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
         // eslint-disable-next-line @next/next/no-img-element -- generated portrait
         <img src={r.icon_key} alt="" className="h-full w-full object-cover" />
       ) : (
-        "🎁"
+        <DiamondIcon size={size * 0.5} />
       )}
     </span>
   );
@@ -102,7 +102,7 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
           return (
             <div
               key={r.id}
-              className={`relative flex flex-col items-center gap-2 rounded-2xl px-4 pb-4 pt-5 text-center ${isAdventure ? "parchment parchment-framed" : ""}`}
+              className={`reward-shimmer relative flex flex-col items-center gap-2 rounded-2xl px-4 pb-4 pt-5 text-center ${isAdventure ? "parchment parchment-framed" : ""}`}
               style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
             >
               {r.needs_review && (

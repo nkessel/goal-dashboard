@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { completeRiteAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
+import { completeRiteAction, uncompleteRiteAction } from "@/app/actions";
 import { GoldRule, Leaf } from "@/components/ui/Ornaments";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 import { RiteEditorDialog } from "./RiteEditorDialog";
@@ -95,16 +95,6 @@ export function EveningRites({
     });
   }
 
-  function promote(r: RiteView, toCore: boolean) {
-    startTransition(async () => {
-      try {
-        await updateRiteAction(r.id, { isCore: toCore });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't move that rite.");
-      }
-    });
-  }
-
   function card(r: RiteView) {
     const done = doneTonight(r.id);
     return (
@@ -126,11 +116,6 @@ export function EveningRites({
           <span className="text-[18px] font-bold leading-none" style={{ color: "var(--t-xp)" }}>
             +{r.xp_value} XP
           </span>
-          {!r.is_core ? (
-            <button type="button" onClick={() => promote(r, true)} className="text-[12.5px] underline" style={{ color: "var(--t-ink-soft)" }} title="Make this a non-negotiable rite">
-              ☆ Make a rite
-            </button>
-          ) : null}
         </span>
       </li>
     );

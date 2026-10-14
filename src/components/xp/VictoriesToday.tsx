@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import type { Task } from "@/lib/data/types";
+import { DiamondIcon } from "@/components/ui/Icons";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { SectionTitle } from "@/components/ui/Ornaments";
 import { eveningDayKey } from "@/components/evening/evening-clock";
@@ -33,7 +34,7 @@ function Seal({ kind }: { kind: "check" | "star" | "gift" }) {
           <path d="M12 2.5l2.6 6.3 6.8.5-5.2 4.4 1.6 6.6L12 16.8l-5.8 3.5 1.6-6.6L2.6 9.3l6.8-.5z" />
         </svg>
       )}
-      {kind === "gift" && <span className="text-[13px] leading-none">🎁</span>}
+      {kind === "gift" && <DiamondIcon size={14} />}
     </span>
   );
 }

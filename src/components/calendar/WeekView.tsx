@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
@@ -64,6 +64,20 @@ export function WeekView({
     });
   });
 
+  // How wide one day's column is: overlapping items split it into lanes when
+  // there's room, and fan out (overlapping, slightly offset) when there isn't.
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [colWidth, setColWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => setColWidth((el.clientWidth - 20 - 40) / Math.max(1, days.length));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [days.length]);
+
   const gridStart = (d: Date) => {
     const x = new Date(d);
     x.setHours(HOUR_START, 0, 0, 0);
@@ -121,6 +135,7 @@ export function WeekView({
 
   return (
     <div
+      ref={boxRef}
       className={`rounded-2xl p-2.5 ${isAdventure ? "parchment" : ""}`}
       style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >
@@ -245,6 +260,9 @@ export function WeekView({
                 const past = now ? it.end.getTime() <= now.getTime() : false;
                 const label = formatShortTimeRange(it.start, it.end);
                 const oneLine = height < 34;
+                // Too narrow to split (phones, multi-day views): fan out instead.
+                const fan = l.count > 1 && colWidth > 0 && colWidth / l.count < 46;
+                const step = Math.min(8, colWidth / (l.count + 2));
                 return (
                   <div
                     key={it.key}
@@ -252,9 +270,11 @@ export function WeekView({
                     style={{
                       top: (it.top / 60) * HOUR_PX + 1,
                       height,
-                      left: `${(100 / l.count) * l.lane}%`,
-                      width: `calc(${100 / l.count}% - 2px)`,
-                      zIndex: it.kind === "task" ? 2 : 1,
+                      left: fan ? l.lane * step : `${(100 / l.count) * l.lane}%`,
+                      width: fan ? `calc(100% - ${l.lane * step + 1}px)` : `calc(${100 / l.count}% - 2px)`,
+                      zIndex: (it.kind === "task" ? 2 : 1) + (fan ? l.lane * 2 : 0),
+                      boxShadow: fan && l.lane > 0 ? "-2px 0 4px rgba(60,40,10,.25)" : undefined,
+                      borderRadius: 6,
                       opacity: past ? 0.5 : 1,
                       filter: past ? "saturate(.25)" : undefined,
                     }}

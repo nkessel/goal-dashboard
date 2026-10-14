@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
 import { claimRewardAction, listAvailableRewardsAction } from "@/app/actions";
-import { CoinIcon } from "@/components/ui/Icons";
+import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import {
   barDust,
   cardDust,
@@ -415,7 +415,7 @@ function RewardChest({
             // eslint-disable-next-line @next/next/no-img-element -- generated portrait
             <img src={claimed.icon_key} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="flex h-full w-full items-center justify-center text-5xl">🎁</span>
+            <span className="flex h-full w-full items-center justify-center"><DiamondIcon size={56} /></span>
           )}
         </div>
         <p className="m-0 text-[26px] font-bold leading-tight" style={{ color: "#2f2a1f" }}>
@@ -493,7 +493,7 @@ function RewardChest({
                   // eslint-disable-next-line @next/next/no-img-element -- generated portrait
                   <img src={r.icon_key} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="flex h-full w-full items-center justify-center text-3xl">🎁</span>
+                  <span className="flex h-full w-full items-center justify-center"><DiamondIcon size={34} /></span>
                 )}
               </span>
               <span className="text-[14.5px] font-semibold leading-tight" style={{ color: "#2f2a1f" }}>

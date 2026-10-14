@@ -1131,3 +1131,45 @@ html[data-evening] [data-theme="adventure"] {
 @media (prefers-reduced-motion: reduce) {
   .peek-open, .peek-close, .peek-zoom-in, .peek-zoom-out { animation: none; }
 }
+
+/* Rewards: a slow sweep of light around a gilded edge. */
+.reward-shimmer { isolation: isolate; }
+.reward-shimmer::after,
+.reward-quest::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2.5px;
+  background: linear-gradient(115deg, rgba(217, 180, 95, 0.5) 0%, rgba(217, 180, 95, 0.5) 38%, #fff6c8 48%, #f2c94c 52%, rgba(217, 180, 95, 0.5) 62%, rgba(217, 180, 95, 0.5) 100%) 0 0 / 300% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: reward-edge-sweep 3.6s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+@keyframes reward-edge-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reward-shimmer::after, .reward-quest::before { animation: none; }
+}
+
+/* Small controls get a finger-sized invisible hit area around them. */
+.tap-pad { position: relative; }
+.tap-pad::after {
+  content: "";
+  position: absolute;
+  inset: -10px -6px;
+}
+
+/* Board cards: the pencil floats top-right on hover; touch screens get it in the footer instead. */
+.board-title-pad { padding-right: 1.75rem; }
+.board-edit-foot { display: none; }
+@media (hover: none) {
+  .board-title-pad { padding-right: 0; }
+  .board-card .board-edit-btn { display: none; }
+  .board-edit-foot { display: flex; }
+}

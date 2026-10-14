@@ -108,6 +108,7 @@ export function PriorityMatrix({
   // Board filter: unchecked board ids ("none" = quests without a board).
   // Remembered per browser.
   const [hiddenBoards, setHiddenBoards] = useState<Set<string>>(() => new Set());
+  const [filterOpen, setFilterOpen] = useState(false);
   useEffect(() => {
     try {
       const saved = JSON.parse(window.localStorage.getItem("matrix-hidden-boards") ?? "[]");
@@ -244,23 +245,48 @@ export function PriorityMatrix({
       {plotEditing && plotTask && (
         <EditTaskModal task={plotTask} theme={theme} onClose={() => setPlotEditing(false)} />
       )}
-      {boards && boards.length > 0 && (
-        <fieldset className={`board-filter ${isAdventure ? "board-filter-adventure" : "board-filter-calm"} flex flex-wrap items-center gap-x-2 gap-y-2`}>
-          <legend className="sr-only">Show quests from these boards</legend>
-          <span aria-hidden className={`mr-1 text-[14px] ${isAdventure ? "font-display italic" : "font-semibold"}`} style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)" }}>
-            {isAdventure ? "Show quests from" : "Show tasks from"}
-          </span>
-          {[...boards, ...(hasUnboarded ? [{ id: "none", title: "No board" }] : [])].map((b) => (
-            <label key={b.id} className="board-chip">
-              <input type="checkbox" className="sr-only" checked={!hiddenBoards.has(b.id)} onChange={() => toggleBoard(b.id)} />
-              <svg className="board-chip-check" width="12" height="12" viewBox="0 0 12 12" aria-hidden>
-                <path d="M2.5 6.4 5 8.8 9.6 3.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      {boards && boards.length > 0 && (() => {
+        const all = [...boards, ...(hasUnboarded ? [{ id: "none", title: "No board" }] : [])];
+        const shown = all.filter((b) => !hiddenBoards.has(b.id)).length;
+        return (
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setFilterOpen((v) => !v)}
+              aria-expanded={filterOpen}
+              className="hover-glow flex min-h-10 items-center gap-2 self-start rounded-full px-4 text-[14.5px]"
+              style={{ background: isAdventure ? "rgba(15,19,13,.55)" : "var(--t-card)", border: `1px solid ${isAdventure ? "rgba(217,180,95,.45)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M4 5h16l-6 7.5V19l-4-2v-4.5z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
               </svg>
-              <span>{b.title}</span>
-            </label>
-          ))}
-        </fieldset>
-      )}
+              <span>
+                {isAdventure ? "Showing quests from " : "Showing tasks from "}
+                <b style={{ color: isAdventure ? "var(--t-gold)" : undefined }}>{shown === all.length ? "all boards" : `${shown} of ${all.length} boards`}</b>
+              </span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: filterOpen ? "rotate(180deg)" : undefined, transition: "transform 160ms" }}>
+                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <div className="drawer-body" data-open={filterOpen ? "true" : "false"}>
+              <div className="drawer-inner">
+                <fieldset className={`board-filter ${isAdventure ? "board-filter-adventure" : "board-filter-calm"} flex flex-wrap items-center gap-x-2 gap-y-2 pb-1 pt-1`}>
+                  <legend className="sr-only">Show quests from these boards</legend>
+                  {all.map((b) => (
+                    <label key={b.id} className="board-chip">
+                      <input type="checkbox" className="sr-only" checked={!hiddenBoards.has(b.id)} onChange={() => toggleBoard(b.id)} />
+                      <svg className="board-chip-check" width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+                        <path d="M2.5 6.4 5 8.8 9.6 3.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span>{b.title}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* Sized to leave room for what's below: never taller than the screen minus the header area. */}
       <div className="mx-auto flex w-full gap-2" style={{ maxWidth: "min(100%, max(260px, calc(100svh - 420px)))" }}>
         {/* Vertical axis: two rotated labels pinned to the top and bottom. */}

@@ -735,6 +735,14 @@ export async function markNotificationReadAction(id: string) {
   revalidatePath("/notifications");
 }
 
+/** Hide a notification for a while; it comes back unread afterwards. */
+export async function snoozeNotificationAction(id: string, minutes: number) {
+  const ownerId = await requireProfileId();
+  const mins = Math.max(5, Math.min(60 * 24 * 14, Math.round(minutes)));
+  await notificationsData.snooze(id, ownerId, new Date(Date.now() + mins * 60_000).toISOString());
+  revalidatePath("/notifications");
+}
+
 export async function markAllNotificationsReadAction() {
   const ownerId = await requireProfileId();
   await notificationsData.markAllRead(ownerId);

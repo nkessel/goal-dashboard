@@ -36,6 +36,7 @@ export async function createNotification(input: {
 }
 
 export async function listForProfile(profileId: string, limit = 30): Promise<AppNotification[]> {
+  await wakeSnoozed(profileId).catch(() => {});
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("notifications")
@@ -48,7 +49,26 @@ export async function listForProfile(profileId: string, limit = 30): Promise<App
   return data ?? [];
 }
 
+/** Snoozed notifications whose time has come return as unread. */
+export async function wakeSnoozed(profileId: string): Promise<void> {
+  await supabaseAdmin()
+    .from("notifications")
+    .update({ is_read: false, snoozed_until: null })
+    .eq("profile_id", profileId)
+    .lte("snoozed_until", new Date().toISOString());
+}
+
+export async function snooze(id: string, profileId: string, untilISO: string): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("notifications")
+    .update({ is_read: true, snoozed_until: untilISO })
+    .eq("id", id)
+    .eq("profile_id", profileId);
+  if (error) throw new Error(/snoozed_until/.test(error.message) ? "Snoozing needs a quick database update first." : `Failed to snooze: ${error.message}`);
+}
+
 export async function countUnread(profileId: string): Promise<number> {
+  await wakeSnoozed(profileId).catch(() => {});
   const db = supabaseAdmin();
   const { count, error } = await db
     .from("notifications")

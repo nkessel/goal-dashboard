@@ -194,7 +194,7 @@ export function BoardGrid({
     const body = (
       <div className="flex h-full flex-col gap-2 px-3 pb-2.5 pt-2.5">
         {/* Header: seal, title and completed count — opens the board */}
-        <Link href={href} draggable={false} className="flex items-start gap-1.5 rounded-md pr-7">
+        <Link href={href} draggable={false} className="board-title-pad flex items-start gap-1.5 rounded-md">
           <span className="mt-[2px]">
             <BoardSeal color={board.color} size={18} />
           </span>
@@ -271,22 +271,35 @@ export function BoardGrid({
           </p>
         )}
 
-        {/* Add to this board */}
+        {/* Add to this board (and, on touch screens, edit it) */}
         {!board.isVirtual && (
-          <button
-            type="button"
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onClick={() => setAddingTo(board.id)}
-            aria-label={`Add a quest or sub-board to ${board.title}`}
-            className="board-quest mt-auto flex h-8 w-full items-center justify-center gap-1 rounded-lg border border-dashed text-[12.5px] font-semibold"
-            style={{ borderColor: isAdventure ? "rgba(120,90,40,.45)" : "var(--t-card-border)", color: soft }}
-          >
-            <span className="text-[15px] leading-none" aria-hidden>
-              +
-            </span>
-            Add
-          </button>
+          <div className="mt-auto flex gap-1.5">
+            <button
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={() => setAddingTo(board.id)}
+              aria-label={`Add a quest or sub-board to ${board.title}`}
+              className="board-quest flex h-9 flex-1 items-center justify-center gap-1 rounded-lg border border-dashed text-[13px] font-semibold"
+              style={{ borderColor: isAdventure ? "rgba(120,90,40,.45)" : "var(--t-card-border)", color: soft }}
+            >
+              <span className="text-[16px] leading-none" aria-hidden>
+                +
+              </span>
+              Add
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={() => setEditingBoard(board)}
+              aria-label={`Edit ${board.title}`}
+              className="board-edit-foot board-quest h-9 w-9 shrink-0 items-center justify-center rounded-lg border"
+              style={{ borderColor: isAdventure ? "rgba(120,90,40,.35)" : "var(--t-card-border)", color: soft }}
+            >
+              <PencilIcon />
+            </button>
+          </div>
         )}
       </div>
     );
