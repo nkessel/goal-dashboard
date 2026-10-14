@@ -38,7 +38,8 @@ export function EnergyCheck({ today }: { /** Today's latest check-in, if any. */
   }
 
   const shown = editing ? value : (saved ?? value);
-  const low = shown <= LOW;
+  // Only after a saved check-in at 5 or below.
+  const low = !editing && saved !== null && saved <= LOW;
   const hue = Math.round(((shown - 1) / 9) * 110); // red → green
 
   return (
@@ -94,8 +95,8 @@ export function EnergyCheck({ today }: { /** Today's latest check-in, if any. */
         <button
           type="button"
           onClick={() => setPicking(true)}
-          className="hover-glow flex h-9 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-bold"
-          style={{ background: "rgba(14,18,10,.5)", border: "1px solid var(--t-gold)", color: "var(--t-gold)" }}
+          className="hover-glow power-glow flex h-9 shrink-0 items-center gap-1 rounded-full px-3.5 text-[13.5px] font-bold"
+          style={{ background: "radial-gradient(circle at 32% 28%, #fff1b8, #f2c96a 45%, #d9a83a)", border: "1.5px solid #fff3c4", color: "#2a1c10", boxShadow: "0 0 14px rgba(255,214,102,.7), 0 2px 6px rgba(0,0,0,.4)" }}
           title="Light quests to get going"
         >
           <BoltIcon size={16} /> Power-ups

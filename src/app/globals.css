@@ -1340,3 +1340,10 @@ html {
 .choice-float:nth-child(2) { animation-delay: 45ms; }
 .choice-float:nth-child(3) { animation-delay: 0ms; }
 @media (prefers-reduced-motion: reduce) { .choice-float { animation: none; } }
+
+@keyframes power-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(255, 214, 102, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4); }
+  50% { box-shadow: 0 0 22px rgba(255, 224, 130, 0.95), 0 2px 6px rgba(0, 0, 0, 0.4); }
+}
+.power-glow { animation: power-glow 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .power-glow { animation: none; } }
