@@ -275,8 +275,8 @@ export function WeekView({
                       zIndex: (it.kind === "task" ? 2 : 1) + (fan ? l.lane * 2 : 0),
                       boxShadow: fan && l.lane > 0 ? "-2px 0 4px rgba(60,40,10,.25)" : undefined,
                       borderRadius: 6,
-                      opacity: past ? 0.5 : 1,
-                      filter: past ? "saturate(.25)" : undefined,
+                      // Faded but still opaque, so past items fanned over each other stay legible.
+                      filter: past ? "saturate(.2) contrast(.6) brightness(1.12)" : undefined,
                     }}
                   >
                     {it.kind === "event" ? (

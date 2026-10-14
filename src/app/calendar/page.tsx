@@ -219,7 +219,7 @@ export default async function CalendarPage({
           />
         )}
         {view === "month" && (
-          <MonthView month={startOfMonth(date)} today={today} tasks={tasks} events={events} theme={theme} />
+          <MonthView monthKey={formatDateParam(startOfMonth(date))} todayKey={formatDateParam(today)} tasks={tasks} events={events} theme={theme} />
         )}
       </div>
     </AppShell>

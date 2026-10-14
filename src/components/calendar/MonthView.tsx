@@ -4,23 +4,26 @@ import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
-import { WEEKDAY_LABELS, formatDateParam, getMonthGridWeeks, isSameDay } from "@/lib/calendar-dates";
+import { WEEKDAY_LABELS, formatDateParam, getMonthGridWeeks, isSameDay, parseDateParam } from "@/lib/calendar-dates";
 import { getTaskDisplayWindow } from "@/lib/calendar-task-window";
 
 export function MonthView({
-  month,
-  today,
+  monthKey,
+  todayKey,
   tasks,
   events = [],
   theme = "calm",
 }: {
-  month: Date;
-  today: Date;
+  /** YYYY-MM-01 — a date key, so it means the same month in every time zone. */
+  monthKey: string;
+  todayKey: string;
   tasks: Task[];
   events?: GoogleCalendarEvent[];
   theme?: "calm" | "adventure";
 }) {
   const isAdventure = theme === "adventure";
+  const month = parseDateParam(monthKey);
+  const today = parseDateParam(todayKey);
   const weeks = getMonthGridWeeks(month);
   // Items are placed by the viewer's own local day, so only after mounting.
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
@@ -41,7 +44,7 @@ export function MonthView({
             key={label}
             className={isAdventure ? "font-display text-center" : "text-center"}
             style={{
-              fontSize: 9,
+              fontSize: 12,
               fontWeight: isAdventure ? 500 : 600,
               color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)",
               paddingBottom: 4,
@@ -103,7 +106,7 @@ export function MonthView({
                       style={{ background: isAdventure ? "rgba(150,170,230,.85)" : "#7a90d6" }}
                     />
                   ))}
-                  {overflow > 0 && <span style={{ fontSize: 7, color: "var(--t-ink-soft)" }}>+{overflow}</span>}
+                  {overflow > 0 && <span style={{ fontSize: 10, color: "var(--t-ink-soft)" }}>+{overflow}</span>}
                 </div>
               </Link>
             );
