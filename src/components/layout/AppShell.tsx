@@ -11,6 +11,7 @@ import { PortraitPainter } from "@/components/imports/PortraitPainter";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BackToToday } from "@/components/layout/BackToToday";
 import { BackToSettings } from "@/components/layout/BackToSettings";
+import { FocusTimerPill } from "@/components/one-thing/FocusTimerPill";
 import { Suspense } from "react";
 
 /**
@@ -88,6 +89,7 @@ export async function AppShell({
         <main className="page-enter flex-1 px-5 pb-36 pt-2">{children}</main>
       </div>
 
+      {profileId && <FocusTimerPill theme={theme} />}
       {profileId && <BottomNav theme={theme} />}
     </div>
   );

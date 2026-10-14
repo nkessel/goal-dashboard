@@ -10,6 +10,7 @@ import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { useEscape } from "@/lib/use-escape";
 import { rankOneThing, whyThisOne } from "@/lib/one-thing";
+import { adoptFocusTask, getFocusTimer, resetFocusTimer, setFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 
@@ -98,10 +99,38 @@ function OneThingView({
   const live = deck.filter((id) => byId.has(id));
   const task = index < live.length ? byId.get(live[index]) : undefined;
 
-  useEscape(() => (editing ? undefined : requestClose()), !editing);
+  const [confirmExit, setConfirmExit] = useState(false);
+  useEscape(() => (confirmExit ? setConfirmExit(false) : requestClose()), !editing);
+
+  // While this view is up, the floating timer pill stays hidden.
+  useEffect(() => {
+    setFocusTimer({ open: true });
+    return () => setFocusTimer({ open: false });
+  }, []);
 
   function requestClose() {
     if (closing) return;
+    const t = getFocusTimer();
+    if (t.runStart !== null && !confirmExit) {
+      setConfirmExit(true);
+      return;
+    }
+    // Leaving with a paused or unused timer: let it go.
+    if (t.runStart === null) resetFocusTimer();
+    setConfirmExit(false);
+    setClosing(true);
+    setTimeout(onClose, 200);
+  }
+
+  function exitKeepingTimer() {
+    setConfirmExit(false);
+    setClosing(true);
+    setTimeout(onClose, 200);
+  }
+
+  function exitPausing() {
+    resetFocusTimer();
+    setConfirmExit(false);
     setClosing(true);
     setTimeout(onClose, 200);
   }
@@ -136,6 +165,7 @@ function OneThingView({
         });
         onDeck(deck.filter((id) => id !== t.id));
         setLeaving(null);
+        if (getFocusTimer().task?.id === t.id) resetFocusTimer();
         if (focus) onClose();
       } catch (e) {
         setLeaving(null);
@@ -153,6 +183,15 @@ function OneThingView({
       role="dialog"
       aria-modal="true"
       aria-label={focus ? "Focus mode" : "One thing"}
+      // Clicks here must not reach the quest card this view was opened from
+      // (React events bubble through portals). Empty space closes the view.
+      onClick={(e) => {
+        e.stopPropagation();
+        if (editing || confirmExit) return;
+        const el = e.target as HTMLElement;
+        if (!el.closest("article, button, a, input, label, [data-keep]")) requestClose();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-3 px-3 pt-[max(12px,env(safe-area-inset-top))]">
         <button
@@ -201,7 +240,7 @@ function OneThingView({
                 {whyThisOne(task, now)}
               </p>
             )}
-            <FocusTimer key={`timer-${task.id}`} minutes={task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25} />
+            <FocusTimer key={`timer-${task.id}`} task={task} minutes={task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25} />
             <FocusSteps key={`steps-${task.id}`} taskId={task.id} />
             {error && (
               <p className="relative z-[1] m-0 text-[14px] font-semibold" style={{ color: "var(--t-warn)" }}>
@@ -270,6 +309,33 @@ function OneThingView({
       )}
 
       {editing && task && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
+      {confirmExit && (
+        <div data-keep className="overlay-fade-in absolute inset-0 z-10 flex items-center justify-center p-6" style={{ background: "rgba(5,7,16,.55)" }} onClick={() => setConfirmExit(false)}>
+          <div
+            role="alertdialog"
+            aria-label="Your timer is still running"
+            onClick={(e) => e.stopPropagation()}
+            className="card-pop-in parchment parchment-framed flex w-full max-w-sm flex-col gap-3 rounded-2xl p-5 text-center"
+            style={{ color: "var(--t-ink)", background: "var(--t-card)" }}
+          >
+            <p className="font-display relative z-[1] m-0 text-[21px]">Your timer is still running</p>
+            <p className="relative z-[1] m-0 text-[14.5px]" style={{ color: "var(--t-ink-soft)" }}>
+              Keep it going while you look around? It stays at the top of the screen.
+            </p>
+            <div className="relative z-[1] flex flex-col gap-2">
+              <button type="button" onClick={exitKeepingTimer} className="one-thing-primary min-h-11 rounded-full text-[15.5px] font-bold">
+                Keep it running
+              </button>
+              <button type="button" onClick={exitPausing} className="min-h-11 rounded-full text-[15px] font-semibold" style={{ border: "1.5px solid #a88a3f", color: "var(--t-ink)" }}>
+                Stop the timer and exit
+              </button>
+              <button type="button" onClick={() => setConfirmExit(false)} className="min-h-10 text-[14px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                Stay in focus mode
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );
@@ -330,20 +396,24 @@ function Facts({ task, now }: { task: Task; now: number }) {
  * Countdown (5 / 10 / 25 minutes or any length) or a stopwatch that counts
  * up. Either pauses at any time; the countdown keeps going past zero.
  */
-function FocusTimer({ minutes }: { minutes: number }) {
-  const [mode, setMode] = useState<"countdown" | "stopwatch">("countdown");
-  const [length, setLength] = useState(Math.max(1, Math.min(240, minutes)));
+function FocusTimer({ task, minutes }: { task: TaskWithCategory; minutes: number }) {
+  const t = useFocusTimer();
   const [custom, setCustom] = useState("");
-  const [elapsed, setElapsed] = useState(0); // seconds banked before the current run
-  const [runStart, setRunStart] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
+  // Follow this quest in the shared timer (keeps a running one going).
   useEffect(() => {
-    if (runStart === null) return;
+    adoptFocusTask(task, Math.max(1, Math.min(240, minutes)));
+  }, [task, minutes]);
+  const mine = t.task?.id === task.id;
+  const mode = mine ? t.mode : "countdown";
+  const length = mine ? t.length : Math.max(1, Math.min(240, minutes));
+  const running = mine && t.runStart !== null;
+  useEffect(() => {
+    if (!running) return;
     const id = window.setInterval(() => setTick(Date.now()), 250);
     return () => window.clearInterval(id);
-  }, [runStart]);
-  const running = runStart !== null;
-  const spent = elapsed + (running ? Math.max(0, (tick || runStart) - runStart) / 1000 : 0);
+  }, [running]);
+  const spent = mine ? spentSeconds(t, running ? tick || t.runStart! : 0) : 0;
   const total = length * 60;
   const counting = mode === "countdown";
   const left = total - spent;
@@ -357,22 +427,18 @@ function FocusTimer({ minutes }: { minutes: number }) {
   const started = spent > 0 || running;
 
   function toggle() {
-    if (running) {
-      setElapsed(spent);
-      setRunStart(null);
-    } else {
-      const t = Date.now();
-      setTick(t);
-      setRunStart(t);
-    }
+    if (!mine) adoptFocusTask(task, length);
+    setTick(Date.now());
+    toggleFocusTimer();
   }
   function reset() {
-    setElapsed(0);
-    setRunStart(null);
+    setFocusTimer({ elapsed: 0, runStart: null });
+  }
+  function setMode(m: "countdown" | "stopwatch") {
+    setFocusTimer({ mode: m, elapsed: 0, runStart: null });
   }
   function pickLength(m: number) {
-    setLength(m);
-    reset();
+    setFocusTimer({ length: m, elapsed: 0, runStart: null });
   }
 
   const chip = (on: boolean): React.CSSProperties =>
