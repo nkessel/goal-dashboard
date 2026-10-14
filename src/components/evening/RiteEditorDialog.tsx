@@ -31,6 +31,8 @@ export function RiteEditorDialog({
   const [description, setDescription] = useState(rite?.description ?? "");
   const [xp, setXp] = useState(rite?.xp_value ?? 5);
   const [isCore, setIsCore] = useState(rite?.is_core ?? defaultCore);
+  const [days, setDays] = useState<number[]>(rite?.days ?? [0, 1, 2, 3, 4, 5, 6]);
+  const [dueTime, setDueTime] = useState(rite?.due_time ?? "");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -45,8 +47,10 @@ export function RiteEditorDialog({
     setError(null);
     startSaving(async () => {
       try {
-        if (rite) await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp });
-        else await createRiteAction({ title, description, isCore: isHabit ? true : isCore, xpValue: xp, slot });
+        if (isHabit && days.length === 0) throw new Error("Pick at least one day.");
+        const schedule = isHabit ? { days: days.length === 7 ? null : days, dueTime: dueTime || null } : {};
+        if (rite) await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
+        else await createRiteAction({ title, description, isCore: isHabit ? true : isCore, xpValue: xp, slot, ...schedule });
         close();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
@@ -85,7 +89,7 @@ export function RiteEditorDialog({
         <div data-embed-hide className="relative z-[1] flex items-center justify-between">
           <h3 className="font-display flex items-center gap-2 text-lg">
             <Moon size={22} />
-            {isHabit ? (rite ? "Edit habit" : "New daily habit") : rite ? "Edit rite" : isCore ? "New evening rite" : "New mini-quest"}
+            {isHabit ? (rite ? "Edit habit" : "New habit") : rite ? "Edit rite" : isCore ? "New evening rite" : "New mini-quest"}
           </h3>
           <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
             ×
@@ -140,6 +144,58 @@ export function RiteEditorDialog({
             style={{ borderColor: XP_PRESETS.includes(xp) ? "#b39a6a" : "#5a4520", background: XP_PRESETS.includes(xp) ? undefined : "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" }}
           />
         </div>
+
+        {isHabit && (
+          <div className="relative z-[1] flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-0.5 text-[14.5px] font-semibold">Repeats</span>
+              <button
+                type="button"
+                onClick={() => setDays(days.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
+                className="h-8 rounded-full px-3 text-[13.5px] font-semibold"
+                style={days.length === 7 ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" } : { border: "1px solid #b39a6a", color: "var(--t-ink)" }}
+              >
+                Every day
+              </button>
+              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => {
+                const on = days.includes(i);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i]}
+                    onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i].sort())}
+                    className="h-8 w-8 rounded-full text-[13.5px] font-bold"
+                    style={on ? { background: "rgba(217,180,95,.55)", border: "1px solid #5a4520", color: "#2a1c10" } : { border: "1px solid #b39a6a", color: "var(--t-ink-soft)" }}
+                  >
+                    {d}
+                  </button>
+                );
+              })}
+            </div>
+            <label className="flex items-center gap-2 text-[14.5px] font-semibold">
+              Due by
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                aria-label="Due by (optional)"
+                className="h-9 rounded-lg border px-2 text-[16px] font-normal"
+                style={{ borderColor: "#b39a6a" }}
+              />
+              {dueTime ? (
+                <button type="button" onClick={() => setDueTime("")} className="text-[13px] font-normal underline" style={{ color: "var(--t-ink-soft)" }}>
+                  clear
+                </button>
+              ) : (
+                <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>
+                  optional
+                </span>
+              )}
+            </label>
+          </div>
+        )}
 
         {!isHabit && (
         <label className="relative z-[1] flex cursor-pointer items-start gap-2.5 rounded-lg px-3 py-2.5" style={{ background: "rgba(255,250,238,.5)", border: "1px solid #b39a6a" }}>

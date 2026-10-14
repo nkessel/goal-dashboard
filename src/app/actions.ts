@@ -1158,10 +1158,30 @@ export async function listAvailableRewardsAction() {
 }
 
 /** Pick a reward after finishing a reward-granting quest (or claim one directly). */
-export async function claimRewardAction(rewardId: string, taskId: string | null) {
+export async function claimRewardAction(rewardId: string, taskId: string | null, opts: { now?: boolean } = {}) {
   const ownerId = await requireProfileId();
   // Accepting spends the reward's coins; its bonus comes when you complete it.
   const { coins, reward } = await rewardsData.claimReward(rewardId, ownerId, taskId);
+  if (opts.now) {
+    // Received on the spot: complete it right away and pay its bonus.
+    const done = await rewardsData.completeReward(rewardId, ownerId);
+    const bonusXp = done.bonus_xp ?? 0;
+    const bonusCoins = done.bonus_coins ?? 0;
+    let totalXp: number | null = null;
+    let coinsNow = coins;
+    if (bonusXp > 0) {
+      const award = await xp.awardXp(ownerId, bonusXp, "task_completed");
+      totalXp = award.totalXp ?? null;
+      coinsNow += award.coinsEarned ?? 0;
+    }
+    if (bonusCoins > 0) {
+      await rewardsData.addCoins(ownerId, bonusCoins);
+      coinsNow += bonusCoins;
+    }
+    revalidatePath("/rewards");
+    revalidatePath("/", "layout");
+    return { coins: coinsNow, received: true as const, bonusXp, bonusCoins, totalXp };
+  }
   // It goes straight into Today's Battle: the reward's own quest, stacked
   // behind its prerequisite quest when it has one.
   if (reward.prereq_xp !== undefined) {
@@ -1186,7 +1206,7 @@ export async function claimRewardAction(rewardId: string, taskId: string | null)
   }
   revalidatePath("/rewards");
   revalidatePath("/", "layout");
-  return { coins };
+  return { coins, received: false as const, bonusXp: 0, bonusCoins: 0, totalXp: null as number | null };
 }
 
 async function reverseRewardBonus(ownerId: string, was: Awaited<ReturnType<typeof rewardsData.uncompleteReward>>) {
@@ -1309,16 +1329,16 @@ export async function uncompleteRiteAction(riteId: string, day: string) {
   revalidatePath("/");
 }
 
-export async function createRiteAction(input: { title: string; description?: string; isCore: boolean; xpValue?: number; slot?: "evening" | "day" }) {
+export async function createRiteAction(input: { title: string; description?: string; isCore: boolean; xpValue?: number; slot?: "evening" | "day"; days?: number[] | null; dueTime?: string | null }) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
   if (!title) throw new Error(input.slot === "day" ? "Name the habit first." : "Name the rite first.");
-  const rite = await ritesData.createRite(ownerId, { title, description: input.description?.trim() || null, isCore: input.isCore, xpValue: input.xpValue, slot: input.slot });
+  const rite = await ritesData.createRite(ownerId, { title, description: input.description?.trim() || null, isCore: input.isCore, xpValue: input.xpValue, slot: input.slot, days: input.days, dueTime: input.dueTime });
   revalidatePath("/");
   return rite.id;
 }
 
-export async function updateRiteAction(riteId: string, input: { title?: string; description?: string; isCore?: boolean; xpValue?: number }) {
+export async function updateRiteAction(riteId: string, input: { title?: string; description?: string; isCore?: boolean; xpValue?: number; days?: number[] | null; dueTime?: string | null }) {
   const ownerId = await requireProfileId();
   if (input.title !== undefined && !input.title.trim()) throw new Error("Name the rite first.");
   await ritesData.updateRite(riteId, ownerId, {
@@ -1326,6 +1346,8 @@ export async function updateRiteAction(riteId: string, input: { title?: string; 
     description: input.description === undefined ? undefined : input.description.trim() || null,
     isCore: input.isCore,
     xpValue: input.xpValue,
+    days: input.days,
+    dueTime: input.dueTime,
   });
   revalidatePath("/");
 }
@@ -1482,10 +1504,11 @@ export async function listTakeoffQuestsAction() {
   const { data, error } = await db.from("tasks").select("*").eq("owner_id", ownerId).eq("status", "open").eq("is_aspiration", false);
   if (error) throw new Error(`Couldn't load quests: ${error.message}`);
   const tasks = (data ?? []) as import("@/lib/data/types").Task[];
-  const light = (t: (typeof tasks)[number]) => (t.effort ?? 0) > 0 ? (t.effort ?? 0) <= 2 : t.estimate_minutes != null && t.estimate_minutes <= 20;
+  const isPowerUp = (t: (typeof tasks)[number]) => !!t.is_power_up || (t.estimate_minutes != null && t.estimate_minutes <= tasksData.POWER_UP_MAX_MINUTES);
+  const light = (t: (typeof tasks)[number]) => ((t.effort ?? 0) > 0 ? (t.effort ?? 0) <= 2 : t.estimate_minutes != null && t.estimate_minutes <= 20);
   return tasks
-    .filter((t) => !t.needs_review && !t.locked_by_task_id && !t.reward_id && (t.is_power_up || light(t)))
-    .sort((a, b) => Number(!!b.is_power_up) - Number(!!a.is_power_up) || (b.importance || 0) - (a.importance || 0))
+    .filter((t) => !t.needs_review && !t.locked_by_task_id && !t.reward_id && (isPowerUp(t) || light(t)))
+    .sort((a, b) => Number(isPowerUp(b)) - Number(isPowerUp(a)) || (b.importance || 0) - (a.importance || 0))
     .slice(0, 15)
-    .map((t) => ({ id: t.id, title: t.title, description: t.description, estimate_minutes: t.estimate_minutes, xp_value: t.xp_value, is_power_up: !!t.is_power_up, is_manual_priority: t.is_manual_priority, icon_key: t.icon_key, icon_source: t.icon_source }));
+    .map((t) => ({ id: t.id, title: t.title, description: t.description, estimate_minutes: t.estimate_minutes, xp_value: t.xp_value, is_power_up: isPowerUp(t), is_manual_priority: t.is_manual_priority, icon_key: t.icon_key, icon_source: t.icon_source }));
 }

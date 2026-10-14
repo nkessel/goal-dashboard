@@ -12,6 +12,10 @@ export type Rite = {
   xp_value: number;
   /** "day" for a daily habit; "evening" (or missing) for an evening rite. */
   slot?: string | null;
+  /** Weekdays it repeats on (0 = Sunday); null = every day. */
+  days?: number[] | null;
+  /** Due by this time of day ("17:30"), if any. */
+  due_time?: string | null;
   sort_order: number;
   archived: boolean;
   created_at: string;
@@ -79,7 +83,7 @@ export async function getRite(riteId: string, ownerId: string): Promise<Rite | n
 
 export async function createRite(
   ownerId: string,
-  input: { title: string; description?: string | null; isCore: boolean; xpValue?: number; slot?: "evening" | "day" }
+  input: { title: string; description?: string | null; isCore: boolean; xpValue?: number; slot?: "evening" | "day"; days?: number[] | null; dueTime?: string | null }
 ): Promise<Rite> {
   const db = supabaseAdmin();
   const { data: last } = await db
@@ -98,10 +102,13 @@ export async function createRite(
       xp_value: Math.max(0, Math.round(input.xpValue ?? 5)),
       sort_order: (last?.[0]?.sort_order ?? 0) + 1,
       ...(input.slot === "day" ? { slot: "day" } : {}),
+      ...(input.days && input.days.length < 7 ? { days: input.days } : {}),
+      ...(input.dueTime ? { due_time: input.dueTime } : {}),
     })
     .select("*")
     .single<Rite>();
   if (error && /slot/.test(error.message)) throw new Error("Daily habits need a quick database update first.");
+  if (error && /days|due_time/.test(error.message)) throw new Error("Weekly habits need a quick database update first.");
   if (error || !data) throw new Error(`Failed to add rite: ${error?.message}`);
   return data;
 }
@@ -109,7 +116,7 @@ export async function createRite(
 export async function updateRite(
   riteId: string,
   ownerId: string,
-  input: { title?: string; description?: string | null; isCore?: boolean; xpValue?: number }
+  input: { title?: string; description?: string | null; isCore?: boolean; xpValue?: number; days?: number[] | null; dueTime?: string | null }
 ): Promise<void> {
   const db = supabaseAdmin();
   const { error } = await db
@@ -119,10 +126,13 @@ export async function updateRite(
       ...(input.description !== undefined ? { description: input.description || null } : {}),
       ...(input.isCore !== undefined ? { is_core: input.isCore } : {}),
       ...(input.xpValue !== undefined ? { xp_value: Math.max(0, Math.round(input.xpValue)) } : {}),
+      ...(input.days !== undefined ? { days: input.days && input.days.length < 7 ? input.days : null } : {}),
+      ...(input.dueTime !== undefined ? { due_time: input.dueTime || null } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", riteId)
     .eq("owner_id", ownerId);
+  if (error && /days|due_time/.test(error.message)) throw new Error("Weekly habits need a quick database update first.");
   if (error) throw new Error(`Failed to update rite: ${error.message}`);
 }
 

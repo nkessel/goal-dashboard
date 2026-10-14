@@ -24,6 +24,11 @@ export function celebrateQuest(detail: QuestCelebration) {
   window.dispatchEvent(new CustomEvent("quest-complete", { detail }));
 }
 
+/** The server has answered: fill in the real totals (or cancel on failure). */
+export function updateQuestCelebration(detail: { taskId: string; totalXp?: number | null; coinsEarned?: number; failed?: boolean }) {
+  window.dispatchEvent(new CustomEvent("quest-complete-update", { detail }));
+}
+
 /** Play the small "progress made" party (XP from partial progress or steps). */
 export function celebrateProgress(detail: ProgressCelebrationDetail) {
   window.dispatchEvent(new CustomEvent("quest-progress", { detail }));
@@ -38,10 +43,20 @@ export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { ava
     const on = (e: Event) => setCurrent((e as CustomEvent<QuestCelebration>).detail);
     let n = 0;
     const onProgress = (e: Event) => setProgress({ ...(e as CustomEvent<ProgressCelebrationDetail>).detail, n: ++n });
+    const onUpdate = (e: Event) => {
+      const d = (e as CustomEvent<{ taskId: string; totalXp?: number | null; coinsEarned?: number; failed?: boolean }>).detail;
+      setCurrent((c) => {
+        if (!c || c.taskId !== d.taskId) return c;
+        if (d.failed) return null;
+        return { ...c, totalXp: d.totalXp ?? c.totalXp, coinsEarned: d.coinsEarned ?? c.coinsEarned };
+      });
+    };
     window.addEventListener("quest-complete", on);
+    window.addEventListener("quest-complete-update", onUpdate);
     window.addEventListener("quest-progress", onProgress);
     return () => {
       window.removeEventListener("quest-complete", on);
+      window.removeEventListener("quest-complete-update", onUpdate);
       window.removeEventListener("quest-progress", onProgress);
     };
   }, []);

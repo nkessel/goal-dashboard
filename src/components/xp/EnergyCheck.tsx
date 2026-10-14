@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { addToTopOfTodayAction, listTakeoffQuestsAction, logEnergyAction } from "@/app/actions";
+import { addToTopOfTodayAction, createQuestAction, listTakeoffQuestsAction, logEnergyAction } from "@/app/actions";
 import { BoltIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
@@ -113,6 +113,10 @@ function TakeoffSheet({ onClose }: { onClose: () => void }) {
   const [added, setAdded] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const [naming, setNaming] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newMinutes, setNewMinutes] = useState(5);
+  const [loadKey, setLoadKey] = useState(0);
   useEffect(() => {
     listTakeoffQuestsAction()
       .then(setRows)
@@ -120,7 +124,23 @@ function TakeoffSheet({ onClose }: { onClose: () => void }) {
         setRows([]);
         setError(e instanceof Error ? e.message : "Couldn't load them.");
       });
-  }, []);
+  }, [loadKey]);
+
+  function create() {
+    const title = newTitle.trim();
+    if (!title) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await createQuestAction({ title, importance: 0, urgency: 0, xpValue: 10, estimateMinutes: newMinutes, effort: 1 });
+        setNewTitle("");
+        setNaming(false);
+        setLoadKey((k) => k + 1);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't add it.");
+      }
+    });
+  }
 
   function add(id: string) {
     setError(null);
@@ -152,10 +172,57 @@ function TakeoffSheet({ onClose }: { onClose: () => void }) {
         <div className="relative z-[1] flex items-center gap-2">
           <BoltIcon size={22} />
           <h3 className="font-display m-0 flex-1 text-[20px]">Power-ups to get going</h3>
+          <button
+            type="button"
+            onClick={() => setNaming((v) => !v)}
+            aria-label="New power-up"
+            aria-expanded={naming}
+            title="New power-up"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none"
+            style={{ border: "1.5px solid #a88a3f", color: "#8a6116", transform: naming ? "rotate(45deg)" : undefined, transition: "transform 150ms" }}
+          >
+            +
+          </button>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
             ×
           </button>
         </div>
+        {naming && (
+          <div className="relative z-[1] flex flex-col gap-2 rounded-xl p-2.5" style={{ background: "rgba(120,90,40,.1)", border: "1px solid rgba(139,112,64,.35)" }}>
+            <input
+              autoFocus
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && create()}
+              placeholder="A quick win (e.g. Clear the kitchen counter)"
+              aria-label="New power-up"
+              className="h-10 rounded-lg border px-3 text-[16px]"
+              style={{ borderColor: "#b39a6a" }}
+            />
+            <div className="flex items-center gap-1.5">
+              {[2, 5, 10, 15].map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setNewMinutes(m)}
+                  className="h-8 rounded-full px-2.5 text-[13px] font-semibold tabular-nums"
+                  style={newMinutes === m ? { background: "rgba(217,180,95,.6)", border: "1px solid #5a4520" } : { border: "1px solid #b39a6a" }}
+                >
+                  {m}m
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={create}
+                disabled={!newTitle.trim()}
+                className="ml-auto h-9 rounded-full px-4 text-[14px] font-bold disabled:opacity-50"
+                style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        )}
         <p className="relative z-[1] m-0 text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
           Low energy is fine. Pick one small win; it goes to the top of Today&apos;s Quests.
         </p>

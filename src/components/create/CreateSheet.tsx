@@ -19,7 +19,7 @@ export type CreateKind = "quest" | "now" | "habit" | "reward" | "rite" | "journa
 const KIND_META: Record<CreateKind, { label: string; icon: React.ReactNode }> = {
   quest: { label: "Quest", icon: <QuestShield size={18} /> },
   now: { label: "Doing now", icon: <NowGlyph /> },
-  habit: { label: "Daily habit", icon: <HabitGlyph /> },
+  habit: { label: "Habit", icon: <HabitGlyph /> },
   reward: { label: "Reward", icon: <DiamondIcon size={17} /> },
   rite: { label: "Evening rite", icon: <Moon size={17} /> },
   journal: { label: "Journal", icon: <QuillGlyph /> },

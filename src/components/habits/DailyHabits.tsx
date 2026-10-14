@@ -29,8 +29,12 @@ export function DailyHabits({
   const [, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
 
+  // Only habits that fall on today (weekday of the app day, 5:30am rollover).
+  const weekday = day ? new Date(`${day}T12:00:00`).getDay() : null;
+  const todays = habits.filter((h) => !h.days || h.days.length === 0 || weekday === null || h.days.includes(weekday));
+  const offToday = habits.length - todays.length;
   const done = (id: string) => optimistic[id] ?? completions.some((c) => c.rite_id === id && c.day === day);
-  const doneCount = habits.filter((h) => done(h.id)).length;
+  const doneCount = todays.filter((h) => done(h.id)).length;
 
   function toggle(h: RiteView) {
     if (!day) return;
@@ -72,9 +76,9 @@ export function DailyHabits({
         <span className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
           <HabitIcon />
           Daily Habits
-          {habits.length > 0 && (
+          {todays.length > 0 && (
             <span className="text-[15px] tabular-nums" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)", fontWeight: 400 }}>
-              ({doneCount}/{habits.length})
+              ({doneCount}/{todays.length})
             </span>
           )}
         </span>
@@ -92,7 +96,7 @@ export function DailyHabits({
             </p>
           )}
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
-            {habits.map((h) => {
+            {todays.map((h) => {
               const d = done(h.id);
               return (
                 <li
@@ -125,9 +129,9 @@ export function DailyHabits({
                     >
                       {h.title}
                     </span>
-                    {h.description && (
+                    {(h.description || h.due_time || (h.days && h.days.length < 7)) && (
                       <span className="block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                        {h.description}
+                        {[scheduleLabel(h), h.description].filter(Boolean).join(" · ")}
                       </span>
                     )}
                   </button>
@@ -152,7 +156,7 @@ export function DailyHabits({
                 <span aria-hidden className="text-[18px] leading-none" style={{ color: "var(--t-gold)" }}>
                   +
                 </span>
-                {habits.length === 0 ? "Add a daily habit" : "Add a habit"}
+                {habits.length === 0 ? "Add a habit" : offToday > 0 ? `Add a habit · ${offToday} not due today` : "Add a habit"}
               </button>
             </li>
           </ul>
@@ -163,6 +167,22 @@ export function DailyHabits({
       {editing && <RiteEditorDialog rite={editing === "new" ? undefined : editing} slot="day" onClose={() => setEditing(null)} />}
     </section>
   );
+}
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const PLURAL_DAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+
+/** "Tuesdays · by 5:30 PM", "Mon, Wed, Fri", "by 9:00 AM". */
+function scheduleLabel(h: RiteView): string | null {
+  const parts: string[] = [];
+  if (h.days && h.days.length > 0 && h.days.length < 7) {
+    parts.push(h.days.length === 1 ? PLURAL_DAYS[h.days[0]] : h.days.map((d) => DAY_NAMES[d]).join(", "));
+  }
+  if (h.due_time) {
+    const [hh, mm] = h.due_time.split(":").map(Number);
+    parts.push(`by ${((hh + 11) % 12) + 1}:${String(mm).padStart(2, "0")} ${hh < 12 ? "AM" : "PM"}`);
+  }
+  return parts.length ? parts.join(" · ") : null;
 }
 
 function HabitIcon() {

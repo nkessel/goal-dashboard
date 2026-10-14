@@ -86,6 +86,9 @@ export function QuestComplete(props: QuestCompleteProps) {
   const [phase, setPhase] = useState<"celebrate" | "rewards">("celebrate");
   const [chest, setChest] = useState<{ rewards: Reward[]; coins: number } | null>(null);
   const [claimed, setClaimed] = useState<Reward | null>(null);
+  // Picked, waiting for "receive now" or "add to my list".
+  const [choosing, setChoosing] = useState<Reward | null>(null);
+  const [received, setReceived] = useState<{ bonusXp: number; bonusCoins: number } | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claiming, startClaim] = useTransition();
 
@@ -98,14 +101,18 @@ export function QuestComplete(props: QuestCompleteProps) {
     }
   }
 
-  function claim(r: Reward) {
+  function claim(r: Reward, now: boolean) {
     setClaimError(null);
     startClaim(async () => {
       try {
         if (!preview) {
-          const res = await claimRewardAction(r.id, taskId);
+          const res = await claimRewardAction(r.id, taskId, { now });
           setChest((c) => (c ? { ...c, coins: res.coins } : c));
+          if (res.received) setReceived({ bonusXp: res.bonusXp, bonusCoins: res.bonusCoins });
+        } else if (now) {
+          setReceived({ bonusXp: r.bonus_xp ?? 0, bonusCoins: r.bonus_coins ?? 0 });
         }
+        setChoosing(null);
         setClaimed(r);
       } catch (e) {
         setClaimError(e instanceof Error ? e.message : "Couldn't claim that one.");
@@ -180,6 +187,16 @@ export function QuestComplete(props: QuestCompleteProps) {
       style={{ fontFamily: "var(--font-eb-garamond), 'EB Garamond', Georgia, serif", backgroundColor: "#232b22", backgroundImage: "url(/design/bg-forest.jpg)", backgroundSize: "cover", backgroundPosition: "top center" }}
     >
       <div className="qc-overlay absolute inset-0" style={{ background: "rgba(9,13,8,.84)" }} />
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        title="Close"
+        className="absolute left-[max(10px,env(safe-area-inset-left))] top-[max(10px,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full text-[28px] leading-none"
+        style={{ color: "#efe6cc", background: "rgba(20,26,18,.55)", border: "1px solid rgba(217,180,95,.45)" }}
+      >
+        ×
+      </button>
       {editTask && <QuestEditorDialog mode={{ kind: "edit", task: editTask }} theme="adventure" onClose={() => setEditTask(null)} />}
 
       {/* ambient embers keep drifting after the main animation */}
@@ -214,7 +231,7 @@ export function QuestComplete(props: QuestCompleteProps) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/design/ui-leaf.png" alt="" className="h-5 w-[26px] shrink-0" />
             <h1 className="m-0 whitespace-nowrap text-[32px] font-semibold tracking-[.01em]" style={{ color: "#efe6cc", textShadow: "0 2px 10px rgba(0,0,0,.6)" }}>
-              {isReward ? "Reward Complete!" : "Quest Complete!"}
+              {received ? "Reward Received!" : isReward ? "Reward Complete!" : "Quest Complete!"}
             </h1>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/design/ui-leaf.png" alt="" className="h-5 w-[26px] shrink-0 -scale-x-100" />
@@ -228,8 +245,11 @@ export function QuestComplete(props: QuestCompleteProps) {
               coins={chest?.coins ?? 0}
               error={claimError}
               claimed={claimed}
+              received={received}
+              choosing={choosing}
               claiming={claiming}
-              onPick={claim}
+              onPick={setChoosing}
+              onDecide={claim}
               onContinue={onClose}
             />
           ) : (
@@ -414,8 +434,11 @@ function RewardChest({
   coins,
   error,
   claimed,
+  received,
+  choosing,
   claiming,
   onPick,
+  onDecide,
   onContinue,
 }: {
   questTitle: string;
@@ -423,8 +446,11 @@ function RewardChest({
   coins: number;
   error: string | null;
   claimed: Reward | null;
+  received: { bonusXp: number; bonusCoins: number } | null;
+  choosing: Reward | null;
   claiming: boolean;
-  onPick: (r: Reward) => void;
+  onPick: (r: Reward | null) => void;
+  onDecide: (r: Reward, now: boolean) => void;
   onContinue: () => void;
 }) {
   const parchment: React.CSSProperties = {
@@ -438,7 +464,7 @@ function RewardChest({
   if (claimed) {
     return (
       <div className="qc-card flex w-full flex-col items-center gap-3 rounded-2xl px-5 py-6 text-center" style={parchment}>
-        <div className="daily-login-pop h-28 w-28 overflow-hidden rounded-full" style={{ border: "3px solid #d9b45f", boxShadow: "0 0 0 4px rgba(217,180,95,.35), 0 0 24px rgba(242,201,106,.6)", background: "#f3e6c8" }}>
+        <div className="card-pop-in h-28 w-28 overflow-hidden rounded-full" style={{ border: "3px solid #d9b45f", boxShadow: "0 0 0 4px rgba(217,180,95,.35), 0 0 24px rgba(242,201,106,.6)", background: "#f3e6c8" }}>
           {claimed.icon_key ? (
             // eslint-disable-next-line @next/next/no-img-element -- generated portrait
             <img src={claimed.icon_key} alt="" className="h-full w-full object-cover" />
@@ -449,9 +475,27 @@ function RewardChest({
         <p className="m-0 text-[26px] font-bold leading-tight" style={{ color: "#2f2a1f" }}>
           {claimed.title}
         </p>
-        <p className="m-0 text-[15px]" style={{ color: "#6b6252" }}>
-          Accepted — earned by “{questTitle}”. Mark it complete in the Treasure Chest once you&apos;ve done it.
-        </p>
+        {received ? (
+          <>
+            <p className="m-0 text-[15px]" style={{ color: "#6b6252" }}>
+              Earned by “{questTitle}”. Enjoy it!
+            </p>
+            {(received.bonusXp > 0 || received.bonusCoins > 0) && (
+              <p className="m-0 flex items-center gap-2 text-[16px] font-bold tabular-nums" style={{ color: "#4f6d3c" }}>
+                {received.bonusXp > 0 && <span>+{received.bonusXp} XP</span>}
+                {received.bonusCoins > 0 && (
+                  <span className="flex items-center gap-1" style={{ color: "#8a6116" }}>
+                    <CoinIcon size={16} />+{received.bonusCoins}
+                  </span>
+                )}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="m-0 text-[15px]" style={{ color: "#6b6252" }}>
+            Added to your list — earned by “{questTitle}”. It&apos;s waiting in Today&apos;s Quests; complete it once you&apos;ve had it.
+          </p>
+        )}
         <button
           type="button"
           onClick={onContinue}
@@ -459,6 +503,55 @@ function RewardChest({
           style={{ border: "2px solid #31301e", background: "radial-gradient(circle at 32% 28%, #f2c96a, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5), 0 6px 14px rgba(0,0,0,.35)" }}
         >
           Continue Your Journey
+        </button>
+      </div>
+    );
+  }
+
+  if (choosing) {
+    return (
+      <div className="qc-card flex w-full flex-col items-center gap-3 rounded-2xl px-5 py-6 text-center" style={parchment}>
+        <div className="card-pop-in h-24 w-24 overflow-hidden rounded-full" style={{ border: "3px solid #d9b45f", boxShadow: "0 0 0 4px rgba(217,180,95,.35)", background: "#f3e6c8" }}>
+          {choosing.icon_key ? (
+            // eslint-disable-next-line @next/next/no-img-element -- generated portrait
+            <img src={choosing.icon_key} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center"><DiamondIcon size={48} /></span>
+          )}
+        </div>
+        <p className="m-0 text-[24px] font-bold leading-tight" style={{ color: "#2f2a1f" }}>
+          {choosing.title}
+        </p>
+        <p className="m-0 text-[14.5px]" style={{ color: "#6b6252" }}>
+          Having it right now, or saving it for later?
+        </p>
+        {error && (
+          <p className="m-0 text-[14.5px] font-semibold" style={{ color: "#8c3b2a" }}>
+            {error}
+          </p>
+        )}
+        <div className="flex w-full flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            disabled={claiming}
+            onClick={() => onDecide(choosing, true)}
+            className="min-h-12 flex-1 cursor-pointer rounded-[14px] px-3 text-[17px] font-bold disabled:opacity-60"
+            style={{ border: "2px solid #31301e", background: "radial-gradient(circle at 32% 28%, #f2c96a, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5), 0 6px 14px rgba(0,0,0,.35)" }}
+          >
+            Receive it now
+          </button>
+          <button
+            type="button"
+            disabled={claiming}
+            onClick={() => onDecide(choosing, false)}
+            className="min-h-12 flex-1 cursor-pointer rounded-[14px] px-3 text-[16px] font-bold disabled:opacity-60"
+            style={{ border: "2px solid #d9b45f", background: "linear-gradient(180deg,#3b4636,#232c22)", color: "#efe6cc" }}
+          >
+            Add it to my list
+          </button>
+        </div>
+        <button type="button" onClick={() => onPick(null)} className="text-[14px] underline" style={{ color: "#6b6252" }}>
+          Pick a different one
         </button>
       </div>
     );

@@ -8,7 +8,7 @@ import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTa
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
 import { QuestActionMenu, type QuestAction } from "./QuestActionMenu";
-import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
+import { celebrateQuest, updateQuestCelebration } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { QuestMonogram } from "./QuestMonogram";
 import { FocusMode } from "@/components/one-thing/OneThing";
@@ -147,11 +147,12 @@ export function TaskRow({
           await deleteTaskAction(task.id);
         } else {
           setDone(true);
-          // Let the check finish its thud before the card leaves the list.
-          await new Promise((r) => setTimeout(r, 800));
+          // Save in the background; celebrate as soon as the check has landed
+          // (the real totals fill in when the server answers).
           const fd = new FormData();
           fd.set("taskId", task.id);
-          const res = await completeTaskAction(fd);
+          const req = completeTaskAction(fd);
+          await new Promise((r) => setTimeout(r, 520));
           celebrateQuest({
             taskId: task.id,
             title: task.title,
@@ -159,10 +160,17 @@ export function TaskRow({
             tag: categoryLabel,
             xp: task.xp_value,
             iconSrc: imageUrl,
-            totalXp: res?.totalXp ?? null,
-            coinsEarned: res?.coinsEarned ?? 0,
+            totalXp: null,
+            coinsEarned: task.coin_value ?? Math.floor(task.xp_value / 10),
             isReward: Boolean(task.reward_id),
           });
+          try {
+            const res = await req;
+            updateQuestCelebration({ taskId: task.id, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
+          } catch (e) {
+            updateQuestCelebration({ taskId: task.id, failed: true });
+            throw e;
+          }
         }
       } catch (e) {
         setDone(false);

@@ -86,7 +86,7 @@ export default async function Home() {
   ]);
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
-  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening" });
+  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
   const eveningRites = rites?.filter((r) => r.slot !== "day").map(riteView) ?? null;
   // Imports wait for approval before they show here at all; quests taken off

@@ -38,6 +38,10 @@ export type RiteView = {
   xp_value: number;
   /** "day" = a daily habit (day side); otherwise an evening rite. */
   slot?: string | null;
+  /** Habits: weekdays it repeats on (0 = Sunday); null = every day. */
+  days?: number[] | null;
+  /** Habits: due by this time ("17:30"). */
+  due_time?: string | null;
 };
 
 const CORE_ZONE = "zone:core";
