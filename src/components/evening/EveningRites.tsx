@@ -1,7 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { completeRiteAction, uncompleteRiteAction } from "@/app/actions";
+import { useState, useSyncExternalStore, useTransition } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  closestCenter,
+  pointerWithin,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { completeRiteAction, reorderRitesAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
 import { GoldRule, Leaf } from "@/components/ui/Ornaments";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 import { RiteEditorDialog } from "./RiteEditorDialog";
@@ -21,6 +39,10 @@ export type RiteView = {
   /** "day" = a daily habit (day side); otherwise an evening rite. */
   slot?: string | null;
 };
+
+const CORE_ZONE = "zone:core";
+const MINI_ZONE = "zone:mini";
+type ListName = "core" | "mini";
 
 /** A moon-and-check seal: empty ring until the rite is done tonight. */
 function RiteSeal({ done }: { done: boolean }) {
@@ -45,10 +67,44 @@ function RiteSeal({ done }: { done: boolean }) {
   );
 }
 
+// ---- Skipped / snoozed tonight (kept on this device, cleared each night) ----
+type Away = Record<string, "skip" | number>;
+const awayKey = (day: string) => `rites-away:${day}`;
+function readAway(day: string | null): Away {
+  if (!day) return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(awayKey(day)) ?? "{}") as Away;
+  } catch {
+    return {};
+  }
+}
+function writeAway(day: string, away: Away) {
+  try {
+    window.localStorage.setItem(awayKey(day), JSON.stringify(away));
+  } catch {
+    /* storage unavailable — just this visit */
+  }
+}
+const subscribeMinute = (cb: () => void) => {
+  const t = setInterval(cb, 30_000);
+  return () => clearInterval(t);
+};
+
+/** A drop target with no cards in it (an empty list or the closed tray's bar). */
+function Zone({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={className} style={isOver ? { boxShadow: "0 0 0 2px rgba(242,210,126,.75)", borderRadius: 16 } : undefined}>
+      {children}
+    </div>
+  );
+}
+
 /**
  * The evening side of Today's Quest. Non-negotiable rites sit where Today's
- * Battle does by day; Additional Mini-Quests are below, and any of them can be
- * promoted. Each rite earns its XP once per night.
+ * Quests do by day; Additional Mini-Quests wait in a tray below. Press and
+ * drag to reorder, or to move one between the two. Each rite earns its XP
+ * once per night; one can be skipped or snoozed for tonight.
  */
 export function EveningRites({
   rites,
@@ -68,16 +124,45 @@ export function EveningRites({
 }) {
   const flip = useFlipToEvening();
   const day = useLocalDay();
+  const now = useSyncExternalStore(subscribeMinute, () => Math.floor(Date.now() / 60_000) * 60_000, () => 0);
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<RiteView | { new: true; core: boolean } | null>(null);
-  const [miniOpen, setMiniOpen] = useState(true);
+  const [miniOpen, setMiniOpen] = useState(false);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [pop, setPop] = useState<{ id: string; xp: number } | null>(null);
+  const [away, setAway] = useState<Away>({});
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  const doneTonight = (id: string) =>
-    optimistic[id] ?? completions.some((c) => c.rite_id === id && c.day === day);
-  const core = (rites ?? []).filter((r) => r.is_core);
-  const mini = (rites ?? []).filter((r) => !r.is_core);
+  // Order + which list, kept locally while dragging / saving.
+  const [local, setLocal] = useState<{ core: string[]; mini: string[] } | null>(null);
+  const [seen, setSeen] = useState(rites);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [startList, setStartList] = useState<ListName | null>(null);
+  if (seen !== rites) {
+    setSeen(rites);
+    if (!activeId) setLocal(null);
+  }
+
+  // Load tonight's skips/snoozes once the local day is known (and again if it rolls over).
+  const [awayDay, setAwayDay] = useState<string | null>(null);
+  if (day !== awayDay) {
+    setAwayDay(day);
+    setAway(readAway(day));
+  }
+
+  const byId = new Map((rites ?? []).map((r) => [r.id, r]));
+  const coreIds = local?.core ?? (rites ?? []).filter((r) => r.is_core).map((r) => r.id);
+  const miniIds = local?.mini ?? (rites ?? []).filter((r) => !r.is_core).map((r) => r.id);
+  const isAway = (id: string) => {
+    const a = away[id];
+    return a === "skip" || (typeof a === "number" && a > now);
+  };
+  const core = coreIds.map((id) => byId.get(id)).filter((r): r is RiteView => !!r && !isAway(r.id));
+  const mini = miniIds.map((id) => byId.get(id)).filter((r): r is RiteView => !!r && !isAway(r.id));
+  const awayList = (rites ?? []).filter((r) => isAway(r.id));
+
+  const doneTonight = (id: string) => optimistic[id] ?? completions.some((c) => c.rite_id === id && c.day === day);
   const coreDone = core.filter((r) => doneTonight(r.id)).length;
   const allDone = core.length > 0 && coreDone === core.length;
 
@@ -86,6 +171,10 @@ export function EveningRites({
     const next = !doneTonight(r.id);
     setError(null);
     setOptimistic((o) => ({ ...o, [r.id]: next }));
+    if (next && r.xp_value > 0) {
+      setPop({ id: r.id, xp: r.xp_value });
+      setTimeout(() => setPop((p) => (p?.id === r.id ? null : p)), 1500);
+    }
     startTransition(async () => {
       try {
         if (next) await completeRiteAction(r.id, day);
@@ -97,10 +186,91 @@ export function EveningRites({
     });
   }
 
-  function card(r: RiteView) {
+  function setAwayFor(id: string, value: "skip" | number | null) {
+    if (!day) return;
+    const next = { ...away };
+    if (value === null) delete next[id];
+    else next[id] = value;
+    setAway(next);
+    writeAway(day, next);
+    setMenuFor(null);
+  }
+
+  // ---- Drag and drop -------------------------------------------------------
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const listOf = (id: string | null | undefined): ListName | null => {
+    if (!id) return null;
+    if (id === CORE_ZONE) return "core";
+    if (id === MINI_ZONE) return "mini";
+    if (coreIds.includes(id)) return "core";
+    if (miniIds.includes(id)) return "mini";
+    return null;
+  };
+  const collision: CollisionDetection = (args) => {
+    const zones = pointerWithin({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id === CORE_ZONE || c.id === MINI_ZONE) });
+    const bar = zones.find((z) => z.id === MINI_ZONE && !miniOpen);
+    if (bar) return [bar];
+    const cards = closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id !== CORE_ZONE && c.id !== MINI_ZONE) });
+    return cards.length ? cards : zones;
+  };
+  function onDragStart(e: DragStartEvent) {
+    const id = String(e.active.id);
+    setActiveId(id);
+    setStartList(listOf(id));
+    setLocal({ core: coreIds, mini: miniIds });
+    setMenuFor(null);
+  }
+  function onDragOver(e: DragOverEvent) {
+    const id = String(e.active.id);
+    const from = listOf(id);
+    const to = listOf(e.over ? String(e.over.id) : null);
+    if (!from || !to || from === to) return;
+    const source = from === "core" ? coreIds : miniIds;
+    const target = to === "core" ? coreIds : miniIds;
+    const overIndex = e.over ? target.indexOf(String(e.over.id)) : -1;
+    const nextTarget = [...target];
+    nextTarget.splice(overIndex === -1 ? target.length : overIndex, 0, id);
+    const nextSource = source.filter((x) => x !== id);
+    setLocal(from === "core" ? { core: nextSource, mini: nextTarget } : { core: nextTarget, mini: nextSource });
+  }
+  function onDragEnd(e: DragEndEvent) {
+    const id = String(e.active.id);
+    const list = listOf(id);
+    let nextCore = coreIds;
+    let nextMini = miniIds;
+    if (list && e.over) {
+      const items = list === "core" ? coreIds : miniIds;
+      const from = items.indexOf(id);
+      const to = items.indexOf(String(e.over.id));
+      if (from !== -1 && to !== -1 && from !== to) {
+        if (list === "core") nextCore = arrayMove(items, from, to);
+        else nextMini = arrayMove(items, from, to);
+      }
+    }
+    setLocal({ core: nextCore, mini: nextMini });
+    setActiveId(null);
+    const crossed = list && startList && list !== startList;
+    setStartList(null);
+    if (!list) return;
+    startTransition(async () => {
+      try {
+        if (crossed) await updateRiteAction(id, { isCore: list === "core" });
+        await reorderRitesAction([...nextCore, ...nextMini]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't move that rite.");
+        setLocal(null);
+      }
+    });
+  }
+
+  function card(r: RiteView, overlay = false) {
     const done = doneTonight(r.id);
     return (
-      <li key={r.id} className={`parchment moonlit relative flex items-center gap-3 rounded-2xl px-3 py-3 ${done ? "rite-done" : ""}`} style={{ borderRadius: 16 }}>
+      <div className={`parchment moonlit relative flex items-center gap-3 rounded-2xl px-3 py-3 ${done ? "rite-done" : ""}`} style={{ borderRadius: 16 }}>
         <button type="button" onClick={() => toggle(r)} aria-pressed={done} aria-label={done ? `Undo ${r.title}` : `Complete ${r.title}`} className="relative z-[1] rounded-full">
           <RiteSeal done={done} />
         </button>
@@ -118,17 +288,50 @@ export function EveningRites({
           <span className="text-[18px] font-bold leading-none" style={{ color: "var(--t-xp)" }}>
             +{r.xp_value} XP
           </span>
+          {!done && !overlay && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={() => setMenuFor(menuFor === r.id ? null : r.id)}
+              aria-label={`Skip or snooze ${r.title}`}
+              aria-expanded={menuFor === r.id}
+              className="flex h-8 items-center rounded-full px-2 text-[18px] leading-none"
+              style={{ color: "var(--t-ink-soft)" }}
+            >
+              ⋯
+            </button>
+          )}
         </span>
-      </li>
+        {menuFor === r.id && !overlay && (
+          <div className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 190 }}>
+            <button type="button" onClick={() => setAwayFor(r.id, "skip")} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5">
+              ⤼ Skip tonight
+            </button>
+            <button type="button" onClick={() => setAwayFor(r.id, Date.now() + 60 * 60_000)} className="relative z-[1] min-h-11 border-t px-4 text-left text-[15px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
+              ⏰ Snooze 1 hour
+            </button>
+            <button type="button" onClick={() => setAwayFor(r.id, Date.now() + 2 * 60 * 60_000)} className="relative z-[1] min-h-11 border-t px-4 text-left text-[15px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
+              ⏰ Snooze 2 hours
+            </button>
+          </div>
+        )}
+        {pop?.id === r.id && (
+          <span aria-hidden className="power-spark pointer-events-none absolute left-1/2 top-0 z-[2] text-[17px] font-bold" style={{ color: "var(--t-xp)" }}>
+            +{pop.xp} XP
+          </span>
+        )}
+      </div>
     );
   }
 
+  const active = activeId ? byId.get(activeId) : null;
+
   return (
     <div className="flex flex-col gap-5">
-      {/* Header, where Today's Battle sits by day */}
+      {/* Header, where Today's Quests sit by day */}
       <div className="flex flex-col items-center gap-1.5 pt-1 text-center">
         <div className="flex w-full items-center gap-2">
-          <span className="h-8 w-8 shrink-0" aria-hidden />
           <span className="hidden flex-1 sm:flex">
             <GoldRule dir="left" />
           </span>
@@ -145,18 +348,6 @@ export function EveningRites({
             <GoldRule dir="right" />
           </span>
           <span className="flex-1 sm:hidden" />
-          <button
-            type="button"
-            onClick={() => setEditing({ new: true, core: true })}
-            aria-label="Add a rite"
-            title="Add a rite"
-            className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-            style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 2px 6px rgba(0,0,0,.4)" }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M12 5v14M5 12h14" stroke="#2a1c10" strokeWidth="2.8" strokeLinecap="round" />
-            </svg>
-          </button>
         </div>
         <p className="m-0 text-[15px]" style={{ color: "#d9d2bd", opacity: 0.85 }}>
           The non-negotiables, before the day is done.
@@ -168,14 +359,46 @@ export function EveningRites({
           The evening rites need a quick database update before they can be saved. Once it&apos;s run, your rites appear here.
         </p>
       ) : (
-        <>
+        <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={() => (setActiveId(null), setLocal(null))}>
           {error && (
             <p className="rounded-lg px-3 py-2 text-center text-[14.5px] font-semibold" style={{ background: "var(--t-warn-bg)", color: "var(--t-warn)" }}>
               {error}
             </p>
           )}
 
-          <ul className="flex flex-col gap-3">{core.map(card)}</ul>
+          {/* The rites themselves, in a subtle section of their own */}
+          <section className="rounded-3xl px-2.5 pb-3 pt-3" style={{ background: "rgba(8,10,30,.35)", border: "1px solid rgba(217,180,95,.2)" }}>
+            <Zone id={CORE_ZONE}>
+              <SortableContext items={core.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+                <ul className="m-0 flex min-h-[48px] list-none flex-col gap-3 p-0">
+                  {core.map((r) => (
+                    <SortableRite key={r.id} id={r.id} raised={menuFor === r.id}>
+                      {card(r)}
+                    </SortableRite>
+                  ))}
+                </ul>
+              </SortableContext>
+              {core.length === 0 && (
+                <p className="-mt-10 px-2 py-3 text-center text-[14.5px]" style={{ color: "#d9d2bd", opacity: 0.75 }}>
+                  Drag a mini-quest up here to make it a rite.
+                </p>
+              )}
+            </Zone>
+          </section>
+
+          {awayList.length > 0 && (
+            <p className="-mt-2 text-center text-[13.5px]" style={{ color: "#d9d2bd", opacity: 0.8 }}>
+              {awayList.map((r, i) => (
+                <span key={r.id}>
+                  {i > 0 && " · "}
+                  {r.title} {away[r.id] === "skip" ? "skipped" : `until ${new Date(away[r.id] as number).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`}{" "}
+                  <button type="button" onClick={() => setAwayFor(r.id, null)} className="underline">
+                    bring back
+                  </button>
+                </span>
+              ))}
+            </p>
+          )}
 
           {allDone && (
             <div className="rest-well flex items-center justify-center gap-2.5 rounded-2xl px-5 py-3 text-center text-[18px]" style={{ color: "#f8e3a0" }}>
@@ -185,43 +408,62 @@ export function EveningRites({
 
           <TomorrowQuests queued={tomorrow} candidates={openQuests} theme={theme} />
 
-          {/* Additional Mini-Quests */}
+          {/* Additional Mini-Quests: a tray that slides open */}
           <section>
-            <button
-              type="button"
-              onClick={() => setMiniOpen((v) => !v)}
-              aria-expanded={miniOpen}
-              className="hover-glow evening-bar relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-4 py-2.5"
-            >
-              <span className="font-display flex items-center gap-3 text-[21px]" style={{ color: "#f1ead2" }}>
-                <Moon size={26} />
-                Additional Mini-Quests
-                <span className="text-[15px] font-normal" style={{ color: "var(--t-gold)" }}>
-                  {mini.length}
-                </span>
-              </span>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="absolute right-5 transition-transform" style={{ transform: miniOpen ? "rotate(180deg)" : undefined }}>
-                <path d="M5.5 9l6.5 6.5L18.5 9" stroke="#f1ead2" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            {miniOpen && (
-              <div className="mt-3 flex flex-col gap-3">
-                <ul className="flex flex-col gap-3">{mini.map(card)}</ul>
-                <button
-                  type="button"
-                  onClick={() => setEditing({ new: true, core: false })}
-                  className="hover-glow flex h-12 items-center justify-center gap-2 rounded-2xl border-2 border-dashed text-[16px]"
-                  style={{ borderColor: "rgba(217,180,95,.45)", background: "rgba(8,10,26,.3)", color: "#f1ead2" }}
-                >
-                  <span className="text-xl leading-none" style={{ color: "var(--t-gold)" }}>
-                    +
+            <Zone id={MINI_ZONE}>
+              <button
+                type="button"
+                onClick={() => setMiniOpen((v) => !v)}
+                aria-expanded={miniOpen}
+                className="hover-glow evening-bar relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-11 py-2.5"
+              >
+                <span className="font-display flex items-center gap-2.5 text-[19px] sm:text-[21px]" style={{ color: "#f1ead2" }}>
+                  <Moon size={26} />
+                  Additional Mini-Quests
+                  <span className="text-[15px] font-normal" style={{ color: "var(--t-gold)" }}>
+                    ({mini.length})
                   </span>
-                  Add a mini-quest
-                </button>
+                </span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="absolute right-5 transition-transform duration-300" style={{ transform: miniOpen ? "rotate(180deg)" : undefined }}>
+                  <path d="M5.5 9l6.5 6.5L18.5 9" stroke="#f1ead2" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </Zone>
+            <div className="drawer-body" data-open={miniOpen ? "true" : "false"}>
+              <div className="drawer-inner -mx-2 px-2">
+                <div
+                  className="quest-tray mt-2.5 flex max-h-[min(58vh,520px)] flex-col gap-3 overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
+                  style={{ background: "rgba(6,8,24,.45)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.6), inset 0 -6px 10px -6px rgba(0,0,0,.6)" }}
+                >
+                  <SortableContext items={mini.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+                    <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                      {mini.map((r) => (
+                        <SortableRite key={r.id} id={r.id} disabled={!miniOpen} raised={menuFor === r.id}>
+                          {card(r)}
+                        </SortableRite>
+                      ))}
+                    </ul>
+                  </SortableContext>
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ new: true, core: false })}
+                    className="hover-glow flex h-12 shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-dashed text-[16px]"
+                    style={{ borderColor: "rgba(217,180,95,.45)", background: "rgba(8,10,26,.3)", color: "#f1ead2" }}
+                  >
+                    <span className="text-xl leading-none" style={{ color: "var(--t-gold)" }}>
+                      +
+                    </span>
+                    Add a mini-quest
+                  </button>
+                </div>
               </div>
-            )}
+            </div>
           </section>
-        </>
+
+          <DragOverlay dropAnimation={{ duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }}>
+            {active ? <div style={{ transform: "scale(1.02)", filter: "drop-shadow(0 12px 18px rgba(0,0,0,.5))" }}>{card(active, true)}</div> : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       <button
@@ -245,5 +487,21 @@ export function EveningRites({
         />
       )}
     </div>
+  );
+}
+
+/** One rite card that can be pressed and dragged (mouse after a short move, touch after a short hold). */
+function SortableRite({ id, disabled = false, raised = false, children }: { id: string; disabled?: boolean; raised?: boolean; children: React.ReactNode }) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled });
+  return (
+    <li
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className="board-sortable touch-manipulation"
+      style={{ transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.35 : 1, position: "relative", zIndex: raised ? 30 : undefined }}
+    >
+      {children}
+    </li>
   );
 }

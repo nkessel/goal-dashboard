@@ -1267,6 +1267,12 @@ export async function updateRiteAction(riteId: string, input: { title?: string; 
   revalidatePath("/");
 }
 
+export async function reorderRitesAction(ids: string[]) {
+  const ownerId = await requireProfileId();
+  await ritesData.reorderRites(ownerId, ids.slice(0, 100));
+  revalidatePath("/");
+}
+
 export async function removeRiteAction(riteId: string) {
   const ownerId = await requireProfileId();
   await ritesData.archiveRite(riteId, ownerId);
@@ -1390,4 +1396,10 @@ export async function setBossAction(level: number, title: string, target: number
   if (!Number.isInteger(level) || level < 1 || level > 9) throw new Error("Bosses guard levels 1 to 9.");
   await bossesData.upsertBoss(ownerId, level, t.slice(0, 200), Math.max(1, Math.min(99, target)));
   revalidatePath("/", "layout");
+}
+
+/** A quest by id, for opening it in the editor (e.g. from the quest-complete screen). */
+export async function getQuestForEditAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  return tasksData.getTask(taskId, ownerId);
 }

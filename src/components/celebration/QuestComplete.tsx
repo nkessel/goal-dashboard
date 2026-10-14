@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
-import { claimRewardAction, listAvailableRewardsAction } from "@/app/actions";
+import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction } from "@/app/actions";
+import type { Task } from "@/lib/data/types";
+import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import {
   barDust,
@@ -44,7 +46,8 @@ export type QuestCompleteProps = {
   onClose: () => void;
 };
 
-function Dust({ items, mode }: { items: Speck[]; mode: "center" | "pct" | "px" }) {
+/** Memoised: the XP count re-renders every frame, the specks shouldn't. */
+const Dust = memo(function Dust({ items, mode }: { items: Speck[]; mode: "center" | "pct" | "px" }) {
   return (
     <>
       {items.map((p, i) => (
@@ -76,7 +79,7 @@ function Dust({ items, mode }: { items: Speck[]; mode: "center" | "pct" | "px" }
       ))}
     </>
   );
-}
+});
 
 export function QuestComplete(props: QuestCompleteProps) {
   const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc = "/design/icon-dragon.jpg", avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, coinsEarned = 0, isReward = false, onClose } = props;
@@ -111,6 +114,7 @@ export function QuestComplete(props: QuestCompleteProps) {
   }
   // Only ever mounted client-side (after a user action), so localStorage is readable up front.
   const [fx] = useState<FxSettings>(() => loadFx());
+  const [editTask, setEditTask] = useState<Task | null>(null);
   const [reduce] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const [p, setP] = useState(reduce ? 1 : 0);
   const [playing, setPlaying] = useState(false);
@@ -136,7 +140,8 @@ export function QuestComplete(props: QuestCompleteProps) {
           const v = Math.min(1, (now - start) / dur);
           setP(v);
           if (v < 1) raf.current = requestAnimationFrame(tick);
-          else timers.current.push(setTimeout(() => setPlaying(false), 1400));
+          // Let the sparkles linger well after the bar fills.
+          else timers.current.push(setTimeout(() => setPlaying(false), 4200));
         };
         raf.current = requestAnimationFrame(tick);
       }, 1250)
@@ -175,6 +180,7 @@ export function QuestComplete(props: QuestCompleteProps) {
       style={{ fontFamily: "var(--font-eb-garamond), 'EB Garamond', Georgia, serif", backgroundColor: "#232b22", backgroundImage: "url(/design/bg-forest.jpg)", backgroundSize: "cover", backgroundPosition: "top center" }}
     >
       <div className="qc-overlay absolute inset-0" style={{ background: "rgba(9,13,8,.84)" }} />
+      {editTask && <QuestEditorDialog mode={{ kind: "edit", task: editTask }} theme="adventure" onClose={() => setEditTask(null)} />}
 
       {/* ambient embers keep drifting after the main animation */}
       <div className="pointer-events-none absolute inset-0">
@@ -236,6 +242,24 @@ export function QuestComplete(props: QuestCompleteProps) {
             <div className="qc-fade pointer-events-none absolute inset-0" style={{ opacity: spark }}>
               <Dust items={card0} mode="pct" />
             </div>
+            {taskId && !preview && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const t = await getQuestForEditAction(taskId).catch(() => null);
+                  if (t) setEditTask(t);
+                }}
+                aria-label="Edit this quest"
+                title="Edit this quest"
+                className="qc-edit absolute right-2 top-2 z-[7] flex h-9 w-9 items-center justify-center rounded-full"
+                style={{ background: "rgba(255,248,230,.92)", border: "1px solid #b39a6a", color: "#2f2a1f", boxShadow: "0 1px 3px rgba(0,0,0,.25)" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                  <path d="M13.5 7l3 3" stroke="currentColor" strokeWidth="1.9" />
+                </svg>
+              </button>
+            )}
             <div className="flex items-stretch gap-3.5">
               <div className="flex shrink-0 flex-col items-center">
                 <div
@@ -286,8 +310,12 @@ export function QuestComplete(props: QuestCompleteProps) {
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-                <h2 className="m-0 break-words text-[22px] font-bold leading-[1.1]" style={{ color: "#2f2a1f" }}>{title}</h2>
-                {description && <div className="line-clamp-3 text-[15px] leading-[1.2]" style={{ color: "#6b6252" }}>{description}</div>}
+                <h2 className={`m-0 break-words ${title.length > 48 ? "text-[18px]" : "text-[22px]"} font-bold leading-[1.1]`} style={{ color: "#2f2a1f" }}>{title}</h2>
+                {description && (
+                  <div className={`${description.length > 140 ? "text-[13.5px]" : "text-[15px]"} leading-[1.22]`} style={{ color: "#6b6252" }}>
+                    {description}
+                  </div>
+                )}
               </div>
 
               <div className="w-px shrink-0" style={{ background: "#b9a47c" }} />

@@ -157,3 +157,11 @@ export async function removeRiteCompletion(ownerId: string, riteId: string, day:
     .maybeSingle<{ xp_awarded: number }>();
   return data ? data.xp_awarded : null;
 }
+
+/** Save the evening's order (rites first, then mini-quests). */
+export async function reorderRites(ownerId: string, ids: string[]): Promise<void> {
+  const db = supabaseAdmin();
+  const results = await Promise.all(ids.map((id, i) => db.from("rites").update({ sort_order: i }).eq("id", id).eq("owner_id", ownerId)));
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(`Failed to reorder rites: ${failed.error.message}`);
+}

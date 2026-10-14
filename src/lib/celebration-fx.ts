@@ -26,13 +26,18 @@ export const FX_DEFAULTS: FxSettings = {
 export const FX_STORAGE_KEY = "goalFxSaved";
 
 export function loadFx(): FxSettings {
+  let fx: FxSettings = { ...FX_DEFAULTS };
   try {
     const raw = localStorage.getItem(FX_STORAGE_KEY);
-    if (raw) return { ...FX_DEFAULTS, ...JSON.parse(raw) };
+    if (raw) fx = { ...FX_DEFAULTS, ...JSON.parse(raw) };
   } catch {
     /* storage unavailable */
   }
-  return { ...FX_DEFAULTS };
+  // Phones: fewer, glowier specks so the animation stays smooth.
+  if (typeof window !== "undefined" && window.innerWidth < 600) {
+    fx = { ...fx, dens: fx.dens * 0.6, embers: Math.round(fx.embers * 0.5) };
+  }
+  return fx;
 }
 
 export function saveFx(fx: FxSettings): boolean {
