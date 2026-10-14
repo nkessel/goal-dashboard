@@ -6,6 +6,7 @@ import { createRiteAction, removeRiteAction, updateRiteAction } from "@/app/acti
 import type { RiteView } from "./EveningRites";
 import { Moon } from "./BeginEveningButton";
 import { useEscape } from "@/lib/use-escape";
+import { usePortalTarget } from "@/components/ui/EmbedHost";
 
 const XP_PRESETS = [0, 5, 10, 15, 25];
 
@@ -61,6 +62,7 @@ export function RiteEditorDialog({
 
   const field = "rounded-lg border px-2.5";
 
+  const portalTarget = usePortalTarget();
   return createPortal(
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${closing ? "overlay-fade-out" : "overlay-fade-in"}`}
@@ -179,6 +181,6 @@ export function RiteEditorDialog({
         </div>
       </div>
     </div>,
-    document.body
+    portalTarget
   );
 }

@@ -13,6 +13,71 @@ function Moon({ size = 22 }: { size?: number }) {
   );
 }
 
+const frac = (n: number) => n - Math.floor(n);
+
+/**
+ * A fixed field of tiny stars, scattered with low-discrepancy (golden-ratio)
+ * sequences so they spread evenly without clumping — deterministic, so the
+ * sky is identical on every render and on server and client alike.
+ */
+const DUST = Array.from({ length: 54 }, (_, i) => {
+  const r = frac(i * 0.4142136 + 0.29);
+  return {
+    left: frac(i * 0.618034 + 0.07) * 100,
+    top: 6 + frac(i * 0.7548777 + 0.41) * 88,
+    size: r < 0.55 ? 1 : r < 0.85 ? 1.5 : 2.2,
+    opacity: 0.35 + frac(i * 0.5698403 + 0.18) * 0.55,
+    delay: -frac(i * 0.381966 + 0.5) * 7,
+    duration: 3.4 + frac(i * 0.2360680) * 3.6,
+  };
+});
+
+/** A few brighter four-point sparkles, kept mostly toward the ends so the label stays clear. */
+const SPARKLES = [
+  { left: 5.5, top: 30, size: 11, delay: -0.6, duration: 5.2 },
+  { left: 14, top: 74, size: 7, delay: -3.1, duration: 6.4 },
+  { left: 25, top: 22, size: 6, delay: -1.8, duration: 5.8 },
+  { left: 77, top: 76, size: 6.5, delay: -4.2, duration: 6 },
+  { left: 86, top: 24, size: 10, delay: -2.4, duration: 5.4 },
+  { left: 95, top: 64, size: 7, delay: -0.2, duration: 6.8 },
+];
+
+function NightSky() {
+  return (
+    <span aria-hidden className="evening-sky">
+      {DUST.map((d, i) => (
+        <span
+          key={i}
+          className="evening-star"
+          style={
+            {
+              left: `${d.left}%`,
+              top: `${d.top}%`,
+              width: d.size,
+              height: d.size,
+              "--o": d.opacity,
+              animationDelay: `${d.delay}s`,
+              animationDuration: `${d.duration}s`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+      {SPARKLES.map((s, i) => (
+        <svg
+          key={`s${i}`}
+          className="evening-sparkle"
+          width={s.size}
+          height={s.size}
+          viewBox="0 0 20 20"
+          style={{ left: `${s.left}%`, top: `${s.top}%`, animationDelay: `${s.delay}s`, animationDuration: `${s.duration}s` }}
+        >
+          <path d="M10 0C10.6 6.4 13.6 9.4 20 10 13.6 10.6 10.6 13.6 10 20 9.4 13.6 6.4 10.6 0 10 6.4 9.4 9.4 6.4 10 0Z" fill="currentColor" />
+        </svg>
+      ))}
+    </span>
+  );
+}
+
 /** Appears after 2:30pm, between Additional Quests and Victories Today. */
 export function BeginEveningButton() {
   const afternoon = useIsAfternoon();
@@ -22,10 +87,13 @@ export function BeginEveningButton() {
     <button
       type="button"
       onClick={() => flip(true)}
-      className="hover-glow evening-cta flex min-h-[58px] w-full items-center justify-center gap-3 rounded-2xl px-5 text-[21px]"
+      className="hover-glow evening-cta relative flex min-h-[58px] w-full items-center justify-center gap-3 rounded-2xl px-5 text-[21px]"
     >
-      <Moon size={26} />
-      <span className="font-display">Begin Evening Routine</span>
+      <NightSky />
+      <span className="relative flex items-center gap-3">
+        <Moon size={26} />
+        <span className="font-display">Begin Evening Routine</span>
+      </span>
     </button>
   );
 }

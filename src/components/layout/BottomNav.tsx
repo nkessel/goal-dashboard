@@ -120,6 +120,25 @@ export function BottomNav({ theme }: { theme: Theme }) {
     return () => window.removeEventListener("resize", measure);
   }, [activePath, isAdventure]);
 
+  // The + button sits right above the Today's Quest tab: publish that tab's
+  // centre as --fab-x so the button can line up with it at any width.
+  useLayoutEffect(() => {
+    const center = itemRefs.current[2];
+    if (!center) return;
+    const place = () => {
+      const r = center.getBoundingClientRect();
+      document.documentElement.style.setProperty("--fab-x", `${r.left + r.width / 2}px`);
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(center);
+    window.addEventListener("resize", place);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", place);
+    };
+  }, [isAdventure]);
+
   // Whole screen slides in from the right when moving to a tab further
   // right in the nav order, or from the left when moving to one further
   // left — a low-key sense of spatial direction, layered on the browser's

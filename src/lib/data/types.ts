@@ -73,6 +73,12 @@ export type Task = {
   effort?: number;
   /** Kept in view on its board, but not actionable yet (off Today, the map and Power-ups). */
   is_aspiration?: boolean;
+  /** A deadline (separate from a calendar slot). */
+  due_at?: string | null;
+  /** Can be worked on in chunks of this many minutes (filler time). */
+  chunk_minutes?: number | null;
+  /** Custom coin payout; null = automatic from XP. */
+  coin_value?: number | null;
   /** Step checklist counts, attached when listed for a card (not a column). */
   steps_total?: number;
   steps_done?: number;

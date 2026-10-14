@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import type { TaskWithBoard } from "@/lib/data/tasks";
 import { computeMatrixLayout } from "@/lib/matrix-layout";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
@@ -14,12 +15,23 @@ import { confirmImportAction, updateTaskPriorityAction } from "@/app/actions";
 // even after a drag, and this is what tells the two apart.
 const CLICK_MOVE_THRESHOLD = 4;
 
-/** Quadrant washes, in LEGEND order: top-right, top-left, bottom-right, bottom-left. */
+/**
+ * Quadrant washes, in LEGEND order. Importance runs along X (right = more
+ * important) and urgency along Y (top = more urgent), so: important & urgent
+ * = top-right, important only = bottom-right, urgent only = top-left,
+ * neither = bottom-left.
+ */
 const QUADRANT_TINT = ["rgba(196,72,40,.13)", "rgba(79,109,60,.13)", "rgba(56,104,140,.12)", "rgba(107,98,82,.10)"];
+const QUADRANT_CORNER: { side: "left" | "right"; edge: "top" | "bottom" }[] = [
+  { side: "right", edge: "top" },
+  { side: "right", edge: "bottom" },
+  { side: "left", edge: "top" },
+  { side: "left", edge: "bottom" },
+];
 const QUADRANT_POS: React.CSSProperties[] = [
   { right: 0, top: 0, borderTopRightRadius: 14 },
-  { left: 0, top: 0, borderTopLeftRadius: 14 },
   { right: 0, bottom: 0, borderBottomRightRadius: 14 },
+  { left: 0, top: 0, borderTopLeftRadius: 14 },
   { left: 0, bottom: 0, borderBottomLeftRadius: 14 },
 ];
 
@@ -145,8 +157,8 @@ export function PriorityMatrix({
     const r = gridRef.current.getBoundingClientRect();
     const xPct = ((clientX - r.left) / r.width) * 100;
     const yPct = ((r.bottom - clientY) / r.height) * 100;
-    const urgency = pctToScale(xPct);
-    const importance = pctToScale(yPct);
+    const importance = pctToScale(xPct);
+    const urgency = pctToScale(yPct);
     const id = plotTask.id;
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, importance, urgency } : t)));
     startTransition(async () => {
@@ -157,8 +169,8 @@ export function PriorityMatrix({
   }
 
   function commitDrag(taskId: string, xPct: number, yPct: number) {
-    const urgency = pctToScale(xPct);
-    const importance = pctToScale(yPct);
+    const importance = pctToScale(xPct);
+    const urgency = pctToScale(yPct);
     setDragState(null);
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, importance, urgency } : t)));
     startTransition(() => {
@@ -222,9 +234,9 @@ export function PriorityMatrix({
                 ✓
               </span>
               <span className="flex-1 text-sm font-semibold">All plotted! Drag any dot to fine-tune.</span>
-              <a href="/matrix" className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
+              <Link href="/matrix" className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
                 Done
-              </a>
+              </Link>
             </>
           )}
         </div>
@@ -233,22 +245,18 @@ export function PriorityMatrix({
         <EditTaskModal task={plotTask} theme={theme} onClose={() => setPlotEditing(false)} />
       )}
       {boards && boards.length > 0 && (
-        <fieldset className="flex flex-wrap gap-x-4 gap-y-1.5">
-          <legend className="sr-only">Boards shown on the map</legend>
+        <fieldset className={`board-filter ${isAdventure ? "board-filter-adventure" : "board-filter-calm"} flex flex-wrap items-center gap-x-2 gap-y-2`}>
+          <legend className="sr-only">Show quests from these boards</legend>
+          <span aria-hidden className={`mr-1 text-[14px] ${isAdventure ? "font-display italic" : "font-semibold"}`} style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)" }}>
+            {isAdventure ? "Show quests from" : "Show tasks from"}
+          </span>
           {[...boards, ...(hasUnboarded ? [{ id: "none", title: "No board" }] : [])].map((b) => (
-            <label
-              key={b.id}
-              className="flex min-h-9 cursor-pointer items-center gap-2 text-[15.5px]"
-              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
-            >
-              <input
-                type="checkbox"
-                checked={!hiddenBoards.has(b.id)}
-                onChange={() => toggleBoard(b.id)}
-                className="h-5 w-5"
-                style={{ accentColor: isAdventure ? "var(--t-gold)" : "var(--t-accent)" }}
-              />
-              {b.title}
+            <label key={b.id} className="board-chip">
+              <input type="checkbox" className="sr-only" checked={!hiddenBoards.has(b.id)} onChange={() => toggleBoard(b.id)} />
+              <svg className="board-chip-check" width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+                <path d="M2.5 6.4 5 8.8 9.6 3.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>{b.title}</span>
             </label>
           ))}
         </fieldset>
@@ -258,10 +266,10 @@ export function PriorityMatrix({
         {/* Vertical axis: two rotated labels pinned to the top and bottom. */}
         <div className="relative w-6 shrink-0" style={axisLabelStyle} aria-hidden>
           <span className="absolute left-1/2 top-2 origin-center whitespace-nowrap text-[14px]" style={{ transform: "translateX(-50%) rotate(180deg)", writingMode: "vertical-rl" }}>
-            {isAdventure ? "Vital ↑" : "Important ↑"}
+            Urgent ↑
           </span>
           <span className="absolute bottom-2 left-1/2 origin-center whitespace-nowrap text-[14px]" style={{ transform: "translateX(-50%) rotate(180deg)", writingMode: "vertical-rl" }}>
-            {isAdventure ? "Minor" : "Not important"}
+            {isAdventure ? "Can wait" : "Not urgent"}
           </span>
         </div>
 
@@ -275,7 +283,7 @@ export function PriorityMatrix({
             {legend.map((q, i) => (
               <div key={q.title} className="pointer-events-none absolute h-1/2 w-1/2" style={{ ...QUADRANT_POS[i], background: QUADRANT_TINT[i] }}>
                 <span
-                  className={`absolute text-[15px] italic ${i % 2 === 0 ? "right-3" : "left-3"} ${i < 2 ? "top-2.5" : "bottom-2.5"}`}
+                  className={`absolute text-[15px] italic ${QUADRANT_CORNER[i].side === "right" ? "right-3" : "left-3"} ${QUADRANT_CORNER[i].edge === "top" ? "top-2.5" : "bottom-2.5"}`}
                   style={{ color: "var(--t-ink-soft)", opacity: 0.85 }}
                 >
                   {q.title}
@@ -424,8 +432,8 @@ export function PriorityMatrix({
                       </p>
                     )}
                     <p className="mt-1" style={{ color: "var(--t-ink-soft)" }}>
-                      Importance {(isDragging ? pctToScale(dragState.yPct) : task.importance).toFixed(1)} · Urgency{" "}
-                      {(isDragging ? pctToScale(dragState.xPct) : task.urgency).toFixed(1)}
+                      Importance {(isDragging ? pctToScale(dragState.xPct) : task.importance).toFixed(1)} · Urgency{" "}
+                      {(isDragging ? pctToScale(dragState.yPct) : task.urgency).toFixed(1)}
                       {task.xp_value > 0 && ` · ${task.xp_value} ${isAdventure ? "XP" : "pts"}`}
                     </p>
                   </div>
@@ -444,8 +452,8 @@ export function PriorityMatrix({
           </div>
 
           <div className="mt-1.5 flex justify-between text-[14px]" style={axisLabelStyle}>
-            <span>Not urgent</span>
-            <span>Urgent →</span>
+            <span>{isAdventure ? "Minor" : "Not important"}</span>
+            <span>Important →</span>
           </div>
         </div>
       </div>

@@ -16,12 +16,9 @@ import { QuestMonogram } from "./QuestMonogram";
  * Kept as a plain helper (not inlined in the component) so the impure
  * `Date.now()` read isn't taken during render itself. */
 function isTaskOverdue(task: Task): boolean {
-  return (
-    task.status === "open" &&
-    task.is_on_calendar &&
-    !!task.scheduled_start &&
-    new Date(task.scheduled_start).getTime() < Date.now()
-  );
+  if (task.status !== "open") return false;
+  const when = task.due_at ?? (task.is_on_calendar ? task.scheduled_start : null);
+  return !!when && new Date(when).getTime() < Date.now();
 }
 
 /** "Due today, 3:00 PM" / "Due tomorrow" / "Due Fri, Oct 9" — read like the mockup's "Due today". */
@@ -56,6 +53,7 @@ export function TaskRow({
   onDragEnd,
   innerRef,
   behind,
+  sortable,
 }: {
   task: Task;
   /** A reward locked behind this quest: drawn as a card stacked behind it. */
@@ -78,6 +76,14 @@ export function TaskRow({
   onDrop?: (e: React.DragEvent<HTMLLIElement>) => void;
   onDragEnd?: (e: React.DragEvent<HTMLLIElement>) => void;
   innerRef?: (el: HTMLLIElement | null) => void;
+  /** dnd-kit sortable wiring (pointer + touch dragging with animated reflow). */
+  sortable?: {
+    setNodeRef: (el: HTMLElement | null) => void;
+    style: React.CSSProperties;
+    attributes: React.HTMLAttributes<HTMLElement>;
+    listeners: Record<string, unknown> | undefined;
+    isDragging: boolean;
+  };
 }) {
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState<"icon" | "dots" | null>(null);
@@ -174,7 +180,13 @@ export function TaskRow({
 
   return (
     <li
-      ref={innerRef}
+      ref={(el) => {
+        innerRef?.(el);
+        sortable?.setNodeRef(el);
+      }}
+      {...(sortable ? sortable.attributes : {})}
+      {...((sortable?.listeners ?? {}) as React.HTMLAttributes<HTMLLIElement>)}
+      style={sortable ? { ...sortable.style, opacity: sortable.isDragging ? 0.35 : 1, touchAction: "manipulation" } : undefined}
       data-task-id={task.id}
       // Explicitly false when this row isn't itself a drag source, so a press
       // inside a goal card on Board Detail doesn't start dragging the goal.
@@ -242,7 +254,7 @@ export function TaskRow({
             >
               {categoryLabel}
             </span>
-          ) : (
+          ) : task.board_id ? null : (
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -303,7 +315,7 @@ export function TaskRow({
             </p>
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1" style={{ color: isAdventure ? "#3d3628" : metaColor, fontSize: 13.5 }}>
-            {task.is_on_calendar && task.scheduled_start && (
+            {(task.due_at || (task.is_on_calendar && task.scheduled_start)) && (
               <span className="flex items-center gap-1.5" style={isOverdue ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
                 {isAdventure ? (
                   // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
@@ -311,7 +323,9 @@ export function TaskRow({
                 ) : (
                   "📅"
                 )}
-                {isOverdue ? "Overdue" : dueLabel(task.scheduled_start)}
+                {isOverdue
+                  ? `Overdue · ${new Date((task.due_at ?? task.scheduled_start)!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+                  : dueLabel((task.due_at ?? task.scheduled_start)!)}
               </span>
             )}
             {task.reschedule_count > 0 && (

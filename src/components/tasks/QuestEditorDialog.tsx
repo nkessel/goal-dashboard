@@ -9,6 +9,7 @@ import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
 import { SlotPickerDialog } from "./SlotPickerDialog";
 import { useEscape } from "@/lib/use-escape";
+import { usePortalTarget } from "@/components/ui/EmbedHost";
 
 export type QuestDraft = {
   title?: string;
@@ -319,6 +320,7 @@ export function QuestEditorDialog({
   const exitCls = origin === "fab" ? "qe-sink-out" : "sheet-minimize-out";
   const empty = <CheckMark checked={false} isAdventure={isAdventure} size={72} />;
 
+  const portalTarget = usePortalTarget();
   return createPortal(
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${phase === "closing" ? "overlay-fade-out" : "overlay-fade-in"}`}
@@ -853,7 +855,7 @@ export function QuestEditorDialog({
         </div>
       </div>
     </div>,
-    document.body
+    portalTarget
   );
 }
 

@@ -133,7 +133,7 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
             className="text-[12.5px] underline"
             style={{ color: "var(--t-ink-soft)" }}
           >
-            {t.is_manual_priority ? "In Today's Battle" : "⚔ Add to today"}
+            {t.is_manual_priority ? "In Today's Quests" : "⚔ Add to today"}
           </button>
         )}
         {isDone && (

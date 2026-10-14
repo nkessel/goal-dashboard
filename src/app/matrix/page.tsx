@@ -40,7 +40,7 @@ export default async function MatrixPage({
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-1">
-          <PageHeader isAdventure={isAdventure} title="War Map" calmTitle="Priority Matrix" subtitle={isAdventure ? "Plot every quest by importance and urgency" : "See everything by importance and urgency"} />
+          <PageHeader isAdventure={isAdventure} title="Quest Priority Matrix" calmTitle="Priority Matrix" subtitle={isAdventure ? "Plot every quest by importance and urgency" : "See everything by importance and urgency"} />
         </div>
 
 

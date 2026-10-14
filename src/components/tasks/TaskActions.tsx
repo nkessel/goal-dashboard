@@ -66,7 +66,7 @@ export function TaskActions({ task, theme = "calm" }: { task: Task; theme?: "cal
               ? "⚔️ In today's battle"
               : "★ In Top 3"
             : isAdventure
-              ? "☆ Add to Today's Battle"
+              ? "☆ Add to Today's Quests"
               : "☆ Pin to Top 3"}
         </button>
 

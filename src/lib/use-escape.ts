@@ -11,8 +11,6 @@ let nextId = 1;
 let listening = false;
 const handlers = new Map<number, () => void>();
 
-if (typeof window !== "undefined") (window as unknown as { __escape?: unknown }).__escape = { stack, handlers };
-
 function onKeyDown(e: KeyboardEvent) {
   if (e.key !== "Escape" || e.defaultPrevented) return;
   const top = stack[stack.length - 1];

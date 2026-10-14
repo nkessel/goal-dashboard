@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="72%">
+      <stop offset="0" stop-color="#fdf1d6"/>
+      <stop offset=".6" stop-color="#e8cf98"/>
+      <stop offset="1" stop-color="#a77c3d"/>
+    </radialGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2d3c5e"/>
+      <stop offset="1" stop-color="#1a2440"/>
+    </linearGradient>
+    <radialGradient id="heartGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd3cf" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#ffd3cf" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="128" height="128" fill="url(#bg)"/>
+  <g transform="translate(-9 -5) scale(1.14)">
+  <!-- warm waves leaving the screen -->
+  <g fill="none" stroke="#fff4d6" stroke-width="2.2">
+    <circle cx="64" cy="54" r="20" opacity="0">
+      <animate attributeName="r" values="20;50" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".8;0" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="64" cy="54" r="20" opacity="0">
+      <animate attributeName="r" values="20;50" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values=".8;0" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  <!-- laptop -->
+  <rect x="30" y="32" width="68" height="46" rx="5" fill="#5b4a33"/>
+  <rect x="34" y="36" width="60" height="38" rx="2.5" fill="url(#screen)"/>
+  <path d="M20 82 H108 L102 92 H26 Z" fill="#8c7350"/>
+  <path d="M20 82 H108 V84 H20 Z" fill="#b89a6c"/>
+  <rect x="56" y="86" width="16" height="2.5" rx="1.2" fill="#6d5838"/>
+  <!-- heart on screen, gently beating -->
+  <circle cx="64" cy="55" r="16" fill="url(#heartGlow)"/>
+  <g transform="translate(64 55)">
+    <path d="M0 9 C-11 1 -11 -9 -5 -10 C-2 -10.5 0 -8 0 -6 C0 -8 2 -10.5 5 -10 C11 -9 11 1 0 9 Z" fill="#e8605a" stroke="#ffd9d4" stroke-width=".8">
+      <animateTransform attributeName="transform" type="scale" values="1;1.14;1;1.08;1" dur="1.6s" repeatCount="indefinite"/>
+    </path>
+  </g>
+  <!-- sparks drifting upward -->
+  <g fill="#fffbe6">
+    <circle cx="46" cy="40" r="1.6"><animate attributeName="cy" values="44;18" dur="4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0" dur="4s" repeatCount="indefinite"/></circle>
+    <circle cx="82" cy="40" r="1.3"><animate attributeName="cy" values="46;16" dur="5s" begin="1s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0" dur="5s" begin="1s" repeatCount="indefinite"/></circle>
+    <circle cx="64" cy="30" r="1.1"><animate attributeName="cy" values="36;12" dur="4.5s" begin="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0" dur="4.5s" begin="2s" repeatCount="indefinite"/></circle>
+  </g>
+  </g>
+</svg>

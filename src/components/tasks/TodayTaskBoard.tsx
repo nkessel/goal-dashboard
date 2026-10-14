@@ -1,19 +1,34 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "@/lib/data/types";
 import { reorderTasksAction, toggleManualPriorityAction } from "@/app/actions";
-import { useFlip } from "@/lib/use-flip";
 import { TaskRow } from "./TaskRow";
 import { QuestPickerSheet } from "./QuestPickerSheet";
 import { GoldRule, Leaf, QuestShield } from "@/components/ui/Ornaments";
 
 type ListName = "priority" | "other";
 const MAX_PRIORITY = 3;
+const PRIORITY_ZONE = "zone:priority";
+const OTHER_ZONE = "zone:other";
 
-/** A task plus its resolved category pill (task -> goal -> board title).
- * Typed locally instead of importing TaskWithCategory from the ("server
- * only") data layer, which client components can't import from. */
+/** A task plus its board title for the card's pill (typed locally: the data layer is server-only). */
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 
 function sameOrder(a: TaskWithCategory[], b: TaskWithCategory[]) {
@@ -25,18 +40,55 @@ function sameIdSet(a: TaskWithCategory[], b: TaskWithCategory[]) {
   return b.every((t) => ids.has(t.id));
 }
 
+/** One draggable quest card: mouse drags after a short move, touch after a short press (so scrolling still works). */
+function SortableQuest({
+  task,
+  theme,
+  behind,
+  disabled = false,
+}: {
+  task: TaskWithCategory;
+  theme: "calm" | "adventure";
+  behind?: TaskWithCategory;
+  /** Cards in a closed drawer can't be dragged or dropped onto. */
+  disabled?: boolean;
+}) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: task.id, disabled });
+  return (
+    <TaskRow
+      task={task}
+      theme={theme}
+      categoryLabel={task.categoryLabel}
+      behind={behind}
+      sortable={{
+        setNodeRef,
+        attributes: attributes as unknown as React.HTMLAttributes<HTMLElement>,
+        listeners,
+        isDragging,
+        style: { transform: CSS.Translate.toString(transform), transition },
+      }}
+    />
+  );
+}
+
+/** A drop target with no cards in it (an empty list, or a closed drawer's header). */
+function Zone({ id, children, className, style }: { id: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={className} style={{ ...style, ...(isOver ? { boxShadow: "0 0 0 2px rgba(242,210,126,.75)" } : null) }}>
+      {children}
+    </div>
+  );
+}
+
 /**
- * Today's Battle (pinned, max 3) and Additional Quests, combined into one
- * component so a quest can be dragged between the two lists — not just
- * reordered within one — with the same live-reflow + FLIP-animated slide
- * used elsewhere. Dropping into the other list toggles is_manual_priority;
- * dropping within a list reorders it (both persist via server actions).
+ * Today's Quests (pinned, up to 3) and the Additional Quests drawer. Cards
+ * drag within and between the two with dnd-kit — mouse, touch (press and
+ * hold) or keyboard — and the others slide aside smoothly. Dropping into the
+ * other list pins/unpins; any new order is saved when the drag ends.
  *
- * priority/other are derived from the server props (priorityTasks/otherTasks)
- * whenever nothing is in flight, so an edit, completion, or new quest added
- * elsewhere (via revalidatePath) shows up immediately. Only while a drag — or
- * its not-yet-confirmed commit — is in progress do we fork to a local
- * optimistic copy, released again once the server props catch up.
+ * The lists follow the server props except while a drag (or its save) is in
+ * flight, when a local copy takes over until fresh props catch up.
  */
 export function TodayTaskBoard({
   priorityTasks,
@@ -51,8 +103,15 @@ export function TodayTaskBoard({
   const [localOther, setLocalOther] = useState<TaskWithCategory[] | null>(null);
   const [seenPriorityTasks, setSeenPriorityTasks] = useState(priorityTasks);
   const [seenOtherTasks, setSeenOtherTasks] = useState(otherTasks);
-  // A reward quest still locked behind an open prerequisite isn't its own card:
-  // it's drawn stacked behind that prerequisite.
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [startList, setStartList] = useState<ListName | null>(null);
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [dragError, setDragError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+  const isAdventure = theme === "adventure";
+
+  // A reward still locked behind an open prerequisite is drawn stacked behind it, not as its own card.
   const openIds = new Set([...priorityTasks, ...otherTasks].map((t) => t.id));
   const isLocked = (t: TaskWithCategory) => !!t.locked_by_task_id && openIds.has(t.locked_by_task_id);
   const lockedBehind = new Map<string, TaskWithCategory>();
@@ -60,159 +119,126 @@ export function TodayTaskBoard({
   const priority = (localPriority ?? priorityTasks).filter((t) => !isLocked(t));
   const other = (localOther ?? otherTasks).filter((t) => !isLocked(t));
 
-  const [otherOpen, setOtherOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [dragError, setDragError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
-  const isAdventure = theme === "adventure";
-
-  const [isDragging, setIsDragging] = useState(false);
-  const drag = useRef<{ id: string; from: ListName; moved: boolean } | null>(null);
-  const registerPriority = useFlip(priority, (t) => t.id);
-  const registerOther = useFlip(other, (t) => t.id);
-
-  // Adjust local overrides in response to new server (revalidated) props —
-  // done during render, React's recommended pattern for resetting state
-  // from props, rather than in a useEffect (which would cost an extra
-  // render after the one that already updated the props). Once the props
-  // either match what we committed, or have changed in a way our local
-  // copy can't know about (an item added/removed elsewhere), the props are
-  // now the more correct source of truth than a stale local snapshot.
-  // Gated on the `isDragging` state (not the `drag` ref, which isn't safe
-  // to read during render) so an unrelated revalidation mid-drag can't yank
-  // the live preview out from under the pointer.
+  // Fresh server props win once they match what we saved (or changed elsewhere).
   if (priorityTasks !== seenPriorityTasks) {
     setSeenPriorityTasks(priorityTasks);
-    if (
-      localPriority &&
-      !isDragging &&
-      (!sameIdSet(localPriority, priorityTasks) || sameOrder(localPriority, priorityTasks))
-    ) {
-      setLocalPriority(null);
-    }
+    if (localPriority && !activeId && (!sameIdSet(localPriority, priorityTasks) || sameOrder(localPriority, priorityTasks))) setLocalPriority(null);
   }
   if (otherTasks !== seenOtherTasks) {
     setSeenOtherTasks(otherTasks);
-    if (
-      localOther &&
-      !isDragging &&
-      (!sameIdSet(localOther, otherTasks) || sameOrder(localOther, otherTasks))
-    ) {
-      setLocalOther(null);
-    }
+    if (localOther && !activeId && (!sameIdSet(localOther, otherTasks) || sameOrder(localOther, otherTasks))) setLocalOther(null);
   }
 
-  function listFor(name: ListName) {
-    return name === "priority" ? priority : other;
-  }
-  function setListFor(name: ListName, next: TaskWithCategory[]) {
-    if (name === "priority") setLocalPriority(next);
-    else setLocalOther(next);
-  }
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-  function start(id: string, from: ListName) {
-    drag.current = { id, from, moved: false };
-    setIsDragging(true);
-    // Snapshot both lists so splices during the drag operate on a stable
-    // local copy rather than racing with fresh server props.
+  const listOf = (id: string | null | undefined): ListName | null => {
+    if (!id) return null;
+    if (id === PRIORITY_ZONE) return "priority";
+    if (id === OTHER_ZONE) return "other";
+    if (priority.some((t) => t.id === id)) return "priority";
+    if (other.some((t) => t.id === id)) return "other";
+    return null;
+  };
+
+  function onDragStart(e: DragStartEvent) {
+    const id = String(e.active.id);
+    setActiveId(id);
+    setStartList(listOf(id));
     setLocalPriority(priority);
     setLocalOther(other);
-  }
-
-  function moveWithin(listName: ListName, overId: string) {
-    const d = drag.current;
-    if (!d || d.from !== listName || d.id === overId) return;
-    const items = listFor(listName);
-    const fromIndex = items.findIndex((t) => t.id === d.id);
-    const toIndex = items.findIndex((t) => t.id === overId);
-    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
-    const next = [...items];
-    const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved);
-    setListFor(listName, next);
-  }
-
-  function moveAcross(targetList: ListName, atEnd: boolean, overId?: string) {
-    const d = drag.current;
-    if (!d || d.from === targetList) return;
-    if (targetList === "priority" && priority.length >= MAX_PRIORITY) return; // full — no room to preview the move
-    const sourceItems = listFor(d.from);
-    const task = sourceItems.find((t) => t.id === d.id);
-    if (!task) return;
-    const nextSource = sourceItems.filter((t) => t.id !== d.id);
-    const targetItems = listFor(targetList);
-    const insertAt = atEnd ? targetItems.length : Math.max(0, targetItems.findIndex((t) => t.id === overId));
-    const nextTarget = [...targetItems];
-    nextTarget.splice(insertAt === -1 ? targetItems.length : insertAt, 0, task);
-    setListFor(d.from, nextSource);
-    setListFor(targetList, nextTarget);
-    drag.current = { id: d.id, from: targetList, moved: true };
-  }
-
-  /**
-   * @param committed Pass `false` from a cancelled drag (dropped outside any
-   * valid target, or aborted via Escape) to discard the live preview instead
-   * of persisting it — `onDragEnd` fires whether or not the drop was
-   * actually accepted, so it passes `e.dataTransfer.dropEffect !== "none"`.
-   */
-  function finish(committed = true) {
-    const d = drag.current;
-    drag.current = null;
-    setIsDragging(false);
-    if (!d) return;
-    if (!committed) {
-      setLocalPriority(null);
-      setLocalOther(null);
-      return;
-    }
     setDragError(null);
+  }
 
-    const committedPriority = priority;
-    const committedOther = other;
+  // Moving between the two lists happens live, while hovering.
+  function onDragOver(e: DragOverEvent) {
+    const id = String(e.active.id);
+    const from = listOf(id);
+    const to = listOf(e.over ? String(e.over.id) : null);
+    if (!from || !to || from === to) return;
+    if (to === "priority" && priority.length >= MAX_PRIORITY) return;
+    const source = from === "priority" ? priority : other;
+    const target = to === "priority" ? priority : other;
+    const task = source.find((t) => t.id === id);
+    if (!task) return;
+    const overIndex = e.over ? target.findIndex((t) => t.id === String(e.over!.id)) : -1;
+    const insertAt = overIndex === -1 ? target.length : overIndex;
+    const nextTarget = [...target];
+    nextTarget.splice(insertAt, 0, task);
+    const nextSource = source.filter((t) => t.id !== id);
+    if (from === "priority") {
+      setLocalPriority(nextSource);
+      setLocalOther(nextTarget);
+    } else {
+      setLocalOther(nextSource);
+      setLocalPriority(nextTarget);
+    }
+  }
+
+  function onDragEnd(e: DragEndEvent) {
+    const id = String(e.active.id);
+    const list = listOf(id);
+    let nextPriority = priority;
+    let nextOther = other;
+    if (list && e.over) {
+      const items = list === "priority" ? priority : other;
+      const from = items.findIndex((t) => t.id === id);
+      const to = items.findIndex((t) => t.id === String(e.over!.id));
+      if (from !== -1 && to !== -1 && from !== to) {
+        const moved = arrayMove(items, from, to);
+        if (list === "priority") nextPriority = moved;
+        else nextOther = moved;
+      }
+    }
+    setLocalPriority(nextPriority);
+    setLocalOther(nextOther);
+    setActiveId(null);
+    const crossed = list && startList && list !== startList;
+    setStartList(null);
+    if (!list) return;
 
     startTransition(async () => {
       try {
-        if (d.moved) {
-          // d.from now holds the *destination* list (see moveAcross) since
-          // we update it as the drag moves — pin true iff it landed in priority.
-          await toggleManualPriorityAction(d.id, d.from === "priority");
-        }
-        await Promise.all([
-          reorderTasksAction(committedPriority.map((t) => t.id)),
-          reorderTasksAction(committedOther.map((t) => t.id)),
-        ]);
-        // Leave local* set — the release effects above clear them once fresh
-        // server props (from the revalidation this triggers) match.
-      } catch (e) {
-        setDragError(e instanceof Error ? e.message : "Couldn't move that quest — try again.");
-        // Roll back optimistic state to what the server actually has.
+        if (crossed) await toggleManualPriorityAction(id, list === "priority");
+        await Promise.all([reorderTasksAction(nextPriority.map((t) => t.id)), reorderTasksAction(nextOther.map((t) => t.id))]);
+      } catch (err) {
+        setDragError(err instanceof Error ? err.message : "Couldn't move that quest — try again.");
         setLocalPriority(null);
         setLocalOther(null);
       }
     });
   }
 
+  function onDragCancel() {
+    setActiveId(null);
+    setStartList(null);
+    setLocalPriority(null);
+    setLocalOther(null);
+  }
+
+  const active = activeId ? [...priority, ...other].find((t) => t.id === activeId) : null;
+  const sectionStyle: React.CSSProperties = isAdventure
+    ? { background: "rgba(14,18,10,.28)", border: "1px solid rgba(217,180,95,.2)", boxShadow: "inset 0 1px 0 rgba(255,240,200,.05)" }
+    : { background: "var(--t-bg)", border: "1px solid var(--t-card-border)" };
+
   return (
-    <>
-      <section className="flex flex-col gap-3">
-        {/* justify-center + the add button pinned via absolute right-0 keeps
-            the title itself centered in the row (per the mockups' chapter-
-            heading feel) while the action stays reachable at the trailing
-            edge — the same "centered title, trailing button" split as a
-            typical mobile nav bar. */}
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
+      {/* Today's Quests: a subtle section of its own */}
+      <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
         {isAdventure ? (
-          <div className="flex items-center gap-2">
-            {/* invisible twin of the + button keeps the title truly centered */}
-            <span className="h-8 w-8 shrink-0" aria-hidden />
+          <div className="flex items-center gap-2 px-1">
             <span className="hidden flex-1 sm:flex">
               <GoldRule dir="left" />
             </span>
             <span className="flex-1 sm:hidden" />
             <Leaf flip />
             <h2 className="font-display m-0 whitespace-nowrap text-[23px] leading-none sm:text-[27px]" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
-              Today&apos;s Battle
+              Today&apos;s Quests
               <span className="ml-2 align-middle text-[14px] font-normal" style={{ color: "var(--t-gold)" }}>
-                {priority.length}/3
+                ({priority.length}/{MAX_PRIORITY})
               </span>
             </h2>
             <Leaf />
@@ -220,212 +246,121 @@ export function TodayTaskBoard({
               <GoldRule dir="right" />
             </span>
             <span className="flex-1 sm:hidden" />
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            aria-label={isAdventure ? "Add to Today's Battle" : "Add to Today's Focus"}
-            title={isAdventure ? "Add to Today's Battle" : "Add to Today's Focus"}
-            className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-            style={
-              isAdventure
-                ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 2px 6px rgba(0,0,0,.4)" }
-                : { background: "var(--t-accent)" }
-            }
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M12 5v14M5 12h14" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="2.8" strokeLinecap="round" />
-            </svg>
-          </button>
           </div>
         ) : (
-          <div className="relative flex items-center justify-center gap-2.5">
+          <div className="flex items-center justify-center gap-2.5">
             <h2 className="text-lg font-extrabold" style={{ color: "var(--t-ink)" }}>
               Today&apos;s Focus
             </h2>
             <span className="text-sm" style={{ color: "var(--t-ink-soft)" }}>
-              {priority.length}/3
+              ({priority.length}/{MAX_PRIORITY})
             </span>
-            <div className="absolute right-0">
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            aria-label={isAdventure ? "Add to Today's Battle" : "Add to Today's Focus"}
-            title={isAdventure ? "Add to Today's Battle" : "Add to Today's Focus"}
-            className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-            style={
-              isAdventure
-                ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 2px 6px rgba(0,0,0,.4)" }
-                : { background: "var(--t-accent)" }
-            }
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M12 5v14M5 12h14" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="2.8" strokeLinecap="round" />
-            </svg>
-          </button>
-            </div>
           </div>
         )}
 
-        {pickerOpen && (
-          <QuestPickerSheet otherTasks={other} theme={theme} onClose={() => setPickerOpen(false)} />
-        )}
         {dragError && (
           <p className="text-xs" style={{ color: "var(--t-warn)" }}>
             {dragError}
           </p>
         )}
 
-        {priority.length === 0 ? (
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              moveAcross("priority", true);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              finish();
-            }}
-            className="rounded-2xl border-2 border-dashed px-5 py-5 text-center text-[15.5px] leading-snug"
-            style={{
-              borderColor: isAdventure ? "rgba(217,180,95,.4)" : "var(--t-ink-soft)",
-              background: isAdventure ? "rgba(10,14,9,.22)" : undefined,
-              color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)",
-            }}
-          >
-            {isAdventure
-              ? "No quests queued yet — drag a quest here, or tap + to choose up to 3 for today's battle."
-              : "Nothing pinned yet — drag a task here (or pin up to 3 below) to curate today's focus."}
-          </div>
-        ) : (
+        <SortableContext id="priority" items={priority.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           <ul className="flex flex-col gap-3">
             {priority.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                theme={theme}
-                categoryLabel={task.categoryLabel}
-                behind={lockedBehind.get(task.id)}
-                draggable
-                innerRef={registerPriority(task.id)}
-                onDragStart={(e) => {
-                  start(task.id, "priority");
-                  e.dataTransfer.effectAllowed = "move";
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  if (drag.current?.from === "priority") moveWithin("priority", task.id);
-                  else moveAcross("priority", false, task.id);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  finish();
-                }}
-                onDragEnd={(e) => finish(e.dataTransfer.dropEffect !== "none")}
-              />
+              <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} />
             ))}
           </ul>
+        </SortableContext>
+
+        {/* An empty slot: tap to add a quest, or drop one here */}
+        {priority.length < MAX_PRIORITY && (
+          <Zone id={PRIORITY_ZONE} className="rounded-2xl">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="add-slot flex min-h-[84px] w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-4 text-[16px]"
+              style={{
+                borderColor: isAdventure ? "rgba(217,180,95,.45)" : "var(--t-card-border)",
+                color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)",
+                background: isAdventure ? "rgba(243,231,203,.04)" : "transparent",
+              }}
+            >
+              <span
+                aria-hidden
+                className="flex h-10 w-10 items-center justify-center rounded-full text-[24px] leading-none"
+                style={{ border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.6)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-gold)" : "var(--t-accent)" }}
+              >
+                +
+              </span>
+              <span className={isAdventure ? "font-display" : ""}>
+                {priority.length === 0 ? "Choose a quest for today" : "Add another quest"}
+              </span>
+            </button>
+          </Zone>
         )}
       </section>
 
+      {/* Additional Quests: a drawer that slides open */}
       <section>
-        {/* hover-glow lives on the <summary> itself, not the whole <details>
-            — putting it on <details> made its box-shadow glow wrap the
-            *entire* element, revealed content included, once open, so
-            hovering (or just having last clicked) the header drew a single
-            fused glow around both the header bar and the quest card(s)
-            underneath it. Scoping it to <summary> keeps the glow on just
-            the clickable header, where it belongs. */}
-        <details className="group rounded-xl" open={otherOpen} onToggle={(e) => setOtherOpen(e.currentTarget.open)}>
-          <summary
+        <Zone id={OTHER_ZONE} className="rounded-2xl">
+          <button
+            type="button"
             data-quest-dropzone="other"
-            className="hover-glow relative flex min-h-[58px] cursor-pointer list-none items-center justify-center rounded-2xl px-4 py-2.5"
+            aria-expanded={otherOpen}
+            onClick={() => setOtherOpen((v) => !v)}
+            className="drawer-header relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-4 py-2.5"
             style={
               isAdventure
                 ? {
                     background: "linear-gradient(180deg, #34412f 0%, #263022 55%, #1f281c 100%)",
                     border: "2px solid #8d7642",
-                    boxShadow:
-                      "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
+                    boxShadow: "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
                   }
                 : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }
             }
           >
-            <span
-              className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm"}`}
-              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
-            >
-              {isAdventure ? (
-                <QuestShield size={30} />
-              ) : (
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="3" width="18" height="18" rx="4" stroke="var(--t-ink-soft)" strokeWidth="1.5" />
-                  <path d="M8 12h8" stroke="var(--t-ink-soft)" strokeWidth="1.5" />
-                </svg>
-              )}
+            <span className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+              {isAdventure && <QuestShield size={30} />}
               {isAdventure ? "Additional Quests" : "More tasks"}
-              <span className="text-[15px]" style={{ color: isAdventure ? "var(--t-gold)" : undefined, opacity: isAdventure ? 0.9 : 0.6, fontWeight: 400 }}>
-                {other.length}
+              <span className="text-[15px]" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)", fontWeight: 400 }}>
+                ({other.length})
               </span>
             </span>
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="absolute right-5 transition-transform group-open:rotate-180"
-            >
-              <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="absolute right-5 transition-transform duration-300" style={{ transform: otherOpen ? "rotate(180deg)" : undefined }}>
+              <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </summary>
-          <div
-            className="mt-3"
-            onDragOver={(e) => {
-              e.preventDefault();
-              if (other.length === 0) moveAcross("other", true);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              finish();
-            }}
-          >
-            {other.length === 0 ? (
-              <p className="text-sm" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: isAdventure ? 0.7 : 1 }}>
-                Nothing here — nice.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {other.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    theme={theme}
-                    categoryLabel={task.categoryLabel}
-                    behind={lockedBehind.get(task.id)}
-                    draggable
-                    innerRef={registerOther(task.id)}
-                    onDragStart={(e) => {
-                      start(task.id, "other");
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "move";
-                      if (drag.current?.from === "other") moveWithin("other", task.id);
-                      else moveAcross("other", false, task.id);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      finish();
-                    }}
-                    onDragEnd={(e) => finish(e.dataTransfer.dropEffect !== "none")}
-                  />
-                ))}
-              </ul>
-            )}
+          </button>
+        </Zone>
+        <div className="drawer-body" data-open={otherOpen ? "true" : "false"}>
+          <div className="drawer-inner -mx-2 px-2">
+            <div className="pb-3 pt-3">
+              {other.length === 0 ? (
+                <p className="px-1 text-sm" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.7 }}>
+                  Nothing here — nice.
+                </p>
+              ) : (
+                <SortableContext id="other" items={other.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                  <ul className="flex flex-col gap-3">
+                    {other.map((task) => (
+                      <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!otherOpen} />
+                    ))}
+                  </ul>
+                </SortableContext>
+              )}
+            </div>
           </div>
-        </details>
+        </div>
       </section>
-    </>
+
+      <DragOverlay dropAnimation={{ duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }}>
+        {active ? (
+          <ul className="m-0 list-none p-0" style={{ transform: "scale(1.02)", filter: "drop-shadow(0 12px 18px rgba(0,0,0,.45))" }}>
+            <TaskRow task={active} theme={theme} categoryLabel={active.categoryLabel} />
+          </ul>
+        ) : null}
+      </DragOverlay>
+
+      {pickerOpen && <QuestPickerSheet otherTasks={other} theme={theme} onClose={() => setPickerOpen(false)} />}
+    </DndContext>
   );
 }

@@ -76,8 +76,8 @@ export function QuestActionMenu({
       icon: inBattle ? "✕" : "⚔",
       label: isAdventure
         ? inBattle
-          ? "Remove from Today's Battle"
-          : "Add to Today's Battle"
+          ? "Remove from Today's Quests"
+          : "Add to Today's Quests"
         : inBattle
           ? "Remove from Today's Focus"
           : "Add to Today's Focus",

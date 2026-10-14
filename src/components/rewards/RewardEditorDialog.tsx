@@ -7,6 +7,7 @@ import { createRewardAction, deleteRewardAction, updateRewardAction } from "@/ap
 import { IconPicker } from "@/components/tasks/IconPicker";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { useEscape } from "@/lib/use-escape";
+import { usePortalTarget } from "@/components/ui/EmbedHost";
 
 const PRICE_PRESETS = [0, 5, 10, 25, 50, 100];
 
@@ -92,6 +93,7 @@ export function RewardEditorDialog({
     });
   }
 
+  const portalTarget = usePortalTarget();
   return createPortal(
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${closing ? "overlay-fade-out" : "overlay-fade-in"}`}
@@ -197,7 +199,7 @@ export function RewardEditorDialog({
           </div>
           {prereq.trim() && (
             <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              Accepting puts both in Today&apos;s Battle — this quest in front, the reward locked behind it until it&apos;s done.
+              Accepting puts both in Today&apos;s Quests — this quest in front, the reward locked behind it until it&apos;s done.
             </p>
           )}
         </div>
@@ -388,6 +390,6 @@ export function RewardEditorDialog({
         </div>
       </div>
     </div>,
-    document.body
+    portalTarget
   );
 }

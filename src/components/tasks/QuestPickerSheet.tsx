@@ -7,7 +7,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { QuestEditorDialog } from "./QuestEditorDialog";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
-type Step = "choose" | "create" | "existing";
+type Step = "choose" | "create";
 
 /**
  * Opened by the "+" beside Today's Battle/Focus. Replaces the old inline
@@ -38,35 +38,16 @@ export function QuestPickerSheet({
   return (
     <BottomSheet onClose={onClose} theme={theme}>
       {(requestClose) => {
-        if (step === "existing") {
-          return (
-            <ExistingStep
-              tasks={otherTasks}
-              isAdventure={isAdventure}
-              onBack={() => setStep("choose")}
-              onDone={requestClose}
-            />
-          );
-        }
         return (
           <div className="flex flex-col gap-3">
-            <Header
-              title={isAdventure ? "Add to Today's Battle" : "Add to Today's Focus"}
-              isAdventure={isAdventure}
-              onClose={requestClose}
-            />
+            <Header title={isAdventure ? "Add to Today's Quests" : "Add to Today's Focus"} isAdventure={isAdventure} onClose={requestClose} />
             <PickerOption
               icon="+"
-              label={isAdventure ? "Create new quest" : "Create new task"}
+              label={isAdventure ? "Create a new quest" : "Create a new task"}
               isAdventure={isAdventure}
               onClick={() => setStep("create")}
             />
-            <PickerOption
-              icon="📋"
-              label={isAdventure ? "Add an existing quest" : "Add an existing task"}
-              isAdventure={isAdventure}
-              onClick={() => setStep("existing")}
-            />
+            <ExistingStep tasks={otherTasks} isAdventure={isAdventure} onDone={requestClose} />
           </div>
         );
       }}
@@ -156,12 +137,10 @@ function PickerOption({
 function ExistingStep({
   tasks,
   isAdventure,
-  onBack,
   onDone,
 }: {
   tasks: TaskWithCategory[];
   isAdventure: boolean;
-  onBack: () => void;
   onDone: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -192,17 +171,13 @@ function ExistingStep({
 
   return (
     <div className="flex flex-col gap-3">
-      <Header
-        title={isAdventure ? "Add an existing quest" : "Add an existing task"}
-        isAdventure={isAdventure}
-        onClose={onDone}
-        onBack={onBack}
-      />
+      <p className="m-0 text-[13px]" style={{ color: dim }}>
+        {isAdventure ? "Or pick one of your Additional Quests:" : "Or pick one of your other tasks:"}
+      </p>
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search…"
-        autoFocus
         className="rounded border px-2 py-1.5 text-sm"
         style={fieldStyle}
       />

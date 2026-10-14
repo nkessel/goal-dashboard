@@ -2,13 +2,13 @@ import type { TaskWithBoard } from "@/lib/data/tasks";
 
 export type PlottedTask = {
   task: TaskWithBoard;
-  xPct: number; // urgency axis, 0-100
-  yPct: number; // importance axis, 0-100 (0 = bottom)
+  xPct: number; // importance axis, 0-100 (0 = left)
+  yPct: number; // urgency axis, 0-100 (0 = bottom)
 };
 
 /**
  * Maps each task's (importance, urgency) — both 0-5 — onto a 10%-90% plot
- * area, jittering tasks that land in the same cell so they don't fully
+ * area (importance along X, urgency along Y), jittering tasks that land in the same cell so they don't fully
  * overlap. Deterministic (no randomness) so re-renders don't jump around.
  */
 export function computeMatrixLayout(tasks: TaskWithBoard[]): PlottedTask[] {
@@ -25,8 +25,8 @@ export function computeMatrixLayout(tasks: TaskWithBoard[]): PlottedTask[] {
     group.sort((a, b) => a.id.localeCompare(b.id)); // stable order
     const n = group.length;
     group.forEach((task, i) => {
-      const baseX = 10 + (task.urgency / 5) * 80;
-      const baseY = 10 + (task.importance / 5) * 80;
+      const baseX = 10 + (task.importance / 5) * 80;
+      const baseY = 10 + (task.urgency / 5) * 80;
       // Spread same-cell points along a short horizontal line, centered.
       const spacing = 4; // percentage points
       const jitter = (i - (n - 1) / 2) * spacing;

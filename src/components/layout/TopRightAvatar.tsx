@@ -30,8 +30,27 @@ export function TopRightAvatar({
   }, [router]);
   if (pathname.startsWith("/settings")) return <CloseSettingsButton isAdventure={isAdventure} size={40} />;
   return (
-    <Link href="/settings" scroll={false} aria-label={`Menu — signed in as ${label}`} className="hover-glow rounded-full">
-      <Avatar profile={profile} size={10} />
+    <Link
+      href="/settings"
+      scroll={false}
+      aria-label={`Menu — signed in as ${label}`}
+      className="avatar-link flex h-10 w-10 items-center justify-center overflow-hidden rounded-full"
+      style={
+        pathname === "/"
+          ? {
+              background: isAdventure ? "rgba(14,18,10,.55)" : "var(--t-card)",
+              border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`,
+            }
+          : undefined
+      }
+    >
+      {pathname === "/" ? (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M4 7h16M4 12h16M4 17h16" stroke={isAdventure ? "var(--t-gold)" : "var(--t-ink)"} strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <Avatar profile={profile} size={10} />
+      )}
     </Link>
   );
 }

@@ -24,11 +24,11 @@ export function FloatingActionButton({
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-20 z-40 mx-auto flex w-full max-w-md justify-center sm:max-w-lg"
+      className="pointer-events-none fixed bottom-20 z-[46] flex justify-center"
       // Same fixed-chrome-in-a-remounted-shell issue as BottomNav (see the
       // comment there) — without its own view-transition-name the FAB gets
       // dragged along with the page-level slide/fade on every navigation.
-      style={{ viewTransitionName: "app-fab" }}
+      style={{ viewTransitionName: "app-fab", left: "var(--fab-x, 50%)", transform: "translateX(-50%)" }}
     >
       <button
         type="button"

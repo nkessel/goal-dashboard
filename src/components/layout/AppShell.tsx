@@ -10,6 +10,7 @@ import { defaultPortraitFor } from "@/components/settings/Avatar";
 import { countImports, countMissingPortraits } from "@/lib/data/rewards";
 import { PortraitPainter } from "@/components/imports/PortraitPainter";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { BackToToday } from "@/components/layout/BackToToday";
 
 /**
  * App shell for the mobile-app-style redesign (matches the Productivity RPG
@@ -63,7 +64,9 @@ export async function AppShell({
         />
       )}
       <div className={`flex w-full flex-1 flex-col ${widthClass}`}>
-        <div className="flex items-center justify-end gap-2.5 px-5 pt-3">
+        <div className="flex items-center gap-2.5 px-5 pt-3">
+          {profileId && <BackToToday isAdventure={isAdventure} />}
+          <span className="flex-1" />
           {profileId && (
             <NotificationsButton unreadCount={unreadCount} isAdventure={isAdventure} iconColor={iconColor} />
           )}
