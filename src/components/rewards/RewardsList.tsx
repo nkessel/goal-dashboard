@@ -95,6 +95,22 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
         </p>
       )}
 
+      <button
+        type="button"
+        onClick={() => setEditing("new")}
+        className="hover-glow -mt-1 flex h-11 items-center justify-center gap-2 self-center rounded-full px-5 text-[16px] font-semibold"
+        style={{
+          border: `1.5px solid ${isAdventure ? "var(--t-gold)" : "var(--t-card-border)"}`,
+          background: isAdventure ? "rgba(10,14,9,.45)" : "var(--t-card)",
+          color: isAdventure ? "var(--t-cream)" : "var(--t-ink)",
+        }}
+      >
+        <span className="text-xl leading-none" style={{ color: "var(--t-gold)" }}>
+          +
+        </span>
+        Add a reward
+      </button>
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {available.map((r) => {
           const cost = r.cost_coins ?? 0;
@@ -155,21 +171,6 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={() => setEditing("new")}
-        className="hover-glow flex h-14 items-center justify-center gap-2 rounded-2xl border-2 border-dashed text-[17px]"
-        style={{
-          borderColor: isAdventure ? "rgba(217,180,95,.5)" : "var(--t-card-border)",
-          background: isAdventure ? "rgba(10,14,9,.25)" : undefined,
-          color: isAdventure ? "var(--t-cream)" : "var(--t-ink)",
-        }}
-      >
-        <span className="text-xl leading-none" style={{ color: "var(--t-gold)" }}>
-          +
-        </span>{" "}
-        Add a reward
-      </button>
 
       {accepted.length > 0 && (
         <section className={`flex flex-col rounded-2xl px-5 py-4 ${isAdventure ? "parchment parchment-framed" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>

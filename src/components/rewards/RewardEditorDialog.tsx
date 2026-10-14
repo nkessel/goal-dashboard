@@ -188,6 +188,7 @@ export function RewardEditorDialog({
                 </span>
                 <input
                   type="number"
+                  onFocus={(e) => e.currentTarget.select()}
                   min={0}
                   value={prereqXp}
                   onChange={(e) => setPrereqXp(Math.max(0, Math.round(Number(e.target.value) || 0)))}
@@ -234,6 +235,7 @@ export function RewardEditorDialog({
                 <CoinIcon size={20} />
                 <input
                   type="number"
+                  onFocus={(e) => e.currentTarget.select()}
                   min={0}
                   value={price}
                   onChange={(e) => setPrice(Math.max(0, Math.round(Number(e.target.value) || 0)))}
@@ -306,6 +308,7 @@ export function RewardEditorDialog({
                   {f.icon}
                   <input
                     type="number"
+                  onFocus={(e) => e.currentTarget.select()}
                     min={0}
                     value={f.value}
                     onChange={(e) => f.set(Math.max(0, Math.round(Number(e.target.value) || 0)))}

@@ -259,6 +259,7 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
               </span>
               <input
                 type="number"
+                  onFocus={(e) => e.currentTarget.select()}
                 min={0}
                 value={xp}
                 onChange={(e) => setXp(Math.max(0, Math.round(Number(e.target.value) || 0)))}

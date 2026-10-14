@@ -55,6 +55,8 @@ export function CreateSheet({
   // The feedback form can be moved aside or tucked away to look at the screen.
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [minimized, setMinimized] = useState(false);
+  const [pillPos, setPillPos] = useState({ x: 0, y: 0 });
+  const pillDrag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
   const dragFrom = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLSpanElement>(null);
@@ -118,9 +120,24 @@ export function CreateSheet({
       {minimized && (
         <button
           type="button"
-          onClick={() => setMinimized(false)}
-          className="create-sheet-in fixed left-1/2 z-[49] flex h-12 -translate-x-1/2 items-center gap-2 rounded-full px-5 text-[15px] font-semibold shadow-xl"
-          style={{ bottom: "calc(5rem + 70px + env(safe-area-inset-bottom))", background: "linear-gradient(180deg,#f2d58a,#d9b45f)", color: "#2a1c10", border: "1.5px solid #8a6116" }}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            pillDrag.current = { px: e.clientX, py: e.clientY, x: pillPos.x, y: pillPos.y, moved: false };
+          }}
+          onPointerMove={(e) => {
+            const d = pillDrag.current;
+            if (!d) return;
+            if (Math.hypot(e.clientX - d.px, e.clientY - d.py) > 5) d.moved = true;
+            if (d.moved) setPillPos({ x: d.x + e.clientX - d.px, y: d.y + e.clientY - d.py });
+          }}
+          onPointerUp={() => {
+            const d = pillDrag.current;
+            pillDrag.current = null;
+            if (d && !d.moved) setMinimized(false);
+          }}
+          onPointerCancel={() => (pillDrag.current = null)}
+          className="create-sheet-in fixed left-1/2 z-[49] flex h-12 -translate-x-1/2 cursor-grab touch-none select-none items-center gap-2 rounded-full px-5 text-[15px] font-semibold shadow-xl"
+          style={{ bottom: "calc(5rem + 70px + env(safe-area-inset-bottom))", translate: `${pillPos.x}px ${pillPos.y}px`, background: "linear-gradient(180deg,#f2d58a,#d9b45f)", color: "#2a1c10", border: "1.5px solid #8a6116" }}
         >
           <span aria-hidden>🛠</span> Feedback draft · tap to finish
         </button>
@@ -173,7 +190,7 @@ export function CreateSheet({
               isAdventure={isAdventure}
               onClick={() => setStage("make")}
             />
-            <ChoiceButton icon={<span className="text-[20px]">🛠</span>} title="App feedback" hint="What to change in the next update, or an idea for the future" isAdventure={isAdventure} onClick={() => setStage("feedback")} />
+            <ChoiceButton icon={<span className="text-[20px]">🛠</span>} title="Feedback" hint="What to change in the next update, or an idea for the future" isAdventure={isAdventure} onClick={() => setStage("feedback")} />
             <ChoiceButton icon={<QuillGlyph />} title="Journal entry" hint="Gratitude, reflections, wins, ideas" isAdventure={isAdventure} onClick={() => setStage("journal")} />
           </div>
         ) : isFeedback ? (
@@ -201,7 +218,7 @@ export function CreateSheet({
             <span aria-hidden className="text-[15px] tracking-[-2px]" style={{ color: "var(--t-ink-soft)" }}>
               ⋮⋮
             </span>
-            <span className={`flex-1 py-1.5 pl-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>App feedback</span>
+            <span className={`flex-1 py-1.5 pl-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>Feedback</span>
             <button type="button" onClick={() => setMinimized(true)} aria-label="Minimize" title="Minimize" className="flex h-9 w-9 items-center justify-center rounded-full" style={{ color: "var(--t-ink-soft)" }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <path d="M6 17h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
@@ -278,6 +295,9 @@ export function CreateSheet({
   );
 }
 
+/** An unfinished journal entry handed from the + sheet to the journal screen. */
+export const JOURNAL_DRAFT_KEY = "journal-draft";
+
 const MOODS = [
   { v: 1, face: "😞", label: "Rough" },
   { v: 2, face: "🙁", label: "Low" },
@@ -288,9 +308,19 @@ const MOODS = [
 
 /** A quick private journal entry, with an optional mood. */
 function JournalComposer({ feedback = false, isAdventure, onDone }: { feedback?: boolean; isAdventure: boolean; onDone: () => void }) {
-  const [body, setBody] = useState("");
-  const [mood, setMood] = useState<number | null>(null);
-  const [kind, setKind] = useState<JournalKind | null>(feedback ? "feedback" : null);
+  // Picks up an entry carried over from the + sheet ("Open journal").
+  const [draft] = useState<{ body: string; mood: number | null; kind: JournalKind | null } | null>(() => {
+    if (feedback) return null;
+    try {
+      const raw = window.localStorage.getItem(JOURNAL_DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [body, setBody] = useState(draft?.body ?? "");
+  const [mood, setMood] = useState<number | null>(draft?.mood ?? null);
+  const [kind, setKind] = useState<JournalKind | null>(feedback ? "feedback" : (draft?.kind ?? null));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [isSaving, startSaving] = useTransition();
@@ -300,6 +330,11 @@ function JournalComposer({ feedback = false, isAdventure, onDone }: { feedback?:
     startSaving(async () => {
       try {
         await addJournalEntryAction(body, feedback ? null : mood, kind);
+        try {
+          if (!feedback) window.localStorage.removeItem(JOURNAL_DRAFT_KEY);
+        } catch {
+          /* storage unavailable */
+        }
         setSaved(true);
         setTimeout(onDone, 900);
       } catch (e) {
@@ -424,9 +459,26 @@ function JournalComposer({ feedback = false, isAdventure, onDone }: { feedback?:
         </p>
       )}
       <div className="flex items-center justify-between gap-2">
-        <Link href="/journal" onClick={onDone} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
-          Open journal
-        </Link>
+        {!feedback ? (
+          <Link
+            href="/journal"
+            onClick={() => {
+              // Carry the unfinished entry over to the journal screen.
+              try {
+                if (body.trim()) window.localStorage.setItem(JOURNAL_DRAFT_KEY, JSON.stringify({ body, mood, kind }));
+              } catch {
+                /* storage unavailable */
+              }
+              onDone();
+            }}
+            className="text-[13px] underline"
+            style={{ color: "var(--t-ink-soft)" }}
+          >
+            Open journal
+          </Link>
+        ) : (
+          <span />
+        )}
         <span className="ml-auto hidden text-[12px] sm:inline" style={{ color: "var(--t-ink-soft)" }}>
           Ctrl + Enter
         </span>

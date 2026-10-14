@@ -133,6 +133,7 @@ export function RiteEditorDialog({
           ))}
           <input
             type="number"
+                  onFocus={(e) => e.currentTarget.select()}
             inputMode="numeric"
             min={0}
             max={500}

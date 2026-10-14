@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { useFabTarget } from "@/lib/fab-target";
-import { CreateSheet, type CreateKind } from "./CreateSheet";
+import { CreateSheet, JOURNAL_DRAFT_KEY, type CreateKind } from "./CreateSheet";
 
 /** The floating + : opens the create sheet above it and becomes its ×. */
 export function CreateFab({
@@ -13,7 +13,10 @@ export function CreateFab({
   todayFull,
   theme = "calm",
   label = "Create something new",
+  resumeDraft = false,
 }: {
+  /** Open straight away when an unfinished journal entry was carried over. */
+  resumeDraft?: boolean;
   kinds: CreateKind[];
   initial?: CreateKind;
   boardId?: string;
@@ -22,6 +25,15 @@ export function CreateFab({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!resumeDraft) return;
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
+      if (window.localStorage.getItem(JOURNAL_DRAFT_KEY)) setOpen(true);
+    } catch {
+      /* storage unavailable */
+    }
+  }, [resumeDraft]);
   // A board popup is open: add to that board, and sit above the popup.
   const target = useFabTarget();
   const k = target?.kinds ?? kinds;

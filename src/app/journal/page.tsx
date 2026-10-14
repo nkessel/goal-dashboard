@@ -18,7 +18,7 @@ export default async function JournalPage() {
       <div className="flex flex-col gap-4">
         <PageHeader isAdventure={isAdventure} title="Journal" subtitle="Private notes to yourself — only you can see these." />
         <JournalList entries={entries} isAdventure={isAdventure} />
-        <CreateFab kinds={["journal", "quest", "habit", "rite", "reward"]} initial="journal" theme={profile.theme} label="New journal entry" />
+        <CreateFab kinds={["journal", "quest", "habit", "rite", "reward"]} initial="journal" theme={profile.theme} label="New journal entry" resumeDraft />
       </div>
     </AppShell>
   );

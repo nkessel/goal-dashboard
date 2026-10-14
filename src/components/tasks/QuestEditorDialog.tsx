@@ -697,6 +697,7 @@ export function QuestEditorDialog({
                 <span className={`${labelCls} min-w-0 flex-1`}>Time to complete</span>
                 <input
                   type="number"
+                  onFocus={(e) => e.currentTarget.select()}
                   inputMode="numeric"
                   min={0}
                   step={5}
@@ -739,6 +740,7 @@ export function QuestEditorDialog({
                   <span>Can be done in</span>
                   <input
                     type="number"
+                  onFocus={(e) => e.currentTarget.select()}
                     inputMode="numeric"
                     min={1}
                     step={5}
@@ -970,6 +972,7 @@ export function QuestEditorDialog({
               <span className="flex h-9 shrink-0 items-center rounded-lg border pr-1.5" style={fieldStyle}>
                 <input
                   type="number"
+                  onFocus={(e) => e.currentTarget.select()}
                   inputMode="numeric"
                   min={0}
                   value={xp}
@@ -996,6 +999,7 @@ export function QuestEditorDialog({
                   <CoinIcon size={16} />
                   <input
                     type="number"
+                  onFocus={(e) => e.currentTarget.select()}
                     inputMode="numeric"
                     min={0}
                     value={coinsShown}
@@ -1127,6 +1131,7 @@ export function QuestEditorDialog({
                   <span className="flex items-center rounded-md px-1" style={{ border: "1px solid rgba(168,138,63,.6)", background: "rgba(0,0,0,.25)" }}>
                     <input
                       type="number"
+                  onFocus={(e) => e.currentTarget.select()}
                       inputMode="numeric"
                       min={0}
                       max={100}
