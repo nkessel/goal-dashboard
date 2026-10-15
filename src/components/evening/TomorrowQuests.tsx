@@ -179,7 +179,7 @@ function SlotCard({ id, n, task, onRemove }: { id: string; n: number; task?: Tas
       className="board-sortable parchment moonlit relative flex cursor-grab touch-manipulation items-center gap-3 rounded-2xl px-3 py-2.5 active:cursor-grabbing"
       style={{
         borderRadius: 16,
-        transform: CSS.Transform.toString(transform),
+        transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 5 : undefined,
         boxShadow: isDragging ? "0 12px 28px rgba(0,0,0,.5)" : undefined,

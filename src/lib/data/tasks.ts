@@ -4,7 +4,6 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { logTaskCompletedActivity } from "./activity";
 import type { Task } from "./types";
 
-const MAX_MANUAL_PRIORITIES = 3;
 
 export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
   const db = supabaseAdmin();
@@ -393,24 +392,6 @@ export async function setManualPriority(
   value: boolean
 ): Promise<Task> {
   const db = supabaseAdmin();
-
-  if (value) {
-    const { count, error: countError } = await db
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("owner_id", ownerId)
-      .eq("is_manual_priority", true)
-      .eq("status", "open");
-
-    if (countError) {
-      throw new Error(`Failed to check top-priority count: ${countError.message}`);
-    }
-    if ((count ?? 0) >= MAX_MANUAL_PRIORITIES) {
-      throw new Error(
-        `You can only have ${MAX_MANUAL_PRIORITIES} tasks in Today's Priorities at a time. Remove one first.`
-      );
-    }
-  }
 
   const { data, error } = await db
     .from("tasks")

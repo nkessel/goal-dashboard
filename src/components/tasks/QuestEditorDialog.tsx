@@ -1,5 +1,6 @@
 "use client";
 
+import { NumberInput } from "@/components/ui/NumberInput";
 import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
@@ -44,7 +45,7 @@ export type QuestEditorMode =
       kind: "create";
       boardId?: string | null;
       pinToBattle?: boolean;
-      /** Today's Quests already holds 3 — new quests default to Additional Quests. */
+      /** @deprecated Today's Quests no longer has a limit; kept for callers. */
       todayFull?: boolean;
       /** Start as a quick power-up (prefills a short time). */
       powerUp?: boolean;
@@ -149,12 +150,12 @@ export function QuestEditorDialog({
       : task.in_additional === false
         ? "none"
         : "additional"
-    : create?.pinToBattle === false || create?.todayFull || create?.schedule
-      ? "additional"
-      : "today";
+    : create?.pinToBattle && !create?.schedule
+      ? "today"
+      : "additional";
   const [placement, setPlacement] = useState<Placement>(initialPlacement);
   const savedPlacement = useRef<Placement>(initialPlacement);
-  const todayFull = Boolean(create?.todayFull) && placement !== "today";
+  const todayFull = false;
   const [draftIcon, setDraftIcon] = useState<{ url: string; source: "library" | "ai" } | null>(null);
   const initialSlot =
     task?.is_on_calendar && task.scheduled_start && task.scheduled_end
@@ -175,6 +176,7 @@ export function QuestEditorDialog({
   const [stepsDirty, setStepsDirty] = useState(false);
   const [newStep, setNewStep] = useState("");
   const [addingStep, setAddingStep] = useState(false);
+  const newStepRef = useRef<HTMLInputElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -783,7 +785,17 @@ export function QuestEditorDialog({
                   </button>
                 )}
               </div>
-              {steps === null || (steps.length === 0 && !addingStep) ? null : (
+              {steps === null && (task?.steps_total ?? 0) > 0 ? (
+                // Loading: hold the steps' place so the editor doesn't jump when they arrive.
+                <ul className="m-0 flex list-none flex-col p-0 pl-[22px]" aria-busy="true" aria-label="Loading steps">
+                  {Array.from({ length: task?.steps_total ?? 0 }).map((_, i) => (
+                    <li key={i} className="flex items-center gap-2 py-[5px] pl-1">
+                      <span className="h-[18px] w-[18px] shrink-0 rounded-[5px]" style={{ border: `1.5px solid ${isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`, opacity: 0.5 }} />
+                      <span className="step-skeleton h-[14px] rounded" style={{ width: `${55 + ((i * 17) % 35)}%` }} />
+                    </li>
+                  ))}
+                </ul>
+              ) : steps === null || (steps.length === 0 && !addingStep) ? null : (
                 <ul className="m-0 flex list-none flex-col p-0 pl-[22px]">
                   {steps.map((st) => (
                     <li key={st.key} className="quest-step flex items-start gap-2 rounded-md py-0.5 pl-1">
@@ -810,7 +822,7 @@ export function QuestEditorDialog({
                         value={st.title}
                         onChange={(v) => renameStep(st.key, v.replace(/\n/g, " "))}
                         ariaLabel="Step"
-                        className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[15px] leading-snug focus:outline-none"
+                        className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none"
                         style={{
                           color: st.done ? "var(--t-ink-soft)" : "var(--t-ink)",
                           textDecoration: st.done ? "line-through" : undefined,
@@ -829,28 +841,38 @@ export function QuestEditorDialog({
                     </li>
                   ))}
                   {!isCompleted && addingStep && (
-                    <li className="flex items-center gap-2 py-0.5 pl-1">
-                      <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#a88a3f" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
+                    <li className="quest-step flex items-start gap-2 rounded-md py-0.5 pl-1">
+                      {/* Same box and type as a saved step, so a step looks the same before and after Enter. */}
+                      <span aria-hidden className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#8a6c2c" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
                         +
                       </span>
                       <input
+                        ref={newStepRef}
                         value={newStep}
                         onChange={(e) => setNewStep(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
                             addStep();
+                            // Stay on the add row for the next step, whatever re-rendered.
+                            requestAnimationFrame(() => newStepRef.current?.focus());
+                          } else if (e.key === "Escape" && !newStep.trim()) {
+                            e.stopPropagation();
+                            setAddingStep(false);
                           }
                         }}
                         onBlur={() => {
                           addStep();
-                          setAddingStep(false);
+                          // Only fold the add row away when it was left empty on purpose.
+                          setTimeout(() => {
+                            if (document.activeElement !== newStepRef.current) setAddingStep(false);
+                          }, 0);
                         }}
                         autoFocus
                         enterKeyHint="enter"
                         placeholder="Add a step, then Enter"
                         aria-label="Add a step"
-                        className="bare-input h-8 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-[16px] focus:outline-none"
+                        className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none"
                         style={{ color: "var(--t-ink)" }}
                       />
                     </li>
@@ -974,13 +996,11 @@ export function QuestEditorDialog({
                 style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
               />
               <span className="flex h-9 shrink-0 items-center rounded-lg border pr-1.5" style={fieldStyle}>
-                <input
-                  type="number"
-                  onFocus={(e) => e.currentTarget.select()}
-                  inputMode="numeric"
+                <NumberInput
                   min={0}
+                  max={1000}
                   value={xp}
-                  onChange={(e) => setXp(Math.max(0, Math.min(1000, Number(e.target.value) || 0)))}
+                  onValueChange={setXp}
                   aria-label="XP amount"
                   className="bare-input h-full w-11 bg-transparent px-1 text-right text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                   style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
@@ -1001,13 +1021,10 @@ export function QuestEditorDialog({
                     −
                   </button>
                   <CoinIcon size={16} />
-                  <input
-                    type="number"
-                  onFocus={(e) => e.currentTarget.select()}
-                    inputMode="numeric"
+                  <NumberInput
                     min={0}
                     value={coinsShown}
-                    onChange={(e) => setCoinValue(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                    onValueChange={setCoinValue}
                     aria-label="Coins"
                     className="bare-input h-full w-8 bg-transparent text-center text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                     style={{ color: coinValue === null ? "var(--t-ink-soft)" : "#8a6116" }}
@@ -1133,15 +1150,12 @@ export function QuestEditorDialog({
                     −
                   </button>
                   <span className="flex items-center rounded-md px-1" style={{ border: "1px solid rgba(168,138,63,.6)", background: "rgba(0,0,0,.25)" }}>
-                    <input
-                      type="number"
-                  onFocus={(e) => e.currentTarget.select()}
-                      inputMode="numeric"
+                    <NumberInput
                       min={0}
                       max={100}
                       value={progress}
                       disabled={!progressTracked}
-                      onChange={(e) => setProgress(Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))))}
+                      onValueChange={setProgress}
                       aria-label="Progress percent"
                       className="bare-input h-7 w-10 bg-transparent text-right text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                       style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}

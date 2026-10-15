@@ -124,7 +124,7 @@ export default async function Home() {
             />
             <BeginEveningButton />
             <section>
-              <AddTaskForm theme={theme} todayFull={topPriorities.length >= 3} />
+              <AddTaskForm theme={theme} />
             </section>
             <VictoriesToday
               tasks={completedTasks}

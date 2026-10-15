@@ -13,6 +13,7 @@ import { DiamondIcon } from "@/components/ui/Icons";
 import { QuestShield } from "@/components/ui/Ornaments";
 import { useEscape } from "@/lib/use-escape";
 import { EVERYDAY_JOURNAL_KINDS, JOURNAL_KINDS, type JournalKind } from "@/lib/journal-kinds";
+import { openFeedback } from "@/components/feedback/FeedbackDock";
 
 export type CreateKind = "quest" | "now" | "habit" | "reward" | "rite" | "journal" | "board" | "subboard";
 
@@ -37,9 +38,12 @@ export function CreateSheet({
   initial,
   boardId,
   todayFull = false,
+  pinToToday = false,
   theme = "calm",
   onClose,
 }: {
+  /** Opened from Today's Quests' own +: the new quest goes straight there. */
+  pinToToday?: boolean;
   kinds: CreateKind[];
   initial?: CreateKind;
   /** Quests (and sub-boards) made here go on this board. */
@@ -51,13 +55,7 @@ export function CreateSheet({
   // With both making-things and the journal on offer, the first screen asks which.
   const makeKinds = kinds.filter((k) => k !== "journal");
   const offersChoice = initial !== "journal" && makeKinds.length > 0 && kinds.includes("journal");
-  const [stage, setStage] = useState<"choose" | "make" | "journal" | "feedback">(offersChoice ? "choose" : initial === "journal" ? "journal" : "make");
-  // The feedback form can be moved aside or tucked away to look at the screen.
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [minimized, setMinimized] = useState(false);
-  const [pillPos, setPillPos] = useState({ x: 0, y: 0 });
-  const pillDrag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
-  const dragFrom = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  const [stage, setStage] = useState<"choose" | "make" | "journal">(offersChoice ? "choose" : initial === "journal" ? "journal" : "make");
   const sheetRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLSpanElement>(null);
   const [kind, setKind] = useState<CreateKind>(initial ?? makeKinds[0] ?? kinds[0]);
@@ -73,10 +71,8 @@ export function CreateSheet({
     setTimeout(onClose, 190);
   }
 
-  const shownKind: CreateKind = stage === "journal" || stage === "feedback" ? "journal" : kind;
-  const tabKinds = stage === "journal" || stage === "feedback" ? [] : makeKinds;
-  const isFeedback = stage === "feedback";
-  const moved = offset.x !== 0 || offset.y !== 0;
+  const shownKind: CreateKind = stage === "journal" ? "journal" : kind;
+  const tabKinds = stage === "journal" ? [] : makeKinds;
 
   // Point the little tail exactly at the + (measured, so scrollbars and
   // centring can't throw it off).
@@ -96,57 +92,30 @@ export function CreateSheet({
   const editorKey = shownKind;
   const editor =
     shownKind === "quest" || shownKind === "now" ? (
-      <QuestEditorDialog key={editorKey} mode={{ kind: "create", boardId, todayFull, doingNow: kind === "now" }} theme={theme} onClose={close} />
+      <QuestEditorDialog key={editorKey} mode={{ kind: "create", boardId, todayFull, doingNow: kind === "now", ...(pinToToday ? { pinToBattle: true } : {}) }} theme={theme} onClose={close} />
     ) : shownKind === "reward" ? (
       <RewardEditorDialog key={editorKey} theme={theme} onClose={close} />
     ) : shownKind === "rite" || shownKind === "habit" ? (
       <RiteEditorDialog key={editorKey} slot={shownKind === "habit" ? "day" : "evening"} onClose={close} />
     ) : shownKind === "journal" ? (
-      <JournalComposer key={isFeedback ? "feedback" : "journal"} feedback={isFeedback} isAdventure={isAdventure} onDone={close} />
+      <JournalComposer key="journal" isAdventure={isAdventure} onDone={close} />
     ) : (
       <BoardComposer key={editorKey} parentBoardId={shownKind === "subboard" ? boardId : undefined} isAdventure={isAdventure} onDone={close} />
     );
 
   return createPortal(
     <>
-      {!minimized && (
-        <div
-          className={`fixed inset-0 z-[48] ${leaving ? "overlay-fade-out" : "overlay-fade-in"}`}
-          style={isFeedback ? { background: "rgba(8,6,3,.2)" } : { background: "rgba(8,6,3,.55)", backdropFilter: "blur(1.5px)" }}
-          onClick={close}
-          aria-hidden
-        />
-      )}
-      {minimized && (
-        <button
-          type="button"
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            pillDrag.current = { px: e.clientX, py: e.clientY, x: pillPos.x, y: pillPos.y, moved: false };
-          }}
-          onPointerMove={(e) => {
-            const d = pillDrag.current;
-            if (!d) return;
-            if (Math.hypot(e.clientX - d.px, e.clientY - d.py) > 5) d.moved = true;
-            if (d.moved) setPillPos({ x: d.x + e.clientX - d.px, y: d.y + e.clientY - d.py });
-          }}
-          onPointerUp={() => {
-            const d = pillDrag.current;
-            pillDrag.current = null;
-            if (d && !d.moved) setMinimized(false);
-          }}
-          onPointerCancel={() => (pillDrag.current = null)}
-          className="create-sheet-in fixed left-1/2 z-[49] flex h-12 -translate-x-1/2 cursor-grab touch-none select-none items-center gap-2 rounded-full px-5 text-[15px] font-semibold shadow-xl"
-          style={{ bottom: "calc(5rem + 70px + env(safe-area-inset-bottom))", translate: `${pillPos.x}px ${pillPos.y}px`, background: "linear-gradient(180deg,#f2d58a,#d9b45f)", color: "#2a1c10", border: "1.5px solid #8a6116" }}
-        >
-          <span aria-hidden>🛠</span> Feedback draft · tap to finish
-        </button>
-      )}
+      <div
+        className={`fixed inset-0 z-[48] ${leaving ? "overlay-fade-out" : "overlay-fade-in"}`}
+        style={{ background: "rgba(8,6,3,.55)", backdropFilter: "blur(1.5px)" }}
+        onClick={close}
+        aria-hidden
+      />
       <div
         ref={sheetRef}
         role="dialog"
-        aria-modal={!isFeedback}
-        aria-label={isFeedback ? "App feedback" : "Create something new"}
+        aria-modal
+        aria-label="Create something new"
         onKeyDown={(e) => {
           // Ctrl/⌘ + Enter submits whatever form is open.
           if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
@@ -156,7 +125,7 @@ export function CreateSheet({
             btn.click();
           }
         }}
-        className={`create-sheet fixed inset-x-0 z-[49] mx-auto flex w-[calc(100%-16px)] max-w-md flex-col ${minimized ? "hidden" : ""} ${leaving ? "create-sheet-out" : "create-sheet-in"}`}
+        className={`create-sheet fixed inset-x-0 z-[49] mx-auto flex w-[calc(100%-16px)] max-w-md flex-col ${leaving ? "create-sheet-out" : "create-sheet-in"}`}
         style={{
           ...(keyboard
             ? // Keyboard up: use all the room left above it.
@@ -165,7 +134,6 @@ export function CreateSheet({
                 bottom: "calc(5rem + 66px + env(safe-area-inset-bottom))",
                 maxHeight: "calc(100dvh - 5rem - 66px - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
               }),
-          translate: moved ? `${offset.x}px ${offset.y}px` : undefined,
         }}
       >
         <div
@@ -190,43 +158,11 @@ export function CreateSheet({
               isAdventure={isAdventure}
               onClick={() => setStage("make")}
             />
-            <ChoiceButton icon={<span className="text-[20px]">🛠</span>} title="Feedback" hint="What to change in the next update, or an idea for the future" isAdventure={isAdventure} onClick={() => setStage("feedback")} />
+            <ChoiceButton icon={<span className="text-[20px]">🛠</span>} title="Feedback" hint="What to change in the next update, or an idea for the future" isAdventure={isAdventure} onClick={() => {
+                openFeedback();
+                close();
+              }} />
             <ChoiceButton icon={<QuillGlyph />} title="Journal entry" hint="Gratitude, reflections, wins, ideas" isAdventure={isAdventure} onClick={() => setStage("journal")} />
-          </div>
-        ) : isFeedback ? (
-          <div
-            className="relative z-[1] flex shrink-0 cursor-move touch-none select-none items-center gap-1 px-2 pt-2"
-            onPointerDown={(e) => {
-              if ((e.target as HTMLElement).closest("button")) return;
-              e.currentTarget.setPointerCapture(e.pointerId);
-              dragFrom.current = { px: e.clientX, py: e.clientY, x: offset.x, y: offset.y };
-            }}
-            onPointerMove={(e) => {
-              const d = dragFrom.current;
-              if (!d) return;
-              setOffset({ x: d.x + e.clientX - d.px, y: d.y + e.clientY - d.py });
-            }}
-            onPointerUp={() => (dragFrom.current = null)}
-            onPointerCancel={() => (dragFrom.current = null)}
-            title="Drag to move"
-          >
-            <button type="button" onClick={() => setStage("choose")} aria-label="Back" className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full" style={{ color: "var(--t-ink-soft)" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M14.5 5.5 8 12l6.5 6.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <span aria-hidden className="text-[15px] tracking-[-2px]" style={{ color: "var(--t-ink-soft)" }}>
-              ⋮⋮
-            </span>
-            <span className={`flex-1 py-1.5 pl-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>Feedback</span>
-            <button type="button" onClick={() => setMinimized(true)} aria-label="Minimize" title="Minimize" className="flex h-9 w-9 items-center justify-center rounded-full" style={{ color: "var(--t-ink-soft)" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M6 17h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button type="button" onClick={close} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-              ×
-            </button>
           </div>
         ) : (
           <div className="relative z-[1] flex shrink-0 items-center gap-1 px-2 pt-2.5">
@@ -288,7 +224,7 @@ export function CreateSheet({
         )}
         </div>
         {/* A small tail pointing down at the + it came from. */}
-        {!keyboard && !moved && stage !== "choose" && <span ref={tailRef} aria-hidden className="-mt-[7px] block h-3 w-3 shrink-0 rotate-45 self-start" style={{ background: isAdventure ? "#e4cfa3" : "var(--t-card)", borderRight: "2px solid #c7a96f", borderBottom: "2px solid #c7a96f" }} />}
+        {!keyboard && !pinToToday && stage !== "choose" && <span ref={tailRef} aria-hidden className="-mt-[7px] block h-3 w-3 shrink-0 rotate-45 self-start" style={{ background: isAdventure ? "#e4cfa3" : "var(--t-card)", borderRight: "2px solid #c7a96f", borderBottom: "2px solid #c7a96f" }} />}
       </div>
     </>,
     document.body

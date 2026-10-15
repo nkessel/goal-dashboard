@@ -1,5 +1,6 @@
 "use client";
 
+import { NumberInput } from "@/components/ui/NumberInput";
 import { useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
 import { addToTopOfTodayAction, completeTaskAction, createQuestAction, reopenTaskAction, toggleManualPriorityAction } from "@/app/actions";
@@ -29,6 +30,8 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
   const [editing, setEditing] = useState<Task | null>(null);
   const [spark, setSpark] = useState<{ id: string; xp: number; coins: number } | null>(null);
   const [finished, setFinished] = useState<Set<string>>(new Set());
+  // Today's Quests membership flips at once on tap; the server catches up behind it.
+  const [onToday, setOnToday] = useState<Record<string, boolean>>({});
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [minutes, setMinutes] = useState(5);
@@ -126,26 +129,32 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
         <span className="text-[17px] font-bold leading-none" style={{ color: "var(--t-xp)" }}>
           +{t.xp_value} XP
         </span>
-        {!isDone && (
-          <button
-            type="button"
-            onClick={() =>
-              startTransition(async () => {
+        {!isDone && (() => {
+          const pinned = onToday[t.id] ?? t.is_manual_priority;
+          return (
+            <button
+              type="button"
+              onClick={() => {
                 setError(null);
-                try {
-                  if (t.is_manual_priority) await toggleManualPriorityAction(t.id, false);
-                  else await addToTopOfTodayAction(t.id);
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "Couldn't change that.");
-                }
-              })
-            }
-            className="text-[12.5px] underline"
-            style={{ color: "var(--t-ink-soft)" }}
-          >
-            {t.is_manual_priority ? "In Today's Quests" : "⚔ Add to today"}
-          </button>
-        )}
+                setOnToday((m) => ({ ...m, [t.id]: !pinned }));
+                startTransition(async () => {
+                  try {
+                    if (pinned) await toggleManualPriorityAction(t.id, false);
+                    else await addToTopOfTodayAction(t.id);
+                  } catch (e) {
+                    setOnToday((m) => ({ ...m, [t.id]: pinned }));
+                    setError(e instanceof Error ? e.message : "Couldn't change that.");
+                  }
+                });
+              }}
+              title={pinned ? "Take it off Today's Quests" : "Put it at the top of Today's Quests"}
+              className="text-[12.5px] underline"
+              style={{ color: pinned ? "var(--t-good)" : "var(--t-ink-soft)" }}
+            >
+              {pinned ? "✓ In today · undo" : "⚔ Add to today"}
+            </button>
+          );
+        })()}
         {isDone && (
           <button type="button" onClick={() => startTransition(() => reopenTaskAction(t.id))} className="text-[12.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
             Undo
@@ -257,12 +266,10 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
               <span className="font-bold" style={{ color: "var(--t-xp)" }}>
                 XP
               </span>
-              <input
-                type="number"
-                  onFocus={(e) => e.currentTarget.select()}
+              <NumberInput
                 min={0}
                 value={xp}
-                onChange={(e) => setXp(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                onValueChange={setXp}
                 aria-label="XP"
                 className="price-input w-9 bg-transparent text-center font-bold tabular-nums outline-none"
               />

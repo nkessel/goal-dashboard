@@ -23,9 +23,9 @@ import type { Task } from "@/lib/data/types";
 import { reorderTasksAction, toggleManualPriorityAction } from "@/app/actions";
 import { TaskRow } from "./TaskRow";
 import { GoldRule, Leaf, QuestShield } from "@/components/ui/Ornaments";
+import { CreateSheet } from "@/components/create/CreateSheet";
 
 type ListName = "priority" | "other";
-const MAX_PRIORITY = 3;
 const PRIORITY_ZONE = "zone:priority";
 const OTHER_ZONE = "zone:other";
 
@@ -47,10 +47,12 @@ function SortableQuest({
   theme,
   behind,
   disabled = false,
+  listMoves,
 }: {
   task: TaskWithCategory;
   theme: "calm" | "adventure";
   behind?: TaskWithCategory;
+  listMoves?: React.ComponentProps<typeof TaskRow>["listMoves"];
   /** Cards in a closed drawer can't be dragged or dropped onto. */
   disabled?: boolean;
 }) {
@@ -61,6 +63,7 @@ function SortableQuest({
       theme={theme}
       categoryLabel={task.categoryLabel}
       behind={behind}
+      listMoves={listMoves}
       sortable={{
         setNodeRef,
         attributes: attributes as unknown as React.HTMLAttributes<HTMLElement>,
@@ -112,6 +115,9 @@ export function TodayTaskBoard({
   const [otherOpen, setOtherOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(true);
   const [dragError, setDragError] = useState<string | null>(null);
+  // A quick move from a card's menu: drop the local copy on the next fresh props.
+  const [softLocal, setSoftLocal] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
 
@@ -124,13 +130,41 @@ export function TodayTaskBoard({
   const other = (localOther ?? otherTasks).filter((t) => !isLocked(t));
 
   // Fresh server props win once they match what we saved (or changed elsewhere).
-  if (priorityTasks !== seenPriorityTasks) {
+  if (priorityTasks !== seenPriorityTasks || otherTasks !== seenOtherTasks) {
     setSeenPriorityTasks(priorityTasks);
-    if (localPriority && !activeId && (!sameIdSet(localPriority, priorityTasks) || sameOrder(localPriority, priorityTasks))) setLocalPriority(null);
-  }
-  if (otherTasks !== seenOtherTasks) {
     setSeenOtherTasks(otherTasks);
-    if (localOther && !activeId && (!sameIdSet(localOther, otherTasks) || sameOrder(localOther, otherTasks))) setLocalOther(null);
+    if (softLocal && !activeId) {
+      setSoftLocal(false);
+      setLocalPriority(null);
+      setLocalOther(null);
+    } else {
+      if (priorityTasks !== seenPriorityTasks && localPriority && !activeId && (!sameIdSet(localPriority, priorityTasks) || sameOrder(localPriority, priorityTasks))) setLocalPriority(null);
+      if (otherTasks !== seenOtherTasks && localOther && !activeId && (!sameIdSet(localOther, otherTasks) || sameOrder(localOther, otherTasks))) setLocalOther(null);
+    }
+  }
+
+  /** Move a card between the lists (or off them) at once, ahead of the save. */
+  function listMovesFor(id: string) {
+    return {
+      move: (to: ListName | null) => {
+        const task = [...priority, ...other].find((t) => t.id === id);
+        if (!task) return;
+        const nextPriority = priority.filter((t) => t.id !== id);
+        const nextOther = other.filter((t) => t.id !== id);
+        if (to === "priority") nextPriority.push(task);
+        if (to === "other") nextOther.unshift(task);
+        setDragError(null);
+        setSoftLocal(true);
+        setLocalPriority(nextPriority);
+        setLocalOther(nextOther);
+      },
+      revert: (message: string) => {
+        setSoftLocal(false);
+        setLocalPriority(null);
+        setLocalOther(null);
+        setDragError(message);
+      },
+    };
   }
 
   const sensors = useSensors(
@@ -164,6 +198,7 @@ export function TodayTaskBoard({
     setStartList(listOf(id));
     setLocalPriority(priority);
     setLocalOther(other);
+    setSoftLocal(false);
     setDragError(null);
   }
 
@@ -173,7 +208,6 @@ export function TodayTaskBoard({
     const from = listOf(id);
     const to = listOf(e.over ? String(e.over.id) : null);
     if (!from || !to || from === to) return;
-    if (to === "priority" && priority.length >= MAX_PRIORITY) return;
     const source = from === "priority" ? priority : other;
     const target = to === "priority" ? priority : other;
     const task = source.find((t) => t.id === id);
@@ -242,8 +276,9 @@ export function TodayTaskBoard({
     <DndContext id="dnd-TodayTaskBoard" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
       {/* Today's Quests: a subtle section of its own */}
       <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
+        <div className="relative">
         {isAdventure ? (
-          <div className="flex items-center gap-2 px-1">
+          <div className="flex items-center gap-2 px-10 sm:px-11">
             <span className="hidden flex-1 sm:flex">
               <GoldRule dir="left" />
             </span>
@@ -269,6 +304,24 @@ export function TodayTaskBoard({
             </h2>
           </div>
         )}
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            aria-label={`Add a quest to Today's ${isAdventure ? "Quests" : "Focus"}`}
+            title={`Add to Today's ${isAdventure ? "Quests" : "Focus"}`}
+            className="hover-glow absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95"
+            style={
+              isAdventure
+                ? { background: "radial-gradient(circle at 32% 28%, #f2c96a, var(--t-gold) 55%, var(--t-gold-deep))", border: "1.5px solid #5a4520", boxShadow: "0 2px 6px rgba(0,0,0,.35)" }
+                : { background: "var(--t-accent)", border: "1.5px solid var(--t-bg)" }
+            }
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M12 5v14M5 12h14" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="2.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+        {adding && <CreateSheet kinds={["quest"]} initial="quest" pinToToday theme={theme} onClose={() => setAdding(false)} />}
 
         {dragError && (
           <p className="text-xs" style={{ color: "var(--t-warn)" }}>
@@ -282,7 +335,7 @@ export function TodayTaskBoard({
               <SortableContext id="priority" items={priority.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 <ul className="flex min-h-[40px] flex-col gap-3 pb-0.5 pt-0.5">
                   {priority.map((task) => (
-                    <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!todayOpen} />
+                    <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!todayOpen} listMoves={listMovesFor(task.id)} />
                   ))}
                 </ul>
               </SortableContext>
@@ -337,7 +390,7 @@ export function TodayTaskBoard({
         <div className="drawer-body" data-open={otherOpen ? "true" : "false"}>
           <div className="drawer-inner -mx-2 px-2">
             <div
-              className="quest-tray mt-2.5 max-h-[min(54vh,440px)] overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
+              className="quest-tray mt-2.5 max-h-[min(50vh,350px)] overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
               style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}
             >
               {other.length === 0 ? (
@@ -348,7 +401,7 @@ export function TodayTaskBoard({
                 <SortableContext id="other" items={other.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                   <ul className="flex flex-col gap-3">
                     {other.map((task) => (
-                      <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!otherOpen} />
+                      <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!otherOpen} listMoves={listMovesFor(task.id)} />
                     ))}
                   </ul>
                 </SortableContext>

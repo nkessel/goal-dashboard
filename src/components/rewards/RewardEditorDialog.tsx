@@ -1,5 +1,6 @@
 "use client";
 
+import { NumberInput } from "@/components/ui/NumberInput";
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
@@ -186,12 +187,10 @@ export function RewardEditorDialog({
                 <span className="text-[12px] font-bold" style={{ color: "var(--t-xp)" }}>
                   XP
                 </span>
-                <input
-                  type="number"
-                  onFocus={(e) => e.currentTarget.select()}
+                <NumberInput
                   min={0}
                   value={prereqXp}
-                  onChange={(e) => setPrereqXp(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                  onValueChange={setPrereqXp}
                   aria-label="Prerequisite XP"
                   className="price-input w-9 bg-transparent text-center text-[15px] font-bold tabular-nums outline-none"
                 />
@@ -233,12 +232,10 @@ export function RewardEditorDialog({
                 style={{ background: "rgba(0,0,0,.35)", border: "1.5px solid #d9b45f" }}
               >
                 <CoinIcon size={20} />
-                <input
-                  type="number"
-                  onFocus={(e) => e.currentTarget.select()}
+                <NumberInput
                   min={0}
                   value={price}
-                  onChange={(e) => setPrice(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                  onValueChange={setPrice}
                   aria-label="Price in coins"
                   className="price-input w-12 bg-transparent text-center text-[19px] font-bold tabular-nums outline-none"
                   style={{ color: "#f8e3a0" }}
@@ -306,12 +303,10 @@ export function RewardEditorDialog({
                 </button>
                 <label className="flex h-9 items-center gap-1.5 rounded-full px-3" style={{ background: "rgba(255,251,240,.8)", border: "1.5px solid #b39a6a" }}>
                   {f.icon}
-                  <input
-                    type="number"
-                  onFocus={(e) => e.currentTarget.select()}
+                  <NumberInput
                     min={0}
                     value={f.value}
-                    onChange={(e) => f.set(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                    onValueChange={f.set}
                     aria-label={`Bonus ${f.label}`}
                     className="price-input w-10 bg-transparent text-center text-[16px] font-bold tabular-nums outline-none"
                     style={{ color: "var(--t-ink)" }}

@@ -426,7 +426,7 @@ function SortableBoard({ id, fixed, questTarget, children }: { id: string; fixed
       {...listeners}
       className="board-sortable cursor-grab touch-manipulation rounded-2xl active:cursor-grabbing"
       style={{
-        transform: CSS.Transform.toString(transform),
+        transform: CSS.Translate.toString(transform),
         transition,
         opacity: isDragging ? 0.35 : 1,
         outline: questTarget && isOver ? "3px solid rgba(242,201,76,.9)" : undefined,

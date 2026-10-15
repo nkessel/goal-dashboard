@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
@@ -55,8 +55,15 @@ export function TaskRow({
   innerRef,
   behind,
   sortable,
+  listMoves,
+  onEditorClose,
 }: {
   task: Task;
+  /** Called after the editor opened from this card closes (e.g. to close a preview popup too). */
+  onEditorClose?: () => void;
+  /** On a list that can update instantly (Today): move or drop this card
+   * right away, then save. `revert` puts it back if the save fails. */
+  listMoves?: { move: (to: "priority" | "other" | null) => void; revert: (message: string) => void };
   /** A reward locked behind this quest: drawn as a card stacked behind it. */
   behind?: Task | null;
   theme?: "calm" | "adventure";
@@ -94,6 +101,7 @@ export function TaskRow({
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const liRef = useRef<HTMLLIElement | null>(null);
   const tint = rescheduleRedness(task.reschedule_count);
   const isAdventure = theme === "adventure";
   const isWarned = task.reschedule_count >= 3;
@@ -137,6 +145,23 @@ export function TaskRow({
     if (action === "edit") return setEditing(true);
     if (action === "calendar") return setScheduling(true);
     if (action === "focus") return setFocusing(true);
+    if (listMoves && (action === "battle" || action === "offtoday" || action === "delete")) {
+      // Leave the list right away (slide left, fade, close the gap), then save.
+      const to = action === "battle" ? (task.is_manual_priority ? "other" : "priority") : null;
+      startTransition(async () => {
+        await slideOut(liRef.current);
+        listMoves.move(to);
+        try {
+          if (action === "battle") await toggleManualPriorityAction(task.id, !task.is_manual_priority);
+          else if (action === "offtoday") await setTaskPlacementAction(task.id, "none");
+          else await deleteTaskAction(task.id);
+        } catch (e) {
+          resetSlide(liRef.current);
+          listMoves.revert(e instanceof Error ? e.message : "Couldn't move that quest — try again.");
+        }
+      });
+      return;
+    }
     startTransition(async () => {
       try {
         if (action === "battle") {
@@ -196,6 +221,7 @@ export function TaskRow({
   return (
     <li
       ref={(el) => {
+        liRef.current = el;
         innerRef?.(el);
         sortable?.setNodeRef(el);
       }}
@@ -387,6 +413,9 @@ export function TaskRow({
                   {task.steps_done ?? 0}/{task.steps_total}
                 </span>
               )}
+              {/* The bar only appears once some progress has been made. */}
+              {((task.progress ?? 0) > 0 || (task.steps_done ?? 0) > 0) && (
+              <>
               <div
                 className="h-2 flex-1 overflow-hidden rounded-full"
                 style={{
@@ -406,6 +435,8 @@ export function TaskRow({
               <span className="text-[12.5px] font-semibold tabular-nums" style={{ color: isAdventure ? "#6f5a24" : "var(--t-ink-soft)" }}>
                 {task.progress ?? 0}%
               </span>
+              </>
+              )}
             </div>
           )}
         </div>
@@ -471,11 +502,46 @@ export function TaskRow({
           document.body
         )}
 
-      {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
+      {editing && (
+        <EditTaskModal
+          task={task}
+          theme={theme}
+          onClose={() => {
+            setEditing(false);
+            onEditorClose?.();
+          }}
+        />
+      )}
       {focusing && <FocusMode task={{ ...task, categoryLabel }} theme={theme} onClose={() => setFocusing(false)} />}
     </div>
     </li>
   );
+}
+
+/** Slide a card out to the left and fade it, then close the gap it leaves. */
+function slideOut(el: HTMLElement | null): Promise<void> {
+  if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
+  const h = el.getBoundingClientRect().height;
+  el.style.height = `${h}px`;
+  el.style.overflow = "hidden";
+  el.style.pointerEvents = "none";
+  el.style.transition = "transform 200ms ease-in, opacity 180ms ease-in";
+  el.style.transform = "translateX(-56px)";
+  el.style.opacity = "0";
+  return new Promise((resolve) =>
+    setTimeout(() => {
+      el.style.transition = "height 220ms cubic-bezier(.2,.8,.2,1), margin-bottom 220ms cubic-bezier(.2,.8,.2,1)";
+      el.style.height = "0px";
+      // Swallow the list's gap too, so the cards below glide up the whole way.
+      el.style.marginBottom = "-12px";
+      setTimeout(resolve, 230);
+    }, 190)
+  );
+}
+
+function resetSlide(el: HTMLElement | null) {
+  if (!el) return;
+  for (const k of ["height", "overflow", "pointerEvents", "transition", "transform", "opacity", "marginBottom"] as const) el.style[k] = "";
 }
 
 /** The quest's default "icon": a round badge with a greyed-out check. On

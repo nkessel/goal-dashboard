@@ -59,7 +59,7 @@ export function QuestCardPopup({
           </button>
         </div>
         <ul className="m-0 list-none p-0">
-          <TaskRow task={task} theme={theme} categoryLabel={categoryLabel ?? undefined} />
+          <TaskRow task={task} theme={theme} categoryLabel={categoryLabel ?? undefined} onEditorClose={requestClose} />
         </ul>
       </div>
     </div>,
