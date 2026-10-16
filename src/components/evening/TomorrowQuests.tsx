@@ -38,8 +38,11 @@ export function TomorrowQuests({
   candidates,
   theme,
   embedded = false,
+  heading = !embedded,
   onCountChange,
 }: {
+  /** Show its own "Tomorrow's Quests" heading (off inside the evening rite's tray). */
+  heading?: boolean;
   /** Null before the database update that adds the queue. In importance order. */
   queued: TaskWithCategory[] | null;
   /** Open quests that could be added. */
@@ -109,7 +112,7 @@ export function TomorrowQuests({
 
   return (
     <section className="flex flex-col gap-2.5" aria-label="Tomorrow's Quests">
-      {!embedded && (
+      {heading && (
         <div className="flex items-end justify-between gap-2 px-1">
           <h3 className="font-display m-0 text-[21px] leading-tight" style={{ color: ink, textShadow: "0 2px 8px rgba(0,0,0,.5)" }}>
             Tomorrow&apos;s Quests
@@ -122,7 +125,7 @@ export function TomorrowQuests({
 
       {rank.length > 1 && (
         <div className="flex flex-col gap-1">
-          <div role="tablist" aria-label="Order" className="inline-flex w-fit rounded-full p-0.5" style={{ background: "rgba(70,50,20,.12)" }}>
+          <div role="tablist" aria-label="Order" className="inline-flex w-fit rounded-full p-0.5" style={{ background: embedded ? "rgba(70,50,20,.12)" : "rgba(255,255,255,.08)", border: embedded ? undefined : "1px solid rgba(217,180,95,.25)" }}>
             {MODES.map((m) => {
               const on = m.key === mode;
               return (

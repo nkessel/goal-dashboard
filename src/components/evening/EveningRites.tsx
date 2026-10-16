@@ -30,6 +30,7 @@ import { Moon } from "./BeginEveningButton";
 import { useFlipToEvening } from "./DayNightFlip";
 import { useLocalDay } from "./evening-clock";
 import { TomorrowQuests } from "./TomorrowQuests";
+import { RiteGlyph, TrophyAvatar, glyphFor } from "./RiteGlyph";
 import type { Task } from "@/lib/data/types";
 
 /** Client-side copy of a rite (the data module is server-only). */
@@ -60,8 +61,33 @@ const CORE_ZONE = "zone:core";
 const MINI_ZONE = "zone:mini";
 type ListName = "core" | "mini";
 
-/** A moon-and-check seal: empty ring until the rite is done tonight. */
-function RiteSeal({ done }: { done: boolean }) {
+/**
+ * The rite's seal: its picture (a portrait if it has one, else a small
+ * glyph that fits it — a heart, a shirt, an eye…) on a pale ring, turning
+ * gold with a check once done tonight. "Celebrate today's wins" wears an
+ * illustrated trophy.
+ */
+function RiteSeal({ done, rite }: { done: boolean; rite?: RiteView }) {
+  if (rite?.kind === "wins" || rite?.icon_key) {
+    return (
+      <span aria-hidden className="relative block h-[52px] w-[52px] shrink-0">
+        {rite.kind === "wins" ? (
+          <TrophyAvatar size={52} />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element -- rite portrait
+          <img src={rite.icon_key!} alt="" className="h-[52px] w-[52px] rounded-full object-cover" style={{ border: "2px solid #8e8aa8" }} />
+        )}
+        {done && (
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)", border: "1.5px solid #fff6e0" }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        )}
+      </span>
+    );
+  }
+  const glyph = rite ? glyphFor(rite) : "moon";
   return (
     <span
       aria-hidden
@@ -76,8 +102,10 @@ function RiteSeal({ done }: { done: boolean }) {
         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="qc-card-check">
           <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#2a1c10" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-      ) : (
+      ) : glyph === "moon" ? (
         <Moon size={24} />
+      ) : (
+        <RiteGlyph kind={glyph} size={27} />
       )}
     </span>
   );
@@ -150,6 +178,8 @@ export function EveningRites({
   const [error, setError] = useState<string | null>(null);
   // Special rites open to show their content (wins, tomorrow's quests).
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // Trays opened at least once stay mounted, so closing can slide away.
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
   // Swiped away: hidden at once, with a moment to undo.
   const [removed, setRemoved] = useState<RiteView | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -210,7 +240,10 @@ export function EveningRites({
   }
 
   const isOpen = (r: RiteView) => expanded[r.id] ?? (r.kind === "tomorrow" && !doneTonight(r.id));
-  const toggleOpen = (r: RiteView) => setExpanded((x) => ({ ...x, [r.id]: !isOpen(r) }));
+  const toggleOpen = (r: RiteView) => {
+    setOpened((o) => (o[r.id] ? o : { ...o, [r.id]: true }));
+    setExpanded((x) => ({ ...x, [r.id]: !isOpen(r) }));
+  };
 
   /**
    * Choosing tomorrow's quests is one rite: it completes itself once three or
@@ -354,11 +387,11 @@ export function EveningRites({
         {r.kind === "tomorrow" && chosenTomorrow === 0 && !done ? (
           // Nothing chosen yet: the seal opens the list instead.
           <button type="button" onClick={() => toggleOpen(r)} aria-label={`${r.title}: choose a quest first`} className="relative z-[1] rounded-full">
-            <RiteSeal done={done} />
+            <RiteSeal done={done} rite={r} />
           </button>
         ) : (
           <button type="button" onClick={() => toggle(r)} aria-pressed={done} aria-label={done ? `Undo ${r.title}` : `Complete ${r.title}`} className="relative z-[1] rounded-full">
-            <RiteSeal done={done} />
+            <RiteSeal done={done} rite={r} />
           </button>
         )}
         <button
@@ -374,6 +407,14 @@ export function EveningRites({
           {r.description && (
             <span className="mt-0.5 block break-words text-[14px] leading-snug" style={{ color: "#4d4535" }}>
               {r.description}
+            </span>
+          )}
+          {special && !overlay && (
+            <span className="mt-1 inline-flex items-center gap-1 text-[13px] font-semibold" style={{ color: "#6f4f12" }}>
+              {open ? "Fold away" : r.kind === "wins" ? "See today's victories" : r.kind === "plan" ? "Open the plan" : "Choose them"}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : undefined }}>
+                <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </span>
           )}
         </button>
@@ -415,28 +456,50 @@ export function EveningRites({
           </span>
         )}
       </div>
-      {open && (
-        // Its own controls (buttons, inner drag, scrolling) shouldn't start dragging the rite card.
-        <div
-          className="relative z-[1] mt-3 border-t pt-3"
-          style={{ borderColor: "rgba(139,112,64,.35)" }}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          {r.kind === "wins" ? (
-            <RecentWins day={day} />
-          ) : r.kind === "plan" ? (
-            <DayPlanner day={day} chosen={tomorrow ?? []} theme={theme} />
-          ) : (
-            <TomorrowQuests embedded queued={tomorrow} candidates={openQuests} theme={theme} onCountChange={(n) => syncTomorrow(r, n)} />
-          )}
-        </div>
-      )}
       </div>
     );
-    return overlay || special ? inner : <SwipeToDelete label={r.title} onDelete={() => remove(r)}>{inner}</SwipeToDelete>;
+    // Special rites slide a tray out from under the card: today's wins on
+    // parchment (like Victories Today); tomorrow's quests and the day plan on
+    // the night's dark tray.
+    const tray =
+      special && !overlay && (opened[r.id] || open) ? (
+        <div className="drawer-body relative z-0" data-open={open ? "true" : "false"}>
+          <div className="drawer-inner">
+            <div
+              className={r.kind === "wins" ? "parchment parchment-framed -mt-3 rounded-b-2xl px-4 pb-3 pt-6" : "-mt-3 rounded-b-2xl px-2.5 pb-3 pt-6 sm:px-3"}
+              style={
+                r.kind === "wins"
+                  ? { borderTopLeftRadius: 4, borderTopRightRadius: 4 }
+                  : { background: "linear-gradient(180deg, rgba(6,8,24,.78), rgba(10,12,32,.62))", border: "1px solid rgba(217,180,95,.22)", borderTop: "none", boxShadow: "inset 0 10px 14px -10px rgba(0,0,0,.8), inset 0 -6px 10px -6px rgba(0,0,0,.6)" }
+              }
+              // Its own controls (buttons, inner drag, scrolling) shouldn't start dragging the rite card.
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <div className="relative z-[1]">
+                {r.kind === "wins" ? (
+                  <RecentWins day={day} />
+                ) : r.kind === "plan" ? (
+                  <DayPlanner day={day} chosen={tomorrow ?? []} theme={theme} />
+                ) : (
+                  <TomorrowQuests heading={false} queued={tomorrow} candidates={openQuests} theme={theme} onCountChange={(n) => syncTomorrow(r, n)} />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null;
+    const withTray = tray ? (
+      <div className="flex flex-col">
+        <div className="relative z-[1]">{inner}</div>
+        {tray}
+      </div>
+    ) : (
+      inner
+    );
+    return overlay || special ? withTray : <SwipeToDelete label={r.title} onDelete={() => remove(r)}>{inner}</SwipeToDelete>;
   }
 
   const active = activeId ? byId.get(activeId) : null;

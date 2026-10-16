@@ -10,6 +10,7 @@ import { usePortalTarget } from "@/components/ui/EmbedHost";
 import { IconPicker } from "@/components/tasks/IconPicker";
 import { CoinIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
+import { RiteGlyph, glyphFor } from "./RiteGlyph";
 
 const XP_PRESETS = [0, 5, 10, 15, 25];
 const MINUTE_PRESETS = [2, 5, 10, 15, 30];
@@ -57,9 +58,8 @@ export function RiteEditorDialog({
     startSaving(async () => {
       try {
         if (isHabit && days.length === 0) throw new Error("Pick at least one day.");
-        const schedule = isHabit
-          ? { days: days.length === 7 ? null : days, dueTime: dueTime || null, iconKey: icon?.url ?? null, iconSource: icon?.source ?? null, coinValue, estimateMinutes: minutes }
-          : {};
+        const picture = { iconKey: icon?.url ?? null, iconSource: icon?.source ?? null };
+        const schedule = isHabit ? { days: days.length === 7 ? null : days, dueTime: dueTime || null, ...picture, coinValue, estimateMinutes: minutes } : picture;
         if (rite) await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
         else await createRiteAction({ title, description, isCore: isHabit ? true : isCore, xpValue: xp, slot, ...schedule });
         close();
@@ -108,7 +108,7 @@ export function RiteEditorDialog({
         </div>
 
         <div className="relative z-[1] flex items-start gap-3">
-          {isHabit && (
+          {rite?.kind !== "wins" && (
             <div className="flex shrink-0 flex-col items-center gap-1">
               <IconPicker
                 currentIcon={icon?.url ?? null}
@@ -117,9 +117,9 @@ export function RiteEditorDialog({
                 taskDescription={description}
                 theme="adventure"
                 size={64}
-                emptyContent={<CheckboxAvatar />}
+                emptyContent={isHabit ? <CheckboxAvatar /> : <GlyphAvatar title={title} kind={rite?.kind ?? null} />}
                 showEditHint
-                clearLabel="Use the checkbox"
+                clearLabel={isHabit ? "Use the checkbox" : "Use the simple icon"}
                 onDraftChange={(url, source) => setIcon(url ? { url, source } : null)}
               />
               <span className="text-[11px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -147,9 +147,9 @@ export function RiteEditorDialog({
             />
           </div>
         </div>
-        {isHabit && !icon && (
+        {!icon && (
           <p className="relative z-[1] -mt-1.5 m-0 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-            It shows as a checkbox. Tap the avatar to give it a portrait instead.
+            {isHabit ? "It shows as a checkbox. Tap the avatar to give it a portrait instead." : "Its icon follows its name. Tap it to give it a portrait instead."}
           </p>
         )}
 
@@ -394,6 +394,16 @@ function CheckboxAvatar() {
         <circle cx="12" cy="12" r="9" stroke="#a58c66" strokeWidth="2" />
         <path d="M7.5 12.4l3 3 6-6.4" stroke="#a58c66" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
+    </span>
+  );
+}
+
+/** The empty avatar for an evening rite: the glyph its name suggests. */
+function GlyphAvatar({ title, kind }: { title: string; kind: string | null }) {
+  const g = glyphFor({ title, kind });
+  return (
+    <span className="flex h-full w-full items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, rgba(255,255,255,.7), rgba(214,220,240,.35))", border: "2px solid #8e8aa8" }}>
+      {g === "moon" ? <Moon size={30} /> : <RiteGlyph kind={g} size={32} />}
     </span>
   );
 }

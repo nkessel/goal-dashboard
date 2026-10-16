@@ -4,6 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import { listRecentWinsAction } from "@/app/actions";
 import { journalKindMeta } from "@/lib/journal-kinds";
 import { eveningDayKey } from "./evening-clock";
+import { Seal } from "@/components/xp/VictoriesToday";
+import { SectionTitle } from "@/components/ui/Ornaments";
 
 type Win = Awaited<ReturnType<typeof listRecentWinsAction>>[number];
 
@@ -14,7 +16,6 @@ const RANGES = [
   { days: 30, label: "Month" },
 ] as const;
 
-const ICON: Record<Win["kind"], string> = { quest: "✔", rite: "🌙", habit: "🔁", reward: "◆", journal: "✒️", feedback: "💬" };
 
 /** Start of the evening-day `daysBack` days before `day` (days run 5:30am to 5:30am). */
 function sinceISO(day: string, days: number) {
@@ -34,9 +35,9 @@ function dayLabel(key: string, today: string) {
 }
 
 /**
- * The evening's first rite: a look back at what got done — quests, rites,
- * habits, rewards, journal entries and feedback. Today by default; reach
- * further back with the range buttons.
+ * "Celebrate today's wins": a look back at what got done — quests, rites,
+ * habits, rewards, journal entries and feedback — drawn like Victories
+ * Today. Today by default; reach further back with the range buttons.
  */
 export function RecentWins({ day }: { day: string | null }) {
   const [days, setDays] = useState<number>(1);
@@ -64,9 +65,56 @@ export function RecentWins({ day }: { day: string | null }) {
   }
   const totalXp = (wins ?? []).reduce((n, w) => n + (w.xp ?? 0), 0);
 
+  // Feedback is one line per day ("Feedback submitted ×n"), like Victories Today.
+  type Row = { id: string; seal: "check" | "star" | "gift"; label: React.ReactNode; xp: number };
+  const rowsFor = (list: Win[]): Row[] => {
+    const feedback = list.filter((w) => w.kind === "feedback");
+    const rows: Row[] = list
+      .filter((w) => w.kind !== "feedback")
+      .map((w) => {
+        const sub = w.kind === "journal" ? journalKindMeta(w.sub) : null;
+        return {
+          id: w.id,
+          seal: w.kind === "reward" ? "gift" : w.kind === "journal" ? "star" : "check",
+          xp: w.xp ?? 0,
+          label: (
+            <>
+              {(w.kind === "rite" || w.kind === "habit" || w.kind === "journal") && (
+                <span style={{ color: "var(--t-ink-soft)" }}>{w.kind === "rite" ? "Evening rite: " : w.kind === "habit" ? "Habit: " : sub ? `${sub.label}: ` : "Journal: "}</span>
+              )}
+              {w.kind === "reward" && <span style={{ color: "var(--t-ink-soft)" }}>Treasure accepted: </span>}
+              {w.title}
+            </>
+          ),
+        };
+      });
+    if (feedback.length)
+      rows.push({
+        id: `fb-${feedback[0].id}`,
+        seal: "check",
+        xp: feedback.reduce((n, w) => n + (w.xp ?? 0), 0),
+        label: (
+          <>
+            Feedback submitted
+            {feedback.length > 1 && <span style={{ color: "var(--t-ink-soft)" }}> (×{feedback.length})</span>}
+          </>
+        ),
+      });
+    return rows;
+  };
+
   return (
-    <div className="flex flex-col gap-2.5">
-      <div role="group" aria-label="How far back" className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col items-center gap-1 text-center">
+        <SectionTitle as="h3" tone="ink" size={21}>
+          {days === 1 ? "Victories Today" : "Recent Victories"}
+        </SectionTitle>
+        <span className="text-[14.5px]" style={{ color: "var(--t-ink)" }}>
+          {days === 1 ? "Today\u2019s XP" : "XP"}: <span className="font-semibold tabular-nums">{totalXp}</span>
+          {wins && wins.length > 0 && <span style={{ color: "var(--t-ink-soft)" }}> · {wins.length} {wins.length === 1 ? "win" : "wins"}</span>}
+        </span>
+      </div>
+      <div role="group" aria-label="How far back" className="flex flex-wrap items-center justify-center gap-1.5">
         {RANGES.map((r) => (
           <button
             key={r.days}
@@ -79,12 +127,6 @@ export function RecentWins({ day }: { day: string | null }) {
             {r.label}
           </button>
         ))}
-        {wins && wins.length > 0 && (
-          <span className="ml-auto text-[13px] tabular-nums" style={{ color: "#5a4a30" }}>
-            {wins.length} {wins.length === 1 ? "win" : "wins"}
-            {totalXp > 0 && ` · ${totalXp} XP`}
-          </span>
-        )}
       </div>
 
       {error && (
@@ -93,44 +135,38 @@ export function RecentWins({ day }: { day: string | null }) {
         </p>
       )}
       {wins === null || (isLoading && wins.length === 0) ? (
-        <p className="m-0 text-[14.5px] italic" style={{ color: "#5a4a30" }}>
+        <p className="m-0 py-2 text-center text-[15px] italic" style={{ color: "var(--t-ink-soft)" }}>
           Gathering your wins…
         </p>
       ) : wins.length === 0 ? (
-        <p className="m-0 text-[14.5px] italic" style={{ color: "#5a4a30" }}>
+        <p className="m-0 py-2 text-center text-[15.5px] italic" style={{ color: "var(--t-ink-soft)" }}>
           {days === 1 ? "Nothing logged yet today — even small steps count. Try a longer look back." : "Nothing logged in this stretch."}
         </p>
       ) : (
-        <div className={`flex max-h-[min(46vh,380px)] flex-col gap-2 overflow-y-auto overscroll-contain pr-1 ${isLoading ? "opacity-60" : ""}`}>
+        <div className={`flex max-h-[min(50vh,420px)] flex-col gap-1 overflow-y-auto overscroll-contain pr-1 ${isLoading ? "opacity-60" : ""}`}>
           {[...groups.entries()].map(([key, list]) => (
             <div key={key}>
               {(days > 1 || key !== day) && (
-                <p className="m-0 mb-0.5 text-[12.5px] font-semibold uppercase tracking-wide" style={{ color: "#6f5a24" }}>
+                <p className="font-display m-0 mt-1 text-center text-[16px]" style={{ color: "#5a4520" }}>
                   {day ? dayLabel(key, day) : key}
                 </p>
               )}
               <ul className="m-0 flex list-none flex-col p-0">
-                {list.map((w) => {
-                  const sub = w.kind === "journal" ? journalKindMeta(w.sub) : null;
-                  return (
-                    <li key={w.id} className="flex items-start gap-2 py-1 text-[15px] leading-snug" style={{ color: "var(--t-ink)" }}>
-                      <span aria-hidden className="w-5 shrink-0 text-center" style={{ color: w.kind === "quest" ? "#3f7a32" : "#8a6c2c" }}>
-                        {sub?.icon ?? ICON[w.kind]}
+                {rowsFor(list).map((row, i) => (
+                  <li
+                    key={row.id}
+                    className="flex min-h-[44px] items-center gap-3 py-2 text-[16.5px]"
+                    style={{ color: "var(--t-ink)", ...(i ? { borderTop: "1px solid rgba(139,112,64,.35)" } : null) }}
+                  >
+                    <Seal kind={row.seal} />
+                    <span className="min-w-0 flex-1 break-words leading-snug">{row.label}</span>
+                    {row.xp > 0 && (
+                      <span className="shrink-0 text-[16px]" style={{ color: "var(--t-ink)" }}>
+                        +{row.xp} XP
                       </span>
-                      <span className="min-w-0 flex-1 break-words">
-                        {(w.kind === "journal" || w.kind === "feedback") && (
-                          <span style={{ color: "#6b5c40" }}>{w.kind === "feedback" ? "Feedback: " : sub ? `${sub.label}: ` : "Journal: "}</span>
-                        )}
-                        {w.title}
-                      </span>
-                      {!!w.xp && (
-                        <span className="shrink-0 text-[13.5px] font-semibold tabular-nums" style={{ color: "var(--t-xp)" }}>
-                          +{w.xp}
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
+                    )}
+                  </li>
+                ))}
               </ul>
             </div>
           ))}

@@ -1621,8 +1621,12 @@ export async function planQuestAtAction(taskId: string, startISO: string, endISO
   revalidatePath("/calendar");
 }
 
-/** A quick event (a meal, a workout…) placed straight onto the plan as a small quest. */
-export async function planQuickEventAction(input: { title: string; startISO: string; endISO: string; xp?: number }) {
+/**
+ * A planning item (a meal, a workout…) placed straight onto tomorrow's plan
+ * as a small quest. Planning it pays `planXp` now (taken back if it comes
+ * off the plan); doing it tomorrow pays its own `xp`.
+ */
+export async function planQuickEventAction(input: { title: string; startISO: string; endISO: string; xp?: number; planXp?: number }) {
   const { profileId, accessToken } = await requireSessionMaybeGoogle();
   const title = input.title.trim().slice(0, 80);
   if (!title) throw new Error("Name it first.");
@@ -1631,28 +1635,42 @@ export async function planQuickEventAction(input: { title: string; startISO: str
   // Lives on the calendar, not in Additional Quests.
   await tasksData.setTaskInAdditional(task.id, profileId, false).catch(() => null);
   await attachCalendarEvent(accessToken, profileId, task, new Date(input.startISO), new Date(input.endISO), false);
+  const planXp = Math.max(0, Math.min(100, Math.round(input.planXp ?? 0)));
+  let coinsEarned = 0;
+  const { error: markErr } = await supabaseAdmin().from("tasks").update({ plan_xp: planXp }).eq("id", task.id).eq("owner_id", profileId);
+  if (!markErr && planXp > 0) coinsEarned = (await xp.awardXp(profileId, planXp, "task_completed")).coinsEarned;
   revalidatePath("/");
   revalidatePath("/calendar");
-  return task.id;
+  return { id: task.id, xp: markErr ? 0 : planXp, coinsEarned };
 }
 
-/** Take a quest back off the calendar (and off Google Calendar, when connected). */
+/**
+ * Take a quest back off the calendar (and off Google Calendar, when
+ * connected). A planning item made from the planner goes away entirely, and
+ * the XP its planning paid is taken back.
+ */
 export async function unscheduleTaskAction(taskId: string) {
   const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const { data: t } = await supabaseAdmin().from("tasks").select("plan_xp, status").eq("id", taskId).eq("owner_id", profileId).maybeSingle<{ plan_xp: number | null; status: string }>();
   const eventId = await tasksData.unscheduleTask(taskId, profileId);
   if (eventId && accessToken) await deleteCalendarEvent(accessToken, eventId).catch(() => {});
+  if (t && t.plan_xp !== null && t.plan_xp !== undefined && t.status === "open") {
+    await tasksData.deleteTask(taskId, profileId);
+    if (t.plan_xp > 0) await xp.awardXp(profileId, -t.plan_xp, "task_completed");
+  }
   revalidatePath("/");
   revalidatePath("/calendar");
 }
 
-export type QuickEvent = { label: string; emoji: string; minutes: number };
+/** A planning item: what it is, how long it takes, and the XP planning it earns. */
+export type QuickEvent = { label: string; emoji: string; minutes: number; xp?: number };
 const DEFAULT_QUICK_EVENTS: QuickEvent[] = [
-  { label: "Breakfast", emoji: "🍳", minutes: 30 },
-  { label: "Lunch", emoji: "🥪", minutes: 45 },
-  { label: "Dinner", emoji: "🍲", minutes: 60 },
-  { label: "Exercise", emoji: "🏃", minutes: 45 },
-  { label: "Visit Dad", emoji: "🏡", minutes: 120 },
-  { label: "Couples check-in", emoji: "💞", minutes: 30 },
+  { label: "Breakfast", emoji: "🍳", minutes: 30, xp: 5 },
+  { label: "Lunch", emoji: "🥪", minutes: 45, xp: 5 },
+  { label: "Dinner", emoji: "🍲", minutes: 60, xp: 5 },
+  { label: "Exercise", emoji: "🏃", minutes: 45, xp: 5 },
+  { label: "Visit Dad", emoji: "🏡", minutes: 120, xp: 5 },
+  { label: "Couples check-in", emoji: "💞", minutes: 30, xp: 5 },
 ];
 
 export async function getQuickEventsAction(): Promise<QuickEvent[]> {
@@ -1665,7 +1683,12 @@ export async function saveQuickEventsAction(list: QuickEvent[]) {
   const profileId = await requireProfileId();
   const clean = list
     .slice(0, 16)
-    .map((q) => ({ label: String(q.label).trim().slice(0, 40), emoji: String(q.emoji || "📌").slice(0, 8), minutes: Math.max(5, Math.min(600, Math.round(Number(q.minutes) || 30))) }))
+    .map((q) => ({
+      label: String(q.label).trim().slice(0, 40),
+      emoji: String(q.emoji || "📌").slice(0, 8),
+      minutes: Math.max(5, Math.min(600, Math.round(Number(q.minutes) || 30))),
+      xp: Math.max(0, Math.min(100, Math.round(Number(q.xp ?? 5)))),
+    }))
     .filter((q) => q.label);
   const { error } = await supabaseAdmin().from("profiles").update({ quick_events: clean }).eq("id", profileId);
   if (error) throw new Error("Saving quick events needs a quick database update first.");

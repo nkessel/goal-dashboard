@@ -48,7 +48,7 @@ export async function listWinsSince(ownerId: string, sinceISO: string): Promise<
       const sub = (j.kind as string | null) ?? (m ? m[1].toLowerCase() : null);
       const body = m ? (j.body as string).slice(m[0].length) : (j.body as string);
       const isFeedback = sub === "feedback" || sub === "refill" || sub === "future" || sub === "app feedback" || sub === "future idea";
-      return { id: `j-${j.id}`, kind: isFeedback ? ("feedback" as const) : ("journal" as const), title: body.length > 140 ? `${body.slice(0, 140)}…` : body, at: j.created_at as string, sub };
+      return { id: `j-${j.id}`, kind: isFeedback ? ("feedback" as const) : ("journal" as const), title: body.length > 140 ? `${body.slice(0, 140)}…` : body, at: j.created_at as string, sub, ...(Number(j.xp_awarded) > 0 ? { xp: Number(j.xp_awarded) } : {}) };
     }),
   ];
   return wins.filter((w) => w.at && w.at >= sinceISO.slice(0, 10)).sort((a, b) => (a.at < b.at ? 1 : -1));

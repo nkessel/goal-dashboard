@@ -45,7 +45,6 @@ export type RiteCompletion = {
 const DEFAULT_RITES: { title: string; description: string; is_core: boolean; xp_value: number }[] = [
   { title: "Plan tomorrow", description: "Look over tomorrow's calendar and choose the quests for tomorrow's battle.", is_core: true, xp_value: 10 },
   { title: "Envision tomorrow", description: "Imagine what you'd love to see happen tomorrow.", is_core: true, xp_value: 5 },
-  { title: "Plan meals & exercise", description: "Decide tomorrow's meals and how you'll move your body.", is_core: true, xp_value: 5 },
   { title: "Check in with Tiffany", description: "Go over plans for the coming day and week.", is_core: true, xp_value: 5 },
   { title: "Tidy the kitchen", description: "Leave it ready for the morning.", is_core: false, xp_value: 5 },
   { title: "Stretch for ten minutes", description: "Unwind the day.", is_core: false, xp_value: 5 },
@@ -80,10 +79,10 @@ export async function listRites(ownerId: string): Promise<Rite[] | null> {
 
 /** The two special evening rites, added once (ahead of the others) when missing. */
 const SPECIAL_RITES: { kind: string; title: string; description: string; xp_value: number; adopt?: RegExp }[] = [
-  { kind: "wins", title: "Appreciate recent wins", description: "Look back at what you got done.", xp_value: 5 },
+  { kind: "wins", title: "Celebrate today's wins", description: "Look back at what you got done.", xp_value: 5 },
   { kind: "tomorrow", title: "Choose tomorrow's quests", description: "Pick tomorrow's quests: how much each matters, and the order you'll do them.", xp_value: 10 },
   // Someone's own "Plan tomorrow…" rite becomes the day planner (keeping its history).
-  { kind: "plan", title: "Plan tomorrow's day", description: "Place tomorrow's quests, meals and moments on its hours.", xp_value: 10, adopt: /^plan tomorrow/i },
+  { kind: "plan", title: "Prepare for tomorrow's day", description: "Plan tomorrow's meals, moments and quests on its hours.", xp_value: 10, adopt: /^plan tomorrow/i },
 ];
 
 async function ensureSpecialRites(ownerId: string, list: Rite[]): Promise<Rite[]> {
@@ -101,7 +100,7 @@ async function ensureSpecialRites(ownerId: string, list: Rite[]): Promise<Rite[]
     if (own) {
       const { data, error } = await db
         .from("rites")
-        .update({ kind: s.kind, sort_order: first - SPECIAL_RITES.length + i })
+        .update({ kind: s.kind, title: s.title, description: s.description, sort_order: first - SPECIAL_RITES.length + i })
         .eq("id", own.id)
         .eq("owner_id", ownerId)
         .select("*")
@@ -122,6 +121,14 @@ async function ensureSpecialRites(ownerId: string, list: Rite[]): Promise<Rite[]
       .single<Rite>();
     if (data) added.push(data);
     else if (error && error.code !== "23505") return rites;
+  }
+  // Meal and exercise planning now happens inside "Prepare for tomorrow's day".
+  if (missing.some((s) => s.kind === "plan")) {
+    const old = rites.filter((r) => !r.kind && r.slot !== "day" && /^plan meals/i.test(r.title));
+    if (old.length) {
+      await db.from("rites").update({ archived: true }).eq("owner_id", ownerId).in("id", old.map((r) => r.id));
+      rites = rites.filter((r) => !old.includes(r));
+    }
   }
   if (added.length < missing.length) {
     // Someone else's insert won the race: read the list again.

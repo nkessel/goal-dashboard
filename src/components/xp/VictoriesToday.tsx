@@ -11,7 +11,7 @@ import { journalKindMeta, splitKindPrefix } from "@/lib/journal-kinds";
 const noop = () => () => {};
 
 /** Round seal at the start of each victory line. */
-function Seal({ kind }: { kind: "check" | "star" | "gift" }) {
+export function Seal({ kind }: { kind: "check" | "star" | "gift" }) {
   const isCheck = kind === "check";
   return (
     <span
