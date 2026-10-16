@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { askForWeatherLocation, daySummary, useWeatherRange } from "@/lib/use-weather";
+import { daySummary, useWeatherRange } from "@/lib/use-weather";
+import { WeatherLocation, useWeatherPlaceName } from "@/components/ui/WeatherLocation";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
@@ -91,7 +92,7 @@ export function WeekView({
     el.addEventListener("pointercancel", up);
   }
   const weather = useWeatherRange(dayKeys[0] ?? null, dayKeys[dayKeys.length - 1] ?? null);
-  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const placeName = useWeatherPlaceName();
   const single = days.length === 1;
   const nowMinute = useNowMinute();
   const now = nowMinute ? new Date(nowMinute * 60_000) : null;
@@ -234,15 +235,19 @@ export function WeekView({
       className={`rounded-2xl p-2.5 ${isAdventure ? "parchment" : ""}`}
       style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >
-      {weather === undefined && (
-        <div className="mb-1.5 flex items-center gap-2 px-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-          <button type="button" onClick={() => askForWeatherLocation(setWeatherError)} className="underline underline-offset-2" style={{ color: "var(--t-ink)" }}>
-            Show weather
-          </button>
-          <span>· uses your rough location</span>
-          {weatherError && <span style={{ color: "var(--t-warn)" }}>{weatherError}</span>}
-        </div>
-      )}
+      <div className="mb-1.5 flex items-center gap-2 px-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+        {weather === undefined ? (
+          <>
+            <WeatherLocation />
+            <span>· for hourly temperatures and rain</span>
+          </>
+        ) : (
+          <>
+            <span>Weather for {placeName ?? "your location"} ·</span>
+            <WeatherLocation label="change" />
+          </>
+        )}
+      </div>
       <div
         className="grid"
         style={{

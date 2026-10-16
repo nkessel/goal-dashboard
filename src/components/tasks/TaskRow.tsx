@@ -479,7 +479,7 @@ export function TaskRow({
                   {Array.from({ length: urgencyCount }).map((_, i) =>
                     isAdventure ? (
                       // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                      <img key={i} src="/design/ui-flame-sm.png" alt="" width={15} height={15} />
+                      <img key={i} src="/design/ui-hourglass.svg" alt="" width={15} height={15} />
                     ) : (
                       <span key={i} style={{ color: "var(--t-clay)", fontSize: 12 }}>
                         &#9679;
@@ -557,14 +557,8 @@ export function TaskRow({
           {importanceCount > 0 && (
             <span className="flex flex-wrap items-center gap-0.5 sm:gap-[3px]" title={`Importance ${task.importance.toFixed(1)}`}>
               {Array.from({ length: importanceCount }).map((_, i) =>
-                isAdventure ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                  <img key={i} src="/design/ui-heart.svg" alt="" width={13} height={13} className="h-[11px] w-[11px] sm:h-[13px] sm:w-[13px]" />
-                ) : (
-                  <span key={i} style={{ color: "#c8402f", fontSize: 13 }}>
-                    &#9829;
-                  </span>
-                )
+                // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
+                <img key={i} src="/design/ui-flame-sm.png" alt="" width={14} height={14} className="h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]" />
               )}
             </span>
           )}

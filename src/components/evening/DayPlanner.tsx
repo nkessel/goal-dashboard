@@ -1,5 +1,8 @@
 "use client";
 
+import { useWeatherRange, type HourWeather } from "@/lib/use-weather";
+import { WeatherLocation } from "@/components/ui/WeatherLocation";
+
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -73,52 +76,11 @@ function lanes<T extends { start: number; end: number }>(items: T[]) {
   return out;
 }
 
-const WEATHER_KEY = "weather-coords";
-const WEATHER_EVENT = "weather-coords";
-
-/**
- * Tomorrow's hourly forecast (temperature, chance of rain) from Open-Meteo,
- * once a location has been shared: undefined = not asked yet, null =
- * loading or unavailable.
- */
-function useHourlyWeather(dayKey: string | null): Record<number, { temp: number; rain: number }> | null | undefined {
-  const [coords, setCoords] = useState<{ lat: number; lon: number } | null | undefined>(undefined);
-  const [data, setData] = useState<Record<number, { temp: number; rain: number }> | null>(null);
-  useEffect(() => {
-    const read = () => {
-      try {
-        const raw = window.localStorage.getItem(WEATHER_KEY);
-        setCoords(raw ? (JSON.parse(raw) as { lat: number; lon: number }) : undefined);
-      } catch {
-        setCoords(undefined);
-      }
-    };
-    read();
-    window.addEventListener(WEATHER_EVENT, read);
-    return () => window.removeEventListener(WEATHER_EVENT, read);
-  }, []);
-  useEffect(() => {
-    if (!coords || !dayKey) return;
-    const fahrenheit = /^en-US/.test(navigator.language) || /^(America\/(?!Sao|Argentina|Bogota|Lima|Santiago|Caracas|Mexico)|US\/)/.test(Intl.DateTimeFormat().resolvedOptions().timeZone);
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&hourly=temperature_2m,precipitation_probability&timezone=auto&start_date=${dayKey}&end_date=${dayKey}${fahrenheit ? "&temperature_unit=fahrenheit" : ""}`;
-    let alive = true;
-    fetch(url)
-      .then((r) => r.json())
-      .then((j: { hourly?: { time: string[]; temperature_2m: number[]; precipitation_probability: number[] } }) => {
-        if (!alive || !j.hourly) return;
-        const out: Record<number, { temp: number; rain: number }> = {};
-        j.hourly.time.forEach((t, i) => {
-          out[Number(t.slice(11, 13))] = { temp: Math.round(j.hourly!.temperature_2m[i]), rain: Math.round(j.hourly!.precipitation_probability[i] ?? 0) };
-        });
-        setData(out);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [coords, dayKey]);
-  if (coords === undefined) return undefined;
-  return data;
+/** Tomorrow's hourly forecast; undefined until a place is shared. */
+function useHourlyWeather(dayKey: string | null): Record<number, HourWeather> | null | undefined {
+  const w = useWeatherRange(dayKey, dayKey);
+  if (w === undefined) return undefined;
+  return w && dayKey ? (w[dayKey] ?? null) : null;
 }
 
 const MEAL_RE = /breakfast|brunch|lunch|dinner|supper|snack|meal/i;
@@ -250,22 +212,6 @@ export function DayPlanner({
   }, [carry, full, mealsOpen, xpFor]);
 
   if (!tomorrow || !dayStart) return null;
-
-  function askForWeather() {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        try {
-          window.localStorage.setItem(WEATHER_KEY, JSON.stringify({ lat: Math.round(p.coords.latitude * 100) / 100, lon: Math.round(p.coords.longitude * 100) / 100 }));
-        } catch {
-          /* storage unavailable */
-        }
-        window.dispatchEvent(new Event(WEATHER_EVENT));
-      },
-      () => setError("Couldn't get your location for the forecast."),
-      { maximumAge: 86_400_000, timeout: 10_000 }
-    );
-  }
 
   const placedIds = new Set((plan?.quests ?? []).map((q) => q.id));
   const toPlace = chosen.filter((t) => !placedIds.has(t.id));
@@ -662,9 +608,9 @@ export function DayPlanner({
         </button>
       )}
       {weather === undefined && (
-        <button type="button" onClick={askForWeather} className="rounded-full px-2.5 py-1.5 text-[13px] underline-offset-2 hover:underline" style={{ color: N.soft }} title="Show each hour's forecast (uses your location)">
-          Show weather
-        </button>
+        <span className="px-2.5 py-1.5 text-[13px]">
+          <WeatherLocation dark up />
+        </span>
       )}
       <Link href={`/calendar?view=day&date=${tomorrow}`} className="rounded-full px-2.5 py-1.5 text-[13px] underline underline-offset-2" style={{ color: N.gold }}>
         Calendar

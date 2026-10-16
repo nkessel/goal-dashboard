@@ -420,7 +420,7 @@ function Facts({ task, now }: { task: Task; now: number }) {
         <span className="whitespace-nowrap" title={`Urgency ${task.urgency}, importance ${task.importance}`}>
           {"🔥".repeat(Math.round(task.urgency))}
           {task.urgency > 0 && task.importance > 0 ? " " : ""}
-          {"❤️".repeat(Math.round(task.importance))}
+          {"🔥".repeat(Math.round(task.importance))}
         </span>
       )}
     </div>
