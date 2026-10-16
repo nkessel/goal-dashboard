@@ -314,7 +314,16 @@ export function TaskRow({
       >
       <div
       onClick={() => setEditing(true)}
-      title="Click to edit"
+      onContextMenu={(e) => {
+        // Right-click opens the same menu as ⋯.
+        if ((e.target as Element).closest("input,textarea,a")) return;
+        const dots = e.currentTarget.querySelector<HTMLElement>(".quest-dots");
+        if (!dots) return;
+        e.preventDefault();
+        setMenuAnchor(dots);
+        setMenu("dots");
+      }}
+      title="Click to edit · right-click for more"
       className={`quest-card hover-glow relative flex cursor-pointer flex-col rounded-2xl px-3 pb-3 pt-2.5 ${behind ? "z-[1]" : ""} ${task.reward_id ? "reward-quest" : ""} ${
         draggable ? "active:cursor-grabbing" : ""
       } ${isPending ? "opacity-70" : ""}`}

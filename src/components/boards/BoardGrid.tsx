@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,7 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { BoardWithStats } from "@/lib/data/boards";
 import { UNCATEGORIZED_ID } from "@/lib/board-ids";
 import type { Task } from "@/lib/data/types";
-import { moveTaskToBoardAction, reorderBoardsAction } from "@/app/actions";
+import { listBoardOptionsAction, moveTaskToBoardAction, nestBoardAction, reorderBoardsAction } from "@/app/actions";
 import { QuestCardPopup } from "@/components/tasks/QuestCardPopup";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { CreateSheet } from "@/components/create/CreateSheet";
@@ -32,6 +33,8 @@ import { BoardSeal } from "./BoardSeal";
 
 /** How many open quests each card previews before "N more". */
 const PREVIEW_COUNT = 3;
+/** Where the Uncategorized card sits among the boards (it has no saved order of its own). */
+const LOOSE_KEY = "boards-loose-index";
 
 /** Two rolled scrolls, one behind the other: boards inside this board. */
 function SubBoardsIcon() {
@@ -95,7 +98,27 @@ export function BoardGrid({
     setOrder(null);
   }
   const byId = new Map(initialBoards.map((b) => [b.id, b]));
-  const boards = (order ?? initialBoards.map((b) => b.id)).map((id) => byId.get(id)).filter((b): b is BoardWithStats => !!b);
+  const [looseAt, setLooseAt] = useState<number | null>(null);
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem(LOOSE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+      if (v !== null && !Number.isNaN(Number(v))) setLooseAt(Number(v));
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  function baseOrder(): string[] {
+    const ids = initialBoards.map((b) => b.id);
+    const i = ids.indexOf(UNCATEGORIZED_ID);
+    if (i < 0 || looseAt === null) return ids;
+    const rest = ids.filter((id) => id !== UNCATEGORIZED_ID);
+    rest.splice(Math.min(looseAt, rest.length), 0, UNCATEGORIZED_ID);
+    return rest;
+  }
+  const [menu, setMenu] = useState<{ board: BoardWithStats; x: number; y: number } | null>(null);
+  const [nesting, setNesting] = useState<BoardWithStats | null>(null);
+  const boards = (order ?? baseOrder()).map((id) => byId.get(id)).filter((b): b is BoardWithStats => !!b);
   const [moved, setMoved] = useState<Record<string, string | null>>({});
   const [active, setActive] = useState<{ kind: "board"; board: BoardWithStats } | { kind: "quest"; quest: Task } | null>(null);
   const [editingBoard, setEditingBoard] = useState<BoardWithStats | null>(null);
@@ -141,9 +164,20 @@ export function BoardGrid({
       const ids = boards.map((b) => b.id);
       const from = ids.indexOf(a.slice(BOARD.length));
       const to = ids.indexOf(over.slice(BOARD.length));
-      if (from < 0 || to < 0 || from === to || ids[to] === UNCATEGORIZED_ID || ids[from] === UNCATEGORIZED_ID) return;
+      if (from < 0 || to < 0 || from === to) return;
       const next = arrayMove(ids, from, to);
       setOrder(next);
+      const loose = next.indexOf(UNCATEGORIZED_ID);
+      if (loose >= 0) {
+        setLooseAt(loose);
+        try {
+          window.localStorage.setItem(LOOSE_KEY, String(loose));
+        } catch {
+          /* storage unavailable */
+        }
+      }
+      const real = (xs: string[]) => xs.filter((id) => id !== UNCATEGORIZED_ID).join();
+      if (real(next) === real(ids)) return;
       startTransition(async () => {
         try {
           await reorderBoardsAction(next.filter((id) => id !== UNCATEGORIZED_ID), parentBoardId);
@@ -330,7 +364,13 @@ export function BoardGrid({
     );
 
     return (
-      <div className={`board-card relative h-full ${isAdventure ? `board-scroll ${board.isComplete ? "is-complete" : ""}` : ""}`}>
+      <div
+        onContextMenu={(e) => {
+          if (board.isVirtual || dragging || active) return;
+          e.preventDefault();
+          setMenu({ board, x: e.clientX, y: e.clientY });
+        }}
+        className={`board-card relative h-full ${isAdventure ? `board-scroll ${board.isComplete ? "is-complete" : ""}` : ""}`}>
         {isAdventure && <span aria-hidden className="scroll-rod top" />}
         <div
           className={isAdventure ? "scroll-sheet" : "h-full rounded-2xl"}
@@ -380,7 +420,7 @@ export function BoardGrid({
         <SortableContext items={boards.map((b) => BOARD + b.id)} strategy={rectSortingStrategy}>
           <ul className={`grid gap-x-2 gap-y-3 sm:gap-x-3 ${boards.length === 1 ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3"}`}>
             {boards.map((board) => (
-              <SortableBoard key={board.id} id={board.id} fixed={!!board.isVirtual} questTarget={active?.kind === "quest"}>
+              <SortableBoard key={board.id} id={board.id} fixed={false} questTarget={active?.kind === "quest"}>
                 {card(board)}
               </SortableBoard>
             ))}
@@ -400,6 +440,52 @@ export function BoardGrid({
         </DragOverlay>
       </DndContext>
 
+      {menu && (
+        <BoardMenu
+          x={menu.x}
+          y={menu.y}
+          title={menu.board.title}
+          nested={!!parentBoardId}
+          onClose={() => setMenu(null)}
+          onOpen={() => router.push(`/boards/${menu.board.id}`)}
+          onEdit={() => setEditingBoard(menu.board)}
+          onAdd={() => setAddingTo(menu.board.id)}
+          onNest={() => setNesting(menu.board)}
+          onUnnest={() => {
+            const id = menu.board.id;
+            startTransition(async () => {
+              try {
+                await nestBoardAction(id, null);
+                router.refresh();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Couldn't move that board.");
+              }
+            });
+          }}
+        />
+      )}
+      {nesting && (
+        <NestPicker
+          board={nesting}
+          isAdventure={isAdventure}
+          onClose={() => setNesting(null)}
+          onPick={(parentId) => {
+            const id = nesting.id;
+            setNesting(null);
+            setError(null);
+            setOrder(boards.map((b) => b.id).filter((x) => x !== id));
+            startTransition(async () => {
+              try {
+                await nestBoardAction(id, parentId);
+                router.refresh();
+              } catch (err) {
+                setOrder(null);
+                setError(err instanceof Error ? err.message : "Couldn't move that board.");
+              }
+            });
+          }}
+        />
+      )}
       {editingBoard && <EditBoardModal board={editingBoard} theme={theme} onClose={() => setEditingBoard(null)} />}
       {openQuest && (
         <QuestCardPopup
@@ -469,5 +555,148 @@ function QuestPreview({ q, disabled, onOpen }: { q: Task; disabled: boolean; onO
         <span className="min-w-0 flex-1 truncate">{q.title}</span>
       </button>
     </li>
+  );
+}
+
+/** Right-click menu for a board card. */
+function BoardMenu({
+  x,
+  y,
+  title,
+  nested,
+  onClose,
+  onOpen,
+  onEdit,
+  onAdd,
+  onNest,
+  onUnnest,
+}: {
+  x: number;
+  y: number;
+  title: string;
+  nested: boolean;
+  onClose: () => void;
+  onOpen: () => void;
+  onEdit: () => void;
+  onAdd: () => void;
+  onNest: () => void;
+  onUnnest: () => void;
+}) {
+  useEffect(() => {
+    const down = (e: PointerEvent) => {
+      if (!(e.target as Element).closest?.("[data-board-menu]")) onClose();
+    };
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("pointerdown", down);
+    window.addEventListener("keydown", key);
+    window.addEventListener("scroll", onClose, true);
+    return () => {
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("scroll", onClose, true);
+    };
+  }, [onClose]);
+  const W = 230;
+  const left = Math.max(8, Math.min(x, window.innerWidth - W - 8));
+  const top = Math.max(8, Math.min(y, window.innerHeight - 230));
+  const items: [string, () => void][] = [
+    ["Open board", onOpen],
+    ["Add a quest or sub-board", onAdd],
+    ["Edit board", onEdit],
+    ["Nest into another board…", onNest],
+    ...(nested ? ([["Move to the top level", onUnnest]] as [string, () => void][]) : []),
+  ];
+  return createPortal(
+    <div
+      data-board-menu
+      role="menu"
+      aria-label={`${title} menu`}
+      className="parchment fixed z-[80] flex flex-col overflow-hidden py-1"
+      style={{ left, top, width: W, borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,.35)", border: "1px solid #b39a6a" }}
+    >
+      {items.map(([label, fn]) => (
+        <button
+          key={label}
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onClose();
+            fn();
+          }}
+          className="relative z-[1] min-h-10 px-3.5 text-left text-[14.5px] hover:bg-black/[.06]"
+          style={{ color: "var(--t-ink)" }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>,
+    document.body
+  );
+}
+
+/** Pick the board to nest this one inside. */
+function NestPicker({ board, isAdventure, onClose, onPick }: { board: BoardWithStats; isAdventure: boolean; onClose: () => void; onPick: (parentId: string) => void }) {
+  const [options, setOptions] = useState<{ id: string; label: string }[] | null>(null);
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    let live = true;
+    listBoardOptionsAction()
+      .then((o) => live && setOptions(o.filter((x) => x.id !== board.id && !x.label.split(" › ").includes(board.title))))
+      .catch(() => live && setOptions([]));
+    return () => {
+      live = false;
+    };
+  }, [board.id, board.title]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onClose]);
+  const shown = (options ?? []).filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase()));
+  return createPortal(
+    <div className="overlay-fade-in fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label={`Nest ${board.title} into another board`}
+        onClick={(e) => e.stopPropagation()}
+        className={`flex max-h-[80vh] w-full max-w-sm flex-col gap-2 p-4 ${isAdventure ? "parchment" : ""}`}
+        style={{ borderRadius: 16, background: isAdventure ? undefined : "var(--t-card)" }}
+      >
+        <h2 className={`relative z-[1] m-0 ${isAdventure ? "font-display text-[19px]" : "text-[16px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
+          Nest &ldquo;{board.title}&rdquo; into…
+        </h2>
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Find a board"
+          className="relative z-[1] h-10 rounded-lg border px-3 text-[15px]"
+          style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.55)", color: "var(--t-ink)" }}
+        />
+        <ul className="relative z-[1] m-0 flex min-h-0 list-none flex-col overflow-y-auto p-0">
+          {options === null ? (
+            <li className="px-2 py-2 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
+              Loading boards…
+            </li>
+          ) : shown.length === 0 ? (
+            <li className="px-2 py-2 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
+              No other boards.
+            </li>
+          ) : (
+            shown.map((o) => (
+              <li key={o.id}>
+                <button type="button" onClick={() => onPick(o.id)} className="min-h-10 w-full rounded-lg px-2 text-left text-[14.5px] hover:bg-black/[.06]" style={{ color: "var(--t-ink)" }}>
+                  {o.label}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+        <button type="button" onClick={onClose} className="relative z-[1] h-9 self-end rounded-full px-4 text-[14px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)" }}>
+          Cancel
+        </button>
+      </div>
+    </div>,
+    document.body
   );
 }

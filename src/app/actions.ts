@@ -99,6 +99,15 @@ export async function updateBoardAction(
   revalidatePath(`/boards/${boardId}`);
 }
 
+/** "Nest into another board" (or back to the top with null). */
+export async function nestBoardAction(boardId: string, parentId: string | null) {
+  const ownerId = await requireProfileId();
+  const board = await boardsData.getBoard(boardId, ownerId);
+  if (!board) throw new Error("That board isn't here anymore.");
+  await boardsData.setBoardParent(boardId, ownerId, parentId);
+  revalidatePath("/boards", "layout");
+}
+
 export async function reorderBoardsAction(orderedIds: string[], parentBoardId?: string | null) {
   const ownerId = await requireProfileId();
   await boardsData.updateBoardOrder(ownerId, orderedIds);

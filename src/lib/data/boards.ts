@@ -223,6 +223,29 @@ export async function updateBoard(
 }
 
 /**
+ * Moves a board inside another (or back to the top level with null). Refuses
+ * to put a board inside itself or one of its own sub-boards.
+ */
+export async function setBoardParent(boardId: string, ownerId: string, parentId: string | null): Promise<void> {
+  const db = supabaseAdmin();
+  if (parentId) {
+    if (parentId === boardId) throw new Error("A board can't go inside itself.");
+    const all = await listBoardsForOwner(ownerId);
+    const byId = new Map(all.map((b) => [b.id, b]));
+    if (!byId.has(parentId)) throw new Error("That board isn't here anymore.");
+    for (let at: string | null = parentId; at; at = byId.get(at)?.parent_board_id ?? null) {
+      if (at === boardId) throw new Error("That board is already inside this one.");
+    }
+  }
+  const { error } = await db
+    .from("boards")
+    .update({ parent_board_id: parentId, sort_order: 9000 })
+    .eq("id", boardId)
+    .eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't move the board: ${error.message}`);
+}
+
+/**
  * Persists a new drag-and-drop order for the owner's boards: `orderedIds`
  * is the full list of board ids in their new display order, and each gets
  * its `sort_order` set to its index. Scoped by owner_id as a safety check
