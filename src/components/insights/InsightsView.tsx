@@ -204,7 +204,7 @@ function MetricChart({ metric, days, readings }: { metric: string; days: Date[];
 
 function XpBars({ days, xpByDay, doneByDay }: { days: Date[]; xpByDay: Map<string, number>; doneByDay: Map<string, number> }) {
   const [hover, setHover] = useState<number | null>(null);
-  const W = 640;
+  const W = 460;
   const H = 150;
   const L = 30;
   const T = 10;
@@ -228,7 +228,7 @@ function XpBars({ days, xpByDay, doneByDay }: { days: Date[]; xpByDay: Map<strin
         {[0, nice / 2, nice].map((v) => (
           <g key={v}>
             <line x1={L} x2={W} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" />
-            <text x={L - 5} y={y(v) + 3.5} textAnchor="end" fontSize="10" fill={INK_SOFT}>
+            <text x={L - 5} y={y(v) + 3.5} textAnchor="end" fontSize="12" fill={INK_SOFT}>
               {v}
             </text>
           </g>
@@ -248,7 +248,7 @@ function XpBars({ days, xpByDay, doneByDay }: { days: Date[]; xpByDay: Map<strin
                 />
               )}
               {(i % 2 === 1 || i === days.length - 1) && (
-                <text x={cx} y={H - 5} textAnchor="middle" fontSize="10" fill={INK_SOFT}>
+                <text x={cx} y={H - 5} textAnchor="middle" fontSize="12" fill={INK_SOFT}>
                   {i === days.length - 1 ? "today" : days[i].toLocaleDateString(undefined, { weekday: "narrow" }) + days[i].getDate()}
                 </text>
               )}
