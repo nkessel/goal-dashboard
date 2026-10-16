@@ -55,6 +55,8 @@ export default async function FeedPage() {
 
         <FriendRequests incoming={incomingWithProfiles} theme={theme} />
 
+        <InviteLinkBox code={invite.code} theme={theme} inviterName={profile?.name?.split(" ")[0] ?? null} />
+
         <section className="flex flex-col gap-3">
           <ul className="flex flex-col gap-3">
             {feed.map((item) => (
@@ -81,8 +83,6 @@ export default async function FeedPage() {
             )}
           </ul>
         </section>
-
-        <InviteLinkBox code={invite.code} theme={theme} />
 
         <section className="flex flex-col gap-2 rounded-2xl px-4 py-3.5" style={{
           background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",

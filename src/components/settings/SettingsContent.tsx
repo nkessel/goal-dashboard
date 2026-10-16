@@ -14,6 +14,8 @@ import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import { CelebrationSettings } from "@/components/settings/CelebrationSettings";
 import { EveningButtonFxSettings } from "@/components/settings/VisualFxSettings";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
+import { isAdmin, countUnreviewed } from "@/lib/data/feedback";
+import { ChatIcon } from "@/components/feedback/FeedbackDock";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
 import { getProfileById } from "@/lib/data/profiles";
 import { xpToNextLevel } from "@/lib/data/xp";
@@ -22,11 +24,13 @@ const ICON_STROKE = { strokeWidth: 1.6, fill: "none" as const };
 
 /** Everything in Settings below its title — shared by the Settings page and the slide-out menu. */
 export async function SettingsContent({ userId, open }: { userId: string; open?: string }) {
-  const [session, profile, imports] = await Promise.all([
+  const [session, profile, imports, admin] = await Promise.all([
     auth(),
     getProfileById(userId),
     countImports(userId).catch(() => ({ quests: 0, rewards: 0 })),
+    isAdmin(userId),
   ]);
+  const newFeedback = admin ? await countUnreviewed() : 0;
   if (!profile) notFound();
   const openAppearance = open === "appearance";
   const isAdventure = profile.theme === "adventure";
@@ -105,6 +109,29 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             </div>
           </div>
         </section>
+
+        {admin && (
+          <Link
+            href="/feedback-review"
+            className={`hover-glow flex items-center gap-3 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}
+            style={isAdventure ? { borderRadius: 14 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }}
+          >
+            <ChatIcon size={24} />
+            <span className="flex flex-1 flex-col leading-tight">
+              <span className="text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                Party feedback
+              </span>
+              <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                {newFeedback > 0 ? `${newFeedback} new to review` : "Review what your party would change"}
+              </span>
+            </span>
+            {newFeedback > 0 && (
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[12.5px] font-bold tabular-nums" style={{ background: "#7a2f1f", color: "#fff6e0", border: "1.5px solid #f2d27e" }}>
+                {newFeedback}
+              </span>
+            )}
+          </Link>
+        )}
 
         {/* Quick ways in: Power-ups and the Treasure Chest */}
         <div className="grid grid-cols-2 gap-2.5">

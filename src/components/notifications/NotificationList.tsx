@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { markNotificationReadAction, markAllNotificationsReadAction, snoozeNotificationAction } from "@/app/actions";
 import type { AppNotification } from "@/lib/data/types";
@@ -79,6 +80,11 @@ export function NotificationList({
           <time className="text-[13.5px]" style={{ color: "var(--t-ink-soft)" }} dateTime={n.created_at}>
             {now === null ? " " : when(n.created_at, now)}
           </time>
+          {n.kind === "feedback" && (
+            <Link href="/feedback-review" className="mt-1 w-fit text-[14px] font-semibold underline underline-offset-2" style={{ color: isAdventure ? "#6f4f12" : "var(--t-accent)" }}>
+              Review it
+            </Link>
+          )}
         </div>
         {!n.is_read && (
           <div className="mt-1 flex shrink-0 flex-col items-stretch gap-1.5">

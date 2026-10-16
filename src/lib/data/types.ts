@@ -235,7 +235,8 @@ export type NotificationKind =
   | "reschedule_reminder"
   | "level_up"
   | "daily_check_in"
-  | "imports";
+  | "imports"
+  | "feedback";
 
 export type AppNotification = {
   id: string;

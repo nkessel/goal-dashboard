@@ -4,7 +4,10 @@ import { useState, useTransition } from "react";
 import { deleteJournalEntryAction } from "@/app/actions";
 import { JOURNAL_KINDS, journalKindMeta } from "@/lib/journal-kinds";
 
-type Entry = { id: string; body: string; mood: number | null; kind?: string | null; created_at: string };
+type Entry = { id: string; body: string; mood: number | null; kind?: string | null; created_at: string; review_status?: string | null };
+
+/** What happened to a piece of feedback, as the person who sent it sees it. */
+const REVIEWED: Record<string, string> = { global: "Planned", personal: "Planned for you", later: "Saved for later", skipped: "Not planned" };
 const FACES = ["", "😞", "🙁", "😐", "🙂", "😄"];
 
 /** Entries newest first, grouped by day. */
@@ -75,6 +78,11 @@ export function JournalList({ entries, isAdventure }: { entries: Entry[] | null;
                 {journalKindMeta(e.kind) && (
                   <span className="rounded-full px-2 py-0.5 font-semibold" style={{ background: "rgba(217,180,95,.3)", color: "var(--t-ink)" }}>
                     {journalKindMeta(e.kind)!.icon} {journalKindMeta(e.kind)!.label}
+                  </span>
+                )}
+                {e.review_status && REVIEWED[e.review_status] && (
+                  <span className="rounded-full px-2 py-0.5 font-semibold" style={{ border: "1px solid rgba(139,112,64,.45)", color: "var(--t-ink)" }}>
+                    {REVIEWED[e.review_status]}
                   </span>
                 )}
                 {e.mood && (

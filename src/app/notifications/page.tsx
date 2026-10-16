@@ -14,6 +14,7 @@ const ICONS: Record<string, string> = {
   level_up: "🎉",
   daily_check_in: "☀️",
   imports: "📜",
+  feedback: "💬",
 };
 
 export default async function NotificationsPage() {

@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 
 import { JOURNAL_KINDS, splitKindPrefix } from "@/lib/journal-kinds";
 
-export type JournalEntry = { id: string; body: string; mood: number | null; kind: string | null; created_at: string };
+export type JournalEntry = { id: string; body: string; mood: number | null; kind: string | null; created_at: string; review_status?: string | null };
 
 function missingTable(error: { code?: string; message: string } | null) {
   return !!error && (error.code === "42P01" || error.code === "PGRST205" || /journal_entries/.test(error.message));

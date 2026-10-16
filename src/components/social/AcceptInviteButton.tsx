@@ -16,15 +16,19 @@ export function AcceptInviteButton({ code, inviterName }: { code: string; invite
       try {
         await acceptInviteAction(code);
         setDone(true);
-        setTimeout(() => router.push("/feed"), 1200);
+        setTimeout(() => router.push("/feed"), 1400);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong");
+        setError(e instanceof Error ? e.message : "Couldn't join. Try opening the link again.");
       }
     });
   }
 
   if (done) {
-    return <p className="text-sm text-emerald-600">You and {inviterName} are now friends 🎉 Redirecting…</p>;
+    return (
+      <p role="status" className="m-0 text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
+        You&apos;re in {inviterName}&apos;s party. Taking you there…
+      </p>
+    );
   }
 
   return (
@@ -33,11 +37,16 @@ export function AcceptInviteButton({ code, inviterName }: { code: string; invite
         type="button"
         onClick={accept}
         disabled={isPending}
-        className="rounded-full bg-foreground px-6 py-3 text-sm font-medium text-background hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
+        className="hover-glow h-12 rounded-full px-7 text-[16px] font-bold disabled:opacity-60"
+        style={{ background: "var(--t-gold)", color: "#2a1c10" }}
       >
-        {isPending ? "Adding…" : `Add ${inviterName} as a friend`}
+        {isPending ? "Joining…" : `Join ${inviterName}'s party`}
       </button>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="m-0 text-[14px]" style={{ color: "var(--t-warn)" }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }

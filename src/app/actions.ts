@@ -15,6 +15,7 @@ import * as taskIconLibraryData from "@/lib/data/task-icon-library";
 import * as rewardsData from "@/lib/data/rewards";
 import * as ritesData from "@/lib/data/rites";
 import * as winsData from "@/lib/data/wins";
+import * as feedbackData from "@/lib/data/feedback";
 import * as stepsData from "@/lib/data/steps";
 import * as journalData from "@/lib/data/journal";
 import * as tomorrowData from "@/lib/data/tomorrow";
@@ -1486,13 +1487,28 @@ export async function listJournalAction() {
 }
 
 export async function addJournalEntryAction(body: string, mood: number | null, kind: string | null = null) {
-  const ownerId = await requireProfileId();
+  const { id: ownerId, name } = await requireIdentity();
   const text = body.trim();
   if (!text) throw new Error("Write something first.");
   const k = kind && /^[a-z]{2,20}$/.test(kind) ? kind : null;
   const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null, k);
+  // Feedback from someone in the party goes to the owner's review queue.
+  if (k && (feedbackData.FEEDBACK_KINDS as readonly string[]).includes(k)) {
+    await feedbackData.notifyReviewers(ownerId, name, text).catch(() => {});
+    revalidatePath("/feedback-review");
+  }
   revalidatePath("/journal");
   return entry;
+}
+
+/** The owner's decision on a piece of feedback (null = back to New). */
+export async function reviewFeedbackAction(entryId: string, status: feedbackData.ReviewStatus | null) {
+  const profileId = await requireProfileId();
+  if (!(await feedbackData.isAdmin(profileId))) throw new Error("Only the app's owner reviews feedback.");
+  if (status !== null && !["global", "personal", "later", "skipped"].includes(status)) throw new Error("Unknown choice.");
+  await feedbackData.setReviewStatus(entryId, status);
+  revalidatePath("/feedback-review");
+  revalidatePath("/settings");
 }
 
 export async function deleteJournalEntryAction(id: string) {
