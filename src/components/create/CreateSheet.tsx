@@ -13,7 +13,7 @@ import { DiamondIcon } from "@/components/ui/Icons";
 import { QuestShield } from "@/components/ui/Ornaments";
 import { useEscape } from "@/lib/use-escape";
 import { EVERYDAY_JOURNAL_KINDS, JOURNAL_KINDS, type JournalKind } from "@/lib/journal-kinds";
-import { openFeedback } from "@/components/feedback/FeedbackDock";
+import { ChatIcon, openFeedback } from "@/components/feedback/FeedbackDock";
 
 export type CreateKind = "quest" | "now" | "habit" | "reward" | "rite" | "journal" | "board" | "subboard";
 
@@ -158,7 +158,7 @@ export function CreateSheet({
               isAdventure={isAdventure}
               onClick={() => setStage("make")}
             />
-            <ChoiceButton icon={<span className="text-[20px]">🛠</span>} title="Feedback" hint="What to change in the next update, or an idea for the future" isAdventure={isAdventure} onClick={() => {
+            <ChoiceButton icon={<ChatIcon size={24} />} title="Feedback" hint="What to change in the next update, or an idea for the future" isAdventure={isAdventure} onClick={() => {
                 openFeedback();
                 close();
               }} />

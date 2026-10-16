@@ -4,7 +4,7 @@ export const JOURNAL_KINDS = [
   { key: "expression", label: "Expression", icon: "💭", prompt: "What's on your mind? Let it out." },
   { key: "win", label: "Win", icon: "🏆", prompt: "What went well?" },
   { key: "idea", label: "Idea", icon: "💡", prompt: "What's the idea?" },
-  { key: "feedback", label: "App feedback", icon: "🛠", prompt: "What would make this app better? (It goes into the next update.)" },
+  { key: "feedback", label: "App feedback", icon: "💬", prompt: "What would make this app better? (It goes into the next update.)" },
   { key: "refill", label: "When credits refill", icon: "⏳", prompt: "A change for the next scheduled update." },
   { key: "future", label: "Future idea", icon: "🔭", prompt: "An idea for later — kept in the future enhancements log." },
 ] as const;

@@ -1361,3 +1361,25 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .step-skeleton { animation: none; }
 }
+
+/* ---------- On-screen keyboard (see KeyboardViewport.tsx) ---------- */
+/* Keyboard up on iPhone: every full-screen overlay shrinks to the visible area
+   above it, so centered popups re-center there and bottom sheets sit on top of
+   the keyboard instead of under it. */
+html[data-kb] .fixed.inset-0 {
+  top: var(--vv-top, 0px);
+  bottom: auto;
+  height: var(--vvh, 100dvh);
+}
+html[data-kb] .fixed.inset-0 > [role="dialog"],
+html[data-kb] .fixed.inset-0 > .kb-fit {
+  max-height: calc(var(--vvh, 100dvh) - 20px) !important;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* While typing on a phone, the bottom bar and floating buttons step aside. */
+html[data-typing] [data-hide-when-typing],
+html[data-kb] [data-hide-when-typing] {
+  visibility: hidden;
+  pointer-events: none;
+}

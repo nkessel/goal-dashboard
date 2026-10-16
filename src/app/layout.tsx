@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Cinzel, EB_Garamond, Manrope } from "next/font/google";
 import { ViewTransitionProvider } from "@/components/ui/ViewTransitionProvider";
+import { KeyboardViewport } from "@/components/ui/KeyboardViewport";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,6 +39,15 @@ export const metadata: Metadata = {
   description: "Personal + social goal & task dashboard",
 };
 
+// Android: let the on-screen keyboard shrink the page, so popups and fixed
+// bars sit above it instead of under it. (iPhone ignores this; KeyboardViewport
+// handles it there.)
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
+};
+
 export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
   return (
     <html
@@ -45,6 +55,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${ebGaramond.variable} ${manrope.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <KeyboardViewport />
         <ViewTransitionProvider>
           {children}
           {drawer}

@@ -63,6 +63,7 @@ export function FloatingActionButton({
   return (
     <div
       ref={wrapRef}
+      data-hide-when-typing
       className={`pointer-events-none fixed bottom-20 flex justify-center ${expanded ? "z-[49]" : raised ? "z-[48]" : "z-[46]"}`}
       // Same fixed-chrome-in-a-remounted-shell issue as BottomNav (see the
       // comment there) — without its own view-transition-name the FAB gets

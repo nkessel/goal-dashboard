@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { addJournalEntryAction } from "@/app/actions";
 
@@ -8,6 +8,59 @@ import { addJournalEntryAction } from "@/app/actions";
 export const OPEN_FEEDBACK_EVENT = "open-feedback";
 export function openFeedback() {
   window.dispatchEvent(new Event(OPEN_FEEDBACK_EVENT));
+}
+
+/** A speech bubble: the feedback button's icon. */
+export function ChatIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.3 3.4c-.4.3-.9 0-.9-.4V17.5h-.3A1.5 1.5 0 0 1 3 16V7a1.5 1.5 0 0 1 1.5-1.5z"
+        fill="#fffaf0"
+        stroke="#5a4214"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <circle cx="8.3" cy="11.5" r="1.15" fill="#5a4214" />
+      <circle cx="12" cy="11.5" r="1.15" fill="#5a4214" />
+      <circle cx="15.7" cy="11.5" r="1.15" fill="#5a4214" />
+    </svg>
+  );
+}
+
+/**
+ * Where the panel may sit right now. On a phone, while typing, it docks to
+ * the top of what's visible above the keyboard (iPhone's keyboard covers the
+ * page instead of shrinking it); otherwise it floats in the corner.
+ */
+function useTypingDock(panel: React.RefObject<HTMLElement | null>, active: boolean) {
+  const [dock, setDock] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    const vv = window.visualViewport;
+    const touch = window.matchMedia("(pointer: coarse)").matches;
+    if (!vv || !touch) return;
+    const update = () => {
+      const el = panel.current;
+      const typing = !!el && el.contains(document.activeElement) && /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? "");
+      setDock(typing ? { top: Math.round(vv.offsetTop) + 8, height: Math.round(vv.height) - 16 } : null);
+    };
+    const later = () => window.setTimeout(update, 60);
+    const first = requestAnimationFrame(update);
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    document.addEventListener("focusin", later);
+    document.addEventListener("focusout", later);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      document.removeEventListener("focusin", later);
+      document.removeEventListener("focusout", later);
+      cancelAnimationFrame(first);
+      setDock(null);
+    };
+  }, [active, panel]);
+  return dock;
 }
 
 const DRAFT_KEY = "feedback-draft";
@@ -64,6 +117,23 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     latest.current = { offset, pill: pillPos };
   }, [offset, pillPos]);
   const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean; target: "panel" | "pill" } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLButtonElement>(null);
+  const dock = useTypingDock(panelRef, open && !minimized);
+
+  // A spot remembered from a bigger screen (or a rotated phone) can leave the
+  // panel or pill partly off screen: bring it back to its home corner.
+  useLayoutEffect(() => {
+    const offscreen = (el: HTMLElement | null) => {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return r.left < 0 || r.top < 0 || r.right > window.innerWidth || r.bottom > window.innerHeight;
+    };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- correcting a measured position
+    if (open && !minimized && !dock && offscreen(panelRef.current)) setOffset({ x: 0, y: 0 });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- correcting a measured position
+    if (open && minimized && offscreen(pillRef.current)) setPillPos({ x: 0, y: 0 });
+  }, [open, minimized, dock]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- portal target exists only after hydration
@@ -129,6 +199,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       aria-label="Feedback (F)"
       title="Feedback (F)"
       aria-expanded={open && !minimized}
+      data-hide-when-typing
       className="hover-glow fixed right-3 z-[60] flex h-10 w-10 items-center justify-center rounded-full text-[17px] shadow-lg transition-transform hover:scale-105 active:scale-95 sm:right-5"
       style={{
         bottom: "calc(5.75rem + env(safe-area-inset-bottom))",
@@ -137,7 +208,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         color: "#2a1c10",
       }}
     >
-      <span aria-hidden>🛠</span>
+      <ChatIcon size={20} />
     </button>
   );
 
@@ -148,6 +219,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       {button}
       {open && minimized && (
         <button
+          ref={pillRef}
           type="button"
           onPointerDown={(e) => startDrag(e, "pill")}
           onPointerMove={moveDrag}
@@ -162,23 +234,25 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             border: "1.5px solid #8a6116",
           }}
         >
-          <span aria-hidden>🛠</span> Feedback draft · tap to finish
+          <ChatIcon size={18} /> Feedback draft · tap to finish
         </button>
       )}
       {open && (
         <div
+          ref={panelRef}
           role="dialog"
           aria-modal={false}
           aria-label="Feedback"
-          className={`create-sheet-in fixed right-2 z-[60] flex w-[min(380px,calc(100%-16px))] flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl sm:right-5 ${minimized ? "hidden" : ""}`}
-          style={{
-            bottom: "calc(9rem + env(safe-area-inset-bottom))",
-            maxHeight: "calc(100dvh - 10rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
-            translate: `${offset.x}px ${offset.y}px`,
-            background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
-            border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-            color: "var(--t-ink)",
-          }}
+          className={`fixed z-[60] flex flex-col ${dock ? "inset-x-2" : "inset-x-2 sm:left-auto sm:right-5 sm:w-[380px]"} ${minimized ? "hidden" : ""}`}
+          style={
+            dock
+              ? { top: dock.top, maxHeight: dock.height }
+              : {
+                  bottom: "calc(9rem + env(safe-area-inset-bottom))",
+                  maxHeight: "calc(100dvh - 10rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+                  translate: `${offset.x}px ${offset.y}px`,
+                }
+          }
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.stopPropagation();
@@ -187,28 +261,37 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           }}
         >
           <div
-            className="relative z-[1] flex shrink-0 cursor-move touch-none select-none items-center gap-1 px-2 pt-2"
-            onPointerDown={(e) => startDrag(e, "panel")}
-            onPointerMove={moveDrag}
-            onPointerUp={endDrag}
-            onPointerCancel={() => (drag.current = null)}
-            title="Drag to move"
+            className="create-sheet-in flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl"
+            style={{
+              background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
+              border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+              color: "var(--t-ink)",
+            }}
           >
-            <span aria-hidden className="pl-2 text-[15px] tracking-[-2px]" style={{ color: "var(--t-ink-soft)" }}>
-              ⋮⋮
-            </span>
-            <span className={`flex-1 py-1.5 pl-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>Feedback</span>
-            <button type="button" onClick={() => setMinimized(true)} aria-label="Minimize" title="Minimize" className="flex h-9 w-9 items-center justify-center rounded-full" style={{ color: "var(--t-ink-soft)" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M6 17h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close" title="Close (your draft is kept)" className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-              ×
-            </button>
-          </div>
-          <div className="relative z-[1] min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            <FeedbackComposer isAdventure={isAdventure} onSent={() => setOpen(false)} />
+            <div
+              className={`relative z-[1] flex shrink-0 select-none items-center gap-1 px-2 pt-2 ${dock ? "" : "cursor-move touch-none"}`}
+              onPointerDown={(e) => !dock && startDrag(e, "panel")}
+              onPointerMove={moveDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={() => (drag.current = null)}
+              title={dock ? undefined : "Drag to move"}
+            >
+              <span aria-hidden className={`pl-2 text-[15px] tracking-[-2px] ${dock ? "invisible" : ""}`} style={{ color: "var(--t-ink-soft)" }}>
+                ⋮⋮
+              </span>
+              <span className={`flex-1 py-1.5 pl-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>Feedback</span>
+              <button type="button" onClick={() => setMinimized(true)} aria-label="Minimize" title="Minimize" className="flex h-9 w-9 items-center justify-center rounded-full" style={{ color: "var(--t-ink-soft)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M6 17h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" title="Close (your draft is kept)" className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
+                ×
+              </button>
+            </div>
+            <div className="relative z-[1] min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <FeedbackComposer isAdventure={isAdventure} compact={!!dock} onSent={() => setOpen(false)} />
+            </div>
           </div>
         </div>
       )}
@@ -218,7 +301,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 }
 
 /** The form itself: where it goes, what to change, submit. */
-function FeedbackComposer({ isAdventure, onSent }: { isAdventure: boolean; onSent: () => void }) {
+function FeedbackComposer({ isAdventure, compact = false, onSent }: { isAdventure: boolean; compact?: boolean; onSent: () => void }) {
   // Closing the panel never loses words: the draft is kept until it's sent.
   const [draft] = useState(() => readJson<{ body: string; kind: WhenKind }>(DRAFT_KEY));
   const [body, setBody] = useState(draft?.body ?? "");
@@ -288,9 +371,11 @@ function FeedbackComposer({ isAdventure, onSent }: { isAdventure: boolean; onSen
               style={{ background: on ? "rgba(217,180,95,.45)" : "rgba(70,50,20,.07)", border: `1.5px solid ${on ? "#a88a3f" : "transparent"}`, color: "var(--t-ink)" }}
             >
               <span className="text-[13.5px] font-semibold leading-tight">{label}</span>
-              <span className="mt-0.5 text-[11.5px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                {hint}
-              </span>
+              {!compact && (
+                <span className="mt-0.5 hidden text-[11.5px] leading-snug sm:block" style={{ color: "var(--t-ink-soft)" }}>
+                  {hint}
+                </span>
+              )}
             </button>
           );
         })}
@@ -299,7 +384,7 @@ function FeedbackComposer({ isAdventure, onSent }: { isAdventure: boolean; onSen
         autoFocus
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        rows={5}
+        rows={compact ? 3 : 5}
         placeholder={kind === "future" ? "An idea for later — kept in the future enhancements log." : "What would make this app better?"}
         aria-label="Feedback"
         className="resize-y rounded-lg border px-3 py-2 text-[16px] leading-relaxed"

@@ -173,6 +173,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
 
   return (
     <nav
+      data-hide-when-typing
       className="fixed inset-x-0 bottom-0 z-30 flex w-full items-stretch justify-between"
       style={{
         // Full-width bar anchored to the bottom (HANDOFF.md §4) — not a
