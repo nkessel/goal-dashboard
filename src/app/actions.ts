@@ -977,6 +977,15 @@ export async function pickTaskIconFromLibraryAction(taskId: string, imageUrl: st
  * @param style Optional art-style preset key (from AVATAR_STYLE_OPTIONS in
  *   avatar-prompts.ts) layered on top of the base epic/gritty prompt.
  */
+/**
+ * Portraits show on the shared Friend Feed, so they stay family-friendly:
+ * explicit prompts are turned away before any painting happens.
+ */
+const EXPLICIT_PROMPT = /\b(nude|nudes|naked|nsfw|topless|bottomless|porn\w*|sex|sexy|sexual|erotic\w*|genital\w*|penis|vagina|nipples?|boobs?|breasts?|lingerie|undress\w*|strip(per|ping)?|fetish\w*|hentai|xxx)\b/i;
+function assertFamilyFriendly(prompt: string) {
+  if (EXPLICIT_PROMPT.test(prompt)) throw new Error("Let's keep portraits family-friendly. Try a different description.");
+}
+
 export async function generateAvatarImageAction(
   prompt: string,
   withBackground = false,
@@ -985,6 +994,7 @@ export async function generateAvatarImageAction(
   const ownerId = await requireProfileId();
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe what you want your avatar to look like first.");
+  assertFamilyFriendly(trimmed);
 
   const fullPrompt = buildAvatarPrompt(trimmed, { withBackground, look: styleLook(style) });
   const url = await generateAndStoreImage(fullPrompt, `avatars/${ownerId}-${Date.now()}.jpg`, {
@@ -1026,6 +1036,7 @@ export async function generateTaskIconAction(taskId: string, prompt: string) {
   const ownerId = await requireProfileId();
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe the monster/icon you want first.");
+  assertFamilyFriendly(trimmed);
 
   // A concrete picture of the task, in the same painted storybook style as imports.
   // Quest portraits keep their painted scene behind them.
@@ -1041,8 +1052,8 @@ export async function generateTaskIconAction(taskId: string, prompt: string) {
 /** Remove one image from the shared avatar library. Profiles already using
  * it keep their avatar — only the library tile goes away. */
 export async function removeAvatarFromLibraryAction(id: string) {
-  await requireProfileId();
-  await avatarLibraryData.removeAvatarFromLibrary(id);
+  const ownerId = await requireProfileId();
+  await avatarLibraryData.removeAvatarFromLibrary(id, ownerId);
   revalidatePath("/settings/avatar");
 }
 
@@ -1135,6 +1146,7 @@ export async function generateQuestIconImageAction(prompt: string, artStyle: "mo
   const ownerId = await requireProfileId();
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe the monster/icon you want first.");
+  assertFamilyFriendly(trimmed);
   const url =
     artStyle === "treasure"
       ? await generateAndStoreImage(buildTreasureIconPrompt(trimmed), `rewards/draft-${ownerId}-${Date.now()}.jpg`)
@@ -1172,8 +1184,8 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
 
 /** Remove one image from the shared quest-icon library (quests already using it keep it). */
 export async function removeTaskIconFromLibraryAction(id: string) {
-  await requireProfileId();
-  await taskIconLibraryData.removeTaskIconFromLibrary(id);
+  const ownerId = await requireProfileId();
+  await taskIconLibraryData.removeTaskIconFromLibrary(id, ownerId);
 }
 
 // ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@ import { NameEditor } from "@/components/settings/NameEditor";
 /** Editing your avatar from inside the app: a popup over the screen you were on. */
 export default async function AvatarModal() {
   const session = await requireSession();
-  const [profile, library] = await Promise.all([getProfileById(session.user.id), listAvatarLibrary()]);
+  const [profile, library] = await Promise.all([getProfileById(session.user.id), listAvatarLibrary(session.user.id)]);
   if (!profile) notFound();
   const theme = profile.theme === "adventure" ? "adventure" : "calm";
   return (

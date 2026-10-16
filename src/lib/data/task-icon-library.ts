@@ -10,11 +10,13 @@ import type { TaskIconLibraryEntry } from "./types";
  * avatar portraits. No pagination yet; fine at the scale a friend-group app
  * runs at.
  */
-export async function listTaskIconLibrary(): Promise<TaskIconLibraryEntry[]> {
+export async function listTaskIconLibrary(ownerId: string): Promise<TaskIconLibraryEntry[]> {
   const db = supabaseAdmin();
+  // Presets plus this person's own paintings — no one else's, for now.
   const { data, error } = await db
     .from("task_icon_library")
     .select("*")
+    .or(`is_preset.eq.true,created_by.eq.${ownerId}`)
     .order("is_preset", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -43,9 +45,9 @@ export async function addTaskIconToLibrary(input: {
   if (error) throw new Error(`Failed to add task icon to library: ${error.message}`);
 }
 
-export async function removeTaskIconFromLibrary(id: string): Promise<void> {
+export async function removeTaskIconFromLibrary(id: string, ownerId: string): Promise<void> {
   const db = supabaseAdmin();
-  const { error } = await db.from("task_icon_library").delete().eq("id", id);
+  const { error } = await db.from("task_icon_library").delete().eq("id", id).eq("created_by", ownerId);
   if (error) throw new Error(`Failed to remove icon from library: ${error.message}`);
 }
 
@@ -67,10 +69,10 @@ const categoryOf = (url: string): "quest" | "reward" =>
 export async function listAllPortraits(ownerId: string): Promise<TaskIconLibraryEntry[]> {
   const db = supabaseAdmin();
   const [lib, tasks, rewards, avatars] = await Promise.all([
-    listTaskIconLibrary().catch(() => [] as TaskIconLibraryEntry[]),
+    listTaskIconLibrary(ownerId).catch(() => [] as TaskIconLibraryEntry[]),
     db.from("tasks").select("icon_key, title, created_at").eq("owner_id", ownerId).in("icon_source", ["ai", "library"]).not("icon_key", "is", null),
     db.from("rewards").select("icon_key, title, created_at").eq("owner_id", ownerId).not("icon_key", "is", null),
-    db.from("avatar_library").select("*").order("created_at", { ascending: false }),
+    db.from("avatar_library").select("*").or(`is_preset.eq.true,created_by.eq.${ownerId}`).order("created_at", { ascending: false }),
   ]);
   const out: TaskIconLibraryEntry[] = [];
   const seen = new Set<string>();

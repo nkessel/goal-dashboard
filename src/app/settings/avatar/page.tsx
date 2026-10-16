@@ -16,7 +16,7 @@ export default async function AvatarSettingsPage() {
   const session = await requireSession();
   const [profile, library] = await Promise.all([
     getProfileById(session.user.id),
-    listAvatarLibrary(),
+    listAvatarLibrary(session.user.id),
   ]);
   if (!profile) notFound();
   const isAdventure = profile.theme === "adventure";
