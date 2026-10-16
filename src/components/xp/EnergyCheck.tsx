@@ -44,14 +44,15 @@ const METRIC_IDEAS = ["Mood", "Focus", "Calm", "Motivation", "Sleep", "Pain"];
 const MAX_METRICS = 6;
 const EXPANDED_KEY = "checkin-expanded";
 
-const fmt = (v: number) => (v % 1 ? v.toFixed(1) : String(v));
+const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 /**
- * Check-in under the boss line: drag energy 1–10 in half steps and save it.
- * The caret beside Energy opens the other things being tracked (mood, focus,
- * anything) and a way to add one; closed, Save stores energy alone, open,
- * one Save stores them all. At 5 or below, a Power-ups button offers light
- * quests to drop straight onto the top of Today's Quests.
+ * Check-in under the boss line: energy 1–10 in tenths. The caret before
+ * Energy opens the other things being tracked (mood, focus, anything): a
+ * list of sliders, then a row of [Edit metrics] · Add new check-in metric ·
+ * Submit check-in. Closed, Save stores energy alone. After saving, the caret
+ * shows (or hides) what was saved. At 5 or below, a Power-ups button offers
+ * light quests to drop straight onto the top of Today's Quests.
  */
 export function EnergyCheck({
   today,
@@ -76,6 +77,7 @@ export function EnergyCheck({
   const [savedVals, setSavedVals] = useState<Record<string, number>>(metricsToday);
   const [expanded, setExpanded] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [editingList, setEditingList] = useState(false);
   const [newMetric, setNewMetric] = useState("");
   const mayOffer = useSyncExternalStore(subscribeMinute, readMayOffer, () => false);
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
@@ -95,7 +97,10 @@ export function EnergyCheck({
   }, []);
   function setOpen(v: boolean) {
     setExpanded(v);
-    if (!v) setAdding(false);
+    if (!v) {
+      setAdding(false);
+      setEditingList(false);
+    }
     try {
       window.localStorage.setItem(EXPANDED_KEY, v ? "1" : "0");
     } catch {
@@ -114,6 +119,7 @@ export function EnergyCheck({
         if (all.length) setSavedVals((o) => ({ ...o, ...Object.fromEntries(all.map((r) => [r.metric, r.level])) }));
         setEditing(false);
         setAdding(false);
+        setEditingList(false);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
       }
@@ -162,37 +168,36 @@ export function EnergyCheck({
   const ideas = METRIC_IDEAS.filter((i) => !metrics.some((m) => m.toLowerCase() === i.toLowerCase()));
   const savedExtras = metrics.filter((m) => savedVals[m] !== undefined);
 
+  /** The caret before "Energy": opens the other metrics (or, once saved, what was saved). */
   const caret = (
     <button
       type="button"
-      onClick={() => {
-        if (!editing) {
-          setEditing(true);
-          setOpen(true);
-        } else setOpen(!expanded);
-      }}
-      aria-expanded={editing && expanded}
+      onClick={() => setOpen(!expanded)}
+      aria-expanded={expanded}
       aria-controls="checkin-more"
-      aria-label={editing && expanded ? "Hide the other check-ins" : "More to check in on"}
-      title={editing && expanded ? "Hide the other check-ins" : "More to check in on"}
-      className="flex h-8 w-7 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
+      aria-label={expanded ? "Hide the other check-ins" : "Show the other check-ins"}
+      title={expanded ? "Hide the other check-ins" : "Other check-ins"}
+      className="-ml-1 flex h-8 w-6 shrink-0 items-center justify-center rounded-full hover:bg-white/10"
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: editing && expanded ? "rotate(180deg)" : undefined }}>
-        <path d="M5.5 9l6.5 6.5L18.5 9" stroke="var(--t-gold)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: expanded ? "rotate(90deg)" : undefined }}>
+        <path d="M9 5.5l6.5 6.5L9 18.5" stroke="var(--t-gold)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </button>
   );
 
-  const saveButton = (label: string, wide = false) => (
-    <button
-      type="button"
-      onClick={save}
-      disabled={isSaving}
-      className={`hover-glow h-8 shrink-0 rounded-full text-[13px] font-bold disabled:opacity-60 ${wide ? "px-4" : "px-3"}`}
-      style={{ background: "var(--t-gold)", color: "#2a1c10" }}
-    >
-      {isSaving ? "…" : label}
-    </button>
+  const label = "w-[78px] shrink-0 truncate text-[14.5px] font-semibold";
+  const slider = (v: number, onChange: (n: number) => void, aria: string, color: string) => (
+    <input
+      type="range"
+      min={1}
+      max={10}
+      step={0.1}
+      value={v}
+      onChange={(e) => onChange(Math.round(Number(e.target.value) * 10) / 10)}
+      aria-label={aria}
+      className="energy-range min-w-0 flex-1"
+      style={{ "--energy-pct": `${((v - 1) / 9) * 100}%`, "--energy-color": color } as React.CSSProperties}
+    />
   );
 
   return (
@@ -201,25 +206,26 @@ export function EnergyCheck({
         {editing ? (
           <>
             <div className="flex items-center gap-2">
-              <span className="w-[74px] shrink-0 truncate text-[13px] font-semibold" style={{ color: "var(--t-cream)" }}>
+              {caret}
+              <span className={label} style={{ color: "var(--t-cream)" }}>
                 Energy
               </span>
-              <input
-                type="range"
-                min={1}
-                max={10}
-                step={0.5}
-                value={value}
-                onChange={(e) => setValue(Number(e.target.value))}
-                aria-label="Energy level, 1 to 10"
-                className="energy-range min-w-0 flex-1"
-                style={{ "--energy-pct": `${((value - 1) / 9) * 100}%`, "--energy-color": `hsl(${hue} 60% 48%)` } as React.CSSProperties}
-              />
-              <span className="w-8 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>
+              {slider(value, setValue, "Energy level, 1 to 10", `hsl(${hue} 60% 48%)`)}
+              <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>
                 {fmt(value)}
               </span>
-              {caret}
-              {!expanded && saveButton("Save")}
+              {/* Same width open or closed, so the slider never jumps. */}
+              <button
+                type="button"
+                onClick={save}
+                disabled={isSaving || expanded}
+                aria-hidden={expanded}
+                tabIndex={expanded ? -1 : 0}
+                className="hover-glow h-8 w-[58px] shrink-0 rounded-full text-[13px] font-bold disabled:opacity-60"
+                style={{ background: "var(--t-gold)", color: "#2a1c10", visibility: expanded ? "hidden" : "visible" }}
+              >
+                {isSaving ? "…" : "Save"}
+              </button>
             </div>
 
             {expanded && (
@@ -228,38 +234,33 @@ export function EnergyCheck({
                   const v = vals[m] ?? 5;
                   return (
                     <div key={m} className="flex items-center gap-2">
-                      <span className="w-[74px] shrink-0 truncate text-[13px] font-semibold" style={{ color: "var(--t-cream)" }} title={m}>
+                      <span aria-hidden className="w-5 shrink-0" />
+                      <span className={label} style={{ color: "var(--t-cream)" }} title={m}>
                         {m}
                       </span>
-                      <input
-                        type="range"
-                        min={1}
-                        max={10}
-                        step={0.5}
-                        value={v}
-                        onChange={(e) => setVals((o) => ({ ...o, [m]: Number(e.target.value) }))}
-                        aria-label={`${m}, 1 to 10`}
-                        className="energy-range min-w-0 flex-1"
-                        style={{ "--energy-pct": `${((v - 1) / 9) * 100}%`, "--energy-color": "#c9a24a" } as React.CSSProperties}
-                      />
-                      <span className="w-8 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: "#f2d58a" }}>
+                      {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), `${m}, 1 to 10`, "#c9a24a")}
+                      <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: "#f2d58a" }}>
                         {fmt(v)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => removeMetric(m)}
-                        aria-label={`Stop tracking ${m}`}
-                        title={`Stop tracking ${m} (past check-ins are kept)`}
-                        className="flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-[17px] leading-none hover:bg-white/10"
-                        style={{ color: "rgba(239,230,204,.6)" }}
-                      >
-                        ×
-                      </button>
+                      {editingList ? (
+                        <button
+                          type="button"
+                          onClick={() => removeMetric(m)}
+                          aria-label={`Stop tracking ${m}`}
+                          title={`Stop tracking ${m} (past check-ins are kept)`}
+                          className="h-8 w-[58px] shrink-0 rounded-full text-[12.5px] font-semibold"
+                          style={{ border: "1px solid rgba(243,179,159,.6)", color: "#f3b39f" }}
+                        >
+                          Remove
+                        </button>
+                      ) : (
+                        <span aria-hidden className="w-[58px] shrink-0" />
+                      )}
                     </div>
                   );
                 })}
 
-                {adding ? (
+                {adding && (
                   <div className="flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid rgba(217,180,95,.3)" }}>
                     <div className="flex items-center gap-1.5">
                       <input
@@ -272,7 +273,7 @@ export function EnergyCheck({
                         }}
                         maxLength={24}
                         placeholder="What else? (e.g. Mood)"
-                        aria-label="Something else to track"
+                        aria-label="New check-in metric"
                         className="h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-[16px]"
                         style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a", color: "#2a1c10" }}
                       />
@@ -280,7 +281,7 @@ export function EnergyCheck({
                         type="button"
                         onClick={() => addMetric(newMetric)}
                         disabled={!newMetric.trim()}
-                        className="h-9 shrink-0 rounded-full px-3.5 text-[13px] font-bold disabled:opacity-50"
+                        className="h-9 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"
                         style={{ background: "var(--t-gold)", color: "#2a1c10" }}
                       >
                         Add
@@ -292,58 +293,78 @@ export function EnergyCheck({
                     {ideas.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
                         {ideas.map((i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => addMetric(i)}
-                            className="h-8 rounded-full px-3 text-[13px] font-semibold"
-                            style={{ border: "1px solid rgba(217,180,95,.55)", color: "var(--t-cream)" }}
-                          >
+                          <button key={i} type="button" onClick={() => addMetric(i)} className="h-8 rounded-full px-3 text-[13.5px] font-semibold" style={{ border: "1px solid rgba(217,180,95,.55)", color: "var(--t-cream)" }}>
                             + {i}
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
-                ) : (
-                  metrics.length < MAX_METRICS && (
+                )}
+
+                {/* [Edit metrics] · Add new check-in metric · Submit check-in */}
+                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 pt-0.5">
+                  {metrics.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingList((v) => !v)}
+                      aria-pressed={editingList}
+                      className="h-8 rounded-full px-2.5 text-[13.5px] underline-offset-2 hover:underline"
+                      style={{ color: "rgba(239,230,204,.75)" }}
+                    >
+                      {editingList ? "Done editing" : "Edit metrics"}
+                    </button>
+                  )}
+                  {metrics.length < MAX_METRICS && !adding && (
                     <button
                       type="button"
                       onClick={() => setAdding(true)}
-                      className="flex h-9 items-center gap-1.5 self-start rounded-full px-3 text-[13px] font-semibold"
-                      style={{ border: "1px dashed rgba(217,180,95,.55)", color: "var(--t-cream)" }}
+                      className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[14px] font-semibold"
+                      style={{ border: "1px dashed rgba(217,180,95,.6)", color: "var(--t-cream)" }}
                     >
                       <span aria-hidden className="text-[16px] leading-none" style={{ color: "var(--t-gold)" }}>
                         +
                       </span>
-                      {metrics.length === 0 ? "Track something else" : "Track another"}
+                      Add new check-in metric
                     </button>
-                  )
-                )}
-
-                <div className="flex items-center justify-end gap-2 pt-0.5">{saveButton(metrics.length ? "Save check-in" : "Save energy", true)}</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={isSaving}
+                    className="hover-glow h-8 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60"
+                    style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                  >
+                    {isSaving ? "…" : "Submit check-in"}
+                  </button>
+                </div>
               </div>
             )}
           </>
         ) : (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13.5px]" style={{ color: "var(--t-cream)" }}>
-            <span className="flex items-center">
+          <>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13.5px]" style={{ color: "var(--t-cream)" }}>
+              {savedExtras.length > 0 && caret}
               <span>
                 Energy <b className="font-display text-[17px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>{fmt(saved!)}</b>
                 <span style={{ opacity: 0.7 }}>/10</span>
               </span>
-              {caret}
-            </span>
-            {savedExtras.map((m) => (
-              <span key={m}>
-                {m} <b className="font-display text-[16px] tabular-nums" style={{ color: "#f2d58a" }}>{fmt(savedVals[m])}</b>
-              </span>
-            ))}
-            {mounted && savedAt && <span style={{ opacity: 0.7 }}>checked in at {clock(savedAt)}</span>}
-            <button type="button" onClick={() => setEditing(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
-              Check in again
-            </button>
-          </div>
+              {mounted && savedAt && <span style={{ opacity: 0.7 }}>· checked in at {clock(savedAt)}</span>}
+              <button type="button" onClick={() => setEditing(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
+                Check in again
+              </button>
+            </div>
+            {/* What was saved, shown under the caret. */}
+            {expanded && savedExtras.length > 0 && (
+              <ul id="checkin-more" className="m-0 flex list-none flex-wrap gap-x-3 gap-y-0.5 p-0 pl-5 text-[13.5px]" style={{ color: "var(--t-cream)" }}>
+                {savedExtras.map((m) => (
+                  <li key={m}>
+                    {m} <b className="font-display text-[16px] tabular-nums" style={{ color: "#f2d58a" }}>{fmt(savedVals[m])}</b>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
         {error && (
           <span className="text-[12.5px] font-semibold" style={{ color: "#f3b39f" }}>

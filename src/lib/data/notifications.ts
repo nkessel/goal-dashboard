@@ -90,6 +90,21 @@ export async function markRead(id: string, profileId: string): Promise<void> {
   if (error) throw new Error(`Failed to mark notification read: ${error.message}`);
 }
 
+export async function markUnread(id: string, profileId: string): Promise<void> {
+  const { error } = await supabaseAdmin().from("notifications").update({ is_read: false, snoozed_until: null }).eq("id", id).eq("profile_id", profileId);
+  if (error && /snoozed_until/.test(error.message)) {
+    const { error: e2 } = await supabaseAdmin().from("notifications").update({ is_read: false }).eq("id", id).eq("profile_id", profileId);
+    if (e2) throw new Error(`Failed to mark unread: ${e2.message}`);
+    return;
+  }
+  if (error) throw new Error(`Failed to mark unread: ${error.message}`);
+}
+
+export async function deleteNotification(id: string, profileId: string): Promise<void> {
+  const { error } = await supabaseAdmin().from("notifications").delete().eq("id", id).eq("profile_id", profileId);
+  if (error) throw new Error(`Failed to delete notification: ${error.message}`);
+}
+
 export async function markAllRead(profileId: string): Promise<void> {
   const db = supabaseAdmin();
   const { error } = await db

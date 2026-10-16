@@ -371,6 +371,8 @@ async function finishTask(ownerId: string, taskId: string, completedAt?: string)
     }
     revalidatePath("/rewards");
   }
+  // A boss's session quest counts toward defeating it.
+  if (completed.boss_id) await bossStep(ownerId, completed.boss_id, 1).catch(() => {});
   revalidatePath("/");
   revalidatePath("/matrix");
   // Lets the quest-complete celebration fill the XP bar to the real total.
@@ -554,6 +556,7 @@ export async function reopenTaskAction(taskId: string) {
     if (was && (was.bonus_coins ?? 0) > 0) await rewardsData.addCoins(ownerId, -(was.bonus_coins ?? 0));
     revalidatePath("/rewards");
   }
+  if (before?.status === "completed" && before.boss_id) await bossStep(ownerId, before.boss_id, -1).catch(() => {});
   if (before?.status === "completed") {
     const paid = typeof before.xp_awarded === "number" ? before.xp_awarded : before.xp_value;
     if (paid > 0) await xp.awardXp(ownerId, -paid, "task_completed", taskId);
@@ -888,6 +891,18 @@ export async function snoozeNotificationAction(id: string, minutes: number) {
   const ownerId = await requireProfileId();
   const mins = Math.max(5, Math.min(60 * 24 * 14, Math.round(minutes)));
   await notificationsData.snooze(id, ownerId, new Date(Date.now() + mins * 60_000).toISOString());
+  revalidatePath("/notifications");
+}
+
+export async function markNotificationUnreadAction(id: string) {
+  const ownerId = await requireProfileId();
+  await notificationsData.markUnread(id, ownerId);
+  revalidatePath("/notifications");
+}
+
+export async function deleteNotificationAction(id: string) {
+  const ownerId = await requireProfileId();
+  await notificationsData.deleteNotification(id, ownerId);
   revalidatePath("/notifications");
 }
 
@@ -1759,6 +1774,66 @@ export async function bossProgressAction(bossId: string, delta: number) {
 }
 
 /** Name (or rename) the boss guarding a level. */
+/** Move a boss's count by one (a session quest done or undone). Defeating it may level you up. */
+async function bossStep(ownerId: string, bossId: string, delta: 1 | -1) {
+  const boss = await bossesData.getBoss(ownerId, bossId);
+  if (!boss) return null;
+  const updated = await bossesData.setBossProgress(ownerId, bossId, boss.progress + delta, boss.target);
+  if (!!updated.defeated_at !== !!boss.defeated_at) {
+    // The level cap moved: settle the level the XP has already earned.
+    const profile = await profilesData.getProfileById(ownerId);
+    if (profile) {
+      const level = Math.min(computeLevelForXp(profile.total_xp), await bossesData.levelCap(ownerId));
+      if (level !== profile.level) await supabaseAdmin().from("profiles").update({ level }).eq("id", ownerId);
+    }
+  }
+  return updated;
+}
+
+/** The quests standing in for a boss's sessions (open and done). */
+export async function listBossQuestsAction(bossId: string) {
+  const ownerId = await requireProfileId();
+  const { data } = await supabaseAdmin()
+    .from("tasks")
+    .select("id, title, status, icon_key, icon_source, xp_value, completed_at, created_at")
+    .eq("owner_id", ownerId)
+    .eq("boss_id", bossId)
+    .order("created_at", { ascending: true });
+  return (data ?? []) as { id: string; title: string; status: string; icon_key: string | null; icon_source: string | null; xp_value: number; completed_at: string | null }[];
+}
+
+/** Open quests that could stand in for a session. */
+export async function listQuestOptionsAction() {
+  const ownerId = await requireProfileId();
+  const { data } = await supabaseAdmin()
+    .from("tasks")
+    .select("id, title, icon_key, icon_source, boss_id")
+    .eq("owner_id", ownerId)
+    .eq("status", "open")
+    .order("created_at", { ascending: false })
+    .limit(80);
+  return ((data ?? []) as { id: string; title: string; icon_key: string | null; icon_source: string | null; boss_id: string | null }[]).filter((t) => !t.boss_id);
+}
+
+/** Make a quest one of the boss's sessions (or, with null, release it). */
+export async function linkQuestToBossAction(taskId: string, bossId: string | null) {
+  const ownerId = await requireProfileId();
+  if (bossId && !(await bossesData.getBoss(ownerId, bossId))) throw new Error("That boss isn't here anymore.");
+  const { error } = await supabaseAdmin().from("tasks").update({ boss_id: bossId }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(/boss_id/.test(error.message) ? "Boss quests need a quick database update first." : `Couldn't link it: ${error.message}`);
+  revalidatePath("/");
+}
+
+/** A new quest for one of the boss's sessions (lands in Additional Quests). */
+export async function createBossQuestAction(bossId: string, title: string) {
+  const ownerId = await requireProfileId();
+  const t = title.trim();
+  if (!t) throw new Error("Name the session first.");
+  const task = await tasksData.createTask(ownerId, { title: t.slice(0, 200), xpValue: 30 });
+  await linkQuestToBossAction(task.id, bossId);
+  return task.id;
+}
+
 export async function setBossAction(level: number, title: string, target: number) {
   const ownerId = await requireProfileId();
   const t = title.trim();

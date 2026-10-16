@@ -57,6 +57,8 @@ export type Task = {
   completed_at: string | null;
   /** When the completion was recorded (may be later than completed_at). */
   logged_at?: string | null;
+  /** The level boss this quest counts toward, if any. */
+  boss_id?: string | null;
   created_at: string;
   updated_at: string;
   reminder_sent_at: string | null;

@@ -1,43 +1,74 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { bossProgressAction, setBossAction } from "@/app/actions";
-import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
+import { bossProgressAction, completeTaskAction, createBossQuestAction, linkQuestToBossAction, listBossQuestsAction, listQuestOptionsAction, setBossAction } from "@/app/actions";
+import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
+import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
 
 export type BossView = { id: string; level: number; title: string; target: number; progress: number };
 
 /**
- * Under the level meter, in italics: the boss you must defeat before you can
- * reach the next level. Tap it to log progress (e.g. one training session),
- * or to name a boss when the level has none.
+ * The level badge under the portrait doubles as the boss's door: hover it
+ * to see the boss standing between you and the next level, tap it to open
+ * the boss (or to name one when the level has none).
  */
-export function BossLine({ boss, level, heldByBoss }: { boss: BossView | null; level: number; heldByBoss: boolean }) {
+export function BossBadge({
+  boss,
+  level,
+  heldByBoss,
+  enabled,
+  children,
+}: {
+  boss: BossView | null;
+  level: number;
+  heldByBoss: boolean;
+  /** False before bosses exist (the badge is then just a badge). */
+  enabled: boolean;
+  children: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
+  if (!enabled) return <>{children}</>;
+  const tip = boss ? `Level ${boss.level} Boss: ${boss.title}${boss.target > 1 ? ` (${boss.progress}/${boss.target})` : ""}` : `Set a boss for level ${level}`;
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title={boss && heldByBoss ? `Defeat it to reach level ${level + 1}` : undefined}
-        // One line when it fits; otherwise two lines of even width, centered.
-        className="hover-glow mx-auto mt-0.5 block max-w-[min(100%,420px)] rounded-lg px-2 py-1 text-center text-[13.5px] italic leading-snug [text-wrap:balance]"
-        style={{ color: "var(--t-cream)", opacity: boss ? 0.95 : 0.55 }}
+        aria-label={`${tip}. Open the boss.`}
+        className="group relative block cursor-pointer"
       >
-        {boss ? (
-          <>
-            <span style={{ color: "var(--t-gold)" }}>Level {boss.level} Boss:</span> {boss.title}
-            {boss.target > 1 && (
-              <span className="ml-1 whitespace-nowrap not-italic tabular-nums" style={{ color: "var(--t-gold)" }}>
-                {boss.progress}/{boss.target}
+        {children}
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-max max-w-[260px] -translate-x-1/2 rounded-xl px-3 py-2 text-center text-[13.5px] leading-snug opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 [text-wrap:balance]"
+          style={{ background: "rgba(20,24,16,.95)", border: "1px solid rgba(217,180,95,.55)", color: "#efe6cc" }}
+        >
+          {boss ? (
+            <>
+              <span className="font-semibold" style={{ color: "var(--t-gold)" }}>
+                ⚔ Level {boss.level} Boss
               </span>
-            )}
-          </>
-        ) : (
-          <>Set a boss for level {level}</>
-        )}
+              <br />
+              <span className="italic">{boss.title}</span>
+              {boss.target > 1 && (
+                <span className="ml-1 whitespace-nowrap tabular-nums" style={{ color: "var(--t-gold)" }}>
+                  {boss.progress}/{boss.target}
+                </span>
+              )}
+              {heldByBoss && (
+                <>
+                  <br />
+                  <span className="text-[12px] opacity-75">Defeat it to reach level {level + 1}</span>
+                </>
+              )}
+            </>
+          ) : (
+            <>Set a boss for level {level}</>
+          )}
+        </span>
       </button>
       {open && <BossDialog boss={boss} level={boss?.level ?? level} onClose={() => setOpen(false)} />}
     </>
@@ -106,28 +137,7 @@ function BossDialog({ boss, level, onClose }: { boss: BossView | null; level: nu
         {!editing && boss ? (
           <>
             <p className="relative z-[1] m-0 text-[17px] italic leading-snug">{boss.title}</p>
-            <div className="relative z-[1] flex items-center justify-center gap-4">
-              <button type="button" onClick={() => step(-1)} disabled={isSaving || progress <= 0} aria-label="One less" className="flex h-11 w-11 items-center justify-center rounded-full border text-[22px] disabled:opacity-40" style={{ borderColor: "#a88a3f" }}>
-                −
-              </button>
-              <span className="font-display text-[30px] tabular-nums">
-                {progress}
-                <span className="text-[18px]" style={{ color: "var(--t-ink-soft)" }}>
-                  {" "}
-                  / {boss.target}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => step(1)}
-                disabled={isSaving || progress >= boss.target}
-                aria-label="One more"
-                className="flex h-11 w-11 items-center justify-center rounded-full text-[22px] disabled:opacity-40"
-                style={{ background: "var(--t-gold)", color: "#2a1c10" }}
-              >
-                +
-              </button>
-            </div>
+            <BossSessions boss={boss} progress={progress} onStep={step} busy={isSaving} onDone={onClose} />
             <p className="relative z-[1] m-0 text-center text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
               Until it&apos;s defeated you stay at level {level}, however much XP you earn.
             </p>
@@ -165,5 +175,227 @@ function BossDialog({ boss, level, onClose }: { boss: BossView | null; level: nu
       </div>
     </div>,
     document.body
+  );
+}
+
+type BossQuest = Awaited<ReturnType<typeof listBossQuestsAction>>[number];
+type Option = Awaited<ReturnType<typeof listQuestOptionsAction>>[number];
+
+/**
+ * One outline per session the boss needs (e.g. three training sessions).
+ * Fill one with an existing quest or a new one — then finish it here or in
+ * the usual quest lists, and it counts. A session can also just be marked
+ * done without a quest.
+ */
+function BossSessions({ boss, progress, onStep, busy, onDone }: { boss: BossView; progress: number; onStep: (d: number) => void; busy: boolean; onDone: () => void }) {
+  const router = useRouter();
+  const [quests, setQuests] = useState<BossQuest[] | null>(null);
+  const [options, setOptions] = useState<Option[] | null>(null);
+  const [slotMode, setSlotMode] = useState<{ i: number; mode: "pick" | "new" } | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const load = () => listBossQuestsAction(boss.id).then(setQuests).catch(() => setQuests([]));
+  useEffect(() => {
+    void listBossQuestsAction(boss.id).then(setQuests).catch(() => setQuests([]));
+  }, [boss.id]);
+
+  const done = (quests ?? []).filter((q) => q.status === "completed");
+  const open = (quests ?? []).filter((q) => q.status !== "completed");
+  const manual = Math.max(0, progress - done.length);
+  type Slot = { kind: "quest-done"; q: BossQuest } | { kind: "manual" } | { kind: "quest-open"; q: BossQuest } | { kind: "empty" };
+  const slots: Slot[] = [
+    ...done.map((q) => ({ kind: "quest-done" as const, q })),
+    ...Array.from({ length: manual }, () => ({ kind: "manual" as const })),
+    ...open.map((q) => ({ kind: "quest-open" as const, q })),
+  ];
+  while (slots.length < boss.target) slots.push({ kind: "empty" });
+
+  function run(fn: () => Promise<unknown>) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await fn();
+        await load();
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
+
+  function complete(q: BossQuest) {
+    run(async () => {
+      const fd = new FormData();
+      fd.set("taskId", q.id);
+      const res = await completeTaskAction(fd);
+      celebrateQuest({ taskId: q.id, title: q.title, xp: q.xp_value, iconSrc: q.icon_source === "ai" || q.icon_source === "library" ? q.icon_key : null, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
+      if (progress + 1 >= boss.target) {
+        celebrateProgress({ title: `Boss defeated: ${boss.title}`, xp: 0, fromPct: 100, toPct: 100, heading: "Boss defeated!", barCaption: `Level ${boss.level + 1} is open to you` });
+        onDone();
+      }
+    });
+  }
+
+  const art = (q: { id: string; title: string; icon_key: string | null; icon_source: string | null }, size = 36) =>
+    (q.icon_source === "ai" || q.icon_source === "library") && q.icon_key ? (
+      // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+      <img src={q.icon_key} alt="" className="shrink-0 rounded-full object-cover" style={{ width: size, height: size, border: "1.5px solid #a58c66" }} />
+    ) : (
+      <span className="shrink-0 overflow-hidden rounded-full" style={{ width: size, height: size, border: "1.5px solid #a58c66" }}>
+        <QuestMonogram id={q.id} title={q.title} size={size} />
+      </span>
+    );
+  const check = (on: boolean) => (
+    <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: on ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "rgba(255,250,238,.7)", border: `2px solid ${on ? "#2f5a26" : "#a58c66"}` }}>
+      {on && (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </span>
+  );
+
+  return (
+    <div className="relative z-[1] flex flex-col gap-2">
+      {quests === null ? (
+        <p className="m-0 text-center text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>
+          Gathering the sessions…
+        </p>
+      ) : (
+        slots.map((sl, i) => {
+          const box = "flex min-h-[52px] items-center gap-2.5 rounded-xl px-3 py-2";
+          if (sl.kind === "quest-done")
+            return (
+              <div key={`d-${sl.q.id}`} className={box} style={{ background: "rgba(88,160,74,.12)", border: "1.5px solid rgba(63,106,44,.5)" }}>
+                {check(true)}
+                {art(sl.q)}
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{sl.q.title}</span>
+              </div>
+            );
+          if (sl.kind === "manual")
+            return (
+              <div key={`m-${i}`} className={box} style={{ background: "rgba(88,160,74,.12)", border: "1.5px solid rgba(63,106,44,.5)" }}>
+                {check(true)}
+                <span className="min-w-0 flex-1 text-[15px] font-semibold">Session {i + 1} done</span>
+                <button type="button" disabled={busy} onClick={() => onStep(-1)} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                  undo
+                </button>
+              </div>
+            );
+          if (sl.kind === "quest-open")
+            return (
+              <div key={`o-${sl.q.id}`} className={box} style={{ background: "rgba(255,250,238,.6)", border: "1.5px solid #b39a6a" }}>
+                <button type="button" disabled={isPending} onClick={() => complete(sl.q)} aria-label={`Complete ${sl.q.title}`} className="rounded-full">
+                  {check(false)}
+                </button>
+                {art(sl.q)}
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{sl.q.title}</span>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => run(() => linkQuestToBossAction(sl.q.id, null))}
+                  aria-label={`Take ${sl.q.title} off this boss`}
+                  title="Take it off this boss (the quest stays)"
+                  className="h-8 w-7 text-[18px] leading-none"
+                  style={{ color: "var(--t-ink-soft)" }}
+                >
+                  ×
+                </button>
+              </div>
+            );
+          const choosing = slotMode?.i === i;
+          return (
+            <div key={`e-${i}`} className="flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "2px dashed rgba(139,112,64,.5)" }}>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-auto text-[14.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+                  Session {i + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSlotMode(choosing && slotMode?.mode === "pick" ? null : { i, mode: "pick" });
+                    if (!options) void listQuestOptionsAction().then(setOptions).catch(() => setOptions([]));
+                  }}
+                  className="h-8 rounded-full px-3 text-[13px] font-semibold"
+                  style={{ border: "1.5px solid #b39a6a" }}
+                >
+                  Pick a quest
+                </button>
+                <button type="button" onClick={() => setSlotMode(choosing && slotMode?.mode === "new" ? null : { i, mode: "new" })} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1.5px solid #b39a6a" }}>
+                  New quest
+                </button>
+                <button type="button" disabled={busy} onClick={() => onStep(1)} title="Count it without a quest" className="h-8 rounded-full px-2.5 text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                  just mark done
+                </button>
+              </div>
+              {choosing && slotMode?.mode === "new" && (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newTitle.trim()) {
+                        const t = newTitle;
+                        setNewTitle("");
+                        setSlotMode(null);
+                        run(() => createBossQuestAction(boss.id, t));
+                      }
+                    }}
+                    placeholder="e.g. Team Alvim class, Tuesday"
+                    aria-label="New session quest"
+                    className="h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-[16px]"
+                    style={{ borderColor: "#b39a6a" }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!newTitle.trim() || isPending}
+                    onClick={() => {
+                      const t = newTitle;
+                      setNewTitle("");
+                      setSlotMode(null);
+                      run(() => createBossQuestAction(boss.id, t));
+                    }}
+                    className="h-9 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"
+                    style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
+              {choosing && slotMode?.mode === "pick" && (
+                <ul className="m-0 flex max-h-[200px] list-none flex-col overflow-y-auto overscroll-contain p-0">
+                  {options === null && <li className="py-1 text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>Loading…</li>}
+                  {options?.length === 0 && <li className="py-1 text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>No open quests to pick.</li>}
+                  {options?.map((o) => (
+                    <li key={o.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSlotMode(null);
+                          setOptions((list) => list?.filter((x) => x.id !== o.id) ?? list);
+                          run(() => linkQuestToBossAction(o.id, boss.id));
+                        }}
+                        className="flex min-h-10 w-full items-center gap-2 rounded-lg px-1.5 text-left text-[14.5px] hover:bg-black/5"
+                      >
+                        {art(o, 26)}
+                        <span className="min-w-0 flex-1 truncate">{o.title}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })
+      )}
+      {error && (
+        <p className="m-0 text-sm" style={{ color: "var(--t-warn)" }}>
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

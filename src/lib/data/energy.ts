@@ -21,7 +21,7 @@ export async function latestEnergy(ownerId: string): Promise<EnergyEntry | null>
 }
 
 export async function logEnergy(ownerId: string, level: number): Promise<EnergyEntry> {
-  const v = Math.min(10, Math.max(1, Math.round(level * 2) / 2));
+  const v = Math.min(10, Math.max(1, Math.round(level * 10) / 10));
   const { data, error } = await supabaseAdmin().from("energy_log").insert({ owner_id: ownerId, level: v }).select("id, level, created_at").single();
   if (missingTable(error)) throw new Error("The energy log needs a quick database update first.");
   if (error) throw new Error(`Couldn't save your energy: ${error.message}`);
@@ -78,7 +78,7 @@ export async function setCheckMetrics(ownerId: string, labels: string[]): Promis
 
 export async function logCheckIns(ownerId: string, readings: { metric: string; level: number }[]): Promise<CheckReading[]> {
   const rows = readings
-    .map((r) => ({ owner_id: ownerId, metric: cleanLabel(r.metric), level: Math.min(10, Math.max(1, Math.round(r.level * 2) / 2)) }))
+    .map((r) => ({ owner_id: ownerId, metric: cleanLabel(r.metric), level: Math.min(10, Math.max(1, Math.round(r.level * 10) / 10)) }))
     .filter((r) => r.metric);
   if (rows.length === 0) return [];
   const { data, error } = await supabaseAdmin().from("check_ins").insert(rows).select("metric, level, created_at");
