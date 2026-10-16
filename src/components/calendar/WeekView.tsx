@@ -1,6 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { askForWeatherLocation, daySummary, useWeatherRange } from "@/lib/use-weather";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
@@ -17,7 +18,11 @@ import { CalendarAddPopup } from "./CalendarAddPopup";
 import { CalendarTaskChip, getTaskDisplayWindow } from "./CalendarTaskChip";
 import { GoogleEventChip } from "./GoogleEventChip";
 
-const HOUR_PX = 48;
+/** Hour height: condensed by default; drag the times on the left to zoom. */
+const DEFAULT_HOUR_PX = 36;
+const MIN_HOUR_PX = 18;
+const MAX_HOUR_PX = 96;
+const ZOOM_KEY = "calendar-hour-px";
 
 /** The current minute, ticking once a minute (0 on the server, so nothing time-dependent renders there). */
 export function useNowMinute() {
@@ -45,6 +50,49 @@ export function WeekView({
 }) {
   const isAdventure = theme === "adventure";
   const days = dayKeys.map((k) => parseDateParam(k));
+  const [hourPx, setHourPx] = useState(DEFAULT_HOUR_PX);
+  const HOUR_PX = hourPx;
+  useEffect(() => {
+    try {
+      const z = Number(window.localStorage.getItem(ZOOM_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+      if (z >= MIN_HOUR_PX && z <= MAX_HOUR_PX) setHourPx(z);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  function zoomTo(px: number) {
+    const v = Math.round(Math.max(MIN_HOUR_PX, Math.min(MAX_HOUR_PX, px)));
+    setHourPx(v);
+    try {
+      window.localStorage.setItem(ZOOM_KEY, String(v));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  function onZoomDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const el = e.currentTarget;
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* capture unavailable */
+    }
+    const y0 = e.clientY;
+    const z0 = hourPx;
+    const move = (ev: PointerEvent) => zoomTo(z0 * Math.pow(2, (ev.clientY - y0) / 160));
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+  }
+  const weather = useWeatherRange(dayKeys[0] ?? null, dayKeys[dayKeys.length - 1] ?? null);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const single = days.length === 1;
   const nowMinute = useNowMinute();
   const now = nowMinute ? new Date(nowMinute * 60_000) : null;
   const hourCount = HOUR_END - HOUR_START + 1;
@@ -186,6 +234,15 @@ export function WeekView({
       className={`rounded-2xl p-2.5 ${isAdventure ? "parchment" : ""}`}
       style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >
+      {weather === undefined && (
+        <div className="mb-1.5 flex items-center gap-2 px-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+          <button type="button" onClick={() => askForWeatherLocation(setWeatherError)} className="underline underline-offset-2" style={{ color: "var(--t-ink)" }}>
+            Show weather
+          </button>
+          <span>· uses your rough location</span>
+          {weatherError && <span style={{ color: "var(--t-warn)" }}>{weatherError}</span>}
+        </div>
+      )}
       <div
         className="grid"
         style={{
@@ -224,6 +281,18 @@ export function WeekView({
               >
                 {day.getDate()}
               </span>
+              {!single && weather && (() => {
+                const w = daySummary(weather[dayKeys[i]]);
+                if (!w) return null;
+                return (
+                  <span className="mt-0.5 flex flex-col items-center text-[11px] leading-tight tabular-nums" style={{ color: "var(--t-ink-soft)" }} title={`High ${w.hi}°, low ${w.lo}°, ${w.rain}% chance of rain`}>
+                    <span>
+                      <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b> {w.lo}°
+                    </span>
+                    {w.rain >= 30 && <span style={{ color: "#3f6fa8" }}>💧{w.rain}%</span>}
+                  </span>
+                );
+              })()}
             </Link>
           );
         })}
@@ -248,23 +317,59 @@ export function WeekView({
             style={{
               gridColumn: 1,
               gridRow: row + 2,
-              fontSize: 11.5,
+              fontSize: HOUR_PX < 30 ? 10.5 : 11.5,
               lineHeight: 1.1,
+              overflow: "hidden",
               whiteSpace: "pre-line",
               color: "var(--t-ink-soft)",
               paddingTop: 2,
               borderTop: `1px solid ${lineColor}`,
             }}
           >
-            {formatHourLabel(HOUR_START + row).replace(" ", "\n")}
+            {HOUR_PX < 30
+              ? formatHourLabel(HOUR_START + row).replace(/:00/, "").replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase())
+              : formatHourLabel(HOUR_START + row).replace(" ", "\n")}
           </div>
         ))}
         {Array.from({ length: hourCount }, (_, row) => (
           <div
             key={`line-${row}`}
+            className="relative"
             style={{ gridColumn: `2 / ${days.length + 2}`, gridRow: row + 2, borderTop: `1px solid ${lineColor}` }}
-          />
+          >
+            {single && weather?.[dayKeys[0]]?.[HOUR_START + row] && (() => {
+              const w = weather[dayKeys[0]][HOUR_START + row];
+              return (
+                <span
+                  className="pointer-events-none absolute right-1 top-0.5 z-[4] flex items-center gap-1 rounded px-1 text-[11.5px] tabular-nums"
+                  style={{ color: "var(--t-ink-soft)", background: isAdventure ? "rgba(243,230,200,.75)" : "var(--t-card)" }}
+                  title={`${w.temp}° · ${w.rain}% chance of rain`}
+                >
+                  {w.rain >= 30 && <span style={{ color: "#3f6fa8" }}>💧{w.rain}%</span>}
+                  {w.temp}°
+                </span>
+              );
+            })()}
+          </div>
         ))}
+        {/* Drag the times up or down to squeeze or stretch the day. */}
+        <div
+          role="slider"
+          aria-label="Zoom the calendar (drag the times)"
+          aria-valuemin={MIN_HOUR_PX}
+          aria-valuemax={MAX_HOUR_PX}
+          aria-valuenow={hourPx}
+          tabIndex={0}
+          title="Drag the times up or down to zoom"
+          className="relative z-[5] cursor-ns-resize touch-none"
+          style={{ gridColumn: 1, gridRow: `2 / ${hourCount + 2}` }}
+          onPointerDown={onZoomDown}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+            e.preventDefault();
+            zoomTo(hourPx + (e.key === "ArrowDown" ? 6 : -6));
+          }}
+        />
 
         {/* Drag-to-add hit cells — one per (day, hour). Rendered before the
             task/event chips below so a chip occupying the same cell stacks
