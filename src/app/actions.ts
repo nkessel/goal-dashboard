@@ -1568,6 +1568,20 @@ export async function setTomorrowQueueAction(rankIds: string[], seqIds?: string[
   revalidatePath("/");
 }
 
+/** Snooze a quest until tomorrow (end of tomorrow's plan; counts as a reschedule). Returns what Undo needs. */
+export async function snoozeQuestAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  const prev = await tomorrowData.snoozeToTomorrow(ownerId, taskId);
+  revalidatePath("/");
+  return prev;
+}
+
+export async function undoSnoozeAction(taskId: string, prev: tomorrowData.SnoozePrev) {
+  const ownerId = await requireProfileId();
+  await tomorrowData.undoSnooze(ownerId, taskId, prev);
+  revalidatePath("/");
+}
+
 // ---------------------------------------------------------------------------
 // Planning tomorrow's day (the evening's "Plan tomorrow's day" rite)
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import {
   DndContext,
   DragOverlay,
@@ -118,7 +119,14 @@ export function TodayTaskBoard({
   // A quick move from a card's menu: drop the local copy on the next fresh props.
   const [softLocal, setSoftLocal] = useState(false);
   const [adding, setAdding] = useState(false);
+  // A short note after a quick move (e.g. a snooze), with Undo.
+  const [notice, setNotice] = useState<{ id: number; text: string; undo?: () => Promise<void> } | null>(null);
   const [, startTransition] = useTransition();
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice((n) => (n?.id === notice.id ? null : n)), 7000);
+    return () => clearTimeout(t);
+  }, [notice]);
   const isAdventure = theme === "adventure";
 
   // A reward still locked behind an open prerequisite is drawn stacked behind it, not as its own card.
@@ -164,6 +172,7 @@ export function TodayTaskBoard({
         setLocalOther(null);
         setDragError(message);
       },
+      notify: (n: { text: string; undo?: () => Promise<void> }) => setNotice({ id: Date.now(), ...n }),
     };
   }
 
@@ -413,6 +422,42 @@ export function TodayTaskBoard({
           </ul>
         ) : null}
       </DragOverlay>
+
+      {notice &&
+        createPortal(
+          <div
+            role="status"
+            data-hide-when-typing
+            className="card-pop-in fixed bottom-[calc(96px+env(safe-area-inset-bottom))] left-1/2 z-[58] flex w-[min(92vw,420px)] -translate-x-1/2 items-center gap-3 rounded-full py-1.5 pl-4 pr-1.5 shadow-xl"
+            style={{ background: "rgba(22,26,44,.95)", border: "1.5px solid rgba(217,180,95,.6)", color: "#f1ead2" }}
+          >
+            <span className="min-w-0 flex-1 truncate text-[14px]">{notice.text}</span>
+            {notice.undo && (
+              <button
+                type="button"
+                onClick={() => {
+                  const undo = notice.undo!;
+                  setNotice(null);
+                  startTransition(async () => {
+                    try {
+                      await undo();
+                    } catch (e) {
+                      setDragError(e instanceof Error ? e.message : "Couldn't undo that.");
+                    }
+                  });
+                }}
+                className="h-9 shrink-0 rounded-full px-4 text-[14px] font-bold"
+                style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+              >
+                Undo
+              </button>
+            )}
+            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "rgba(241,234,210,.7)" }}>
+              ×
+            </button>
+          </div>,
+          document.body
+        )}
 
     </DndContext>
   );

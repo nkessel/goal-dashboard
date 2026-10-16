@@ -4,10 +4,11 @@ import { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction } from "@/app/actions";
+import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
-import { QuestActionMenu, type QuestAction } from "./QuestActionMenu";
+import { QuestActionMenu, SnoozeGlyph, type QuestAction } from "./QuestActionMenu";
+import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { celebrateQuest, updateQuestCelebration } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { QuestMonogram } from "./QuestMonogram";
@@ -64,7 +65,12 @@ export function TaskRow({
   onEditorClose?: () => void;
   /** On a list that can update instantly (Today): move or drop this card
    * right away, then save. `revert` puts it back if the save fails. */
-  listMoves?: { move: (to: "priority" | "other" | null) => void; revert: (message: string) => void };
+  listMoves?: {
+    move: (to: "priority" | "other" | null) => void;
+    revert: (message: string) => void;
+    /** A short note under the lists, with an optional Undo. */
+    notify?: (n: { text: string; undo?: () => Promise<void> }) => void;
+  };
   /** A reward locked behind this quest: drawn as a card stacked behind it. */
   behind?: Task | null;
   theme?: "calm" | "adventure";
@@ -146,6 +152,24 @@ export function TaskRow({
     if (action === "edit") return setEditing(true);
     if (action === "calendar") return setScheduling(true);
     if (action === "focus") return setFocusing(true);
+    if (action === "snooze") {
+      // Off today now; back at the top of the day tomorrow. Undo puts it back.
+      startTransition(async () => {
+        if (listMoves) {
+          await slideOut(liRef.current);
+          listMoves.move(null);
+        }
+        try {
+          const prev = await snoozeQuestAction(task.id);
+          listMoves?.notify?.({ text: `Snoozed until tomorrow: ${task.title}`, undo: () => undoSnoozeAction(task.id, prev) });
+        } catch (e) {
+          resetSlide(liRef.current);
+          if (listMoves) listMoves.revert(e instanceof Error ? e.message : "Couldn't snooze that quest — try again.");
+          else setError(e instanceof Error ? e.message : "Couldn't snooze that quest.");
+        }
+      });
+      return;
+    }
     if (listMoves && (action === "battle" || action === "offtoday" || action === "delete")) {
       // Leave the list right away (slide left, fade, close the gap), then save.
       const to = action === "battle" ? (task.is_manual_priority ? "other" : "priority") : null;
@@ -212,6 +236,7 @@ export function TaskRow({
       isReward={Boolean(task.reward_id)}
       onToday={task.is_manual_priority || task.in_additional !== false}
       onCalendar={task.is_on_calendar}
+      canSnooze={Boolean(listMoves) && task.status === "open"}
       align={align}
       anchor={menuAnchor}
       onPick={pick}
@@ -241,6 +266,16 @@ export function TaskRow({
     >
       {/* A locked reward peeks out from behind its prerequisite quest. */}
       {behind && <LockedRewardCard reward={behind} />}
+      {/* On Today, swipe right to snooze it until tomorrow. */}
+      <SwipeReveal
+        side="left"
+        label="Snooze"
+        icon={<SnoozeGlyph size={22} />}
+        background="linear-gradient(180deg,#56669c,#2f3a68)"
+        color="#f6ecd2"
+        disabled={!listMoves || task.status !== "open"}
+        onAction={() => pick("snooze")}
+      >
       <div
       onClick={() => setEditing(true)}
       title="Click to edit"
@@ -526,6 +561,7 @@ export function TaskRow({
       )}
       {focusing && <FocusMode task={{ ...task, categoryLabel }} theme={theme} onClose={() => setFocusing(false)} />}
     </div>
+      </SwipeReveal>
     </li>
   );
 }

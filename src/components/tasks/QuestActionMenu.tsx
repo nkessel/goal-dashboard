@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 
-export type QuestAction = "edit" | "complete" | "focus" | "battle" | "offtoday" | "calendar" | "delete";
+export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "delete";
 
 /**
  * The quest card's action list — opened from the card's icon (the blank
@@ -16,11 +16,14 @@ export function QuestActionMenu({
   isReward = false,
   onToday = true,
   onCalendar,
+  canSnooze = false,
   align,
   anchor,
   onPick,
   onClose,
 }: {
+  /** Offer "Snooze until tomorrow" (quests on the Today screen). */
+  canSnooze?: boolean;
   isAdventure: boolean;
   inBattle: boolean;
   /** The quest is a reward being claimed: "Complete this reward". */
@@ -89,7 +92,8 @@ export function QuestActionMenu({
           ? "Remove from Today's Focus"
           : "Add to Today's Focus",
     },
-    ...(onToday ? [{ key: "offtoday" as const, icon: <SnoozeGlyph />, label: "Take off the Today screen" }] : []),
+    ...(canSnooze ? [{ key: "snooze" as const, icon: <SnoozeGlyph />, label: "Snooze until tomorrow" }] : []),
+    ...(onToday ? [{ key: "offtoday" as const, icon: <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />, label: "Take off the Today screen" }] : []),
     { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule on calendar" : "Add to calendar" },
     { key: "delete", icon: <Glyph d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, label: isReward ? "Delete reward" : isAdventure ? "Delete quest" : "Delete task" },
   ];
@@ -168,9 +172,9 @@ function Glyph({ d }: { d: string }) {
 }
 
 /** Snooze: a little clock with "z"s. */
-function SnoozeGlyph() {
+export function SnoozeGlyph({ size = 18 }: { size?: number }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       <circle cx="10" cy="13" r="7" stroke="currentColor" strokeWidth="1.8" />
       <path d="M10 9.5V13l2.2 1.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M15.5 3h4l-4 4h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
