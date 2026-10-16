@@ -479,10 +479,10 @@ export function TaskRow({
               {Array.from({ length: importanceCount }).map((_, i) =>
                 isAdventure ? (
                   // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                  <img key={i} src="/design/ui-bolt.png" alt="" width={13} height={13} className="h-[11px] w-[11px] sm:h-[13px] sm:w-[13px]" />
+                  <img key={i} src="/design/ui-heart.svg" alt="" width={13} height={13} className="h-[11px] w-[11px] sm:h-[13px] sm:w-[13px]" />
                 ) : (
-                  <span key={i} style={{ color: "var(--t-accent)", fontSize: 13 }}>
-                    &#9889;
+                  <span key={i} style={{ color: "#c8402f", fontSize: 13 }}>
+                    &#9829;
                   </span>
                 )
               )}

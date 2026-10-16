@@ -156,6 +156,8 @@ export async function updateTask(
     /** Undefined leaves the board untouched; null takes it off its board. */
     boardId?: string | null;
     effort?: number;
+    /** 0–5 energy it gives back when done. */
+    energyGain?: number;
     isAspiration?: boolean;
     /** Undefined leaves these untouched; null clears them. */
     dueAt?: string | null;
@@ -179,6 +181,7 @@ export async function updateTask(
         : {}),
       ...(input.boardId !== undefined ? { board_id: input.boardId } : {}),
       ...(input.effort !== undefined ? { effort: Math.max(0, Math.min(5, Math.round(input.effort))) } : {}),
+      ...(input.energyGain !== undefined ? { energy_gain: Math.max(0, Math.min(5, Math.round(input.energyGain))) } : {}),
       ...(input.isAspiration !== undefined ? { is_aspiration: input.isAspiration } : {}),
       ...(input.dueAt !== undefined ? { due_at: input.dueAt } : {}),
       ...(input.chunkMinutes !== undefined ? { chunk_minutes: input.chunkMinutes === null ? null : Math.max(1, Math.round(input.chunkMinutes)) } : {}),
@@ -334,6 +337,7 @@ export async function createTask(
     goalId?: string | null;
     boardId?: string | null;
     effort?: number;
+    energyGain?: number;
     color?: string;
     estimateMinutes?: number | null;
     iconKey?: string | null;
@@ -364,6 +368,7 @@ export async function createTask(
       goal_id: input.goalId || null,
       ...(input.boardId ? { board_id: input.boardId } : {}),
       ...(input.effort ? { effort: Math.max(0, Math.min(5, Math.round(input.effort))) } : {}),
+      ...(input.energyGain ? { energy_gain: Math.max(0, Math.min(5, Math.round(input.energyGain))) } : {}),
       title: input.title,
       description: input.description || null,
       importance: input.importance ?? 0,

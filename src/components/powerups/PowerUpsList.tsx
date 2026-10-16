@@ -10,13 +10,13 @@ import { BoltIcon } from "@/components/ui/Icons";
 const QUICK_MINUTES = [2, 5, 10, 15];
 const EFFORT_CAPS = [1, 2, 3, 5];
 
-/** 1–5 little dumbbells for effort. */
+/** 1–5 little flexed arms for challenge (effort). */
 function EffortPips({ n, size = 13 }: { n: number; size?: number }) {
   return (
-    <span className="inline-flex items-center gap-px" aria-label={`Effort ${n}`}>
+    <span className="inline-flex items-center gap-px" aria-label={`Challenge ${n}`}>
       {Array.from({ length: n }).map((_, i) => (
         // eslint-disable-next-line @next/next/no-img-element -- effort glyph
-        <img key={i} src="/design/ui-effort.svg" alt="" width={size} height={size} />
+        <img key={i} src="/design/ui-muscle.svg" alt="" width={size} height={size} />
       ))}
     </span>
   );

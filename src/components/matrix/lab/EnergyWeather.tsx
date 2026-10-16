@@ -48,9 +48,10 @@ export function EnergyWeather<T extends LabTask>({ tasks, energy, now, isAdventu
   }
 
   // Each quest goes to the time whose usual energy best fits its effort (effort 1–5 → energy 2–10).
+  // A quest that gives energy back asks for a little less to start.
   const placed = new Map<string, T[]>();
   for (const t of tasks) {
-    const need = 2 * (t.effort && t.effort > 0 ? t.effort : 3);
+    const need = Math.max(2, 2 * (t.effort && t.effort > 0 ? t.effort : 3) - (t.energy_gain ?? 0) * 0.6);
     let best = known[0];
     let bestFit = Infinity;
     for (const s of known) {

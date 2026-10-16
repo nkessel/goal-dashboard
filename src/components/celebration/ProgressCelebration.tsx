@@ -33,15 +33,26 @@ const PIECES = Array.from({ length: 24 }, (_, i) => {
   };
 });
 
+/** Off for now: XP screens stay until closed, so they can be reviewed. */
+const AUTO_DISMISS = false;
+
 /**
  * A small party for partial progress: confetti, the bar filling from where it
- * was to where it is now, and the XP counting up. Dismisses itself.
+ * was to where it is now, and the XP counting up. For now it stays until
+ * closed (so it can be looked at and given feedback on); set
+ * AUTO_DISMISS to bring back the self-dismissing version.
  */
 export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct, steps, heading = "Progress made!", barCaption, onClose }: ProgressCelebrationDetail & { onClose: () => void }) {
   const [shown, setShown] = useState(0);
   const [leaving, setLeaving] = useState(false);
-  const [pinned, setPinned] = useState(false);
+  const [pinned, setPinned] = useState(!AUTO_DISMISS);
   const dismiss = useEffectEvent(() => onClose());
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && dismiss();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     const start = performance.now();
@@ -93,7 +104,7 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
         </div>
 
         <div
-          className="pc-card parchment relative flex w-[290px] flex-col items-center gap-2 rounded-2xl px-6 pb-5 pt-5 text-center"
+          className="pc-card parchment pointer-events-auto relative flex w-[290px] flex-col items-center gap-2 rounded-2xl px-6 pb-5 pt-5 text-center"
         >
           <p className="font-display m-0 text-[25px] leading-none" style={{ color: "var(--t-ink)" }}>
             {heading}

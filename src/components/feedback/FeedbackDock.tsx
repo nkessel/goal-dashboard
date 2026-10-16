@@ -10,32 +10,31 @@ export function openFeedback() {
   window.dispatchEvent(new Event(OPEN_FEEDBACK_EVENT));
 }
 
-/** A round speech bubble: the feedback button's icon. */
+/** A plain speech-bubble outline: the feedback button's icon. */
 export function ChatIcon({ size = 20, ink = "#3a2a10" }: { size?: number; ink?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M12 4.2c-4.6 0-8.2 3.1-8.2 7 0 2.1 1 4 2.7 5.2l-.6 3c-.1.5.4.9.8.6l3.2-1.8c.7.2 1.4.3 2.1.3 4.6 0 8.2-3.1 8.2-7.2 0-3.9-3.6-7.1-8.2-7.1z"
-        fill="#fffaf0"
         stroke={ink}
-        strokeWidth="1.6"
+        strokeWidth="1.9"
         strokeLinejoin="round"
       />
-      <circle cx="8.6" cy="11.3" r="1.05" fill={ink} />
-      <circle cx="12" cy="11.3" r="1.05" fill={ink} />
-      <circle cx="15.4" cy="11.3" r="1.05" fill={ink} />
     </svg>
   );
 }
 
 const WHEN = [
   ["feedback", "Next update", "Build it in the next update"],
-  ["refill", "When credits refill", "The next scheduled update"],
+  ["refill", "Credits refill", "When credits refill: the next scheduled update"],
   ["future", "Future idea", "Keep it in the ideas log"],
 ] as const;
 type WhenKind = (typeof WHEN)[number][0];
 
-type Draft = { id: string; body: string; kind: WhenKind };
+/** XP you choose to earn for a piece of feedback. */
+const XP_CHOICES = [1, 2, 3] as const;
+
+type Draft = { id: string; body: string; kind: WhenKind; xp?: number };
 type Geom = { x: number; y: number; w: number; h: number };
 type ButtonPos = { side: "left" | "right"; bottom: number };
 type Viewport = { left: number; top: number; w: number; h: number; innerW: number; innerH: number };
@@ -132,7 +131,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [loaded, setLoaded] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [sent, setSent] = useState<{ id: string; kind: WhenKind } | null>(null);
+  const [sent, setSent] = useState<{ id: string; kind: WhenKind; xp: number } | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [btn, setBtn] = useState<ButtonPos>(DEFAULT_BUTTON);
   const [btnDrag, setBtnDrag] = useState<{ x: number; y: number } | null>(null);
@@ -201,16 +200,12 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     setDrafts((ds) => ds.map((d) => (d.id === openId ? { ...d, ...patch } : d)));
   }
 
-  function onSent(kind: WhenKind) {
+  /** The thank-you stays until it's closed (or another is started). */
+  function onSent(kind: WhenKind, xp: number) {
     const id = openId;
     if (!id) return;
-    setSent({ id, kind });
+    setSent({ id, kind, xp });
     setDrafts((ds) => ds.map((d) => (d.id === id ? { ...d, body: "" } : d)));
-    setTimeout(() => {
-      setSent((s) => (s?.id === id ? null : s));
-      setDrafts((ds) => ds.filter((d) => d.id !== id));
-      setOpenId((o) => (o === id ? null : o));
-    }, 2600);
   }
 
   // The button, F, and the + sheet's Feedback choice all start feedback.
@@ -277,7 +272,6 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     return { w, h, x: mobile ? 8 : btn.side === "right" ? vp.innerW - w - 20 : 20, y: above > 60 ? above : 60 };
   };
   const shown = fit(geom ?? defaultGeom(), vp);
-  const roomy = shown.h >= 330;
 
   function onPanelDown(e: React.PointerEvent<HTMLElement>, kind: "move" | "resize") {
     if (kind === "move" && (e.target as HTMLElement).closest("button")) return;
@@ -306,6 +300,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     : { background: "var(--t-card)", boxShadow: "0 0 0 1px var(--t-card-border), 0 4px 12px rgba(0,0,0,.2)" };
 
   const pillsAbove = btnTop > vp.innerH / 2;
+  const isSent = !!open && sent?.id === open.id;
 
   return createPortal(
     <>
@@ -330,7 +325,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         className={`fixed z-[60] flex touch-none select-none items-center justify-center rounded-full ${btnDrag ? "cursor-grabbing" : "cursor-pointer transition-transform hover:scale-105 active:scale-95"}`}
         style={{ ...buttonStyle, width: BTN, height: BTN, ...coin, transition: btnDrag ? "none" : "left 220ms cubic-bezier(.2,.8,.2,1), right 220ms cubic-bezier(.2,.8,.2,1), top 220ms cubic-bezier(.2,.8,.2,1)" }}
       >
-        <ChatIcon size={23} />
+        <ChatIcon size={27} />
         {minimized.length > 0 && !openId && (
           <span
             aria-hidden
@@ -393,39 +388,47 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             }}
           >
             <div
-              className="relative z-[1] flex shrink-0 cursor-move touch-none select-none items-center gap-1 px-2 pt-1.5"
-              onPointerDown={(e) => onPanelDown(e, "move")}
-              onPointerMove={onPanelMove}
-              onPointerUp={onPanelUp}
-              onPointerCancel={onPanelUp}
-              title="Drag to move"
+              className={`relative z-[1] flex shrink-0 select-none items-center gap-1 px-2 pt-1.5 ${isSent ? "pl-4" : "cursor-move touch-none"}`}
+              {...(isSent
+                ? {}
+                : {
+                    onPointerDown: (e: React.PointerEvent<HTMLElement>) => onPanelDown(e, "move"),
+                    onPointerMove: onPanelMove,
+                    onPointerUp: onPanelUp,
+                    onPointerCancel: onPanelUp,
+                    title: "Drag to move",
+                  })}
             >
-              <span aria-hidden className="flex h-9 w-6 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
-                <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden>
-                  {[2, 8, 14].map((y) => (
-                    <g key={y}>
-                      <circle cx="2.5" cy={y} r="1.4" />
-                      <circle cx="7.5" cy={y} r="1.4" />
-                    </g>
-                  ))}
-                </svg>
-              </span>
+              {!isSent && (
+                <span aria-hidden className="flex h-9 w-6 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
+                  <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden>
+                    {[2, 8, 14].map((y) => (
+                      <g key={y}>
+                        <circle cx="2.5" cy={y} r="1.4" />
+                        <circle cx="7.5" cy={y} r="1.4" />
+                      </g>
+                    ))}
+                  </svg>
+                </span>
+              )}
               <span className={`flex-1 py-1 ${isAdventure ? "font-display text-[18px]" : "text-base font-bold"}`}>Feedback</span>
-              <button type="button" onClick={leaveOpen} aria-label="Minimize" title="Minimize — start another with the feedback button" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M6 16h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-                </svg>
-              </button>
+              {!isSent && (
+                <button type="button" onClick={leaveOpen} aria-label="Minimize" title="Minimize — start another with the feedback button" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M6 16h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                  </svg>
+                </button>
+              )}
               <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
                 ×
               </button>
             </div>
 
             <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
-              {sent?.id === open.id ? (
-                <Sent kind={sent.kind} isAdventure={isAdventure} onAnother={startNew} />
+              {sent && isSent ? (
+                <Sent kind={sent.kind} xp={sent.xp} isAdventure={isAdventure} onAnother={startNew} />
               ) : (
-                <Composer key={open.id} draft={open} roomy={roomy} isAdventure={isAdventure} onChange={update} onSent={onSent} />
+                <Composer key={open.id} draft={open} isAdventure={isAdventure} onChange={update} onSent={onSent} />
               )}
               {confirmDiscard && (
                 <div role="alertdialog" aria-label="Discard this feedback?" className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3 px-6 text-center" style={{ background: isAdventure ? "rgba(236,218,180,.96)" : "var(--t-card)" }}>
@@ -445,6 +448,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             </div>
 
             {/* Resize from the corner. */}
+            {!isSent && (
             <span
               role="presentation"
               title="Drag to resize"
@@ -458,6 +462,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
                 <path d="M11 3L3 11M11 7L7 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </span>
+            )}
           </div>
         </div>
       )}
@@ -466,30 +471,29 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   );
 }
 
-/** Where it goes, what to change, submit. */
+/** Where it goes, the XP it earns, what to change, submit. */
 function Composer({
   draft,
-  roomy,
   isAdventure,
   onChange,
   onSent,
 }: {
   draft: Draft;
-  roomy: boolean;
   isAdventure: boolean;
   onChange: (patch: Partial<Draft>) => void;
-  onSent: (kind: WhenKind) => void;
+  onSent: (kind: WhenKind, xp: number) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
+  const xp = draft.xp ?? 1;
 
   function save() {
     if (!draft.body.trim() || isSaving) return;
     setError(null);
     startSaving(async () => {
       try {
-        await addJournalEntryAction(draft.body, null, draft.kind);
-        onSent(draft.kind);
+        const res = await addJournalEntryAction(draft.body, null, draft.kind, xp);
+        onSent(draft.kind, res.xpAwarded);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't send it. Check your connection and try again.");
       }
@@ -498,7 +502,7 @@ function Composer({
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col gap-2.5 px-3.5 pb-3 pt-1"
+      className="flex min-h-0 flex-1 flex-col gap-2 px-3.5 pb-3 pt-1"
       onKeyDown={(e) => {
         if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
           e.preventDefault();
@@ -506,30 +510,21 @@ function Composer({
         }
       }}
     >
-      <div role="radiogroup" aria-label="When" className="grid shrink-0 grid-cols-3 gap-1.5">
-        {WHEN.map(([k, label, hint]) => {
-          const on = draft.kind === k;
-          return (
-            <button
-              key={k}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => onChange({ kind: k })}
-              title={hint}
-              className="create-kind flex flex-col items-start justify-center rounded-xl px-2.5 py-1.5 text-left"
-              style={{ background: on ? "rgba(217,180,95,.45)" : "rgba(70,50,20,.07)", border: `1.5px solid ${on ? "#a88a3f" : "transparent"}`, color: "var(--t-ink)" }}
-            >
-              <span className="text-[13px] font-semibold leading-tight">{label}</span>
-              {roomy && (
-                <span className="mt-0.5 hidden text-[11.5px] leading-snug sm:block" style={{ color: "var(--t-ink-soft)" }}>
-                  {hint}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <Segmented
+        label="Where it goes"
+        isAdventure={isAdventure}
+        value={draft.kind}
+        onChange={(k) => onChange({ kind: k })}
+        options={WHEN.map(([k, label, hint]) => ({ value: k, label, hint }))}
+      />
+      <Segmented
+        label="XP you earn"
+        lead="XP"
+        isAdventure={isAdventure}
+        value={xp}
+        onChange={(n) => onChange({ xp: n })}
+        options={XP_CHOICES.map((n) => ({ value: n, label: `+${n}`, hint: `Earn ${n} XP for this feedback` }))}
+      />
       <textarea
         data-feedback-text
         autoFocus
@@ -563,7 +558,58 @@ function Composer({
   );
 }
 
-function Sent({ kind, isAdventure, onAnother }: { kind: WhenKind; isAdventure: boolean; onAnother: () => void }) {
+/**
+ * One choice from a few, as a single pill track: equal segments that fit a
+ * phone and a desktop alike. An optional lead label sits inside the track.
+ */
+function Segmented<V extends string | number>({
+  label,
+  lead,
+  value,
+  options,
+  onChange,
+  isAdventure,
+}: {
+  label: string;
+  lead?: string;
+  value: V;
+  options: { value: V; label: string; hint?: string }[];
+  onChange: (v: V) => void;
+  isAdventure: boolean;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="flex h-10 shrink-0 items-stretch gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.12)" }}>
+      {lead && (
+        <span aria-hidden className="flex shrink-0 items-center pl-3 pr-1.5 text-[12.5px] font-bold tracking-wide" style={{ color: "var(--t-xp)" }}>
+          {lead}
+        </span>
+      )}
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={String(o.value)}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            title={o.hint}
+            onClick={() => onChange(o.value)}
+            className="min-w-0 flex-1 truncate rounded-full px-2 text-[13.5px] font-semibold transition-[background,box-shadow] duration-150"
+            style={{
+              background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
+              boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
+              color: on ? "#2a1c10" : "var(--t-ink-soft)",
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Sent({ kind, xp, isAdventure, onAnother }: { kind: WhenKind; xp: number; isAdventure: boolean; onAnother: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 py-6 text-center" role="status">
       <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden className="card-pop-in">
@@ -573,7 +619,12 @@ function Sent({ kind, isAdventure, onAnother }: { kind: WhenKind; isAdventure: b
       <p className={`m-0 ${isAdventure ? "font-display text-xl" : "text-lg font-bold"}`}>
         {kind === "future" ? "Saved to the future ideas log" : kind === "refill" ? "Saved for when credits refill" : "Sent. It goes into the next update."}
       </p>
-      <button type="button" onClick={onAnother} className="mt-1 text-[13.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
+      {xp > 0 && (
+        <p className="m-0 text-[17px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
+          +{xp} XP
+        </p>
+      )}
+      <button type="button" onClick={onAnother} className="mt-2 h-10 rounded-full border px-4 text-[14px] font-semibold" style={{ borderColor: "rgba(139,112,64,.5)", color: "var(--t-ink)" }}>
         Write another
       </button>
     </div>

@@ -20,7 +20,7 @@ import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
 import { DailyHabits } from "@/components/habits/DailyHabits";
 import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
-import { latestEnergy } from "@/lib/data/energy";
+import { getCheckMetrics, latestCheckIns, latestEnergy } from "@/lib/data/energy";
 import { bossesTableExists, getActiveBoss } from "@/lib/data/bosses";
 
 /** Start of a window `n` days back (kept outside render for purity). */
@@ -75,7 +75,7 @@ export default async function Home() {
     listFriendIds(session.user.id),
   ]);
   // A two-day window; VictoriesToday narrows it to the viewer's own local day.
-  const [recentClaims, rites, riteCompletions, tomorrowRows, boss, bossesEnabled, lastEnergy] = await Promise.all([
+  const [recentClaims, rites, riteCompletions, tomorrowRows, boss, bossesEnabled, lastEnergy, checkMetrics, lastReadings] = await Promise.all([
     listClaimedSince(session.user.id, daysAgoISO(2)).catch(() => []),
     listRites(session.user.id).catch(() => null),
     listRiteCompletions(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => []),
@@ -83,8 +83,16 @@ export default async function Home() {
     getActiveBoss(session.user.id),
     bossesTableExists(),
     latestEnergy(session.user.id),
+    getCheckMetrics(session.user.id).catch(() => []),
+    latestCheckIns(session.user.id, daysAgoISO(2)).catch(() => ({})),
   ]);
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
+  // Today's latest reading of each extra check-in metric.
+  const metricsToday = Object.fromEntries(
+    Object.entries(lastReadings as Record<string, { level: number; at: string }>)
+      .filter(([, r]) => appDayKey(new Date(r.at)) === appDayKey())
+      .map(([k, r]) => [k, r.level])
+  ) as Record<string, number>;
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
   const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, kind: r.kind ?? null });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
@@ -110,6 +118,8 @@ export default async function Home() {
         bossesEnabled={bossesEnabled}
         energyToday={energyToday}
         energyAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null}
+        checkMetrics={checkMetrics}
+        metricsToday={metricsToday}
       />
     </section>
   );

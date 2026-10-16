@@ -44,11 +44,17 @@ export function XpSummary({
   bossesEnabled = false,
   energyToday,
   energyAt,
+  checkMetrics = [],
+  metricsToday = {},
 }: {
   /** Today's latest energy check-in (undefined = don't show the meter). */
   energyToday?: number | null;
   /** When today's energy check-in was saved (ISO). */
   energyAt?: string | null;
+  /** Extra things tracked in the check-in (mood, focus…). */
+  checkMetrics?: string[];
+  /** Today's latest reading of each. */
+  metricsToday?: Record<string, number>;
   /** The boss standing in the way of the next level (null = none set). */
   boss?: BossView | null;
   /** False before the bosses table exists (no "set a boss" prompt then). */
@@ -144,7 +150,7 @@ export function XpSummary({
         </div>
 
         {(boss || bossesEnabled) && nextLevel && <BossLine boss={boss && boss.level === level ? boss : null} level={level} heldByBoss={heldByBoss} />}
-        {energyToday !== undefined && <EnergyCheck today={energyToday} todayAt={energyAt ?? null} />}
+        {energyToday !== undefined && <EnergyCheck today={energyToday} todayAt={energyAt ?? null} metrics={checkMetrics} metricsToday={metricsToday} />}
 
         {profile.streak_protection_tokens > 0 && (
           <div className="text-center text-xs" style={{ color: "var(--t-cream)", opacity: 0.75 }}>

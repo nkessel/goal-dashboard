@@ -13,6 +13,8 @@ export type Weighable = {
   importance: number;
   urgency: number;
   effort?: number | null;
+  /** 0–5 energy finishing it gives back. */
+  energy_gain?: number | null;
   estimate_minutes: number | null;
   due_at?: string | null;
   is_on_calendar?: boolean;

@@ -391,6 +391,8 @@ export async function updateTaskAction(
     boardId?: string | null;
     /** 0–5 energy it takes (0 = unrated). */
     effort?: number;
+    /** 0–5 energy it gives back when done (0 = unrated). */
+    energyGain?: number;
     /** Keep it as an aspiration (not actionable yet). */
     isAspiration?: boolean;
     grantsReward?: boolean;
@@ -432,6 +434,7 @@ export async function updateTaskAction(
     estimateMinutes: input.estimateMinutes,
     boardId: input.boardId,
     effort: input.effort,
+    energyGain: input.energyGain,
     isAspiration: input.isAspiration,
     dueAt: input.dueAt,
     chunkMinutes: input.chunkMinutes,
@@ -1026,6 +1029,7 @@ export async function createQuestAction(input: {
   estimateMinutes?: number | null;
   boardId?: string | null;
   effort?: number;
+  energyGain?: number;
   iconKey?: string | null;
   iconSource?: "library" | "ai";
   pinToBattle?: boolean;
@@ -1049,6 +1053,7 @@ export async function createQuestAction(input: {
     xpValue: Math.max(0, Math.round(input.xpValue)),
     boardId: input.boardId ?? null,
     effort: input.effort,
+    energyGain: input.energyGain,
     estimateMinutes: input.estimateMinutes ?? null,
     iconKey: input.iconKey ?? null,
     iconSource: input.iconSource,
@@ -1490,19 +1495,30 @@ export async function listJournalAction() {
   return journalData.listJournalEntries(ownerId);
 }
 
-export async function addJournalEntryAction(body: string, mood: number | null, kind: string | null = null) {
+/**
+ * A journal entry, or a piece of feedback. Feedback earns the 1–3 XP its
+ * writer picked (`feedbackXp`); the result says how much was paid.
+ */
+export async function addJournalEntryAction(body: string, mood: number | null, kind: string | null = null, feedbackXp = 0) {
   const { id: ownerId, name } = await requireIdentity();
   const text = body.trim();
   if (!text) throw new Error("Write something first.");
   const k = kind && /^[a-z]{2,20}$/.test(kind) ? kind : null;
   const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null, k);
+  let xpAwarded = 0;
   // Feedback from someone in the party goes to the owner's review queue.
   if (k && (feedbackData.FEEDBACK_KINDS as readonly string[]).includes(k)) {
     await feedbackData.notifyReviewers(ownerId, name, text).catch(() => {});
+    const amount = Math.max(0, Math.min(3, Math.round(feedbackXp)));
+    if (amount > 0) {
+      await xp.awardXp(ownerId, amount, "task_completed");
+      xpAwarded = amount;
+      revalidatePath("/");
+    }
     revalidatePath("/feedback-review");
   }
   revalidatePath("/journal");
-  return entry;
+  return { ...entry, xpAwarded };
 }
 
 /** The owner's decision on a piece of feedback (null = back to New). */
@@ -1705,10 +1721,31 @@ export async function listTakeoffQuestsAction() {
   const isPowerUp = (t: (typeof tasks)[number]) => !!t.is_power_up || (t.estimate_minutes != null && t.estimate_minutes <= tasksData.POWER_UP_MAX_MINUTES);
   const light = (t: (typeof tasks)[number]) => ((t.effort ?? 0) > 0 ? (t.effort ?? 0) <= 2 : t.estimate_minutes != null && t.estimate_minutes <= 20);
   return tasks
-    .filter((t) => !t.needs_review && !t.locked_by_task_id && !t.reward_id && (isPowerUp(t) || light(t)))
-    .sort((a, b) => Number(isPowerUp(b)) - Number(isPowerUp(a)) || (b.importance || 0) - (a.importance || 0))
+    .filter((t) => !t.needs_review && !t.locked_by_task_id && !t.reward_id && (isPowerUp(t) || light(t) || (t.energy_gain ?? 0) >= 3))
+    // Quests that give energy back come first: just what a low moment needs.
+    .sort((a, b) => (b.energy_gain ?? 0) - (a.energy_gain ?? 0) || Number(isPowerUp(b)) - Number(isPowerUp(a)) || (b.importance || 0) - (a.importance || 0))
     .slice(0, 15)
-    .map((t) => ({ id: t.id, title: t.title, description: t.description, estimate_minutes: t.estimate_minutes, xp_value: t.xp_value, is_power_up: isPowerUp(t), is_manual_priority: t.is_manual_priority, icon_key: t.icon_key, icon_source: t.icon_source }));
+    .map((t) => ({ id: t.id, title: t.title, description: t.description, estimate_minutes: t.estimate_minutes, xp_value: t.xp_value, is_power_up: isPowerUp(t), energy_gain: t.energy_gain ?? 0, is_manual_priority: t.is_manual_priority, icon_key: t.icon_key, icon_source: t.icon_source }));
+}
+
+/**
+ * One check-in: energy, plus any other things being tracked (mood, focus…).
+ * `metrics` empty = energy only.
+ */
+export async function saveCheckInAction(energy: number, metrics: { metric: string; level: number }[] = []) {
+  const ownerId = await requireProfileId();
+  const entry = await energyData.logEnergy(ownerId, energy);
+  const extra = metrics.length ? await energyData.logCheckIns(ownerId, metrics) : [];
+  revalidatePath("/");
+  return { energy: entry, metrics: extra };
+}
+
+/** Start or stop tracking a check-in metric. Returns the new list. */
+export async function setCheckMetricsAction(labels: string[]) {
+  const ownerId = await requireProfileId();
+  const list = await energyData.setCheckMetrics(ownerId, labels);
+  revalidatePath("/");
+  return list;
 }
 
 /** Ask Google for Calendar access (only when the person chooses to connect it). */

@@ -93,6 +93,8 @@ export type Task = {
   interest?: number | null;
   novelty?: number | null;
   challenge?: number | null;
+  /** 0–5: how much energy finishing it gives back (0 = unrated). */
+  energy_gain?: number | null;
   /** The first step still to do (when loaded). */
   next_step?: string | null;
   /** Can be worked on in chunks of this many minutes (filler time). */

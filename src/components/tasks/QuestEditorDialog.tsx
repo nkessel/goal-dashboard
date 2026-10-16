@@ -27,7 +27,7 @@ import { SlotPickerDialog } from "./SlotPickerDialog";
 import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
 import { useIsEmbedded, usePortalTarget } from "@/components/ui/EmbedHost";
-import { BoltIcon, CoinIcon } from "@/components/ui/Icons";
+import { CoinIcon } from "@/components/ui/Icons";
 import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
 
 export type QuestDraft = {
@@ -61,7 +61,6 @@ type StepDraft = { key: string; id?: string; title: string; done: boolean };
 
 const XP_MAX = 350;
 const XP_STEP = 10;
-const POWER_UP_MINUTES = 15;
 /** Coins follow XP (1 per XP_PER_COIN) unless a quest sets its own. */
 const autoCoins = coinsForXp;
 
@@ -136,6 +135,7 @@ export function QuestEditorDialog({
   const [xp, setXp] = useState(task?.xp_value ?? (doingNow ? 30 : 0));
   const [coinValue, setCoinValue] = useState<number | null>(task?.coin_value ?? null);
   const [effort, setEffort] = useState(task?.effort ?? Math.round(prefill?.effort ?? 0));
+  const [energyGain, setEnergyGain] = useState(task?.energy_gain ?? 0);
   const [aspiration, setAspiration] = useState(Boolean(task?.is_aspiration));
   const [estimate, setEstimate] = useState<string>(() => {
     const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (create?.powerUp ? 5 : undefined);
@@ -233,11 +233,12 @@ export function QuestEditorDialog({
   const est = estimate.trim() ? Math.max(0, Math.round(Number(estimate))) : null;
   const chunkMinutes = chunk.trim() && Number(chunk) > 0 ? Math.round(Number(chunk)) : null;
   const dueAt = dueIso(dueDate, dueTime);
-  const isPowerUp = est !== null && est > 0 && est <= POWER_UP_MINUTES;
 
   // ---- Saving as you go (existing quests) ----------------------------------
   const autosave = Boolean(task) && !review;
-  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, effort, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration, placement]);
+  // Placement isn't saved as you go: moving the quest to another list would
+  // take its card (and this dialog) away mid-edit. It's saved on close.
+  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, effort, energyGain, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration]);
   const [savedFields, setSavedFields] = useState(fields);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const dirty = fields !== savedFields || stepsDirty;
@@ -250,8 +251,8 @@ export function QuestEditorDialog({
     stepsRef.current = steps;
   });
 
-  /** Queue one save of everything that changed (saves never overlap). */
-  function persist() {
+  /** Queue one save of everything that changed (saves never overlap); placement only when asked (on close). */
+  function persist(withPlacement = false) {
     if (!task || deleted.current || !title.trim()) return chain.current;
     const snap = fields;
     const input = {
@@ -263,13 +264,14 @@ export function QuestEditorDialog({
       estimateMinutes: est,
       boardId,
       effort: task.effort !== undefined || effort ? effort : undefined,
+      energyGain,
       isAspiration: aspiration,
       dueAt,
       chunkMinutes,
       coinValue,
     };
     const newSlot = !fixedSchedule && slot && slot.start !== savedSlotStart.current ? slot : null;
-    const newPlacement = placement !== savedPlacement.current ? placement : null;
+    const newPlacement = withPlacement && placement !== savedPlacement.current ? placement : null;
     const sendSteps = stepsDirty;
     if (sendSteps) setStepsDirty(false);
     setSaveState("saving");
@@ -366,7 +368,7 @@ export function QuestEditorDialog({
   function close() {
     if (phase === "closing") return;
     if (autosave) {
-      if (dirty) void persist();
+      if (dirty || placement !== savedPlacement.current) void persist(true);
       commitProgress();
     }
     setPhase("closing");
@@ -431,6 +433,7 @@ export function QuestEditorDialog({
             estimateMinutes: est,
             boardId,
             effort: task.effort !== undefined || effort ? effort : undefined,
+            energyGain,
             isAspiration: aspiration,
             dueAt,
             chunkMinutes,
@@ -470,6 +473,7 @@ export function QuestEditorDialog({
           estimateMinutes: est,
           boardId,
           effort: effort || undefined,
+          energyGain: energyGain || undefined,
           iconKey: draftIcon?.url ?? null,
           iconSource: draftIcon?.source,
           pinToBattle: placement === "today",
@@ -642,15 +646,21 @@ export function QuestEditorDialog({
             </p>
           )}
 
-          {/* Where it shows on Today: Today's Quests, Additional Quests, or neither */}
+          {/* Where it shows on Today: Today's Quests, Additional Quests, or the backlog (just its board). One choice. */}
           {!doingNow && !isCompleted && !fixedSchedule && (
             <div className="flex flex-col gap-1">
               <span className={labelCls}>On the Today screen</span>
-              <div role="radiogroup" aria-label="Where it shows on the Today screen" className="grid grid-cols-2 gap-1.5">
+              <div
+                role="radiogroup"
+                aria-label="Where it shows on the Today screen"
+                className="grid h-11 grid-cols-3 gap-0.5 rounded-full p-[3px]"
+                style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.14)" }}
+              >
                 {(
                   [
-                    { v: "today" as const, label: `Today's ${isAdventure ? "Quests" : "Tasks"}`, hint: todayFull ? "full" : null },
-                    { v: "additional" as const, label: `Additional ${isAdventure ? "Quests" : "Tasks"}`, hint: null },
+                    { v: "today" as const, label: `Today's ${isAdventure ? "Quests" : "Tasks"}`, short: "Today" },
+                    { v: "additional" as const, label: `Additional ${isAdventure ? "Quests" : "Tasks"}`, short: "Additional" },
+                    { v: "none" as const, label: "Backlog", short: "Backlog" },
                   ]
                 ).map((o) => {
                   const on = placement === o.v;
@@ -660,42 +670,39 @@ export function QuestEditorDialog({
                       type="button"
                       role="radio"
                       aria-checked={on}
-                      disabled={o.v === "today" && todayFull}
-                      // Tap the chosen one again to leave it off both (just on its board).
-                      onClick={() => setPlacement(on ? "none" : o.v)}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl border px-2 text-[13.5px] font-semibold transition-colors disabled:opacity-45"
-                      style={
-                        on
-                          ? { background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", borderColor: "#8a6116", boxShadow: "0 1px 3px rgba(0,0,0,.25)" }
-                          : { borderColor: chipBorder, color: "var(--t-ink-soft)" }
-                      }
+                      aria-label={o.label}
+                      title={o.label}
+                      onClick={() => setPlacement(o.v)}
+                      className="flex min-w-0 items-center justify-center gap-1.5 rounded-full px-1.5 text-[13.5px] font-semibold transition-[background,box-shadow] duration-150"
+                      style={{
+                        background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
+                        boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
+                        color: on ? "#2a1c10" : "var(--t-ink-soft)",
+                      }}
                     >
                       <span
                         aria-hidden
-                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px]"
-                        style={{ border: `1.5px solid ${on ? "#2a1c10" : chipBorder}`, background: on ? "rgba(255,255,255,.35)" : "transparent" }}
+                        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full"
+                        style={{ border: `1.5px solid ${on ? "#6b4a12" : "rgba(110,90,50,.55)"}` }}
                       >
-                        {on && (
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#2a1c10" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
+                        {on && <span className="block h-1.5 w-1.5 rounded-full" style={{ background: "#6b4a12" }} />}
                       </span>
-                      {o.label}
-                      {o.hint && <span className="font-normal"> ({o.hint})</span>}
+                      <span className="truncate">{o.short}</span>
                     </button>
                   );
                 })}
               </div>
-              {placement === "none" && (
-                <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-                  Neither — it stays on its board until you add it to Today.
-                </span>
-              )}
+              <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+                {placement === "today"
+                  ? `In Today's ${isAdventure ? "Quests" : "Tasks"}, at the top of the day.`
+                  : placement === "additional"
+                    ? `In Additional ${isAdventure ? "Quests" : "Tasks"}, below today's.`
+                    : "Stays on its board until you add it to Today."}
+              </span>
             </div>
           )}
 
-          {/* Time to complete, power-up, and whether it can be done in pieces */}
+          {/* Time to complete, and whether it can be done in pieces */}
           {!doingNow && (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2.5">
@@ -720,22 +727,6 @@ export function QuestEditorDialog({
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 pl-[28px]">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={isPowerUp}
-                  onClick={() => setEstimate(isPowerUp ? "" : "5")}
-                  title={`Power-ups are quick wins — ${POWER_UP_MINUTES} minutes or less`}
-                  className="hover-glow flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-semibold"
-                  style={{
-                    borderColor: isPowerUp ? "#c99a2e" : chipBorder,
-                    background: isPowerUp ? "rgba(242,201,76,.35)" : "transparent",
-                    color: "var(--t-ink)",
-                  }}
-                >
-                  <BoltIcon size={15} />
-                  Power-up{isPowerUp ? " ✓" : ""}
-                </button>
                 <label className="flex min-h-8 cursor-pointer items-center gap-1.5 text-[12.5px]">
                   <input
                     type="checkbox"
@@ -1046,9 +1037,10 @@ export function QuestEditorDialog({
 
           {!doingNow && (
             <>
-              <IconScale label="Importance" icon="/design/ui-bolt.png" value={importance} onChange={setImportance} />
+              <IconScale label="Importance" icon="/design/ui-heart.svg" value={importance} onChange={setImportance} />
               <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
-              <IconScale label="Effort" icon="/design/ui-effort.svg" value={effort} onChange={setEffort} />
+              <IconScale label="Challenge" icon="/design/ui-muscle.svg" hint="How much it takes out of you" value={effort} onChange={setEffort} />
+              <IconScale label="Energy boost" icon="/design/ui-bolt.png" hint="How much energy finishing it gives you" value={energyGain} onChange={setEnergyGain} />
             </>
           )}
 
@@ -1349,11 +1341,14 @@ function AutoGrowText({
 export function IconScale({
   label,
   icon,
+  hint,
   value,
   onChange,
 }: {
   label: string;
   icon: string;
+  /** What the scale measures, shown on hover and read to screen readers. */
+  hint?: string;
   value: number;
   onChange: (v: number) => void;
 }) {
@@ -1368,12 +1363,14 @@ export function IconScale({
 
   return (
     <div className="flex items-center gap-2.5">
-      <span className="w-[92px] shrink-0 text-[13px] font-semibold">{label}</span>
+      <span className="w-[92px] shrink-0 text-[13px] font-semibold" title={hint}>
+        {label}
+      </span>
       <div
         ref={rowRef}
         role="slider"
         tabIndex={0}
-        aria-label={label}
+        aria-label={hint ? `${label}: ${hint}` : label}
         aria-valuemin={0}
         aria-valuemax={5}
         aria-valuenow={value}
