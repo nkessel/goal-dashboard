@@ -36,19 +36,22 @@ const XP_CHOICES = [1, 2, 3] as const;
 
 type Draft = { id: string; body: string; kind: WhenKind; xp?: number };
 type Geom = { x: number; y: number; w: number; h: number };
-type ButtonPos = { side: "left" | "right"; bottom: number };
+/** The round button's top-left corner, in px from the window's top-left. */
+type Pos = { x: number; y: number };
 type Viewport = { left: number; top: number; w: number; h: number; innerW: number; innerH: number };
 
 const DRAFTS_KEY = "feedback-drafts";
 const LEGACY_DRAFT_KEY = "feedback-draft";
-const BUTTON_KEY = "feedback-button";
+const BUTTON_KEY = "feedback-button-pos";
 const PANEL_KEY = "feedback-panel";
+const SUBMIT_KEY = "feedback-submit-x";
 
-const BTN = 44;
-const EDGE = 12;
-const MIN_W = 280;
-const MIN_H = 220;
-const DEFAULT_BUTTON: ButtonPos = { side: "right", bottom: 92 };
+const BTN = 46;
+const MIN_W = 250;
+/** The box can be made very thin; its content then scrolls. */
+const MIN_H = 96;
+/** The Submit button sits across the box's bottom edge, this far below it. */
+const SUBMIT_DROP = 15;
 
 function readJson<T>(key: string): T | null {
   try {
@@ -105,25 +108,62 @@ function useViewport(): Viewport | null {
   return vp;
 }
 
-/** Keep a panel inside what's visible, shrinking it only when it can't fit. */
+/** Keep the box inside what's visible (leaving room for Submit under it), shrinking only when it can't fit. */
 function fit(g: Geom, vp: Viewport): Geom {
   const w = clamp(g.w, Math.min(MIN_W, vp.w - 16), vp.w - 16);
-  const h = clamp(g.h, Math.min(MIN_H, vp.h - 16), vp.h - 16);
+  const h = clamp(g.h, Math.min(MIN_H, vp.h - 40), vp.h - 40);
   return {
     w,
     h,
     x: clamp(g.x, vp.left + 8, vp.left + vp.w - w - 8),
-    y: clamp(g.y, vp.top + 8, vp.top + vp.h - h - 8),
+    y: clamp(g.y, vp.top + 8, vp.top + vp.h - h - 8 - SUBMIT_DROP - 8),
   };
 }
 
 /**
- * Feedback, from any screen. A round button (drag it anywhere; it settles
- * against the nearest side) opens a feedback box that doesn't block the app,
- * so you can keep using the very thing you're writing about. The box can be
- * dragged by its top and resized from its corner, and always stays in view —
- * above the keyboard too. Minimize a draft to start another; minimized drafts
- * wait as small pills by the button. Shortcut: F (when not typing).
+ * Track a press that may turn into a drag. Listens on the window so a drag
+ * can never get "stuck" to the pointer, whatever element it ends over.
+ * `onTap` runs for a press that didn't move.
+ */
+function pressOrDrag(
+  e: React.PointerEvent,
+  opts: { onMove: (dx: number, dy: number) => void; onEnd: (moved: boolean) => void; threshold?: number }
+) {
+  if (e.button !== 0) return;
+  const x0 = e.clientX;
+  const y0 = e.clientY;
+  const id = e.pointerId;
+  let moved = false;
+  const move = (ev: PointerEvent) => {
+    if (ev.pointerId !== id) return;
+    const dx = ev.clientX - x0;
+    const dy = ev.clientY - y0;
+    if (!moved && Math.hypot(dx, dy) < (opts.threshold ?? 6)) return;
+    moved = true;
+    ev.preventDefault();
+    opts.onMove(dx, dy);
+  };
+  const end = (ev: PointerEvent) => {
+    if (ev.pointerId !== id) return;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+    opts.onEnd(moved);
+  };
+  window.addEventListener("pointermove", move, { passive: false });
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
+}
+
+/**
+ * Feedback, from any screen. A round button (drag it anywhere — it stays
+ * where you put it) opens a feedback box that doesn't block the app, so you
+ * can keep using the very thing you're writing about. The box can be dragged
+ * by its top and resized from its corner — even very thin, when its content
+ * scrolls — and always stays in view, above the keyboard too. Submit sits
+ * on the box's bottom edge, always visible (slide it along the edge to move
+ * it). Minimize a draft to start another; with drafts waiting, the button
+ * asks whether to continue one or start fresh. Shortcut: F (when not typing).
  */
 export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" }) {
   const isAdventure = theme === "adventure";
@@ -133,12 +173,15 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [openId, setOpenId] = useState<string | null>(null);
   const [sent, setSent] = useState<{ id: string; kind: WhenKind; xp: number } | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const [btn, setBtn] = useState<ButtonPos>(DEFAULT_BUTTON);
-  const [btnDrag, setBtnDrag] = useState<{ x: number; y: number } | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const [pos, setPos] = useState<Pos | null>(null);
+  const [dragPos, setDragPos] = useState<Pos | null>(null);
   const [geom, setGeom] = useState<Geom | null>(null);
-  const btnOp = useRef<{ px: number; py: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const [submitX, setSubmitX] = useState<number | null>(null);
+  const [submitDrag, setSubmitDrag] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, startSaving] = useTransition();
   const justDragged = useRef(false);
-  const panelOp = useRef<{ kind: "move" | "resize"; px: number; py: number; g: Geom } | null>(null);
 
   // Restore drafts and positions saved on this device.
   useEffect(() => {
@@ -150,8 +193,9 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     }
     /* eslint-disable react-hooks/set-state-in-effect -- browser storage is only readable after hydration */
     setDrafts(saved.filter((d) => d && typeof d.body === "string"));
-    setBtn(readJson<ButtonPos>(BUTTON_KEY) ?? DEFAULT_BUTTON);
+    setPos(readJson<Pos>(BUTTON_KEY));
     setGeom(readJson<Geom>(PANEL_KEY));
+    setSubmitX(readJson<number>(SUBMIT_KEY));
     setLoaded(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -162,11 +206,12 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   }, [drafts, loaded]);
 
   const open = drafts.find((d) => d.id === openId) ?? null;
-  const minimized = drafts.filter((d) => d.id !== openId && d.body.trim());
+  const waiting = drafts.filter((d) => d.id !== openId && d.body.trim());
 
   /** Leave the open draft: empty ones simply go away. */
   const leaveOpen = useCallback(() => {
     setConfirmDiscard(false);
+    setError(null);
     setDrafts((ds) => ds.filter((d) => d.id !== openId || d.body.trim()));
     setOpenId(null);
   }, [openId]);
@@ -174,25 +219,42 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const startNew = useCallback(() => {
     const d: Draft = { id: newId(), body: "", kind: "feedback" };
     setConfirmDiscard(false);
+    setChoosing(false);
     setSent(null);
+    setError(null);
     setDrafts((ds) => [...ds.filter((x) => x.id !== openId || x.body.trim()), d]);
     setOpenId(d.id);
   }, [openId]);
 
+  /** The button (or F): with drafts waiting, ask; otherwise start one. */
+  const begin = useCallback(() => {
+    if (openId) {
+      document.querySelector<HTMLTextAreaElement>("[data-feedback-text]")?.focus();
+      return;
+    }
+    const hasWaiting = drafts.some((d) => d.body.trim());
+    if (hasWaiting) setChoosing((v) => !v);
+    else startNew();
+  }, [openId, drafts, startNew]);
+
   function restore(id: string) {
     setConfirmDiscard(false);
+    setChoosing(false);
+    setError(null);
+    setSent(null);
     setDrafts((ds) => ds.filter((d) => d.id !== openId || d.body.trim()));
     setOpenId(id);
   }
 
   function discard() {
     setConfirmDiscard(false);
+    setError(null);
     setDrafts((ds) => ds.filter((d) => d.id !== openId));
     setOpenId(null);
   }
 
   function requestClose() {
-    if (open?.body.trim()) setConfirmDiscard(true);
+    if (open?.body.trim() && sent?.id !== open.id) setConfirmDiscard(true);
     else discard();
   }
 
@@ -200,96 +262,110 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     setDrafts((ds) => ds.map((d) => (d.id === openId ? { ...d, ...patch } : d)));
   }
 
-  /** The thank-you stays until it's closed (or another is started). */
-  function onSent(kind: WhenKind, xp: number) {
-    const id = openId;
-    if (!id) return;
-    setSent({ id, kind, xp });
-    setDrafts((ds) => ds.map((d) => (d.id === id ? { ...d, body: "" } : d)));
+  function submit() {
+    const d = open;
+    if (!d || !d.body.trim() || isSaving) return;
+    setError(null);
+    startSaving(async () => {
+      try {
+        const res = await addJournalEntryAction(d.body, null, d.kind, d.xp ?? 1);
+        // The thank-you stays until it's closed (or another is started).
+        setSent({ id: d.id, kind: d.kind, xp: res.xpAwarded });
+        setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, body: "" } : x)));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't send it. Check your connection and try again.");
+      }
+    });
   }
 
   // The button, F, and the + sheet's Feedback choice all start feedback.
   useEffect(() => {
-    const onOpen = () => (openId ? document.querySelector<HTMLTextAreaElement>("[data-feedback-text]")?.focus() : startNew());
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "f" || e.ctrlKey || e.metaKey || e.altKey || e.repeat || isTyping(e.target)) return;
       e.preventDefault();
-      onOpen();
+      begin();
     };
-    window.addEventListener(OPEN_FEEDBACK_EVENT, onOpen);
+    window.addEventListener(OPEN_FEEDBACK_EVENT, begin);
     window.addEventListener("keydown", onKey);
     return () => {
-      window.removeEventListener(OPEN_FEEDBACK_EVENT, onOpen);
+      window.removeEventListener(OPEN_FEEDBACK_EVENT, begin);
       window.removeEventListener("keydown", onKey);
     };
-  }, [openId, startNew]);
+  }, [begin]);
 
   if (!loaded || !vp) return null;
 
-  // ---- The round button: tap to start feedback (or tuck the open one away), drag to move.
-  const btnTop = vp.innerH - btn.bottom - BTN;
-  const buttonStyle: React.CSSProperties = btnDrag
-    ? { left: btnDrag.x, top: btnDrag.y }
-    : btn.side === "right"
-      ? { right: EDGE, top: btnTop }
-      : { left: EDGE, top: btnTop };
+  // ---- The round button: tap to start (or continue) feedback, drag to put it anywhere.
+  const defaultPos: Pos = { x: vp.innerW - BTN - 12, y: vp.innerH - BTN - 92 };
+  const placeBtn = (p: Pos): Pos => ({ x: clamp(p.x, 6, vp.innerW - BTN - 6), y: clamp(p.y, 6, vp.innerH - BTN - 6) });
+  const btnPos = placeBtn(dragPos ?? pos ?? defaultPos);
 
   function onBtnDown(e: React.PointerEvent<HTMLButtonElement>) {
-    const r = e.currentTarget.getBoundingClientRect();
-    btnOp.current = { px: e.clientX, py: e.clientY, ox: r.left, oy: r.top, moved: false };
-  }
-  function onBtnMove(e: React.PointerEvent<HTMLButtonElement>) {
-    const d = btnOp.current;
-    if (!d) return;
-    if (!d.moved && Math.hypot(e.clientX - d.px, e.clientY - d.py) > 6) {
-      d.moved = true;
-      e.currentTarget.setPointerCapture(e.pointerId);
-    }
-    if (d.moved) setBtnDrag({ x: d.ox + e.clientX - d.px, y: d.oy + e.clientY - d.py });
-  }
-  function onBtnUp() {
-    const d = btnOp.current;
-    btnOp.current = null;
-    if (!d?.moved || !btnDrag || !vp) return;
-    justDragged.current = true;
-    setTimeout(() => (justDragged.current = false), 0);
-    // Settle against the nearer side, clear of the bottom bar and the top.
-    const next: ButtonPos = {
-      side: btnDrag.x + BTN / 2 < vp.innerW / 2 ? "left" : "right",
-      bottom: Math.round(clamp(vp.innerH - btnDrag.y - BTN, 84, vp.innerH - BTN - 64)),
-    };
-    setBtn(next);
-    setBtnDrag(null);
-    writeJson(BUTTON_KEY, next);
+    const start = btnPos;
+    let last = start;
+    pressOrDrag(e, {
+      onMove: (dx, dy) => {
+        last = placeBtn({ x: start.x + dx, y: start.y + dy });
+        setDragPos(last);
+        setChoosing(false);
+      },
+      onEnd: (moved) => {
+        if (!moved) return;
+        justDragged.current = true;
+        setTimeout(() => (justDragged.current = false), 0);
+        setPos(last);
+        setDragPos(null);
+        writeJson(BUTTON_KEY, last);
+      },
+    });
   }
 
   // ---- The box: drag by its top, resize from its corner, always in view.
   const mobile = vp.innerW < 640;
   const defaultGeom = (): Geom => {
     const w = mobile ? vp.innerW - 16 : 380;
-    const h = Math.min(mobile ? 330 : 370, vp.innerH - 160);
-    const above = vp.innerH - btn.bottom - BTN - 12 - h;
-    return { w, h, x: mobile ? 8 : btn.side === "right" ? vp.innerW - w - 20 : 20, y: above > 60 ? above : 60 };
+    const h = Math.min(mobile ? 320 : 350, vp.innerH - 170);
+    const above = btnPos.y - 12 - h - SUBMIT_DROP;
+    return { w, h, x: mobile ? 8 : clamp(btnPos.x + BTN - w, 20, vp.innerW - w - 20), y: above > 60 ? above : 60 };
   };
   const shown = fit(geom ?? defaultGeom(), vp);
+  const isSent = !!open && sent?.id === open.id;
 
   function onPanelDown(e: React.PointerEvent<HTMLElement>, kind: "move" | "resize") {
     if (kind === "move" && (e.target as HTMLElement).closest("button")) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    panelOp.current = { kind, px: e.clientX, py: e.clientY, g: shown };
+    if (kind === "resize") e.preventDefault();
+    const g = shown;
+    let last = g;
+    pressOrDrag(e, {
+      threshold: kind === "resize" ? 0 : 4,
+      onMove: (dx, dy) => {
+        last = kind === "move" ? { ...g, x: g.x + dx, y: g.y + dy } : { ...g, w: Math.max(MIN_W, g.w + dx), h: Math.max(MIN_H, g.h + dy) };
+        setGeom(last);
+      },
+      onEnd: (moved) => moved && writeJson(PANEL_KEY, fit(last, vp)),
+    });
   }
-  function onPanelMove(e: React.PointerEvent<HTMLElement>) {
-    const o = panelOp.current;
-    if (!o) return;
-    const dx = e.clientX - o.px;
-    const dy = e.clientY - o.py;
-    setGeom(o.kind === "move" ? { ...o.g, x: o.g.x + dx, y: o.g.y + dy } : { ...o.g, w: Math.max(MIN_W, o.g.w + dx), h: Math.max(MIN_H, o.g.h + dy) });
-  }
-  function onPanelUp() {
-    if (!panelOp.current) return;
-    panelOp.current = null;
-    // Handlers come from the latest render, so `shown` is where the box now sits.
-    writeJson(PANEL_KEY, shown);
+
+  // ---- Submit: on the bottom edge, slid anywhere along it.
+  const SUBMIT_W = 112;
+  const submitLeft = clamp(submitDrag ?? submitX ?? shown.w - SUBMIT_W - 34, 10, shown.w - SUBMIT_W - 30);
+  function onSubmitDown(e: React.PointerEvent<HTMLButtonElement>) {
+    const start = submitLeft;
+    let last = start;
+    pressOrDrag(e, {
+      onMove: (dx) => {
+        last = clamp(start + dx, 10, shown.w - SUBMIT_W - 30);
+        setSubmitDrag(last);
+      },
+      onEnd: (moved) => {
+        if (!moved) return;
+        justDragged.current = true;
+        setTimeout(() => (justDragged.current = false), 0);
+        setSubmitX(last);
+        setSubmitDrag(null);
+        writeJson(SUBMIT_KEY, last);
+      },
+    });
   }
 
   const coin = isAdventure
@@ -299,68 +375,72 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       }
     : { background: "var(--t-card)", boxShadow: "0 0 0 1px var(--t-card-border), 0 4px 12px rgba(0,0,0,.2)" };
 
-  const pillsAbove = btnTop > vp.innerH / 2;
-  const isSent = !!open && sent?.id === open.id;
+  const chooserAbove = btnPos.y > vp.innerH / 2;
+  const chooserRight = btnPos.x > vp.innerW / 2;
 
   return createPortal(
     <>
       <button
         type="button"
-        data-hide-when-typing
+        data-feedback-hide
         onPointerDown={onBtnDown}
-        onPointerMove={onBtnMove}
-        onPointerUp={onBtnUp}
-        onPointerCancel={() => {
-          btnOp.current = null;
-          setBtnDrag(null);
-        }}
         onClick={() => {
           if (justDragged.current) return;
           if (openId) leaveOpen();
-          else startNew();
+          else begin();
         }}
         aria-label={openId ? "Minimize feedback" : "Feedback (F)"}
         title={openId ? "Minimize feedback" : "Feedback (F) — drag to move"}
-        aria-expanded={!!openId}
-        className={`fixed z-[60] flex touch-none select-none items-center justify-center rounded-full ${btnDrag ? "cursor-grabbing" : "cursor-pointer transition-transform hover:scale-105 active:scale-95"}`}
-        style={{ ...buttonStyle, width: BTN, height: BTN, ...coin, transition: btnDrag ? "none" : "left 220ms cubic-bezier(.2,.8,.2,1), right 220ms cubic-bezier(.2,.8,.2,1), top 220ms cubic-bezier(.2,.8,.2,1)" }}
+        aria-expanded={!!openId || choosing}
+        className={`fixed z-[60] flex touch-none select-none items-center justify-center rounded-full ${dragPos ? "cursor-grabbing" : "cursor-pointer transition-transform hover:scale-105 active:scale-95"}`}
+        style={{ left: btnPos.x, top: btnPos.y, width: BTN, height: BTN, ...coin }}
       >
         <ChatIcon size={27} />
-        {minimized.length > 0 && !openId && (
+        {waiting.length > 0 && !openId && (
           <span
             aria-hidden
             className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-bold tabular-nums"
             style={{ background: "#7a2f1f", color: "#fff6e0", border: "1.5px solid #f2d27e" }}
           >
-            {minimized.length}
+            {waiting.length}
           </span>
         )}
       </button>
 
-      {/* Minimized drafts wait by the button. */}
-      {minimized.length > 0 && !btnDrag && (
+      {/* Drafts waiting: keep working on one, or start a new one. */}
+      {choosing && !openId && !dragPos && (
         <div
-          data-hide-when-typing
-          className={`fixed z-[60] flex gap-1.5 ${pillsAbove ? "flex-col-reverse" : "flex-col"} ${btn.side === "right" ? "items-end" : "items-start"}`}
+          role="menu"
+          aria-label="Your unsent feedback"
+          className="card-pop-in parchment fixed z-[61] flex w-[min(300px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl shadow-2xl"
           style={{
-            ...(btn.side === "right" ? { right: EDGE } : { left: EDGE }),
-            ...(pillsAbove ? { bottom: btn.bottom + BTN + 8 } : { top: btnTop + BTN + 8 }),
-            maxWidth: Math.min(260, vp.innerW - 2 * EDGE),
+            ...(chooserRight ? { right: vp.innerW - btnPos.x - BTN } : { left: btnPos.x }),
+            ...(chooserAbove ? { bottom: vp.innerH - btnPos.y + 8 } : { top: btnPos.y + BTN + 8 }),
+            borderRadius: 16,
+            color: "var(--t-ink)",
           }}
         >
-          {minimized.slice(-4).map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => restore(d.id)}
-              title="Continue this feedback"
-              className="create-sheet-in flex h-9 max-w-full items-center gap-1.5 rounded-full pl-2 pr-3 text-[13.5px] font-semibold shadow-lg"
-              style={{ background: "linear-gradient(180deg,#f6e3a8,#dcb763)", color: "#2a1c10", border: "1.5px solid #8a6116" }}
-            >
-              <ChatIcon size={17} />
-              <span className="truncate">{d.body.trim().slice(0, 40)}</span>
+          <p className="relative z-[1] m-0 px-4 pb-1 pt-3 text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+            Keep working on…
+          </p>
+          {waiting.slice(-4).reverse().map((d) => (
+            <button key={d.id} type="button" role="menuitem" onClick={() => restore(d.id)} className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[14.5px] hover:bg-black/5">
+              <ChatIcon size={16} />
+              <span className="min-w-0 flex-1 truncate">{d.body.trim()}</span>
             </button>
           ))}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={startNew}
+            className="relative z-[1] flex min-h-11 items-center gap-2 border-t px-4 text-left text-[14.5px] font-semibold hover:bg-black/5"
+            style={{ borderColor: "rgba(139,112,64,.3)" }}
+          >
+            <span aria-hidden className="w-4 text-center text-[18px] leading-none" style={{ color: "#8a6116" }}>
+              +
+            </span>
+            New feedback
+          </button>
         </div>
       )}
 
@@ -369,7 +449,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           role="dialog"
           aria-modal={false}
           aria-label="Feedback"
-          className="fixed z-[61] flex flex-col"
+          className="fixed z-[61]"
           style={{ left: shown.x, top: shown.y, width: shown.w, height: shown.h }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
@@ -378,92 +458,107 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             }
           }}
         >
-          {/* Positioning stays on the box above; the theme's parchment frame (which sets position: relative) lives here. */}
+          {/* Positioning stays on this box; the theme's parchment frame (which sets position: relative) lives inside. */}
           <div
-            className="create-sheet-in relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl"
+            className="create-sheet-in relative flex h-full flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl"
             style={{
               background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
               border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
               color: "var(--t-ink)",
             }}
           >
-            <div
-              className={`relative z-[1] flex shrink-0 select-none items-center gap-1 px-2 pt-1.5 ${isSent ? "pl-4" : "cursor-move touch-none"}`}
-              {...(isSent
-                ? {}
-                : {
-                    onPointerDown: (e: React.PointerEvent<HTMLElement>) => onPanelDown(e, "move"),
-                    onPointerMove: onPanelMove,
-                    onPointerUp: onPanelUp,
-                    onPointerCancel: onPanelUp,
-                    title: "Drag to move",
-                  })}
-            >
-              {!isSent && (
-                <span aria-hidden className="flex h-9 w-6 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
-                  <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden>
-                    {[2, 8, 14].map((y) => (
-                      <g key={y}>
-                        <circle cx="2.5" cy={y} r="1.4" />
-                        <circle cx="7.5" cy={y} r="1.4" />
-                      </g>
-                    ))}
-                  </svg>
-                </span>
-              )}
-              <span className={`flex-1 py-1 ${isAdventure ? "font-display text-[18px]" : "text-base font-bold"}`}>Feedback</span>
-              {!isSent && (
-                <button type="button" onClick={leaveOpen} aria-label="Minimize" title="Minimize — start another with the feedback button" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M6 16h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-                  </svg>
+            {/* Everything scrolls together, so a very thin box still reaches it all. */}
+            <div className="feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-6">
+              <div
+                className={`flex shrink-0 select-none items-center gap-1 px-2 pt-1.5 ${isSent ? "pl-4" : "cursor-move touch-none"}`}
+                onPointerDown={isSent ? undefined : (e) => onPanelDown(e, "move")}
+                title={isSent ? undefined : "Drag to move"}
+              >
+                {!isSent && (
+                  <span aria-hidden className="flex h-9 w-6 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
+                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden>
+                      {[2, 8, 14].map((y) => (
+                        <g key={y}>
+                          <circle cx="2.5" cy={y} r="1.4" />
+                          <circle cx="7.5" cy={y} r="1.4" />
+                        </g>
+                      ))}
+                    </svg>
+                  </span>
+                )}
+                <span className={`flex-1 py-1 ${isAdventure ? "font-display text-[18px]" : "text-base font-bold"}`}>Feedback</span>
+                {!isSent && (
+                  <button type="button" onClick={leaveOpen} aria-label="Minimize" title="Minimize — continue it later from the feedback button" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M6 16h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
+                <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+                  ×
                 </button>
-              )}
-              <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-                ×
-              </button>
-            </div>
+              </div>
 
-            <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
-              {sent && isSent ? (
+              {isSent && sent ? (
                 <Sent kind={sent.kind} xp={sent.xp} isAdventure={isAdventure} onAnother={startNew} />
               ) : (
-                <Composer key={open.id} draft={open} isAdventure={isAdventure} onChange={update} onSent={onSent} />
-              )}
-              {confirmDiscard && (
-                <div role="alertdialog" aria-label="Discard this feedback?" className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3 px-6 text-center" style={{ background: isAdventure ? "rgba(236,218,180,.96)" : "var(--t-card)" }}>
-                  <p className="m-0 text-[15.5px] leading-snug" style={{ color: "var(--t-ink)" }}>
-                    Discard this feedback? What you wrote will be lost.
-                  </p>
-                  <div className="flex gap-2">
-                    <button type="button" autoFocus onClick={() => setConfirmDiscard(false)} className="h-10 rounded-full px-5 text-[14.5px] font-semibold" style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}>
-                      Keep writing
-                    </button>
-                    <button type="button" onClick={discard} className="h-10 rounded-full px-4 text-[14.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
-                      Discard
-                    </button>
-                  </div>
-                </div>
+                <Composer key={open.id} draft={open} isAdventure={isAdventure} error={error} onChange={update} onSubmit={submit} />
               )}
             </div>
 
+            {confirmDiscard && (
+              <div role="alertdialog" aria-label="Discard this feedback?" className="absolute inset-0 z-[4] flex flex-col items-center justify-center gap-3 overflow-y-auto px-6 text-center" style={{ background: isAdventure ? "rgba(236,218,180,.97)" : "var(--t-card)" }}>
+                <p className="m-0 text-[15.5px] leading-snug" style={{ color: "var(--t-ink)" }}>
+                  Discard this feedback? What you wrote will be lost.
+                </p>
+                <div className="flex gap-2">
+                  <button type="button" autoFocus onClick={() => setConfirmDiscard(false)} className="h-10 rounded-full px-5 text-[14.5px] font-semibold" style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}>
+                    Keep writing
+                  </button>
+                  <button type="button" onClick={discard} className="h-10 rounded-full px-4 text-[14.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Resize from the corner. */}
-            {!isSent && (
             <span
               role="presentation"
               title="Drag to resize"
               className="absolute bottom-0 right-0 z-[3] flex h-7 w-7 cursor-nwse-resize touch-none items-end justify-end p-1.5"
               onPointerDown={(e) => onPanelDown(e, "resize")}
-              onPointerMove={onPanelMove}
-              onPointerUp={onPanelUp}
-              onPointerCancel={onPanelUp}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden style={{ color: "var(--t-ink-soft)", opacity: 0.7 }}>
                 <path d="M11 3L3 11M11 7L7 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </span>
-            )}
           </div>
+
+          {/* Submit: always visible, across the bottom edge; slide it along the edge to move it. */}
+          {!isSent && (
+            <button
+              type="button"
+              onPointerDown={onSubmitDown}
+              onClick={() => {
+                if (justDragged.current) return;
+                submit();
+              }}
+              disabled={isSaving || !open.body.trim()}
+              title="Submit feedback (Ctrl + Enter) — drag to slide it along the edge"
+              className={`hover-glow absolute z-[5] h-8 touch-none select-none rounded-full text-[13.5px] font-bold shadow-lg disabled:opacity-60 ${submitDrag !== null ? "cursor-grabbing" : ""}`}
+              style={{
+                left: submitLeft,
+                bottom: -SUBMIT_DROP,
+                width: SUBMIT_W,
+                background: isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-accent)",
+                color: isAdventure ? "#2a1c10" : "#fff",
+                border: isAdventure ? "1.5px solid #8a6116" : undefined,
+              }}
+            >
+              {isSaving ? "Sending…" : "Submit"}
+            </button>
+          )}
         </div>
       )}
     </>,
@@ -471,68 +566,62 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   );
 }
 
-/** Where it goes, the XP it earns, what to change, submit. */
+/** Where it goes, the XP it earns, and what to change. */
 function Composer({
   draft,
   isAdventure,
+  error,
   onChange,
-  onSent,
+  onSubmit,
 }: {
   draft: Draft;
   isAdventure: boolean;
+  error: string | null;
   onChange: (patch: Partial<Draft>) => void;
-  onSent: (kind: WhenKind, xp: number) => void;
+  onSubmit: () => void;
 }) {
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, startSaving] = useTransition();
+  const textRef = useRef<HTMLTextAreaElement>(null);
   const xp = draft.xp ?? 1;
-
-  function save() {
-    if (!draft.body.trim() || isSaving) return;
-    setError(null);
-    startSaving(async () => {
-      try {
-        const res = await addJournalEntryAction(draft.body, null, draft.kind, xp);
-        onSent(draft.kind, res.xpAwarded);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't send it. Check your connection and try again.");
-      }
-    });
-  }
-
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col gap-2 px-3.5 pb-3 pt-1"
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          save();
-        }
-      }}
-    >
+    <div className="flex min-h-0 flex-1 flex-col gap-2 px-3.5 pb-2 pt-1">
       <Segmented
         label="Where it goes"
         isAdventure={isAdventure}
         value={draft.kind}
-        onChange={(k) => onChange({ kind: k })}
+        onChange={(k) => {
+          onChange({ kind: k });
+          textRef.current?.focus();
+        }}
         options={WHEN.map(([k, label, hint]) => ({ value: k, label, hint }))}
       />
       <Segmented
         label="XP you earn"
         lead="XP"
+        small
         isAdventure={isAdventure}
         value={xp}
-        onChange={(n) => onChange({ xp: n })}
+        onChange={(n) => {
+          onChange({ xp: n });
+          // Straight on to writing.
+          textRef.current?.focus();
+        }}
         options={XP_CHOICES.map((n) => ({ value: n, label: `+${n}`, hint: `Earn ${n} XP for this feedback` }))}
       />
       <textarea
+        ref={textRef}
         data-feedback-text
         autoFocus
         value={draft.body}
         onChange={(e) => onChange({ body: e.target.value })}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            onSubmit();
+          }
+        }}
         placeholder={draft.kind === "future" ? "An idea for later. It goes in the future ideas log." : "What would make this better?"}
         aria-label="Feedback"
-        className="min-h-[56px] flex-1 resize-none rounded-lg border px-3 py-2 text-[16px] leading-relaxed"
+        className="min-h-[72px] flex-1 resize-none rounded-lg border px-3 py-2 text-[16px] leading-relaxed"
         style={{ borderColor: "var(--t-panel-border)" }}
       />
       {error && (
@@ -540,20 +629,6 @@ function Composer({
           {error}
         </p>
       )}
-      <div className="flex shrink-0 items-center justify-end gap-2 pr-4">
-        <span className="hidden text-[12px] sm:inline" style={{ color: "var(--t-ink-soft)" }}>
-          Ctrl + Enter
-        </span>
-        <button
-          type="button"
-          onClick={save}
-          disabled={isSaving || !draft.body.trim()}
-          className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold disabled:opacity-45"
-          style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
-        >
-          {isSaving ? "Sending…" : "Submit feedback"}
-        </button>
-      </div>
     </div>
   );
 }
@@ -569,6 +644,7 @@ function Segmented<V extends string | number>({
   options,
   onChange,
   isAdventure,
+  small = false,
 }: {
   label: string;
   lead?: string;
@@ -576,11 +652,17 @@ function Segmented<V extends string | number>({
   options: { value: V; label: string; hint?: string }[];
   onChange: (v: V) => void;
   isAdventure: boolean;
+  small?: boolean;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex h-10 shrink-0 items-stretch gap-0.5 rounded-full p-[3px]" style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.12)" }}>
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={`flex shrink-0 items-stretch gap-0.5 rounded-full p-[3px] ${small ? "h-8 w-fit self-start" : "h-10"}`}
+      style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.12)" }}
+    >
       {lead && (
-        <span aria-hidden className="flex shrink-0 items-center pl-3 pr-1.5 text-[12.5px] font-bold tracking-wide" style={{ color: "var(--t-xp)" }}>
+        <span aria-hidden className={`flex shrink-0 items-center pr-1 font-bold tracking-wide ${small ? "pl-2.5 text-[11.5px]" : "pl-3 text-[12.5px]"}`} style={{ color: "var(--t-xp)" }}>
           {lead}
         </span>
       )}
@@ -594,7 +676,7 @@ function Segmented<V extends string | number>({
             aria-checked={on}
             title={o.hint}
             onClick={() => onChange(o.value)}
-            className="min-w-0 flex-1 truncate rounded-full px-2 text-[13.5px] font-semibold transition-[background,box-shadow] duration-150"
+            className={`min-w-0 truncate rounded-full font-semibold transition-[background,box-shadow] duration-150 ${small ? "px-3 text-[12.5px]" : "flex-1 px-2 text-[13.5px]"}`}
             style={{
               background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
               boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
@@ -611,20 +693,20 @@ function Segmented<V extends string | number>({
 
 function Sent({ kind, xp, isAdventure, onAnother }: { kind: WhenKind; xp: number; isAdventure: boolean; onAnother: () => void }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-4 py-6 text-center" role="status">
-      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden className="card-pop-in">
+    <div className="flex flex-col items-center gap-1.5 px-4 pb-2 pt-2 text-center" role="status">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden className="card-pop-in shrink-0">
         <circle cx="12" cy="12" r="10.5" fill="#58a04a" stroke="#2f5a26" strokeWidth="1.2" />
         <path d="M6.8 12.4l3.4 3.4 7-7.6" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <p className={`m-0 ${isAdventure ? "font-display text-xl" : "text-lg font-bold"}`}>
+      <p className={`m-0 ${isAdventure ? "font-display text-[19px]" : "text-[17px] font-bold"}`}>
         {kind === "future" ? "Saved to the future ideas log" : kind === "refill" ? "Saved for when credits refill" : "Sent. It goes into the next update."}
       </p>
       {xp > 0 && (
-        <p className="m-0 text-[17px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
+        <p className="m-0 text-[16px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
           +{xp} XP
         </p>
       )}
-      <button type="button" onClick={onAnother} className="mt-2 h-10 rounded-full border px-4 text-[14px] font-semibold" style={{ borderColor: "rgba(139,112,64,.5)", color: "var(--t-ink)" }}>
+      <button type="button" onClick={onAnother} className="mt-1 h-10 shrink-0 rounded-full border px-4 text-[14px] font-semibold" style={{ borderColor: "rgba(139,112,64,.5)", color: "var(--t-ink)" }}>
         Write another
       </button>
     </div>

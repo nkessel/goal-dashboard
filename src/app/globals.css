@@ -1413,6 +1413,13 @@ html[data-kb] [data-hide-when-typing] {
   visibility: hidden;
   pointer-events: none;
 }
+/* The feedback button stays available while typing; it only steps aside while the keyboard is actually up. */
+html[data-kb] [data-feedback-hide] {
+  visibility: hidden;
+  pointer-events: none;
+}
+/* The feedback box's scroll bar: slim and quiet. */
+.feedback-scroll { scrollbar-width: thin; scrollbar-color: rgba(139, 112, 64, 0.45) transparent; }
 
 /* ---------- Evening: the bottom bar goes moonlit with the rest of the screen ---------- */
 html[data-evening] nav[data-app-nav] {
