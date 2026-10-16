@@ -1906,6 +1906,7 @@ export async function saveCheckInAction(energy: number, metrics: { metric: strin
   const entry = await energyData.logEnergy(ownerId, energy);
   const extra = metrics.length ? await energyData.logCheckIns(ownerId, metrics) : [];
   revalidatePath("/");
+  revalidatePath("/insights");
   return { energy: entry, metrics: extra };
 }
 

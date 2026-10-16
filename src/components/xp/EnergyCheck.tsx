@@ -60,7 +60,10 @@ export function EnergyCheck({
   todayAt = null,
   metrics: initialMetrics = [],
   metricsToday = {},
+  full = false,
 }: {
+  /** The Insights screen's full check-in: every metric shown, no link back to Insights. */
+  full?: boolean;
   /** Today's latest check-in, if any. */
   today: number | null;
   /** When it was saved (ISO). */
@@ -76,7 +79,7 @@ export function EnergyCheck({
   const [metrics, setMetrics] = useState<string[]>(initialMetrics);
   const [vals, setVals] = useState<Record<string, number>>(metricsToday);
   const [savedVals, setSavedVals] = useState<Record<string, number>>(metricsToday);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(full);
   const [adding, setAdding] = useState(false);
   const [editingList, setEditingList] = useState(false);
   const [newMetric, setNewMetric] = useState("");
@@ -354,9 +357,11 @@ export function EnergyCheck({
               <button type="button" onClick={() => setEditing(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
                 Check in again
               </button>
-              <Link href="/insights" className="flex items-center gap-1 underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
-                See more insights →
-              </Link>
+              {!full && (
+                <Link href="/insights" className="flex items-center gap-1 underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
+                  See more insights →
+                </Link>
+              )}
             </div>
             {/* What was saved, shown under the caret. */}
             {expanded && savedExtras.length > 0 && (
