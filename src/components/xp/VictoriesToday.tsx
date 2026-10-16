@@ -54,7 +54,7 @@ export function VictoriesToday({
   theme,
 }: {
   /** Recent journal and feedback entries (narrowed here to today). */
-  journal?: { id: string; body: string; kind: string | null; created_at: string }[];
+  journal?: { id: string; body: string; kind: string | null; created_at: string; xp?: number }[];
   tasks: Task[];
   claimed: { id: string; title: string; claimed_at: string | null }[];
   lastCheckInAt: string | null;
@@ -72,12 +72,17 @@ export function VictoriesToday({
   const todays = tasks.filter((t) => isToday(t.completed_at));
   const todaysRewards = claimed.filter((r) => isToday(r.claimed_at));
   const todaysRites = rites.filter((r) => today !== null && r.day === today);
-  const todaysJournal = journal
+  const todaysAll = journal
     .filter((j) => isToday(j.created_at))
     .map((j) => (j.kind ? j : { ...j, ...splitKindPrefix(j.body) }));
+  // Feedback counts as one victory line ("Feedback submitted ×n"), not one per note.
+  const isFeedbackKind = (k: string | null) => k === "feedback" || k === "refill" || k === "future";
+  const todaysFeedback = todaysAll.filter((j) => isFeedbackKind(j.kind));
+  const feedbackXp = todaysFeedback.reduce((n, j) => n + (j.xp ?? 0), 0);
+  const todaysJournal = todaysAll.filter((j) => !isFeedbackKind(j.kind));
   const totalXp =
-    (loginToday ? 5 : 0) + todays.reduce((n, t) => n + t.xp_value, 0) + todaysRites.reduce((n, r) => n + r.xp, 0);
-  const empty = !loginToday && todays.length === 0 && todaysRewards.length === 0 && todaysRites.length === 0 && todaysJournal.length === 0;
+    (loginToday ? 5 : 0) + todays.reduce((n, t) => n + t.xp_value, 0) + todaysRites.reduce((n, r) => n + r.xp, 0) + feedbackXp;
+  const empty = !loginToday && todays.length === 0 && todaysRewards.length === 0 && todaysRites.length === 0 && todaysJournal.length === 0 && todaysFeedback.length === 0;
 
   const rowCls = "flex min-h-[44px] items-center gap-3 py-2 text-[16.5px]";
   const divider = { borderTop: `1px solid ${isAdventure ? "rgba(139,112,64,.35)" : "var(--t-card-border)"}` };
@@ -163,14 +168,27 @@ export function VictoriesToday({
             </span>
           </li>
         ))}
+        {todaysFeedback.length > 0 && (
+          <li className={rowCls} style={{ ...(loginToday || todays.length > 0 || todaysRites.length > 0 || todaysRewards.length > 0 ? divider : {}), color: "var(--t-ink)" }}>
+            <Seal kind="check" />
+            <span className="min-w-0 flex-1 leading-snug">
+              Feedback submitted
+              {todaysFeedback.length > 1 && <span style={{ color: "var(--t-ink-soft)" }}> (×{todaysFeedback.length})</span>}
+            </span>
+            {feedbackXp > 0 && (
+              <span className="shrink-0" style={xpStyle}>
+                +{feedbackXp} XP
+              </span>
+            )}
+          </li>
+        )}
         {todaysJournal.map((j) => {
           const meta = journalKindMeta(j.kind);
-          const isFeedback = j.kind === "feedback" || j.kind === "refill" || j.kind === "future";
           return (
             <li key={`j-${j.id}`} className={rowCls} style={{ ...divider, color: "var(--t-ink)" }}>
               <Seal kind="star" />
               <span className="min-w-0 flex-1 break-words leading-snug">
-                <span style={{ color: "var(--t-ink-soft)" }}>{isFeedback ? "Feedback: " : meta ? `${meta.label}: ` : "Journal: "}</span>
+                <span style={{ color: "var(--t-ink-soft)" }}>{meta ? `${meta.label}: ` : "Journal: "}</span>
                 <span className="line-clamp-2">{j.body}</span>
               </span>
             </li>

@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 
 import { JOURNAL_KINDS, splitKindPrefix } from "@/lib/journal-kinds";
 
-export type JournalEntry = { id: string; body: string; mood: number | null; kind: string | null; created_at: string; review_status?: string | null };
+export type JournalEntry = { id: string; body: string; mood: number | null; kind: string | null; created_at: string; review_status?: string | null; xp_awarded?: number };
 
 function missingTable(error: { code?: string; message: string } | null) {
   return !!error && (error.code === "42P01" || error.code === "PGRST205" || /journal_entries/.test(error.message));
@@ -26,9 +26,16 @@ export async function listJournalEntries(ownerId: string, limit = 100): Promise<
   });
 }
 
-export async function addJournalEntry(ownerId: string, body: string, mood: number | null, kind: string | null = null): Promise<JournalEntry> {
+export async function addJournalEntry(ownerId: string, body: string, mood: number | null, kind: string | null = null, xpAwarded = 0): Promise<JournalEntry> {
   const db = supabaseAdmin();
-  let { data, error } = await db.from("journal_entries").insert({ owner_id: ownerId, body, mood, ...(kind ? { kind } : {}) }).select("*").single();
+  let { data, error } = await db
+    .from("journal_entries")
+    .insert({ owner_id: ownerId, body, mood, ...(kind ? { kind } : {}), ...(xpAwarded > 0 ? { xp_awarded: xpAwarded } : {}) })
+    .select("*")
+    .single();
+  if (error && xpAwarded > 0 && /xp_awarded/.test(error.message)) {
+    ({ data, error } = await db.from("journal_entries").insert({ owner_id: ownerId, body, mood, ...(kind ? { kind } : {}) }).select("*").single());
+  }
   if (error && kind && /kind/.test(error.message)) {
     // Before the kind column exists: keep the kind as a "[Label] " prefix.
     const label = JOURNAL_KINDS.find((k) => k.key === kind)?.label;

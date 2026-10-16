@@ -100,7 +100,7 @@ export default async function Home() {
   const [habitHistory, habitSkips, journal] = await Promise.all([
     habits?.length ? listCompletionsFor(session.user.id, habits.map((h) => h.id), daysAgoISO(120).slice(0, 10)) : Promise.resolve([]),
     listHabitSkips(session.user.id, daysAgoISO(120).slice(0, 10)),
-    listJournalEntries(session.user.id, 30).catch(() => null),
+    listJournalEntries(session.user.id, 150).catch(() => null),
   ]);
   const eveningRites = rites?.filter((r) => r.slot !== "day").map(riteView) ?? null;
   // Imports wait for approval before they show here at all; quests taken off
@@ -152,7 +152,7 @@ export default async function Home() {
                 const r = rites?.find((x) => x.id === c.rite_id);
                 return r ? [{ id: c.id, title: r.title, day: c.day, xp: c.xp_awarded }] : [];
               })}
-              journal={(journal ?? []).filter((j) => j.created_at >= daysAgoISO(2)).map((j) => ({ id: j.id, body: j.body, kind: j.kind, created_at: j.created_at }))}
+              journal={(journal ?? []).filter((j) => j.created_at >= daysAgoISO(2)).map((j) => ({ id: j.id, body: j.body, kind: j.kind, created_at: j.created_at, xp: j.xp_awarded ?? 0 }))}
               theme={theme}
             />
           </div>

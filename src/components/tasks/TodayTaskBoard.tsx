@@ -25,6 +25,7 @@ import { reorderTasksAction, toggleManualPriorityAction } from "@/app/actions";
 import { TaskRow } from "./TaskRow";
 import { GoldRule, Leaf, QuestShield } from "@/components/ui/Ornaments";
 import { CreateSheet } from "@/components/create/CreateSheet";
+import { SectionStack } from "./SectionStack";
 
 type ListName = "priority" | "other";
 const PRIORITY_ZONE = "zone:priority";
@@ -104,7 +105,7 @@ export function TodayTaskBoard({
   priorityTasks: TaskWithCategory[];
   otherTasks: TaskWithCategory[];
   theme?: "calm" | "adventure";
-  /** Shown between Today's Quests and Additional Quests (Daily habits). */
+  /** Daily habits: a section of its own, above Today's Quests unless moved. */
   between?: React.ReactNode;
 }) {
   const [localPriority, setLocalPriority] = useState<TaskWithCategory[] | null>(null);
@@ -283,137 +284,150 @@ export function TodayTaskBoard({
 
   return (
     <DndContext id="dnd-TodayTaskBoard" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-      {/* Today's Quests: a subtle section of its own */}
-      <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
-        <div className="relative">
-        {isAdventure ? (
-          <div className="flex items-center gap-2 px-1">
-            <span className="hidden flex-1 sm:flex">
-              <GoldRule dir="left" />
-            </span>
-            <span className="flex-1 sm:hidden" />
-            <Leaf flip />
-            <h2 className="font-display m-0 whitespace-nowrap text-[23px] leading-none sm:text-[27px]" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
-              <button type="button" onClick={() => setTodayOpen((v) => !v)} aria-expanded={todayOpen} className="cursor-pointer select-none">
-                Today&apos;s Quests
-              </button>
-            </h2>
-            <Leaf />
-            <span className="hidden flex-1 sm:flex">
-              <GoldRule dir="right" />
-            </span>
-            <span className="flex-1 sm:hidden" />
-          </div>
-        ) : (
-          <div className="flex items-center justify-center gap-2.5">
-            <h2 className="text-lg font-extrabold" style={{ color: "var(--t-ink)" }}>
-              <button type="button" onClick={() => setTodayOpen((v) => !v)} aria-expanded={todayOpen}>
-                Today&apos;s Focus
-              </button>
-            </h2>
-          </div>
-        )}
-        </div>
-        {adding && <CreateSheet kinds={["quest"]} initial="quest" pinToToday theme={theme} onClose={() => setAdding(false)} />}
+      {/* Daily Habits, Today's Quests and Additional Quests: drag a closed one to reorder. */}
+      <SectionStack
+        storageKey="today-section-order"
+        defaultOrder={["habits", "today", "other"]}
+        sections={[
+          {
+            id: "today",
+            node: (
+              <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
+                <div className="relative">
+                {isAdventure ? (
+                  <div className="flex items-center gap-2 px-1">
+                    <span className="hidden flex-1 sm:flex">
+                      <GoldRule dir="left" />
+                    </span>
+                    <span className="flex-1 sm:hidden" />
+                    <Leaf flip />
+                    <h2 className="font-display m-0 whitespace-nowrap text-[23px] leading-none sm:text-[27px]" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
+                      <button type="button" onClick={() => setTodayOpen((v) => !v)} aria-expanded={todayOpen} className="cursor-pointer select-none">
+                        Today&apos;s Quests
+                      </button>
+                    </h2>
+                    <Leaf />
+                    <span className="hidden flex-1 sm:flex">
+                      <GoldRule dir="right" />
+                    </span>
+                    <span className="flex-1 sm:hidden" />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2.5">
+                    <h2 className="text-lg font-extrabold" style={{ color: "var(--t-ink)" }}>
+                      <button type="button" onClick={() => setTodayOpen((v) => !v)} aria-expanded={todayOpen}>
+                        Today&apos;s Focus
+                      </button>
+                    </h2>
+                  </div>
+                )}
+                </div>
+                {adding && <CreateSheet kinds={["quest"]} initial="quest" pinToToday theme={theme} onClose={() => setAdding(false)} />}
 
-        {dragError && (
-          <p className="text-xs" style={{ color: "var(--t-warn)" }}>
-            {dragError}
-          </p>
-        )}
+                {dragError && (
+                  <p className="text-xs" style={{ color: "var(--t-warn)" }}>
+                    {dragError}
+                  </p>
+                )}
 
-        <div className="drawer-body" data-open={todayOpen ? "true" : "false"}>
-          <div className="drawer-inner -mx-1 px-1">
-            <Zone id={PRIORITY_ZONE} className="rounded-2xl">
-              <SortableContext id="priority" items={priority.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                <ul className="flex min-h-[40px] flex-col gap-3 pb-0.5 pt-0.5">
-                  {priority.map((task) => (
-                    <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!todayOpen} listMoves={listMovesFor(task.id)} />
-                  ))}
-                </ul>
-              </SortableContext>
-              {priority.length === 0 && (
-                <p className="-mt-8 px-2 pb-1 text-center text-[14.5px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.75 }}>
-                  Drag a quest up here, or add one below.
-                </p>
-              )}
-            </Zone>
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              className="habit-add mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-[14.5px]"
-              style={{ borderColor: isAdventure ? "rgba(217,180,95,.4)" : "var(--t-card-border)", color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}
-            >
-              <span aria-hidden className="text-[18px] leading-none" style={{ color: "var(--t-gold)" }}>
-                +
-              </span>
-              Add a quest to today
-            </button>
-          </div>
-        </div>
-        {!todayOpen && priority.length > 0 && (
-          <button type="button" onClick={() => setTodayOpen(true)} className="-mt-1.5 text-center text-[13px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.6 }}>
-            {priority.length} {priority.length === 1 ? "quest" : "quests"} tucked away
-          </button>
-        )}
-      </section>
-
-      {between}
-
-      {/* Additional Quests: a drawer that slides open into a scrollable tray */}
-      <section>
-        <Zone id={OTHER_ZONE} className="rounded-2xl">
-          <button
-            type="button"
-            data-quest-dropzone="other"
-            aria-expanded={otherOpen}
-            onClick={() => setOtherOpen((v) => !v)}
-            className="drawer-header relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-4 py-2.5"
-            style={
-              isAdventure
-                ? {
-                    background: "linear-gradient(180deg, #34412f 0%, #263022 55%, #1f281c 100%)",
-                    border: "2px solid #8d7642",
-                    boxShadow: "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
-                  }
-                : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }
-            }
-          >
-            <span className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
-              {isAdventure && <QuestShield size={30} />}
-              {isAdventure ? "Additional Quests" : "More tasks"}
-              <span className="text-[15px]" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)", fontWeight: 400 }}>
-                ({other.length})
-              </span>
-            </span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="absolute right-5 transition-transform duration-300" style={{ transform: otherOpen ? "rotate(180deg)" : undefined }}>
-              <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </Zone>
-        <div className="drawer-body" data-open={otherOpen ? "true" : "false"}>
-          <div className="drawer-inner -mx-2 px-2">
-            <div
-              className="quest-tray mt-2.5 max-h-[min(50vh,350px)] overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
-              style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}
-            >
-              {other.length === 0 ? (
-                <p className="px-1 text-sm" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.7 }}>
-                  Nothing here — nice.
-                </p>
-              ) : (
-                <SortableContext id="other" items={other.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                  <ul className="flex flex-col gap-3">
-                    {other.map((task) => (
-                      <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!otherOpen} listMoves={listMovesFor(task.id)} />
-                    ))}
-                  </ul>
-                </SortableContext>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
+                <div className="drawer-body" data-open={todayOpen ? "true" : "false"}>
+                  <div className="drawer-inner -mx-1 px-1">
+                    <Zone id={PRIORITY_ZONE} className="rounded-2xl">
+                      <SortableContext id="priority" items={priority.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                        <ul className="flex min-h-[40px] flex-col gap-3 pb-0.5 pt-0.5">
+                          {priority.map((task) => (
+                            <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!todayOpen} listMoves={listMovesFor(task.id)} />
+                          ))}
+                        </ul>
+                      </SortableContext>
+                      {priority.length === 0 && (
+                        <p className="-mt-8 px-2 pb-1 text-center text-[14.5px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.75 }}>
+                          Drag a quest up here, or add one below.
+                        </p>
+                      )}
+                    </Zone>
+                    <button
+                      type="button"
+                      onClick={() => setAdding(true)}
+                      className="habit-add mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-[14.5px]"
+                      style={{ borderColor: isAdventure ? "rgba(217,180,95,.4)" : "var(--t-card-border)", color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}
+                    >
+                      <span aria-hidden className="text-[18px] leading-none" style={{ color: "var(--t-gold)" }}>
+                        +
+                      </span>
+                      Add a quest to today
+                    </button>
+                  </div>
+                </div>
+                {!todayOpen && priority.length > 0 && (
+                  <button type="button" onClick={() => setTodayOpen(true)} className="-mt-1.5 text-center text-[13px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.6 }}>
+                    {priority.length} {priority.length === 1 ? "quest" : "quests"} tucked away
+                  </button>
+                )}
+              </section>
+            ),
+          },
+          ...(between ? [{ id: "habits", node: between }] : []),
+          {
+            id: "other",
+            node: (
+              <section>
+                <Zone id={OTHER_ZONE} className="rounded-2xl">
+                  <button
+                    type="button"
+                    data-quest-dropzone="other"
+                    aria-expanded={otherOpen}
+                    onClick={() => setOtherOpen((v) => !v)}
+                    className="drawer-header relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-4 py-2.5"
+                    style={
+                      isAdventure
+                        ? {
+                            background: "linear-gradient(180deg, #34412f 0%, #263022 55%, #1f281c 100%)",
+                            border: "2px solid #8d7642",
+                            boxShadow: "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
+                          }
+                        : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }
+                    }
+                  >
+                    <span className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+                      {isAdventure && <QuestShield size={30} />}
+                      {isAdventure ? "Additional Quests" : "More tasks"}
+                      <span className="text-[15px]" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)", fontWeight: 400 }}>
+                        ({other.length})
+                      </span>
+                    </span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="absolute right-5 transition-transform duration-300" style={{ transform: otherOpen ? "rotate(180deg)" : undefined }}>
+                      <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </Zone>
+                <div className="drawer-body" data-open={otherOpen ? "true" : "false"}>
+                  <div className="drawer-inner -mx-2 px-2">
+                    <div
+                      className="quest-tray mt-2.5 max-h-[min(50vh,350px)] overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
+                      style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}
+                    >
+                      {other.length === 0 ? (
+                        <p className="px-1 text-sm" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.7 }}>
+                          Nothing here — nice.
+                        </p>
+                      ) : (
+                        <SortableContext id="other" items={other.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                          <ul className="flex flex-col gap-3">
+                            {other.map((task) => (
+                              <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!otherOpen} listMoves={listMovesFor(task.id)} />
+                            ))}
+                          </ul>
+                        </SortableContext>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ),
+          },
+        ]}
+      />
 
       <DragOverlay dropAnimation={{ duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }}>
         {active ? (

@@ -1527,15 +1527,14 @@ export async function addJournalEntryAction(body: string, mood: number | null, k
   const text = body.trim();
   if (!text) throw new Error("Write something first.");
   const k = kind && /^[a-z]{2,20}$/.test(kind) ? kind : null;
-  const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null, k);
-  let xpAwarded = 0;
+  const isFeedback = !!k && (feedbackData.FEEDBACK_KINDS as readonly string[]).includes(k);
+  const xpAwarded = isFeedback ? Math.max(0, Math.min(3, Math.round(feedbackXp))) : 0;
+  const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null, k, xpAwarded);
   // Feedback from someone in the party goes to the owner's review queue.
-  if (k && (feedbackData.FEEDBACK_KINDS as readonly string[]).includes(k)) {
+  if (isFeedback) {
     await feedbackData.notifyReviewers(ownerId, name, text).catch(() => {});
-    const amount = Math.max(0, Math.min(3, Math.round(feedbackXp)));
-    if (amount > 0) {
-      await xp.awardXp(ownerId, amount, "task_completed");
-      xpAwarded = amount;
+    if (xpAwarded > 0) {
+      await xp.awardXp(ownerId, xpAwarded, "task_completed");
       revalidatePath("/");
     }
     revalidatePath("/feedback-review");
