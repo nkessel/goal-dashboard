@@ -156,7 +156,9 @@ export function QuestComplete(props: QuestCompleteProps) {
     return stop;
   }, [reduce, fx.fill, stop]);
 
-  useEscape(onClose);
+  useEscape(() => {
+    if (!editTask) onClose();
+  });
 
   const eased = 1 - Math.pow(1 - p, 3);
   const gained = Math.round(questXp * eased);
@@ -178,6 +180,10 @@ export function QuestComplete(props: QuestCompleteProps) {
 
   const remaining = questXp - gained;
 
+  // Editing replaces the celebration (it comes back when the editor closes),
+  // so the two never draw over each other.
+  if (editTask) return <QuestEditorDialog mode={{ kind: "edit", task: editTask }} theme="adventure" onClose={() => setEditTask(null)} />;
+
   return createPortal(
     <div
       role="dialog"
@@ -197,7 +203,6 @@ export function QuestComplete(props: QuestCompleteProps) {
       >
         ×
       </button>
-      {editTask && <QuestEditorDialog mode={{ kind: "edit", task: editTask }} theme="adventure" onClose={() => setEditTask(null)} />}
 
       {/* ambient embers keep drifting after the main animation */}
       <div className="pointer-events-none absolute inset-0">
