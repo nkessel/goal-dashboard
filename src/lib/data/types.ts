@@ -89,6 +89,12 @@ export type Task = {
   queue_rank?: number | null;
   /** Tomorrow's planned order of doing (see queue_rank for importance). */
   queue_seq?: number | null;
+  /** Spark map ratings, 0–5 (null = not rated yet). */
+  interest?: number | null;
+  novelty?: number | null;
+  challenge?: number | null;
+  /** The first step still to do (when loaded). */
+  next_step?: string | null;
   /** Can be worked on in chunks of this many minutes (filler time). */
   chunk_minutes?: number | null;
   /** Custom coin payout; null = automatic from XP. */

@@ -6,6 +6,8 @@ import { PriorityViews } from "@/components/matrix/PriorityViews";
 import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
 import { listBoardsForOwner } from "@/lib/data/boards";
 import { getProfileById } from "@/lib/data/profiles";
+import { attachNextSteps } from "@/lib/data/steps";
+import { listEnergySince } from "@/lib/data/energy";
 import { xpToNextLevel } from "@/lib/data/xp";
 import {
   listCompletedTasksForOwner,
@@ -22,12 +24,15 @@ export default async function MatrixPage({
   const plotIds = typeof sp.plot === "string" ? sp.plot.split(",").filter(Boolean) : undefined;
   const confirmImports = sp.review === "1";
 
-  const [boards, tasks, completedTasks, profile] = await Promise.all([
+  const [boards, rawTasks, completedTasks, profile, energy] = await Promise.all([
     listBoardsForOwner(session.user.id),
     listOpenTasksWithBoardForOwner(session.user.id),
     listCompletedTasksForOwner(session.user.id, 10),
     getProfileById(session.user.id),
+    listEnergySince(session.user.id, new Date(Date.now() - 30 * 86_400_000).toISOString()),
   ]);
+  // Steps (counts and the next one to do) feed the Finish line and Start-friction views.
+  const tasks = await attachNextSteps(rawTasks, session.user.id).catch(() => rawTasks);
 
   const theme = profile?.theme ?? "calm";
   const isAdventure = theme === "adventure";
@@ -45,7 +50,7 @@ export default async function MatrixPage({
         </div>
 
 
-        <PriorityViews tasks={tasks} theme={theme} boards={boards} plotIds={plotIds} confirmImports={confirmImports} />
+        <PriorityViews tasks={tasks} theme={theme} boards={boards} plotIds={plotIds} confirmImports={confirmImports} energy={energy.map((e) => ({ level: e.level, at: e.created_at }))} />
 
         <section
           className={`flex flex-col gap-1.5 rounded-2xl px-5 py-4 ${isAdventure ? "parchment parchment-framed" : ""}`}

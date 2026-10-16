@@ -1717,3 +1717,33 @@ export async function connectGoogleCalendarAction(returnTo: string = "/calendar"
   const to = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/calendar";
   await signIn("google", { redirectTo: to }, CALENDAR_AUTH_PARAMS);
 }
+
+// ---------------------------------------------------------------------------
+// Priority Lab
+// ---------------------------------------------------------------------------
+
+/** Spark map: how interesting, novel and challenging a quest feels (0–5; null clears). */
+export async function rateSparkAction(taskId: string, patch: { interest?: number | null; novelty?: number | null; challenge?: number | null }) {
+  const ownerId = await requireProfileId();
+  const clean: Record<string, number | null> = {};
+  for (const k of ["interest", "novelty", "challenge"] as const) {
+    if (!(k in patch)) continue;
+    const v = patch[k];
+    clean[k] = v === null || v === undefined ? null : Math.max(0, Math.min(5, Math.round(v)));
+  }
+  const { error } = await supabaseAdmin().from("tasks").update(clean).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(/interest|novelty|challenge/.test(error.message) ? "Spark ratings need a quick database update first." : `Couldn't save that: ${error.message}`);
+  revalidatePath("/matrix");
+}
+
+/**
+ * Fresh start for a quest that keeps slipping: its reschedule count goes
+ * back to zero (the "fresh start effect" — new beginnings renew effort).
+ */
+export async function freshStartAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  const { error } = await supabaseAdmin().from("tasks").update({ reschedule_count: 0 }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't reset it: ${error.message}`);
+  revalidatePath("/");
+  revalidatePath("/matrix");
+}

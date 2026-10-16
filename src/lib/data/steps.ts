@@ -92,3 +92,28 @@ export async function replaceSteps(
   }
   return (await listStepsForTask(taskId, ownerId)) ?? [];
 }
+
+/** Step counts plus the next step still to do, for each quest (unchanged when steps aren't available). */
+export async function attachNextSteps<T extends Task>(tasks: T[], ownerId: string): Promise<(T & { next_step?: string | null })[]> {
+  if (tasks.length === 0) return tasks;
+  const { data, error } = await supabaseAdmin()
+    .from("quest_steps")
+    .select("task_id, title, done, sort_order, created_at")
+    .eq("owner_id", ownerId)
+    .in("task_id", tasks.map((t) => t.id))
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) return tasks;
+  const info = new Map<string, { total: number; done: number; next: string | null }>();
+  for (const s of data ?? []) {
+    const c = info.get(s.task_id as string) ?? { total: 0, done: 0, next: null };
+    c.total += 1;
+    if (s.done) c.done += 1;
+    else if (!c.next) c.next = s.title as string;
+    info.set(s.task_id as string, c);
+  }
+  return tasks.map((t) => {
+    const c = info.get(t.id);
+    return c ? { ...t, steps_total: c.total, steps_done: c.done, next_step: c.next } : t;
+  });
+}

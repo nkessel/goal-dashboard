@@ -27,3 +27,16 @@ export async function logEnergy(ownerId: string, level: number): Promise<EnergyE
   if (error) throw new Error(`Couldn't save your energy: ${error.message}`);
   return { id: data.id as string, level: Number(data.level), created_at: data.created_at as string };
 }
+
+/** Check-ins since a moment, oldest first (empty before the table exists). */
+export async function listEnergySince(ownerId: string, sinceISO: string): Promise<EnergyEntry[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("energy_log")
+    .select("id, level, created_at")
+    .eq("owner_id", ownerId)
+    .gte("created_at", sinceISO)
+    .order("created_at", { ascending: true })
+    .limit(500);
+  if (error) return [];
+  return (data ?? []).map((r) => ({ id: r.id as string, level: Number(r.level), created_at: r.created_at as string }));
+}
