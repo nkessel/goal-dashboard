@@ -11,8 +11,8 @@ import { listEvents, type GoogleCalendarEvent } from "@/lib/google-calendar";
 import { DayView } from "@/components/calendar/DayView";
 import { WeekView } from "@/components/calendar/WeekView";
 import { MonthView } from "@/components/calendar/MonthView";
-import { SchedulingList } from "@/components/calendar/SchedulingList";
-import { listSchedulingList } from "@/lib/data/scheduling";
+import { SchedulingDrawer } from "@/components/calendar/SchedulingList";
+import { getSchedulingFolders, listSchedulingList } from "@/lib/data/scheduling";
 import {
   addDays,
   addMonths,
@@ -100,9 +100,10 @@ export default async function CalendarPage({
   // viewer's time zone aren't cut off (the views place items by local day).
   rangeStart = addDays(rangeStart, -1);
   rangeEnd = addDays(rangeEnd, 1);
-  const [tasks, toSchedule] = await Promise.all([
+  const [tasks, toSchedule, scheduleFolders] = await Promise.all([
     listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
     listSchedulingList(session.user.id),
+    getSchedulingFolders(session.user.id),
   ]);
   const todayHref = `/calendar?view=${view}&date=${formatDateParam(today)}`;
 
@@ -125,7 +126,7 @@ export default async function CalendarPage({
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="flex gap-4">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <PageHeader isAdventure={isAdventure} title="Quest Calendar" calmTitle="Calendar" />
         {!session.googleAccessToken && <ConnectCalendar isAdventure={isAdventure} />}
@@ -232,9 +233,7 @@ export default async function CalendarPage({
         )}
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
-      <div className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[300px]">
-        <SchedulingList tasks={toSchedule} theme={theme} />
-      </div>
+      <SchedulingDrawer tasks={toSchedule} folders={scheduleFolders} theme={theme} />
       </div>
     </AppShell>
   );

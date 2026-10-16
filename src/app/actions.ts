@@ -1977,3 +1977,29 @@ export async function setSchedulingAction(taskId: string, place: schedulingData.
   else await schedulingData.removeFromSchedulingList(ownerId, taskId);
   revalidatePath("/calendar");
 }
+
+export async function setSchedulingFoldersAction(folders: schedulingData.ScheduleFolder[]) {
+  const ownerId = await requireProfileId();
+  const next = await schedulingData.setSchedulingFolders(ownerId, folders);
+  revalidatePath("/calendar");
+  return next;
+}
+
+export async function moveSchedulingFolderAction(taskId: string, folder: string | null, order?: string[]) {
+  const ownerId = await requireProfileId();
+  await schedulingData.moveToSchedulingFolder(ownerId, taskId, folder);
+  if (order) await schedulingData.setSchedulingOrder(ownerId, order.slice(0, 100));
+  revalidatePath("/calendar");
+}
+
+export async function renameSchedulingFolderAction(from: string, to: string) {
+  const ownerId = await requireProfileId();
+  await schedulingData.renameSchedulingFolder(ownerId, from, to);
+  revalidatePath("/calendar");
+}
+
+export async function deleteSchedulingFolderAction(name: string) {
+  const ownerId = await requireProfileId();
+  await schedulingData.deleteSchedulingFolder(ownerId, name);
+  revalidatePath("/calendar");
+}

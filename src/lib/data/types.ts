@@ -61,6 +61,7 @@ export type Task = {
   boss_id?: string | null;
   /** Place on the scheduling priority list (null = not on it). */
   schedule_rank?: number | null;
+  schedule_folder?: string | null;
   created_at: string;
   updated_at: string;
   reminder_sent_at: string | null;

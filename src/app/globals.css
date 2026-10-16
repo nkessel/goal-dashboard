@@ -1504,3 +1504,11 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
     opacity: 0.5;
   }
 }
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.slide-in-right {
+  animation: slide-in-right 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
