@@ -20,6 +20,7 @@ import * as stepsData from "@/lib/data/steps";
 import * as journalData from "@/lib/data/journal";
 import * as tomorrowData from "@/lib/data/tomorrow";
 import * as schedulingData from "@/lib/data/scheduling";
+import * as forumData from "@/lib/data/forum";
 import * as bossesData from "@/lib/data/bosses";
 import * as energyData from "@/lib/data/energy";
 import { computeLevelForXp } from "@/lib/levels";
@@ -2002,4 +2003,49 @@ export async function deleteSchedulingFolderAction(name: string) {
   const ownerId = await requireProfileId();
   await schedulingData.deleteSchedulingFolder(ownerId, name);
   revalidatePath("/calendar");
+}
+
+// ---------------------------------------------------------------------------
+// Forums (Party, Community, Feature ideas)
+// ---------------------------------------------------------------------------
+
+export async function createForumThreadAction(scope: forumData.ForumScope, title: string, body: string) {
+  const ownerId = await requireProfileId();
+  if (!forumData.SCOPES.includes(scope)) throw new Error("Unknown forum.");
+  const t = await forumData.createThread(ownerId, scope, title, body);
+  revalidatePath("/feed");
+  return t.id;
+}
+
+export async function replyForumAction(threadId: string, body: string) {
+  const ownerId = await requireProfileId();
+  await forumData.reply(ownerId, threadId, body);
+  revalidatePath(`/feed/forum/${threadId}`);
+  revalidatePath("/feed");
+}
+
+export async function voteForumAction(threadId: string) {
+  const ownerId = await requireProfileId();
+  const res = await forumData.toggleVote(ownerId, threadId);
+  revalidatePath("/feed");
+  return res;
+}
+
+export async function deleteForumThreadAction(threadId: string) {
+  const ownerId = await requireProfileId();
+  await forumData.deleteThread(ownerId, threadId);
+  revalidatePath("/feed");
+}
+
+export async function deleteForumPostAction(postId: string, threadId: string) {
+  const ownerId = await requireProfileId();
+  await forumData.deletePost(ownerId, postId);
+  revalidatePath(`/feed/forum/${threadId}`);
+}
+
+export async function setIdeaStatusAction(threadId: string, status: forumData.IdeaStatus) {
+  const ownerId = await requireProfileId();
+  await forumData.setIdeaStatus(ownerId, threadId, status);
+  revalidatePath(`/feed/forum/${threadId}`);
+  revalidatePath("/feed");
 }

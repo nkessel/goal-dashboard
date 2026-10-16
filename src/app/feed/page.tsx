@@ -15,6 +15,8 @@ import {
 } from "@/lib/data/friendships";
 import { getOrCreateInviteLink } from "@/lib/data/invites";
 import { listFeed } from "@/lib/data/activity";
+import { listThreads } from "@/lib/data/forum";
+import { Forums, type AuthorView } from "@/components/social/Forums";
 
 export default async function FeedPage() {
   const session = await requireSession();
@@ -28,6 +30,13 @@ export default async function FeedPage() {
     getOrCreateInviteLink(profileId),
     getProfileById(profileId),
   ]);
+
+  const forums = await Promise.all((["party", "community", "ideas"] as const).map((sc) => listThreads(sc, profileId)));
+  const threads = forums.flatMap((f) => f.threads);
+  const forumPeople = await getProfilesByIds([...new Set(threads.map((t) => t.author_id).filter((x): x is string => !!x))]);
+  const forumAuthors: Record<string, AuthorView> = Object.fromEntries(
+    [...forumPeople.values()].map((p) => [p.id, { id: p.id, name: p.name?.split(" ")[0] ?? "Adventurer", level: p.level, avatar_color: p.avatar_color, avatar_image_url: p.avatar_image_url }])
+  );
 
   const incomingProfiles = await getProfilesByIds(incoming.map((f) => f.requester_id));
   const incomingWithProfiles = incoming
@@ -54,6 +63,8 @@ export default async function FeedPage() {
         <PageHeader isAdventure={isAdventure} title="Guild Hall" calmTitle="Friends" />
 
         <FriendRequests incoming={incomingWithProfiles} theme={theme} />
+
+        <Forums threads={threads} voted={forums[2].voted} authors={forumAuthors} theme={theme} />
 
         <InviteLinkBox code={invite.code} theme={theme} inviterName={profile?.name?.split(" ")[0] ?? null} />
 
