@@ -750,14 +750,44 @@ html[data-evening] [data-theme="adventure"] {
   box-shadow: 0 0 2px rgba(253, 246, 220, 0.7);
   opacity: var(--o, 0.6);
   transform: translate(-50%, -50%);
-  animation: evening-twinkle 5s ease-in-out infinite;
 }
 .evening-sparkle {
   position: absolute;
   color: #fff4cf;
   filter: drop-shadow(0 0 3px rgba(255, 228, 150, 0.85)) drop-shadow(0 0 7px rgba(242, 210, 126, 0.35));
   transform: translate(-50%, -50%);
-  animation: evening-sparkle 6s ease-in-out infinite;
+}
+/* Effects are switched in Settings → Visual Effects (data-* on the button). */
+[data-star-twinkle] .evening-star {
+  animation: evening-twinkle var(--tw-dur, 5s) ease-in-out var(--tw-delay, 0s) infinite;
+}
+[data-star-twinkle] .evening-sparkle {
+  animation: evening-sparkle var(--tw-dur, 6s) ease-in-out var(--tw-delay, 0s) infinite;
+}
+[data-star-shimmer] .evening-star {
+  animation: evening-star-shimmer 5s ease-in-out var(--sh-delay, 0s) infinite;
+}
+[data-star-shimmer] .evening-sparkle {
+  animation: evening-sparkle-shimmer 5s ease-in-out var(--sh-delay, 0s) infinite;
+}
+[data-star-twinkle][data-star-shimmer] .evening-star {
+  animation:
+    evening-twinkle var(--tw-dur, 5s) ease-in-out var(--tw-delay, 0s) infinite,
+    evening-star-shimmer 5s ease-in-out var(--sh-delay, 0s) infinite;
+}
+[data-star-twinkle][data-star-shimmer] .evening-sparkle {
+  animation:
+    evening-sparkle var(--tw-dur, 6s) ease-in-out var(--tw-delay, 0s) infinite,
+    evening-sparkle-shimmer 5s ease-in-out var(--sh-delay, 0s) infinite;
+}
+/* A wave of light passing over the stars: each one flares as it goes by. */
+@keyframes evening-star-shimmer {
+  0%, 68%, 100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 2px rgba(253, 246, 220, 0.7); background: #fdf6dc; }
+  78% { transform: translate(-50%, -50%) scale(2); box-shadow: 0 0 6px 1.5px rgba(255, 236, 170, 0.95); background: #fffbea; }
+}
+@keyframes evening-sparkle-shimmer {
+  0%, 68%, 100% { filter: drop-shadow(0 0 3px rgba(255, 228, 150, 0.85)) drop-shadow(0 0 7px rgba(242, 210, 126, 0.35)); }
+  78% { filter: brightness(1.5) drop-shadow(0 0 5px rgba(255, 236, 170, 1)) drop-shadow(0 0 12px rgba(242, 210, 126, 0.7)); }
 }
 @keyframes evening-twinkle {
   0%, 100% { opacity: var(--o, 0.6); }
@@ -768,7 +798,7 @@ html[data-evening] [data-theme="adventure"] {
   50% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.72) rotate(12deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .evening-star, .evening-sparkle { animation: none; }
+  .evening-star, .evening-sparkle { animation: none !important; }
 }
 .day-cta {
   color: #2a1c10;

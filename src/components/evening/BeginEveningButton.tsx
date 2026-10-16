@@ -2,6 +2,7 @@
 
 import { useIsAfternoon } from "./evening-clock";
 import { useFlipToEvening } from "./DayNightFlip";
+import { useVisualFx, type VisualFx } from "@/lib/visual-fx";
 
 function Moon({ size = 22 }: { size?: number }) {
   return (
@@ -56,8 +57,10 @@ function NightSky() {
               width: d.size,
               height: d.size,
               "--o": d.opacity,
-              animationDelay: `${d.delay}s`,
-              animationDuration: `${d.duration}s`,
+              "--tw-delay": `${d.delay}s`,
+              "--tw-dur": `${d.duration}s`,
+              // The shimmer wave runs left to right across the sky.
+              "--sh-delay": `${(d.left / 100) * 1.6 - 5}s`,
             } as React.CSSProperties
           }
         />
@@ -69,7 +72,7 @@ function NightSky() {
           width={s.size}
           height={s.size}
           viewBox="0 0 20 20"
-          style={{ left: `${s.left}%`, top: `${s.top}%`, animationDelay: `${s.delay}s`, animationDuration: `${s.duration}s` }}
+          style={{ left: `${s.left}%`, top: `${s.top}%`, "--tw-delay": `${s.delay}s`, "--tw-dur": `${s.duration}s`, "--sh-delay": `${(s.left / 100) * 1.6 - 5}s` } as React.CSSProperties}
         >
           <path d="M10 0C10.6 6.4 13.6 9.4 20 10 13.6 10.6 10.6 13.6 10 20 9.4 13.6 6.4 10.6 0 10 6.4 9.4 9.4 6.4 10 0Z" fill="currentColor" />
         </svg>
@@ -78,23 +81,48 @@ function NightSky() {
   );
 }
 
-/** Appears after 2:30pm, between Additional Quests and Victories Today. */
-export function BeginEveningButton() {
-  const afternoon = useIsAfternoon();
-  const flip = useFlipToEvening();
-  if (!afternoon) return null;
+/** The button's look, with the effects chosen in Settings → Visual Effects. */
+function fxProps(fx: VisualFx) {
+  return {
+    className: `evening-cta relative flex min-h-[58px] w-full items-center justify-center gap-3 rounded-2xl px-5 text-[21px] ${fx.eveningBorderShimmer ? "shimmer-edge" : ""}`,
+    "data-star-twinkle": fx.eveningStarTwinkle ? "" : undefined,
+    "data-star-shimmer": fx.eveningStarShimmer ? "" : undefined,
+  };
+}
+
+function Face() {
   return (
-    <button
-      type="button"
-      onClick={() => flip(true)}
-      className="hover-glow evening-cta shimmer-edge relative flex min-h-[58px] w-full items-center justify-center gap-3 rounded-2xl px-5 text-[21px]"
-    >
+    <>
       <NightSky />
       <span className="relative flex items-center gap-3">
         <Moon size={26} />
         <span className="font-display">Evening Routine</span>
       </span>
+    </>
+  );
+}
+
+/** Appears after 2:30pm, between Additional Quests and Victories Today. */
+export function BeginEveningButton() {
+  const afternoon = useIsAfternoon();
+  const flip = useFlipToEvening();
+  const fx = useVisualFx();
+  if (!afternoon) return null;
+  const { className, ...data } = fxProps(fx);
+  return (
+    <button type="button" onClick={() => flip(true)} className={`hover-glow ${className}`} {...data}>
+      <Face />
     </button>
+  );
+}
+
+/** A live, non-clickable copy of the button for the settings screen. */
+export function EveningButtonPreview({ fx }: { fx: VisualFx }) {
+  const { className, ...data } = fxProps(fx);
+  return (
+    <div aria-hidden className={className} {...data}>
+      <Face />
+    </div>
   );
 }
 
