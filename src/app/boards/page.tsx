@@ -13,7 +13,7 @@ export default async function BoardsPage() {
     listBoardsWithStatsForOwner(session.user.id),
     getProfileById(session.user.id),
   ]);
-  const theme = profile?.theme ?? "calm";
+  const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
   const level = profile ? xpToNextLevel(profile.total_xp).level : 1;
 

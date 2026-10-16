@@ -24,7 +24,7 @@ import * as energyData from "@/lib/data/energy";
 import { computeLevelForXp } from "@/lib/levels";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { generateAndStoreImage, buildAvatarPrompt, buildSketchbookIconPrompt, buildTreasureIconPrompt, visualSubjectFor } from "@/lib/ai-image";
+import { generateAndStoreImage, buildAvatarPrompt, buildQuestScenePrompt, buildTreasureIconPrompt, visualSubjectFor } from "@/lib/ai-image";
 import { styleLook, AVATAR_STYLE_OPTIONS, STYLE_EXAMPLE_SUBJECT } from "@/lib/avatar-prompts";
 import { exportAccountData, type AccountExport } from "@/lib/data/export";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
@@ -496,15 +496,34 @@ export async function listQuestStepsAction(taskId: string) {
   return stepsData.listStepsForTask(taskId, ownerId);
 }
 
-/** Saves the editor's step list for a quest. */
-export async function saveQuestStepsAction(taskId: string, steps: { id?: string; title: string; done: boolean }[]) {
+/**
+ * Saves the editor's step list for a quest. A step with its own XP pays it
+ * when it's done (and takes it back if it's unticked); `xpEarned` is what
+ * this save paid.
+ */
+export async function saveQuestStepsAction(taskId: string, steps: stepsData.StepInput[]) {
   const ownerId = await requireProfileId();
   const task = await tasksData.getTask(taskId, ownerId);
   if (!task) throw new Error("That quest isn't here anymore.");
   const saved = await stepsData.replaceSteps(taskId, ownerId, steps.slice(0, 50));
+  let delta = 0;
+  for (const st of saved) {
+    const owed = st.done ? (st.xp ?? 0) : 0;
+    const paid = st.xp_paid ?? 0;
+    if (owed !== paid) {
+      delta += owed - paid;
+      await stepsData.setStepPaid(st.id, ownerId, owed);
+    }
+  }
+  let coinsEarned = 0;
+  if (delta !== 0) coinsEarned = (await xp.awardXp(ownerId, delta, "task_completed", taskId)).coinsEarned;
   revalidatePath("/");
   revalidatePath("/boards", "layout");
-  return saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order }));
+  return {
+    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0) })),
+    xpEarned: delta,
+    coinsEarned,
+  };
 }
 
 /** Deletion lives inside the edit dialog, not a separate control. */
@@ -994,11 +1013,8 @@ export async function generateTaskIconAction(taskId: string, prompt: string) {
   if (!trimmed) throw new Error("Describe the monster/icon you want first.");
 
   // A concrete picture of the task, in the same painted storybook style as imports.
-  const url = await generateAndStoreImage(
-    buildSketchbookIconPrompt(await visualSubjectFor(trimmed)),
-    `tasks/${taskId}-${Date.now()}.jpg`,
-    { transparentBackground: true }
-  );
+  // Quest portraits keep their painted scene behind them.
+  const url = await generateAndStoreImage(buildQuestScenePrompt(await visualSubjectFor(trimmed)), `tasks/${taskId}-${Date.now()}.jpg`);
   await tasksData.setTaskIcon(taskId, ownerId, { iconKey: url, iconSource: "ai" });
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: trimmed });
   revalidatePath("/");
@@ -1107,9 +1123,7 @@ export async function generateQuestIconImageAction(prompt: string, artStyle: "mo
   const url =
     artStyle === "treasure"
       ? await generateAndStoreImage(buildTreasureIconPrompt(trimmed), `rewards/draft-${ownerId}-${Date.now()}.jpg`)
-      : await generateAndStoreImage(buildSketchbookIconPrompt(await visualSubjectFor(trimmed)), `tasks/draft-${ownerId}-${Date.now()}.jpg`, {
-          transparentBackground: true,
-        });
+      : await generateAndStoreImage(buildQuestScenePrompt(await visualSubjectFor(trimmed)), `tasks/draft-${ownerId}-${Date.now()}.jpg`);
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: trimmed });
   return url;
 }
@@ -1358,9 +1372,7 @@ export async function generateNextImportIconAction(): Promise<{ done: boolean; i
   const url =
     next.kind === "reward"
       ? await generateAndStoreImage(buildTreasureIconPrompt(await visualSubjectFor(next.prompt)), `rewards/${next.id}-${Date.now()}.jpg`)
-      : await generateAndStoreImage(buildSketchbookIconPrompt(await visualSubjectFor(next.prompt)), `tasks/${next.id}-${Date.now()}.jpg`, {
-          transparentBackground: true,
-        });
+      : await generateAndStoreImage(buildQuestScenePrompt(await visualSubjectFor(next.prompt)), `tasks/${next.id}-${Date.now()}.jpg`);
   await rewardsData.setImportIcon(next.kind, next.id, ownerId, url);
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: next.prompt });
   return { done: false, id: next.id, url };

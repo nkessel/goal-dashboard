@@ -34,7 +34,7 @@ export default async function MatrixPage({
   // Steps (counts and the next one to do) feed the Finish line and Start-friction views.
   const tasks = await attachNextSteps(rawTasks, session.user.id).catch(() => rawTasks);
 
-  const theme = profile?.theme ?? "calm";
+  const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
   const level = profile ? xpToNextLevel(profile.total_xp).level : 1;
   const victoriesStyle = {

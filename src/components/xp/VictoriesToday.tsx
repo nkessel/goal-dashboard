@@ -69,7 +69,16 @@ export function VictoriesToday({
 
   const isToday = (iso: string | null) => !!iso && today !== null && eveningDayKey(new Date(iso)) === today;
   const loginToday = isToday(lastCheckInAt);
-  const todays = tasks.filter((t) => isToday(t.completed_at));
+  // A quest logged today counts today, even when it was done earlier (marked "(yesterday)").
+  const todays = tasks.filter((t) => isToday(t.logged_at ?? t.completed_at));
+  const doneEarlier = (t: Task) => {
+    if (!t.completed_at || isToday(t.completed_at) || today === null) return null;
+    const d = eveningDayKey(new Date(t.completed_at));
+    const y = new Date(`${today}T12:00:00`);
+    y.setDate(y.getDate() - 1);
+    const yKey = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
+    return d === yKey ? "yesterday" : new Date(t.completed_at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  };
   const todaysRewards = claimed.filter((r) => isToday(r.claimed_at));
   const todaysRites = rites.filter((r) => today !== null && r.day === today);
   const todaysAll = journal
@@ -140,7 +149,10 @@ export function VictoriesToday({
               style={{ color: "var(--t-ink)" }}
             >
               <Seal kind="check" />
-              <span className="min-w-0 flex-1 break-words leading-snug">{t.title}</span>
+              <span className="min-w-0 flex-1 break-words leading-snug">
+                {t.title}
+                {doneEarlier(t) && <span style={{ color: "var(--t-ink-soft)" }}> ({doneEarlier(t)})</span>}
+              </span>
               <span className="shrink-0" style={xpStyle}>
                 +{t.xp_value} XP
               </span>
@@ -172,8 +184,8 @@ export function VictoriesToday({
           <li className={rowCls} style={{ ...(loginToday || todays.length > 0 || todaysRites.length > 0 || todaysRewards.length > 0 ? divider : {}), color: "var(--t-ink)" }}>
             <Seal kind="check" />
             <span className="min-w-0 flex-1 leading-snug">
-              Feedback submitted
-              {todaysFeedback.length > 1 && <span style={{ color: "var(--t-ink-soft)" }}> (×{todaysFeedback.length})</span>}
+              {todaysFeedback.length > 1 && <span style={{ color: "var(--t-ink-soft)" }}>{todaysFeedback.length} × </span>}
+              Feedback
             </span>
             {feedbackXp > 0 && (
               <span className="shrink-0" style={xpStyle}>

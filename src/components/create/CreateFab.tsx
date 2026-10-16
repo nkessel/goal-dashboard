@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 import { useFabTarget } from "@/lib/fab-target";
 import { CreateSheet, JOURNAL_DRAFT_KEY, type CreateKind } from "./CreateSheet";
@@ -25,6 +25,7 @@ export function CreateFab({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [pressed, setPressed] = useState<boolean | null>(null);
   useEffect(() => {
     if (!resumeDraft) return;
     try {
@@ -49,7 +50,21 @@ export function CreateFab({
           onClose={() => setOpen(false)}
         />
       )}
-      <FloatingActionButton onClick={() => setOpen((v) => !v)} label={open ? "Close" : (target?.label ?? label)} theme={theme} expanded={open} raised={!!target} />
+      <FloatingActionButton
+        onClick={() => {
+          // The button answers at once; the (heavier) sheet renders right after without holding it up.
+          const next = !(pressed ?? open);
+          setPressed(next);
+          startTransition(() => {
+            setOpen(next);
+            setPressed(null);
+          });
+        }}
+        label={(pressed ?? open) ? "Close" : (target?.label ?? label)}
+        theme={theme}
+        expanded={pressed ?? open}
+        raised={!!target}
+      />
     </>
   );
 }

@@ -23,7 +23,7 @@ export default async function NotificationsPage() {
     listForProfile(session.user.id, 50),
     getProfileById(session.user.id),
   ]);
-  const theme = profile?.theme ?? "calm";
+  const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
 
   return (

@@ -10,7 +10,7 @@ export default async function BoardDetailPage({ params }: { params: Promise<{ bo
   const { boardId } = await params;
   const session = await requireSession();
   const [data, profile] = await Promise.all([loadBoard(boardId, session.user.id), getProfileById(session.user.id)]);
-  const theme = profile?.theme ?? "calm";
+  const theme = profile?.theme ?? "adventure";
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>

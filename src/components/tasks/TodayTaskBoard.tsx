@@ -26,6 +26,45 @@ import { TaskRow } from "./TaskRow";
 import { GoldRule, Leaf, QuestShield } from "@/components/ui/Ornaments";
 import { CreateSheet } from "@/components/create/CreateSheet";
 import { SectionStack } from "./SectionStack";
+import { settleOptimisticQuests, takeOptimisticFailure, useOptimisticQuests, type OptimisticQuest } from "@/lib/optimistic-quests";
+
+/** A just-created quest, drawn like the rest while it saves (blank checkbox until its portrait is ready). */
+function asTask(q: OptimisticQuest): TaskWithCategory {
+  const now = new Date().toISOString();
+  return {
+    id: q.tempId,
+    title: q.title,
+    description: q.description,
+    xp_value: q.xp,
+    estimate_minutes: q.estimate,
+    importance: 0,
+    urgency: 0,
+    icon_key: q.iconUrl,
+    icon_source: q.iconUrl ? "library" : "monster",
+    status: "open",
+    is_manual_priority: q.placement === "today",
+    in_additional: true,
+    is_on_calendar: false,
+    scheduled_start: null,
+    scheduled_end: null,
+    due_at: null,
+    progress: 0,
+    reschedule_count: 0,
+    created_at: now,
+    updated_at: now,
+  } as unknown as TaskWithCategory;
+}
+
+/** Stand-ins can't be opened or dragged until they're real. */
+function PendingQuest({ q, theme }: { q: OptimisticQuest; theme: "calm" | "adventure" }) {
+  return (
+    <li className="pointer-events-none list-none opacity-90" aria-busy="true">
+      <ul className="m-0 list-none p-0">
+        <TaskRow task={asTask(q)} theme={theme} />
+      </ul>
+    </li>
+  );
+}
 
 type ListName = "priority" | "other";
 const PRIORITY_ZONE = "zone:priority";
@@ -137,6 +176,15 @@ export function TodayTaskBoard({
   for (const t of [...priorityTasks, ...otherTasks]) if (isLocked(t)) lockedBehind.set(t.locked_by_task_id!, t);
   const priority = (localPriority ?? priorityTasks).filter((t) => !isLocked(t));
   const other = (localOther ?? otherTasks).filter((t) => !isLocked(t));
+  // Quests just created elsewhere, until the real ones arrive.
+  const pendingAll = useOptimisticQuests();
+  const pending = pendingAll.filter((q) => !q.realId || !openIds.has(q.realId));
+  useEffect(() => {
+    if (pendingAll.length) settleOptimisticQuests(openIds);
+    const f = takeOptimisticFailure();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- surfacing a background save failure
+    if (f) setDragError(f);
+  });
 
   // Fresh server props win once they match what we saved (or changed elsewhere).
   if (priorityTasks !== seenPriorityTasks || otherTasks !== seenOtherTasks) {
@@ -338,6 +386,11 @@ export function TodayTaskBoard({
                           {priority.map((task) => (
                             <SortableQuest key={task.id} task={task} theme={theme} behind={lockedBehind.get(task.id)} disabled={!todayOpen} listMoves={listMovesFor(task.id)} />
                           ))}
+                          {pending
+                            .filter((q) => q.placement === "today")
+                            .map((q) => (
+                              <PendingQuest key={q.tempId} q={q} theme={theme} />
+                            ))}
                         </ul>
                       </SortableContext>
                       {priority.length === 0 && (
@@ -360,8 +413,11 @@ export function TodayTaskBoard({
                   </div>
                 </div>
                 {!todayOpen && priority.length > 0 && (
-                  <button type="button" onClick={() => setTodayOpen(true)} className="-mt-1.5 text-center text-[13px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.6 }}>
-                    {priority.length} {priority.length === 1 ? "quest" : "quests"} tucked away
+                  <button type="button" onClick={() => setTodayOpen(true)} className="-mt-1.5 flex items-center justify-center gap-1 self-center rounded-full px-3 py-1 text-[13.5px] font-semibold" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.85 }}>
+                    Show {priority.length} {priority.length === 1 ? "quest" : "quests"}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </button>
                 )}
               </section>
@@ -407,6 +463,15 @@ export function TodayTaskBoard({
                       className="quest-tray mt-2.5 max-h-[min(50vh,350px)] overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
                       style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}
                     >
+                      {pending.some((q) => q.placement === "additional") && (
+                        <ul className="mb-3 flex flex-col gap-3">
+                          {pending
+                            .filter((q) => q.placement === "additional")
+                            .map((q) => (
+                              <PendingQuest key={q.tempId} q={q} theme={theme} />
+                            ))}
+                        </ul>
+                      )}
                       {other.length === 0 ? (
                         <p className="px-1 text-sm" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.7 }}>
                           Nothing here — nice.

@@ -397,10 +397,24 @@ export async function setManualPriority(
   value: boolean
 ): Promise<Task> {
   const db = supabaseAdmin();
+  // Joining Today's Quests puts it at the bottom of the list.
+  let sortOrder: number | undefined;
+  if (value) {
+    const { data: last } = await db
+      .from("tasks")
+      .select("sort_order")
+      .eq("owner_id", ownerId)
+      .eq("status", "open")
+      .eq("is_manual_priority", true)
+      .neq("id", taskId)
+      .order("sort_order", { ascending: false })
+      .limit(1);
+    sortOrder = ((last?.[0]?.sort_order as number | undefined) ?? 0) + 1;
+  }
 
   const { data, error } = await db
     .from("tasks")
-    .update({ is_manual_priority: value })
+    .update({ is_manual_priority: value, ...(sortOrder !== undefined ? { sort_order: sortOrder } : {}) })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
     .select("*")
@@ -445,6 +459,8 @@ export async function completeTask(
     .update({
       status: "completed",
       completed_at: completedAt || new Date().toISOString(),
+      // When it was recorded (and paid): a quest finished yesterday but logged today counts among today's victories.
+      logged_at: new Date().toISOString(),
       is_manual_priority: false, // clears it off the top-3 list once done
     })
     .eq("id", taskId)

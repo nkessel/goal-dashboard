@@ -55,6 +55,8 @@ export type Task = {
   is_manual_priority: boolean;
   status: "open" | "completed";
   completed_at: string | null;
+  /** When the completion was recorded (may be later than completed_at). */
+  logged_at?: string | null;
   created_at: string;
   updated_at: string;
   reminder_sent_at: string | null;

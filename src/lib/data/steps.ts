@@ -8,7 +8,17 @@ export type QuestStep = {
   title: string;
   done: boolean;
   sort_order: number;
+  /** XP paid when the step is done (0 = none). */
+  xp?: number;
+  /** Percent of the quest this step is worth; null = an equal share. */
+  weight?: number | null;
+  /** How far along the step is, 0–100 (100 once done). */
+  progress?: number;
+  /** XP this step has paid so far. */
+  xp_paid?: number;
 };
+
+export type StepInput = { id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number };
 
 /** True when the error just means the quest_steps table hasn't been created yet. */
 function missingTable(error: { code?: string; message: string } | null) {
@@ -19,7 +29,7 @@ function missingTable(error: { code?: string; message: string } | null) {
 export async function listStepsForTask(taskId: string, ownerId: string): Promise<QuestStep[] | null> {
   const { data, error } = await supabaseAdmin()
     .from("quest_steps")
-    .select("id, task_id, title, done, sort_order")
+    .select("*")
     .eq("owner_id", ownerId)
     .eq("task_id", taskId)
     .order("sort_order", { ascending: true })
@@ -58,7 +68,7 @@ export async function attachStepCounts<T extends Task>(tasks: T[], ownerId: stri
 export async function replaceSteps(
   taskId: string,
   ownerId: string,
-  steps: { id?: string; title: string; done: boolean }[]
+  steps: StepInput[]
 ): Promise<QuestStep[]> {
   const db = supabaseAdmin();
   const existing = await listStepsForTask(taskId, ownerId);
@@ -75,18 +85,30 @@ export async function replaceSteps(
     const title = s.title.trim();
     if (!title) continue;
     const prev = s.id ? before.get(s.id) : undefined;
+    const extra = {
+      ...(s.xp !== undefined ? { xp: Math.max(0, Math.min(1000, Math.round(s.xp))) } : {}),
+      ...(s.weight !== undefined ? { weight: s.weight === null ? null : Math.max(1, Math.min(100, Math.round(s.weight))) } : {}),
+      ...(s.progress !== undefined || s.done ? { progress: s.done ? 100 : Math.max(0, Math.min(99, Math.round(s.progress ?? 0))) } : {}),
+    };
     if (prev) {
-      if (prev.title === title && prev.done === s.done && prev.sort_order === i) continue;
+      const same =
+        prev.title === title &&
+        prev.done === s.done &&
+        prev.sort_order === i &&
+        (extra.xp === undefined || extra.xp === (prev.xp ?? 0)) &&
+        (extra.weight === undefined || extra.weight === (prev.weight ?? null)) &&
+        (extra.progress === undefined || extra.progress === (prev.progress ?? 0));
+      if (same) continue;
       const { error } = await db
         .from("quest_steps")
-        .update({ title, done: s.done, sort_order: i, ...(prev.done !== s.done ? { done_at: s.done ? now : null } : {}) })
+        .update({ title, done: s.done, sort_order: i, ...extra, ...(prev.done !== s.done ? { done_at: s.done ? now : null } : {}) })
         .eq("id", prev.id)
         .eq("owner_id", ownerId);
       if (error) throw new Error(`Failed to save a step: ${error.message}`);
     } else {
       const { error } = await db
         .from("quest_steps")
-        .insert({ owner_id: ownerId, task_id: taskId, title, done: s.done, done_at: s.done ? now : null, sort_order: i });
+        .insert({ owner_id: ownerId, task_id: taskId, title, done: s.done, done_at: s.done ? now : null, sort_order: i, ...extra });
       if (error) throw new Error(`Failed to add a step: ${error.message}`);
     }
   }
@@ -116,4 +138,9 @@ export async function attachNextSteps<T extends Task>(tasks: T[], ownerId: strin
     const c = info.get(t.id);
     return c ? { ...t, steps_total: c.total, steps_done: c.done, next_step: c.next } : t;
   });
+}
+
+/** Record what a step has paid. */
+export async function setStepPaid(stepId: string, ownerId: string, xpPaid: number): Promise<void> {
+  await supabaseAdmin().from("quest_steps").update({ xp_paid: xpPaid }).eq("id", stepId).eq("owner_id", ownerId);
 }

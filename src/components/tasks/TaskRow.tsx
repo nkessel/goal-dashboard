@@ -105,6 +105,7 @@ export function TaskRow({
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [focusing, setFocusing] = useState(false);
+  const [doneEarlier, setDoneEarlier] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -146,12 +147,47 @@ export function TaskRow({
   const imageUrl = task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null;
   const emoji = task.icon_source === "monster" ? MONSTER_ICONS.find((m) => m.key === task.icon_key)?.emoji : null;
 
+  /** Completed on another day (or earlier today): pays now, shows in today's victories marked with its day. */
+  function completeEarlier(when: Date) {
+    setDoneEarlier(false);
+    setError(null);
+    startTransition(async () => {
+      try {
+        if (listMoves) {
+          await slideOut(liRef.current);
+          listMoves.move(null);
+        } else setDone(true);
+        const fd = new FormData();
+        fd.set("taskId", task.id);
+        fd.set("completedAt", when.toISOString());
+        const res = await completeTaskAction(fd);
+        celebrateQuest({
+          taskId: task.id,
+          title: task.title,
+          description: task.description,
+          tag: categoryLabel,
+          xp: task.xp_value,
+          iconSrc: imageUrl,
+          totalXp: res?.totalXp ?? null,
+          coinsEarned: res?.coinsEarned ?? 0,
+          isReward: Boolean(task.reward_id),
+        });
+      } catch (e) {
+        resetSlide(liRef.current);
+        setDone(false);
+        if (listMoves) listMoves.revert(e instanceof Error ? e.message : "Couldn't save that.");
+        else setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
+
   function pick(action: QuestAction) {
     setMenu(null);
     setError(null);
     if (action === "edit") return setEditing(true);
     if (action === "calendar") return setScheduling(true);
     if (action === "focus") return setFocusing(true);
+    if (action === "earlier") return setDoneEarlier(true);
     if (action === "snooze") {
       // Off today now; back at the top of the day tomorrow. Undo puts it back.
       startTransition(async () => {
@@ -401,7 +437,7 @@ export function TaskRow({
             {task.title}
           </p>
           {task.description && (
-            <p className="break-words text-[13.5px] leading-snug sm:text-[14px]" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
+            <p className="line-clamp-3 break-words text-[13.5px] leading-snug sm:text-[14px]" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
               {task.description}
             </p>
           )}
@@ -460,8 +496,8 @@ export function TaskRow({
                   {task.steps_done ?? 0}/{task.steps_total}
                 </span>
               )}
-              {/* The bar only appears once some progress has been made. */}
-              {((task.progress ?? 0) > 0 || (task.steps_done ?? 0) > 0) && (
+              {/* The bar shows from the start once a quest has steps or progress. */}
+              {true && (
               <>
               <div
                 className="h-2 flex-1 overflow-hidden rounded-full"
@@ -532,6 +568,9 @@ export function TaskRow({
         </p>
       )}
 
+      {/* Dialogs render in portals, but their events still bubble through this
+          card in React — keep typing, selecting and Space from starting a card drag. */}
+      <div className="contents" onPointerDown={stopBubble} onMouseDown={stopBubble} onTouchStart={stopBubble} onKeyDown={stopKeyBubble} onClick={stopBubble}>
       {scheduling &&
         createPortal(
           <div
@@ -560,6 +599,8 @@ export function TaskRow({
         />
       )}
       {focusing && <FocusMode task={{ ...task, categoryLabel }} theme={theme} onClose={() => setFocusing(false)} />}
+      {doneEarlier && <DoneEarlierDialog title={task.title} isAdventure={isAdventure} onPick={completeEarlier} onClose={() => setDoneEarlier(false)} />}
+      </div>
     </div>
       </SwipeReveal>
     </li>
@@ -567,6 +608,12 @@ export function TaskRow({
 }
 
 /** Slide a card out to the left and fade it, then close the gap it leaves. */
+const stopBubble = (e: React.SyntheticEvent) => e.stopPropagation();
+/** Escape still reaches the dialogs' window listeners. */
+const stopKeyBubble = (e: React.KeyboardEvent) => {
+  if (e.key !== "Escape") e.stopPropagation();
+};
+
 function slideOut(el: HTMLElement | null): Promise<void> {
   if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
   const h = el.getBoundingClientRect().height;
@@ -664,5 +711,75 @@ function LockedRewardCard({ reward }: { reward: Task }) {
         unlocks next
       </span>
     </div>
+  );
+}
+
+/** "Already completed": which day (and, if wanted, what time) it was done. */
+function DoneEarlierDialog({ title, isAdventure, onPick, onClose }: { title: string; isAdventure: boolean; onPick: (when: Date) => void; onClose: () => void }) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const [now] = useState(() => new Date());
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const [day, setDay] = useState(keyOf(yesterday));
+  const [time, setTime] = useState("");
+  const quick = [0, 1, 2].map((n) => {
+    const d = new Date(now);
+    d.setDate(now.getDate() - n);
+    return { key: keyOf(d), label: n === 0 ? "Earlier today" : n === 1 ? "Yesterday" : d.toLocaleDateString(undefined, { weekday: "long" }) };
+  });
+  function confirm() {
+    const [y, m, d] = day.split("-").map(Number);
+    const [hh, mm] = time ? time.split(":").map(Number) : [12, 0];
+    let when = new Date(y, m - 1, d, hh, mm);
+    if (when > now) when = now;
+    onPick(when);
+  }
+  return createPortal(
+    <div className="overlay-fade-in fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="When was it completed?"
+        onClick={(e) => e.stopPropagation()}
+        className="card-pop-in parchment parchment-framed flex w-full max-w-sm flex-col gap-3 rounded-2xl p-5"
+        style={{ color: "var(--t-ink)", background: isAdventure ? undefined : "var(--t-card)" }}
+      >
+        <div className="relative z-[1] flex flex-col gap-0.5">
+          <p className={`m-0 text-[19px] ${isAdventure ? "font-display" : "font-bold"}`}>When did you finish it?</p>
+          <p className="m-0 line-clamp-2 text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>
+            {title}
+          </p>
+        </div>
+        <div className="relative z-[1] flex flex-wrap gap-1.5">
+          {quick.map((q) => (
+            <button
+              key={q.key}
+              type="button"
+              aria-pressed={day === q.key}
+              onClick={() => setDay(q.key)}
+              className="h-9 rounded-full px-3.5 text-[14px] font-semibold"
+              style={day === q.key ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10" } : { border: "1.5px solid #b39a6a" }}
+            >
+              {q.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative z-[1] flex flex-wrap items-center gap-2 text-[14px]">
+          <input type="date" value={day} max={keyOf(now)} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Day" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Time (optional)" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
+          <span style={{ color: "var(--t-ink-soft)" }}>time optional</span>
+        </div>
+        <div className="relative z-[1] flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="h-10 rounded-full px-4 text-[15px] font-semibold hover:bg-black/5" style={{ border: "1.5px solid #b39a6a" }}>
+            Cancel
+          </button>
+          <button type="button" onClick={confirm} className="hover-glow h-10 rounded-full px-5 text-[15px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+            Mark completed
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

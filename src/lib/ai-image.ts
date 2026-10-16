@@ -44,6 +44,19 @@ export function buildSketchbookIconPrompt(subject: string) {
   );
 }
 
+/** Quest portraits: the same painted storybook style, with a softly painted
+ * scene behind the subject (kept, not keyed out). */
+export function buildQuestScenePrompt(subject: string) {
+  return (
+    `whimsical painted storybook illustration of ${subject}, soft chalk pastel and gouache painting ` +
+    "in the style of late-1990s illustrated children's fantasy novel chapter art, warm glowing golden candlelight, " +
+    "rich saturated jewel tones, deep ambers and teals, soft blended edges, visible pastel grain and brush texture, " +
+    "magical cozy enchanted atmosphere, the subject centered and clearly readable, " +
+    "set in a softly painted matching scene that fills the whole frame, gentle vignette, " +
+    "absolutely no text, no words, no writing, no labels, no captions, no signature, no letters or numbers"
+  );
+}
+
 /** Rewards: the same painted storybook style, but the treasure keeps a
  * beaming background — golden rays and a glowing halo behind it, like a
  * found jewel or an opened chest. Not keyed out. */

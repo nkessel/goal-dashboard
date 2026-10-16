@@ -87,7 +87,7 @@ export function XpSummary({
 
           <div className="flex flex-col items-center gap-3">
             {/* Character name above the portrait — click to rename. */}
-            <div className="-mb-1.5 max-w-[190px] sm:max-w-[250px]">
+            <div className="-mb-1.5 flex w-[220px] justify-center sm:w-[270px]">
               <InlineNameEditor initialName={profile.name ?? ""} isAdventure variant="hero" />
             </div>
             <div className="relative h-[100px] w-[100px] sm:h-[124px] sm:w-[124px]">

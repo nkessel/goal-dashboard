@@ -108,7 +108,7 @@ export default async function Home() {
   const onToday = openTasks.filter((t) => !t.needs_review);
   const topPriorities = onToday.filter((t) => t.is_manual_priority);
   const otherTasks = onToday.filter((t) => !t.is_manual_priority && t.in_additional !== false);
-  const theme = profile?.theme ?? "calm";
+  const theme = profile?.theme ?? "adventure";
   const stats = profile && (
     <section>
       <XpSummary

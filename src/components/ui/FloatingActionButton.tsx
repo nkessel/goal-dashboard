@@ -76,7 +76,7 @@ export function FloatingActionButton({
         aria-label={label}
         title={label}
         // A gilded ring around a gold coin, like the avatar's frame.
-        className="fab-ring hover-glow fab-rise pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full p-[3px] transition-transform hover:scale-105 active:scale-95"
+        className="fab-ring hover-glow fab-rise pointer-events-auto flex h-14 w-14 touch-manipulation select-none items-center justify-center rounded-full p-[3px] transition-transform duration-100 hover:scale-105 active:scale-95"
         style={
           isAdventure
             ? {

@@ -95,8 +95,8 @@ export function RecentWins({ day }: { day: string | null }) {
         xp: feedback.reduce((n, w) => n + (w.xp ?? 0), 0),
         label: (
           <>
-            Feedback submitted
-            {feedback.length > 1 && <span style={{ color: "var(--t-ink-soft)" }}> (×{feedback.length})</span>}
+            {feedback.length > 1 && <span style={{ color: "var(--t-ink-soft)" }}>{feedback.length} × </span>}
+            Feedback
           </>
         ),
       });
