@@ -159,7 +159,7 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
 
   const showWeather = isOn("weather");
   const activeEvents = EVENTS.filter((e) => isOn(e.key));
-  const W = 640;
+  const W = 440;
   const L = 28;
   const R = 12;
   const weatherH = showWeather ? 34 : 0;
@@ -281,14 +281,14 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
           {[1, 4, 7, 10].map((v) => (
             <g key={v}>
               <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" />
-              <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="11" fill={INK_SOFT}>
+              <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="12" fill={INK_SOFT}>
                 {v}
               </text>
             </g>
           ))}
           {days.map((d, i) =>
             (n - 1 - i) % tickEvery === 0 ? (
-              <text key={i} x={xDay(i)} y={T + plotH + 16} textAnchor="middle" fontSize="11" fill={INK_SOFT}>
+              <text key={i} x={xDay(i)} y={T + plotH + 16} textAnchor="middle" fontSize="12" fill={INK_SOFT}>
                 {i === n - 1 ? "today" : d.toLocaleDateString(undefined, n <= 7 ? { weekday: "short" } : { month: "short", day: "numeric" })}
               </text>
             ) : null

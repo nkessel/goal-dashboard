@@ -186,7 +186,7 @@ export function Forums({
           const mine = voted.has(t.id);
           return (
             <li key={t.id} className="flex items-stretch gap-2 rounded-xl px-2.5 py-2 hover:bg-black/[.035]" style={{ background: t.pinned ? "rgba(217,180,95,.16)" : undefined }}>
-              {tab === "ideas" && (
+              {tab === "ideas" && !t.pinned && (
                 <button
                   type="button"
                   onClick={() => vote(t)}
