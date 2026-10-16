@@ -278,7 +278,7 @@ export function TodayTaskBoard({
       <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
         <div className="relative">
         {isAdventure ? (
-          <div className="flex items-center gap-2 px-10 sm:px-11">
+          <div className="flex items-center gap-2 px-1">
             <span className="hidden flex-1 sm:flex">
               <GoldRule dir="left" />
             </span>
@@ -304,22 +304,6 @@ export function TodayTaskBoard({
             </h2>
           </div>
         )}
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            aria-label={`Add a quest to Today's ${isAdventure ? "Quests" : "Focus"}`}
-            title={`Add to Today's ${isAdventure ? "Quests" : "Focus"}`}
-            className="hover-glow absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95"
-            style={
-              isAdventure
-                ? { background: "radial-gradient(circle at 32% 28%, #f2c96a, var(--t-gold) 55%, var(--t-gold-deep))", border: "1.5px solid #5a4520", boxShadow: "0 2px 6px rgba(0,0,0,.35)" }
-                : { background: "var(--t-accent)", border: "1.5px solid var(--t-bg)" }
-            }
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M12 5v14M5 12h14" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="2.8" strokeLinecap="round" />
-            </svg>
-          </button>
         </div>
         {adding && <CreateSheet kinds={["quest"]} initial="quest" pinToToday theme={theme} onClose={() => setAdding(false)} />}
 
@@ -341,10 +325,21 @@ export function TodayTaskBoard({
               </SortableContext>
               {priority.length === 0 && (
                 <p className="-mt-8 px-2 pb-1 text-center text-[14.5px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.75 }}>
-                  Drag a quest up here, or tap + to make one.
+                  Drag a quest up here, or add one below.
                 </p>
               )}
             </Zone>
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="habit-add mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-[14.5px]"
+              style={{ borderColor: isAdventure ? "rgba(217,180,95,.4)" : "var(--t-card-border)", color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}
+            >
+              <span aria-hidden className="text-[18px] leading-none" style={{ color: "var(--t-gold)" }}>
+                +
+              </span>
+              Add a quest to today
+            </button>
           </div>
         </div>
         {!todayOpen && priority.length > 0 && (

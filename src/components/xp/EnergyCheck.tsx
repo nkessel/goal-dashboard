@@ -1,24 +1,63 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { addToTopOfTodayAction, createQuestAction, listTakeoffQuestsAction, logEnergyAction } from "@/app/actions";
 import { BoltIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
+import { eveningDayKey } from "@/components/evening/evening-clock";
 
 type Takeoff = Awaited<ReturnType<typeof listTakeoffQuestsAction>>[number];
 
 const LOW = 5;
+/** From 7pm the Power-ups button no longer offers itself. */
+const QUIET_FROM_HOUR = 19;
+
+const hiddenKey = () => `powerups-hidden:${eveningDayKey()}`;
+const subscribeMinute = (cb: () => void) => {
+  const t = setInterval(cb, 30_000);
+  window.addEventListener("storage", cb);
+  return () => {
+    clearInterval(t);
+    window.removeEventListener("storage", cb);
+  };
+};
+/** Whether the Power-ups button may show itself right now (client only). */
+function readMayOffer(): boolean {
+  const h = new Date().getHours();
+  // Quiet in the evening (7pm until the day turns over at 5:30am).
+  if (h >= QUIET_FROM_HOUR || h < 5 || (h === 5 && new Date().getMinutes() < 30)) return false;
+  try {
+    return window.localStorage.getItem(hiddenKey()) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+function clock(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
 
 /**
  * Energy check-in under the boss line: drag 1–10 in half steps and save it
  * to the energy log. At 5 or below, a Power-ups button offers light quests
  * to drop straight onto the top of Today's Quests.
  */
-export function EnergyCheck({ today }: { /** Today's latest check-in, if any. */ today: number | null }) {
+export function EnergyCheck({
+  today,
+  todayAt = null,
+}: {
+  /** Today's latest check-in, if any. */
+  today: number | null;
+  /** When it was saved (ISO). */
+  todayAt?: string | null;
+}) {
   const [value, setValue] = useState(today ?? 6);
   const [saved, setSaved] = useState<number | null>(today);
+  const [savedAt, setSavedAt] = useState<string | null>(todayAt);
+  const mayOffer = useSyncExternalStore(subscribeMinute, readMayOffer, () => false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [editing, setEditing] = useState(saved === null);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +69,7 @@ export function EnergyCheck({ today }: { /** Today's latest check-in, if any. */
       try {
         const entry = await logEnergyAction(value);
         setSaved(entry.level);
+        setSavedAt(entry.created_at ?? new Date().toISOString());
         setEditing(false);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
@@ -38,8 +78,17 @@ export function EnergyCheck({ today }: { /** Today's latest check-in, if any. */
   }
 
   const shown = editing ? value : (saved ?? value);
-  // Only after a saved check-in at 5 or below.
-  const low = !editing && saved !== null && saved <= LOW;
+  // Only after a saved check-in at 5 or below — and not once hidden for today, or in the evening.
+  const low = !editing && saved !== null && saved <= LOW && mayOffer;
+
+  function hideForToday() {
+    try {
+      window.localStorage.setItem(hiddenKey(), "1");
+    } catch {
+      /* storage unavailable */
+    }
+    window.dispatchEvent(new StorageEvent("storage"));
+  }
   const hue = Math.round(((shown - 1) / 9) * 110); // red → green
 
   return (
@@ -78,7 +127,8 @@ export function EnergyCheck({ today }: { /** Today's latest check-in, if any. */
           <div className="flex items-center gap-2 text-[13.5px]" style={{ color: "var(--t-cream)" }}>
             <span>
               Energy <b className="font-display text-[17px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>{saved! % 1 ? saved!.toFixed(1) : saved}</b>
-              <span style={{ opacity: 0.7 }}>/10 saved</span>
+              <span style={{ opacity: 0.7 }}>/10</span>
+              {mounted && savedAt && <span style={{ opacity: 0.7 }}> · checked in at {clock(savedAt)}</span>}
             </span>
             <button type="button" onClick={() => setEditing(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
               Check in again
@@ -92,15 +142,24 @@ export function EnergyCheck({ today }: { /** Today's latest check-in, if any. */
         )}
       </div>
       {low && (
-        <button
-          type="button"
-          onClick={() => setPicking(true)}
-          className="hover-glow power-glow flex h-9 shrink-0 items-center gap-1 rounded-full px-3.5 text-[13.5px] font-bold"
-          style={{ background: "radial-gradient(circle at 32% 28%, #fff1b8, #f2c96a 45%, #d9a83a)", border: "1.5px solid #fff3c4", color: "#2a1c10", boxShadow: "0 0 14px rgba(255,214,102,.7), 0 2px 6px rgba(0,0,0,.4)" }}
-          title="Light quests to get going"
+        <span
+          className="flex h-9 shrink-0 items-stretch overflow-hidden rounded-full"
+          style={{ background: "radial-gradient(circle at 32% 28%, #fff1b8, #f2c96a 45%, #d9a83a)", border: "1.5px solid #fff3c4", boxShadow: "0 0 12px rgba(255,214,102,.55), 0 2px 6px rgba(0,0,0,.4)" }}
         >
-          <BoltIcon size={16} /> Power-ups
-        </button>
+          <button type="button" onClick={() => setPicking(true)} className="flex items-center gap-1 pl-3 pr-2 text-[13.5px] font-bold" style={{ color: "#2a1c10" }} title="Light quests to get going">
+            <BoltIcon size={16} /> Power-ups
+          </button>
+          <button
+            type="button"
+            onClick={hideForToday}
+            aria-label="Hide Power-ups for today"
+            title="Hide for today"
+            className="flex w-7 items-center justify-center text-[16px] leading-none"
+            style={{ color: "rgba(42,28,16,.7)", borderLeft: "1px solid rgba(90,60,20,.3)" }}
+          >
+            ×
+          </button>
+        </span>
       )}
       {picking && <TakeoffSheet onClose={() => setPicking(false)} />}
     </div>

@@ -28,6 +28,7 @@ import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
 import { useIsEmbedded, usePortalTarget } from "@/components/ui/EmbedHost";
 import { BoltIcon, CoinIcon } from "@/components/ui/Icons";
+import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
 
 export type QuestDraft = {
   title?: string;
@@ -61,8 +62,8 @@ type StepDraft = { key: string; id?: string; title: string; done: boolean };
 const XP_MAX = 350;
 const XP_STEP = 10;
 const POWER_UP_MINUTES = 15;
-/** Coins follow XP at 1 per 10 unless a quest sets its own. */
-const autoCoins = (xp: number) => Math.ceil(Math.max(0, xp) / 10);
+/** Coins follow XP (1 per XP_PER_COIN) unless a quest sets its own. */
+const autoCoins = coinsForXp;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 function localDate(iso: string | null | undefined) {
@@ -976,7 +977,7 @@ export function QuestEditorDialog({
             <div className="flex items-center gap-2">
               <span className={labelCls}>{isAdventure ? "XP reward" : "Points"}</span>
               <span className="ml-auto text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                {coinValue === null ? "coins follow XP (1 per 10)" : (
+                {coinValue === null ? `coins follow XP (1 per ${XP_PER_COIN})` : (
                   <button type="button" onClick={() => setCoinValue(null)} className="underline">
                     custom coins · reset to auto
                   </button>

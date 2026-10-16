@@ -109,6 +109,7 @@ export default async function Home() {
         boss={boss ? { id: boss.id, level: boss.level, title: boss.title, target: boss.target, progress: boss.progress } : null}
         bossesEnabled={bossesEnabled}
         energyToday={energyToday}
+        energyAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null}
       />
     </section>
   );

@@ -111,7 +111,7 @@ export type Profile = {
   theme: "calm" | "adventure";
   level: number;
   total_xp: number;
-  /** Spendable on rewards; earned at 1 per 10 XP. Missing before migration 0013. */
+  /** Spendable on rewards; earned with XP (see lib/coins). Missing before migration 0013. */
   coins?: number;
   weekly_xp_budget: number;
   streak_count: number;

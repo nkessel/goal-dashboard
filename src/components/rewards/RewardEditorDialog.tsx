@@ -9,6 +9,7 @@ import { IconPicker } from "@/components/tasks/IconPicker";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { useEscape } from "@/lib/use-escape";
 import { usePortalTarget } from "@/components/ui/EmbedHost";
+import { coinsForXp } from "@/lib/coins";
 
 const PRICE_PRESETS = [0, 5, 10, 25, 50, 100];
 
@@ -329,7 +330,7 @@ export function RewardEditorDialog({
               Completing it gives{bonusXp > 0 ? ` +${bonusXp} XP` : ""}
               {bonusXp > 0 && bonusCoins > 0 ? " and" : ""}
               {bonusCoins > 0 ? ` +${bonusCoins} coin${bonusCoins === 1 ? "" : "s"}` : ""}
-              {bonusXp > 0 ? ` (plus ${Math.ceil(bonusXp / 10)} from the XP)` : ""}.
+              {bonusXp > 0 ? ` (plus ${coinsForXp(bonusXp)} from the XP)` : ""}.
             </p>
           )}
         </div>

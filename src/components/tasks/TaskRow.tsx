@@ -12,6 +12,7 @@ import { celebrateQuest, updateQuestCelebration } from "@/components/celebration
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { QuestMonogram } from "./QuestMonogram";
 import { FocusMode } from "@/components/one-thing/OneThing";
+import { coinsForXp } from "@/lib/coins";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
  * Kept as a plain helper (not inlined in the component) so the impure
@@ -186,7 +187,7 @@ export function TaskRow({
             xp: task.xp_value,
             iconSrc: imageUrl,
             totalXp: null,
-            coinsEarned: task.coin_value ?? Math.floor(task.xp_value / 10),
+            coinsEarned: task.coin_value ?? coinsForXp(task.xp_value),
             isReward: Boolean(task.reward_id),
           });
           try {

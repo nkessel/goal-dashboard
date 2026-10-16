@@ -34,6 +34,7 @@ import {
   createCalendarEvent,
   updateCalendarEvent,
 } from "@/lib/google-calendar";
+import { coinsForXp } from "@/lib/coins";
 
 async function requireProfileId(): Promise<string> {
   const session = await auth();
@@ -47,15 +48,11 @@ async function requireIdentity(): Promise<{ id: string; name: string }> {
   return { id: session.user.id, name: session.user.name || session.user.email || "Someone" };
 }
 
-async function requireSessionWithGoogle() {
+/** Signed in; Google Calendar access too when it's been connected (else null). */
+async function requireSessionMaybeGoogle() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not signed in");
-  if (!session.googleAccessToken) {
-    throw new Error(
-      "Google Calendar isn't connected yet — connect it from the Calendar page to use your calendar here."
-    );
-  }
-  return { profileId: session.user.id, accessToken: session.googleAccessToken };
+  return { profileId: session.user.id, accessToken: session.googleAccessToken ?? null };
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +326,7 @@ export async function completeTaskAction(formData: FormData) {
 /** Coins to add on completion so the quest pays exactly its custom coin value. */
 function customCoinAdjustment(task: { coin_value?: number | null; xp_value: number }) {
   if (task.coin_value == null) return 0;
-  return Math.max(0, Math.round(task.coin_value)) - Math.ceil(Math.max(0, task.xp_value) / 10);
+  return Math.max(0, Math.round(task.coin_value)) - coinsForXp(task.xp_value);
 }
 
 /**
@@ -398,7 +395,7 @@ export async function updateTaskAction(
     confirmImport?: boolean;
     dueAt?: string | null;
     chunkMinutes?: number | null;
-    /** Coins paid on completion; null = automatic (1 per 10 XP). */
+    /** Coins paid on completion; null = automatic (see lib/coins). */
     coinValue?: number | null;
   }
 ) {
@@ -555,11 +552,21 @@ export async function reopenTaskAction(taskId: string) {
 export async function suggestSlotsAction(
   durationMinutes = 30
 ): Promise<{ start: string; end: string }[]> {
-  const { accessToken } = await requireSessionWithGoogle();
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
 
   const from = new Date();
   const horizonEnd = new Date(from.getTime() + 14 * 86_400_000);
-  const busy = await listBusyIntervals(accessToken, from, horizonEnd);
+  // Busy = Google appointments (when connected) plus quests already on the calendar.
+  const [google, scheduled] = await Promise.all([
+    accessToken ? listBusyIntervals(accessToken, from, horizonEnd).catch(() => []) : Promise.resolve([]),
+    tasksData.listCalendarTasksForOwner(profileId, from, horizonEnd),
+  ]);
+  const busy = [
+    ...google,
+    ...scheduled
+      .filter((t) => t.status === "open" && t.scheduled_start && t.scheduled_end)
+      .map((t) => ({ start: new Date(t.scheduled_start!), end: new Date(t.scheduled_end!) })),
+  ];
 
   const slots = findOpenSlots(busy, { from, durationMinutes, horizonDays: 14, maxSlots: 3 });
   return slots.map((s: Interval) => ({
@@ -574,13 +581,18 @@ export async function suggestSlotsAction(
  * event, if it was already scheduled) and records the schedule on the task.
  */
 async function attachCalendarEvent(
-  accessToken: string,
+  /** Null when Google Calendar isn't connected: the time is kept in the app only. */
+  accessToken: string | null,
   profileId: string,
   task: { id: string; title: string; description: string | null; google_calendar_event_id?: string | null },
   start: Date,
   end: Date
 ) {
   let eventId = task.google_calendar_event_id ?? undefined;
+  if (!accessToken) {
+    await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId);
+    return;
+  }
   if (eventId) {
     await updateCalendarEvent(accessToken, eventId, { start, end });
   } else {
@@ -605,7 +617,7 @@ export async function scheduleTaskAction(
   startISO: string,
   endISO: string
 ) {
-  const { profileId, accessToken } = await requireSessionWithGoogle();
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
 
   const task = await tasksData.getTask(taskId, profileId);
   if (!task) throw new Error("Task not found");
@@ -632,7 +644,7 @@ export async function listSchedulableTasksAction() {
  * into that range, is scheduleTaskAction above).
  */
 export async function createScheduledTaskAction(formData: FormData) {
-  const { profileId, accessToken } = await requireSessionWithGoogle();
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
   const title = String(formData.get("title") || "").trim();
   if (!title) throw new Error("Task title is required");
   const startISO = String(formData.get("startISO") || "");
@@ -1271,7 +1283,7 @@ export async function completeRewardAction(rewardId: string) {
     }
     const before = await rewardsData.listRewards(ownerId).then((rs) => rs.find((r) => r.id === rewardId));
     await finishTask(ownerId, quest.id);
-    return { bonusXp: quest.xp_value, bonusCoins: before?.bonus_coins ?? 0, bonusCoinsFromXp: Math.ceil(quest.xp_value / 10) };
+    return { bonusXp: quest.xp_value, bonusCoins: before?.bonus_coins ?? 0, bonusCoinsFromXp: coinsForXp(quest.xp_value) };
   }
   const reward = await rewardsData.completeReward(rewardId, ownerId);
   const bonusXp = reward.bonus_xp ?? 0;
@@ -1280,7 +1292,7 @@ export async function completeRewardAction(rewardId: string) {
   if (bonusCoins > 0) await rewardsData.addCoins(ownerId, bonusCoins);
   revalidatePath("/rewards");
   revalidatePath("/", "layout");
-  return { bonusXp, bonusCoins, bonusCoinsFromXp: Math.ceil(bonusXp / 10) };
+  return { bonusXp, bonusCoins, bonusCoinsFromXp: coinsForXp(bonusXp) };
 }
 
 /** Undo a completion (back to accepted) and take back its bonus. */

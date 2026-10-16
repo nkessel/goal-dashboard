@@ -174,6 +174,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
   return (
     <nav
       data-hide-when-typing
+      data-app-nav
       className="fixed inset-x-0 bottom-0 z-30 flex w-full items-stretch justify-between"
       style={{
         // Full-width bar anchored to the bottom (HANDOFF.md §4) — not a
@@ -205,6 +206,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
         {highlight && (
           <div
             aria-hidden
+            data-nav-highlight
             className="pointer-events-none absolute transition-[left,width] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
             style={{
               left: highlight.left,

@@ -5,6 +5,7 @@ import type { Profile } from "./types";
 
 import { LEVEL_THRESHOLDS, computeLevelForXp, xpToNextLevel } from "@/lib/levels";
 import * as bossesData from "./bosses";
+import { coinsForXp } from "@/lib/coins";
 export { LEVEL_THRESHOLDS, computeLevelForXp, xpToNextLevel };
 
 
@@ -108,9 +109,9 @@ export async function awardXp(
     unlockedPerks.push(...getLevelPerks(newLevel));
   }
 
-  // Coins follow XP at 1 per 10, rounded up per award (and the same amount
-  // back out when an award is reversed).
-  const coinDelta = Math.sign(amount) * Math.ceil(Math.abs(amount) / 10);
+  // Coins follow XP at 1 per XP_PER_COIN, rounded down per award (and the
+  // same amount back out when an award is reversed).
+  const coinDelta = Math.sign(amount) * coinsForXp(Math.abs(amount));
   const hasCoins = typeof profile.coins === "number";
   const { error: updateErr } = await db
     .from("profiles")

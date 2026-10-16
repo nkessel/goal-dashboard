@@ -1413,3 +1413,28 @@ html[data-kb] [data-hide-when-typing] {
   visibility: hidden;
   pointer-events: none;
 }
+
+/* ---------- Evening: the bottom bar goes moonlit with the rest of the screen ---------- */
+html[data-evening] nav[data-app-nav] {
+  background:
+    radial-gradient(1px 1px at 9% 34%, rgba(253, 246, 220, 0.75), transparent 70%),
+    radial-gradient(1px 1px at 27% 68%, rgba(253, 246, 220, 0.5), transparent 70%),
+    radial-gradient(1.5px 1.5px at 46% 22%, rgba(255, 244, 207, 0.7), transparent 70%),
+    radial-gradient(1px 1px at 63% 74%, rgba(253, 246, 220, 0.55), transparent 70%),
+    radial-gradient(1px 1px at 81% 30%, rgba(253, 246, 220, 0.65), transparent 70%),
+    radial-gradient(1.5px 1.5px at 94% 62%, rgba(255, 244, 207, 0.6), transparent 70%),
+    linear-gradient(180deg, #1b2152 0%, #121640 55%, #0b0e2a 100%) !important;
+  border-top: 1.5px solid rgba(217, 180, 95, 0.55) !important;
+  box-shadow: 0 -1px 0 rgba(150, 165, 255, 0.18), 0 -10px 26px rgba(4, 6, 24, 0.6) !important;
+  transition: background 400ms ease, border-color 400ms ease;
+}
+html[data-evening] nav[data-app-nav] [data-nav-highlight] {
+  background: linear-gradient(180deg, #343d86 0%, #222a66 50%, #161b46 100%) !important;
+  border-color: var(--t-gold) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(200, 210, 255, 0.16),
+    inset 0 1px 0 rgba(220, 228, 255, 0.28),
+    inset 0 -8px 14px rgba(0, 0, 20, 0.45),
+    0 0 16px rgba(160, 175, 255, 0.28),
+    0 3px 8px rgba(0, 0, 0, 0.5) !important;
+}

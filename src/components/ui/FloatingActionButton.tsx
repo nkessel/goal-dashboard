@@ -75,31 +75,39 @@ export function FloatingActionButton({
         onClick={onClick}
         aria-label={label}
         title={label}
-        className="hover-glow fab-rise pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95"
-        style={{
-          background: isAdventure
-            ? "radial-gradient(circle at 32% 28%, #f2c96a, var(--t-gold) 55%, var(--t-gold-deep))"
-            : "var(--t-accent)",
-          border: `3px solid ${isAdventure ? "var(--t-bg-1)" : "var(--t-bg)"}`,
-          boxShadow: isAdventure
-            ? "inset 0 1px 0 rgba(255,255,255,.5), inset 0 -3px 5px rgba(0,0,0,.25), 0 6px 14px rgba(0,0,0,.45)"
-            : "0 6px 16px rgba(0,0,0,.28)",
-        }}
+        // A gilded ring around a gold coin, like the avatar's frame.
+        className="fab-ring hover-glow fab-rise pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full p-[3px] transition-transform hover:scale-105 active:scale-95"
+        style={
+          isAdventure
+            ? {
+                background: "linear-gradient(155deg, #fff1c2 0%, #e2bf68 30%, #8a6c2c 62%, #c9a24e 82%, #f4dc94 100%)",
+                boxShadow: "0 0 0 1.5px #2e2410, 0 0 18px rgba(217,180,95,.28), 0 6px 14px rgba(0,0,0,.5)",
+              }
+            : { background: "var(--t-card)", boxShadow: "0 0 0 1px var(--t-card-border), 0 6px 16px rgba(0,0,0,.22)" }
+        }
       >
-        <svg
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          style={{ transform: expanded ? "rotate(45deg)" : undefined, transition: "transform 150ms" }}
+        <span
+          className="flex h-full w-full items-center justify-center rounded-full"
+          style={
+            isAdventure
+              ? {
+                  background: "radial-gradient(circle at 34% 28%, #fbe7a6, #e0b75a 48%, #a9802c 100%)",
+                  boxShadow: "0 0 0 1px rgba(58,42,14,.6), inset 0 1.5px 0 rgba(255,250,225,.65), inset 0 -4px 7px rgba(90,60,12,.35)",
+                }
+              : { background: "var(--t-accent)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)" }
+          }
         >
-          <path
-            d="M12 5v14M5 12h14"
-            stroke={isAdventure ? "#2a1c10" : "#fff"}
-            strokeWidth="2.4"
-            strokeLinecap="round"
-          />
-        </svg>
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+            style={{ transform: expanded ? "rotate(45deg)" : undefined, transition: "transform 150ms", filter: isAdventure ? "drop-shadow(0 1px 0 rgba(255,245,210,.6))" : undefined }}
+          >
+            <path d="M12 5v14M5 12h14" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="2.6" strokeLinecap="round" />
+          </svg>
+        </span>
       </button>
     </div>
   );

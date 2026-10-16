@@ -22,20 +22,21 @@ export function BossLine({ boss, level, heldByBoss }: { boss: BossView | null; l
         type="button"
         onClick={() => setOpen(true)}
         title={boss && heldByBoss ? `Defeat it to reach level ${level + 1}` : undefined}
-        className="hover-glow mx-auto mt-0.5 block max-w-[min(100%,360px)] truncate whitespace-nowrap rounded-lg px-2 py-1 text-center text-[13.5px] italic leading-snug"
+        // One line when it fits; otherwise two lines of even width, centered.
+        className="hover-glow mx-auto mt-0.5 block max-w-[min(100%,420px)] rounded-lg px-2 py-1 text-center text-[13.5px] italic leading-snug [text-wrap:balance]"
         style={{ color: "var(--t-cream)", opacity: boss ? 0.95 : 0.55 }}
       >
         {boss ? (
           <>
-            <span style={{ color: "var(--t-gold)" }}>Final Boss:</span> {boss.title}
+            <span style={{ color: "var(--t-gold)" }}>Level {boss.level} Boss:</span> {boss.title}
             {boss.target > 1 && (
-              <span className="ml-1 not-italic tabular-nums" style={{ color: "var(--t-gold)" }}>
+              <span className="ml-1 whitespace-nowrap not-italic tabular-nums" style={{ color: "var(--t-gold)" }}>
                 {boss.progress}/{boss.target}
               </span>
             )}
           </>
         ) : (
-          <>Set a final boss for level {level}</>
+          <>Set a boss for level {level}</>
         )}
       </button>
       {open && <BossDialog boss={boss} level={boss?.level ?? level} onClose={() => setOpen(false)} />}
