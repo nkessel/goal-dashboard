@@ -2,6 +2,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
+import { useRouter } from "next/navigation";
+import { scheduleTaskAction } from "@/app/actions";
+import { carryQuest, useCarried, QUEST_DRAG_TYPE, type Carried } from "@/lib/schedule-carry";
 import { WeatherLocation, useWeatherPlaceName } from "@/components/ui/WeatherLocation";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
@@ -93,6 +96,30 @@ export function WeekView({
   }
   const weather = useWeatherRange(dayKeys[0] ?? null, dayKeys[dayKeys.length - 1] ?? null);
   const placeName = useWeatherPlaceName();
+  const router = useRouter();
+  const carried = useCarried();
+  const [ghost, setGhost] = useState<{ dayIndex: number; min: number } | null>(null);
+  const [placeError, setPlaceError] = useState<string | null>(null);
+  const [placing, setPlacing] = useState(false);
+  /** Put a quest from the "To schedule" list at a time on the calendar. */
+  async function placeCarried(q: Carried, dayIndex: number, startMin: number) {
+    const day = days[dayIndex];
+    if (!day) return;
+    const start = minuteDate(day, startMin);
+    const end = new Date(start.getTime() + q.minutes * 60_000);
+    carryQuest(null);
+    setGhost(null);
+    setPlaceError(null);
+    setPlacing(true);
+    try {
+      await scheduleTaskAction(q.id, start.toISOString(), end.toISOString());
+      router.refresh();
+    } catch (e) {
+      setPlaceError(e instanceof Error ? e.message : "Couldn't put it on the calendar.");
+    } finally {
+      setPlacing(false);
+    }
+  }
   const single = days.length === 1;
   const nowMinute = useNowMinute();
   const now = nowMinute ? new Date(nowMinute * 60_000) : null;
@@ -119,6 +146,11 @@ export function WeekView({
   };
   function pickDown(e: React.PointerEvent<HTMLDivElement>, dayIndex: number) {
     const m = minuteAt(e);
+    if (carried) {
+      e.preventDefault();
+      void placeCarried(carried, dayIndex, m);
+      return;
+    }
     const mouse = e.pointerType === "mouse";
     pick.current = { dayIndex, startMin: m, x: e.clientX, y: e.clientY, mouse, moved: false, lo: m, hi: m + SNAP };
     if (mouse) {
@@ -235,6 +267,27 @@ export function WeekView({
       className={`rounded-2xl p-2.5 ${isAdventure ? "parchment" : ""}`}
       style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >
+      {(carried || placing || placeError) && (
+        <div
+          role="status"
+          className="sticky top-2 z-[30] mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-[14px] font-semibold"
+          style={{ background: "radial-gradient(circle at 30% 20%, #f6e3a8, #d9b45f 70%)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 4px 12px rgba(0,0,0,.25)" }}
+        >
+          <span className="min-w-0 flex-1">
+            {placing ? "Putting it on the calendar…" : placeError ? placeError : <>Tap a time to place <b>{carried!.title}</b></>}
+          </span>
+          {carried && (
+            <button type="button" onClick={() => (carryQuest(null), setGhost(null))} className="h-8 shrink-0 rounded-full px-3 text-[13px]" style={{ background: "#2a1c10", color: "#f6dc8e" }}>
+              Cancel
+            </button>
+          )}
+          {placeError && (
+            <button type="button" onClick={() => setPlaceError(null)} className="h-8 shrink-0 rounded-full px-3 text-[13px]" style={{ background: "#2a1c10", color: "#f6dc8e" }}>
+              OK
+            </button>
+          )}
+        </div>
+      )}
       <div className="mb-1.5 flex items-center gap-2 px-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
         {weather === undefined ? (
           <>
@@ -386,10 +439,39 @@ export function WeekView({
             className="relative select-none"
             style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}`, cursor: "pointer", touchAction: "pan-y" }}
             onPointerDown={(e) => pickDown(e, dayIndex)}
-            onPointerMove={(e) => pickMove(e, dayIndex)}
+            onPointerMove={(e) => {
+              if (carried && e.pointerType === "mouse") setGhost({ dayIndex, min: minuteAt(e) });
+              pickMove(e, dayIndex);
+            }}
+            onPointerLeave={() => setGhost(null)}
+            onDragOver={(e) => {
+              if (!e.dataTransfer.types.includes(QUEST_DRAG_TYPE)) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              const r = e.currentTarget.getBoundingClientRect();
+              const m = Math.max(0, Math.min(hourCount * 60 - SNAP, Math.floor((((e.clientY - r.top) / HOUR_PX) * 60) / SNAP) * SNAP));
+              setGhost({ dayIndex, min: m });
+            }}
+            onDragLeave={() => setGhost(null)}
+            onDrop={(e) => {
+              const raw = e.dataTransfer.getData(QUEST_DRAG_TYPE);
+              if (!raw) return;
+              e.preventDefault();
+              const r = e.currentTarget.getBoundingClientRect();
+              const m = Math.max(0, Math.min(hourCount * 60 - SNAP, Math.floor((((e.clientY - r.top) / HOUR_PX) * 60) / SNAP) * SNAP));
+              void placeCarried(JSON.parse(raw) as Carried, dayIndex, m);
+            }}
             onPointerUp={(e) => pickUp(e, dayIndex)}
             onPointerCancel={() => (pick.current = null, setSel(null))}
           >
+            {carried && ghost && ghost.dayIndex === dayIndex && (
+              <div
+                className="pointer-events-none absolute inset-x-0.5 z-[6] overflow-hidden rounded-md px-1 text-[11px] font-semibold"
+                style={{ top: (ghost.min / 60) * HOUR_PX, height: (carried.minutes / 60) * HOUR_PX, background: "rgba(217,180,95,.55)", border: "1.5px dashed #6b5124", color: "#2a1c10" }}
+              >
+                {carried.title}
+              </div>
+            )}
             {sel && sel.dayIndex === dayIndex && (
               <div
                 className="pointer-events-none absolute inset-x-0.5 rounded-md"

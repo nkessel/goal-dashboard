@@ -29,6 +29,7 @@ import {
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { TaskScheduleControl } from "@/components/tasks/TaskScheduleControl";
+import { carryQuest, useCarried, QUEST_DRAG_TYPE } from "@/lib/schedule-carry";
 
 type Folder = { name: string; open: boolean };
 
@@ -216,6 +217,13 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
 
   const isAdventure = theme === "adventure";
   const count = ids.length;
+  const carried = useCarried();
+  /** Pick a quest up to place on the calendar (tap again to put it back). */
+  function place2(t: Task) {
+    if (carried?.id === t.id) return carryQuest(null);
+    carryQuest({ id: t.id, title: t.title, minutes: Math.max(15, t.estimate_minutes ?? 60) });
+    if (!wide) toggle(false); // get the slide-out out of the way of the calendar
+  }
 
   // The closed tab: a slim vertical pull on the calendar's right edge.
   const tab = (
@@ -305,6 +313,8 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
                       dividerBefore={i === NUMBERED}
                       onOpen={() => setEditing(byId.get(id)!)}
                       onSchedule={() => setScheduling(byId.get(id)!)}
+                      onPlace={() => place2(byId.get(id)!)}
+                      placing={carried?.id === id}
                       onMove={(x, y) => setMoving({ task: byId.get(id)!, x, y })}
                       onRemove={() => remove(id)}
                     />
@@ -392,6 +402,8 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
                           dividerBefore={false}
                           onOpen={() => setEditing(byId.get(id)!)}
                           onSchedule={() => setScheduling(byId.get(id)!)}
+                          onPlace={() => place2(byId.get(id)!)}
+                          placing={carried?.id === id}
                           onMove={(x, y) => setMoving({ task: byId.get(id)!, x, y })}
                           onRemove={() => remove(id)}
                         />
@@ -505,6 +517,8 @@ function Row({
   dividerBefore,
   onOpen,
   onSchedule,
+  onPlace,
+  placing,
   onMove,
   onRemove,
 }: {
@@ -513,6 +527,8 @@ function Row({
   dividerBefore: boolean;
   onOpen: () => void;
   onSchedule: () => void;
+  onPlace: () => void;
+  placing: boolean;
   onMove: (x: number, y: number) => void;
   onRemove: () => void;
 }) {
@@ -560,10 +576,26 @@ function Row({
             </span>
           )}
         </button>
-        <IconBtn label="Find a time" {...stop} onClick={onSchedule}>
-          <rect x="3.5" y="5" width="17" height="15.5" rx="2.4" stroke="currentColor" strokeWidth="1.9" fill="none" />
-          <path d="M3.5 9.6h17M8 3v4M16 3v4M12 12.5v5M9.5 15h5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-        </IconBtn>
+        <button
+          type="button"
+          {...stop}
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData(QUEST_DRAG_TYPE, JSON.stringify({ id: task.id, title: task.title, minutes: Math.max(15, task.estimate_minutes ?? 60) }));
+            e.dataTransfer.effectAllowed = "move";
+            carryQuest({ id: task.id, title: task.title, minutes: Math.max(15, task.estimate_minutes ?? 60) });
+          }}
+          onClick={() => onPlace()}
+          aria-label={`Place ${task.title} on the calendar`}
+          title="Place on the calendar: tap, then tap a time — or drag onto the calendar"
+          className="flex h-8 w-7 shrink-0 cursor-grab items-center justify-center rounded-full hover:bg-black/[.07]"
+          style={placing ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10" } : { color: "var(--t-ink-soft)" }}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden>
+            <rect x="3.5" y="5" width="17" height="15.5" rx="2.4" stroke="currentColor" strokeWidth="1.9" fill="none" />
+            <path d="M3.5 9.6h17M8 3v4M16 3v4M12 12.5v5M9.5 15h5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+          </svg>
+        </button>
         <IconBtn label="Move to a folder" {...stop} onClick={(e) => onMove(e.clientX, e.clientY)}>
           <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2h8.8A1.5 1.5 0 0 1 21 8.5V18a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" stroke="currentColor" strokeWidth="1.9" fill="none" strokeLinejoin="round" />
         </IconBtn>

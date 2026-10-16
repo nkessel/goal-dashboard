@@ -28,11 +28,11 @@ import {
   startOfWeek,
 } from "@/lib/calendar-dates";
 
-type ViewKind = "day" | "week" | "next7" | "month";
-const VIEW_LABELS: Record<ViewKind, string> = { day: "Day", week: "Week", next7: "7 days", month: "Month" };
+type ViewKind = "day" | "3day" | "week" | "next7" | "month";
+const VIEW_LABELS: Record<ViewKind, string> = { day: "Day", "3day": "3 days", week: "Week", next7: "7 days", month: "Month" };
 
 function parseView(v: string | undefined): ViewKind {
-  return v === "day" || v === "month" || v === "next7" ? v : "week";
+  return v === "day" || v === "3day" || v === "month" || v === "next7" ? v : "week";
 }
 
 /** Today's date in the app's home time zone (the server itself runs on UTC). */
@@ -81,6 +81,17 @@ export default async function CalendarPage({
     heading = formatMonthHeading(monthStart);
     prevHref = `/calendar?view=month&date=${formatDateParam(addMonths(monthStart, -1))}`;
     nextHref = `/calendar?view=month&date=${formatDateParam(addMonths(monthStart, 1))}`;
+  } else if (view === "3day") {
+    rangeStart = startOfDay(date);
+    rangeEnd = addDays(rangeStart, 3);
+    {
+      const last = addDays(rangeStart, 2);
+      const a = rangeStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const b = last.toLocaleDateString("en-US", last.getMonth() === rangeStart.getMonth() ? { day: "numeric" } : { month: "short", day: "numeric" });
+      heading = `${a} – ${b}`;
+    }
+    prevHref = `/calendar?view=3day&date=${formatDateParam(addDays(date, -3))}`;
+    nextHref = `/calendar?view=3day&date=${formatDateParam(addDays(date, 3))}`;
   } else if (view === "next7") {
     rangeStart = startOfDay(date);
     rangeEnd = addDays(rangeStart, 7);
@@ -162,7 +173,7 @@ export default async function CalendarPage({
             border: isAdventure ? "1px solid rgba(209,161,60,.35)" : undefined,
           }}
         >
-          {(["day", "week", "next7", "month"] as const).map((v) => {
+          {(["day", "3day", "week", "next7", "month"] as const).map((v) => {
             const active = v === view;
             return (
               <Link
@@ -220,6 +231,9 @@ export default async function CalendarPage({
         </div>
 
         {view === "day" && <DayView dateKey={formatDateParam(date)} tasks={tasks} events={events} theme={theme} />}
+        {view === "3day" && (
+          <WeekView dayKeys={Array.from({ length: 3 }, (_, i) => formatDateParam(addDays(date, i)))} tasks={tasks} events={events} theme={theme} />
+        )}
         {(view === "week" || view === "next7") && (
           <WeekView
             dayKeys={Array.from({ length: 7 }, (_, i) => formatDateParam(addDays(view === "week" ? startOfWeek(date) : date, i)))}
