@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { QuestsTabs } from "@/components/layout/QuestsTabs";
 import { CreateBoardForm } from "@/components/boards/CreateBoardForm";
 import { BoardGrid } from "@/components/boards/BoardGrid";
 import { listBoardsWithStatsForOwner } from "@/lib/data/boards";
@@ -21,8 +22,9 @@ export default async function BoardsPage() {
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <PageHeader isAdventure={isAdventure} title="Quest Boards" calmTitle="Boards" subtitle="Your active campaigns" />
+          <PageHeader isAdventure={isAdventure} title="All Quests" calmTitle="All quests" subtitle="Your quests by board" />
         </div>
+        <QuestsTabs active="boards" isAdventure={isAdventure} />
 
         <CreateBoardForm theme={theme} />
 

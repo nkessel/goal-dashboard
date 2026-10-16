@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { addToTopOfTodayAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, setCheckMetricsAction } from "@/app/actions";
@@ -353,6 +354,9 @@ export function EnergyCheck({
               <button type="button" onClick={() => setEditing(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
                 Check in again
               </button>
+              <Link href="/insights" className="flex items-center gap-1 underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
+                See more insights →
+              </Link>
             </div>
             {/* What was saved, shown under the caret. */}
             {expanded && savedExtras.length > 0 && (

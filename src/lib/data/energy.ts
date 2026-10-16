@@ -101,3 +101,16 @@ export async function latestCheckIns(ownerId: string, sinceISO: string): Promise
   for (const r of data ?? []) if (!((r.metric as string) in out)) out[r.metric as string] = { level: Number(r.level), at: r.created_at as string };
   return out;
 }
+
+/** Every check-in reading (other than energy) since a moment, oldest first. */
+export async function listCheckInsSince(ownerId: string, sinceISO: string): Promise<CheckReading[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("check_ins")
+    .select("metric, level, created_at")
+    .eq("owner_id", ownerId)
+    .gte("created_at", sinceISO)
+    .order("created_at", { ascending: true })
+    .limit(1000);
+  if (error) return [];
+  return (data ?? []).map((r) => ({ metric: r.metric as string, level: Number(r.level), created_at: r.created_at as string }));
+}

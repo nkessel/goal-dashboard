@@ -35,6 +35,12 @@ function calmIcon(name: string, color: string) {
           <circle cx="12" cy="12" r="4.5" fill={color} />
         </svg>
       );
+    case "insights":
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M4 20V10M10 20V4M16 20v-7M21 20H3" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      );
     case "target":
       return (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -57,7 +63,9 @@ function calmIcon(name: string, color: string) {
 
 const ITEMS: {
   href: string;
-  key: "calendar" | "grid" | "now" | "target" | "party";
+  key: "calendar" | "grid" | "now" | "insights" | "party";
+  /** Other paths that belong to this tab. */
+  also?: string[];
   /** Deliberate divergence from mockup.png, per HANDOFF.md §5: Goals/Boards
    * uses ui-grid (four squares), Priority uses ui-target (bullseye) — the
    * opposite of the original painted reference. Keep it this way. */
@@ -66,16 +74,21 @@ const ITEMS: {
   calmLabel: string;
 }[] = [
   { href: "/calendar", key: "calendar", adventureIcon: "ui-scroll.png", adventureLabel: "Calendar", calmLabel: "Calendar" },
-  { href: "/boards", key: "grid", adventureIcon: "ui-grid.png", adventureLabel: "Quest Boards", calmLabel: "Boards" },
+  { href: "/boards", key: "grid", adventureIcon: "ui-grid.png", adventureLabel: "All Quests", calmLabel: "Quests", also: ["/matrix"] },
   { href: "/", key: "now", adventureIcon: "ui-compass.png", adventureLabel: "Today's Quest", calmLabel: "Now" },
-  { href: "/matrix", key: "target", adventureIcon: "ui-target.png", adventureLabel: "Priority", calmLabel: "Priority" },
+  { href: "/insights", key: "insights", adventureIcon: "ui-insights.svg", adventureLabel: "Insights", calmLabel: "Insights" },
   { href: "/feed", key: "party", adventureIcon: "ui-party-simple.svg", adventureLabel: "Party", calmLabel: "Friends" },
 ];
 
 /** Index of the nav item a pathname belongs to, or -1 if it's not one of
  * the main tabs (a detail page, settings, etc). */
 function navIndex(pathname: string) {
-  return ITEMS.findIndex((item) => (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)));
+  return ITEMS.findIndex((item) => onTab(item, pathname));
+}
+
+function onTab(item: { href: string; also?: string[] }, pathname: string) {
+  if (item.href === "/") return pathname === "/";
+  return [item.href, ...(item.also ?? [])].some((h) => pathname.startsWith(h));
 }
 
 export function BottomNav({ theme }: { theme: Theme }) {
@@ -227,7 +240,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
           />
         )}
         {ITEMS.map((item, i) => {
-          const active = item.href === "/" ? activePath === "/" : activePath.startsWith(item.href);
+          const active = onTab(item, activePath);
           const label = isAdventure ? item.adventureLabel : item.calmLabel;
 
           return (

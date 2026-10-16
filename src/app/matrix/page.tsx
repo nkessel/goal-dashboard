@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { CreateFab } from "@/components/create/CreateFab";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { QuestsTabs } from "@/components/layout/QuestsTabs";
 import { PriorityViews } from "@/components/matrix/PriorityViews";
 import { CompletedTaskRow } from "@/components/tasks/CompletedTaskRow";
 import { listBoardsForOwner } from "@/lib/data/boards";
@@ -46,8 +47,9 @@ export default async function MatrixPage({
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-1">
-          <PageHeader isAdventure={isAdventure} title="Quest Priority Matrix" calmTitle="Priority Matrix" subtitle={isAdventure ? "Weigh every quest — by the classic matrix, or by everything at once" : "Weigh everything — by the classic matrix, or by every factor at once"} />
+          <PageHeader isAdventure={isAdventure} title="All Quests" calmTitle="All quests" subtitle="Weigh every quest — by the classic matrix, or by everything at once" />
         </div>
+        <QuestsTabs active="priority" isAdventure={isAdventure} />
 
 
         <PriorityViews tasks={tasks} theme={theme} boards={boards} plotIds={plotIds} confirmImports={confirmImports} energy={energy.map((e) => ({ level: e.level, at: e.created_at }))} />

@@ -11,7 +11,6 @@ import { Ladder } from "./lab/Ladder";
 import { Constellation } from "./lab/Constellation";
 import { TugBoard } from "./lab/TugBoard";
 import { Lens } from "./lab/Lens";
-import { ParallelLines } from "./lab/ParallelLines";
 import { TimeTide } from "./lab/TimeTide";
 import { SparkMap } from "./lab/SparkMap";
 import { FinishLine } from "./lab/FinishLine";
@@ -20,7 +19,7 @@ import { StuckMap } from "./lab/StuckMap";
 import { StartFriction } from "./lab/StartFriction";
 import { EnergyWeather } from "./lab/EnergyWeather";
 
-type View = "matrix" | "ladder" | "constellation" | "tug" | "lens" | "lines" | "tide" | "spark" | "finish" | "forecast" | "stuck" | "friction" | "energy";
+type View = "matrix" | "ladder" | "constellation" | "tug" | "lens" | "tide" | "spark" | "finish" | "forecast" | "stuck" | "friction" | "energy";
 const GROUPS: { label: string; views: { key: View; label: string }[] }[] = [
   {
     label: "Weigh",
@@ -30,7 +29,6 @@ const GROUPS: { label: string; views: { key: View; label: string }[] }[] = [
       { key: "constellation", label: "Constellation" },
       { key: "tug", label: "Tug board" },
       { key: "lens", label: "Lens" },
-      { key: "lines", label: "Lines" },
     ],
   },
   {
@@ -48,7 +46,7 @@ const GROUPS: { label: string; views: { key: View; label: string }[] }[] = [
 ];
 const VIEWS = GROUPS.flatMap((g) => g.views);
 /** Views that rank by the shared weights. */
-const WEIGHED: View[] = ["ladder", "constellation", "lens", "lines"];
+const WEIGHED: View[] = ["ladder", "constellation", "lens"];
 const VIEW_KEY = "priority-view";
 const WEIGHTS_KEY = "priority-weights";
 const noop = () => () => {};
@@ -155,7 +153,6 @@ export function PriorityViews({
           {view === "constellation" && <Constellation scored={scored} boards={boards} onOpen={open} />}
           {view === "tug" && <TugBoard scored={scored} weights={weights} onWeights={changeWeights} isAdventure={isAdventure} onOpen={open} />}
           {view === "lens" && <Lens scored={scored} isAdventure={isAdventure} onOpen={open} />}
-          {view === "lines" && <ParallelLines scored={scored} isAdventure={isAdventure} onOpen={open} />}
           {view === "tide" && <TimeTide tasks={live} now={now} isAdventure={isAdventure} onOpen={open} />}
           {view === "spark" && <SparkMap tasks={live} isAdventure={isAdventure} onOpen={open} />}
           {view === "finish" && <FinishLine tasks={live} isAdventure={isAdventure} onOpen={open} />}
