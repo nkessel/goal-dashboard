@@ -57,6 +57,16 @@ export default async function FeedPage() {
 
         <InviteLinkBox code={invite.code} theme={theme} inviterName={profile?.name?.split(" ")[0] ?? null} />
 
+        <section className="flex flex-col gap-2 rounded-2xl px-4 py-3.5" style={{
+          background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
+          border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+        }}>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
+            Find your party
+          </h2>
+          <FriendDirectory profileId={profileId} rows={directoryRows} theme={theme} />
+        </section>
+
         <section className="flex flex-col gap-3">
           <ul className="flex flex-col gap-3">
             {feed.map((item) => (
@@ -84,15 +94,6 @@ export default async function FeedPage() {
           </ul>
         </section>
 
-        <section className="flex flex-col gap-2 rounded-2xl px-4 py-3.5" style={{
-          background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
-          border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-        }}>
-          <h2 className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
-            {isAdventure ? "The Realm" : "Directory"}
-          </h2>
-          <FriendDirectory profileId={profileId} rows={directoryRows} theme={theme} />
-        </section>
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
     </AppShell>

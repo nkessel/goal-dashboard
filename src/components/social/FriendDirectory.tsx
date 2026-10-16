@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { sendFriendRequestAction, removeFriendAction } from "@/app/actions";
 import type { Friendship, Profile } from "@/lib/data/types";
+import { defaultPortraitFor } from "@/components/settings/Avatar";
 
 type Row = { profile: Profile; friendship?: Friendship };
 type Theme = "calm" | "adventure";
@@ -16,17 +17,34 @@ export function FriendDirectory({
   rows: Row[];
   theme?: Theme;
 }) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  // Search by name, or by someone's exact email address (emails are never listed).
+  const shown = q
+    ? rows.filter((r) => (r.profile.name ?? "").toLowerCase().includes(q) || (q.includes("@") && (r.profile.email ?? "").toLowerCase() === q))
+    : rows;
   return (
-    <ul className="flex flex-col" style={{ color: "var(--t-ink)" }}>
-      {rows.map((row, i) => (
-        <DirectoryRow key={row.profile.id} profileId={profileId} row={row} theme={theme} showDivider={i > 0} />
-      ))}
-      {rows.length === 0 && (
-        <p className="py-2 text-sm" style={{ color: "var(--t-ink-soft)" }}>
-          No other users yet — share your invite link below.
-        </p>
-      )}
-    </ul>
+    <div className="flex flex-col gap-2">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search by name or email"
+        aria-label="Find someone"
+        className="h-10 rounded-full border px-4 text-[16px]"
+        style={{ borderColor: theme === "adventure" ? "var(--t-panel-border)" : "var(--t-card-border)", background: theme === "adventure" ? "rgba(255,250,238,.7)" : "var(--t-bg)", color: "var(--t-ink)" }}
+      />
+      <ul className="flex flex-col" style={{ color: "var(--t-ink)" }}>
+        {shown.map((row, i) => (
+          <DirectoryRow key={row.profile.id} profileId={profileId} row={row} theme={theme} showDivider={i > 0} />
+        ))}
+        {shown.length === 0 && (
+          <p className="py-2 text-sm" style={{ color: "var(--t-ink-soft)" }}>
+            {q ? "No one by that name yet. Send them your invite link instead." : "No one else here yet. Share your invite link."}
+          </p>
+        )}
+      </ul>
+    </div>
   );
 }
 
@@ -73,8 +91,10 @@ function DirectoryRow({
           : undefined
       }
     >
-      <div className="flex items-center gap-2">
-        <span className="font-medium">{profile.name || profile.email}</span>
+      <div className="flex min-w-0 items-center gap-2.5">
+        {/* eslint-disable-next-line @next/next/no-img-element -- portrait */}
+        <img src={profile.avatar_image_url ?? defaultPortraitFor(profile.id)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" style={{ border: "1.5px solid #a58c66" }} />
+        <span className="truncate text-[15px] font-semibold">{profile.name || "Adventurer"}</span>
         {profile.level >= 8 && (
           <span
             className="rounded-full px-2 py-0.5 text-[10px] font-bold"
@@ -93,12 +113,12 @@ function DirectoryRow({
           className="rounded-full px-3 py-1 text-xs font-medium disabled:opacity-50"
           style={{ border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}` }}
         >
-          + Add friend
+          + Invite to party
         </button>
       )}
       {friendship?.status === "pending" && friendship.requester_id === profileId && (
         <span className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
-          Request sent
+          Invite sent
         </span>
       )}
       {friendship?.status === "pending" && friendship.addressee_id === profileId && (
@@ -117,7 +137,7 @@ function DirectoryRow({
             color: "var(--t-ink-soft)",
           }}
         >
-          ✓ Friends — remove
+          ✓ In your party · remove
         </button>
       )}
       {friendship?.status === "declined" && (
