@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { CreateFab } from "@/components/create/CreateFab";
 import { InsightsView } from "@/components/insights/InsightsView";
 import { getProfileById } from "@/lib/data/profiles";
-import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckInsSince, listEnergySince } from "@/lib/data/energy";
+import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckInsSince, listCheckNotesSince, listEnergySince } from "@/lib/data/energy";
 import { appDayKey } from "@/lib/data/tomorrow";
 import { EnergyCheck } from "@/components/xp/EnergyCheck";
 import { listWinsSince } from "@/lib/data/wins";
@@ -12,7 +12,7 @@ import { listWinsSince } from "@/lib/data/wins";
 export default async function InsightsPage() {
   const session = await requireSession();
   const since = new Date(Date.now() - 92 * 86_400_000).toISOString();
-  const [profile, energy, checks, metrics, wins, lastEnergy, lastReadings] = await Promise.all([
+  const [profile, energy, checks, metrics, wins, lastEnergy, lastReadings, notes] = await Promise.all([
     getProfileById(session.user.id),
     listEnergySince(session.user.id, since),
     listCheckInsSince(session.user.id, since),
@@ -20,6 +20,7 @@ export default async function InsightsPage() {
     listWinsSince(session.user.id, since),
     latestEnergy(session.user.id),
     latestCheckIns(session.user.id, new Date(Date.now() - 2 * 86_400_000).toISOString()).catch(() => ({})),
+    listCheckNotesSince(session.user.id, since),
   ]);
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   const metricsToday = Object.fromEntries(
@@ -42,7 +43,7 @@ export default async function InsightsPage() {
           <h2 className={`m-0 text-center ${isAdventure ? "font-display text-[20px]" : "text-[16px] font-bold"}`} style={{ color: "#f2d27e" }}>
             Check in
           </h2>
-          <EnergyCheck full today={energyToday} todayAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null} metrics={metrics} metricsToday={metricsToday} />
+          <EnergyCheck full today={energyToday} todayAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null} metrics={metrics} metricsToday={metricsToday} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey()).map((n) => ({ id: n.id, body: n.body }))} />
         </section>
         <InsightsView
           theme={theme}
@@ -51,7 +52,10 @@ export default async function InsightsPage() {
             ...checks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at })),
           ]}
           metrics={["Energy", ...metrics]}
-          wins={wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title }))}
+          wins={[
+            ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title })),
+            ...notes.map((n) => ({ kind: "note", at: n.created_at, xp: 0, title: n.body })),
+          ]}
         />
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>

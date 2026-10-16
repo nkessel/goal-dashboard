@@ -20,7 +20,7 @@ import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
 import { DailyHabits } from "@/components/habits/DailyHabits";
 import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
-import { getCheckMetrics, latestCheckIns, latestEnergy } from "@/lib/data/energy";
+import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckNotesSince } from "@/lib/data/energy";
 import { bossesTableExists, getActiveBoss } from "@/lib/data/bosses";
 
 /** Start of a window `n` days back (kept outside render for purity). */
@@ -75,7 +75,7 @@ export default async function Home() {
     listFriendIds(session.user.id),
   ]);
   // A two-day window; VictoriesToday narrows it to the viewer's own local day.
-  const [recentClaims, rites, riteCompletions, tomorrowRows, boss, bossesEnabled, lastEnergy, checkMetrics, lastReadings] = await Promise.all([
+  const [recentClaims, rites, riteCompletions, tomorrowRows, boss, bossesEnabled, lastEnergy, checkMetrics, lastReadings, recentNotes] = await Promise.all([
     listClaimedSince(session.user.id, daysAgoISO(2)).catch(() => []),
     listRites(session.user.id).catch(() => null),
     listRiteCompletions(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => []),
@@ -85,6 +85,7 @@ export default async function Home() {
     latestEnergy(session.user.id),
     getCheckMetrics(session.user.id).catch(() => []),
     latestCheckIns(session.user.id, daysAgoISO(2)).catch(() => ({})),
+    listCheckNotesSince(session.user.id, daysAgoISO(2)).catch(() => []),
   ]);
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   // Today's latest reading of each extra check-in metric.
@@ -120,6 +121,7 @@ export default async function Home() {
         energyAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null}
         checkMetrics={checkMetrics}
         metricsToday={metricsToday}
+        notesToday={recentNotes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey()).map((n) => ({ id: n.id, body: n.body }))}
       />
     </section>
   );

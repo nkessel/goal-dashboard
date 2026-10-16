@@ -2050,3 +2050,20 @@ export async function setIdeaStatusAction(threadId: string, status: forumData.Id
   revalidatePath(`/feed/forum/${threadId}`);
   revalidatePath("/feed");
 }
+
+// ---------------------------------------------------------------------------
+// Check-in notes and #tags
+// ---------------------------------------------------------------------------
+
+export async function addCheckNoteAction(text: string) {
+  const ownerId = await requireProfileId();
+  const note = await energyData.addCheckNote(ownerId, text);
+  revalidatePath("/insights");
+  return note;
+}
+
+export async function deleteCheckNoteAction(id: string) {
+  const ownerId = await requireProfileId();
+  await energyData.deleteCheckNote(ownerId, id);
+  revalidatePath("/insights");
+}

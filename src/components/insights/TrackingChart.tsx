@@ -23,6 +23,7 @@ const EVENTS: { key: string; label: string; kinds: string[]; glyph: string; colo
   { key: "quests", label: "Quests done", kinds: ["quest"], glyph: "◆", color: "#8a6116" },
   { key: "habits", label: "Habits & rites", kinds: ["habit", "rite"], glyph: "●", color: "#5d7a3a" },
   { key: "journal", label: "Journal notes", kinds: ["journal"], glyph: "✎", color: "#6b4a8a" },
+  { key: "notes", label: "Events & #tags", kinds: ["note"], glyph: "🏷", color: "#7a4a1a" },
   { key: "rewards", label: "Rewards", kinds: ["reward"], glyph: "★", color: "#b5521f" },
 ];
 

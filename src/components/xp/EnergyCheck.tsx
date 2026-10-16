@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { addToTopOfTodayAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, setCheckMetricsAction } from "@/app/actions";
+import { addCheckNoteAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, setCheckMetricsAction } from "@/app/actions";
 import { BoltIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
@@ -61,7 +61,10 @@ export function EnergyCheck({
   metrics: initialMetrics = [],
   metricsToday = {},
   full = false,
+  notesToday = [],
 }: {
+  /** Today's write-in events and #tags. */
+  notesToday?: { id: string; body: string }[];
   /** The Insights screen's full check-in: every metric shown, no link back to Insights. */
   full?: boolean;
   /** Today's latest check-in, if any. */
@@ -80,6 +83,27 @@ export function EnergyCheck({
   const [vals, setVals] = useState<Record<string, number>>(metricsToday);
   const [savedVals, setSavedVals] = useState<Record<string, number>>(metricsToday);
   const [expanded, setExpanded] = useState(full);
+  const [notes, setNotes] = useState(notesToday);
+  const [noting, setNoting] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  function addNote() {
+    const text = noteText.trim();
+    if (!text) return setNoting(false);
+    const temp = { id: `temp-${Date.now()}`, body: text };
+    setNotes((n) => [...n, temp]);
+    setNoteText("");
+    setNoting(false);
+    addCheckNoteAction(text)
+      .then((saved) => setNotes((n) => n.map((x) => (x.id === temp.id ? { id: saved.id, body: saved.body } : x))))
+      .catch((e) => {
+        setNotes((n) => n.filter((x) => x.id !== temp.id));
+        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      });
+  }
+  function dropNote(id: string) {
+    setNotes((n) => n.filter((x) => x.id !== id));
+    if (!id.startsWith("temp-")) void deleteCheckNoteAction(id).catch(() => {});
+  }
   const [adding, setAdding] = useState(false);
   const [editingList, setEditingList] = useState(false);
   const [newMetric, setNewMetric] = useState("");
@@ -190,6 +214,66 @@ export function EnergyCheck({
   );
 
   const label = "w-[78px] shrink-0 truncate text-[14.5px] font-semibold";
+  const noteChips = notes.length > 0 && (
+    <ul className="m-0 flex list-none flex-wrap justify-center gap-1.5 p-0">
+      {notes.map((n) => (
+        <li key={n.id} className="flex h-7 max-w-full items-center gap-1 rounded-full pl-2.5 pr-1 text-[13px]" style={{ background: "rgba(242,210,126,.14)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+          <span className="truncate">
+            {n.body.split(/(#[\p{L}\p{N}_-]+)/u).map((part, i) =>
+              part.startsWith("#") ? (
+                <b key={i} style={{ color: "#f2d27e" }}>
+                  {part}
+                </b>
+              ) : (
+                part
+              )
+            )}
+          </span>
+          <button type="button" onClick={() => dropNote(n.id)} aria-label={`Remove “${n.body}”`} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[15px] leading-none hover:bg-white/10" style={{ color: "rgba(239,230,204,.7)" }}>
+            ×
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+  const noteInput = noting ? (
+    <div className="flex w-full items-center gap-1.5">
+      <input
+        autoFocus
+        value={noteText}
+        onChange={(e) => setNoteText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") addNote();
+          if (e.key === "Escape") setNoting(false);
+        }}
+        maxLength={200}
+        placeholder="What happened? e.g. Slept badly #sleep"
+        aria-label="Event or #tag"
+        className="h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-[15px]"
+        style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a", color: "#2a1c10" }}
+      />
+      <button type="button" onClick={addNote} disabled={!noteText.trim()} className="h-9 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+        Add
+      </button>
+      <button type="button" onClick={() => setNoting(false)} aria-label="Cancel" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "rgba(239,230,204,.75)" }}>
+        ×
+      </button>
+    </div>
+  ) : null;
+  const noteButton = (
+    <button
+      type="button"
+      onClick={() => setNoting(true)}
+      className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold"
+      style={{ border: "1px dashed rgba(217,180,95,.6)", color: "var(--t-cream)" }}
+      title="Write in something that happened, or a #tag"
+    >
+      <span aria-hidden style={{ color: "var(--t-gold)" }}>
+        🏷
+      </span>
+      Event or #tag
+    </button>
+  );
   const slider = (v: number, onChange: (n: number) => void, aria: string, color: string) => (
     <input
       type="range"
@@ -306,8 +390,11 @@ export function EnergyCheck({
                   </div>
                 )}
 
-                {/* [Edit metrics] · Add new check-in metric · Submit check-in */}
+                {noteChips}
+                {noteInput}
+                {/* [Edit metrics] · Add new check-in metric · Event or #tag · Submit check-in */}
                 <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 pt-0.5">
+                  {!noting && noteButton}
                   {metrics.length > 0 && (
                     <button
                       type="button"
@@ -346,34 +433,43 @@ export function EnergyCheck({
             )}
           </>
         ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13.5px]" style={{ color: "var(--t-cream)" }}>
-              {savedExtras.length > 0 && caret}
-              <span>
-                Energy <b className="font-display text-[17px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>{fmt(saved!)}</b>
-                <span style={{ opacity: 0.7 }}>/10</span>
-              </span>
-              {mounted && savedAt && <span style={{ opacity: 0.7 }}>· checked in at {clock(savedAt)}</span>}
+          <div className="flex flex-col items-center gap-1.5">
+            {/* What you checked in with, as small seals of value. */}
+            <ul className="m-0 flex list-none flex-wrap justify-center gap-1.5 p-0">
+              <li className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(0,0,0,.28)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+                Energy
+                <b className="font-display text-[17px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>
+                  {fmt(saved!)}
+                </b>
+              </li>
+              {savedExtras.map((m) => (
+                <li key={m} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(0,0,0,.28)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+                  {m}
+                  <b className="font-display text-[17px] tabular-nums" style={{ color: "#f2d58a" }}>
+                    {fmt(savedVals[m])}
+                  </b>
+                </li>
+              ))}
+            </ul>
+            {noteChips}
+            {noteInput}
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]" style={{ color: "var(--t-cream)" }}>
+              {mounted && savedAt && <span style={{ opacity: 0.75 }}>✓ Checked in at {clock(savedAt)}</span>}
               <button type="button" onClick={() => setEditing(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
                 Check in again
               </button>
+              {!noting && (
+                <button type="button" onClick={() => setNoting(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
+                  + Event or #tag
+                </button>
+              )}
               {!full && (
-                <Link href="/insights" className="flex items-center gap-1 underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
-                  See more insights →
+                <Link href="/insights" className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
+                  Insights →
                 </Link>
               )}
             </div>
-            {/* What was saved, shown under the caret. */}
-            {expanded && savedExtras.length > 0 && (
-              <ul id="checkin-more" className="m-0 flex list-none flex-wrap gap-x-3 gap-y-0.5 p-0 pl-5 text-[13.5px]" style={{ color: "var(--t-cream)" }}>
-                {savedExtras.map((m) => (
-                  <li key={m}>
-                    {m} <b className="font-display text-[16px] tabular-nums" style={{ color: "#f2d58a" }}>{fmt(savedVals[m])}</b>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
+          </div>
         )}
         {error && (
           <span className="text-[12.5px] font-semibold" style={{ color: "#f3b39f" }}>

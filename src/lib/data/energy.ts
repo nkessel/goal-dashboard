@@ -114,3 +114,32 @@ export async function listCheckInsSince(ownerId: string, sinceISO: string): Prom
   if (error) return [];
   return (data ?? []).map((r) => ({ metric: r.metric as string, level: Number(r.level), created_at: r.created_at as string }));
 }
+
+// ---------------------------------------------------------------------------
+// Write-in events and #tags beside a check-in
+// ---------------------------------------------------------------------------
+
+export type CheckNote = { id: string; body: string; tags: string[]; created_at: string };
+
+/** "Slept badly #sleep #travel" → tags ["sleep", "travel"]; the text is kept whole. */
+export function tagsIn(text: string): string[] {
+  return [...new Set([...text.matchAll(/#([\p{L}\p{N}_-]{1,24})/gu)].map((m) => m[1].toLowerCase()))].slice(0, 8);
+}
+
+export async function addCheckNote(ownerId: string, text: string): Promise<CheckNote> {
+  const body = text.replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!body) throw new Error("Write something first.");
+  const { data, error } = await supabaseAdmin().from("check_in_notes").insert({ owner_id: ownerId, body, tags: tagsIn(body) }).select("id, body, tags, created_at").single();
+  if (error) throw new Error(`Couldn't save that: ${error.message}`);
+  return data as CheckNote;
+}
+
+export async function deleteCheckNote(ownerId: string, id: string): Promise<void> {
+  await supabaseAdmin().from("check_in_notes").delete().eq("owner_id", ownerId).eq("id", id);
+}
+
+export async function listCheckNotesSince(ownerId: string, sinceISO: string): Promise<CheckNote[]> {
+  const { data, error } = await supabaseAdmin().from("check_in_notes").select("id, body, tags, created_at").eq("owner_id", ownerId).gte("created_at", sinceISO).order("created_at", { ascending: true }).limit(1000);
+  if (error) return [];
+  return (data ?? []) as CheckNote[];
+}

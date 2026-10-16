@@ -46,6 +46,7 @@ export function XpSummary({
   energyAt,
   checkMetrics = [],
   metricsToday = {},
+  notesToday = [],
 }: {
   /** Today's latest energy check-in (undefined = don't show the meter). */
   energyToday?: number | null;
@@ -55,6 +56,7 @@ export function XpSummary({
   checkMetrics?: string[];
   /** Today's latest reading of each. */
   metricsToday?: Record<string, number>;
+  notesToday?: { id: string; body: string }[];
   /** The boss standing in the way of the next level (null = none set). */
   boss?: BossView | null;
   /** False before the bosses table exists (no "set a boss" prompt then). */
@@ -152,7 +154,7 @@ export function XpSummary({
           </div>
         </div>
 
-        {energyToday !== undefined && <EnergyCheck today={energyToday} todayAt={energyAt ?? null} metrics={checkMetrics} metricsToday={metricsToday} />}
+        {energyToday !== undefined && <EnergyCheck today={energyToday} todayAt={energyAt ?? null} metrics={checkMetrics} metricsToday={metricsToday} notesToday={notesToday} />}
 
         {profile.streak_protection_tokens > 0 && (
           <div className="text-center text-xs" style={{ color: "var(--t-cream)", opacity: 0.75 }}>
