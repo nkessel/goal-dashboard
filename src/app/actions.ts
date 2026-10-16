@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/auth";
+import { auth, signIn, CALENDAR_AUTH_PARAMS } from "@/auth";
 import * as boardsData from "@/lib/data/boards";
 import * as goalsData from "@/lib/data/goals";
 import * as tasksData from "@/lib/data/tasks";
@@ -14,6 +14,7 @@ import * as avatarLibraryData from "@/lib/data/avatar-library";
 import * as taskIconLibraryData from "@/lib/data/task-icon-library";
 import * as rewardsData from "@/lib/data/rewards";
 import * as ritesData from "@/lib/data/rites";
+import * as winsData from "@/lib/data/wins";
 import * as stepsData from "@/lib/data/steps";
 import * as journalData from "@/lib/data/journal";
 import * as tomorrowData from "@/lib/data/tomorrow";
@@ -51,7 +52,7 @@ async function requireSessionWithGoogle() {
   if (!session?.user?.id) throw new Error("Not signed in");
   if (!session.googleAccessToken) {
     throw new Error(
-      "No Google Calendar access token on this session — sign out and back in to grant Calendar access."
+      "Google Calendar isn't connected yet — connect it from the Calendar page to use your calendar here."
     );
   }
   return { profileId: session.user.id, accessToken: session.googleAccessToken };
@@ -1407,6 +1408,37 @@ export async function removeRiteAction(riteId: string) {
   revalidatePath("/");
 }
 
+/** Undo a just-removed rite. */
+export async function restoreRiteAction(riteId: string) {
+  const ownerId = await requireProfileId();
+  await ritesData.restoreRite(riteId, ownerId);
+  revalidatePath("/");
+}
+
+/** Skip a habit for `day` on purpose (ends its streak). */
+export async function skipHabitAction(riteId: string, day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  await ritesData.addHabitSkip(ownerId, riteId, day);
+  revalidatePath("/");
+}
+
+export async function unskipHabitAction(riteId: string, day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  await ritesData.removeHabitSkip(ownerId, riteId, day);
+  revalidatePath("/");
+}
+
+/** Wins since `sinceISO` (at most 31 days back) for the evening's "Appreciate recent wins". */
+export async function listRecentWinsAction(sinceISO: string) {
+  const ownerId = await requireProfileId();
+  const since = new Date(sinceISO);
+  if (Number.isNaN(since.getTime())) throw new Error("Bad date.");
+  const floor = Date.now() - 31 * 86_400_000;
+  return winsData.listWinsSince(ownerId, new Date(Math.max(since.getTime(), floor)).toISOString());
+}
+
 // ---------------------------------------------------------------------------
 // "Doing now" and the journal (both from the + sheet)
 // ---------------------------------------------------------------------------
@@ -1554,4 +1586,11 @@ export async function listTakeoffQuestsAction() {
     .sort((a, b) => Number(isPowerUp(b)) - Number(isPowerUp(a)) || (b.importance || 0) - (a.importance || 0))
     .slice(0, 15)
     .map((t) => ({ id: t.id, title: t.title, description: t.description, estimate_minutes: t.estimate_minutes, xp_value: t.xp_value, is_power_up: isPowerUp(t), is_manual_priority: t.is_manual_priority, icon_key: t.icon_key, icon_source: t.icon_source }));
+}
+
+/** Ask Google for Calendar access (only when the person chooses to connect it). */
+export async function connectGoogleCalendarAction(returnTo: string = "/calendar") {
+  await requireProfileId();
+  const to = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/calendar";
+  await signIn("google", { redirectTo: to }, CALENDAR_AUTH_PARAMS);
 }

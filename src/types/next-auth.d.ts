@@ -11,6 +11,7 @@ declare module "next-auth" {
 
 declare module "next-auth/jwt" {
   interface JWT {
+    scope?: string;
     googleSub?: string;
     profileId?: string;
     accessToken?: string;
@@ -25,6 +26,7 @@ declare module "next-auth/jwt" {
 // this needs augmenting too.
 declare module "@auth/core/jwt" {
   interface JWT {
+    scope?: string;
     googleSub?: string;
     profileId?: string;
     accessToken?: string;

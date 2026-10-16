@@ -2,16 +2,20 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
-// Scopes: base identity (openid/email/profile) + full Calendar access.
-// Priority #4 (pull-to-calendar) both reads free/busy AND creates events on
-// the user's primary calendar, so read-only isn't enough — this needs
-// https://www.googleapis.com/auth/calendar, not just calendar.readonly.
-const GOOGLE_SCOPES = [
-  "openid",
-  "https://www.googleapis.com/auth/userinfo.email",
-  "https://www.googleapis.com/auth/userinfo.profile",
-  "https://www.googleapis.com/auth/calendar",
-].join(" ");
+// Signing in only asks for who you are. Calendar access is optional and is
+// asked for separately, from the Calendar page (connectGoogleCalendar below).
+const BASE_SCOPES = ["openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"];
+// Pull-to-calendar both reads free/busy AND creates events on the primary
+// calendar, so read-only isn't enough.
+export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
+
+/** Authorization params for the "Connect Google Calendar" step (incremental consent). */
+export const CALENDAR_AUTH_PARAMS = {
+  scope: [...BASE_SCOPES, CALENDAR_SCOPE].join(" "),
+  access_type: "offline", // a refresh_token, so the calendar keeps working
+  prompt: "consent",
+  include_granted_scopes: "true",
+};
 
 async function refreshGoogleAccessToken(refreshToken: string) {
   const response = await fetch("https://oauth2.googleapis.com/token", {
@@ -47,9 +51,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
-          scope: GOOGLE_SCOPES,
-          access_type: "offline", // request a refresh_token
-          prompt: "consent", // force refresh_token on every sign-in while in testing
+          scope: BASE_SCOPES.join(" "),
+          // Re-signing in shouldn't drop a calendar already connected.
+          include_granted_scopes: "true",
         },
       },
     }),
@@ -61,6 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account && profile) {
         token.googleSub = profile.sub as string;
         token.accessToken = account.access_token;
+        token.scope = account.scope;
         token.refreshToken = account.refresh_token ?? token.refreshToken;
         token.accessTokenExpires = account.expires_at
           ? account.expires_at * 1000
@@ -113,9 +118,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.profileId as string;
       }
-      // Exposed so server components/route handlers can call the Calendar
-      // API on the user's behalf. Do not send this to client components.
-      session.googleAccessToken = token.accessToken as string | undefined;
+      // Exposed (only once Calendar access is granted) so server components
+      // and route handlers can call the Calendar API on the user's behalf.
+      // Do not send this to client components. Sessions from before scopes
+      // were tracked all had Calendar access.
+      const calendar = token.scope ? token.scope.split(" ").includes(CALENDAR_SCOPE) : !!token.accessToken;
+      session.googleAccessToken = calendar ? (token.accessToken as string | undefined) : undefined;
       return session;
     },
   },

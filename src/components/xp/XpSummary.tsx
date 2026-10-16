@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import type { Profile } from "@/lib/data/types";
 import { xpToNextLevel } from "@/lib/data/xp";
 import { Avatar, defaultPortraitFor } from "@/components/settings/Avatar";
@@ -76,6 +77,10 @@ export function XpSummary({
           </div>
 
           <div className="flex flex-col items-center gap-3">
+            {/* Character name above the portrait — click to rename. */}
+            <div className="-mb-1.5 max-w-[190px] sm:max-w-[250px]">
+              <InlineNameEditor initialName={profile.name ?? ""} isAdventure variant="hero" />
+            </div>
             <div className="relative h-[100px] w-[100px] sm:h-[124px] sm:w-[124px]">
               <Link
                 href="/settings?open=appearance"
@@ -155,8 +160,8 @@ export function XpSummary({
           <Avatar profile={profile} size={18} />
         </Link>
         <div className="flex-1">
-          <div className="text-base font-bold" style={{ color: "var(--t-ink)" }}>
-            {level >= 8 ? "Adventurer" : "Good to see you"}
+          <div className="-ml-2">
+            <InlineNameEditor initialName={profile.name ?? ""} isAdventure={false} variant="hero" />
           </div>
           <div className="mt-0.5 flex items-center gap-2">
             <span

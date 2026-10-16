@@ -6,6 +6,7 @@ import { DiamondIcon } from "@/components/ui/Icons";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { SectionTitle } from "@/components/ui/Ornaments";
 import { eveningDayKey } from "@/components/evening/evening-clock";
+import { journalKindMeta, splitKindPrefix } from "@/lib/journal-kinds";
 
 const noop = () => () => {};
 
@@ -49,8 +50,11 @@ export function VictoriesToday({
   claimed,
   lastCheckInAt,
   rites = [],
+  journal = [],
   theme,
 }: {
+  /** Recent journal and feedback entries (narrowed here to today). */
+  journal?: { id: string; body: string; kind: string | null; created_at: string }[];
   tasks: Task[];
   claimed: { id: string; title: string; claimed_at: string | null }[];
   lastCheckInAt: string | null;
@@ -68,9 +72,12 @@ export function VictoriesToday({
   const todays = tasks.filter((t) => isToday(t.completed_at));
   const todaysRewards = claimed.filter((r) => isToday(r.claimed_at));
   const todaysRites = rites.filter((r) => today !== null && r.day === today);
+  const todaysJournal = journal
+    .filter((j) => isToday(j.created_at))
+    .map((j) => (j.kind ? j : { ...j, ...splitKindPrefix(j.body) }));
   const totalXp =
     (loginToday ? 5 : 0) + todays.reduce((n, t) => n + t.xp_value, 0) + todaysRites.reduce((n, r) => n + r.xp, 0);
-  const empty = !loginToday && todays.length === 0 && todaysRewards.length === 0 && todaysRites.length === 0;
+  const empty = !loginToday && todays.length === 0 && todaysRewards.length === 0 && todaysRites.length === 0 && todaysJournal.length === 0;
 
   const rowCls = "flex min-h-[44px] items-center gap-3 py-2 text-[16.5px]";
   const divider = { borderTop: `1px solid ${isAdventure ? "rgba(139,112,64,.35)" : "var(--t-card-border)"}` };
@@ -156,6 +163,19 @@ export function VictoriesToday({
             </span>
           </li>
         ))}
+        {todaysJournal.map((j) => {
+          const meta = journalKindMeta(j.kind);
+          const isFeedback = j.kind === "feedback" || j.kind === "refill" || j.kind === "future";
+          return (
+            <li key={`j-${j.id}`} className={rowCls} style={{ ...divider, color: "var(--t-ink)" }}>
+              <Seal kind="star" />
+              <span className="min-w-0 flex-1 break-words leading-snug">
+                <span style={{ color: "var(--t-ink-soft)" }}>{isFeedback ? "Feedback: " : meta ? `${meta.label}: ` : "Journal: "}</span>
+                <span className="line-clamp-2">{j.body}</span>
+              </span>
+            </li>
+          );
+        })}
         {empty && today !== null && (
           <li className="py-2 text-center text-[15.5px] italic" style={{ color: "var(--t-ink-soft)" }}>
             Nothing completed yet today — you&apos;ve got this.

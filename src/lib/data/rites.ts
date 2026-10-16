@@ -16,6 +16,8 @@ export type Rite = {
   days?: number[] | null;
   /** Due by this time of day ("17:30"), if any. */
   due_time?: string | null;
+  /** A special evening rite with its own content: "wins" or "tomorrow"; null for ordinary rites. */
+  kind?: string | null;
   sort_order: number;
   archived: boolean;
   created_at: string;
@@ -64,7 +66,41 @@ export async function listRites(ownerId: string): Promise<Rite[] | null> {
     if (seedErr) return null;
     return (seeded ?? []) as Rite[];
   }
-  return (data as Rite[]).filter((r) => !r.archived);
+  const live = (data as Rite[]).filter((r) => !r.archived);
+  return ensureSpecialRites(ownerId, live);
+}
+
+/** The two special evening rites, added once (ahead of the others) when missing. */
+const SPECIAL_RITES: { kind: string; title: string; description: string; xp_value: number }[] = [
+  { kind: "wins", title: "Appreciate recent wins", description: "Look back at what you got done.", xp_value: 5 },
+  { kind: "tomorrow", title: "Choose tomorrow's quests", description: "Pick tomorrow's three main quests.", xp_value: 10 },
+];
+
+async function ensureSpecialRites(ownerId: string, rites: Rite[]): Promise<Rite[]> {
+  // Before migration 0030 there's no `kind` column: leave things as they are.
+  if (rites.length > 0 && !("kind" in rites[0])) return rites;
+  const missing = SPECIAL_RITES.filter((s) => !rites.some((r) => r.kind === s.kind));
+  if (missing.length === 0) return rites;
+  const db = supabaseAdmin();
+  const first = Math.min(0, ...rites.filter((r) => r.slot !== "day").map((r) => r.sort_order));
+  const added: Rite[] = [];
+  for (const [i, s] of SPECIAL_RITES.entries()) {
+    if (!missing.includes(s)) continue;
+    // A unique index keeps a second, simultaneous page load from adding it twice.
+    const { data, error } = await db
+      .from("rites")
+      .insert({ owner_id: ownerId, title: s.title, description: s.description, is_core: true, xp_value: s.xp_value, kind: s.kind, sort_order: first - SPECIAL_RITES.length + i })
+      .select("*")
+      .single<Rite>();
+    if (data) added.push(data);
+    else if (error && error.code !== "23505") return rites;
+  }
+  if (added.length < missing.length) {
+    // Someone else's insert won the race: read the list again.
+    const { data } = await db.from("rites").select("*").eq("owner_id", ownerId).eq("archived", false).order("sort_order").order("created_at");
+    return (data as Rite[] | null) ?? rites;
+  }
+  return [...added, ...rites].sort((a, b) => a.sort_order - b.sort_order);
 }
 
 /** Completions on or after `sinceDay` (YYYY-MM-DD). */
@@ -134,6 +170,40 @@ export async function updateRite(
     .eq("owner_id", ownerId);
   if (error && /days|due_time/.test(error.message)) throw new Error("Weekly habits need a quick database update first.");
   if (error) throw new Error(`Failed to update rite: ${error.message}`);
+}
+
+/** Bring back a rite that was just removed. */
+export async function restoreRite(riteId: string, ownerId: string): Promise<void> {
+  const { error } = await supabaseAdmin().from("rites").update({ archived: false }).eq("id", riteId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to restore rite: ${error.message}`);
+}
+
+/** Completions of these rites on or after `sinceDay` (for habit streaks). */
+export async function listCompletionsFor(ownerId: string, riteIds: string[], sinceDay: string): Promise<{ rite_id: string; day: string }[]> {
+  if (riteIds.length === 0) return [];
+  const { data, error } = await supabaseAdmin().from("rite_completions").select("rite_id, day").eq("owner_id", ownerId).in("rite_id", riteIds).gte("day", sinceDay);
+  if (error) return [];
+  return (data ?? []) as { rite_id: string; day: string }[];
+}
+
+/** Habit days skipped on purpose, on or after `sinceDay`; null before migration 0030. */
+export async function listHabitSkips(ownerId: string, sinceDay: string): Promise<{ rite_id: string; day: string }[] | null> {
+  const { data, error } = await supabaseAdmin().from("habit_skips").select("rite_id, day").eq("owner_id", ownerId).gte("day", sinceDay);
+  if (error) return null;
+  return (data ?? []) as { rite_id: string; day: string }[];
+}
+
+export async function addHabitSkip(ownerId: string, riteId: string, day: string): Promise<void> {
+  const { error } = await supabaseAdmin().from("habit_skips").insert({ owner_id: ownerId, rite_id: riteId, day });
+  if (error && error.code !== "23505") {
+    if (/habit_skips/.test(error.message)) throw new Error("Skipping habits needs a quick database update first.");
+    throw new Error(`Failed to skip: ${error.message}`);
+  }
+}
+
+export async function removeHabitSkip(ownerId: string, riteId: string, day: string): Promise<void> {
+  const { error } = await supabaseAdmin().from("habit_skips").delete().eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day);
+  if (error) throw new Error(`Failed to undo the skip: ${error.message}`);
 }
 
 /** Archive rather than delete, so past evenings keep their history. */

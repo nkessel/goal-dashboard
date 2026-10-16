@@ -13,7 +13,8 @@ import { getProfileById } from "@/lib/data/profiles";
 import { getWeeklyXpEarned, currentWeekStart } from "@/lib/data/xp";
 import { listFriendIds } from "@/lib/data/friendships";
 import { listClaimedSince } from "@/lib/data/rewards";
-import { listRites, listRiteCompletions } from "@/lib/data/rites";
+import { listRites, listRiteCompletions, listCompletionsFor, listHabitSkips } from "@/lib/data/rites";
+import { listJournalEntries } from "@/lib/data/journal";
 import { DayNightFlip } from "@/components/evening/DayNightFlip";
 import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
@@ -85,8 +86,14 @@ export default async function Home() {
   ]);
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
-  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null });
+  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, kind: r.kind ?? null });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
+  // Habit streaks look back a few months; skips end a streak. Journal entries join today's victories.
+  const [habitHistory, habitSkips, journal] = await Promise.all([
+    habits?.length ? listCompletionsFor(session.user.id, habits.map((h) => h.id), daysAgoISO(120).slice(0, 10)) : Promise.resolve([]),
+    listHabitSkips(session.user.id, daysAgoISO(120).slice(0, 10)),
+    listJournalEntries(session.user.id, 30).catch(() => null),
+  ]);
   const eveningRites = rites?.filter((r) => r.slot !== "day").map(riteView) ?? null;
   // Imports wait for approval before they show here at all; quests taken off
   // the Today screen live only on their boards.
@@ -118,7 +125,7 @@ export default async function Home() {
               theme={theme}
               between={
                 habits && rites?.some((r) => "slot" in r) ? (
-                  <DailyHabits habits={habits} completions={riteCompletions.map((c) => ({ rite_id: c.rite_id, day: c.day }))} theme={theme} />
+                  <DailyHabits habits={habits} completions={habitHistory} skips={habitSkips} theme={theme} />
                 ) : null
               }
             />
@@ -134,6 +141,7 @@ export default async function Home() {
                 const r = rites?.find((x) => x.id === c.rite_id);
                 return r ? [{ id: c.id, title: r.title, day: c.day, xp: c.xp_awarded }] : [];
               })}
+              journal={(journal ?? []).filter((j) => j.created_at >= daysAgoISO(2)).map((j) => ({ id: j.id, body: j.body, kind: j.kind, created_at: j.created_at }))}
               theme={theme}
             />
           </div>

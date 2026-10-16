@@ -13,6 +13,7 @@ import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import { CelebrationSettings } from "@/components/settings/CelebrationSettings";
 import { EveningButtonFxSettings } from "@/components/settings/VisualFxSettings";
+import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
 import { getProfileById } from "@/lib/data/profiles";
 import { xpToNextLevel } from "@/lib/data/xp";
@@ -231,11 +232,14 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </svg>
             }
           >
-            <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
-              {session?.googleAccessToken
-                ? "Your Google Calendar is connected — appointments show on the Calendar view, and scheduling a quest adds it to your calendar too."
-                : "Sign in with Google again to connect your calendar."}
-            </p>
+            {session?.googleAccessToken ? (
+              <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
+                Your Google Calendar is connected — appointments show on the Calendar view, and scheduling a quest adds it to your calendar too.
+                To unlink it, remove Goal Dashboard under Third-party apps in your Google Account.
+              </p>
+            ) : (
+              <ConnectCalendar isAdventure={isAdventure} returnTo="/settings" compact />
+            )}
           </SettingsRow>
 
           <SettingsRow

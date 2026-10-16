@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { completeRiteAction, uncompleteRiteAction } from "@/app/actions";
+import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { completeRiteAction, reorderRitesAction, skipHabitAction, uncompleteRiteAction, unskipHabitAction } from "@/app/actions";
 import { useLocalDay } from "@/components/evening/evening-clock";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
 import type { RiteView } from "@/components/evening/EveningRites";
@@ -14,10 +17,14 @@ import type { RiteView } from "@/components/evening/EveningRites";
 export function DailyHabits({
   habits,
   completions,
+  skips = [],
   theme,
 }: {
   habits: RiteView[];
+  /** Completions over the last few months (for today's ticks and the streaks). */
   completions: { rite_id: string; day: string }[];
+  /** Days skipped on purpose; null before that database update. */
+  skips?: { rite_id: string; day: string }[] | null;
   theme: "calm" | "adventure";
 }) {
   const day = useLocalDay();
@@ -26,15 +33,93 @@ export function DailyHabits({
   const [editing, setEditing] = useState<RiteView | "new" | null>(null);
   const [pop, setPop] = useState<{ id: string; xp: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [confirmSkip, setConfirmSkip] = useState<string | null>(null);
+  const [skipOverride, setSkipOverride] = useState<Record<string, boolean>>({});
+  // Order kept locally while a drag is saving.
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [seen, setSeen] = useState(habits);
   const [, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
+  if (seen !== habits) {
+    setSeen(habits);
+    setOrder(null);
+  }
 
+  const byId = new Map(habits.map((h) => [h.id, h]));
+  const ordered = (order ?? habits.map((h) => h.id)).map((id) => byId.get(id)).filter((h): h is RiteView => !!h);
   // Only habits that fall on today (weekday of the app day, 5:30am rollover).
   const weekday = day ? new Date(`${day}T12:00:00`).getDay() : null;
-  const todays = habits.filter((h) => !h.days || h.days.length === 0 || weekday === null || h.days.includes(weekday));
-  const offToday = habits.length - todays.length;
-  const done = (id: string) => optimistic[id] ?? completions.some((c) => c.rite_id === id && c.day === day);
+  const dueOn = (h: RiteView, wd: number | null) => !h.days || h.days.length === 0 || wd === null || h.days.includes(wd);
+  const doneSet = new Set(completions.map((c) => `${c.rite_id}|${c.day}`));
+  const skipSet = new Set((skips ?? []).map((c) => `${c.rite_id}|${c.day}`));
+  const done = (id: string) => optimistic[id] ?? doneSet.has(`${id}|${day}`);
+  const skipped = (id: string) => skipOverride[id] ?? skipSet.has(`${id}|${day}`);
+  const dueToday = ordered.filter((h) => dueOn(h, weekday));
+  const todays = dueToday.filter((h) => !skipped(h.id));
+  const skippedToday = dueToday.filter((h) => skipped(h.id));
+  const offToday = habits.length - dueToday.length;
   const doneCount = todays.filter((h) => done(h.id)).length;
+
+  /**
+   * Days in a row this habit was done, counting only the days it's due.
+   * Today counts once ticked; until then the streak carries on from
+   * yesterday. A missed or skipped day ends it.
+   */
+  function streak(h: RiteView): number {
+    if (!day) return 0;
+    let n = 0;
+    const d = new Date(`${day}T12:00:00`);
+    for (let i = 0; i < 400; i++) {
+      const key = localKey(d);
+      if (dueOn(h, d.getDay())) {
+        const isDone = i === 0 ? done(h.id) : doneSet.has(`${h.id}|${key}`);
+        const isSkipped = i === 0 ? skipped(h.id) : skipSet.has(`${h.id}|${key}`);
+        if (isDone) n++;
+        else if (isSkipped || i > 0) return n;
+      }
+      d.setDate(d.getDate() - 1);
+    }
+    return n;
+  }
+
+  function setSkip(h: RiteView, value: boolean) {
+    if (!day) return;
+    setMenuFor(null);
+    setConfirmSkip(null);
+    setError(null);
+    setSkipOverride((o) => ({ ...o, [h.id]: value }));
+    startTransition(async () => {
+      try {
+        if (value) await skipHabitAction(h.id, day);
+        else await unskipHabitAction(h.id, day);
+      } catch (e) {
+        setSkipOverride((o) => ({ ...o, [h.id]: !value }));
+        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  function onDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const ids = ordered.map((h) => h.id);
+    const next = arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
+    setOrder(next);
+    startTransition(async () => {
+      try {
+        await reorderRitesAction(next);
+      } catch (e) {
+        setOrder(null);
+        setError(e instanceof Error ? e.message : "Couldn't reorder.");
+      }
+    });
+  }
 
   function toggle(h: RiteView) {
     if (!day) return;
@@ -95,12 +180,15 @@ export function DailyHabits({
               {error}
             </p>
           )}
+          <DndContext id="dnd-DailyHabits" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={todays.map((h) => h.id)} strategy={verticalListSortingStrategy}>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {todays.map((h) => {
               const d = done(h.id);
+              const s = streak(h);
               return (
-                <li
-                  key={h.id}
+                <SortableHabit key={h.id} id={h.id} disabled={!open} raised={menuFor === h.id || confirmSkip === h.id}>
+                <div
                   className={`relative flex items-center gap-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
                   style={isAdventure ? { borderRadius: 16 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
                 >
@@ -135,17 +223,82 @@ export function DailyHabits({
                       </span>
                     )}
                   </button>
-                  <span className="relative z-[1] shrink-0 text-[15px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
-                    +{h.xp_value} XP
+                  <span className="relative z-[1] flex shrink-0 flex-col items-end gap-0.5">
+                    <span className="text-[15px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
+                      +{h.xp_value} XP
+                    </span>
+                    {s > 0 && (
+                      <span className="text-[12.5px] font-semibold tabular-nums" style={{ color: isAdventure ? "#8a4b12" : "var(--t-clay)" }} title={`${s}-day streak`}>
+                        🔥 {s}
+                      </span>
+                    )}
                   </span>
+                  {!d && skips !== null && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onClick={() => setMenuFor(menuFor === h.id ? null : h.id)}
+                      aria-label={`More for ${h.title}`}
+                      aria-expanded={menuFor === h.id}
+                      className="relative z-[1] -mr-1 flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-[18px] leading-none"
+                      style={{ color: "var(--t-ink-soft)" }}
+                    >
+                      ⋯
+                    </button>
+                  )}
+                  {menuFor === h.id && (
+                    <div className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 170 }}>
+                      <button
+                        type="button"
+                        onClick={() => (s > 0 ? (setMenuFor(null), setConfirmSkip(h.id)) : setSkip(h, true))}
+                        className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5"
+                      >
+                        ⤼ Skip today
+                      </button>
+                    </div>
+                  )}
+                  {confirmSkip === h.id && (
+                    <div role="alertdialog" aria-label="Skip and lose your streak?" className="card-pop-in absolute inset-x-2 top-full z-20 mt-1 flex flex-col gap-2 rounded-xl p-3 parchment" style={{ borderRadius: 12 }}>
+                      <p className="relative z-[1] m-0 text-[14.5px] leading-snug" style={{ color: "var(--t-ink)" }}>
+                        Skip <b>{h.title}</b> today? Your 🔥 {s}-day streak will end.
+                      </p>
+                      <div className="relative z-[1] flex justify-end gap-2">
+                        <button type="button" onClick={() => setConfirmSkip(null)} className="h-9 rounded-full px-4 text-[14px] font-semibold" style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}>
+                          Keep my streak
+                        </button>
+                        <button type="button" onClick={() => setSkip(h, true)} className="h-9 rounded-full px-3 text-[14px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                          Skip anyway
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {pop?.id === h.id && (
                     <span aria-hidden className="power-spark pointer-events-none absolute left-1/2 top-0 z-[2] text-[16px] font-bold" style={{ color: "var(--t-xp)" }}>
                       +{pop.xp} XP
                     </span>
                   )}
-                </li>
+                </div>
+                </SortableHabit>
               );
             })}
+          </ul>
+          </SortableContext>
+          </DndContext>
+          {skippedToday.length > 0 && (
+            <p className="m-0 px-2 pt-2 text-center text-[13.5px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.85 }}>
+              {skippedToday.map((h, i) => (
+                <span key={h.id}>
+                  {i > 0 && " · "}
+                  {h.title} skipped today{" "}
+                  <button type="button" onClick={() => setSkip(h, false)} className="underline">
+                    undo
+                  </button>
+                </span>
+              ))}
+            </p>
+          )}
+          <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
             <li>
               <button
                 type="button"
@@ -167,6 +320,27 @@ export function DailyHabits({
       {editing && <RiteEditorDialog rite={editing === "new" ? undefined : editing} slot="day" onClose={() => setEditing(null)} />}
     </section>
   );
+}
+
+/** A habit row that can be pressed and dragged to reorder (mouse after a short move, touch after a short hold). */
+function SortableHabit({ id, disabled = false, raised = false, children }: { id: string; disabled?: boolean; raised?: boolean; children: React.ReactNode }) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled });
+  return (
+    <li
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className="board-sortable touch-manipulation"
+      style={{ transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.4 : 1, position: "relative", zIndex: raised || isDragging ? 30 : undefined }}
+    >
+      {children}
+    </li>
+  );
+}
+
+function localKey(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

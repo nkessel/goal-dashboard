@@ -19,7 +19,9 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { completeRiteAction, reorderRitesAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
+import { completeRiteAction, removeRiteAction, reorderRitesAction, restoreRiteAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
+import { SwipeToDelete } from "@/components/ui/SwipeToDelete";
+import { RecentWins } from "./RecentWins";
 import { GoldRule, Leaf } from "@/components/ui/Ornaments";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 import { RiteEditorDialog } from "./RiteEditorDialog";
@@ -42,6 +44,8 @@ export type RiteView = {
   days?: number[] | null;
   /** Habits: due by this time ("17:30"). */
   due_time?: string | null;
+  /** Special evening rites with their own content: "wins" or "tomorrow". */
+  kind?: string | null;
 };
 
 const CORE_ZONE = "zone:core";
@@ -136,6 +140,11 @@ export function EveningRites({
   const [pop, setPop] = useState<{ id: string; xp: number } | null>(null);
   const [away, setAway] = useState<Away>({});
   const [error, setError] = useState<string | null>(null);
+  // Special rites open to show their content (wins, tomorrow's quests).
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // Swiped away: hidden at once, with a moment to undo.
+  const [removed, setRemoved] = useState<RiteView | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
 
   // Order + which list, kept locally while dragging / saving.
@@ -159,12 +168,14 @@ export function EveningRites({
   const coreIds = local?.core ?? (rites ?? []).filter((r) => r.is_core).map((r) => r.id);
   const miniIds = local?.mini ?? (rites ?? []).filter((r) => !r.is_core).map((r) => r.id);
   const isAway = (id: string) => {
+    if (hidden.has(id)) return true;
     const a = away[id];
     return a === "skip" || (typeof a === "number" && a > now);
   };
   const core = coreIds.map((id) => byId.get(id)).filter((r): r is RiteView => !!r && !isAway(r.id));
   const mini = miniIds.map((id) => byId.get(id)).filter((r): r is RiteView => !!r && !isAway(r.id));
-  const awayList = (rites ?? []).filter((r) => isAway(r.id));
+  const awayList = (rites ?? []).filter((r) => isAway(r.id) && !hidden.has(r.id));
+  const tomorrowRite = (rites ?? []).find((r) => r.kind === "tomorrow");
 
   const doneTonight = (id: string) => optimistic[id] ?? completions.some((c) => c.rite_id === id && c.day === day);
   const coreDone = core.filter((r) => doneTonight(r.id)).length;
@@ -186,6 +197,53 @@ export function EveningRites({
       } catch (e) {
         setOptimistic((o) => ({ ...o, [r.id]: !next }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
+
+  const isOpen = (r: RiteView) => expanded[r.id] ?? (r.kind === "tomorrow" && !doneTonight(r.id));
+  const toggleOpen = (r: RiteView) => setExpanded((x) => ({ ...x, [r.id]: !isOpen(r) }));
+
+  /** Tomorrow's Quests is one rite: done (with its XP) once all three slots are filled. */
+  function syncTomorrow(r: RiteView, filled: number) {
+    const done = doneTonight(r.id);
+    if ((filled >= 3 && !done) || (filled < 3 && done)) toggle(r);
+  }
+
+  function remove(r: RiteView) {
+    setHidden((h) => new Set(h).add(r.id));
+    setRemoved(r);
+    setError(null);
+    startTransition(async () => {
+      try {
+        await removeRiteAction(r.id);
+      } catch (e) {
+        setHidden((h) => {
+          const n = new Set(h);
+          n.delete(r.id);
+          return n;
+        });
+        setRemoved(null);
+        setError(e instanceof Error ? e.message : "Couldn't remove that rite.");
+      }
+    });
+    setTimeout(() => setRemoved((x) => (x?.id === r.id ? null : x)), 6000);
+  }
+
+  function undoRemove() {
+    const r = removed;
+    if (!r) return;
+    setRemoved(null);
+    setHidden((h) => {
+      const n = new Set(h);
+      n.delete(r.id);
+      return n;
+    });
+    startTransition(async () => {
+      try {
+        await restoreRiteAction(r.id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't bring it back.");
       }
     });
   }
@@ -273,12 +331,28 @@ export function EveningRites({
 
   function card(r: RiteView, overlay = false) {
     const done = doneTonight(r.id);
-    return (
-      <div className={`parchment moonlit relative flex items-center gap-3 rounded-2xl px-3 py-3 ${done ? "rite-done" : ""}`} style={{ borderRadius: 16 }}>
-        <button type="button" onClick={() => toggle(r)} aria-pressed={done} aria-label={done ? `Undo ${r.title}` : `Complete ${r.title}`} className="relative z-[1] rounded-full">
-          <RiteSeal done={done} />
-        </button>
-        <button type="button" onClick={() => setEditing(r)} title="Edit rite" className="relative z-[1] min-w-0 flex-1 text-left">
+    const special = r.kind === "wins" || r.kind === "tomorrow";
+    const open = special && !overlay && isOpen(r);
+    const inner = (
+      <div className={`parchment moonlit relative flex flex-col rounded-2xl px-3 py-3 ${done ? "rite-done" : ""}`} style={{ borderRadius: 16 }}>
+      <div className="flex items-center gap-3">
+        {r.kind === "tomorrow" ? (
+          // Completes itself once all three quests are chosen.
+          <button type="button" onClick={() => toggleOpen(r)} aria-label={done ? `${r.title}: done` : `${r.title}: choose all three to complete`} className="relative z-[1] rounded-full">
+            <RiteSeal done={done} />
+          </button>
+        ) : (
+          <button type="button" onClick={() => toggle(r)} aria-pressed={done} aria-label={done ? `Undo ${r.title}` : `Complete ${r.title}`} className="relative z-[1] rounded-full">
+            <RiteSeal done={done} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => (special ? toggleOpen(r) : setEditing(r))}
+          aria-expanded={special ? open : undefined}
+          title={special ? (open ? "Fold away" : "Open") : "Edit rite"}
+          className="relative z-[1] min-w-0 flex-1 text-left"
+        >
           <span className="block break-words text-[18px] font-semibold leading-tight" style={{ color: "var(--t-ink)", textDecoration: done ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)" }}>
             {r.title}
           </span>
@@ -326,7 +400,26 @@ export function EveningRites({
           </span>
         )}
       </div>
+      {open && (
+        // Its own controls (buttons, inner drag, scrolling) shouldn't start dragging the rite card.
+        <div
+          className="relative z-[1] mt-3 border-t pt-3"
+          style={{ borderColor: "rgba(139,112,64,.35)" }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {r.kind === "wins" ? (
+            <RecentWins day={day} />
+          ) : (
+            <TomorrowQuests embedded queued={tomorrow} candidates={openQuests} theme={theme} onCountChange={(n) => syncTomorrow(r, n)} />
+          )}
+        </div>
+      )}
+      </div>
     );
+    return overlay || special ? inner : <SwipeToDelete label={r.title} onDelete={() => remove(r)}>{inner}</SwipeToDelete>;
   }
 
   const active = activeId ? byId.get(activeId) : null;
@@ -410,7 +503,16 @@ export function EveningRites({
             </div>
           )}
 
-          <TomorrowQuests queued={tomorrow} candidates={openQuests} theme={theme} />
+          {!tomorrowRite && <TomorrowQuests queued={tomorrow} candidates={openQuests} theme={theme} />}
+
+          {removed && (
+            <p role="status" className="-mt-2 text-center text-[14px]" style={{ color: "#d9d2bd" }}>
+              Removed “{removed.title}” ·{" "}
+              <button type="button" onClick={undoRemove} className="font-semibold underline" style={{ color: "var(--t-gold)" }}>
+                Undo
+              </button>
+            </p>
+          )}
 
           {/* Additional Mini-Quests: a tray that slides open */}
           <section>

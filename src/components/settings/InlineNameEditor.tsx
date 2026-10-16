@@ -3,8 +3,12 @@
 import { useRef, useState, useTransition } from "react";
 import { updateProfileNameAction } from "@/app/actions";
 
-/** The character name in the Settings header — click it to rename in place. */
-export function InlineNameEditor({ initialName, isAdventure }: { initialName: string; isAdventure: boolean }) {
+/**
+ * The character name — click it to rename in place. "settings" sits in the
+ * Settings header; "hero" sits above the avatar on the Today screen.
+ */
+export function InlineNameEditor({ initialName, isAdventure, variant = "settings" }: { initialName: string; isAdventure: boolean; variant?: "settings" | "hero" }) {
+  const hero = variant === "hero";
   const [name, setName] = useState(initialName);
   const [draft, setDraft] = useState(initialName);
   const [editing, setEditing] = useState(false);
@@ -35,10 +39,13 @@ export function InlineNameEditor({ initialName, isAdventure }: { initialName: st
     });
   }
 
-  const textCls = `text-lg font-semibold ${isAdventure ? "font-display" : ""}`;
+  const textCls = hero
+    ? `${isAdventure ? "font-display text-[17px] sm:text-[19px]" : "text-base font-bold"} leading-tight`
+    : `text-lg font-semibold ${isAdventure ? "font-display" : ""}`;
+  const color = hero && isAdventure ? "#f2d27e" : "var(--t-ink)";
 
   return (
-    <div className="mt-2 flex flex-col items-center">
+    <div className={hero ? `flex max-w-full flex-col ${isAdventure ? "items-center" : "items-start"}` : "mt-2 flex flex-col items-center"}>
       {editing ? (
         <input
           ref={inputRef}
@@ -51,7 +58,8 @@ export function InlineNameEditor({ initialName, isAdventure }: { initialName: st
           }}
           maxLength={40}
           aria-label="Character name"
-          className={`${textCls} w-60 rounded-lg border px-2 py-0.5 text-center`}
+          placeholder="Character name"
+          className={`${textCls} ${hero ? "w-48" : "w-60"} rounded-lg border px-2 py-0.5 text-center`}
           style={{
             color: "var(--t-ink)",
             background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
@@ -63,10 +71,10 @@ export function InlineNameEditor({ initialName, isAdventure }: { initialName: st
           type="button"
           onClick={start}
           title="Click to rename"
-          className={`${textCls} group flex items-center gap-1.5 rounded-lg px-2 py-0.5 hover:bg-black/5`}
-          style={{ color: "var(--t-ink)", opacity: isSaving ? 0.6 : 1 }}
+          className={`${textCls} group flex max-w-full items-center gap-1.5 rounded-lg px-2 py-0.5 ${hero ? "hover:bg-white/10" : "hover:bg-black/5"}`}
+          style={{ color, opacity: isSaving ? 0.6 : name ? 1 : 0.7, textShadow: hero && isAdventure ? "0 2px 6px rgba(0,0,0,.65)" : undefined }}
         >
-          {name}
+          <span className="truncate">{name || "Name your character"}</span>
           <svg
             width="14"
             height="14"

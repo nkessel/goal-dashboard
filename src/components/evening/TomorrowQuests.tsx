@@ -17,6 +17,7 @@ import type { Task } from "@/lib/data/types";
 import { setTomorrowQueueAction } from "@/app/actions";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { QuestPickerSheet } from "@/components/tasks/QuestPickerSheet";
+import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 const SLOTS = 3;
@@ -30,7 +31,13 @@ export function TomorrowQuests({
   queued,
   candidates,
   theme,
+  embedded = false,
+  onCountChange,
 }: {
+  /** Shown inside its evening rite card: no heading of its own. */
+  embedded?: boolean;
+  /** How many slots are filled after a change (the rite completes at three). */
+  onCountChange?: (n: number) => void;
   /** Null before the database update that adds the queue. */
   queued: TaskWithCategory[] | null;
   /** Open quests that could go in a slot. */
@@ -40,6 +47,7 @@ export function TomorrowQuests({
   const [order, setOrder] = useState<string[] | null>(null);
   const [seen, setSeen] = useState(queued);
   const [picking, setPicking] = useState(false);
+  const [editing, setEditing] = useState<TaskWithCategory | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   if (seen !== queued) {
@@ -62,6 +70,7 @@ export function TomorrowQuests({
   function save(next: string[]) {
     setOrder(next);
     setError(null);
+    onCountChange?.(next.length);
     startTransition(async () => {
       try {
         await setTomorrowQueueAction(next);
@@ -82,7 +91,8 @@ export function TomorrowQuests({
   }
 
   return (
-    <section className="flex flex-col gap-2.5" aria-labelledby="tomorrow-heading">
+    <section className="flex flex-col gap-2.5" aria-labelledby={embedded ? undefined : "tomorrow-heading"} aria-label={embedded ? "Tomorrow's Quests" : undefined}>
+      {!embedded && (
       <div className="flex items-end justify-between gap-2 px-1">
         <div>
           <h3 id="tomorrow-heading" className="font-display m-0 text-[21px] leading-tight" style={{ color: "#f1ead2", textShadow: "0 2px 8px rgba(0,0,0,.5)" }}>
@@ -96,6 +106,7 @@ export function TomorrowQuests({
           {filled.length}/{SLOTS}
         </span>
       </div>
+      )}
 
       {error && (
         <p className="m-0 rounded-lg px-3 py-2 text-[14px] font-semibold" style={{ background: "var(--t-warn-bg)", color: "var(--t-warn)" }}>
@@ -114,6 +125,7 @@ export function TomorrowQuests({
                   id={id}
                   n={i + 1}
                   task={t}
+                  onEdit={t ? () => setEditing(t) : undefined}
                   onRemove={() => save(filled.filter((x) => x !== id))}
                 />
               );
@@ -148,6 +160,7 @@ export function TomorrowQuests({
           onClose={() => setPicking(false)}
         />
       )}
+      {editing && <EditTaskModal task={editing} theme={theme} onClose={() => setEditing(null)} />}
     </section>
   );
 }
@@ -168,7 +181,7 @@ function SlotNumber({ n, empty = false }: { n: number; empty?: boolean }) {
   );
 }
 
-function SlotCard({ id, n, task, onRemove }: { id: string; n: number; task?: TaskWithCategory; onRemove: () => void }) {
+function SlotCard({ id, n, task, onEdit, onRemove }: { id: string; n: number; task?: TaskWithCategory; onEdit?: () => void; onRemove: () => void }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
   const art = task && (task.icon_source === "ai" || task.icon_source === "library") ? task.icon_key : null;
   return (
@@ -198,7 +211,7 @@ function SlotCard({ id, n, task, onRemove }: { id: string; n: number; task?: Tas
           <QuestMonogram id={id} title={task?.title ?? "?"} size={40} />
         )}
       </span>
-      <span className="relative z-[1] min-w-0 flex-1">
+      <button type="button" onClick={onEdit} disabled={!onEdit} title="Edit this quest" className="relative z-[1] min-w-0 flex-1 text-left">
         <span className="line-clamp-2 block text-[16px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
           {task?.title ?? "Loading…"}
         </span>
@@ -207,7 +220,7 @@ function SlotCard({ id, n, task, onRemove }: { id: string; n: number; task?: Tas
             {task.categoryLabel}
           </span>
         )}
-      </span>
+      </button>
       <button
         type="button"
         onMouseDown={(e) => e.stopPropagation()}

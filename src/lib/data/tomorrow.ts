@@ -5,6 +5,7 @@ import type { Task } from "./types";
 const TZ = process.env.APP_TIMEZONE || "America/New_York";
 /** The app's day turns over at 5:30am, like the evening routine's clock. */
 const ROLLOVER_MINUTES = 5 * 60 + 30;
+/** Tomorrow's Quests has three slots. */
 const MAX_TODAY = 3;
 
 /** Today's key (YYYY-MM-DD) in the app's time zone, with the 5:30am rollover. */
@@ -72,10 +73,8 @@ export async function promoteQueuedQuests(ownerId: string): Promise<boolean> {
   const { data: openQueued } = await db.from("tasks").select("id").eq("status", "open").in("id", queued.map((q) => q.id));
   const openIds = new Set((openQueued ?? []).map((r) => r.id as string));
   const queuedIds = queued.map((q) => q.id as string).filter((id) => openIds.has(id));
-  const next = [...new Set([...queuedIds, ...(pinned ?? []).map((r) => r.id as string)])].slice(0, MAX_TODAY);
-  const unpin = (pinned ?? []).map((r) => r.id as string).filter((id) => !next.includes(id));
-
-  if (unpin.length) await db.from("tasks").update({ is_manual_priority: false }).eq("owner_id", ownerId).in("id", unpin);
+  // Planned quests go on top; whatever was already in Today's Quests stays below them.
+  const next = [...new Set([...queuedIds, ...(pinned ?? []).map((r) => r.id as string)])];
   await Promise.all(next.map((id, i) => db.from("tasks").update({ is_manual_priority: true, sort_order: i }).eq("owner_id", ownerId).eq("id", id)));
   await db.from("tasks").update({ queued_for: null, queue_rank: null }).eq("owner_id", ownerId).in("id", queued.map((q) => q.id as string));
   return true;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { CreateFab } from "@/components/create/CreateFab";
@@ -121,6 +122,7 @@ export default async function CalendarPage({
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex flex-col gap-4">
         <PageHeader isAdventure={isAdventure} title="Quest Calendar" calmTitle="Calendar" />
+        {!session.googleAccessToken && <ConnectCalendar isAdventure={isAdventure} />}
 
         <div
           className="flex items-center gap-2 text-xs"
