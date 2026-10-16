@@ -59,6 +59,12 @@ export async function createCalendarEvent(
   return res.data.id;
 }
 
+/** Removes an event (a quest taken back off the calendar). */
+export async function deleteCalendarEvent(accessToken: string, eventId: string): Promise<void> {
+  const calendar = calendarClient(accessToken);
+  await calendar.events.delete({ calendarId: "primary", eventId });
+}
+
 /**
  * Updates (moves) an existing event — used when a task already has a
  * calendar event and gets rescheduled, so it's a move rather than a

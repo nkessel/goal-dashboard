@@ -22,6 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { completeRiteAction, removeRiteAction, reorderRitesAction, restoreRiteAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
 import { SwipeToDelete } from "@/components/ui/SwipeToDelete";
 import { RecentWins } from "./RecentWins";
+import { DayPlanner } from "./DayPlanner";
 import { GoldRule, Leaf } from "@/components/ui/Ornaments";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 import { RiteEditorDialog } from "./RiteEditorDialog";
@@ -204,10 +205,17 @@ export function EveningRites({
   const isOpen = (r: RiteView) => expanded[r.id] ?? (r.kind === "tomorrow" && !doneTonight(r.id));
   const toggleOpen = (r: RiteView) => setExpanded((x) => ({ ...x, [r.id]: !isOpen(r) }));
 
-  /** Tomorrow's Quests is one rite: done (with its XP) once all three slots are filled. */
+  /**
+   * Choosing tomorrow's quests is one rite: it completes itself once three or
+   * more are chosen (or with a tap, for a lighter day), and undoes itself if
+   * every quest is taken back out.
+   */
+  const [tomorrowCount, setTomorrowCount] = useState<number | null>(null);
+  const chosenTomorrow = tomorrowCount ?? tomorrow?.length ?? 0;
   function syncTomorrow(r: RiteView, filled: number) {
+    setTomorrowCount(filled);
     const done = doneTonight(r.id);
-    if ((filled >= 3 && !done) || (filled < 3 && done)) toggle(r);
+    if ((filled >= 3 && !done) || (filled === 0 && done)) toggle(r);
   }
 
   function remove(r: RiteView) {
@@ -331,14 +339,14 @@ export function EveningRites({
 
   function card(r: RiteView, overlay = false) {
     const done = doneTonight(r.id);
-    const special = r.kind === "wins" || r.kind === "tomorrow";
+    const special = r.kind === "wins" || r.kind === "tomorrow" || r.kind === "plan";
     const open = special && !overlay && isOpen(r);
     const inner = (
       <div className={`parchment moonlit relative flex flex-col rounded-2xl px-3 py-3 ${done ? "rite-done" : ""}`} style={{ borderRadius: 16 }}>
       <div className="flex items-center gap-3">
-        {r.kind === "tomorrow" ? (
-          // Completes itself once all three quests are chosen.
-          <button type="button" onClick={() => toggleOpen(r)} aria-label={done ? `${r.title}: done` : `${r.title}: choose all three to complete`} className="relative z-[1] rounded-full">
+        {r.kind === "tomorrow" && chosenTomorrow === 0 && !done ? (
+          // Nothing chosen yet: the seal opens the list instead.
+          <button type="button" onClick={() => toggleOpen(r)} aria-label={`${r.title}: choose a quest first`} className="relative z-[1] rounded-full">
             <RiteSeal done={done} />
           </button>
         ) : (
@@ -412,6 +420,8 @@ export function EveningRites({
         >
           {r.kind === "wins" ? (
             <RecentWins day={day} />
+          ) : r.kind === "plan" ? (
+            <DayPlanner day={day} chosen={tomorrow ?? []} theme={theme} />
           ) : (
             <TomorrowQuests embedded queued={tomorrow} candidates={openQuests} theme={theme} onCountChange={(n) => syncTomorrow(r, n)} />
           )}

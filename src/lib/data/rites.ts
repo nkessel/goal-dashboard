@@ -71,12 +71,15 @@ export async function listRites(ownerId: string): Promise<Rite[] | null> {
 }
 
 /** The two special evening rites, added once (ahead of the others) when missing. */
-const SPECIAL_RITES: { kind: string; title: string; description: string; xp_value: number }[] = [
+const SPECIAL_RITES: { kind: string; title: string; description: string; xp_value: number; adopt?: RegExp }[] = [
   { kind: "wins", title: "Appreciate recent wins", description: "Look back at what you got done.", xp_value: 5 },
-  { kind: "tomorrow", title: "Choose tomorrow's quests", description: "Pick tomorrow's three main quests.", xp_value: 10 },
+  { kind: "tomorrow", title: "Choose tomorrow's quests", description: "Pick tomorrow's quests: how much each matters, and the order you'll do them.", xp_value: 10 },
+  // Someone's own "Plan tomorrow…" rite becomes the day planner (keeping its history).
+  { kind: "plan", title: "Plan tomorrow's day", description: "Place tomorrow's quests, meals and moments on its hours.", xp_value: 10, adopt: /^plan tomorrow/i },
 ];
 
-async function ensureSpecialRites(ownerId: string, rites: Rite[]): Promise<Rite[]> {
+async function ensureSpecialRites(ownerId: string, list: Rite[]): Promise<Rite[]> {
+  let rites = list;
   // Before migration 0030 there's no `kind` column: leave things as they are.
   if (rites.length > 0 && !("kind" in rites[0])) return rites;
   const missing = SPECIAL_RITES.filter((s) => !rites.some((r) => r.kind === s.kind));
@@ -86,6 +89,23 @@ async function ensureSpecialRites(ownerId: string, rites: Rite[]): Promise<Rite[
   const added: Rite[] = [];
   for (const [i, s] of SPECIAL_RITES.entries()) {
     if (!missing.includes(s)) continue;
+    const own = s.adopt ? rites.find((r) => !r.kind && r.slot !== "day" && s.adopt!.test(r.title)) : undefined;
+    if (own) {
+      const { data, error } = await db
+        .from("rites")
+        .update({ kind: s.kind, sort_order: first - SPECIAL_RITES.length + i })
+        .eq("id", own.id)
+        .eq("owner_id", ownerId)
+        .select("*")
+        .single<Rite>();
+      if (data) {
+        added.push(data);
+        rites = rites.filter((r) => r.id !== own.id);
+        continue;
+      }
+      if (error && error.code !== "23505") return rites;
+      continue;
+    }
     // A unique index keeps a second, simultaneous page load from adding it twice.
     const { data, error } = await db
       .from("rites")

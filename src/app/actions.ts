@@ -34,6 +34,8 @@ import {
   listBusyIntervals,
   createCalendarEvent,
   updateCalendarEvent,
+  deleteCalendarEvent,
+  listEvents,
 } from "@/lib/google-calendar";
 import { coinsForXp } from "@/lib/coins";
 
@@ -587,11 +589,13 @@ async function attachCalendarEvent(
   profileId: string,
   task: { id: string; title: string; description: string | null; google_calendar_event_id?: string | null },
   start: Date,
-  end: Date
+  end: Date,
+  /** False while planning a day: moving a quest around isn't a reschedule. */
+  countAsReschedule = true
 ) {
   let eventId = task.google_calendar_event_id ?? undefined;
   if (!accessToken) {
-    await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId);
+    await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId, countAsReschedule);
     return;
   }
   if (eventId) {
@@ -604,7 +608,7 @@ async function attachCalendarEvent(
       end,
     });
   }
-  await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId);
+  await tasksData.rescheduleTask(task.id, profileId, start.toISOString(), end.toISOString(), eventId, countAsReschedule);
 }
 
 /**
@@ -1518,10 +1522,101 @@ export async function deleteJournalEntryAction(id: string) {
 }
 
 /** The evening routine's "Tomorrow's Quests": up to three, in slot order. */
-export async function setTomorrowQueueAction(ids: string[]) {
+/** Tomorrow's plan: `rankIds` by importance, `seqIds` in the order you'll do them. */
+export async function setTomorrowQueueAction(rankIds: string[], seqIds?: string[]) {
   const ownerId = await requireProfileId();
-  await tomorrowData.setTomorrowQueue(ownerId, ids);
+  await tomorrowData.setTomorrowQueue(ownerId, rankIds, seqIds);
   revalidatePath("/");
+}
+
+// ---------------------------------------------------------------------------
+// Planning tomorrow's day (the evening's "Plan tomorrow's day" rite)
+// ---------------------------------------------------------------------------
+
+export type DayPlan = {
+  events: { id: string; title: string; start: string; end: string; isAllDay: boolean }[];
+  quests: { id: string; title: string; start: string; end: string; icon_key: string | null; icon_source: string | null; status: string }[];
+  calendarConnected: boolean;
+};
+
+/** What's already on a day: Google appointments (when connected) and quests placed there. */
+export async function getDayPlanAction(startISO: string, endISO: string): Promise<DayPlan> {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const start = new Date(startISO);
+  const end = new Date(endISO);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) throw new Error("Bad day.");
+  const [events, tasks] = await Promise.all([
+    accessToken ? listEvents(accessToken, start, end).catch(() => []) : Promise.resolve([]),
+    tasksData.listCalendarTasksForOwner(profileId, start, end),
+  ]);
+  const linked = new Set(tasks.map((t) => t.google_calendar_event_id).filter(Boolean));
+  return {
+    calendarConnected: !!accessToken,
+    events: events.filter((e) => !linked.has(e.id)).map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, isAllDay: e.isAllDay })),
+    quests: tasks
+      .filter((t) => t.scheduled_start && t.scheduled_end)
+      .map((t) => ({ id: t.id, title: t.title, start: t.scheduled_start!, end: t.scheduled_end!, icon_key: t.icon_key ?? null, icon_source: t.icon_source ?? null, status: t.status })),
+  };
+}
+
+/** Place (or move) a quest in a day plan. Planning moves don't count as reschedules. */
+export async function planQuestAtAction(taskId: string, startISO: string, endISO: string) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const task = await tasksData.getTask(taskId, profileId);
+  if (!task) throw new Error("That quest isn't here anymore.");
+  await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO), false);
+  revalidatePath("/");
+  revalidatePath("/calendar");
+}
+
+/** A quick event (a meal, a workout…) placed straight onto the plan as a small quest. */
+export async function planQuickEventAction(input: { title: string; startISO: string; endISO: string; xp?: number }) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const title = input.title.trim().slice(0, 80);
+  if (!title) throw new Error("Name it first.");
+  const minutes = Math.round((new Date(input.endISO).getTime() - new Date(input.startISO).getTime()) / 60_000);
+  const task = await tasksData.createTask(profileId, { title, xpValue: Math.max(0, Math.round(input.xp ?? 5)), estimateMinutes: minutes > 0 ? minutes : null });
+  // Lives on the calendar, not in Additional Quests.
+  await tasksData.setTaskInAdditional(task.id, profileId, false).catch(() => null);
+  await attachCalendarEvent(accessToken, profileId, task, new Date(input.startISO), new Date(input.endISO), false);
+  revalidatePath("/");
+  revalidatePath("/calendar");
+  return task.id;
+}
+
+/** Take a quest back off the calendar (and off Google Calendar, when connected). */
+export async function unscheduleTaskAction(taskId: string) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const eventId = await tasksData.unscheduleTask(taskId, profileId);
+  if (eventId && accessToken) await deleteCalendarEvent(accessToken, eventId).catch(() => {});
+  revalidatePath("/");
+  revalidatePath("/calendar");
+}
+
+export type QuickEvent = { label: string; emoji: string; minutes: number };
+const DEFAULT_QUICK_EVENTS: QuickEvent[] = [
+  { label: "Breakfast", emoji: "🍳", minutes: 30 },
+  { label: "Lunch", emoji: "🥪", minutes: 45 },
+  { label: "Dinner", emoji: "🍲", minutes: 60 },
+  { label: "Exercise", emoji: "🏃", minutes: 45 },
+  { label: "Visit Dad", emoji: "🏡", minutes: 120 },
+  { label: "Couples check-in", emoji: "💞", minutes: 30 },
+];
+
+export async function getQuickEventsAction(): Promise<QuickEvent[]> {
+  const profileId = await requireProfileId();
+  const { data, error } = await supabaseAdmin().from("profiles").select("quick_events").eq("id", profileId).maybeSingle<{ quick_events: QuickEvent[] | null }>();
+  return !error && Array.isArray(data?.quick_events) ? data.quick_events : DEFAULT_QUICK_EVENTS;
+}
+
+export async function saveQuickEventsAction(list: QuickEvent[]) {
+  const profileId = await requireProfileId();
+  const clean = list
+    .slice(0, 16)
+    .map((q) => ({ label: String(q.label).trim().slice(0, 40), emoji: String(q.emoji || "📌").slice(0, 8), minutes: Math.max(5, Math.min(600, Math.round(Number(q.minutes) || 30))) }))
+    .filter((q) => q.label);
+  const { error } = await supabaseAdmin().from("profiles").update({ quick_events: clean }).eq("id", profileId);
+  if (error) throw new Error("Saving quick events needs a quick database update first.");
 }
 
 /** Drag a quest onto another board. */

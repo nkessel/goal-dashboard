@@ -498,7 +498,9 @@ export async function rescheduleTask(
   ownerId: string,
   scheduledStart: string,
   scheduledEnd: string,
-  googleCalendarEventId?: string
+  googleCalendarEventId?: string,
+  /** False while planning a day: moving a quest around a plan isn't a reschedule. */
+  countAsReschedule = true
 ): Promise<Task> {
   const db = supabaseAdmin();
   const { data: current, error: fetchError } = await db
@@ -510,7 +512,7 @@ export async function rescheduleTask(
 
   if (fetchError) throw new Error(`Failed to load task: ${fetchError.message}`);
 
-  const nextCount = current.is_on_calendar
+  const nextCount = current.is_on_calendar && countAsReschedule
     ? current.reschedule_count + 1
     : current.reschedule_count;
 
@@ -530,6 +532,19 @@ export async function rescheduleTask(
 
   if (error) throw new Error(`Failed to reschedule task: ${error.message}`);
   return data;
+}
+
+/** Take a quest back off the calendar; returns its Google event id, if it had one. */
+export async function unscheduleTask(taskId: string, ownerId: string): Promise<string | null> {
+  const db = supabaseAdmin();
+  const { data: current } = await db.from("tasks").select("google_calendar_event_id").eq("id", taskId).eq("owner_id", ownerId).maybeSingle();
+  const { error } = await db
+    .from("tasks")
+    .update({ is_on_calendar: false, scheduled_start: null, scheduled_end: null, google_calendar_event_id: null })
+    .eq("id", taskId)
+    .eq("owner_id", ownerId);
+  if (error) throw new Error(`Failed to take it off the calendar: ${error.message}`);
+  return (current?.google_calendar_event_id as string | null) ?? null;
 }
 
 export async function getTask(taskId: string, ownerId: string): Promise<Task | null> {

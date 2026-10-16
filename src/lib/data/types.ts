@@ -87,6 +87,8 @@ export type Task = {
   /** False = not listed in Additional Quests (lives on its board only). */
   in_additional?: boolean;
   queue_rank?: number | null;
+  /** Tomorrow's planned order of doing (see queue_rank for importance). */
+  queue_seq?: number | null;
   /** Can be worked on in chunks of this many minutes (filler time). */
   chunk_minutes?: number | null;
   /** Custom coin payout; null = automatic from XP. */
