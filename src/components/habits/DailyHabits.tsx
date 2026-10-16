@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -8,11 +8,15 @@ import { completeRiteAction, reorderRitesAction, skipHabitAction, uncompleteRite
 import { useLocalDay } from "@/components/evening/evening-clock";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
 import type { RiteView } from "@/components/evening/EveningRites";
+import { FocusMode, habitAsTask } from "@/components/one-thing/OneThing";
+import { CoinIcon } from "@/components/ui/Icons";
+import { coinsForXp } from "@/lib/coins";
 
 /**
  * Daily habits: small repeating quests on the day side (stored like evening
- * rites, in the "day" slot). Tick each one once a day for its XP. Collapsible,
- * open by default.
+ * rites, in the "day" slot). Tick each one once a day for its XP and coins;
+ * its avatar is a checkbox unless it has a portrait. The ⋯ menu opens focus
+ * mode (with a timer) or skips it for today. Collapsible, open by default.
  */
 export function DailyHabits({
   habits,
@@ -35,6 +39,7 @@ export function DailyHabits({
   const [error, setError] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [confirmSkip, setConfirmSkip] = useState<string | null>(null);
+  const [focusing, setFocusing] = useState<RiteView | null>(null);
   const [skipOverride, setSkipOverride] = useState<Record<string, boolean>>({});
   // Order kept locally while a drag is saving.
   const [order, setOrder] = useState<string[] | null>(null);
@@ -45,6 +50,9 @@ export function DailyHabits({
     setSeen(habits);
     setOrder(null);
   }
+
+  // One stable quest-shaped copy of the habit while focus mode is open.
+  const focusTask = useMemo(() => (focusing && day ? habitAsTask(focusing, day) : null), [focusing, day]);
 
   const byId = new Map(habits.map((h) => [h.id, h]));
   const ordered = (order ?? habits.map((h) => h.id)).map((id) => byId.get(id)).filter((h): h is RiteView => !!h);
@@ -192,24 +200,46 @@ export function DailyHabits({
                   className={`relative flex items-center gap-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
                   style={isAdventure ? { borderRadius: 16 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
                 >
-                  <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={d}
-                    aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
-                    onClick={() => toggle(h)}
-                    className="relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
-                    style={{
-                      background: d ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "rgba(255,250,238,.6)",
-                      border: `2px solid ${d ? "#2f5a26" : "#a58c66"}`,
-                    }}
-                  >
-                    {d && (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                        <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </button>
+                  {h.icon_key ? (
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={d}
+                      aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
+                      onClick={() => toggle(h)}
+                      className="relative z-[1] h-11 w-11 shrink-0 rounded-full transition-transform active:scale-90"
+                      style={{ boxShadow: d ? "0 0 0 2.5px #58a04a" : "0 0 0 2px #a58c66" }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- habit portrait */}
+                      <img src={h.icon_key} alt="" className="h-full w-full rounded-full object-cover" style={{ filter: d ? "saturate(.55) brightness(.92)" : undefined }} />
+                      {d && (
+                        <span aria-hidden className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)", border: "1.5px solid #fff6e0" }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={d}
+                      aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
+                      onClick={() => toggle(h)}
+                      className="relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
+                      style={{
+                        background: d ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "rgba(255,250,238,.6)",
+                        border: `2px solid ${d ? "#2f5a26" : "#a58c66"}`,
+                      }}
+                    >
+                      {d && (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
                   <button type="button" onClick={() => setEditing(h)} className="relative z-[1] min-w-0 flex-1 text-left" title="Edit habit">
                     <span
                       className="block text-[16px] font-semibold leading-snug"
@@ -217,15 +247,21 @@ export function DailyHabits({
                     >
                       {h.title}
                     </span>
-                    {(h.description || h.due_time || (h.days && h.days.length < 7)) && (
+                    {(h.description || h.due_time || h.estimate_minutes || (h.days && h.days.length < 7)) && (
                       <span className="block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                        {[scheduleLabel(h), h.description].filter(Boolean).join(" · ")}
+                        {[h.estimate_minutes ? `⏱ ${h.estimate_minutes}m` : null, scheduleLabel(h), h.description].filter(Boolean).join(" · ")}
                       </span>
                     )}
                   </button>
                   <span className="relative z-[1] flex shrink-0 flex-col items-end gap-0.5">
-                    <span className="text-[15px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
+                    <span className="flex items-center gap-1.5 text-[15px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
                       +{h.xp_value} XP
+                      {(h.coin_value ?? coinsForXp(h.xp_value)) > 0 && (
+                        <span className="flex items-center gap-0.5 text-[13.5px]" style={{ color: "#8a6116" }} title={`${h.coin_value ?? coinsForXp(h.xp_value)} coins`}>
+                          <CoinIcon size={14} />
+                          {h.coin_value ?? coinsForXp(h.xp_value)}
+                        </span>
+                      )}
                     </span>
                     {s > 0 && (
                       <span className="text-[12.5px] font-semibold tabular-nums" style={{ color: isAdventure ? "#8a4b12" : "var(--t-clay)" }} title={`${s}-day streak`}>
@@ -233,7 +269,7 @@ export function DailyHabits({
                       </span>
                     )}
                   </span>
-                  {!d && skips !== null && (
+                  {!d && (
                     <button
                       type="button"
                       onMouseDown={(e) => e.stopPropagation()}
@@ -248,14 +284,32 @@ export function DailyHabits({
                     </button>
                   )}
                   {menuFor === h.id && (
-                    <div className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 170 }}>
+                    <div className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 190 }}>
                       <button
                         type="button"
-                        onClick={() => (s > 0 ? (setMenuFor(null), setConfirmSkip(h.id)) : setSkip(h, true))}
-                        className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5"
+                        onClick={() => {
+                          setMenuFor(null);
+                          setFocusing(h);
+                        }}
+                        className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5"
                       >
-                        ⤼ Skip today
+                        <FocusGlyph /> Focus mode
+                        {h.estimate_minutes ? (
+                          <span className="ml-auto text-[13px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+                            {h.estimate_minutes}m
+                          </span>
+                        ) : null}
                       </button>
+                      {skips !== null && (
+                        <button
+                          type="button"
+                          onClick={() => (s > 0 ? (setMenuFor(null), setConfirmSkip(h.id)) : setSkip(h, true))}
+                          className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5"
+                          style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
+                        >
+                          ⤼ Skip today
+                        </button>
+                      )}
                     </div>
                   )}
                   {confirmSkip === h.id && (
@@ -318,6 +372,7 @@ export function DailyHabits({
       </div>
 
       {editing && <RiteEditorDialog rite={editing === "new" ? undefined : editing} slot="day" onClose={() => setEditing(null)} />}
+      {focusTask && <FocusMode task={focusTask} theme={theme} onClose={() => setFocusing(null)} />}
     </section>
   );
 }
@@ -357,6 +412,17 @@ function scheduleLabel(h: RiteView): string | null {
     parts.push(`by ${((hh + 11) % 12) + 1}:${String(mm).padStart(2, "0")} ${hh < 12 ? "AM" : "PM"}`);
   }
   return parts.length ? parts.join(" · ") : null;
+}
+
+/** A target: focus mode. */
+function FocusGlyph() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "#7a5f2a" }}>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+    </svg>
+  );
 }
 
 function HabitIcon() {

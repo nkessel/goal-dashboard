@@ -94,7 +94,7 @@ export default async function Home() {
       .map(([k, r]) => [k, r.level])
   ) as Record<string, number>;
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
-  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, kind: r.kind ?? null });
+  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, kind: r.kind ?? null, icon_key: r.icon_source ? r.icon_key : null, icon_source: r.icon_source ?? null, coin_value: r.coin_value ?? null, estimate_minutes: r.estimate_minutes ?? null });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
   // Habit streaks look back a few months; skips end a streak. Journal entries join today's victories.
   const [habitHistory, habitSkips, journal] = await Promise.all([

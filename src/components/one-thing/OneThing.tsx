@@ -3,8 +3,9 @@
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
-import { completeTaskAction, listQuestStepsAction, saveQuestStepsAction } from "@/app/actions";
-import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
+import { useRouter } from "next/navigation";
+import { completeRiteAction, completeTaskAction, listQuestStepsAction, saveQuestStepsAction } from "@/app/actions";
+import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
@@ -12,7 +13,30 @@ import { useEscape } from "@/lib/use-escape";
 import { rankOneThing, whyThisOne } from "@/lib/one-thing";
 import { adoptFocusTask, getFocusTimer, resetFocusTimer, setFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
 
-type TaskWithCategory = Task & { categoryLabel?: string | null };
+/** `habit` marks a daily habit shown as a quest (focus mode for a habit). */
+type TaskWithCategory = Task & { categoryLabel?: string | null; habit?: { riteId: string; day: string } };
+
+/**
+ * A daily habit dressed as a quest, so it can use focus mode (timer and
+ * all). Its id is "habit:<id>"; finishing it ticks the habit for `day`.
+ */
+export function habitAsTask(h: { id: string; title: string; description: string | null; xp_value: number; estimate_minutes?: number | null; icon_key?: string | null; icon_source?: string | null }, day: string): TaskWithCategory {
+  return {
+    id: `habit:${h.id}`,
+    title: h.title,
+    description: h.description,
+    xp_value: h.xp_value,
+    estimate_minutes: h.estimate_minutes ?? null,
+    icon_key: h.icon_key ?? null,
+    icon_source: (h.icon_source as Task["icon_source"]) ?? "monster",
+    importance: 0,
+    urgency: 0,
+    progress: 0,
+    status: "open",
+    categoryLabel: "Daily habit",
+    habit: { riteId: h.id, day },
+  } as unknown as TaskWithCategory;
+}
 
 /**
  * "Just one thing": when the list is too much, show a single quest full
@@ -93,6 +117,7 @@ function OneThingView({
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const router = useRouter();
 
   const byId = new Map(tasks.map((t) => [t.id, t]));
   // Quests finished or removed elsewhere drop out of the deck.
@@ -149,6 +174,14 @@ function OneThingView({
     const imageUrl = t.icon_source === "ai" || t.icon_source === "library" ? t.icon_key : null;
     startTransition(async () => {
       try {
+        if (t.habit) {
+          const res = await completeRiteAction(t.habit.riteId, t.habit.day);
+          if (res.xp > 0) celebrateProgress({ title: t.title, xp: res.xp, coinsEarned: res.coinsEarned, fromPct: 0, toPct: 100, heading: "Habit done!", barCaption: "Done for today" });
+          if (getFocusTimer().task?.id === t.id) resetFocusTimer();
+          router.refresh();
+          onClose();
+          return;
+        }
         const fd = new FormData();
         fd.set("taskId", t.id);
         const res = await completeTaskAction(fd);
@@ -241,20 +274,22 @@ function OneThingView({
               </p>
             )}
             <FocusTimer key={`timer-${task.id}`} task={task} minutes={task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25} />
-            <FocusSteps key={`steps-${task.id}`} taskId={task.id} />
+            {!task.habit && <FocusSteps key={`steps-${task.id}`} taskId={task.id} />}
             {error && (
               <p className="relative z-[1] m-0 text-[14px] font-semibold" style={{ color: "var(--t-warn)" }}>
                 {error}
               </p>
             )}
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="relative z-[1] text-[14px] underline decoration-dotted underline-offset-4"
-              style={{ color: "#6b5534" }}
-            >
-              Open quest
-            </button>
+            {!task.habit && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="relative z-[1] text-[14px] underline decoration-dotted underline-offset-4"
+                style={{ color: "#6b5534" }}
+              >
+                Open quest
+              </button>
+            )}
           </article>
         ) : (
           <div className="one-thing-in flex max-w-sm flex-col items-center gap-4 text-center">

@@ -7,12 +7,18 @@ import type { RiteView } from "./EveningRites";
 import { Moon } from "./BeginEveningButton";
 import { useEscape } from "@/lib/use-escape";
 import { usePortalTarget } from "@/components/ui/EmbedHost";
+import { IconPicker } from "@/components/tasks/IconPicker";
+import { CoinIcon } from "@/components/ui/Icons";
+import { coinsForXp } from "@/lib/coins";
 
 const XP_PRESETS = [0, 5, 10, 15, 25];
+const MINUTE_PRESETS = [2, 5, 10, 15, 30];
 
 /**
  * Create or edit an evening rite (name, note, XP, whether it's non-negotiable)
- * or, with slot="day", a daily habit — the same thing on the day side.
+ * or, with slot="day", a daily habit — the same thing on the day side, plus
+ * an avatar (a plain checkbox unless a portrait is picked), coins, and how
+ * long it usually takes (focus mode's timer).
  */
 export function RiteEditorDialog({
   rite,
@@ -33,6 +39,9 @@ export function RiteEditorDialog({
   const [isCore, setIsCore] = useState(rite?.is_core ?? defaultCore);
   const [days, setDays] = useState<number[]>(rite?.days ?? [0, 1, 2, 3, 4, 5, 6]);
   const [dueTime, setDueTime] = useState(rite?.due_time ?? "");
+  const [icon, setIcon] = useState<{ url: string; source: "library" | "ai" } | null>(rite?.icon_key && rite.icon_source ? { url: rite.icon_key, source: rite.icon_source } : null);
+  const [coinValue, setCoinValue] = useState<number | null>(rite?.coin_value ?? null);
+  const [minutes, setMinutes] = useState<number | null>(rite?.estimate_minutes ?? null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -48,7 +57,9 @@ export function RiteEditorDialog({
     startSaving(async () => {
       try {
         if (isHabit && days.length === 0) throw new Error("Pick at least one day.");
-        const schedule = isHabit ? { days: days.length === 7 ? null : days, dueTime: dueTime || null } : {};
+        const schedule = isHabit
+          ? { days: days.length === 7 ? null : days, dueTime: dueTime || null, iconKey: icon?.url ?? null, iconSource: icon?.source ?? null, coinValue, estimateMinutes: minutes }
+          : {};
         if (rite) await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
         else await createRiteAction({ title, description, isCore: isHabit ? true : isCore, xpValue: xp, slot, ...schedule });
         close();
@@ -96,23 +107,51 @@ export function RiteEditorDialog({
           </button>
         </div>
 
-        <input
-          autoFocus={!rite}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && save()}
-          placeholder={isHabit ? "What's the habit? (e.g. Tell Tiffany what she's doing right)" : "What's the rite? (e.g. Lay out tomorrow's clothes)"}
-          aria-label={isHabit ? "Habit" : "Rite"}
-          className={`${field} relative z-[1] h-11 font-semibold`}
-        />
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={2}
-          placeholder="A note to yourself (optional)"
-          aria-label="Note"
-          className={`${field} relative z-[1] resize-none py-1.5`}
-        />
+        <div className="relative z-[1] flex items-start gap-3">
+          {isHabit && (
+            <div className="flex shrink-0 flex-col items-center gap-1">
+              <IconPicker
+                currentIcon={icon?.url ?? null}
+                currentSource={icon?.source ?? "library"}
+                taskTitle={title}
+                taskDescription={description}
+                theme="adventure"
+                size={64}
+                emptyContent={<CheckboxAvatar />}
+                showEditHint
+                clearLabel="Use the checkbox"
+                onDraftChange={(url, source) => setIcon(url ? { url, source } : null)}
+              />
+              <span className="text-[11px]" style={{ color: "var(--t-ink-soft)" }}>
+                Avatar
+              </span>
+            </div>
+          )}
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <input
+              autoFocus={!rite}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && save()}
+              placeholder={isHabit ? "What's the habit? (e.g. Tell Tiffany what she's doing right)" : "What's the rite? (e.g. Lay out tomorrow's clothes)"}
+              aria-label={isHabit ? "Habit" : "Rite"}
+              className={`${field} h-11 font-semibold`}
+            />
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="A note to yourself (optional)"
+              aria-label="Note"
+              className={`${field} resize-none py-1.5`}
+            />
+          </div>
+        </div>
+        {isHabit && !icon && (
+          <p className="relative z-[1] -mt-1.5 m-0 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+            It shows as a checkbox. Tap the avatar to give it a portrait instead.
+          </p>
+        )}
 
         <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
           <span className="mr-0.5 text-[14.5px] font-semibold">XP</span>
@@ -145,6 +184,90 @@ export function RiteEditorDialog({
             style={{ borderColor: XP_PRESETS.includes(xp) ? "#b39a6a" : "#5a4520", background: XP_PRESETS.includes(xp) ? undefined : "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" }}
           />
         </div>
+
+        {isHabit && (
+          <div className="relative z-[1] flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1.5 text-[14.5px] font-semibold">
+              <CoinIcon size={17} /> Coins
+            </span>
+            <span className="flex h-8 items-center rounded-full border" style={{ borderColor: coinValue === null ? "#b39a6a" : "#5a4520" }}>
+              <button
+                type="button"
+                onClick={() => setCoinValue(Math.max(0, (coinValue ?? coinsForXp(xp)) - 1))}
+                aria-label="Fewer coins"
+                className="flex h-8 w-8 items-center justify-center text-[17px] leading-none"
+                style={{ color: "var(--t-ink-soft)" }}
+              >
+                −
+              </button>
+              <span className="min-w-6 text-center text-[15px] font-bold tabular-nums" style={{ color: coinValue === null ? "var(--t-ink-soft)" : "#8a6116" }} aria-live="polite">
+                {coinValue ?? coinsForXp(xp)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCoinValue(Math.min(1000, (coinValue ?? coinsForXp(xp)) + 1))}
+                aria-label="More coins"
+                className="flex h-8 w-8 items-center justify-center text-[17px] leading-none"
+                style={{ color: "var(--t-ink-soft)" }}
+              >
+                +
+              </button>
+            </span>
+            {coinValue === null ? (
+              <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+                automatic (1 per 30 XP)
+              </span>
+            ) : (
+              <button type="button" onClick={() => setCoinValue(null)} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                back to automatic
+              </button>
+            )}
+          </div>
+        )}
+
+        {isHabit && (
+          <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
+            <span className="mr-0.5 text-[14.5px] font-semibold">Takes</span>
+            {MINUTE_PRESETS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={minutes === m}
+                onClick={() => setMinutes(minutes === m ? null : m)}
+                className="h-8 min-w-10 rounded-full px-2.5 text-[13.5px] font-semibold tabular-nums"
+                style={
+                  minutes === m
+                    ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" }
+                    : { border: "1px solid #b39a6a", color: "var(--t-ink)" }
+                }
+              >
+                {m}m
+              </button>
+            ))}
+            <input
+              type="number"
+              onFocus={(e) => e.currentTarget.select()}
+              inputMode="numeric"
+              min={1}
+              max={600}
+              value={minutes !== null && !MINUTE_PRESETS.includes(minutes) ? minutes : ""}
+              placeholder="other"
+              onChange={(e) => {
+                const n = Math.round(Number(e.target.value) || 0);
+                setMinutes(n > 0 ? Math.min(600, n) : null);
+              }}
+              aria-label="Minutes it takes (any amount)"
+              className="h-8 w-[60px] rounded-full border px-1.5 text-center text-[16px] font-semibold tabular-nums"
+              style={{
+                borderColor: minutes !== null && !MINUTE_PRESETS.includes(minutes) ? "#5a4520" : "#b39a6a",
+                background: minutes !== null && !MINUTE_PRESETS.includes(minutes) ? "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" : undefined,
+              }}
+            />
+            <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+              {minutes ? "focus mode's timer" : "optional"}
+            </span>
+          </div>
+        )}
 
         {isHabit && (
           <div className="relative z-[1] flex flex-col gap-2">
@@ -260,5 +383,17 @@ export function RiteEditorDialog({
       </div>
     </div>,
     portalTarget
+  );
+}
+
+/** The empty avatar: the habit's plain checkbox. */
+function CheckboxAvatar() {
+  return (
+    <span className="flex h-full w-full items-center justify-center rounded-full" style={{ background: "rgba(255,250,238,.6)", border: "2px dashed #a58c66" }}>
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9" stroke="#a58c66" strokeWidth="2" />
+        <path d="M7.5 12.4l3 3 6-6.4" stroke="#a58c66" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }

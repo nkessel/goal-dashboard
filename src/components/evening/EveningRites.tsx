@@ -47,6 +47,13 @@ export type RiteView = {
   due_time?: string | null;
   /** Special evening rites with their own content: "wins" or "tomorrow". */
   kind?: string | null;
+  /** Habits: a picked portrait (null = the plain checkbox). */
+  icon_key?: string | null;
+  icon_source?: "library" | "ai" | null;
+  /** Habits: coins paid; null = automatic. */
+  coin_value?: number | null;
+  /** Habits: minutes it usually takes. */
+  estimate_minutes?: number | null;
 };
 
 const CORE_ZONE = "zone:core";

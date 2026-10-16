@@ -29,6 +29,7 @@ export function IconPicker({
   centered = false,
   showEditHint = false,
   artStyle = "monster",
+  clearLabel = "Clear",
 }: {
   /** Omit together with `onDraftChange` when the quest doesn't exist yet. */
   taskId?: string;
@@ -55,6 +56,8 @@ export function IconPicker({
   showEditHint?: boolean;
   /** "treasure" paints rewards on a beaming golden background. */
   artStyle?: "monster" | "treasure";
+  /** Label for taking the picture off (e.g. "Use the checkbox"). */
+  clearLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   // Shows a new pick right away (the quest prop only updates after a refresh).
@@ -285,7 +288,7 @@ export function IconPicker({
             <span className="ml-auto flex items-center gap-2">
               {shownIcon && (
                 <button type="button" onClick={clear} disabled={isPending} style={{ color: "var(--t-ink-soft)" }}>
-                  Clear
+                  {clearLabel}
                 </button>
               )}
               <button

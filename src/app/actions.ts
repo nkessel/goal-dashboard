@@ -1379,9 +1379,15 @@ export async function completeRiteAction(riteId: string, day: string) {
   assertDay(day);
   const rite = await ritesData.getRite(riteId, ownerId);
   if (!rite) throw new Error("That rite isn't here anymore.");
-  const added = await ritesData.addRiteCompletion(ownerId, riteId, day, rite.xp_value);
+  // A habit with its own coin value pays exactly that (on top of or instead of the automatic coins).
+  const coinAdjust = rite.coin_value == null ? 0 : Math.max(0, rite.coin_value) - coinsForXp(rite.xp_value);
+  const added = await ritesData.addRiteCompletion(ownerId, riteId, day, rite.xp_value, coinAdjust);
   let coinsEarned = 0;
   if (added && rite.xp_value > 0) coinsEarned = (await xp.awardXp(ownerId, rite.xp_value, "task_completed")).coinsEarned;
+  if (added && coinAdjust !== 0) {
+    await rewardsData.addCoins(ownerId, coinAdjust);
+    coinsEarned += coinAdjust;
+  }
   revalidatePath("/");
   return { xp: added ? rite.xp_value : 0, coinsEarned };
 }
@@ -1391,20 +1397,33 @@ export async function uncompleteRiteAction(riteId: string, day: string) {
   const ownerId = await requireProfileId();
   assertDay(day);
   const paid = await ritesData.removeRiteCompletion(ownerId, riteId, day);
-  if (paid && paid > 0) await xp.awardXp(ownerId, -paid, "task_completed");
+  if (paid && paid.xp > 0) await xp.awardXp(ownerId, -paid.xp, "task_completed");
+  if (paid && paid.coins !== 0) await rewardsData.addCoins(ownerId, -paid.coins);
   revalidatePath("/");
 }
 
-export async function createRiteAction(input: { title: string; description?: string; isCore: boolean; xpValue?: number; slot?: "evening" | "day"; days?: number[] | null; dueTime?: string | null }) {
+export async function createRiteAction(input: { title: string; description?: string; isCore: boolean; xpValue?: number; slot?: "evening" | "day"; days?: number[] | null; dueTime?: string | null } & ritesData.HabitExtras) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
   if (!title) throw new Error(input.slot === "day" ? "Name the habit first." : "Name the rite first.");
-  const rite = await ritesData.createRite(ownerId, { title, description: input.description?.trim() || null, isCore: input.isCore, xpValue: input.xpValue, slot: input.slot, days: input.days, dueTime: input.dueTime });
+  const rite = await ritesData.createRite(ownerId, {
+    title,
+    description: input.description?.trim() || null,
+    isCore: input.isCore,
+    xpValue: input.xpValue,
+    slot: input.slot,
+    days: input.days,
+    dueTime: input.dueTime,
+    iconKey: input.iconKey,
+    iconSource: input.iconSource,
+    coinValue: input.coinValue,
+    estimateMinutes: input.estimateMinutes,
+  });
   revalidatePath("/");
   return rite.id;
 }
 
-export async function updateRiteAction(riteId: string, input: { title?: string; description?: string; isCore?: boolean; xpValue?: number; days?: number[] | null; dueTime?: string | null }) {
+export async function updateRiteAction(riteId: string, input: { title?: string; description?: string; isCore?: boolean; xpValue?: number; days?: number[] | null; dueTime?: string | null } & ritesData.HabitExtras) {
   const ownerId = await requireProfileId();
   if (input.title !== undefined && !input.title.trim()) throw new Error("Name the rite first.");
   await ritesData.updateRite(riteId, ownerId, {
@@ -1414,6 +1433,10 @@ export async function updateRiteAction(riteId: string, input: { title?: string; 
     xpValue: input.xpValue,
     days: input.days,
     dueTime: input.dueTime,
+    iconKey: input.iconKey,
+    iconSource: input.iconSource,
+    coinValue: input.coinValue,
+    estimateMinutes: input.estimateMinutes,
   });
   revalidatePath("/");
 }

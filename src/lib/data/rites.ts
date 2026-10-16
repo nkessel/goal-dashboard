@@ -18,6 +18,12 @@ export type Rite = {
   due_time?: string | null;
   /** A special evening rite with its own content: "wins" or "tomorrow"; null for ordinary rites. */
   kind?: string | null;
+  /** Habits: where `icon_key`'s picture came from; null = the plain checkbox. */
+  icon_source?: "library" | "ai" | null;
+  /** Coins paid on completion; null = automatic (1 per 30 XP). */
+  coin_value?: number | null;
+  /** Minutes it usually takes (for focus mode's timer). */
+  estimate_minutes?: number | null;
   sort_order: number;
   archived: boolean;
   created_at: string;
@@ -31,6 +37,8 @@ export type RiteCompletion = {
   /** The viewer's local calendar day, YYYY-MM-DD. */
   day: string;
   xp_awarded: number;
+  /** Coins paid beyond the automatic ones (a habit's own coin value). */
+  coins_awarded?: number;
   completed_at: string;
 };
 
@@ -139,7 +147,7 @@ export async function getRite(riteId: string, ownerId: string): Promise<Rite | n
 
 export async function createRite(
   ownerId: string,
-  input: { title: string; description?: string | null; isCore: boolean; xpValue?: number; slot?: "evening" | "day"; days?: number[] | null; dueTime?: string | null }
+  input: { title: string; description?: string | null; isCore: boolean; xpValue?: number; slot?: "evening" | "day"; days?: number[] | null; dueTime?: string | null } & HabitExtras
 ): Promise<Rite> {
   const db = supabaseAdmin();
   const { data: last } = await db
@@ -160,10 +168,12 @@ export async function createRite(
       ...(input.slot === "day" ? { slot: "day" } : {}),
       ...(input.days && input.days.length < 7 ? { days: input.days } : {}),
       ...(input.dueTime ? { due_time: input.dueTime } : {}),
+      ...habitExtrasPatch(input),
     })
     .select("*")
     .single<Rite>();
   if (error && /slot/.test(error.message)) throw new Error("Daily habits need a quick database update first.");
+  if (error && /icon_source|coin_value|estimate_minutes/.test(error.message)) throw new Error("Habit avatars, coins and times need a quick database update first.");
   if (error && /days|due_time/.test(error.message)) throw new Error("Weekly habits need a quick database update first.");
   if (error || !data) throw new Error(`Failed to add rite: ${error?.message}`);
   return data;
@@ -172,7 +182,7 @@ export async function createRite(
 export async function updateRite(
   riteId: string,
   ownerId: string,
-  input: { title?: string; description?: string | null; isCore?: boolean; xpValue?: number; days?: number[] | null; dueTime?: string | null }
+  input: { title?: string; description?: string | null; isCore?: boolean; xpValue?: number; days?: number[] | null; dueTime?: string | null } & HabitExtras
 ): Promise<void> {
   const db = supabaseAdmin();
   const { error } = await db
@@ -184,11 +194,13 @@ export async function updateRite(
       ...(input.xpValue !== undefined ? { xp_value: Math.max(0, Math.round(input.xpValue)) } : {}),
       ...(input.days !== undefined ? { days: input.days && input.days.length < 7 ? input.days : null } : {}),
       ...(input.dueTime !== undefined ? { due_time: input.dueTime || null } : {}),
+      ...habitExtrasPatch(input),
       updated_at: new Date().toISOString(),
     })
     .eq("id", riteId)
     .eq("owner_id", ownerId);
   if (error && /days|due_time/.test(error.message)) throw new Error("Weekly habits need a quick database update first.");
+  if (error && /icon_source|coin_value|estimate_minutes/.test(error.message)) throw new Error("Habit avatars, coins and times need a quick database update first.");
   if (error) throw new Error(`Failed to update rite: ${error.message}`);
 }
 
@@ -234,9 +246,11 @@ export async function archiveRite(riteId: string, ownerId: string): Promise<void
 }
 
 /** Records a completion; returns false if it was already done that day. */
-export async function addRiteCompletion(ownerId: string, riteId: string, day: string, xpAwarded: number): Promise<boolean> {
+export async function addRiteCompletion(ownerId: string, riteId: string, day: string, xpAwarded: number, coinsAwarded = 0): Promise<boolean> {
   const db = supabaseAdmin();
-  const { error } = await db.from("rite_completions").insert({ owner_id: ownerId, rite_id: riteId, day, xp_awarded: xpAwarded });
+  const { error } = await db
+    .from("rite_completions")
+    .insert({ owner_id: ownerId, rite_id: riteId, day, xp_awarded: xpAwarded, ...(coinsAwarded ? { coins_awarded: coinsAwarded } : {}) });
   if (error) {
     if (error.code === "23505") return false; // already completed that day
     throw new Error(`Failed to complete rite: ${error.message}`);
@@ -244,8 +258,8 @@ export async function addRiteCompletion(ownerId: string, riteId: string, day: st
   return true;
 }
 
-/** Removes a completion; returns the XP it had paid (to reverse), or null. */
-export async function removeRiteCompletion(ownerId: string, riteId: string, day: string): Promise<number | null> {
+/** Removes a completion; returns what it had paid (to reverse), or null. */
+export async function removeRiteCompletion(ownerId: string, riteId: string, day: string): Promise<{ xp: number; coins: number } | null> {
   const db = supabaseAdmin();
   const { data } = await db
     .from("rite_completions")
@@ -253,9 +267,29 @@ export async function removeRiteCompletion(ownerId: string, riteId: string, day:
     .eq("owner_id", ownerId)
     .eq("rite_id", riteId)
     .eq("day", day)
-    .select("xp_awarded")
-    .maybeSingle<{ xp_awarded: number }>();
-  return data ? data.xp_awarded : null;
+    .select("*")
+    .maybeSingle<{ xp_awarded: number; coins_awarded?: number | null }>();
+  return data ? { xp: data.xp_awarded, coins: data.coins_awarded ?? 0 } : null;
+}
+
+/** A habit's avatar, coins and usual time (undefined leaves each as it is; null clears). */
+export type HabitExtras = {
+  iconKey?: string | null;
+  iconSource?: "library" | "ai" | null;
+  coinValue?: number | null;
+  estimateMinutes?: number | null;
+};
+
+function habitExtrasPatch(input: HabitExtras) {
+  const out: Record<string, unknown> = {};
+  if (input.iconKey !== undefined) {
+    const ok = typeof input.iconKey === "string" && input.iconKey.length < 2000 && /^(https?:\/\/|\/)/.test(input.iconKey);
+    out.icon_key = ok ? input.iconKey : null;
+    out.icon_source = ok ? (input.iconSource === "ai" ? "ai" : "library") : null;
+  }
+  if (input.coinValue !== undefined) out.coin_value = input.coinValue === null ? null : Math.max(0, Math.min(1000, Math.round(input.coinValue)));
+  if (input.estimateMinutes !== undefined) out.estimate_minutes = input.estimateMinutes && input.estimateMinutes > 0 ? Math.min(600, Math.round(input.estimateMinutes)) : null;
+  return out;
 }
 
 /** Save the evening's order (rites first, then mini-quests). */
