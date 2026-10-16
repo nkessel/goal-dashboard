@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 
 export type Win = {
   id: string;
-  kind: "quest" | "rite" | "habit" | "reward" | "journal" | "feedback";
+  kind: "quest" | "rite" | "habit" | "reward" | "journal" | "feedback" | "login";
   title: string;
   /** When it happened (ISO). */
   at: string;
@@ -18,11 +18,12 @@ export type Win = {
 export async function listWinsSince(ownerId: string, sinceISO: string): Promise<Win[]> {
   const db = supabaseAdmin();
   const sinceDay = sinceISO.slice(0, 10);
-  const [tasks, completions, rewards, journal] = await Promise.all([
+  const [tasks, completions, rewards, journal, logins] = await Promise.all([
     db.from("tasks").select("id, title, completed_at, xp_value, reward_id").eq("owner_id", ownerId).eq("status", "completed").gte("completed_at", sinceISO).order("completed_at", { ascending: false }).limit(300),
     db.from("rite_completions").select("id, rite_id, day, xp_awarded, completed_at").eq("owner_id", ownerId).gte("day", sinceDay).limit(500),
     db.from("rewards").select("id, title, claimed_at").eq("owner_id", ownerId).in("status", ["claimed", "completed"]).gte("claimed_at", sinceISO).limit(100),
     db.from("journal_entries").select("*").eq("owner_id", ownerId).gte("created_at", sinceISO).order("created_at", { ascending: false }).limit(200),
+    db.from("xp_events").select("id, amount, created_at").eq("owner_id", ownerId).eq("kind", "daily_check_in").gte("created_at", sinceISO).limit(60),
   ]);
 
   const riteIds = [...new Set((completions.data ?? []).map((c) => c.rite_id as string))];
@@ -41,6 +42,7 @@ export async function listWinsSince(ownerId: string, sinceISO: string): Promise<
       if (!r) return [];
       return [{ id: `r-${c.id}`, kind: r.slot === "day" ? ("habit" as const) : ("rite" as const), title: r.title, at: c.completed_at as string, day: c.day as string, xp: c.xp_awarded as number }];
     }),
+    ...(logins.data ?? []).map((l) => ({ id: `l-${l.id}`, kind: "login" as const, title: "Answered the call (daily login)", at: l.created_at as string, xp: Number(l.amount) || 0 })),
     ...(rewards.data ?? []).map((r) => ({ id: `w-${r.id}`, kind: "reward" as const, title: r.title as string, at: r.claimed_at as string })),
     ...(journal.data ?? []).map((j) => {
       // Older entries carry their kind as a "[Label] " prefix instead.

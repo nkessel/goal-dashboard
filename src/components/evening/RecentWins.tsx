@@ -103,6 +103,8 @@ export function RecentWins({ day }: { day: string | null }) {
     return rows;
   };
 
+  const victories = [...groups.values()].reduce((n, list) => n + rowsFor(list).length, 0);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col items-center gap-1 text-center">
@@ -111,7 +113,12 @@ export function RecentWins({ day }: { day: string | null }) {
         </SectionTitle>
         <span className="text-[14.5px]" style={{ color: "var(--t-ink)" }}>
           {days === 1 ? "Today\u2019s XP" : "XP"}: <span className="font-semibold tabular-nums">{totalXp}</span>
-          {wins && wins.length > 0 && <span style={{ color: "var(--t-ink-soft)" }}> · {wins.length} {wins.length === 1 ? "win" : "wins"}</span>}
+          {wins && wins.length > 0 && (
+            <span style={{ color: "var(--t-ink-soft)" }}>
+              {" "}
+              · {victories} {victories === 1 ? "victory" : "victories"}
+            </span>
+          )}
         </span>
       </div>
       <div role="group" aria-label="How far back" className="flex flex-wrap items-center justify-center gap-1.5">

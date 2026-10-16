@@ -152,18 +152,33 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
     if (plan && scrollRef.current) scrollRef.current.scrollTop = (8 - FIRST_HOUR) * HOUR_PX - 8;
   }, [plan === null, full]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Esc puts down whatever is being carried, then leaves full screen.
+  // A tap outside closes the Meal choices and the XP editor.
+  useEffect(() => {
+    if (!mealsOpen && !xpFor) return;
+    const onDown = (e: PointerEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.("[data-plan-pop]")) return;
+      setMealsOpen(false);
+      setXpFor(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [mealsOpen, xpFor]);
+
+  // Esc closes a menu, then puts down whatever is being carried, then leaves full screen.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (carry) {
+      if (mealsOpen || xpFor) {
+        setMealsOpen(false);
+        setXpFor(null);
+      } else if (carry) {
         setCarry(null);
         setGhost(null);
       } else if (full) setFull(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [carry, full]);
+  }, [carry, full, mealsOpen, xpFor]);
 
   if (!tomorrow || !dayStart) return null;
 
@@ -248,6 +263,7 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
   const xpHandlers = (label: string) => ({
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault();
+      if (!meals.some((m) => m.label === label)) setMealsOpen(false);
       setXpFor(label);
     },
     onPointerDown: (e: React.PointerEvent) => {
@@ -561,7 +577,7 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
           )}
           <div className="flex flex-wrap gap-1.5">
             {meals.length > 0 && (
-              <span className="relative">
+              <span className="relative" data-plan-pop>
                 <button
                   type="button"
                   aria-expanded={mealsOpen}
@@ -574,6 +590,7 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
                 >
                   <span aria-hidden>🍽️</span>
                   {carry?.kind === "quick" && meals.some((m) => m.label === carry.label) ? carry.label : "Meal"}
+                  {xpBadge(Math.max(...meals.map(xpOf)), carry?.kind === "quick" && meals.some((m) => m.label === carry.label))}
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
                     <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -607,7 +624,7 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
             {others.map((q) => {
               const on = carry?.kind === "quick" && carry.label === q.label;
               return (
-                <span key={q.label} className="relative">
+                <span key={q.label} className="relative" data-plan-pop>
                   <button
                     type="button"
                     aria-pressed={on}
