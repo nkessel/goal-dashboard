@@ -9,7 +9,7 @@ import { listWinsSince } from "@/lib/data/wins";
 
 export default async function InsightsPage() {
   const session = await requireSession();
-  const since = new Date(Date.now() - 31 * 86_400_000).toISOString();
+  const since = new Date(Date.now() - 92 * 86_400_000).toISOString();
   const [profile, energy, checks, metrics, wins] = await Promise.all([
     getProfileById(session.user.id),
     listEnergySince(session.user.id, since),
@@ -31,7 +31,7 @@ export default async function InsightsPage() {
             ...checks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at })),
           ]}
           metrics={["Energy", ...metrics]}
-          wins={wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0 }))}
+          wins={wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title }))}
         />
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>

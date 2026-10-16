@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { TrackingChart } from "./TrackingChart";
 
 type Reading = { metric: string; level: number; at: string };
-type WinLite = { kind: string; at: string; xp: number };
+type WinLite = { kind: string; at: string; xp: number; title?: string };
 
 const DAY = 86_400_000;
 const noop = () => () => {};
@@ -58,7 +59,6 @@ export function InsightsView({ theme, readings, metrics, wins }: { theme: "calm"
     { label: "Check-ins", now: new Set(readings.filter((r) => inRange(r.at, week, now + 1)).map((r) => dayKey(new Date(r.at)))).size, before: null, dec: false, suffix: " of 7 days" },
   ];
 
-  const days30 = lastDays(30);
   const days14 = lastDays(14);
   const xpByDay = new Map<string, number>();
   const doneByDay = new Map<string, number>();
@@ -99,16 +99,12 @@ export function InsightsView({ theme, readings, metrics, wins }: { theme: "calm"
         </div>
       </section>
 
-      {/* Check-ins */}
-      <section className={card} style={cardStyle} aria-label="Check-ins over 30 days">
+      {/* Everything you track, on one chart */}
+      <section className={card} style={cardStyle} aria-label="Tracking">
         <h2 className={h2} style={{ color: "var(--t-ink)" }}>
-          Check-ins · last 30 days
+          Tracking
         </h2>
-        <div className="relative z-[1] grid gap-3 sm:grid-cols-2">
-          {metrics.map((m) => (
-            <MetricChart key={m} metric={m} days={days30} readings={readings.filter((r) => r.metric === m)} />
-          ))}
-        </div>
+        <TrackingChart metrics={metrics} readings={readings} wins={wins} />
       </section>
 
       {/* XP per day */}
@@ -127,78 +123,6 @@ export function InsightsView({ theme, readings, metrics, wins }: { theme: "calm"
         <Patterns energy={energy} quests={quests} />
       </section>
     </div>
-  );
-}
-
-/** One metric's daily average over the last 30 days, 1–10. */
-function MetricChart({ metric, days, readings }: { metric: string; days: Date[]; readings: Reading[] }) {
-  const [hover, setHover] = useState<number | null>(null);
-  const W = 320;
-  const H = 120;
-  const L = 22;
-  const R = 6;
-  const T = 8;
-  const B = 18;
-  const byDay = new Map<string, number[]>();
-  for (const r of readings) {
-    const k = dayKey(new Date(r.at));
-    byDay.set(k, [...(byDay.get(k) ?? []), r.level]);
-  }
-  const pts = days.map((d, i) => ({ i, d, v: avg(byDay.get(dayKey(d)) ?? []), n: (byDay.get(dayKey(d)) ?? []).length }));
-  const x = (i: number) => L + (i * (W - L - R)) / (days.length - 1);
-  const y = (v: number) => T + ((10 - v) * (H - T - B)) / 9;
-  const have = pts.filter((p) => p.v !== null) as { i: number; d: Date; v: number; n: number }[];
-  const path = have.map((p, k) => `${k === 0 ? "M" : "L"}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
-  const latest = have[have.length - 1];
-  const h = hover !== null ? pts[hover] : null;
-
-  return (
-    <figure className="m-0 flex flex-col gap-1 rounded-xl px-3 py-2.5" style={{ background: "rgba(255,250,235,.55)", border: `1px solid ${GRID}` }}>
-      <figcaption className="flex items-baseline gap-2">
-        <span className="text-[15px] font-semibold" style={{ color: INK }}>
-          {metric}
-        </span>
-        <span className="ml-auto text-[13px] tabular-nums" style={{ color: INK_SOFT }}>
-          {h ? `${h.d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}: ${h.v === null ? "no check-in" : fmt1(h.v)}` : latest ? `latest ${fmt1(latest.v)}` : "no check-ins yet"}
-        </span>
-      </figcaption>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full touch-none"
-        role="img"
-        aria-label={`${metric}: ${have.length} days with check-ins${latest ? `, latest ${fmt1(latest.v)} of 10` : ""}`}
-        onPointerMove={(e) => {
-          const r = e.currentTarget.getBoundingClientRect();
-          const px = ((e.clientX - r.left) / r.width) * W;
-          setHover(Math.max(0, Math.min(days.length - 1, Math.round(((px - L) * (days.length - 1)) / (W - L - R)))));
-        }}
-        onPointerLeave={() => setHover(null)}
-      >
-        {[1, 5, 10].map((v) => (
-          <g key={v}>
-            <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" />
-            <text x={L - 5} y={y(v) + 3.5} textAnchor="end" fontSize="10" fill={INK_SOFT}>
-              {v}
-            </text>
-          </g>
-        ))}
-        {[0, 14, 29].map((i) => (
-          <text key={i} x={x(i)} y={H - 4} textAnchor={i === 0 ? "start" : i === 29 ? "end" : "middle"} fontSize="10" fill={INK_SOFT}>
-            {i === 29 ? "today" : days[i].toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-          </text>
-        ))}
-        {h && <line x1={x(h.i)} x2={x(h.i)} y1={T} y2={H - B} stroke={INK_SOFT} strokeWidth="1" strokeDasharray="3 3" />}
-        {have.length > 1 && <path d={path} fill="none" stroke={MARK} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
-        {have.map((p) => (
-          <circle key={p.i} cx={x(p.i)} cy={y(p.v)} r={hover === p.i ? 5 : 4} fill={MARK} stroke="#fbf3df" strokeWidth="2" />
-        ))}
-      </svg>
-      {have.length < 3 && (
-        <p className="m-0 text-[12.5px]" style={{ color: INK_SOFT }}>
-          A few more check-ins and a trend will show here.
-        </p>
-      )}
-    </figure>
   );
 }
 
