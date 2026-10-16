@@ -12,7 +12,7 @@ import { CoinIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
 import { RiteGlyph, glyphFor } from "./RiteGlyph";
 
-const XP_PRESETS = [0, 5, 10, 15, 25];
+const XP_PRESETS = [1, 3, 5, 10, 15];
 const MINUTE_PRESETS = [2, 5, 10, 15, 30];
 
 /**
@@ -348,13 +348,16 @@ export function RiteEditorDialog({
         <div className="relative z-[1] flex items-center justify-between gap-2 pt-1">
           {rite ? (
             !confirmingDelete ? (
-              <button type="button" onClick={() => setConfirmingDelete(true)} className="text-sm underline" style={{ color: "var(--t-warn)" }}>
-                {isHabit ? "Remove habit" : "Remove rite"}
+              <button type="button" onClick={() => setConfirmingDelete(true)} className="flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[14px] font-semibold hover:bg-black/5" style={{ color: "var(--t-warn)" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5L17.5 7M9.5 7V4.5h5V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Delete
               </button>
             ) : (
               <span className="flex items-center gap-2 text-sm">
                 <button type="button" onClick={remove} disabled={isSaving} className="rounded-full px-3 py-1.5 font-semibold" style={{ background: "var(--t-warn)", color: "#fff" }}>
-                  Yes, remove
+                  Yes, delete
                 </button>
                 <button type="button" onClick={() => setConfirmingDelete(false)} style={{ color: "var(--t-ink-soft)" }}>
                   Keep
@@ -365,7 +368,7 @@ export function RiteEditorDialog({
             <span />
           )}
           <span className="flex gap-2">
-            <button type="button" onClick={close} className="h-10 rounded-full px-4 text-[15px]" style={{ color: "var(--t-ink-soft)" }}>
+            <button type="button" onClick={close} className="h-10 rounded-full border-[1.5px] px-4 text-[15px] font-semibold transition-colors hover:bg-[rgba(139,112,64,.16)]" style={{ borderColor: "#a58c66", color: "var(--t-ink)" }}>
               Cancel
             </button>
             <button

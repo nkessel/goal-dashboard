@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -239,7 +239,7 @@ export function EveningRites({
     });
   }
 
-  const isOpen = (r: RiteView) => expanded[r.id] ?? (r.kind === "tomorrow" && !doneTonight(r.id));
+  const isOpen = (r: RiteView) => expanded[r.id] ?? false;
   const toggleOpen = (r: RiteView) => {
     setOpened((o) => (o[r.id] ? o : { ...o, [r.id]: true }));
     setExpanded((x) => ({ ...x, [r.id]: !isOpen(r) }));
@@ -305,6 +305,17 @@ export function EveningRites({
     writeAway(day, next);
     setMenuFor(null);
   }
+
+  // A tap outside closes a rite's menu.
+  useEffect(() => {
+    if (!menuFor) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t?.closest?.("[data-rite-menu]") && !t?.closest?.("[data-rite-menu-button]")) setMenuFor(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [menuFor]);
 
   // ---- Drag and drop -------------------------------------------------------
   const sensors = useSensors(
@@ -382,7 +393,15 @@ export function EveningRites({
     const special = r.kind === "wins" || r.kind === "tomorrow" || r.kind === "plan";
     const open = special && !overlay && isOpen(r);
     const inner = (
-      <div className={`parchment moonlit relative flex flex-col rounded-2xl px-3 py-3 ${done ? "rite-done" : ""}`} style={{ borderRadius: 16 }}>
+      <div
+        className={`parchment moonlit relative flex flex-col rounded-2xl px-3 py-3 ${done ? "rite-done" : ""}`}
+        style={{ borderRadius: 16 }}
+        onContextMenu={(e) => {
+          if (overlay) return;
+          e.preventDefault();
+          setMenuFor(r.id);
+        }}
+      >
       <div className="flex items-center gap-3">
         {r.kind === "tomorrow" && chosenTomorrow === 0 && !done ? (
           // Nothing chosen yet: the seal opens the list instead.
@@ -409,14 +428,7 @@ export function EveningRites({
               {r.description}
             </span>
           )}
-          {special && !overlay && (
-            <span className="mt-1 inline-flex items-center gap-1 text-[13px] font-semibold" style={{ color: "#6f4f12" }}>
-              {open ? "Fold away" : r.kind === "wins" ? "See today's victories" : r.kind === "plan" ? "Open the plan" : "Choose them"}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : undefined }}>
-                <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-          )}
+
         </button>
         <span className="relative z-[1] flex shrink-0 flex-col items-end gap-1">
           <span className="text-[18px] font-bold leading-none" style={{ color: "var(--t-xp)" }}>
@@ -427,8 +439,9 @@ export function EveningRites({
               type="button"
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
+              data-rite-menu-button
               onClick={() => setMenuFor(menuFor === r.id ? null : r.id)}
-              aria-label={`Skip or snooze ${r.title}`}
+              aria-label={`More for ${r.title}`}
               aria-expanded={menuFor === r.id}
               className="flex h-8 items-center rounded-full px-2 text-[18px] leading-none"
               style={{ color: "var(--t-ink-soft)" }}
@@ -438,16 +451,42 @@ export function EveningRites({
           )}
         </span>
         {menuFor === r.id && !overlay && (
-          <div className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 190 }}>
-            <button type="button" onClick={() => setAwayFor(r.id, "skip")} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5">
-              ⤼ Skip tonight
+          <div data-rite-menu role="menu" className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 190 }}>
+            {!special && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuFor(null);
+                  setEditing(r);
+                }}
+                className="relative z-[1] flex min-h-11 items-center gap-2.5 px-4 text-left text-[15px] hover:bg-black/5"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Edit
+              </button>
+            )}
+            <button type="button" role="menuitem" onClick={() => setAwayFor(r.id, "skip")} className="relative z-[1] flex min-h-11 items-center gap-2.5 border-t px-4 text-left text-[15px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
+              <span aria-hidden className="w-4 text-center">⤼</span>
+              Skip tonight
             </button>
-            <button type="button" onClick={() => setAwayFor(r.id, Date.now() + 60 * 60_000)} className="relative z-[1] min-h-11 border-t px-4 text-left text-[15px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
-              ⏰ Snooze 1 hour
-            </button>
-            <button type="button" onClick={() => setAwayFor(r.id, Date.now() + 2 * 60 * 60_000)} className="relative z-[1] min-h-11 border-t px-4 text-left text-[15px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
-              ⏰ Snooze 2 hours
-            </button>
+            {!special && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuFor(null);
+                  remove(r);
+                }}
+                className="relative z-[1] flex min-h-11 items-center gap-2.5 border-t px-4 text-left text-[15px] hover:bg-black/5"
+                style={{ borderColor: "rgba(139,112,64,.3)", color: "var(--t-warn)" }}
+              >
+                <TrashGlyph />
+                Delete
+              </button>
+            )}
           </div>
         )}
         {pop?.id === r.id && (
@@ -480,9 +519,9 @@ export function EveningRites({
             >
               <div className="relative z-[1]">
                 {r.kind === "wins" ? (
-                  <RecentWins day={day} />
+                  <RecentWins day={day} onHide={() => toggleOpen(r)} />
                 ) : r.kind === "plan" ? (
-                  <DayPlanner day={day} chosen={tomorrow ?? []} theme={theme} />
+                  <DayPlanner day={day} chosen={tomorrow ?? []} theme={theme} onHide={() => toggleOpen(r)} />
                 ) : (
                   <TomorrowQuests heading={false} queued={tomorrow} candidates={openQuests} theme={theme} onCountChange={(n) => syncTomorrow(r, n)} />
                 )}
@@ -689,5 +728,13 @@ function SortableRite({ id, disabled = false, raised = false, children }: { id: 
     >
       {children}
     </li>
+  );
+}
+
+function TrashGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5L17.5 7M9.5 7V4.5h5V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

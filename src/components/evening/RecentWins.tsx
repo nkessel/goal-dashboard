@@ -39,7 +39,7 @@ function dayLabel(key: string, today: string) {
  * habits, rewards, journal entries and feedback — drawn like Victories
  * Today. Today by default; reach further back with the range buttons.
  */
-export function RecentWins({ day }: { day: string | null }) {
+export function RecentWins({ day, onHide }: { day: string | null; /** Fold the tray away (small link at the bottom). */ onHide?: () => void }) {
   const [days, setDays] = useState<number>(1);
   const [wins, setWins] = useState<Win[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +178,11 @@ export function RecentWins({ day }: { day: string | null }) {
             </div>
           ))}
         </div>
+      )}
+      {onHide && (
+        <button type="button" onClick={onHide} className="mx-auto mt-1 rounded-full px-3 py-1 text-[13px] underline-offset-2 hover:underline" style={{ color: "var(--t-ink-soft)" }}>
+          Hide victories
+        </button>
       )}
     </div>
   );

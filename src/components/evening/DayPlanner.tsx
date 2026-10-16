@@ -24,7 +24,10 @@ type Carry =
 
 const FIRST_HOUR = 6;
 const LAST_HOUR = 23;
-const HOUR_PX = 48;
+const DEFAULT_HOUR_PX = 30;
+const MIN_HOUR_PX = 20;
+const MAX_HOUR_PX = 96;
+const ZOOM_KEY = "planner-hour-px";
 const SNAP_MIN = 15;
 const GUTTER = 46;
 
@@ -70,6 +73,54 @@ function lanes<T extends { start: number; end: number }>(items: T[]) {
   return out;
 }
 
+const WEATHER_KEY = "weather-coords";
+const WEATHER_EVENT = "weather-coords";
+
+/**
+ * Tomorrow's hourly forecast (temperature, chance of rain) from Open-Meteo,
+ * once a location has been shared: undefined = not asked yet, null =
+ * loading or unavailable.
+ */
+function useHourlyWeather(dayKey: string | null): Record<number, { temp: number; rain: number }> | null | undefined {
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null | undefined>(undefined);
+  const [data, setData] = useState<Record<number, { temp: number; rain: number }> | null>(null);
+  useEffect(() => {
+    const read = () => {
+      try {
+        const raw = window.localStorage.getItem(WEATHER_KEY);
+        setCoords(raw ? (JSON.parse(raw) as { lat: number; lon: number }) : undefined);
+      } catch {
+        setCoords(undefined);
+      }
+    };
+    read();
+    window.addEventListener(WEATHER_EVENT, read);
+    return () => window.removeEventListener(WEATHER_EVENT, read);
+  }, []);
+  useEffect(() => {
+    if (!coords || !dayKey) return;
+    const fahrenheit = /^en-US/.test(navigator.language) || /^(America\/(?!Sao|Argentina|Bogota|Lima|Santiago|Caracas|Mexico)|US\/)/.test(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&hourly=temperature_2m,precipitation_probability&timezone=auto&start_date=${dayKey}&end_date=${dayKey}${fahrenheit ? "&temperature_unit=fahrenheit" : ""}`;
+    let alive = true;
+    fetch(url)
+      .then((r) => r.json())
+      .then((j: { hourly?: { time: string[]; temperature_2m: number[]; precipitation_probability: number[] } }) => {
+        if (!alive || !j.hourly) return;
+        const out: Record<number, { temp: number; rain: number }> = {};
+        j.hourly.time.forEach((t, i) => {
+          out[Number(t.slice(11, 13))] = { temp: Math.round(j.hourly!.temperature_2m[i]), rain: Math.round(j.hourly!.precipitation_probability[i] ?? 0) };
+        });
+        setData(out);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [coords, dayKey]);
+  if (coords === undefined) return undefined;
+  return data;
+}
+
 const MEAL_RE = /breakfast|brunch|lunch|dinner|supper|snack|meal/i;
 const HEIGHT_KEY = "planner-height";
 const PLANNING_KEY = "planner-open";
@@ -95,7 +146,19 @@ const N = {
  * rest, each earning its XP when placed. Right-click (or press and hold) an
  * item to change its XP. Tap an item, then tap a time.
  */
-export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day: string | null; /** Tomorrow's chosen quests. */ chosen: TaskWithCategory[]; theme?: "calm" | "adventure" }) {
+export function DayPlanner({
+  day,
+  chosen,
+  onHide,
+}: {
+  /** This evening's day key. */
+  day: string | null;
+  /** Tomorrow's chosen quests. */
+  chosen: TaskWithCategory[];
+  theme?: "calm" | "adventure";
+  /** Fold the tray away (the small link at the bottom). */
+  onHide?: () => void;
+}) {
   const tomorrow = day ? addDays(day, 1) : null;
   const [plan, setPlan] = useState<DayPlan | null>(null);
   const [quick, setQuick] = useState<QuickEvent[] | null>(null);
@@ -107,6 +170,10 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
   const [mealsOpen, setMealsOpen] = useState(false);
   const [xpFor, setXpFor] = useState<string | null>(null);
   const [height, setHeight] = useState(DEFAULT_HEIGHT);
+  // How tall an hour is: drag the times on the left to squeeze or stretch the day.
+  const [hourPx, setHourPx] = useState(DEFAULT_HOUR_PX);
+  const HOUR_PX = hourPx;
+  const weather = useHourlyWeather(tomorrow);
   const [full, setFull] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +208,8 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
       const h = Number(window.localStorage.getItem(HEIGHT_KEY));
       // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
       if (h >= 120) setHeight(h);
+      const z = Number(window.localStorage.getItem(ZOOM_KEY));
+      if (z >= MIN_HOUR_PX && z <= MAX_HOUR_PX) setHourPx(z);
       if (window.localStorage.getItem(PLANNING_KEY) === "0") setPlanning(false);
     } catch {
       /* storage unavailable */
@@ -181,6 +250,22 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
   }, [carry, full, mealsOpen, xpFor]);
 
   if (!tomorrow || !dayStart) return null;
+
+  function askForWeather() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        try {
+          window.localStorage.setItem(WEATHER_KEY, JSON.stringify({ lat: Math.round(p.coords.latitude * 100) / 100, lon: Math.round(p.coords.longitude * 100) / 100 }));
+        } catch {
+          /* storage unavailable */
+        }
+        window.dispatchEvent(new Event(WEATHER_EVENT));
+      },
+      () => setError("Couldn't get your location for the forecast."),
+      { maximumAge: 86_400_000, timeout: 10_000 }
+    );
+  }
 
   const placedIds = new Set((plan?.quests ?? []).map((q) => q.id));
   const toPlace = chosen.filter((t) => !placedIds.has(t.id));
@@ -297,7 +382,7 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
   const allDay = (plan?.events ?? []).filter((e) => e.isAllDay);
   const totalXp = items.reduce((n, q) => n + xpOf(q), 0);
 
-  const chip = "relative flex h-10 items-center gap-1.5 rounded-full pl-3 pr-2 text-[14px] font-semibold";
+  const chip = "relative flex h-8 items-center gap-1.5 rounded-full pl-2.5 pr-1.5 text-[13px] font-semibold";
   const chipStyle = (on: boolean): React.CSSProperties =>
     on
       ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10", boxShadow: "0 0 0 3px rgba(242,201,76,.3)" }
@@ -357,9 +442,19 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
   const timeline = (
     <div
       ref={scrollRef}
-      className="relative min-h-0 overflow-y-auto overscroll-contain rounded-xl"
+      className="relative min-h-0 overflow-y-auto rounded-xl"
       style={{ background: N.grid, border: `1px solid ${N.border}`, height: full ? undefined : height, flex: full ? "1 1 auto" : undefined, boxShadow: "inset 0 4px 12px rgba(0,0,0,.4)" }}
     >
+      {/* All-day events stay in view at the top of the day. */}
+      {allDay.length > 0 && (
+        <div className="sticky top-0 z-[6] flex flex-wrap gap-1 px-1.5 py-1" style={{ paddingLeft: GUTTER, background: "rgba(12,14,34,.94)", borderBottom: `1px solid ${N.line}` }}>
+          {allDay.map((e) => (
+            <span key={e.id} className="rounded-md px-2 py-0.5 text-[12px]" style={{ background: "rgba(140,150,190,.18)", color: "#c3c8dd" }}>
+              {e.title}
+            </span>
+          ))}
+        </div>
+      )}
       <div
         ref={gridRef}
         className={`relative ${carry ? "cursor-copy" : ""}`}
@@ -372,14 +467,42 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
           if (at !== null) place(at);
         }}
       >
-        {hours.map((h, i) => (
-          <div key={h} className="absolute inset-x-0 flex" style={{ top: i * HOUR_PX, height: HOUR_PX, borderTop: i ? `1px solid ${N.line}` : undefined }}>
-            <span className="w-[46px] shrink-0 pr-1.5 pt-0.5 text-right text-[11.5px] tabular-nums" style={{ color: N.faint }}>
-              {hourLabel(h)}
-            </span>
-            <span className="flex-1" style={{ borderTop: "1px dashed rgba(255,255,255,.04)", marginTop: HOUR_PX / 2 }} />
-          </div>
-        ))}
+        {hours.map((h, i) => {
+          const w = weather?.[h];
+          return (
+            <div key={h} className="absolute inset-x-0 flex" style={{ top: i * HOUR_PX, height: HOUR_PX, borderTop: i ? `1px solid ${N.line}` : undefined }}>
+              <span className="w-[46px] shrink-0 pr-1.5 pt-0.5 text-right text-[11.5px] tabular-nums" style={{ color: N.faint }}>
+                {hourLabel(h)}
+              </span>
+              <span className="flex-1" style={{ borderTop: HOUR_PX >= 36 ? "1px dashed rgba(255,255,255,.04)" : undefined, marginTop: HOUR_PX / 2 }} />
+              {/* The hour's forecast, on the right. */}
+              {w && (
+                <span className="pointer-events-none absolute right-1.5 top-0.5 flex items-center gap-1 text-[11px] tabular-nums" style={{ color: N.faint }} title={`${w.temp}° · ${w.rain}% chance of rain`}>
+                  {w.rain >= 40 && <span style={{ color: "#8fb6e8" }}>💧{w.rain}%</span>}
+                  {w.temp}°
+                </span>
+              )}
+            </div>
+          );
+        })}
+        {/* Drag the times up or down to squeeze or stretch the day. */}
+        <div
+          role="slider"
+          aria-label="Zoom the day (drag the times)"
+          aria-valuemin={MIN_HOUR_PX}
+          aria-valuemax={MAX_HOUR_PX}
+          aria-valuenow={HOUR_PX}
+          tabIndex={0}
+          title="Drag up or down to zoom"
+          className="absolute bottom-0 left-0 top-0 z-[5] w-[46px] cursor-ns-resize touch-none"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={onZoomDown}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+            e.preventDefault();
+            zoomTo(HOUR_PX + (e.key === "ArrowDown" ? 6 : -6));
+          }}
+        />
 
         {laid.map((it) => {
           const top = ((Math.max(it.start, FIRST_HOUR * 60) - FIRST_HOUR * 60) / 60) * HOUR_PX;
@@ -498,35 +621,82 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
     el.addEventListener("pointercancel", up);
   }
 
+  function zoomTo(px: number) {
+    const v = Math.round(Math.max(MIN_HOUR_PX, Math.min(MAX_HOUR_PX, px)));
+    // Keep the hour in the middle of the view where it was.
+    const el = scrollRef.current;
+    if (el) {
+      const mid = (el.scrollTop + el.clientHeight / 2) / HOUR_PX;
+      requestAnimationFrame(() => (el.scrollTop = mid * v - el.clientHeight / 2));
+    }
+    setHourPx(v);
+    try {
+      window.localStorage.setItem(ZOOM_KEY, String(v));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  function onZoomDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    const y0 = e.clientY;
+    const z0 = HOUR_PX;
+    const move = (ev: PointerEvent) => zoomTo(z0 * Math.pow(2, (ev.clientY - y0) / 160));
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+  }
+
+  const tools = (
+    <div className="flex items-center gap-1">
+      {onHide && !full && (
+        <button type="button" onClick={onHide} className="mr-auto rounded-full px-2 py-1.5 text-[13px] underline-offset-2 hover:underline" style={{ color: N.soft }}>
+          Hide planning
+        </button>
+      )}
+      {weather === undefined && (
+        <button type="button" onClick={askForWeather} className="rounded-full px-2.5 py-1.5 text-[13px] underline-offset-2 hover:underline" style={{ color: N.soft }} title="Show each hour's forecast (uses your location)">
+          Show weather
+        </button>
+      )}
+      <Link href={`/calendar?view=day&date=${tomorrow}`} className="rounded-full px-2.5 py-1.5 text-[13px] underline underline-offset-2" style={{ color: N.gold }}>
+        Calendar
+      </Link>
+      <button
+        type="button"
+        onClick={() => setFull((v) => !v)}
+        aria-label={full ? "Leave full screen" : "Full screen"}
+        title={full ? "Leave full screen (Esc)" : "Full screen"}
+        className="flex h-9 w-9 items-center justify-center rounded-full"
+        style={{ border: `1px solid ${N.border}`, color: N.gold }}
+      >
+        {full ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+
   const body = (
     <div className={`flex flex-col gap-3 ${full ? "h-full" : ""}`}>
       <div className="flex items-center justify-between gap-2">
         <span className={`font-semibold ${full ? "font-display text-[22px]" : "text-[15px]"}`} style={{ color: N.ink }}>
           {tomorrowName}
         </span>
-        <span className="flex items-center gap-1">
-          <Link href={`/calendar?view=day&date=${tomorrow}`} className="rounded-full px-2.5 py-1.5 text-[13px] underline underline-offset-2" style={{ color: N.gold }}>
-            Calendar
-          </Link>
-          <button
-            type="button"
-            onClick={() => setFull((v) => !v)}
-            aria-label={full ? "Leave full screen" : "Full screen"}
-            title={full ? "Leave full screen (Esc)" : "Full screen"}
-            className="flex h-9 w-9 items-center justify-center rounded-full"
-            style={{ border: `1px solid ${N.border}`, color: N.gold }}
-          >
-            {full ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </button>
-        </span>
+        {full && tools}
       </div>
 
       {/* Plan the day: every planning item at once */}
@@ -534,15 +704,16 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
         type="button"
         onClick={togglePlanning}
         aria-expanded={planning}
-        className="hover-glow flex min-h-11 items-center justify-between gap-2 rounded-xl px-3.5 text-left"
-        style={planning ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10" } : { background: "rgba(255,250,238,.08)", border: "1.5px solid rgba(217,180,95,.5)", color: N.ink }}
+        className="hover-glow flex min-h-10 items-center justify-between gap-2 rounded-xl px-3.5 text-left"
+        // Gold until opened; then it settles into the tray.
+        style={planning ? { background: "rgba(255,250,238,.06)", border: "1.5px solid rgba(217,180,95,.45)", color: N.ink } : { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10" }}
       >
         <span className="flex items-center gap-2 text-[15px] font-semibold">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M5 7h14M5 12h10M5 17h7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
           </svg>
-          Plan the day
-          {totalXp > 0 && <span className="text-[13px] font-bold" style={{ color: planning ? "#5a3a08" : N.gold }}>up to +{totalXp} XP</span>}
+          Plan daily tasks
+          {totalXp > 0 && <span className="text-[13px] font-bold" style={{ color: planning ? N.gold : "#5a3a08" }}>+XP</span>}
         </span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: planning ? "rotate(180deg)" : undefined }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -684,16 +855,6 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
         </p>
       )}
 
-      {allDay.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {allDay.map((e) => (
-            <span key={e.id} className="rounded-md px-2 py-0.5 text-[12.5px]" style={{ background: "rgba(140,150,190,.16)", color: "#aeb3cc" }}>
-              {e.title}
-            </span>
-          ))}
-        </div>
-      )}
-
       {timeline}
       {!full && (
         <div
@@ -725,6 +886,7 @@ export function DayPlanner({ day, chosen }: { /** This evening's day key. */ day
           Connect Google Calendar on the Calendar page to see your appointments here too.
         </p>
       )}
+      {!full && tools}
     </div>
   );
 
