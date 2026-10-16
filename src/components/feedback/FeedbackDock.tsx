@@ -335,6 +335,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     if (kind === "move" && (e.target as HTMLElement).closest("button")) return;
     if (kind === "resize") e.preventDefault();
     const g = shown;
+    const view = vp!;
     let last = g;
     pressOrDrag(e, {
       threshold: kind === "resize" ? 0 : 4,
@@ -342,7 +343,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         last = kind === "move" ? { ...g, x: g.x + dx, y: g.y + dy } : { ...g, w: Math.max(MIN_W, g.w + dx), h: Math.max(MIN_H, g.h + dy) };
         setGeom(last);
       },
-      onEnd: (moved) => moved && writeJson(PANEL_KEY, fit(last, vp)),
+      onEnd: (moved) => moved && writeJson(PANEL_KEY, fit(last, view)),
     });
   }
 
