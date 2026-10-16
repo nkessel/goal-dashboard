@@ -16,6 +16,7 @@ import {
   reopenTaskAction,
   saveQuestStepsAction,
   scheduleTaskAction,
+  setSchedulingAction,
   setTaskPlacementAction,
   setTaskProgressAction,
   updateTaskAction,
@@ -179,6 +180,20 @@ export function QuestEditorDialog({
       ? { start: task.scheduled_start, end: task.scheduled_end }
       : null;
   const [slot, setSlot] = useState<{ start: string; end: string } | null>(initialSlot);
+  // The scheduling priority list beside the calendar.
+  const [toSchedule, setToSchedule] = useState(task?.schedule_rank != null);
+  const [schedPlace, setSchedPlace] = useState<"top" | "unordered" | "bottom">("top");
+  const [schedNote, setSchedNote] = useState<string | null>(null);
+  /** Existing quests join or leave the list at once; new ones when created. */
+  function applyScheduling(on: boolean, place: "top" | "unordered" | "bottom") {
+    setToSchedule(on);
+    setSchedPlace(place);
+    if (!task) return;
+    setSchedNote(null);
+    setSchedulingAction(task.id, on ? place : null)
+      .then(() => setSchedNote(on ? "On the scheduling list" : "Off the scheduling list"))
+      .catch((e) => setSchedNote(e instanceof Error ? e.message : "Couldn't update the list."));
+  }
   const [pickingSlot, setPickingSlot] = useState(false);
   const initialBoard = task ? (task.board_id ?? null) : (create?.boardId ?? null);
   const [boardId, setBoardId] = useState<string | null>(initialBoard);
@@ -532,6 +547,7 @@ export function QuestEditorDialog({
           throw e;
         }
         if (tempId) resolveOptimisticQuest(tempId, id);
+        if (toSchedule) await setSchedulingAction(id, schedPlace).catch(() => {});
         const newSteps = (steps ?? []).filter((st) => st.title.trim());
         if (newSteps.length > 0) await saveQuestStepsAction(id, stepPayload(newSteps).map(({ id: _id, ...st }) => st)); // eslint-disable-line @typescript-eslint/no-unused-vars
         paintPortrait(id);
@@ -1099,6 +1115,57 @@ export function QuestEditorDialog({
                     {slot ? "Change" : "Find a time"}
                   </button>
                 </>
+              )}
+            </div>
+          )}
+          {/* Scheduling priority list */}
+          {!doingNow && !fixedSchedule && (
+            <div className="flex flex-col gap-1.5">
+              <label className="flex min-h-9 cursor-pointer items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={toSchedule}
+                  onChange={(e) => applyScheduling(e.target.checked, schedPlace)}
+                  className="h-[18px] w-[18px] shrink-0 accent-[#7a5f2a]"
+                />
+                <span className="text-[14px]" style={{ color: "var(--t-ink)" }}>
+                  Add to the scheduling list
+                </span>
+                {schedNote && (
+                  <span className="ml-auto text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+                    {schedNote}
+                  </span>
+                )}
+              </label>
+              {toSchedule && (
+                <div role="radiogroup" aria-label="Where on the scheduling list" className="ml-7 flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ["top", "Top"],
+                      ["unordered", "Top of unnumbered"],
+                      ["bottom", "Bottom"],
+                    ] as const
+                  ).map(([v, label]) => {
+                    const on = schedPlace === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => applyScheduling(true, v)}
+                        className="h-8 rounded-full px-3 text-[12.5px] font-semibold"
+                        style={{
+                          border: `1px solid ${on ? "#7a5f2a" : chipBorder}`,
+                          background: on ? "#7a5f2a" : "transparent",
+                          color: on ? "#fbf3df" : "var(--t-ink)",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}

@@ -11,6 +11,8 @@ import { listEvents, type GoogleCalendarEvent } from "@/lib/google-calendar";
 import { DayView } from "@/components/calendar/DayView";
 import { WeekView } from "@/components/calendar/WeekView";
 import { MonthView } from "@/components/calendar/MonthView";
+import { SchedulingList } from "@/components/calendar/SchedulingList";
+import { listSchedulingList } from "@/lib/data/scheduling";
 import {
   addDays,
   addMonths,
@@ -98,7 +100,10 @@ export default async function CalendarPage({
   // viewer's time zone aren't cut off (the views place items by local day).
   rangeStart = addDays(rangeStart, -1);
   rangeEnd = addDays(rangeEnd, 1);
-  const tasks = await listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd);
+  const [tasks, toSchedule] = await Promise.all([
+    listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
+    listSchedulingList(session.user.id),
+  ]);
   const todayHref = `/calendar?view=${view}&date=${formatDateParam(today)}`;
 
   // Real Google Calendar appointments, layered onto the same view — separate
@@ -120,7 +125,8 @@ export default async function CalendarPage({
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
         <PageHeader isAdventure={isAdventure} title="Quest Calendar" calmTitle="Calendar" />
         {!session.googleAccessToken && <ConnectCalendar isAdventure={isAdventure} />}
 
@@ -225,6 +231,10 @@ export default async function CalendarPage({
           <MonthView monthKey={formatDateParam(startOfMonth(date))} todayKey={formatDateParam(today)} tasks={tasks} events={events} theme={theme} />
         )}
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
+      </div>
+      <div className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[300px]">
+        <SchedulingList tasks={toSchedule} theme={theme} />
+      </div>
       </div>
     </AppShell>
   );

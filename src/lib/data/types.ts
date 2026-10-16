@@ -59,6 +59,8 @@ export type Task = {
   logged_at?: string | null;
   /** The level boss this quest counts toward, if any. */
   boss_id?: string | null;
+  /** Place on the scheduling priority list (null = not on it). */
+  schedule_rank?: number | null;
   created_at: string;
   updated_at: string;
   reminder_sent_at: string | null;

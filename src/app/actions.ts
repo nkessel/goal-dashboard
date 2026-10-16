@@ -19,6 +19,7 @@ import * as feedbackData from "@/lib/data/feedback";
 import * as stepsData from "@/lib/data/steps";
 import * as journalData from "@/lib/data/journal";
 import * as tomorrowData from "@/lib/data/tomorrow";
+import * as schedulingData from "@/lib/data/scheduling";
 import * as bossesData from "@/lib/data/bosses";
 import * as energyData from "@/lib/data/energy";
 import { computeLevelForXp } from "@/lib/levels";
@@ -1941,4 +1942,29 @@ export async function freshStartAction(taskId: string) {
   if (error) throw new Error(`Couldn't reset it: ${error.message}`);
   revalidatePath("/");
   revalidatePath("/matrix");
+}
+
+// ---------------------------------------------------------------------------
+// Scheduling priority list (beside the calendar)
+// ---------------------------------------------------------------------------
+
+export async function listSchedulingAction() {
+  const ownerId = await requireProfileId();
+  return schedulingData.listSchedulingList(ownerId);
+}
+
+export async function reorderSchedulingAction(ids: string[]) {
+  const ownerId = await requireProfileId();
+  await schedulingData.setSchedulingOrder(ownerId, ids.slice(0, 100));
+  revalidatePath("/calendar");
+}
+
+/** On (with where it goes) or off the scheduling list. */
+export async function setSchedulingAction(taskId: string, place: schedulingData.SchedulePlace | null) {
+  const ownerId = await requireProfileId();
+  const task = await tasksData.getTask(taskId, ownerId);
+  if (!task) throw new Error("That quest isn't here anymore.");
+  if (place) await schedulingData.addToSchedulingList(ownerId, taskId, place);
+  else await schedulingData.removeFromSchedulingList(ownerId, taskId);
+  revalidatePath("/calendar");
 }
