@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { addJournalEntryAction } from "@/app/actions";
+import { useEscape } from "@/lib/use-escape";
 
 /** Ask the dock to start (or bring back) feedback from anywhere, e.g. the + sheet. */
 export const OPEN_FEEDBACK_EVENT = "open-feedback";
@@ -293,6 +294,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     };
   }, [begin]);
 
+  // Escape minimizes the feedback box first, before any dialog under it (like an open quest editor).
+  useEscape(() => leaveOpen(), !!openId);
   if (!loaded || !vp) return null;
 
   // ---- The round button: tap to start (or continue) feedback, drag to put it anywhere.
@@ -469,9 +472,10 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             }}
           >
             {/* Everything scrolls together, so a very thin box still reaches it all. */}
-            <div className="feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-6">
+            <div className="feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-8">
               <div
-                className={`flex shrink-0 select-none items-center gap-1 px-2 pt-1.5 ${isSent ? "pl-4" : "cursor-move touch-none"}`}
+                className={`sticky top-0 z-[3] flex shrink-0 select-none items-center gap-1 px-2 pt-1.5 ${isSent ? "pl-4" : "cursor-move touch-none"}`}
+                style={{ background: isAdventure ? "linear-gradient(180deg, rgba(236,220,184,.97) 70%, rgba(236,220,184,0))" : "var(--t-card)" }}
                 onPointerDown={isSent ? undefined : (e) => onPanelDown(e, "move")}
                 title={isSent ? undefined : "Drag to move"}
               >
@@ -622,8 +626,8 @@ function Composer({
         }}
         placeholder={draft.kind === "future" ? "An idea for later. It goes in the future ideas log." : "What would make this better?"}
         aria-label="Feedback"
-        className="min-h-[72px] flex-1 resize-none rounded-lg border px-3 py-2 text-[16px] leading-relaxed"
-        style={{ borderColor: "var(--t-panel-border)" }}
+        className="min-h-[72px] flex-1 resize-none rounded-lg border px-3 pt-2 text-[16px] leading-relaxed"
+        style={{ borderColor: "var(--t-panel-border)", paddingBottom: 30, scrollPaddingBottom: 30 }}
       />
       {error && (
         <p className="m-0 shrink-0 text-sm" style={{ color: "var(--t-warn)" }}>

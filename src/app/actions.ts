@@ -1585,8 +1585,8 @@ export async function addJournalEntryAction(body: string, mood: number | null, k
   if (isFeedback) {
     await feedbackData.notifyReviewers(ownerId, name, text).catch(() => {});
     if (xpAwarded > 0) {
+      // No refresh of the Today screen here: a quest editor open there would be swept away.
       await xp.awardXp(ownerId, xpAwarded, "task_completed");
-      revalidatePath("/");
     }
     revalidatePath("/feedback-review");
   }
