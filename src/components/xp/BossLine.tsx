@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { bossProgressAction, completeTaskAction, createBossQuestAction, linkQuestToBossAction, listBossQuestsAction, listQuestOptionsAction, setBossAction } from "@/app/actions";
 import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
@@ -129,7 +130,23 @@ function BossDialog({ boss, level, onClose }: { boss: BossView | null; level: nu
         style={{ background: "var(--t-panel)", color: "var(--t-ink)" }}
       >
         <div className="relative z-[1] flex items-center justify-between">
-          <h3 className="font-display m-0 text-[21px]">⚔ Level {level} boss</h3>
+          <h3 className="font-display m-0 flex items-center gap-2 text-[21px]">
+            ⚔ Level {level} boss
+            {/* A secret: the mountain view of today, with this boss at the summit. */}
+            <Link
+              href="/summit"
+              onClick={onClose}
+              aria-label="A hidden trail…"
+              title="A hidden trail…"
+              className="summit-secret flex h-7 w-7 items-center justify-center rounded-full opacity-35 transition-opacity hover:opacity-100"
+            >
+              <svg width="18" height="16" viewBox="0 0 24 20" fill="none" aria-hidden>
+                <path d="M1 19L9 6l4 6 3-4 7 11z" fill="currentColor" opacity=".55" />
+                <path d="M9 6l-2 3.2 2-.7 1.4 1.5L11 9z" fill="#fff" opacity=".9" />
+                <circle cx="9" cy="3" r="1.2" fill="#d9b45f" />
+              </svg>
+            </Link>
+          </h3>
           <button type="button" onClick={onClose} aria-label="Close" className="h-9 w-9 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
             ×
           </button>

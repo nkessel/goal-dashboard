@@ -1779,3 +1779,25 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 @keyframes notif-out { to { opacity: 0; transform: translateY(-8px); } }
 .notif-in { animation: notif-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .notif-out { animation: notif-out 0.25s ease-in both; }
+
+/* The summit (secret mountain view of today) */
+.summit-stars circle { animation: summit-twinkle 3s ease-in-out infinite; }
+@keyframes summit-twinkle { 0%, 100% { opacity: .85; } 50% { opacity: .25; } }
+.summit-crown { animation: summit-crown 3.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes summit-crown { 0%, 100% { opacity: .7; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.15); } }
+.summit-mist { animation: summit-mist 14s ease-in-out infinite alternate; }
+@keyframes summit-mist { from { transform: translateX(-12px); } to { transform: translateX(12px); } }
+.summit-cloud-a { animation: summit-drift-a 26s ease-in-out infinite alternate; }
+.summit-cloud-b { animation: summit-drift-b 32s ease-in-out infinite alternate; }
+@keyframes summit-drift-a { from { transform: translateX(-22px); } to { transform: translateX(26px); } }
+@keyframes summit-drift-b { from { transform: translateX(24px); } to { transform: translateX(-20px); } }
+.summit-firefly { animation: summit-firefly 4s ease-in-out infinite; }
+@keyframes summit-firefly { 0%, 100% { opacity: 0; transform: translate(0, 0); } 50% { opacity: 1; transform: translate(4px, -6px); } }
+.summit-next { animation: summit-next 2s ease-in-out infinite; }
+@keyframes summit-next { 0%, 100% { box-shadow: 0 0 0 0 rgba(242,210,126,.8), 0 4px 10px rgba(0,0,0,.55); } 50% { box-shadow: 0 0 0 9px rgba(242,210,126,0), 0 4px 10px rgba(0,0,0,.55); } }
+.summit-mark { transition: transform .15s ease; touch-action: none; }
+.summit-mark.is-dragging { transform: translate(-50%, -88%) scale(1.12) !important; filter: drop-shadow(0 10px 10px rgba(0,0,0,.5)); }
+.summit-boss { animation: ui-fade .6s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .summit-stars circle, .summit-crown, .summit-mist, .summit-cloud-a, .summit-cloud-b, .summit-firefly, .summit-next { animation: none; }
+}
