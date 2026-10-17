@@ -819,7 +819,7 @@ export function QuestEditorDialog({
                 </span>
               </button>
               {schedOpen && (
-                <div className="flex flex-col gap-2.5 pb-1">
+                <div className="reveal flex flex-col gap-2.5 pb-1">
           {/* Due date */}
           {!doingNow && (
             <div className="flex items-center gap-2.5">
@@ -917,7 +917,7 @@ export function QuestEditorDialog({
                 )}
               </label>
               {toSchedule && (
-                <div role="radiogroup" aria-label="Where on the scheduling list" className="ml-7 flex flex-wrap gap-1.5">
+                <div role="radiogroup" aria-label="Where on the scheduling list" className="reveal ml-7 flex flex-wrap gap-1.5">
                   {(
                     [
                       ["top", "Top"],
@@ -1028,7 +1028,7 @@ export function QuestEditorDialog({
               </div>
               {/* Breaking it into pieces stays tucked away until asked for. */}
               {chunk === "" && !breakingDown ? null : (
-                <div className="flex flex-wrap items-center gap-1.5 pl-[28px] text-[12.5px]">
+                <div className="reveal flex flex-wrap items-center gap-1.5 pl-[28px] text-[12.5px]">
                   <span>Do it in</span>
                   {[10, 15, 25, 45].map((m) => (
                     <button
@@ -1164,7 +1164,7 @@ export function QuestEditorDialog({
                       </span>
                     )}
                     {stepOpen === st.key && (
-                      <div className="ml-[26px] mr-1 mt-1 flex flex-col gap-2 rounded-lg px-2.5 py-2 text-[13px]" style={{ background: "rgba(70,50,20,.06)", border: "1px solid rgba(139,112,64,.25)" }}>
+                      <div className="reveal ml-[26px] mr-1 mt-1 flex flex-col gap-2 rounded-lg px-2.5 py-2 text-[13px]" style={{ background: "rgba(70,50,20,.06)", border: "1px solid rgba(139,112,64,.25)" }}>
                         <label className="flex items-center gap-2">
                           <span className="w-[92px] shrink-0">Done so far</span>
                           <input
@@ -1216,7 +1216,7 @@ export function QuestEditorDialog({
                     </li>
                   ))}
                   {!isCompleted && addingStep && (
-                    <li className="quest-step flex items-start gap-2 rounded-md py-0.5 pl-1">
+                    <li className="reveal quest-step flex items-start gap-2 rounded-md py-0.5 pl-1">
                       {/* Same box and type as a saved step, so a step looks the same before and after Enter. */}
                       <span aria-hidden className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] border-dashed text-[13px] leading-none" style={{ borderColor: isAdventure ? "#8a6c2c" : "var(--t-card-border)", color: "var(--t-ink-soft)" }}>
                         +

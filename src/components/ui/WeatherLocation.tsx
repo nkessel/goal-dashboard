@@ -108,7 +108,7 @@ export function WeatherLocation({ dark = false, label = "Show weather", up = fal
         <div
           role="dialog"
           aria-label="Where should the forecast be for?"
-          className={`absolute z-[40] flex ${up ? "bottom-full right-0 mb-1.5" : "left-0 top-full mt-1.5"} w-[min(290px,calc(100vw-32px))] flex-col gap-2 p-3 ${dark ? "" : "parchment"}`}
+          className={`pop absolute z-[40] flex ${up ? "bottom-full right-0 mb-1.5" : "left-0 top-full mt-1.5"} w-[min(290px,calc(100vw-32px))] flex-col gap-2 p-3 ${dark ? "" : "parchment"}`}
           style={{
             borderRadius: 12,
             boxShadow: "0 12px 28px rgba(0,0,0,.35)",

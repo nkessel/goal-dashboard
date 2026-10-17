@@ -403,7 +403,7 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
         {/* Hover readout */}
         {hd && (
           <div
-            className="pointer-events-none absolute top-2 z-[3] flex max-w-[230px] flex-col gap-0.5 rounded-lg px-2.5 py-2 text-[13px] shadow-lg"
+            className="fade-in pointer-events-none absolute top-2 z-[3] flex max-w-[230px] flex-col gap-0.5 rounded-lg px-2.5 py-2 text-[13px] shadow-lg"
             style={{ [hover! > n / 2 ? "left" : "right"]: 12, background: "#fbf3df", border: "1px solid #b39a6a", color: INK }}
           >
             <b className="text-[13.5px]">{hd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</b>
@@ -447,7 +447,7 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
             </svg>
           </button>
           {settings && (
-            <div role="dialog" aria-label="Chart view settings" className="parchment absolute bottom-full right-0 mb-2 flex w-[250px] flex-col gap-2.5 p-3" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
+            <div role="dialog" aria-label="Chart view settings" className="pop parchment absolute bottom-full right-0 mb-2 flex w-[250px] flex-col gap-2.5 p-3" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
               <Seg label="Time span" value={String(view.range)} options={[["7", "Week"], ["30", "Month"], ["90", "3 months"]]} onPick={(v) => setV({ range: Number(v) as View["range"] })} />
               <Seg label="Points" value={view.detail} options={[["daily", "Daily average"], ["every", "Every check-in"]]} onPick={(v) => setV({ detail: v as View["detail"] })} />
               <Seg label="Lines" value={view.smooth ? "smooth" : "straight"} options={[["smooth", "Smooth"], ["straight", "Straight"]]} onPick={(v) => setV({ smooth: v === "smooth" })} />

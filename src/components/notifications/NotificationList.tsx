@@ -276,7 +276,7 @@ export function NotificationList({
         </div>
         </SwipeActions>
         {snoozing === n.id && (
-          <div role="group" aria-label="Snooze for" className="mt-2 flex flex-wrap gap-1.5 pl-[52px]">
+          <div role="group" aria-label="Snooze for" className="reveal mt-2 flex flex-wrap gap-1.5 pl-[52px]">
             {SNOOZE_OPTIONS.map((o) => (
               <button
                 key={o.minutes}
@@ -362,7 +362,7 @@ export function NotificationList({
             </span>
           </div>
         </div>
-        {open && <ul className="ml-[52px] flex flex-col">{c.map((n, i) => renderRow(n, i === 0))}</ul>}
+        {open && <ul className="reveal ml-[52px] flex flex-col">{c.map((n, i) => renderRow(n, i === 0))}</ul>}
       </li>
     );
   }
@@ -396,7 +396,7 @@ export function NotificationList({
       )}
 
       {deleted && (
-        <p role="status" className="m-0 text-center text-[14px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}>
+        <p role="status" className="fade-in m-0 text-center text-[14px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}>
           Deleted “{deleted.body.length > 40 ? `${deleted.body.slice(0, 40)}…` : deleted.body}” ·{" "}
           <button type="button" onClick={undoDelete} className="font-semibold underline" style={{ color: "var(--t-gold)" }}>
             Undo
@@ -427,7 +427,7 @@ export function NotificationList({
           );
         })}
       </div>
-      <section className={`flex flex-col gap-3 rounded-2xl px-5 py-4 ${panelCls}`} style={panelStyle}>
+      <section key={filter} className={`fade-in flex flex-col gap-3 rounded-2xl px-5 py-4 ${panelCls}`} style={panelStyle}>
         {notifications.length === 0 ? (
           <p className="py-6 text-center text-[16px] italic" style={{ color: "var(--t-ink-soft)" }}>
             All quiet. Reactions, comments and reminders will appear here.

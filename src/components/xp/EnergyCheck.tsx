@@ -269,7 +269,7 @@ export function EnergyCheck({
     </ul>
   );
   const noteInput = noting ? (
-    <div className="flex w-full items-center gap-1.5">
+    <div className="reveal flex w-full items-center gap-1.5">
       <div className="flex min-h-9 min-w-0 flex-1 flex-wrap items-center gap-1 rounded-lg border px-1.5 py-1" style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a" }}>
         {pendingTags.map((t) => (
           <span key={t} className="flex h-6 items-center gap-0.5 rounded-full pl-2 pr-0.5 text-[13px] font-semibold" style={{ background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10" }}>
@@ -360,7 +360,7 @@ export function EnergyCheck({
             </div>
 
             {expanded && (
-              <div id="checkin-more" className="flex flex-col gap-1.5 pb-0.5">
+              <div id="checkin-more" className="reveal flex flex-col gap-1.5 pb-0.5">
                 {metrics.map((m) => {
                   const v = vals[m] ?? 5;
                   return (
@@ -392,7 +392,7 @@ export function EnergyCheck({
                 })}
 
                 {adding && (
-                  <div className="flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid rgba(217,180,95,.3)" }}>
+                  <div className="reveal flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid rgba(217,180,95,.3)" }}>
                     <div className="flex items-center gap-1.5">
                       <input
                         autoFocus

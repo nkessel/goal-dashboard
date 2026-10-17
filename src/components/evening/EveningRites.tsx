@@ -625,7 +625,7 @@ export function EveningRites({
           {!tomorrowRite && <TomorrowQuests queued={tomorrow} candidates={openQuests} theme={theme} />}
 
           {removed && (
-            <p role="status" className="-mt-2 text-center text-[14px]" style={{ color: "#d9d2bd" }}>
+            <p role="status" className="fade-in -mt-2 text-center text-[14px]" style={{ color: "#d9d2bd" }}>
               Removed “{removed.title}” ·{" "}
               <button type="button" onClick={undoRemove} className="font-semibold underline" style={{ color: "var(--t-gold)" }}>
                 Undo

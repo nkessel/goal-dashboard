@@ -48,7 +48,7 @@ export function HonoraryLevel({ level, children }: { level: number; children: Re
         <div
           role="dialog"
           aria-label="Set your level"
-          className="parchment absolute left-1/2 top-full z-[40] mt-2 flex w-[230px] -translate-x-1/2 flex-col gap-2 p-3"
+          className="fade-in parchment absolute left-1/2 top-full z-[40] mt-2 flex w-[230px] -translate-x-1/2 flex-col gap-2 p-3"
           style={{ borderRadius: 14, border: "1.5px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}
         >
           <p className="font-display relative z-[1] m-0 text-center text-[16px]" style={{ color: "var(--t-ink)" }}>

@@ -88,7 +88,7 @@ export function StatSplitEditor({
       </button>
 
       {open && (
-        <>
+        <div className="reveal flex flex-col gap-1.5">
           <DndContext id="dnd-StatSplit" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={stats} strategy={verticalListSortingStrategy}>
               <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
@@ -154,7 +154,7 @@ export function StatSplitEditor({
               </button>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

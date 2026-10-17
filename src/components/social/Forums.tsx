@@ -163,7 +163,7 @@ export function Forums({
       </p>
 
       {composing && (
-        <form onSubmit={post} className="relative z-[1] flex flex-col gap-2 rounded-xl p-3" style={{ background: "rgba(255,250,235,.55)", border: "1px solid rgba(110,85,40,.25)" }}>
+        <form onSubmit={post} className="reveal relative z-[1] flex flex-col gap-2 rounded-xl p-3" style={{ background: "rgba(255,250,235,.55)", border: "1px solid rgba(110,85,40,.25)" }}>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={tab === "ideas" ? "Your idea in a line" : "Title"} maxLength={140} autoFocus className="h-10 rounded-lg border px-3 text-[15.5px] font-semibold" style={field} />
           <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={tab === "ideas" ? "How would it work? Why would it help?" : "Say more (optional)"} rows={3} className="rounded-lg border px-3 py-2 text-[15px]" style={field} />
           {error && (
@@ -177,7 +177,7 @@ export function Forums({
         </form>
       )}
 
-      <ul className="relative z-[1] m-0 flex list-none flex-col gap-1.5 p-0">
+      <ul key={tab} className="fade-in relative z-[1] m-0 flex list-none flex-col gap-1.5 p-0">
         {list.length === 0 && (
           <li className="rounded-xl border border-dashed px-3 py-3 text-[14px]" style={{ borderColor: "rgba(110,85,40,.35)", color: "var(--t-ink-soft)" }}>
             {tab === "party" ? "No posts in your party yet — start one, or invite friends to join." : "Nothing here yet — be the first to post."}

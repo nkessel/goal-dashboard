@@ -1644,3 +1644,31 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 @media (prefers-reduced-motion: reduce) {
   .owl-idle, .owl-perched .owl-idle, .owl-takeoff .owl-idle { animation: none !important; }
 }
+
+/* ── Smooth, responsive motion for everyday UI ─────────────────────────
+   Menus and popovers pop from where they open; folded sections slide
+   open; buttons ease their colours. All of it bows out for reduced motion. */
+@keyframes ui-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ui-reveal {
+  from { opacity: 0; transform: translateY(-6px); clip-path: inset(0 0 100% 0); }
+  to { opacity: 1; transform: none; clip-path: inset(0 0 0 0); }
+}
+@keyframes ui-fade { from { opacity: 0; } to { opacity: 1; } }
+[role="menu"], .pop { animation: ui-pop 0.16s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: top center; }
+.reveal { animation: ui-reveal 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fade-in { animation: ui-fade 0.18s ease-out both; }
+@layer base {
+  button, a, [role="tab"], [role="radio"], summary {
+    transition-property: background-color, border-color, color, box-shadow, opacity, filter;
+    transition-duration: 0.16s;
+    transition-timing-function: ease-out;
+  }
+}
+.hover-glow:active:not(:disabled) { transform: scale(0.97); }
+details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  [role="menu"], .pop, .reveal, .fade-in, details > summary ~ * { animation: none !important; }
+}

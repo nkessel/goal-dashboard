@@ -388,7 +388,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
                 </div>
                 {f.open && (
                   <SortableContext items={g.ids} strategy={verticalListSortingStrategy}>
-                    <ol className="m-0 ml-4 flex list-none flex-col gap-1 border-l border-dashed p-0 pl-1.5" style={{ borderColor: "rgba(139,112,64,.4)" }}>
+                    <ol className="reveal m-0 ml-4 flex list-none flex-col gap-1 border-l border-dashed p-0 pl-1.5" style={{ borderColor: "rgba(139,112,64,.4)" }}>
                       {g.ids.length === 0 && (
                         <li className="px-1.5 py-1 text-[13px] italic" style={{ color: "var(--t-ink-soft)" }}>
                           Empty — drag quests here.
@@ -422,7 +422,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
               e.preventDefault();
               addFolder(String(new FormData(e.currentTarget).get("name") ?? ""));
             }}
-            className="flex items-center gap-1.5 px-1 pt-1"
+            className="reveal flex items-center gap-1.5 px-1 pt-1"
           >
             <FolderGlyph open={false} />
             <input
