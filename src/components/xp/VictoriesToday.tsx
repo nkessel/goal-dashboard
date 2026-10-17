@@ -171,17 +171,8 @@ export function VictoriesToday({
             </span>
           </li>
         ))}
-        {todaysRewards.map((r) => (
-          <li key={r.id} className={rowCls} style={{ ...divider, color: "var(--t-ink)" }}>
-            <Seal kind="gift" />
-            <span className="min-w-0 flex-1">
-              {isAdventure ? "Treasure accepted: " : "Reward: "}
-              {r.title}
-            </span>
-          </li>
-        ))}
         {todaysFeedback.length > 0 && (
-          <li className={rowCls} style={{ ...(loginToday || todays.length > 0 || todaysRites.length > 0 || todaysRewards.length > 0 ? divider : {}), color: "var(--t-ink)" }}>
+          <li className={rowCls} style={{ ...(loginToday || todays.length > 0 || todaysRites.length > 0 ? divider : {}), color: "var(--t-ink)" }}>
             <Seal kind="check" />
             <span className="min-w-0 flex-1 leading-snug">
               {todaysFeedback.length > 1 && <span style={{ color: "var(--t-ink-soft)" }}>{todaysFeedback.length} × </span>}
@@ -206,6 +197,16 @@ export function VictoriesToday({
             </li>
           );
         })}
+        {/* Treasure comes last — the payoff at the end of the day's list. */}
+        {todaysRewards.map((r, i) => (
+          <li key={r.id} className={rowCls} style={{ ...(i > 0 || loginToday || todays.length > 0 || todaysRites.length > 0 || todaysFeedback.length > 0 || todaysJournal.length > 0 ? divider : {}), color: "var(--t-ink)" }}>
+            <Seal kind="gift" />
+            <span className="min-w-0 flex-1">
+              {isAdventure ? "Treasure accepted: " : "Reward: "}
+              {r.title}
+            </span>
+          </li>
+        ))}
         {empty && today !== null && (
           <li className="py-2 text-center text-[15.5px] italic" style={{ color: "var(--t-ink-soft)" }}>
             Nothing completed yet today — you&apos;ve got this.

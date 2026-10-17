@@ -7,6 +7,14 @@ import { eveningDayKey } from "@/components/evening/evening-clock";
 import { ProgressCelebration } from "@/components/celebration/ProgressCelebration";
 import { xpToNextLevel } from "@/lib/levels";
 
+/** The day's first greeting, in the realm's voice. */
+function dawnHeading() {
+  const h = new Date().getHours();
+  if (h < 12) return "A new day dawns, adventurer";
+  if (h < 17) return "Welcome back, adventurer";
+  return "The road calls once more";
+}
+
 type Award = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
 
 /**
@@ -53,7 +61,7 @@ export function DailyLogin() {
   if (!award) return null;
   return (
     <ProgressCelebration
-      heading="You showed up!"
+      heading={dawnHeading()}
       title={award.streak > 1 ? `🔥 ${award.streak}-day streak — keep it going` : "Day one of a new streak"}
       xp={award.xp}
       coinsEarned={award.coins}

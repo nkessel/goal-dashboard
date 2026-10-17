@@ -21,7 +21,6 @@ import { EveningRites } from "@/components/evening/EveningRites";
 import { DailyHabits } from "@/components/habits/DailyHabits";
 import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
 import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckNotesSince } from "@/lib/data/energy";
-import { settleHp } from "@/lib/data/hp";
 import { bossesTableExists, getActiveBoss } from "@/lib/data/bosses";
 
 /** Start of a window `n` days back (kept outside render for purity). */
@@ -67,8 +66,6 @@ export default async function Home() {
 
   // A new day: last evening's plan moves into Today's Quests first.
   await promoteQueuedQuests(session.user.id).catch(() => false);
-  // Missed non-negotiables from past days cost HP.
-  await settleHp(session.user.id).catch(() => null);
   const [openTasks, completedTasks, profile, questsComplete, xpThisWeek, friendIds] = await Promise.all([
     listOpenTasksForOwnerWithCategory(session.user.id),
     listCompletedTasksForOwner(session.user.id, 40),

@@ -78,12 +78,18 @@ export function FeedbackReview({ items, theme }: { items: Item[]; theme: "calm" 
 
   const statusOf = (it: Item) => (it.id in local ? local[it.id] : it.review_status);
   const active = TABS.find((t) => t.key === tab)!;
-  const shown = items.filter((it) => active.match(statusOf(it)));
+  // A note decided here stays on this tab (marked, with Undo) until you leave
+  // it, so a slip of the finger never makes it vanish.
+  const [stay, setStay] = useState<Record<string, string>>({});
+  const [last, setLast] = useState<{ it: Item; before: Status | null; status: Status | null } | null>(null);
+  const shown = items.filter((it) => active.match(statusOf(it)) || stay[it.id] === tab);
 
   function decide(it: Item, status: Status | null) {
     const before = statusOf(it);
     setError(null);
     setLocal((l) => ({ ...l, [it.id]: status }));
+    setStay((s) => (s[it.id] ? s : { ...s, [it.id]: tab }));
+    setLast(status === null ? null : { it, before, status });
     startTransition(async () => {
       try {
         await reviewFeedbackAction(it.id, status);
@@ -109,7 +115,11 @@ export function FeedbackReview({ items, theme }: { items: Item[]; theme: "calm" 
               type="button"
               role="tab"
               aria-selected={on}
-              onClick={() => setTab(t.key)}
+              onClick={() => {
+                setTab(t.key);
+                setStay({});
+                setLast(null);
+              }}
               className="flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold"
               style={{
                 background: on ? (isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)") : isAdventure ? "rgba(14,18,10,.45)" : "var(--t-card)",
@@ -123,6 +133,25 @@ export function FeedbackReview({ items, theme }: { items: Item[]; theme: "calm" 
           );
         })}
       </div>
+
+      {last && (
+        <div role="status" className="fade-in flex items-center gap-3 rounded-full px-4 py-2 text-[14px]" style={{ background: "#2a1c10", color: "#f6ecd2", border: "1.5px solid #8a6116" }}>
+          <span className="min-w-0 flex-1 truncate">
+            {DONE_LABEL[last.status!](last.it.author.name?.split(" ")[0] || "them")}: “{(textOf(last.it) ?? last.it.body).slice(0, 60)}”
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              decide(last.it, last.before);
+              setLast(null);
+            }}
+            className="shrink-0 font-bold underline underline-offset-2"
+            style={{ color: "#f2d27e" }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="m-0 rounded-lg px-3 py-2 text-[14px] font-semibold" style={{ background: "var(--t-warn-bg)", color: "var(--t-warn)" }}>
@@ -244,7 +273,7 @@ export function FeedbackReview({ items, theme }: { items: Item[]; theme: "calm" 
                       {DONE_LABEL[status](name)}
                     </span>
                     <button type="button" onClick={() => decide(it, null)} className="underline" style={{ color: "var(--t-ink-soft)" }}>
-                      Change
+                      {stay[it.id] && !active.match(status) ? "Undo" : "Change"}
                     </button>
                   </div>
                 ) : (
