@@ -1623,6 +1623,15 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   0% { opacity: 1; transform: translate(-50%, -50%) scale(0.3); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(4.2); }
 }
+.toucan-tap { animation: toucan-tap 0.9s cubic-bezier(.3,.7,.3,1) both; transform-origin: 50% 90%; }
+@keyframes toucan-tap {
+  0% { transform: none; filter: none; }
+  18% { transform: translateY(2px) scale(1.04, 0.94); }
+  42% { transform: translateY(-12px) rotate(-6deg) scale(1.08); filter: drop-shadow(0 0 14px rgba(126,240,220,.95)) brightness(1.15); }
+  62% { transform: translateY(-9px) rotate(4deg) scale(1.06); filter: drop-shadow(0 0 10px rgba(242,210,126,.9)); }
+  82% { transform: translateY(1px) scale(1.02, 0.97); }
+  100% { transform: none; filter: none; }
+}
 .toucan-spirit { animation: toucan-hover 3.2s ease-in-out infinite; }
 @keyframes toucan-hover {
   0%, 100% { transform: translateY(0); }
@@ -1653,7 +1662,7 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 .toucan-amulet { animation: toucan-amulet 3.4s ease-in-out infinite; }
 @keyframes toucan-amulet { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .toucan-halo, .toucan-stars, .toucan-amulet { animation: none; }
+  .toucan-halo, .toucan-stars, .toucan-amulet, .toucan-tap { animation: none; }
   .owl-charging, .poof-puff, .toucan-spirit, .toucan-aura, .toucan-mote { animation: none; }
   .poof-puff { opacity: 0; }
 }

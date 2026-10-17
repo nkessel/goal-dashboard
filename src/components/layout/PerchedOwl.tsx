@@ -85,6 +85,7 @@ export function PerchedOwl() {
   // Drag it anywhere: it stays where you set it down (remembered on this device).
   const drag = useRef<{ x0: number; y0: number; offX: number; offY: number; moving: boolean } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [taps, setTaps] = useState(0);
 
   const put = useCallback((p: { x: number; y: number }, tilt = 0, lift = 0) => {
     pos.current = p;
@@ -199,6 +200,11 @@ export function PerchedOwl() {
   function speak() {
     const p = pos.current;
     if (!p) return;
+    // A wise flourish: it rises, spreads its glow and lets starlight fall from its bill.
+    setTaps((n) => n + 1);
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      for (let i = 0; i < 9; i++) setTimeout(() => spark(p.x + facing * (10 + Math.random() * 26), p.y - OWL_H * 0.75 + (Math.random() - 0.5) * 30), 120 + i * 45);
+    }
     let i = Math.floor(Math.random() * WISDOM.length);
     if (i === lastWisdom.current) i = (i + 1) % WISDOM.length;
     lastWisdom.current = i;
@@ -367,7 +373,11 @@ export function PerchedOwl() {
       >
         <div className={charging ? "owl-charging" : undefined}>
           <div ref={body} className={`owl-body owl-${phase}`} style={{ transform: `scaleX(${facing})` }}>
-            {spirit ? <ToucanSpirit /> : phase === "perched" || phase === "takeoff" ? <SittingOwl /> : <FlyingOwl />}
+            {spirit ? (
+              <div key={taps} className={taps ? "toucan-tap" : undefined}>
+                <ToucanSpirit />
+              </div>
+            ) : phase === "perched" || phase === "takeoff" ? <SittingOwl /> : <FlyingOwl />}
           </div>
         </div>
       </button>
