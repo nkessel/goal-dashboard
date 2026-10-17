@@ -1798,6 +1798,18 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 .summit-mark { transition: transform .15s ease; touch-action: none; }
 .summit-mark.is-dragging { transform: translate(-50%, -88%) scale(1.12) !important; filter: drop-shadow(0 10px 10px rgba(0,0,0,.5)); }
 .summit-boss { animation: ui-fade .6s ease-out both; }
+.summit-saying { animation: summit-saying 2.4s ease-out both; }
+@keyframes summit-saying { from { opacity: 0; transform: translate(-50%, 8px); letter-spacing: .04em; } to { opacity: 1; transform: translate(-50%, 0); letter-spacing: 0; } }
+.summit-wanderer { transition: left .5s ease, top .5s ease; }
+.wanderer-lantern { animation: wanderer-flicker 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes wanderer-flicker { 0%, 100% { opacity: .85; transform: scale(1); } 40% { opacity: 1; transform: scale(1.12); } 70% { opacity: .7; transform: scale(.94); } }
+.adv-birds { animation: adv-birds 60s linear infinite; }
+.adv-birds-b { animation-duration: 80s; animation-delay: -30s; }
+@keyframes adv-birds { from { translate: -260px 0; } to { translate: 260px -30px; } }
+.adv-bird { animation: adv-flap .9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes adv-flap { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.45); } }
+.adv-rays { animation: adv-rays 9s ease-in-out infinite alternate; }
+@keyframes adv-rays { from { opacity: .3; } to { opacity: .5; } }
 @media (prefers-reduced-motion: reduce) {
-  .summit-stars circle, .summit-crown, .summit-mist, .summit-cloud-a, .summit-cloud-b, .summit-firefly, .summit-next { animation: none; }
+  .summit-stars circle, .summit-crown, .summit-mist, .summit-cloud-a, .summit-cloud-b, .summit-firefly, .summit-next, .summit-saying, .wanderer-lantern, .adv-birds, .adv-bird, .adv-rays { animation: none; }
 }

@@ -8,6 +8,42 @@ import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { MountainClouds, MountainScene, SCENE_H, SCENE_W, SUMMIT } from "./MountainScene";
 
+/** A line for the climb, one a day. */
+const SAYINGS = [
+  "Every summit is reached one step at a time.",
+  "The mountain does not ask you to hurry — only to keep walking.",
+  "Small steps, taken daily, move mountains.",
+  "The view from the top is earned on the trail.",
+  "You don't have to see the whole path. Just the next stone.",
+  "Climb so that you can see the world, not so the world can see you.",
+  "What you do today is the trail you'll stand on tomorrow.",
+];
+const sayingToday = () => SAYINGS[Math.floor(Date.now() / 86_400_000) % SAYINGS.length];
+
+/** A small wanderer with a cloak, a staff and a lantern. */
+function Wanderer() {
+  return (
+    <svg width="30" height="46" viewBox="0 0 30 46" aria-hidden style={{ overflow: "visible" }}>
+      <defs>
+        <radialGradient id="wanderer-glow" cx=".5" cy=".5" r=".5">
+          <stop offset="0" stopColor="#ffe9a8" stopOpacity=".9" />
+          <stop offset="1" stopColor="#ffc96a" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="15" cy="44" rx="10" ry="2.2" fill="#000" opacity=".35" />
+      <circle className="wanderer-lantern" cx="25" cy="27" r="11" fill="url(#wanderer-glow)" />
+      <path d="M22.5 6L25.5 44" stroke="#5a3e22" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M15 9c4 0 6 4 7 10l2 22c-6 2-12 2-18 0l2-22c1-6 3-10 7-10z" fill="#3b2d4f" />
+      <path d="M15 9c4 0 6 4 7 10l2 22c-2 .7-4 1-6 1l-1-24c0-4-1-7-2-9z" fill="#55426e" />
+      <path d="M9.5 10.5c1-4 3-6.5 5.5-6.5s4.5 2.5 5.5 6.5c-3-1.5-8-1.5-11 0z" fill="#2c2140" />
+      <circle cx="15" cy="9" r="3.2" fill="#e8c9a6" />
+      <path d="M11.5 8.5c1-3 6-3 7 0-2-1-5-1-7 0z" fill="#2c2140" />
+      <path d="M23.5 24.5h3v4.5h-3z" fill="#f2c94c" stroke="#5a3e22" strokeWidth=".7" />
+      <circle cx="25" cy="26.8" r="1.1" fill="#fff6c8" />
+    </svg>
+  );
+}
+
 type Quest = { id: string; title: string; xp: number; icon: string | null; done: boolean };
 type Spot = { fx: number; fy: number };
 
@@ -89,9 +125,26 @@ export function SummitView({ quests, boss, level }: { quests: Quest[]; boss: { t
   // The trailhead, at the bottom of the screen.
   const head = { x: w * 0.5, y: h + 20 };
   const trail = [head, ...pts];
-  const segs = w ? segments(trail) : [];
+  // Meander: between each pair of stops the trail swings out one way, then the other.
+  const wind: { x: number; y: number }[] = [];
+  trail.forEach((p, i) => {
+    wind.push(p);
+    const q = trail[i + 1];
+    if (!q) return;
+    const dx = q.x - p.x;
+    const dy = q.y - p.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    // Never so wide that neighbouring switchbacks cross.
+    const amp = Math.min(len * 0.2, 12 + 22 * Math.max(0, (p.y / h - TOP) / (1 - TOP)), Math.abs(dy) * 0.45 + 4);
+    const sgn = i % 2 === 0 ? 1 : -1;
+    wind.push({ x: p.x + dx / 3 + nx * amp * sgn, y: p.y + dy / 3 + ny * amp * sgn });
+    wind.push({ x: p.x + (2 * dx) / 3 - nx * amp * 0.7 * sgn, y: p.y + (2 * dy) / 3 - ny * amp * 0.7 * sgn });
+  });
+  const segs = w ? segments(wind) : [];
   // Width falls away with distance, so the trail recedes into the forest.
-  const widthAt = (y: number) => 10 + Math.max(0, Math.min(1, (y / h - TOP) / (1 - TOP))) * 30;
+  const widthAt = (y: number) => 3 + Math.max(0, Math.min(1, (y / h - TOP) / (1 - TOP))) * 9;
 
   // Where the summit sits on screen (the scene is drawn to cover the box).
   const s = Math.max(w / SCENE_W, h / SCENE_H);
@@ -99,20 +152,22 @@ export function SummitView({ quests, boss, level }: { quests: Quest[]; boss: { t
   const oy = h - SCENE_H * s; // anchored to the bottom
   const peak = { x: ox + SUMMIT.x * s, y: oy + SUMMIT.y * s };
   const last = trail[trail.length - 1] ?? head;
-  // The dotted way onward: from the last quest, up through the mist, to the peak.
+  // The dotted way onward: switchbacks from the last quest, up through the
+  // clouds, narrowing toward the peak.
   const mistY = h * (TOP - 0.06);
-  const ctrl = { x: (last.x + peak.x) / 2 + w * 0.18, y: mistY };
-  const dots: { x: number; y: number; o: number; r: number }[] = [];
+  let climb = "";
   if (w) {
-    const N = 46;
-    for (let k = 1; k <= N; k++) {
-      const t = k / N;
-      const x = (1 - t) * (1 - t) * last.x + 2 * (1 - t) * t * ctrl.x + t * t * peak.x;
-      const y = (1 - t) * (1 - t) * last.y + 2 * (1 - t) * t * ctrl.y + t * t * peak.y;
-      // Clear near the forest, lost in the mist, a faint glimmer near the top.
-      const o = y > mistY + 30 ? 0.9 : y > mistY - h * 0.12 ? 0.45 : 0.3 + 0.4 * t;
-      dots.push({ x, y, o, r: 1.4 + Math.max(0, Math.min(1, (y / h - 0.1) / 0.8)) * 2.4 });
+    const turns = 7;
+    const up: { x: number; y: number }[] = [last];
+    for (let k = 1; k < turns; k++) {
+      const t = k / turns;
+      const cx = last.x + (peak.x - last.x) * Math.pow(t, 0.8);
+      const y = last.y + (peak.y - last.y) * (1 - Math.pow(1 - t, 1.25));
+      const amp = (1 - t) * Math.min(w * 0.2, 150) + 8;
+      up.push({ x: cx + (k % 2 === 0 ? -1 : 1) * amp, y });
     }
+    up.push(peak);
+    climb = segments(up).join("");
   }
   const nextId = list.find((q) => !q.done)?.id ?? null;
 
@@ -181,26 +236,55 @@ export function SummitView({ quests, boss, level }: { quests: Quest[]; boss: { t
               </feMerge>
             </filter>
           </defs>
-          {dots.map((d, i) => (
-            <circle key={i} cx={d.x} cy={d.y} r={d.r} fill="#f6dc8e" opacity={d.o} filter={d.y < mistY - h * 0.12 ? "url(#summit-glow)" : undefined} />
-          ))}
+          <linearGradient id="summit-climb" gradientUnits="userSpaceOnUse" x1="0" y1={last.y} x2="0" y2={peak.y}>
+            <stop offset="0" stopColor="#ffe9b0" stopOpacity=".95" />
+            <stop offset=".3" stopColor="#ffe9b0" stopOpacity=".6" />
+            <stop offset=".75" stopColor="#fff3cf" stopOpacity=".35" />
+            <stop offset="1" stopColor="#fffbe8" stopOpacity=".9" />
+          </linearGradient>
+          <path d={climb} stroke="url(#summit-climb)" strokeWidth="3" strokeLinecap="round" strokeDasharray="0 8" fill="none" filter="url(#summit-glow)" />
         </svg>
       )}
       {/* clouds drift over the way up: glimpsed, never quite seen */}
       <MountainClouds />
       {w > 0 && (
         <svg className="pointer-events-none absolute inset-0" width={w} height={h} aria-hidden>
+          {/* a warm glow along the way, then the worn earth of the trail */}
           {segs.map((d, i) => (
-            <path key={`e${i}`} d={d} stroke="#3b2a17" strokeWidth={widthAt(trail[i + 1].y) + 6} strokeLinecap="round" fill="none" opacity=".75" />
+            <path key={`g${i}`} d={d} stroke="#ffcf7a" strokeWidth={widthAt(wind[i + 1].y) * 3.2} strokeLinecap="round" fill="none" opacity=".12" />
           ))}
           {segs.map((d, i) => (
-            <path key={`p${i}`} d={d} stroke="#b8956a" strokeWidth={widthAt(trail[i + 1].y)} strokeLinecap="round" fill="none" />
+            <path key={`e${i}`} d={d} stroke="#2e2011" strokeWidth={widthAt(wind[i + 1].y) + 2.5} strokeLinecap="round" fill="none" opacity=".7" />
           ))}
           {segs.map((d, i) => (
-            <path key={`c${i}`} d={d} stroke="#d9bd8c" strokeWidth={Math.max(2, widthAt(trail[i + 1].y) * 0.22)} strokeLinecap="round" strokeDasharray="2 9" fill="none" opacity=".7" />
+            <path key={`p${i}`} d={d} stroke="#d2ad78" strokeWidth={widthAt(wind[i + 1].y)} strokeLinecap="round" fill="none" />
           ))}
         </svg>
       )}
+
+      {/* a soft vignette, like an old painting */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, rgba(8,6,20,.45) 100%)" }} />
+
+      {/* a line for the climb */}
+      {w > 0 && (
+        <p
+          className="summit-saying pointer-events-none absolute left-1/2 m-0 w-[min(88vw,520px)] -translate-x-1/2 text-center font-display italic"
+          style={{ top: Math.max(peak.y + 70, h * 0.3), fontSize: w < 500 ? 19 : 24, lineHeight: 1.3, color: "#fff7e6", textShadow: "0 2px 12px rgba(40,20,60,.75), 0 0 2px rgba(40,20,60,.6)" }}
+        >
+          {sayingToday()}
+        </p>
+      )}
+
+      {/* the wanderer waits beside the next quest */}
+      {w > 0 && nextId && (() => {
+        const i = list.findIndex((q) => q.id === nextId);
+        const p = pts[i];
+        return p && dragId !== nextId ? (
+          <div className="summit-wanderer pointer-events-none absolute" style={{ left: p.x - MARK / 2 - 28, top: p.y - MARK * 0.78 - 8, zIndex: Math.round(p.y) + 1 }}>
+            <Wanderer />
+          </div>
+        ) : null;
+      })()}
 
       {/* the boss at the peak */}
       {w > 0 && (
@@ -309,7 +393,7 @@ export function SummitView({ quests, boss, level }: { quests: Quest[]; boss: { t
         <Link href="/" className="flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold" style={{ background: "rgba(20,14,30,.6)", border: "1px solid rgba(242,210,126,.5)", color: "#f6ecd2", backdropFilter: "blur(4px)" }}>
           ← Today
         </Link>
-        <span className="rounded-full px-3 py-2 text-right text-[12.5px]" style={{ background: "rgba(20,14,30,.45)", color: "rgba(246,236,210,.85)" }}>
+        <span className="hidden rounded-full px-3 py-2 text-right text-[12.5px] sm:block" style={{ background: "rgba(20,14,30,.45)", color: "rgba(246,236,210,.85)" }}>
           {list.length === 0 ? "No quests on today's trail yet" : remaining === 0 ? "Every step of today's trail walked ✓" : `${remaining} step${remaining === 1 ? "" : "s"} on today's trail · drag to reshape`}
         </span>
       </div>

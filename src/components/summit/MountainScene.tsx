@@ -1,130 +1,214 @@
+import { Birds, Pines, Rays, wobble } from "./art";
+
 /**
- * The painted world behind the summit view: a dawn sky, a far range, the
- * great peak (its top is the level boss), misty foothills and a dark pine
- * forest in front. Drawn 1600×800, anchored to the bottom and centre, so a
- * phone sees the middle and a wide screen sees the whole range.
+ * The painted world behind the summit view, at golden hour: a deep sky
+ * warming to gold at the horizon, the sun breaking behind the great peak in
+ * long rays, ranges fading into haze, alpenglow on the snow, a glowing mist
+ * in the valley and a dark pine forest in front, rim-lit by the sunset.
+ * Drawn 1600×800, anchored to the bottom and centre, so a phone sees the
+ * middle and a wide screen sees the whole range.
  */
 export const SCENE_W = 1600;
 export const SCENE_H = 800;
 /** The middle 400 units hold the peak; the rest widens the world. */
 const CX = 600;
 /** The very top of the peak, in scene units. */
-export const SUMMIT = { x: CX + 205, y: 132 };
+export const SUMMIT = { x: CX + 205, y: 118 };
 export const SCENE_ASPECT = "xMidYMax slice";
 
-function pine(x: number, base: number, h: number, fill: string, edge?: string) {
-  const w = h * 0.42;
-  const tiers = 4;
-  let d = "";
-  for (let i = 0; i < tiers; i++) {
-    const top = base - h + (i * h) / (tiers + 0.6);
-    const bot = top + h * 0.42;
-    const ww = (w * (0.45 + (i / tiers) * 0.55)) / 2;
-    d += `M${x} ${top.toFixed(1)}L${(x + ww).toFixed(1)} ${bot.toFixed(1)}L${(x - ww).toFixed(1)} ${bot.toFixed(1)}Z`;
-  }
-  return (
-    <g key={`${x}-${base}-${h}`}>
-      <rect x={x - h * 0.025} y={base - h * 0.12} width={h * 0.05} height={h * 0.12} fill="#1a120b" />
-      <path d={d} fill={fill} />
-      {edge && <path d={d} fill="none" stroke={edge} strokeWidth=".8" opacity=".35" />}
-    </g>
-  );
-}
+const STARS = Array.from({ length: 150 }, (_, i) => ({ x: wobble(i + 1) * 1600, y: Math.pow(wobble(i + 77), 1.6) * 230, r: 0.4 + wobble(i + 33) * 1.1, d: wobble(i + 5) * 4 }));
 
-const STARS = Array.from({ length: 130 }, (_, i) => ({ x: (i * 397) % 1600, y: (i * 53) % 200, r: 0.5 + ((i * 7) % 3) * 0.35, d: (i % 6) * 0.6 }));
+/** A distant range as one silhouette, from a list of ridge heights. */
+function range(peaks: number[], base: number, step: number, x0 = -40) {
+  let d = `M${x0} ${base}`;
+  peaks.forEach((y, i) => {
+    const x = x0 + i * step;
+    d += `L${x + step * 0.5} ${y}L${x + step} ${y + (base - y) * (0.25 + wobble(i + y) * 0.35)}`;
+  });
+  return d + `L${x0 + peaks.length * step + 40} ${base + 400}L${x0} ${base + 400}Z`;
+}
 
 export function MountainScene() {
   return (
     <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${SCENE_W} ${SCENE_H}`} preserveAspectRatio={SCENE_ASPECT} aria-hidden>
       <defs>
         <linearGradient id="ms-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#141a3a" />
-          <stop offset=".3" stopColor="#3b2f63" />
-          <stop offset=".5" stopColor="#a8678a" />
-          <stop offset=".62" stopColor="#f2a979" />
-          <stop offset=".72" stopColor="#ffd9a3" />
+          <stop offset="0" stopColor="#0b0e2a" />
+          <stop offset=".2" stopColor="#1f1b4f" />
+          <stop offset=".36" stopColor="#4c2f6e" />
+          <stop offset=".46" stopColor="#9a4f7c" />
+          <stop offset=".54" stopColor="#e07a6e" />
+          <stop offset=".6" stopColor="#f6a65f" />
+          <stop offset=".66" stopColor="#ffd38a" />
+          <stop offset=".72" stopColor="#fff0c4" />
         </linearGradient>
         <radialGradient id="ms-sun" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#fff3c8" stopOpacity=".95" />
-          <stop offset=".35" stopColor="#ffd28a" stopOpacity=".45" />
-          <stop offset="1" stopColor="#ffb070" stopOpacity="0" />
+          <stop offset="0" stopColor="#fffbe8" stopOpacity="1" />
+          <stop offset=".12" stopColor="#fff0bf" stopOpacity=".9" />
+          <stop offset=".35" stopColor="#ffc779" stopOpacity=".42" />
+          <stop offset="1" stopColor="#ff9a5c" stopOpacity="0" />
         </radialGradient>
-        <linearGradient id="ms-far" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8b86b8" />
-          <stop offset="1" stopColor="#c9a7b8" />
+        <linearGradient id="ms-haze" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffd9b0" stopOpacity="0" />
+          <stop offset="1" stopColor="#ffd9b0" stopOpacity=".55" />
         </linearGradient>
-        <linearGradient id="ms-lit" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#c7b3c9" />
-          <stop offset=".5" stopColor="#8a7aa3" />
-          <stop offset="1" stopColor="#5a5480" />
+        <linearGradient id="ms-r1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#c58fa6" />
+          <stop offset="1" stopColor="#e6b2a6" />
+        </linearGradient>
+        <linearGradient id="ms-r2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#8d6d9c" />
+          <stop offset="1" stopColor="#b98a9e" />
+        </linearGradient>
+        <linearGradient id="ms-lit" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f2b6a2" />
+          <stop offset=".35" stopColor="#b98aa6" />
+          <stop offset="1" stopColor="#5b4d80" />
         </linearGradient>
         <linearGradient id="ms-shade" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#4a4470" />
-          <stop offset="1" stopColor="#2c2a4c" />
+          <stop offset="0" stopColor="#4a3f72" />
+          <stop offset="1" stopColor="#2a2550" />
         </linearGradient>
-        <linearGradient id="ms-snow" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset=".6" stopColor="#ffe9dc" />
-          <stop offset="1" stopColor="#c9c3e6" />
+        <linearGradient id="ms-snow" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff6e6" />
+          <stop offset=".45" stopColor="#ffd8c4" />
+          <stop offset="1" stopColor="#c8b8e0" />
+        </linearGradient>
+        <linearGradient id="ms-snow-shade" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#b8b0dc" />
+          <stop offset="1" stopColor="#8b84bd" />
+        </linearGradient>
+        <linearGradient id="ms-valley" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffe2b8" stopOpacity="0" />
+          <stop offset=".45" stopColor="#ffe2b8" stopOpacity=".75" />
+          <stop offset="1" stopColor="#ffe2b8" stopOpacity="0" />
         </linearGradient>
         <linearGradient id="ms-hills" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#3e5a6a" />
-          <stop offset="1" stopColor="#253c45" />
+          <stop offset="0" stopColor="#4d5f78" />
+          <stop offset="1" stopColor="#2c3b4c" />
         </linearGradient>
         <linearGradient id="ms-meadow" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#3f6b45" />
-          <stop offset=".5" stopColor="#2a4d31" />
-          <stop offset="1" stopColor="#16301d" />
+          <stop offset="0" stopColor="#57784a" />
+          <stop offset=".35" stopColor="#36573a" />
+          <stop offset="1" stopColor="#13261a" />
         </linearGradient>
-        <linearGradient id="ms-mist" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fff4ea" stopOpacity="0" />
-          <stop offset=".5" stopColor="#fff4ea" stopOpacity=".55" />
-          <stop offset="1" stopColor="#fff4ea" stopOpacity="0" />
+        <linearGradient id="ms-rim" x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stopColor="#ffbf73" stopOpacity=".55" />
+          <stop offset=".35" stopColor="#ffbf73" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="ms-shaft" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff0c8" stopOpacity=".38" />
+          <stop offset="1" stopColor="#fff0c8" stopOpacity="0" />
         </linearGradient>
         <radialGradient id="ms-crown" cx=".5" cy=".5" r=".5">
-          <stop offset="0" stopColor="#fff1b8" stopOpacity=".9" />
+          <stop offset="0" stopColor="#fffbe0" stopOpacity="1" />
+          <stop offset=".4" stopColor="#ffe08a" stopOpacity=".6" />
           <stop offset="1" stopColor="#ffd28a" stopOpacity="0" />
         </radialGradient>
+        <filter id="ms-blur" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur stdDeviation="5" />
+        </filter>
+        <filter id="ms-soft" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2.2" />
+        </filter>
       </defs>
 
-      {/* sky and dawn */}
+      {/* sky */}
       <rect width="1600" height="800" fill="url(#ms-sky)" />
       <g className="summit-stars">
         {STARS.map((s, i) => (
-          <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity=".8" style={{ animationDelay: `${s.d}s` }} />
+          <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity=".85" style={{ animationDelay: `${s.d}s` }} />
         ))}
       </g>
-      <circle cx={CX + 205} cy="300" r="260" fill="url(#ms-sun)" />
 
-      {/* the wide world: distant ranges either side */}
-      <path d="M0 470L60 400L120 430L190 340L250 400L320 360L400 420L470 380L560 440L600 480L1000 480L1060 420L1120 450L1200 360L1270 410L1340 350L1410 420L1480 380L1550 430L1600 410V520H0Z" fill="url(#ms-far)" opacity=".8" />
-      <path d="M0 520L90 450L160 480L260 410L360 470L460 430L600 500L1000 500L1120 440L1220 480L1320 420L1440 470L1530 440L1600 470V560H0Z" fill="#6e6a98" opacity=".75" />
-
-      <g transform={`translate(${CX} 0)`}>
-
-      {/* the great peak */}
-      <path d="M205 132L178 172L156 206L132 250L104 300L70 356L30 418L-80 520L-200 580L620 580L520 520L430 460L382 402L334 332L292 268L262 214L236 178Z" fill="url(#ms-lit)" />
-      <path d="M205 132L236 178L262 214L292 268L334 332L382 402L430 460L520 520L620 580L212 580L200 430L216 360L198 290L214 214Z" fill="url(#ms-shade)" />
-      <path d="M205 132L182 168L166 192L176 196L186 186L192 204L204 192L214 214L224 198L236 210L246 198L254 206L236 178Z" fill="url(#ms-snow)" />
-      <path d="M132 250l18 8 10-14M262 214l-6 14 14 4M104 300l22 6M292 268l-10 16 16 2" stroke="#efe6f4" strokeWidth="2" strokeLinecap="round" fill="none" opacity=".5" />
-      {/* a glow at the top, where the boss waits */}
-      <circle className="summit-crown" cx="205" cy="132" r="26" fill="url(#ms-crown)" />
+      {/* the setting sun behind the peak, and its rays */}
+      <circle cx={CX + 262} cy="300" r="420" fill="url(#ms-sun)" />
+      <g filter="url(#ms-blur)">
+        <Rays x={CX + 262} y={300} id="ms-ray" len={1000} count={17} opacity={0.3} />
       </g>
 
-      {/* misty foothills with distant pines */}
-      <path d="M0 530Q160 470 330 500T640 492Q720 470 810 492T1060 486T1320 500T1600 492V640H0Z" fill="url(#ms-hills)" />
-      {Array.from({ length: 34 }, (_, i) => 20 + i * 47).map((x, i) => pine(x, 512 + (i % 3) * 7, 24 + (i % 4) * 6, "#20343c"))}
-      <rect x="-40" y="440" width="1680" height="150" fill="url(#ms-mist)" className="summit-mist" />
+      {/* sunset cloud streaks */}
+      <g opacity=".85" filter="url(#ms-soft)">
+        {[[120, 300, 260, 7], [420, 330, 220, 6], [1080, 290, 300, 8], [1330, 340, 240, 6], [700, 360, 180, 5], [960, 250, 160, 5], [250, 250, 170, 4]].map(([x, y, w, h], i) => (
+          <g key={i}>
+            <ellipse cx={x} cy={y} rx={w} ry={h} fill="#ffb98a" opacity=".55" />
+            <ellipse cx={x + 20} cy={y - 3} rx={w * 0.6} ry={h * 0.5} fill="#ffe3bc" opacity=".6" />
+          </g>
+        ))}
+      </g>
+      <Birds x={CX - 120} y={210} s={1.1} color="#3a2346" />
+      <Birds x={CX + 520} y={170} s={0.8} color="#3a2346" cls="adv-birds adv-birds-b" />
+
+      {/* the farthest ranges, softened by haze */}
+      <path d={range([350, 300, 330, 270, 310, 340, 290, 320, 300, 350, 280, 330, 300, 345, 310, 330], 480, 110)} fill="url(#ms-r1)" opacity=".75" />
+      <rect y="320" width="1600" height="180" fill="url(#ms-haze)" />
+
+      {/* the great peak */}
+      <g transform={`translate(${CX} 0)`}>
+        {/* flanking peaks */}
+        <path d="M-160 520L-40 300L10 340L60 270L130 360L200 520Z" fill="url(#ms-r2)" />
+        <path d="M-40 300L-60 330L-30 322L-12 338L10 340Z" fill="#f6d8d0" opacity=".8" />
+        <path d="M280 520L360 320L400 350L450 255L540 420L600 520Z" fill="url(#ms-r2)" />
+        <path d="M450 255L432 290L452 284L466 300L478 290Z" fill="#fde6d6" opacity=".85" />
+        <rect x="-200" y="380" width="900" height="160" fill="url(#ms-haze)" />
+
+        {/* main massif: shadow face, then the lit (sunward) face */}
+        <path d="M205 118L180 156L160 186L140 222L118 262L96 300L70 340L40 386L0 440L-60 500L-140 560L560 560L480 500L420 440L376 382L336 324L302 270L274 222L252 184L232 152Z" fill="url(#ms-shade)" />
+        <path d="M205 118L232 152L252 184L274 222L302 270L336 324L376 382L420 440L480 500L560 560L240 560L226 500L238 440L220 380L236 320L218 262L226 200L212 160Z" fill="url(#ms-lit)" />
+        {/* rock strata and gullies */}
+        <g stroke="#2a2550" strokeWidth="1.3" fill="none" opacity=".3" strokeLinecap="round">
+          <path d="M150 230l22 10 12-8M118 290l26 8 20-10M86 340l30 10 24-12M60 392l34 8 30-14M30 440l40 6 36-14" />
+          <path d="M170 200q8 40-6 80t4 90M120 300q10 40-2 90" />
+        </g>
+        <g stroke="#ffd9c0" strokeWidth="1.2" fill="none" opacity=".28" strokeLinecap="round">
+          <path d="M262 236l-14 18 18 4M300 300l-18 22 22 2M344 360l-20 20 26 4M390 420l-24 18 30 4" />
+          <path d="M248 200q-8 44 8 90t-4 80" />
+        </g>
+        {/* snowfields: alpenglow on the sunward side */}
+        <path d="M205 118L180 156L166 180L176 186L184 176L190 196L198 186L206 206L214 192L222 210L230 196L240 206L248 192L258 204L252 184L232 152Z" fill="url(#ms-snow-shade)" />
+        <path d="M205 118L232 152L252 184L262 204L272 224L262 222L256 232L246 222L238 236L230 224L222 238L214 222L210 206L214 190L212 160Z" fill="url(#ms-snow)" />
+        <path d="M140 222l14 6 8-10 6 12 10-6M118 262l12 4 10-8" stroke="#ece6f8" strokeWidth="2" fill="none" opacity=".55" strokeLinecap="round" />
+        <path d="M302 270l-10 14 14 0 4 10 10-6M336 324l-12 12 16 2" stroke="#fff0e2" strokeWidth="2.2" fill="none" opacity=".7" strokeLinecap="round" />
+        {/* the sunward ridge glows */}
+        <path d="M205 118L232 152L252 184L274 222L302 270L336 324L376 382L420 440" stroke="#ffe2b0" strokeWidth="2.4" fill="none" opacity=".85" filter="url(#ms-soft)" />
+        <path d="M205 118L232 152L252 184L274 222L302 270" stroke="#fffbe8" strokeWidth="1" fill="none" />
+        {/* the summit's light, where the boss waits */}
+        <circle className="summit-crown" cx="205" cy="118" r="34" fill="url(#ms-crown)" />
+      </g>
+
+      {/* the valley mist, lit gold */}
+      <rect x="-40" y="420" width="1680" height="190" fill="url(#ms-valley)" className="summit-mist" />
+
+      {/* foothills with distant pines */}
+      <path d="M0 540Q160 492 330 516T640 506Q720 488 810 506T1060 498T1320 514T1600 500V660H0Z" fill="url(#ms-hills)" />
+      <Pines trees={Array.from({ length: 40 }, (_, i) => [10 + i * 40 + wobble(i) * 20, 528 + wobble(i + 3) * 14, 22 + wobble(i + 8) * 18])} fill="#2b3a4c" rim="url(#ms-rim)" seed={3} />
+      <rect x="-40" y="500" width="1680" height="90" fill="url(#ms-valley)" opacity=".55" />
 
       {/* the forest floor */}
-      <path d="M0 610Q200 560 420 585T800 572T1180 586T1600 576V820H0Z" fill="url(#ms-meadow)" />
-      {/* forest: thickest at the far edges, a fringe each side of the middle */}
-      {[[CX + 8, 610, 60], [CX + 34, 622, 74], [CX + 372, 612, 64], [CX + 394, 630, 80], [CX + 62, 640, 54], [CX + 346, 646, 58], [120, 600, 70], [240, 615, 60], [360, 605, 66], [470, 620, 58], [1130, 612, 62], [1250, 600, 72], [1380, 618, 60], [1500, 604, 70]].map(([x, b, hh]) => pine(x, b, hh, "#1c3a26", "#6fa36f"))}
-      {[[CX - 6, 720, 150], [CX + 30, 760, 190], [CX + 392, 730, 160], [CX + 420, 780, 220], [CX + 76, 800, 120], [CX + 330, 812, 140], [60, 760, 220], [180, 800, 260], [330, 780, 200], [470, 760, 180], [1110, 770, 190], [1260, 790, 240], [1400, 760, 210], [1530, 800, 260]].map(([x, b, hh]) => pine(x, b, hh, "#0f2418", "#4f8a5a"))}
-      {[[CX - 10, 860, 300], [CX + 418, 870, 320], [20, 880, 380], [1590, 880, 380]].map(([x, b, hh]) => pine(x, b, hh, "#0a1a11"))}
+      <path d="M0 620Q200 568 420 594T800 580T1180 596T1600 584V820H0Z" fill="url(#ms-meadow)" />
+      {/* sunlight slanting through the trees */}
+      <g className="summit-shafts" style={{ mixBlendMode: "screen" }} opacity=".45" filter="url(#ms-blur)">
+        {[[CX + 300, 70], [CX + 360, 40], [CX + 80, 50], [1250, 80], [300, 60]].map(([x, w], i) => (
+          <path key={i} d={`M${x} 520L${x + w} 520L${x - 160 + w} 820L${x - 160} 820Z`} fill="url(#ms-shaft)" />
+        ))}
+      </g>
+      {/* forest: middle distance, then near, then the darkest frame */}
+      <Pines
+        trees={[[CX + 8, 626, 64], [CX + 36, 640, 80], [CX + 372, 628, 70], [CX + 396, 646, 86], [CX + 64, 654, 56], [CX + 346, 660, 60], [120, 616, 76], [240, 630, 64], [360, 620, 70], [470, 636, 62], [1130, 628, 66], [1250, 614, 78], [1380, 634, 64], [1500, 620, 76]]}
+        fill="#24452f"
+        rim="url(#ms-rim)"
+        seed={11}
+      />
+      <Pines
+        trees={[[CX - 6, 740, 160], [CX + 30, 780, 200], [CX + 392, 750, 170], [CX + 420, 800, 230], [CX + 76, 820, 130], [CX + 330, 830, 150], [60, 780, 230], [180, 820, 270], [330, 800, 210], [470, 780, 190], [1110, 790, 200], [1260, 810, 250], [1400, 780, 220], [1530, 820, 270]]}
+        fill="#11281b"
+        rim="url(#ms-rim)"
+        seed={23}
+      />
+      <Pines trees={[[CX - 14, 880, 320], [CX + 424, 890, 340], [20, 900, 400], [1590, 900, 400]]} fill="#081710" seed={41} />
       {/* fireflies */}
-      {[[CX + 120, 700], [CX + 270, 660], [CX + 90, 610], [CX + 320, 740], [CX + 200, 640], [CX + 150, 760], [300, 690], [1300, 680], [450, 650], [1150, 720]].map(([x, y], i) => (
-        <circle key={i} className="summit-firefly" cx={x} cy={y} r="1.6" fill="#fff3a0" style={{ animationDelay: `${i * 0.7}s` }} />
+      {[[CX + 120, 700], [CX + 270, 660], [CX + 90, 620], [CX + 320, 740], [CX + 200, 650], [CX + 150, 770], [300, 690], [1300, 680], [450, 650], [1150, 720], [CX + 40, 690], [CX + 360, 690]].map(([x, y], i) => (
+        <circle key={i} className="summit-firefly" cx={x} cy={y} r="1.8" fill="#fff3a0" style={{ animationDelay: `${i * 0.55}s` }} />
       ))}
     </svg>
   );
@@ -132,32 +216,44 @@ export function MountainScene() {
 
 /**
  * Drifting clouds over the climb — drawn above the dotted way up, so the
- * route to the summit is glimpsed but never quite seen.
+ * route to the summit is glimpsed but never quite seen. Lit warm from the
+ * sunset side.
  */
 export function MountainClouds() {
   const cloud = (x: number, y: number, s: number, o: number, cls: string, delay: number) => (
     <g key={`${x}-${y}`} className={cls} style={{ animationDelay: `${delay}s` }} opacity={o}>
       <g transform={`translate(${x} ${y}) scale(${s})`}>
-        <ellipse cx="0" cy="0" rx="46" ry="14" fill="#fff6f0" />
-        <ellipse cx="-22" cy="-8" rx="22" ry="14" fill="#fff6f0" />
-        <ellipse cx="10" cy="-13" rx="26" ry="17" fill="#fffaf6" />
-        <ellipse cx="34" cy="-5" rx="18" ry="11" fill="#fff6f0" />
-        <ellipse cx="0" cy="5" rx="50" ry="8" fill="#e9d6e6" opacity=".7" />
+        <ellipse cx="2" cy="7" rx="54" ry="9" fill="#b98aa6" opacity=".45" filter="url(#mc-soft)" />
+        <ellipse cx="0" cy="0" rx="48" ry="14" fill="url(#mc-body)" />
+        <ellipse cx="-24" cy="-8" rx="22" ry="14" fill="url(#mc-body)" />
+        <ellipse cx="9" cy="-14" rx="27" ry="18" fill="url(#mc-body)" />
+        <ellipse cx="34" cy="-5" rx="18" ry="11" fill="url(#mc-body)" />
+        <ellipse cx="18" cy="-20" rx="14" ry="6" fill="#fff8ec" opacity=".8" />
       </g>
     </g>
   );
   return (
     <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${SCENE_W} ${SCENE_H}`} preserveAspectRatio={SCENE_ASPECT} aria-hidden>
+      <defs>
+        <linearGradient id="mc-body" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff4e2" />
+          <stop offset=".55" stopColor="#f6dcd8" />
+          <stop offset="1" stopColor="#c9a9c4" />
+        </linearGradient>
+        <filter id="mc-soft" x="-20%" y="-50%" width="140%" height="200%">
+          <feGaussianBlur stdDeviation="3" />
+        </filter>
+      </defs>
       <g transform={`translate(${CX} 0)`}>
-      {cloud(250, 210, 1.1, 0.88, "summit-cloud-a", 0)}
-      {cloud(150, 285, 1.35, 0.92, "summit-cloud-b", 2)}
-      {cloud(285, 350, 1.25, 0.85, "summit-cloud-a", 4)}
-      {cloud(110, 410, 1.6, 0.9, "summit-cloud-b", 1)}
-      {cloud(300, 455, 1.5, 0.8, "summit-cloud-a", 3)}
-      {cloud(190, 505, 1.9, 0.7, "summit-cloud-b", 5)}
+        {cloud(258, 196, 1.05, 0.9, "summit-cloud-a", 0)}
+        {cloud(150, 262, 1.3, 0.94, "summit-cloud-b", 2)}
+        {cloud(292, 330, 1.25, 0.88, "summit-cloud-a", 4)}
+        {cloud(118, 392, 1.55, 0.9, "summit-cloud-b", 1)}
+        {cloud(300, 446, 1.5, 0.82, "summit-cloud-a", 3)}
+        {cloud(200, 500, 1.9, 0.6, "summit-cloud-b", 5)}
       </g>
-      {cloud(180, 260, 1.4, 0.75, "summit-cloud-a", 2)}
-      {cloud(1420, 230, 1.5, 0.75, "summit-cloud-b", 3)}
+      {cloud(180, 250, 1.4, 0.7, "summit-cloud-a", 2)}
+      {cloud(1420, 220, 1.5, 0.7, "summit-cloud-b", 3)}
     </svg>
   );
 }
