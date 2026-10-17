@@ -47,7 +47,11 @@ function mergeDrafts(a: Draft[], b: Draft[]): Draft[] {
   return [...byId.values()];
 }
 /** What to keep: drafts with words in them, and recent deletions (so another tab or device doesn't bring them back). */
-const keepable = (ds: Draft[]) => ds.filter((d) => (d.deleted ? (d.updatedAt ?? 0) > Date.now() - 86_400_000 : d.body.trim()));
+const keepable = (ds: Draft[]) =>
+  ds
+    // A draft emptied out counts as deleted, so an older copy elsewhere can't bring it back.
+    .map((d) => (!d.deleted && !d.body.trim() ? { ...d, deleted: true } : d))
+    .filter((d) => !d.deleted || (d.updatedAt ?? 0) > Date.now() - 86_400_000);
 type Geom = { x: number; y: number; w: number; h: number };
 /** The round button's top-left corner, in px from the window's top-left. */
 type Pos = { x: number; y: number };
