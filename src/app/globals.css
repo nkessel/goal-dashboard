@@ -1573,6 +1573,8 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   100% { opacity: 0; transform: translate(-50%, 6px) scale(0.2) rotate(90deg); }
 }
 .owl-spark {
+  position: absolute;
+  pointer-events: none;
   width: 7px;
   height: 7px;
   background: radial-gradient(circle, #fffbe6 0 30%, #f6dc8e 55%, transparent 72%);
@@ -1607,4 +1609,38 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 .reward-coin { opacity: 0; animation-name: reward-coin; animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1); animation-fill-mode: both; }
 @media (prefers-reduced-motion: reduce) {
   .reward-rays, .reward-star, .reward-coin { animation: none; }
+}
+
+/* Owl, refined: idle breath and glance; crouch, beat, glide, flare. */
+.owl-perch { transition: filter 0.2s; }
+.owl-perch.owl-arrive { animation: owl-arrive 0.5s ease-out both; }
+@keyframes owl-arrive { from { opacity: 0; } to { opacity: 1; } }
+.owl-body { display: block; transform-origin: 50% 100%; }
+.owl-body svg { display: block; overflow: visible; }
+@keyframes owl-breathe-glance {
+  0%, 100% { transform: scale(1, 1) rotate(0deg); }
+  20% { transform: scale(1.015, 1.03) rotate(0deg); }
+  40% { transform: scale(1, 1) rotate(0deg); }
+  62% { transform: scale(1, 1) rotate(-7deg); }
+  70% { transform: scale(1.01, 1.02) rotate(-7deg); }
+  78% { transform: scale(1, 1) rotate(0deg); }
+  88% { transform: scale(1.015, 1.03) rotate(0deg); }
+}
+.owl-perched .owl-idle { transform-origin: 50% 90%; animation: owl-breathe-glance 7.5s ease-in-out infinite; }
+@keyframes owl-crouch {
+  0% { transform: scale(1, 1) translateY(0); }
+  60% { transform: scale(1.06, 0.84) translateY(3px); }
+  100% { transform: scale(0.96, 1.08) translateY(-6px); }
+}
+.owl-takeoff .owl-idle { transform-origin: 50% 100%; animation: owl-crouch 0.17s ease-in forwards; }
+.owl-flying .owl-wing-l, .owl-flying .owl-wing-r { animation-duration: 0.22s; }
+.owl-gliding .owl-wing-l, .owl-gliding .owl-wing-r { animation-duration: 1.6s; }
+@keyframes owl-flare-l { 0% { transform: rotate(0deg); } 100% { transform: rotate(-32deg) scaleY(1.05); } }
+@keyframes owl-flare-r { 0% { transform: rotate(0deg); } 100% { transform: rotate(32deg) scaleY(1.05); } }
+.owl-landing .owl-wing-l { animation: owl-flare-l 0.26s ease-out forwards; }
+.owl-landing .owl-wing-r { animation: owl-flare-r 0.26s ease-out forwards; }
+@keyframes owl-settle { 0% { transform: scale(1.04, 0.9); } 60% { transform: scale(0.98, 1.03); } 100% { transform: scale(1, 1); } }
+.owl-perched .owl-idle { animation: owl-settle 0.32s ease-out, owl-breathe-glance 7.5s ease-in-out 0.32s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .owl-idle, .owl-perched .owl-idle, .owl-takeoff .owl-idle { animation: none !important; }
 }

@@ -21,121 +21,168 @@ function perches(): { x: number; y: number }[] {
 
 const OWL_W = 52;
 const OWL_H = 56;
-const FLIGHT_MS = 1250;
+type Phase = "perched" | "takeoff" | "flying" | "gliding" | "landing";
+
+const easeInOutSine = (t: number) => -(Math.cos(Math.PI * t) - 1) / 2;
+const bez = (a: number, b: number, c: number, d: number, t: number) => {
+  const u = 1 - t;
+  return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
+};
 
 /**
  * A snowy owl that keeps watch in the Adventure theme. It perches on the
- * navigation bar, blinks now and then, and — when you tap it — spreads its
- * wings and flies to another perch, trailing a little starlight.
+ * navigation bar, breathes, blinks and glances about. Tap it and it crouches,
+ * springs up, beats its wings into a smooth banking arc (gliding on the long
+ * middle stretch), then flares its wings to land on another perch — trailing
+ * a little starlight. Motion runs on the compositor, not React renders.
  */
 export function PerchedOwl() {
   const [mounted, setMounted] = useState(false);
-  const [at, setAt] = useState(0);
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const [flying, setFlying] = useState(false);
+  const [phase, setPhase] = useState<Phase>("perched");
   const [facing, setFacing] = useState<1 | -1>(1);
-  const [sparks, setSparks] = useState<{ id: number; x: number; y: number }[]>([]);
-  const sparkId = useRef(0);
+  const at = useRef(0);
+  const pos = useRef<{ x: number; y: number } | null>(null);
+  const box = useRef<HTMLButtonElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const sparks = useRef<HTMLDivElement>(null);
   const raf = useRef<number | null>(null);
+  const busy = useRef(false);
 
-  const place = useCallback((i: number) => {
-    const p = perches()[i];
-    if (p) setPos(p);
+  const put = useCallback((p: { x: number; y: number }, tilt = 0, lift = 0) => {
+    pos.current = p;
+    const el = box.current;
+    if (!el) return;
+    el.style.transform = `translate3d(${(p.x - OWL_W / 2).toFixed(1)}px, ${(p.y - OWL_H - lift).toFixed(1)}px, 0) rotate(${tilt.toFixed(1)}deg)`;
   }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the page has to exist before we can perch on it
     setMounted(true);
-    let i = 0;
     try {
-      i = Number(window.localStorage.getItem("owl-perch") ?? 0) || 0;
+      at.current = Number(window.localStorage.getItem("owl-perch") ?? 0) || 0;
     } catch {
       /* storage unavailable */
     }
-    setAt(i);
-    const settle = () => place(i);
-    const t = setTimeout(settle, 60);
-    return () => clearTimeout(t);
-  }, [place]);
-
-  useEffect(() => {
-    const onResize = () => !flying && place(at);
+    const t = setTimeout(() => {
+      const p = perches()[at.current] ?? perches()[0];
+      put(p);
+      box.current?.classList.add("owl-arrive");
+    }, 80);
+    const onResize = () => !busy.current && put(perches()[at.current] ?? perches()[0]);
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [at, flying, place]);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", onResize);
+      if (raf.current) cancelAnimationFrame(raf.current);
+    };
+  }, [put]);
 
-  useEffect(() => () => void (raf.current && cancelAnimationFrame(raf.current)), []);
+  function spark(x: number, y: number) {
+    const host = sparks.current;
+    if (!host) return;
+    const s = document.createElement("span");
+    s.className = "owl-spark";
+    s.style.left = `${x}px`;
+    s.style.top = `${y}px`;
+    host.appendChild(s);
+    setTimeout(() => s.remove(), 950);
+  }
 
   function fly() {
-    if (flying || !pos) return;
+    if (busy.current || !pos.current) return;
     const all = perches();
     let next = Math.floor(Math.random() * (all.length - 1));
-    if (next >= at) next += 1;
+    if (next >= at.current) next += 1;
     const to = all[next];
-    const from = pos;
+    const from = pos.current;
     try {
       window.localStorage.setItem("owl-perch", String(next));
     } catch {
       /* storage unavailable */
     }
-    setFacing(to.x >= from.x ? 1 : -1);
+    const dir: 1 | -1 = to.x >= from.x ? 1 : -1;
+    setFacing(dir);
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setAt(next);
-      setPos(to);
+      at.current = next;
+      put(to);
       return;
     }
-    setFlying(true);
-    // An arc: up and over, higher for longer flights.
-    const lift = Math.min(260, 90 + Math.hypot(to.x - from.x, to.y - from.y) * 0.35);
-    const cx = (from.x + to.x) / 2;
-    const cy = Math.min(from.y, to.y) - lift;
-    const start = performance.now();
-    let lastSpark = 0;
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / FLIGHT_MS);
-      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-      const x = (1 - e) * (1 - e) * from.x + 2 * (1 - e) * e * cx + e * e * to.x;
-      const y = (1 - e) * (1 - e) * from.y + 2 * (1 - e) * e * cy + e * e * to.y;
-      setPos({ x, y });
-      if (now - lastSpark > 45 && t < 0.95) {
-        lastSpark = now;
-        const id = ++sparkId.current;
-        setSparks((s) => [...s.slice(-24), { id, x: x - facing * 14 + (Math.random() - 0.5) * 12, y: y - OWL_H * 0.45 + (Math.random() - 0.5) * 12 }]);
-        setTimeout(() => setSparks((s) => s.filter((k) => k.id !== id)), 900);
-      }
-      if (t < 1) raf.current = requestAnimationFrame(step);
-      else {
-        setFlying(false);
-        setAt(next);
-      }
-    };
-    raf.current = requestAnimationFrame(step);
+    busy.current = true;
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    const dur = Math.max(900, Math.min(1700, 600 + dist * 1.1));
+    const lift = Math.min(220, 70 + dist * 0.3);
+    // Two control points: a steep climb out, a gentle descent in.
+    const c1 = { x: from.x + (to.x - from.x) * 0.15, y: Math.min(from.y, to.y) - lift };
+    const c2 = { x: from.x + (to.x - from.x) * 0.75, y: Math.min(from.y, to.y) - lift * 0.8 };
+
+    // 1) Crouch and spring.
+    setPhase("takeoff");
+    setTimeout(() => {
+      setPhase("flying");
+      const start = performance.now();
+      let last = { x: from.x, y: from.y };
+      let lastSpark = 0;
+      let gliding = false;
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / dur);
+        const e = easeInOutSine(t);
+        const x = bez(from.x, c1.x, c2.x, to.x, e);
+        const y = bez(from.y, c1.y, c2.y, to.y, e);
+        // Bank into the turn: tilt with the path's slope.
+        const vx = x - last.x;
+        const vy = y - last.y;
+        const tilt = Math.max(-22, Math.min(22, (Math.atan2(vy, Math.abs(vx) + 0.001) * 180) / Math.PI * 0.45)) * dir;
+        last = { x, y };
+        put({ x, y }, tilt);
+        // Glide through the middle of a long flight.
+        const glideNow = dur > 1100 && t > 0.38 && t < 0.68;
+        if (glideNow !== gliding) {
+          gliding = glideNow;
+          setPhase(glideNow ? "gliding" : "flying");
+        }
+        if (now - lastSpark > 38 && t > 0.05 && t < 0.92) {
+          lastSpark = now;
+          spark(x - dir * 16 + (Math.random() - 0.5) * 10, y - OWL_H * 0.42 + (Math.random() - 0.5) * 10);
+        }
+        if (t < 1) raf.current = requestAnimationFrame(step);
+        else {
+          // 3) Flare and settle.
+          setPhase("landing");
+          put(to);
+          setTimeout(() => {
+            setPhase("perched");
+            at.current = next;
+            busy.current = false;
+          }, 260);
+        }
+      };
+      raf.current = requestAnimationFrame(step);
+    }, 170);
   }
 
-  if (!mounted || !pos) return null;
+  if (!mounted) return null;
   return createPortal(
     <>
-      {sparks.map((s) => (
-        <span key={s.id} aria-hidden className="owl-spark pointer-events-none fixed z-[44]" style={{ left: s.x, top: s.y }} />
-      ))}
+      <div ref={sparks} aria-hidden className="pointer-events-none fixed inset-0 z-[44]" />
       <button
+        ref={box}
         type="button"
         onClick={fly}
         aria-label="A snowy owl — tap and it flies to another perch"
         title="Hoo!"
-        className="owl-perch fixed z-[45] p-0"
+        className="owl-perch fixed left-0 top-0 z-[45] p-0"
         style={{
-          left: pos.x - OWL_W / 2,
-          top: pos.y - OWL_H,
           width: OWL_W,
           height: OWL_H,
           background: "transparent",
           border: 0,
-          transform: `scaleX(${facing})`,
+          willChange: "transform",
           filter: "drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 10px rgba(255,236,170,.25))",
         }}
       >
-        {flying ? <FlyingOwl /> : <SittingOwl />}
+        <div ref={body} className={`owl-body owl-${phase}`} style={{ transform: `scaleX(${facing})` }}>
+          {phase === "perched" || phase === "takeoff" ? <SittingOwl /> : <FlyingOwl />}
+        </div>
       </button>
     </>,
     document.body
@@ -186,7 +233,7 @@ function Eyes({ y = 19 }: { y?: number }) {
 
 function SittingOwl() {
   return (
-    <svg viewBox="0 0 52 56" width="52" height="56" aria-hidden>
+    <svg viewBox="0 0 52 56" width="52" height="56" aria-hidden className="owl-idle">
       <Defs />
       {/* tail and wings folded behind */}
       <path d="M17 46l9 8 9-8z" fill="#c9ccd6" />
