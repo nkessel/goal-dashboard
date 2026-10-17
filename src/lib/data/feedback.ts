@@ -7,6 +7,8 @@ export const FEEDBACK_KINDS = ["feedback", "refill", "future"] as const;
 export type FeedbackForReview = {
   id: string;
   body: string;
+  /** The owner's rewording, when they edited it before deciding. */
+  edited_body: string | null;
   kind: string;
   created_at: string;
   review_status: ReviewStatus | null;
@@ -31,7 +33,7 @@ export async function listFeedbackForReview(): Promise<FeedbackForReview[]> {
   const admins = await adminIds();
   let q = db
     .from("journal_entries")
-    .select("id, body, kind, created_at, review_status, reviewed_at, owner_id")
+    .select("*")
     .in("kind", [...FEEDBACK_KINDS])
     .order("created_at", { ascending: false })
     .limit(300);
@@ -47,6 +49,7 @@ export async function listFeedbackForReview(): Promise<FeedbackForReview[]> {
   return (data ?? []).map((r) => ({
     id: r.id as string,
     body: r.body as string,
+    edited_body: (r.edited_body as string | null | undefined) ?? null,
     kind: r.kind as string,
     created_at: r.created_at as string,
     review_status: (r.review_status as ReviewStatus | null) ?? null,
@@ -62,6 +65,13 @@ export async function setReviewStatus(entryId: string, status: ReviewStatus | nu
     .eq("id", entryId)
     .in("kind", [...FEEDBACK_KINDS]);
   if (error) throw new Error(`Couldn't save that decision: ${error.message}`);
+}
+
+/** Reword a piece of feedback (null puts the sender's words back). */
+export async function setEditedBody(entryId: string, text: string | null): Promise<void> {
+  const v = text?.trim() ? text.trim().slice(0, 4000) : null;
+  const { error } = await supabaseAdmin().from("journal_entries").update({ edited_body: v }).eq("id", entryId).in("kind", [...FEEDBACK_KINDS]);
+  if (error) throw new Error(`Couldn't save that edit: ${error.message}`);
 }
 
 export async function countUnreviewed(): Promise<number> {

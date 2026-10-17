@@ -1603,6 +1603,13 @@ export async function reviewFeedbackAction(entryId: string, status: feedbackData
   revalidatePath("/settings");
 }
 
+export async function editFeedbackAction(entryId: string, text: string | null) {
+  const profileId = await requireProfileId();
+  if (!(await feedbackData.isAdmin(profileId))) throw new Error("Only the app's owner edits feedback.");
+  await feedbackData.setEditedBody(entryId, text);
+  revalidatePath("/feedback-review");
+}
+
 export async function deleteJournalEntryAction(id: string) {
   const ownerId = await requireProfileId();
   await journalData.deleteJournalEntry(ownerId, id);

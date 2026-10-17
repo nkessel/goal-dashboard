@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useSyncExternalStore, useTransition } from "react";
-import { reviewFeedbackAction } from "@/app/actions";
+import { editFeedbackAction, reviewFeedbackAction } from "@/app/actions";
 
 type Status = "global" | "personal" | "later" | "skipped";
 type Item = {
   id: string;
   body: string;
+  edited_body: string | null;
   kind: string;
   created_at: string;
   review_status: Status | null;
@@ -49,6 +50,28 @@ export function FeedbackReview({ items, theme }: { items: Item[]; theme: "calm" 
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("new");
   const [local, setLocal] = useState<Record<string, Status | null>>({});
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [edits, setEdits] = useState<Record<string, string | null>>({});
+  const [showOriginal, setShowOriginal] = useState<Set<string>>(new Set());
+  const textOf = (it: Item) => (it.id in edits ? edits[it.id] : it.edited_body);
+  function saveEdit(it: Item, text: string | null) {
+    const v = text && text.trim() && text.trim() !== it.body ? text.trim() : null;
+    setEditing(null);
+    setEdits((e) => ({ ...e, [it.id]: v }));
+    startTransition(async () => {
+      try {
+        await editFeedbackAction(it.id, v);
+      } catch (err) {
+        setEdits((e) => {
+          const x = { ...e };
+          delete x[it.id];
+          return x;
+        });
+        setError(err instanceof Error ? err.message : "Couldn't save that edit.");
+      }
+    });
+  }
   const [, startTransition] = useTransition();
   const now = useSyncExternalStore(noop, () => Math.floor(Date.now() / 60_000) * 60_000, () => null);
 
@@ -138,9 +161,71 @@ export function FeedbackReview({ items, theme }: { items: Item[]; theme: "calm" 
                     </span>
                   </span>
                 </div>
-                <p className="relative z-[1] m-0 whitespace-pre-line text-[16px] leading-relaxed" style={{ color: "var(--t-ink)" }}>
-                  {it.body}
-                </p>
+                {editing === it.id ? (
+                  <div className="relative z-[1] flex flex-col gap-2">
+                    <textarea
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      rows={Math.min(8, Math.max(3, Math.ceil(draft.length / 60)))}
+                      aria-label="Edit this feedback"
+                      className="rounded-lg border px-3 py-2 text-[16px] leading-relaxed"
+                      style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.6)", color: "var(--t-ink)" }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") setEditing(null);
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveEdit(it, draft);
+                      }}
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="button" onClick={() => saveEdit(it, draft)} className="h-9 rounded-full px-4 text-[14px] font-bold" style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", border: isAdventure ? "1.5px solid #8a6116" : undefined, color: isAdventure ? "#2a1c10" : "#fff" }}>
+                        Save edit
+                      </button>
+                      <button type="button" onClick={() => setEditing(null)} className="h-9 rounded-full px-3 text-[14px] hover:bg-black/[.06]" style={{ color: "var(--t-ink)" }}>
+                        Cancel
+                      </button>
+                      {textOf(it) && (
+                        <button type="button" onClick={() => saveEdit(it, null)} className="ml-auto text-[13.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                          Use their original words
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative z-[1] flex flex-col gap-1">
+                    <p className="m-0 whitespace-pre-line text-[16px] leading-relaxed" style={{ color: "var(--t-ink)" }}>
+                      {textOf(it) ?? it.body}
+                    </p>
+                    <span className="flex flex-wrap items-center gap-x-3 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraft(textOf(it) ?? it.body);
+                          setEditing(it.id);
+                        }}
+                        className="flex items-center gap-1 underline underline-offset-2"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                        </svg>
+                        Edit before deciding
+                      </button>
+                      {textOf(it) && (
+                        <button
+                          type="button"
+                          onClick={() => setShowOriginal((o) => { const x = new Set(o); if (x.has(it.id)) x.delete(it.id); else x.add(it.id); return x; })}
+                          className="underline underline-offset-2"
+                        >
+                          {showOriginal.has(it.id) ? "Hide" : "Edited · show"} their original
+                        </button>
+                      )}
+                    </span>
+                    {textOf(it) && showOriginal.has(it.id) && (
+                      <p className="m-0 whitespace-pre-line border-l-2 pl-2.5 text-[14px] italic" style={{ borderColor: "rgba(139,112,64,.4)", color: "var(--t-ink-soft)" }}>
+                        {it.body}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {status ? (
                   <div className="relative z-[1] flex flex-wrap items-center gap-2 text-[14px]">
