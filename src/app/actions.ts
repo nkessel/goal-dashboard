@@ -2068,9 +2068,9 @@ export async function setIdeaStatusAction(threadId: string, status: forumData.Id
 // Check-in notes and #tags
 // ---------------------------------------------------------------------------
 
-export async function addCheckNoteAction(text: string) {
+export async function addCheckNoteAction(text: string, atISO?: string | null) {
   const ownerId = await requireProfileId();
-  const note = await energyData.addCheckNote(ownerId, text);
+  const note = await energyData.addCheckNote(ownerId, text, atISO);
   revalidatePath("/insights");
   return note;
 }

@@ -7,6 +7,7 @@ import { getProfileById } from "@/lib/data/profiles";
 import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckInsSince, listCheckNotesSince, listEnergySince } from "@/lib/data/energy";
 import { appDayKey } from "@/lib/data/tomorrow";
 import { EnergyCheck } from "@/components/xp/EnergyCheck";
+import { EventLog } from "@/components/insights/EventLog";
 import { listWinsSince } from "@/lib/data/wins";
 
 export default async function InsightsPage() {
@@ -44,6 +45,16 @@ export default async function InsightsPage() {
             Check in
           </h2>
           <EnergyCheck full today={energyToday} todayAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null} metrics={metrics} metricsToday={metricsToday} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey()).map((n) => ({ id: n.id, body: n.body }))} />
+        </section>
+        <section
+          aria-label="Events and tags"
+          className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
+          style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
+        >
+          <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
+            Events &amp; #tags <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— log anything, any time</span>
+          </h2>
+          <EventLog notes={notes.map((n) => ({ id: n.id, body: n.body, created_at: n.created_at }))} />
         </section>
         <InsightsView
           theme={theme}
