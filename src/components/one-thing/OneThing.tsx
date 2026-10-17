@@ -1,5 +1,6 @@
 "use client";
 
+import { FocusSteps as FocusStepsPanel } from "./FocusSteps";
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
@@ -274,7 +275,7 @@ function OneThingView({
               </p>
             )}
             <FocusTimer key={`timer-${task.id}`} task={task} minutes={task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25} />
-            {!task.habit && <FocusSteps key={`steps-${task.id}`} taskId={task.id} />}
+            {!task.habit && <FocusStepsPanel key={`steps-${task.id}`} taskId={task.id} />}
             {error && (
               <p className="relative z-[1] m-0 text-[14px] font-semibold" style={{ color: "var(--t-warn)" }}>
                 {error}
@@ -565,62 +566,6 @@ function FocusTimer({ task, minutes }: { task: TaskWithCategory; minutes: number
             </>
           )}
         </div>
-      )}
-    </div>
-  );
-}
-
-type Step = { id: string; title: string; done: boolean };
-
-/** The quest's steps, tickable right here. */
-function FocusSteps({ taskId }: { taskId: string }) {
-  const [steps, setSteps] = useState<Step[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
-  useEffect(() => {
-    let alive = true;
-    listQuestStepsAction(taskId)
-      .then((rows) => alive && setSteps((rows ?? []).map((r) => ({ id: r.id, title: r.title, done: r.done }))))
-      .catch(() => alive && setSteps([]));
-    return () => {
-      alive = false;
-    };
-  }, [taskId]);
-  if (!steps || steps.length === 0) return null;
-
-  function toggle(id: string) {
-    const next = steps!.map((s) => (s.id === id ? { ...s, done: !s.done } : s));
-    setSteps(next);
-    setError(null);
-    startTransition(async () => {
-      try {
-        await saveQuestStepsAction(taskId, next);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't save that step.");
-      }
-    });
-  }
-
-  const done = steps.filter((s) => s.done).length;
-  return (
-    <div className="relative z-[1] flex w-full flex-col gap-1 text-left">
-      <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: "#6b5534" }}>
-        Steps · {done}/{steps.length}
-      </span>
-      <ul className="m-0 flex list-none flex-col p-0">
-        {steps.map((s) => (
-          <li key={s.id}>
-            <label className="flex min-h-10 cursor-pointer items-center gap-2.5 py-1 text-[15.5px]" style={{ color: "var(--t-ink)" }}>
-              <input type="checkbox" checked={s.done} onChange={() => toggle(s.id)} className="h-5 w-5 shrink-0 accent-[#58a04a]" />
-              <span style={{ textDecoration: s.done ? "line-through" : undefined, opacity: s.done ? 0.65 : 1 }}>{s.title}</span>
-            </label>
-          </li>
-        ))}
-      </ul>
-      {error && (
-        <p className="m-0 text-[13px] font-semibold" style={{ color: "var(--t-warn)" }}>
-          {error}
-        </p>
       )}
     </div>
   );

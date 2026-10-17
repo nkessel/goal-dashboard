@@ -14,11 +14,13 @@ export type QuestStep = {
   weight?: number | null;
   /** How far along the step is, 0–100 (100 once done). */
   progress?: number;
+  /** Seconds spent on it in focus mode. */
+  seconds_spent?: number;
   /** XP this step has paid so far. */
   xp_paid?: number;
 };
 
-export type StepInput = { id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number };
+export type StepInput = { id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number; seconds?: number };
 
 /** True when the error just means the quest_steps table hasn't been created yet. */
 function missingTable(error: { code?: string; message: string } | null) {
@@ -89,6 +91,7 @@ export async function replaceSteps(
       ...(s.xp !== undefined ? { xp: Math.max(0, Math.min(1000, Math.round(s.xp))) } : {}),
       ...(s.weight !== undefined ? { weight: s.weight === null ? null : Math.max(1, Math.min(100, Math.round(s.weight))) } : {}),
       ...(s.progress !== undefined || s.done ? { progress: s.done ? 100 : Math.max(0, Math.min(99, Math.round(s.progress ?? 0))) } : {}),
+      ...(s.seconds !== undefined ? { seconds_spent: Math.max(0, Math.round(s.seconds)) } : {}),
     };
     if (prev) {
       const same =
@@ -97,7 +100,8 @@ export async function replaceSteps(
         prev.sort_order === i &&
         (extra.xp === undefined || extra.xp === (prev.xp ?? 0)) &&
         (extra.weight === undefined || extra.weight === (prev.weight ?? null)) &&
-        (extra.progress === undefined || extra.progress === (prev.progress ?? 0));
+        (extra.progress === undefined || extra.progress === (prev.progress ?? 0)) &&
+        (extra.seconds_spent === undefined || extra.seconds_spent === (prev.seconds_spent ?? 0));
       if (same) continue;
       const { error } = await db
         .from("quest_steps")
