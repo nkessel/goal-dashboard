@@ -6,14 +6,9 @@ import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { cleanToucan, type ToucanState } from "@/lib/toucan";
 
 /** What it says while you carry it, and when you set it down. */
-const SAY_FLYING = {
-  toucan: ["Wheee!", "To the skies!", "The winds obey me.", "Onward, to wisdom!", "Behold my majestic flight!", "Higher, friend, higher!", "I have soared over many forests."],
-  owl: ["Hoo-hoo!", "Whooo's flying? Me!", "Wheee!", "To a new perch!", "Silent wings, swift as night."],
-};
-const SAY_LANDING = {
-  toucan: ["A fine perch indeed.", "Here I shall dispense wisdom.", "Ah. The view is excellent.", "I approve of this spot."],
-  owl: ["Hoo. Nice spot.", "Cozy.", "I'll keep watch from here."],
-};
+// Only the toucan spirit speaks; the owl keeps its silence.
+const SAY_FLYING = ["Wheee!", "To the skies!", "The winds obey me.", "Onward, to wisdom!", "Behold my majestic flight!", "Higher, friend, higher!", "I have soared over many forests."];
+const SAY_LANDING = ["Here I shall dispense wisdom.", "Ah. The view is excellent.", "I approve of this spot."];
 const pick = (list: string[]) => list[Math.floor(Math.random() * list.length)];
 
 /** Where the owl can land, worked out from the page each time. */
@@ -222,6 +217,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
       for (let i = 0; i < 10; i++) spark(cx + (Math.random() - 0.5) * 60, cy + (Math.random() - 0.5) * 50);
     }
     setWisdom(null);
+    setSay(null);
     setTimeout(() => {
       setSpirit((v) => {
         try {
@@ -373,7 +369,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             setWisdom(null);
             setDragging(true);
             setPhase("flying");
-            speakBrief(pick(spirit ? SAY_FLYING.toucan : SAY_FLYING.owl), null);
+            if (spirit) speakBrief(pick(SAY_FLYING), null);
           }
           const W = window.innerWidth;
           const H = window.innerHeight;
@@ -394,7 +390,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             put(pos.current);
             setPhase("landing");
             setTimeout(() => setPhase("perched"), 260);
-            speakBrief(pick(spirit ? SAY_LANDING.toucan : SAY_LANDING.owl), 2200);
+            if (spirit) speakBrief(pick(SAY_LANDING), 2200);
             at.current = -1;
             try {
               window.localStorage.setItem("owl-perch", "-1");
