@@ -3,7 +3,7 @@
 import { createPortal } from "react-dom";
 import { useState, useTransition } from "react";
 import type { Board } from "@/lib/data/types";
-import { setBoardPrivateAction, updateBoardAction } from "@/app/actions";
+import { setBoardPrivateAction, setBoardSharedAction, updateBoardAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 
 const COLORS = [null, "#fde8d0", "#dcefe0", "#e0e7fb", "#fbe0e6", "#fff4c2"];
@@ -23,6 +23,7 @@ export function EditBoardModal({
   const [description, setDescription] = useState(board.description ?? "");
   const [color, setColor] = useState<string | null>(board.color);
   const [isPrivate, setIsPrivate] = useState(!!board.is_private);
+  const [shared, setShared] = useState(!!board.shared_with_party);
   const [isSaving, startSaving] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +39,7 @@ export function EditBoardModal({
       try {
         await updateBoardAction(board.id, { title, description, color });
         if (isPrivate !== !!board.is_private) await setBoardPrivateAction(board.id, isPrivate);
+        if (!isPrivate && shared !== !!board.shared_with_party) await setBoardSharedAction(board.id, shared);
         onClose();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save changes.");
@@ -107,6 +109,15 @@ export function EditBoardModal({
           </div>
         </div>
 
+        <label className="flex min-h-10 cursor-pointer items-center gap-2.5 text-sm" title="Your party can see it, add quests to it and take its quests on">
+          <input type="checkbox" checked={shared && !isPrivate} disabled={isPrivate} onChange={(e) => setShared(e.target.checked)} />
+          <span>
+            <span className="font-semibold">Share with my party</span>
+            <span className="block text-xs" style={{ color: "var(--t-ink-soft)" }}>
+              It shows in the Guild Hall: party members can add quests to it and take its quests on.
+            </span>
+          </span>
+        </label>
         <label className="flex min-h-10 cursor-pointer items-center gap-2.5 text-sm" title="Private boards are never shown to your party">
           <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
           <span>

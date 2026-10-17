@@ -25,7 +25,7 @@ const SNOOZE_OPTIONS: { label: string; minutes: number }[] = [
 type Filter = "all" | "party" | "feedback" | "reminders";
 const FILTERS: { key: Filter; label: string; kinds?: string[] }[] = [
   { key: "all", label: "All" },
-  { key: "party", label: "Party", kinds: ["reaction", "comment", "friend_request", "friend_request_accepted"] },
+  { key: "party", label: "Party", kinds: ["reaction", "comment", "friend_request", "friend_request_accepted", "support", "shared_board"] },
   { key: "feedback", label: "Feedback", kinds: ["feedback"] },
   { key: "reminders", label: "Reminders", kinds: ["reschedule_reminder", "imports"] },
 ];

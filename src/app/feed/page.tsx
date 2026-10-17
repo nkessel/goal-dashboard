@@ -19,6 +19,9 @@ import {
 import { getOrCreateInviteLink } from "@/lib/data/invites";
 import { listFeed } from "@/lib/data/activity";
 import { listThreads } from "@/lib/data/forum";
+import { listSharedBoards } from "@/lib/data/party";
+import { SupportCall } from "@/components/social/SupportCall";
+import { SharedBoards } from "@/components/social/SharedBoards";
 import { Forums, type AuthorView } from "@/components/social/Forums";
 
 export default async function FeedPage() {
@@ -34,7 +37,15 @@ export default async function FeedPage() {
     getProfileById(profileId),
   ]);
 
-  const champion = await getChampion();
+  const [champion, shared] = await Promise.all([getChampion(), listSharedBoards(profileId)]);
+  const adders = await getProfilesByIds([...new Set(shared.flatMap((b) => b.quests.map((q) => q.added_by).filter((x): x is string => !!x)))]);
+  const sharedViews = shared.map((b) => ({
+    id: b.board.id,
+    title: b.board.title,
+    ownerId: b.owner.id,
+    ownerName: b.owner.name?.split(" ")[0] ?? "A party member",
+    quests: b.quests.map((q) => ({ id: q.id, title: q.title, xp: q.xp_value, addedBy: q.added_by ? (adders.get(q.added_by)?.name?.split(" ")[0] ?? null) : null })),
+  }));
   const forums = await Promise.all((["party", "community", "ideas"] as const).map((sc) => listThreads(sc, profileId)));
   const threads = forums.flatMap((f) => f.threads);
   const forumPeople = await getProfilesByIds([...new Set(threads.map((t) => t.author_id).filter((x): x is string => !!x))]);
@@ -95,21 +106,16 @@ export default async function FeedPage() {
 
         <FriendRequests incoming={incomingWithProfiles} theme={theme} />
 
+        <SupportCall partySize={friendIds.length} isAdventure={isAdventure} />
+
         <Forums threads={threads} voted={forums[2].voted} authors={forumAuthors} theme={theme} />
 
-        <InviteLinkBox code={invite.code} theme={theme} inviterName={profile?.name?.split(" ")[0] ?? null} />
+        <SharedBoards boards={sharedViews} viewerId={profileId} isAdventure={isAdventure} />
 
-        <section className="flex flex-col gap-2 rounded-2xl px-4 py-3.5" style={{
-          background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
-          border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-        }}>
-          <h2 className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
-            Find your party
+        <section className="flex flex-col gap-3" aria-label="Party activity">
+          <h2 className={`m-0 ${isAdventure ? "font-display text-[20px]" : "text-[16px] font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+            Party activity
           </h2>
-          <FriendDirectory profileId={profileId} rows={directoryRows} theme={theme} championId={champion?.id ?? null} />
-        </section>
-
-        <section className="flex flex-col gap-3">
           <ul className="flex flex-col gap-3">
             {feed.map((item) => (
               <ActivityFeedItem
@@ -135,6 +141,30 @@ export default async function FeedPage() {
             )}
           </ul>
         </section>
+
+        {/* Inviting and finding people, tucked away (open while the party is empty). */}
+        <details open={friendIds.length === 0} className={`rounded-2xl px-4 py-3 ${isAdventure ? "parchment parchment-framed" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
+          <summary className={`relative z-[1] flex min-h-9 cursor-pointer list-none items-center gap-2 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
+            <span aria-hidden>➕</span> Grow your party
+            <span className="ml-auto text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>
+              invite · find people
+            </span>
+          </summary>
+          <div className="relative z-[1] mt-3 flex flex-col gap-4">
+        <InviteLinkBox code={invite.code} theme={theme} inviterName={profile?.name?.split(" ")[0] ?? null} />
+
+        <section className="flex flex-col gap-2 rounded-2xl px-4 py-3.5" style={{
+          background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
+          border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+        }}>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
+            Find your party
+          </h2>
+          <FriendDirectory profileId={profileId} rows={directoryRows} theme={theme} championId={champion?.id ?? null} />
+        </section>
+
+          </div>
+        </details>
 
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>

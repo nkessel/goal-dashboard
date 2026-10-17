@@ -17,6 +17,9 @@ export async function createNotification(input: {
   }
 
   const db = supabaseAdmin();
+  // Respect the recipient's notification level.
+  const { data: pref } = await db.from("profiles").select("notify_level").eq("id", input.profileId).maybeSingle<{ notify_level: string | null }>();
+  if (!passesLevel(pref?.notify_level ?? "all", input.kind)) return null;
   const { data, error } = await db
     .from("notifications")
     .insert({
@@ -33,6 +36,19 @@ export async function createNotification(input: {
 
   if (error) throw new Error(`Failed to create notification: ${error.message}`);
   return data;
+}
+
+/**
+ * Everything: all of it. Highlights: everything but taps (reactions, level-ups,
+ * daily check-ins). Essential: only what needs you — party requests, calls for
+ * support, reminders, shared boards and (for the owner) feedback.
+ */
+const ESSENTIAL = new Set(["friend_request", "support", "reschedule_reminder", "imports", "feedback", "shared_board"]);
+const NOT_HIGHLIGHTS = new Set(["reaction", "level_up", "daily_check_in"]);
+export function passesLevel(level: string, kind: string): boolean {
+  if (level === "essential") return ESSENTIAL.has(kind);
+  if (level === "highlights") return !NOT_HIGHLIGHTS.has(kind);
+  return true;
 }
 
 export async function listForProfile(profileId: string, limit = 30): Promise<AppNotification[]> {

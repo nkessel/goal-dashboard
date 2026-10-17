@@ -4,7 +4,12 @@ import { useState, useTransition } from "react";
 import { addReactionAction, removeReactionAction } from "@/app/actions";
 import type { ActivityReaction } from "@/lib/data/types";
 
-const QUICK_PICKS = ["👍", "❤️", "🎉", "🔥", "👏"];
+/** Three cheers, calm and in theme: a raised banner, applause, a toast. */
+const CHEERS: { emoji: string; label: string }[] = [
+  { emoji: "📣", label: "Cheer" },
+  { emoji: "👏", label: "Bravo" },
+  { emoji: "🥂", label: "Toast" },
+];
 
 export function ReactionBar({
   activityId,
@@ -18,7 +23,6 @@ export function ReactionBar({
   theme?: "calm" | "adventure";
 }) {
   const [isPending, startTransition] = useTransition();
-  const [customEmoji, setCustomEmoji] = useState("");
   const isAdventure = theme === "adventure";
 
   // Group by emoji -> count + whether the current user reacted with it.
@@ -53,51 +57,33 @@ export function ReactionBar({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {[...grouped.entries()].map(([emoji, { count, mine }]) => (
-        <button
-          key={emoji}
-          type="button"
-          disabled={isPending}
-          onClick={() => toggle(emoji)}
-          className="h-8 rounded-full px-2.5 text-[15px]"
-          style={chipStyle(mine)}
-        >
-          {emoji} {count}
-        </button>
-      ))}
-
-      {QUICK_PICKS.filter((e) => !grouped.has(e)).map((emoji) => (
-        <button
-          key={emoji}
-          type="button"
-          disabled={isPending}
-          onClick={() => toggle(emoji)}
-          className="h-8 rounded-full border border-dashed px-2.5 text-[15px] opacity-70 hover:opacity-100"
-          style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)" }}
-        >
-          {emoji}
-        </button>
-      ))}
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (customEmoji.trim()) {
-            toggle(customEmoji.trim());
-            setCustomEmoji("");
-          }
-        }}
-        className="flex items-center gap-1"
-      >
-        <input
-          value={customEmoji}
-          onChange={(e) => setCustomEmoji(e.target.value)}
-          placeholder="🦖"
-          maxLength={8}
-          className="w-10 rounded border px-1 py-0.5 text-xs"
-          style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)", color: "var(--t-ink)" }}
-        />
-      </form>
+      {CHEERS.map(({ emoji, label }) => {
+        const g = grouped.get(emoji);
+        return (
+          <button
+            key={emoji}
+            type="button"
+            disabled={isPending}
+            onClick={() => toggle(emoji)}
+            aria-pressed={!!g?.mine}
+            className="hover-glow flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px] font-semibold"
+            style={chipStyle(!!g?.mine)}
+            title={g?.mine ? `Take back your ${label.toLowerCase()}` : label}
+          >
+            <span aria-hidden>{emoji}</span>
+            {label}
+            {g && g.count > 0 && <span className="tabular-nums opacity-75">{g.count}</span>}
+          </button>
+        );
+      })}
+      {/* Older reactions still count, quietly. */}
+      {[...grouped.entries()]
+        .filter(([e]) => !CHEERS.some((c) => c.emoji === e))
+        .map(([emoji, { count, mine }]) => (
+          <button key={emoji} type="button" disabled={isPending} onClick={() => toggle(emoji)} className="h-8 rounded-full px-2 text-[13px]" style={chipStyle(mine)}>
+            {emoji} {count}
+          </button>
+        ))}
     </div>
   );
 }

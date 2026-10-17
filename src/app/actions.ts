@@ -23,6 +23,7 @@ import * as schedulingData from "@/lib/data/scheduling";
 import * as forumData from "@/lib/data/forum";
 import * as statsData from "@/lib/data/stats";
 import * as sharingData from "@/lib/data/sharing";
+import * as partyData from "@/lib/data/party";
 import * as bossesData from "@/lib/data/bosses";
 import * as energyData from "@/lib/data/energy";
 import { computeLevelForXp } from "@/lib/levels";
@@ -2139,4 +2140,41 @@ export async function setBoardPrivateAction(boardId: string, isPrivate: boolean)
   await boardsData.updateBoard(boardId, ownerId, { title: board.title, description: board.description, color: board.color, isPrivate });
   revalidatePath("/boards", "layout");
   revalidatePath("/friends", "layout");
+}
+
+// ---------------------------------------------------------------------------
+// Party: support calls, notification levels, shared boards
+// ---------------------------------------------------------------------------
+
+export async function callForSupportAction(kind: partyData.SupportKind, message: string) {
+  const { id, name } = await requireIdentity();
+  if (!["encouragement", "accountability", "help"].includes(kind)) throw new Error("Pick what you need.");
+  const threadId = await partyData.callForSupport(id, name, kind, message);
+  revalidatePath("/feed");
+  return threadId;
+}
+
+export async function setNotifyPrefsAction(prefs: { level?: string; email?: boolean }) {
+  const ownerId = await requireProfileId();
+  await partyData.setNotifyPrefs(ownerId, prefs);
+  revalidatePath("/settings");
+}
+
+export async function setBoardSharedAction(boardId: string, shared: boolean) {
+  const { id, name } = await requireIdentity();
+  await partyData.setBoardShared(id, boardId, shared, name);
+  revalidatePath("/boards", "layout");
+  revalidatePath("/feed");
+}
+
+export async function addQuestToSharedBoardAction(boardId: string, title: string) {
+  const { id } = await requireIdentity();
+  await partyData.addQuestToSharedBoard(id, boardId, title);
+  revalidatePath("/feed");
+}
+
+export async function takeOnSharedQuestAction(taskId: string) {
+  const { id } = await requireIdentity();
+  await partyData.takeOnSharedQuest(id, taskId);
+  revalidatePath("/");
 }

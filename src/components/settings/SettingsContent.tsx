@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
 import { SharingSettings } from "@/components/settings/SharingSettings";
+import { NotificationPrefs } from "@/components/settings/NotificationPrefs";
 import { SettingsRow } from "@/components/settings/SettingsRow";
 import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
@@ -322,6 +323,14 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             </div>
           </SettingsRow>
 
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Notifications"
+            icon={<span style={{ fontSize: 14 }}>🔔</span>}
+          >
+            <NotificationPrefs level={profile.notify_level ?? "all"} email={profile.notify_email ?? true} />
+          </SettingsRow>
 
           <SettingsRow
             theme={profile.theme}

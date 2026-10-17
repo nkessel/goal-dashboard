@@ -5,6 +5,8 @@ export type Board = {
   description: string | null;
   color: string | null;
   is_private: boolean;
+  /** Visible to your party, who can add quests and take them on. */
+  shared_with_party?: boolean;
   sort_order: number;
   /** Null for a top-level board; another board's id for a nested sub-board. */
   parent_board_id: string | null;
@@ -66,6 +68,8 @@ export type Task = {
   stat_split?: Record<string, number> | null;
   /** Hidden from your party, even on screens you share. */
   is_private?: boolean;
+  /** A party member who added this quest to a shared board. */
+  added_by?: string | null;
   created_at: string;
   updated_at: string;
   reminder_sent_at: string | null;
@@ -149,6 +153,8 @@ export type Profile = {
   display_level?: number | null;
   /** Which screens your party can see. */
   share_settings?: Record<string, boolean> | null;
+  notify_level?: "all" | "highlights" | "essential";
+  notify_email?: boolean;
 };
 
 /** A shared avatar image — either one of the built-in presets or one a user
@@ -265,7 +271,9 @@ export type NotificationKind =
   | "level_up"
   | "daily_check_in"
   | "imports"
-  | "feedback";
+  | "feedback"
+  | "support"
+  | "shared_board";
 
 export type AppNotification = {
   id: string;

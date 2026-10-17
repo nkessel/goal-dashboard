@@ -15,6 +15,8 @@ const ICONS: Record<string, string> = {
   daily_check_in: "☀️",
   imports: "📜",
   feedback: "💬",
+  support: "🔔",
+  shared_board: "🗂️",
 };
 
 export default async function NotificationsPage() {
