@@ -34,7 +34,20 @@ type WhenKind = (typeof WHEN)[number][0];
 /** XP you choose to earn for a piece of feedback. */
 const XP_CHOICES = [1, 2, 3] as const;
 
-type Draft = { id: string; body: string; kind: WhenKind; xp?: number; images?: string[] };
+type Draft = { id: string; body: string; kind: WhenKind; xp?: number; images?: string[]; page?: string; shot?: string | null; updatedAt?: number; deleted?: boolean };
+
+/** Two lists of drafts as one: the newest edit of each wins, and deletions stick. */
+function mergeDrafts(a: Draft[], b: Draft[]): Draft[] {
+  const byId = new Map<string, Draft>();
+  for (const d of [...a, ...b]) {
+    if (!d || typeof d.id !== "string" || typeof d.body !== "string") continue;
+    const prev = byId.get(d.id);
+    if (!prev || (d.updatedAt ?? 0) >= (prev.updatedAt ?? 0)) byId.set(d.id, d);
+  }
+  return [...byId.values()];
+}
+/** What to keep: drafts with words in them, and recent deletions (so another tab or device doesn't bring them back). */
+const keepable = (ds: Draft[]) => ds.filter((d) => (d.deleted ? (d.updatedAt ?? 0) > Date.now() - 86_400_000 : d.body.trim()));
 type Geom = { x: number; y: number; w: number; h: number };
 /** The round button's top-left corner, in px from the window's top-left. */
 type Pos = { x: number; y: number };
@@ -192,7 +205,12 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       writeJson(LEGACY_DRAFT_KEY, null);
     }
     /* eslint-disable react-hooks/set-state-in-effect -- browser storage is only readable after hydration */
-    setDrafts(saved.filter((d) => d && typeof d.body === "string"));
+    setDrafts(mergeDrafts([], saved));
+    // Drafts kept on your account (from another tab or device) join in.
+    fetch("/api/feedback/drafts")
+      .then((r) => (r.ok ? r.json() : { drafts: [] }))
+      .then((j: { drafts?: Draft[] }) => setDrafts((ds) => mergeDrafts(ds, j.drafts ?? [])))
+      .catch(() => {});
     setPos(readJson<Pos>(BUTTON_KEY));
     setGeom(readJson<Geom>(PANEL_KEY));
     setSubmitX(readJson<number>(SUBMIT_KEY));
@@ -200,13 +218,39 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
-  // Keep every draft that has words in it, so nothing is lost on a reload.
+  // Keep every draft that has words in it — on this device at once, and on
+  // your account shortly after — so nothing is lost on a reload, in another
+  // tab, or on another device.
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (loaded) writeJson(DRAFTS_KEY, drafts.filter((d) => d.body.trim()));
+    if (!loaded) return;
+    const merged = keepable(mergeDrafts(readJson<Draft[]>(DRAFTS_KEY) ?? [], drafts));
+    writeJson(DRAFTS_KEY, merged);
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      void fetch("/api/feedback/drafts", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ drafts: merged }), keepalive: true }).catch(() => {});
+    }, 1200);
   }, [drafts, loaded]);
+  // Another tab changed the drafts: take its changes in.
+  useEffect(() => {
+    const on = (e: StorageEvent) => {
+      if (e.key !== DRAFTS_KEY || !e.newValue) return;
+      try {
+        const theirs = JSON.parse(e.newValue) as Draft[];
+        setDrafts((ds) => {
+          const m = mergeDrafts(ds, theirs);
+          return m.length === ds.length && m.every((d, i) => d === ds[i]) ? ds : m;
+        });
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("storage", on);
+    return () => window.removeEventListener("storage", on);
+  }, []);
 
-  const open = drafts.find((d) => d.id === openId) ?? null;
-  const waiting = drafts.filter((d) => d.id !== openId && d.body.trim());
+  const open = drafts.find((d) => d.id === openId && (!d.deleted || sent?.id === d.id)) ?? null;
+  const waiting = drafts.filter((d) => d.id !== openId && !d.deleted && d.body.trim());
 
   /** Leave the open draft: empty ones simply go away. */
   const leaveOpen = useCallback(() => {
@@ -217,7 +261,11 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   }, [openId]);
 
   const startNew = useCallback(() => {
-    const d: Draft = { id: newId(), body: "", kind: "feedback" };
+    const d: Draft = { id: newId(), body: "", kind: "feedback", page: window.location.pathname + window.location.search, shot: null, updatedAt: Date.now() };
+    // A picture of the screen you're on, so the feedback has its context.
+    void captureScreen().then((url) => {
+      if (url) setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, shot: url } : x)));
+    });
     setConfirmDiscard(false);
     setChoosing(false);
     setSent(null);
@@ -249,7 +297,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   function discard() {
     setConfirmDiscard(false);
     setError(null);
-    setDrafts((ds) => ds.filter((d) => d.id !== openId));
+    setDrafts((ds) => ds.map((d) => (d.id === openId ? { ...d, deleted: true, updatedAt: Date.now() } : d)));
     setOpenId(null);
   }
 
@@ -259,7 +307,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   }
 
   function update(patch: Partial<Draft>) {
-    setDrafts((ds) => ds.map((d) => (d.id === openId ? { ...d, ...patch } : d)));
+    setDrafts((ds) => ds.map((d) => (d.id === openId ? { ...d, ...patch, updatedAt: Date.now() } : d)));
   }
 
   function submit() {
@@ -271,13 +319,13 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         const r = await fetch("/api/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: d.body, kind: d.kind, xp: d.xp ?? 1, images: d.images ?? [] }),
+          body: JSON.stringify({ body: d.body, kind: d.kind, xp: d.xp ?? 1, images: [...(d.shot ? [d.shot] : []), ...(d.images ?? [])], page: d.page }),
         });
         const res = (await r.json().catch(() => ({ ok: false, error: "Couldn't send it." }))) as { ok: boolean; xpAwarded?: number; error?: string };
         if (!r.ok || !res.ok) throw new Error(r.status === 401 || r.status === 403 ? "You've been signed out — sign in again to send (your note is saved)." : (res.error ?? "Couldn't send it."));
         // The thank-you stays until it's closed (or another is started).
         setSent({ id: d.id, kind: d.kind, xp: res.xpAwarded ?? 0 });
-        setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, body: "" } : x)));
+        setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, body: "", deleted: true, updatedAt: Date.now() } : x)));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't send it. Check your connection and try again.");
       }
@@ -393,6 +441,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       <button
         type="button"
         data-feedback-hide
+        data-feedback-root
         onPointerDown={onBtnDown}
         onClick={() => {
           if (justDragged.current) return;
@@ -422,6 +471,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         <div
           role="menu"
           aria-label="Your unsent feedback"
+          data-feedback-root
           className="card-pop-in parchment fixed z-[61] flex w-[min(300px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl shadow-2xl"
           style={{
             ...(chooserRight ? { right: vp.innerW - btnPos.x - BTN } : { left: btnPos.x }),
@@ -459,6 +509,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           role="dialog"
           aria-modal={false}
           aria-label="Feedback"
+          data-feedback-root
           className="fixed z-[61]"
           style={{ left: shown.x, top: shown.y, width: shown.w, height: shown.h }}
           onKeyDown={(e) => {
@@ -577,6 +628,42 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   );
 }
 
+/**
+ * A picture of the page as it is now (without the feedback box), uploaded
+ * and returned as a URL. Uses modern-screenshot, loaded on first use.
+ */
+async function captureScreen(): Promise<string | null> {
+  try {
+    const w = window as unknown as { __domToJpeg?: (el: Element, o: object) => Promise<string> };
+    if (!w.__domToJpeg) {
+      await new Promise<void>((resolve, reject) => {
+        const s = document.createElement("script");
+        s.type = "module";
+        s.textContent = 'import { domToJpeg } from "https://cdn.jsdelivr.net/npm/modern-screenshot@4/+esm"; window.__domToJpeg = domToJpeg; window.dispatchEvent(new Event("shot-ready"));';
+        const t = setTimeout(() => reject(new Error("timeout")), 8000);
+        window.addEventListener("shot-ready", () => (clearTimeout(t), resolve()), { once: true });
+        document.head.appendChild(s);
+      });
+    }
+    const dataUrl = await w.__domToJpeg!(document.body, {
+      quality: 0.8,
+      scale: Math.min(1, 1400 / window.innerWidth),
+      width: window.innerWidth,
+      height: window.innerHeight,
+      style: { transform: `translateY(-${window.scrollY}px)` },
+      filter: (n: Node) => !(n instanceof Element && n.closest("[data-feedback-root]")),
+    });
+    const blob = await (await fetch(dataUrl)).blob();
+    const fd = new FormData();
+    fd.append("file", new File([blob], "screen.jpg", { type: "image/jpeg" }));
+    const r = await fetch("/api/feedback/image", { method: "POST", body: fd });
+    const j = (await r.json().catch(() => ({ ok: false }))) as { ok: boolean; url?: string };
+    return r.ok && j.ok && j.url ? j.url : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Scale a screenshot down (max 1600px, JPEG) in the browser so it uploads quickly. */
 async function shrinkImage(f: File): Promise<File> {
   try {
@@ -681,6 +768,15 @@ function Composer({
       />
       {/* Screenshots: paste one into the box, or pick from your device. */}
       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        {draft.shot && (
+          <span className="relative h-12 w-16 overflow-hidden rounded-lg" style={{ border: "1.5px solid #b39a6a" }} title="A picture of the screen you were on — sent with your feedback">
+            {/* eslint-disable-next-line @next/next/no-img-element -- screen picture */}
+            <img src={draft.shot} alt="The screen you were on" className="h-full w-full object-cover object-top" />
+            <button type="button" onClick={() => onChange({ shot: null })} aria-label="Don't send the screen picture" className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center rounded-bl-md text-[13px] leading-none" style={{ background: "rgba(0,0,0,.6)", color: "#fff" }}>
+              ×
+            </button>
+          </span>
+        )}
         {(draft.images ?? []).map((u) => (
           <span key={u} className="relative h-12 w-12 overflow-hidden rounded-lg" style={{ border: "1.5px solid #b39a6a" }}>
             {/* eslint-disable-next-line @next/next/no-img-element -- attached screenshot */}

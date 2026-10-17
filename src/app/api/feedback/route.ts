@@ -7,8 +7,9 @@ import { addJournalEntryAction } from "@/app/actions";
  */
 export async function POST(req: Request) {
   try {
-    const { body, kind, xp, images } = (await req.json()) as { body?: string; kind?: string; xp?: number; images?: string[] };
-    const res = await addJournalEntryAction(String(body ?? ""), null, kind ?? "feedback", Number(xp ?? 1), Array.isArray(images) ? images : []);
+    const { body, kind, xp, images, page } = (await req.json()) as { body?: string; kind?: string; xp?: number; images?: string[]; page?: string };
+    const where = typeof page === "string" && /^\/[\w\-/?=&%.]*$/.test(page) ? `\n\n— sent from ${page.slice(0, 120)}` : "";
+    const res = await addJournalEntryAction(String(body ?? "") + (String(body ?? "").trim() ? where : ""), null, kind ?? "feedback", Number(xp ?? 1), Array.isArray(images) ? images : []);
     return NextResponse.json({ ok: true, xpAwarded: res.xpAwarded });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Couldn't send it." }, { status: 400 });
