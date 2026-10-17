@@ -17,6 +17,7 @@ import {
   saveQuestStepsAction,
   scheduleTaskAction,
   setSchedulingAction,
+  setTaskStatSplitAction,
   setTaskPlacementAction,
   setTaskProgressAction,
   updateTaskAction,
@@ -30,6 +31,7 @@ import { useEscape } from "@/lib/use-escape";
 import { useIsEmbedded, usePortalTarget } from "@/components/ui/EmbedHost";
 import { addOptimisticQuest, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { CoinIcon } from "@/components/ui/Icons";
+import { StatSplitEditor } from "./StatSplitEditor";
 import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
 
 export type QuestDraft = {
@@ -180,6 +182,15 @@ export function QuestEditorDialog({
       ? { start: task.scheduled_start, end: task.scheduled_end }
       : null;
   const [slot, setSlot] = useState<{ start: string; end: string } | null>(initialSlot);
+  // Share of this quest's XP sent to character stats (saved as you slide, for existing quests).
+  const [statSplit, setStatSplit] = useState<Record<string, number>>(task?.stat_split ?? {});
+  const statTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function changeStatSplit(next: Record<string, number>) {
+    setStatSplit(next);
+    if (!task) return;
+    if (statTimer.current) clearTimeout(statTimer.current);
+    statTimer.current = setTimeout(() => void setTaskStatSplitAction(task.id, next).catch(() => {}), 500);
+  }
   // The scheduling priority list beside the calendar.
   const [toSchedule, setToSchedule] = useState(task?.schedule_rank != null);
   const [schedPlace, setSchedPlace] = useState<"top" | "unordered" | "bottom">("top");
@@ -548,6 +559,7 @@ export function QuestEditorDialog({
         }
         if (tempId) resolveOptimisticQuest(tempId, id);
         if (toSchedule) await setSchedulingAction(id, schedPlace).catch(() => {});
+        if (Object.keys(statSplit).length) await setTaskStatSplitAction(id, statSplit).catch(() => {});
         const newSteps = (steps ?? []).filter((st) => st.title.trim());
         if (newSteps.length > 0) await saveQuestStepsAction(id, stepPayload(newSteps).map(({ id: _id, ...st }) => st)); // eslint-disable-line @typescript-eslint/no-unused-vars
         paintPortrait(id);
@@ -1253,6 +1265,9 @@ export function QuestEditorDialog({
               )}
             </div>
           </div>
+
+          {/* Character stats: a share of the XP can build stats instead of your level */}
+          {!doingNow && <StatSplitEditor xp={xp} split={statSplit} onChange={changeStatSplit} isAdventure={isAdventure} />}
 
           {/* Quest progress: partial progress earns its share of the XP */}
           {task && !isCompleted && (

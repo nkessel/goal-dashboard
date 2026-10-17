@@ -1,4 +1,5 @@
 import "server-only";
+import * as statsData from "./stats";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { logLevelUpActivity } from "./activity";
 import type { Profile } from "./types";
@@ -74,6 +75,12 @@ export async function awardXp(
   taskId?: string
 ): Promise<XpAwardResult> {
   const db = supabaseAdmin();
+  // Coins follow the whole award; a quest may send part of its XP to
+  // character stats instead of the main meter.
+  const fullAmount = amount;
+  if (taskId && kind === "task_completed" && amount !== 0) {
+    amount = await statsData.splitTaskXp(ownerId, taskId, amount).catch(() => amount);
+  }
 
   if (amount !== 0) {
     const { error } = await db.from("xp_events").insert({
@@ -111,7 +118,7 @@ export async function awardXp(
 
   // Coins follow XP at 1 per XP_PER_COIN, rounded down per award (and the
   // same amount back out when an award is reversed).
-  const coinDelta = Math.sign(amount) * coinsForXp(Math.abs(amount));
+  const coinDelta = Math.sign(fullAmount) * coinsForXp(Math.abs(fullAmount));
   const hasCoins = typeof profile.coins === "number";
   const { error: updateErr } = await db
     .from("profiles")

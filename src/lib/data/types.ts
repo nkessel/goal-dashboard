@@ -62,6 +62,8 @@ export type Task = {
   /** Place on the scheduling priority list (null = not on it). */
   schedule_rank?: number | null;
   schedule_folder?: string | null;
+  /** Percent of this quest's XP sent to each character stat. */
+  stat_split?: Record<string, number> | null;
   created_at: string;
   updated_at: string;
   reminder_sent_at: string | null;
@@ -137,6 +139,10 @@ export type Profile = {
   is_public: boolean;
   created_at: string;
   updated_at: string;
+  /** Character stats, in the owner's order (null = the defaults). */
+  stats?: string[] | null;
+  /** XP earned in each stat. */
+  stat_xp?: Record<string, number> | null;
 };
 
 /** A shared avatar image — either one of the built-in presets or one a user

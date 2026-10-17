@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { CharacterStats } from "./CharacterStats";
+import { DEFAULT_STATS } from "@/lib/stats";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import type { Profile } from "@/lib/data/types";
 import { xpToNextLevel } from "@/lib/data/xp";
@@ -145,6 +147,7 @@ export function XpSummary({
                   ? `${Math.min(xpIntoLevel, xpForNextLevel!).toLocaleString("en-US")} / ${xpForNextLevel!.toLocaleString("en-US")} XP`
                   : `${profile.total_xp.toLocaleString("en-US")} XP · Max level`}
               </div>
+              <CharacterStats order={Array.isArray(profile.stats) ? profile.stats : [...DEFAULT_STATS]} xp={profile.stat_xp ?? {}} />
             </div>
           </div>
 

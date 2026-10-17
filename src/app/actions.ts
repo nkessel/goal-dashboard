@@ -21,6 +21,7 @@ import * as journalData from "@/lib/data/journal";
 import * as tomorrowData from "@/lib/data/tomorrow";
 import * as schedulingData from "@/lib/data/scheduling";
 import * as forumData from "@/lib/data/forum";
+import * as statsData from "@/lib/data/stats";
 import * as bossesData from "@/lib/data/bosses";
 import * as energyData from "@/lib/data/energy";
 import { computeLevelForXp } from "@/lib/levels";
@@ -2073,4 +2074,28 @@ export async function deleteCheckNoteAction(id: string) {
   const ownerId = await requireProfileId();
   await energyData.deleteCheckNote(ownerId, id);
   revalidatePath("/insights");
+}
+
+// ---------------------------------------------------------------------------
+// Character stats
+// ---------------------------------------------------------------------------
+
+export async function getStatsAction() {
+  const ownerId = await requireProfileId();
+  const [stats, xp] = await Promise.all([statsData.getStats(ownerId), statsData.getStatXp(ownerId)]);
+  return { stats, xp };
+}
+
+export async function setStatsAction(names: string[]) {
+  const ownerId = await requireProfileId();
+  const next = await statsData.setStats(ownerId, names);
+  revalidatePath("/", "layout");
+  return next;
+}
+
+export async function setTaskStatSplitAction(taskId: string, split: Record<string, number>) {
+  const ownerId = await requireProfileId();
+  const next = await statsData.setTaskStatSplit(ownerId, taskId, split);
+  revalidatePath("/");
+  return next;
 }
