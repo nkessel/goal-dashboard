@@ -1517,3 +1517,16 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 .cursor-ns-resize {
   cursor: url("/design/cursor-resize.svg") 14 14, ns-resize;
 }
+
+/* Titles people type can be in any script. Right-to-left text (Arabic,
+   Balochi, Persian, Hebrew…) runs right to left, keeps its letters joined
+   (no letter-spacing or hyphenation), and uses a font that has its letters. */
+.user-text {
+  unicode-bidi: plaintext;
+}
+.user-text:dir(rtl) {
+  letter-spacing: 0 !important;
+  hyphens: manual !important;
+  font-family: var(--font-naskh), "Geeza Pro", "Segoe UI", "Tahoma", system-ui, sans-serif !important;
+  text-align: start;
+}

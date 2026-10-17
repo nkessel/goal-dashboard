@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Cinzel, EB_Garamond, Manrope } from "next/font/google";
+import { Geist, Geist_Mono, Cinzel, EB_Garamond, Manrope, Noto_Naskh_Arabic } from "next/font/google";
 import { ViewTransitionProvider } from "@/components/ui/ViewTransitionProvider";
 import { KeyboardViewport } from "@/components/ui/KeyboardViewport";
 import "./globals.css";
@@ -28,6 +28,15 @@ const ebGaramond = EB_Garamond({
   subsets: ["latin"],
 });
 // Calm theme typography — one sans-serif family for everything.
+/** For titles written in Arabic script (Arabic, Balochi, Persian, Urdu…). */
+const naskh = Noto_Naskh_Arabic({
+  variable: "--font-naskh",
+  subsets: ["arabic"],
+  weight: ["400", "600", "700"],
+  display: "swap",
+  preload: false,
+});
+
 const manrope = Manrope({
   variable: "--font-manrope",
   weight: ["400", "500", "600", "700", "800"],
@@ -52,7 +61,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${ebGaramond.variable} ${manrope.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${ebGaramond.variable} ${manrope.variable} ${naskh.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <KeyboardViewport />

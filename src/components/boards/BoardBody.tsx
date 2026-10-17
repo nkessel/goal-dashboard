@@ -68,7 +68,7 @@ export function BoardBody({
       <div className="flex items-center gap-2.5">
         <BoardSeal color={board.color} size={30} />
         <div className="min-w-0 flex-1">
-          <h1 className={`m-0 ${isAdventure ? "font-display text-[22px] leading-tight" : "text-xl font-extrabold"}`} style={{ color: text }}>
+          <h1 dir="auto" className={`user-text m-0 ${isAdventure ? "font-display text-[22px] leading-tight" : "text-xl font-extrabold"}`} style={{ color: text }}>
             {board.title}
             {board.is_private && <span className="ml-1.5 text-xs font-normal">🔒</span>}
           </h1>

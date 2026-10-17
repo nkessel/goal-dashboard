@@ -440,13 +440,14 @@ export function TaskRow({
         {/* Middle: title, description, due + urgency */}
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 pr-1 pt-2">
           <p
-            className={`break-words leading-[1.15] ${isAdventure ? "text-[17.5px] font-semibold sm:text-[19px]" : "text-[16px] font-bold"}`}
+            dir="auto"
+            className={`user-text break-words leading-[1.15] ${isAdventure ? "text-[17.5px] font-semibold sm:text-[19px]" : "text-[16px] font-bold"}`}
             style={{ color: isOverdue ? "var(--t-warn)" : "var(--t-ink)" }}
           >
             {task.title}
           </p>
           {task.description && (
-            <p className="line-clamp-3 break-words text-[13.5px] leading-snug sm:text-[14px]" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
+            <p dir="auto" className="user-text line-clamp-3 break-words text-[13.5px] leading-snug sm:text-[14px]" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
               {task.description}
             </p>
           )}

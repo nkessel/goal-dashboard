@@ -234,7 +234,8 @@ export function BoardGrid({
           </span>
           <span className="min-w-0">
             <span
-              className={`block leading-tight [overflow-wrap:break-word] [hyphens:auto] ${isAdventure ? "font-display text-[17px] font-semibold sm:text-[19px]" : "text-[15px] font-bold"}`}
+              dir="auto"
+              className={`user-text block leading-tight [overflow-wrap:break-word] [hyphens:auto] ${isAdventure ? "font-display text-[17px] font-semibold sm:text-[19px]" : "text-[15px] font-bold"}`}
               style={{ color: "var(--t-ink)" }}
             >
               {board.title}
@@ -552,7 +553,7 @@ function QuestPreview({ q, disabled, onOpen }: { q: Task; disabled: boolean; onO
         title={q.title}
       >
         <QuestDot q={q} />
-        <span className="min-w-0 flex-1 truncate">{q.title}</span>
+        <span dir="auto" className="user-text min-w-0 flex-1 truncate">{q.title}</span>
       </button>
     </li>
   );
