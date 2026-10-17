@@ -53,7 +53,7 @@ export default async function InsightsPage() {
           ]}
           metrics={["Energy", ...metrics]}
           wins={[
-            ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title })),
+            ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null })),
             ...notes.map((n) => ({ kind: "note", at: n.created_at, xp: 0, title: n.body })),
           ]}
         />

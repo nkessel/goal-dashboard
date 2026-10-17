@@ -27,6 +27,31 @@ const EVENTS: { key: string; label: string; kinds: string[]; glyph: string; colo
   { key: "rewards", label: "Rewards", kinds: ["reward"], glyph: "★", color: "#b5521f" },
 ];
 
+/** Small drawn marks for each kind of event, the same in the toggles and the chart. */
+function EventMark({ k, color, size = 12 }: { k: string; color: string; size?: number }) {
+  const h = size / 2;
+  const shape =
+    k === "quests" ? (
+      <path d={`M0 ${-h}L${h} 0 0 ${h} ${-h} 0z`} fill={color} />
+    ) : k === "habits" ? (
+      <circle r={h * 0.8} fill={color} />
+    ) : k === "journal" ? (
+      <path d={`M${-h * 0.9} ${h}L${-h * 0.5} ${h * 0.1}L${h * 0.55} ${-h * 0.95}L${h} ${-h * 0.5}L${-h * 0.05} ${h * 0.55}Z`} fill={color} />
+    ) : k === "notes" ? (
+      <path d={`M${-h} ${-h * 0.55}H${h * 0.25}L${h} 0L${h * 0.25} ${h * 0.55}H${-h}Z`} fill={color} />
+    ) : (
+      <path
+        d={Array.from({ length: 10 }, (_, i) => {
+          const r = i % 2 ? h * 0.45 : h;
+          const a = (Math.PI / 5) * i - Math.PI / 2;
+          return `${i ? "L" : "M"}${(Math.cos(a) * r).toFixed(2)} ${(Math.sin(a) * r).toFixed(2)}`;
+        }).join("") + "Z"}
+        fill={color}
+      />
+    );
+  return shape;
+}
+
 function dayKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -232,14 +257,18 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
         <span aria-hidden className="mx-0.5 self-center" style={{ width: 1, height: 20, background: GRID }} />
         <label className="flex min-h-9 items-center gap-1.5 text-[14.5px]" style={{ color: INK }}>
           <input type="checkbox" checked={showWeather} onChange={() => flip("weather")} />
-          <span aria-hidden>⛅</span>Weather
+          <svg aria-hidden width="16" height="16" viewBox="0 0 24 24">
+            <circle cx="9" cy="9" r="4" fill="#e7b43c" />
+            <path d="M8 19h9.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.5A2.8 2.8 0 0 0 8 19z" fill="#f6f1e4" stroke="#7d8aa0" strokeWidth="1.4" />
+          </svg>
+          Weather
         </label>
         {EVENTS.map((e) => (
           <label key={e.key} className="flex min-h-9 items-center gap-1.5 text-[14.5px]" style={{ color: INK }}>
             <input type="checkbox" checked={isOn(e.key)} onChange={() => flip(e.key)} />
-            <span aria-hidden style={{ color: e.color }}>
-              {e.glyph}
-            </span>
+            <svg aria-hidden width="14" height="14" viewBox="-7 -7 14 14">
+              <EventMark k={e.key} color={e.color} size={12} />
+            </svg>
             {e.label}
           </label>
         ))}
@@ -273,7 +302,23 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
                 const label = n <= 30 || i % 3 === 0;
                 return (
                   <g key={i}>
-                    {w.rain > 0.02 && <rect x={xDay(i) - 3} y={10 + weatherH - 8} width="6" height={Math.min(8, 2 + w.rain * 12)} rx="1.5" fill="#3f6fa8" opacity=".75" transform={`translate(0 ${-Math.min(8, 2 + w.rain * 12) + 8})`} />}
+                    {w.rain > 0.02 && (() => {
+                      // A light-blue drop, filled with dark blue as far as the day was wet (an inch fills it).
+                      const metric = !/^en-US/.test(typeof navigator === "undefined" ? "" : navigator.language);
+                      const full = Math.max(0.15, Math.min(1, w.rain / (metric ? 25 : 1)));
+                      const drop = "M0 -6C2.6 -2.6 4 -0.6 4 1.6A4 4 0 0 1 -4 1.6C-4 -0.6 -2.6 -2.6 0 -6Z";
+                      const cx = xDay(i);
+                      const cy = 10 + weatherH - 7;
+                      return (
+                        <g transform={`translate(${cx.toFixed(1)} ${cy})`}>
+                          <clipPath id={`rain-${i}`}>
+                            <rect x="-5" y={(5.6 - 11.6 * full).toFixed(2)} width="10" height="12" />
+                          </clipPath>
+                          <path d={drop} fill="#cfe3f7" stroke="#2f5f9e" strokeWidth="0.9" />
+                          <path d={drop} fill="#2f5f9e" clipPath={`url(#rain-${i})`} />
+                        </g>
+                      );
+                    })()}
                     {label && (
                       <text x={xDay(i)} y={20} textAnchor="middle" fontSize={n <= 7 ? 12 : 9.5} fill={INK_SOFT}>
                         {w.hi}°
@@ -329,16 +374,25 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
 
           {/* Event lanes */}
           {activeEvents.map((ev, li) => {
-            const ly = T + plotH + 30 + li * 16;
+            const ly = T + plotH + 32 + li * 16;
             return (
               <g key={ev.key}>
+                <line x1={L} x2={W - R} y1={ly} y2={ly} stroke={GRID} strokeWidth="1" strokeDasharray="1 4" />
+                <g transform={`translate(${L - 10} ${ly})`}>
+                  <EventMark k={ev.key} color={ev.color} size={9} />
+                </g>
                 {days.map((d, i) => {
                   const c = (eventsByDay.get(dayKey(d)) ?? []).filter((w) => ev.kinds.includes(w.kind)).length;
                   if (!c) return null;
                   return (
-                    <text key={i} x={xDay(i)} y={ly} textAnchor="middle" fontSize={c > 1 ? 12 : 10.5} fontWeight={c > 2 ? 700 : 400} fill={ev.color}>
-                      {ev.glyph}
-                    </text>
+                    <g key={i} transform={`translate(${xDay(i).toFixed(1)} ${ly})`}>
+                      <EventMark k={ev.key} color={ev.color} size={n > 30 ? 8 : 10} />
+                      {c > 1 && n <= 30 && (
+                        <text x="7" y="3.5" fontSize="9" fontWeight="700" fill={ev.color}>
+                          {c}
+                        </text>
+                      )}
+                    </g>
                   );
                 })}
               </g>
@@ -366,7 +420,7 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
             )}
             {hoverEvents.slice(0, 4).map((w, i) => (
               <span key={i} className="truncate" style={{ color: INK_SOFT }}>
-                {EVENTS.find((e) => e.kinds.includes(w.kind))?.glyph} {w.title ?? w.kind}
+                {EVENTS.find((e) => e.kinds.includes(w.kind))?.label.replace(/s?( &.*)?$/, "")}: {w.title ?? w.kind}
               </span>
             ))}
             {hoverEvents.length > 4 && <span style={{ color: INK_SOFT }}>+{hoverEvents.length - 4} more</span>}
@@ -385,8 +439,11 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
             style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 2px 6px rgba(60,40,10,.3)" }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" stroke="currentColor" strokeWidth="2" />
-              <path d="M19.4 13.4l1.7 1.3-1.8 3.1-2-.8a7.6 7.6 0 0 1-2 1.2l-.3 2.1h-3.6l-.3-2.1a7.6 7.6 0 0 1-2-1.2l-2 .8-1.8-3.1 1.7-1.3a7.7 7.7 0 0 1 0-2.8L3.3 9.3l1.8-3.1 2 .8a7.6 7.6 0 0 1 2-1.2l.3-2.1h3.6l.3 2.1a7.6 7.6 0 0 1 2 1.2l2-.8 1.8 3.1-1.7 1.3a7.7 7.7 0 0 1 0 2.8z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+              {Array.from({ length: 8 }, (_, i) => (
+                <rect key={i} x="10.4" y="1.6" width="3.2" height="4.6" rx="1" fill="currentColor" transform={`rotate(${i * 45} 12 12)`} />
+              ))}
+              <circle cx="12" cy="12" r="6.9" fill="currentColor" />
+              <circle cx="12" cy="12" r="2.7" fill="#e3c06e" />
             </svg>
           </button>
           {settings && (

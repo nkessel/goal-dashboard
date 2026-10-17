@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { TrackingChart } from "./TrackingChart";
 
 type Reading = { metric: string; level: number; at: string };
-type WinLite = { kind: string; at: string; xp: number; title?: string };
+type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null };
 
 const DAY = 86_400_000;
 const noop = () => () => {};
@@ -112,7 +112,7 @@ export function InsightsView({ theme, readings, metrics, wins }: { theme: "calm"
         <h2 className={h2} style={{ color: "var(--t-ink)" }}>
           XP per day · last 14 days
         </h2>
-        <XpBars days={days14} xpByDay={xpByDay} doneByDay={doneByDay} />
+        <XpBars days={days14} wins={wins} />
       </section>
 
       {/* Patterns */}
@@ -126,60 +126,148 @@ export function InsightsView({ theme, readings, metrics, wins }: { theme: "calm"
   );
 }
 
-function XpBars({ days, xpByDay, doneByDay }: { days: Date[]; xpByDay: Map<string, number>; doneByDay: Map<string, number> }) {
+const XP_VIEW_KEY = "insights-xp-view";
+
+/** Quest kinds counted in the daily tallies, in display order. */
+const TALLIES: { kind: string; one: string; many: string }[] = [
+  { kind: "quest", one: "quest", many: "quests" },
+  { kind: "habit", one: "habit", many: "habits" },
+  { kind: "rite", one: "rite", many: "rites" },
+  { kind: "journal", one: "journal", many: "journals" },
+  { kind: "feedback", one: "feedback", many: "feedback" },
+  { kind: "reward", one: "reward", many: "rewards" },
+];
+
+/**
+ * XP per day as gilded columns, each labelled with its weekday and date.
+ * Optionally shows the portraits of what was finished that day, and a
+ * written tally (XP, quests, journals, feedback…) under each day.
+ */
+function XpBars({ days, wins }: { days: Date[]; wins: WinLite[] }) {
   const [hover, setHover] = useState<number | null>(null);
-  const W = 460;
-  const H = 150;
-  const L = 30;
-  const T = 10;
-  const B = 20;
-  const vals = days.map((d) => xpByDay.get(dayKey(d)) ?? 0);
-  const max = Math.max(10, ...vals);
+  const [opts, setOpts] = useState<{ icons: boolean; tallies: boolean }>(() => {
+    try {
+      return { icons: true, tallies: false, ...(JSON.parse(window.localStorage.getItem(XP_VIEW_KEY) ?? "{}") as object) };
+    } catch {
+      return { icons: true, tallies: false };
+    }
+  });
+  function set(patch: Partial<typeof opts>) {
+    const next = { ...opts, ...patch };
+    setOpts(next);
+    try {
+      window.localStorage.setItem(XP_VIEW_KEY, JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  const byDay = days.map((d) => {
+    const k = dayKey(d);
+    const ws = wins.filter((w) => dayKey(new Date(w.at)) === k);
+    return { d, ws, xp: ws.reduce((a, w) => a + w.xp, 0) };
+  });
+  const max = Math.max(10, ...byDay.map((b) => b.xp));
   const nice = Math.ceil(max / 10) * 10;
-  const slot = (W - L) / days.length;
-  const bw = Math.min(28, slot - 6);
-  const y = (v: number) => T + ((nice - v) * (H - T - B)) / nice;
-  const total = vals.reduce((a, b) => a + b, 0);
-  const h = hover !== null ? { d: days[hover], v: vals[hover], n: doneByDay.get(dayKey(days[hover])) ?? 0 } : null;
+  const total = byDay.reduce((a, b) => a + b.xp, 0);
+  const BAR_H = 110;
+  const wide = opts.icons || opts.tallies;
+  const h = hover !== null ? byDay[hover] : null;
+  const todayKey = dayKey(new Date());
+
   return (
-    <div className="relative z-[1] flex flex-col gap-1">
-      <p className="m-0 text-[13.5px] tabular-nums" style={{ color: INK_SOFT }}>
-        {h
-          ? `${h.d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}: ${h.v} XP · ${h.n} ${h.n === 1 ? "quest" : "quests"}`
-          : `${total} XP over two weeks · ${Math.round(total / days.length)} a day on average`}
-      </p>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`XP per day for the last 14 days, ${total} in all`} onPointerLeave={() => setHover(null)}>
-        {[0, nice / 2, nice].map((v) => (
-          <g key={v}>
-            <line x1={L} x2={W} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" />
-            <text x={L - 5} y={y(v) + 3.5} textAnchor="end" fontSize="12" fill={INK_SOFT}>
-              {v}
-            </text>
-          </g>
-        ))}
-        {vals.map((v, i) => {
-          const cx = L + slot * i + slot / 2;
-          const top = y(v);
-          const hgt = H - B - top;
-          return (
-            <g key={i} onPointerEnter={() => setHover(i)} onPointerDown={() => setHover(i)}>
-              <rect x={L + slot * i} y={T} width={slot} height={H - T} fill="transparent" />
-              {v > 0 && (
-                <path
-                  d={`M${cx - bw / 2},${H - B}V${top + Math.min(4, hgt)}q0,-4 4,-4h${bw - 8}q4,0 4,4V${H - B}z`}
-                  fill={BAR}
-                  opacity={hover === null || hover === i ? 1 : 0.55}
-                />
-              )}
-              {(i % 2 === 1 || i === days.length - 1) && (
-                <text x={cx} y={H - 5} textAnchor="middle" fontSize="12" fill={INK_SOFT}>
-                  {i === days.length - 1 ? "today" : days[i].toLocaleDateString(undefined, { weekday: "narrow" }) + days[i].getDate()}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
+    <div className="relative z-[1] flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="m-0 min-w-0 flex-1 text-[13.5px] tabular-nums" style={{ color: INK_SOFT }}>
+          {h
+            ? `${h.d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}: ${h.xp} XP`
+            : `${total} XP over two weeks · ${Math.round(total / days.length)} a day on average`}
+        </p>
+        <label className="flex min-h-8 items-center gap-1.5 text-[13.5px]" style={{ color: INK }}>
+          <input type="checkbox" checked={opts.icons} onChange={() => set({ icons: !opts.icons })} />
+          Portraits
+        </label>
+        <label className="flex min-h-8 items-center gap-1.5 text-[13.5px]" style={{ color: INK }}>
+          <input type="checkbox" checked={opts.tallies} onChange={() => set({ tallies: !opts.tallies })} />
+          Daily tallies
+        </label>
+      </div>
+
+      <div className={wide ? "-mx-1 overflow-x-auto px-1 pb-1" : ""}>
+        <div className="relative flex" style={{ minWidth: wide ? days.length * 52 : undefined }} onPointerLeave={() => setHover(null)}>
+          {/* Scale */}
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0" style={{ height: BAR_H }}>
+            {[nice, nice / 2, 0].map((v, i) => (
+              <div key={v} className="absolute inset-x-0 flex items-center" style={{ top: (i * BAR_H) / 2 - 1 }}>
+                <span className="w-7 shrink-0 pr-1 text-right text-[11px] tabular-nums" style={{ color: INK_SOFT, transform: "translateY(-50%)" }}>
+                  {v}
+                </span>
+                <span className="flex-1" style={{ borderTop: `1px solid ${GRID}` }} />
+              </div>
+            ))}
+          </div>
+          <span aria-hidden className="w-7 shrink-0" />
+          {byDay.map((b, i) => {
+            const isToday = dayKey(b.d) === todayKey;
+            const icons = b.ws.filter((w) => (w.kind === "quest" || w.kind === "reward") && w.icon);
+            return (
+              <div
+                key={i}
+                className="flex min-w-0 flex-1 flex-col items-center"
+                onPointerEnter={() => setHover(i)}
+                onPointerDown={() => setHover(i)}
+                style={{ background: hover === i ? "rgba(217,180,95,.12)" : undefined, borderRadius: 8 }}
+              >
+                <div className="relative flex w-full items-end justify-center" style={{ height: BAR_H }}>
+                  {b.xp > 0 && (
+                    <div
+                      className="w-[62%] max-w-[26px] rounded-t-[5px]"
+                      style={{ height: Math.max(3, (b.xp / nice) * BAR_H), background: `linear-gradient(180deg, #e8c46a, ${BAR})`, boxShadow: "inset 0 0 0 1px rgba(90,60,20,.25)" }}
+                      title={`${b.xp} XP`}
+                    />
+                  )}
+                </div>
+                <div className="flex flex-col items-center pt-1 leading-none" style={{ color: isToday ? INK : INK_SOFT }}>
+                  <span className="text-[10.5px] uppercase tracking-wide">{isToday ? "Today" : b.d.toLocaleDateString(undefined, { weekday: "short" })}</span>
+                  <span className={`text-[13px] tabular-nums ${isToday ? "font-bold" : ""}`}>{b.d.getDate()}</span>
+                </div>
+                {opts.icons && icons.length > 0 && (
+                  <div className="mt-1 flex flex-col items-center gap-0.5">
+                    {icons.slice(0, 3).map((w, k) => (
+                      // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+                      <img
+                        key={k}
+                        src={w.icon!}
+                        alt=""
+                        title={w.title}
+                        className="h-6 w-6 rounded-full object-cover"
+                        style={{ border: `1.5px solid ${w.kind === "reward" ? "#b5521f" : "#a58c66"}` }}
+                      />
+                    ))}
+                    {icons.length > 3 && (
+                      <span className="text-[10.5px] font-semibold" style={{ color: INK_SOFT }}>
+                        +{icons.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {opts.tallies && (
+                  <div className="mt-1 flex flex-col items-center gap-px text-center text-[10.5px] leading-tight" style={{ color: INK_SOFT }}>
+                    {b.xp > 0 && <b style={{ color: INK }}>{b.xp} XP</b>}
+                    {TALLIES.map((t) => {
+                      const c = b.ws.filter((w) => w.kind === t.kind).length;
+                      return c ? (
+                        <span key={t.kind}>
+                          {c} {c === 1 ? t.one : t.many}
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
