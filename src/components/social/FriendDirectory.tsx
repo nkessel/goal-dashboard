@@ -1,6 +1,7 @@
 "use client";
 
 import { LevelPill } from "./LevelPill";
+import { shownLevel } from "@/lib/shown-level";
 import { useState, useTransition } from "react";
 import { sendFriendRequestAction, removeFriendAction } from "@/app/actions";
 import type { Friendship, Profile } from "@/lib/data/types";
@@ -100,7 +101,7 @@ function DirectoryRow({
         {/* eslint-disable-next-line @next/next/no-img-element -- portrait */}
         <img src={profile.avatar_image_url ?? defaultPortraitFor(profile.id)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" style={{ border: "1.5px solid #a58c66" }} />
         <span className="truncate text-[15px] font-semibold">{profile.name || "Adventurer"}</span>
-        <LevelPill level={profile.level} champion={profile.id === championId} />
+        <LevelPill level={shownLevel(profile)} champion={profile.id === championId} />
       </div>
 
       {!friendship && (

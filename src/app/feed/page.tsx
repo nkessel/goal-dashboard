@@ -8,6 +8,7 @@ import { InviteLinkBox } from "@/components/social/InviteLinkBox";
 import { ActivityFeedItem } from "@/components/social/ActivityFeedItem";
 import { listDirectory, getProfilesByIds, getProfileById, getChampion } from "@/lib/data/profiles";
 import { LevelPill } from "@/components/social/LevelPill";
+import { shownLevel } from "@/lib/shown-level";
 import { Avatar } from "@/components/settings/Avatar";
 import { xpToNextLevel } from "@/lib/data/xp";
 import {
@@ -38,7 +39,7 @@ export default async function FeedPage() {
   const threads = forums.flatMap((f) => f.threads);
   const forumPeople = await getProfilesByIds([...new Set(threads.map((t) => t.author_id).filter((x): x is string => !!x))]);
   const forumAuthors: Record<string, AuthorView> = Object.fromEntries(
-    [...forumPeople.values()].map((p) => [p.id, { id: p.id, name: p.name ?? "Adventurer", level: p.level, avatar_color: p.avatar_color, avatar_image_url: p.avatar_image_url, champion: p.id === champion?.id }])
+    [...forumPeople.values()].map((p) => [p.id, { id: p.id, name: p.name ?? "Adventurer", level: shownLevel(p), avatar_color: p.avatar_color, avatar_image_url: p.avatar_image_url, champion: p.id === champion?.id }])
   );
 
   const incomingProfiles = await getProfilesByIds(incoming.map((f) => f.requester_id));
@@ -82,7 +83,7 @@ export default async function FeedPage() {
               </span>
               <span className={`flex flex-wrap items-center gap-1.5 ${isAdventure ? "font-display text-[19px]" : "text-[17px] font-bold"}`} style={{ color: "#f6ecd2" }}>
                 {champion.name ?? "Adventurer"}
-                <LevelPill level={champion.level} />
+                <LevelPill level={shownLevel(champion)} />
               </span>
               <span className="block text-[13px] tabular-nums" style={{ color: "rgba(246,236,210,.75)" }}>
                 {champion.total_xp.toLocaleString()} XP — the most of anyone

@@ -2099,3 +2099,16 @@ export async function setTaskStatSplitAction(taskId: string, split: Record<strin
   revalidatePath("/");
   return next;
 }
+
+/** Someone holding an honorary level sets it (1–99). Only those granted one can. */
+export async function setDisplayLevelAction(level: number) {
+  const ownerId = await requireProfileId();
+  const n = Math.round(Number(level));
+  if (!Number.isFinite(n) || n < 1 || n > 99) throw new Error("Pick a level from 1 to 99.");
+  const db = (await import("@/lib/supabase/server")).supabaseAdmin();
+  const { data } = await db.from("profiles").select("display_level").eq("id", ownerId).maybeSingle<{ display_level: number | null }>();
+  if (data?.display_level == null) throw new Error("Only an honorary level can be changed.");
+  const { error } = await db.from("profiles").update({ display_level: n }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't change it: ${error.message}`);
+  revalidatePath("/", "layout");
+}

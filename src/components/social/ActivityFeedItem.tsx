@@ -1,6 +1,7 @@
 import type { FeedItem } from "@/lib/data/activity";
 import type { Profile } from "@/lib/data/types";
 import { Avatar } from "@/components/settings/Avatar";
+import { shownLevel } from "@/lib/shown-level";
 import { formatRelativeTime } from "@/lib/format-time";
 import { ReactionBar } from "./ReactionBar";
 import { CommentThread, type CommentWithAuthor } from "./CommentThread";
@@ -54,7 +55,7 @@ export function ActivityFeedItem({
             {authorName}{" "}
             {author && (
               <span className="ml-1 rounded-full px-2 py-px align-middle text-[12px] font-semibold" style={{ background: "rgba(42,28,16,.82)", color: "#f2d27e" }}>
-                Lvl {author.level}
+                Lvl {shownLevel(author)}
               </span>
             )}
           </div>

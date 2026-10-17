@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CharacterStats } from "./CharacterStats";
+import { HonoraryLevel } from "./HonoraryLevel";
 import { DEFAULT_STATS } from "@/lib/stats";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import type { Profile } from "@/lib/data/types";
@@ -111,21 +112,37 @@ export function XpSummary({
                 </span>
               </Link>
               <div className="absolute left-1/2" style={{ bottom: -12, transform: "translateX(-50%)" }}>
+              {profile.display_level != null ? (
+                <HonoraryLevel level={profile.display_level}>
+                  <span
+                    className="font-display block whitespace-nowrap rounded-full px-3 py-[2px] text-[14.5px] leading-tight sm:px-4 sm:py-[3px] sm:text-[16px]"
+                    style={{
+                      background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)",
+                      color: "#2a1c10",
+                      border: "2px solid #4a3913",
+                      boxShadow: "0 0 14px rgba(242,210,126,.6), 0 3px 8px rgba(0,0,0,.5)",
+                    }}
+                  >
+                    Lvl {profile.display_level} · Legend
+                  </span>
+                </HonoraryLevel>
+              ) : (
               <BossBadge boss={boss && boss.level === level ? boss : null} level={level} heldByBoss={heldByBoss} enabled={!!(boss || bossesEnabled) && !!nextLevel}>
-              <div
-                className="font-display whitespace-nowrap rounded-full px-3 py-[2px] text-[14.5px] leading-tight sm:px-4 sm:py-[3px] sm:text-[16px]"
-                style={{
-                  background: "linear-gradient(180deg, #3f4c39, #222b20)",
-                  color: "#f2d27e",
-                  border: "2px solid var(--t-gold)",
-                  boxShadow: "inset 0 1px 0 rgba(255,235,180,.2), 0 3px 8px rgba(0,0,0,.5)",
-                }}
-              >
-                {(boss || bossesEnabled) && nextLevel && <span aria-hidden className="mr-1 text-[12px]">⚔</span>}
-                Lvl {level}
-                {level >= 8 && " · Adventurer"}
-              </div>
-              </BossBadge>
+                <div
+                  className="font-display whitespace-nowrap rounded-full px-3 py-[2px] text-[14.5px] leading-tight sm:px-4 sm:py-[3px] sm:text-[16px]"
+                  style={{
+                    background: "linear-gradient(180deg, #3f4c39, #222b20)",
+                    color: "#f2d27e",
+                    border: "2px solid var(--t-gold)",
+                    boxShadow: "inset 0 1px 0 rgba(255,235,180,.2), 0 3px 8px rgba(0,0,0,.5)",
+                  }}
+                >
+                  {(boss || bossesEnabled) && nextLevel && <span aria-hidden className="mr-1 text-[12px]">⚔</span>}
+                  Lvl {level}
+                  {level >= 8 && " · Adventurer"}
+                </div>
+                </BossBadge>
+              )}
               </div>
             </div>
             <div className="mt-3 flex w-[150px] flex-col gap-1.5 sm:w-[210px]">

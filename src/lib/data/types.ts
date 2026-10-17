@@ -143,6 +143,8 @@ export type Profile = {
   stats?: string[] | null;
   /** XP earned in each stat. */
   stat_xp?: Record<string, number> | null;
+  /** An honorary level (1–99) shown instead of the earned one, when granted. */
+  display_level?: number | null;
 };
 
 /** A shared avatar image — either one of the built-in presets or one a user
