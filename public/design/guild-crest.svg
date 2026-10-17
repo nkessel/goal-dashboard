@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6dc8e"/><stop offset="1" stop-color="#a8822f"/></linearGradient>
+    <linearGradient id="field" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f5a33"/><stop offset="1" stop-color="#22351d"/></linearGradient>
+  </defs>
+  <!-- banner shield -->
+  <path d="M32 4l22 7v17c0 15-9.5 25-22 32C19.5 53 10 43 10 28V11z" fill="url(#gold)" stroke="#3b2a14" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M32 9.5l17 5.4v13.3c0 12-7.4 20.3-17 26.2-9.6-5.9-17-14.2-17-26.2V14.9z" fill="url(#field)"/>
+  <!-- three party members beneath a hall roof -->
+  <path d="M19 27l13-9 13 9" fill="none" stroke="#f2d27e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#f2d27e">
+    <circle cx="32" cy="31" r="3.6"/>
+    <path d="M25.5 44c0-4.3 2.9-7.3 6.5-7.3s6.5 3 6.5 7.3z"/>
+    <circle cx="23" cy="34" r="2.7"/>
+    <path d="M18 45c0-3.4 2.2-5.8 5-5.8 1.4 0 2.6.6 3.5 1.6-.9 1.2-1.5 2.6-1.6 4.2z"/>
+    <circle cx="41" cy="34" r="2.7"/>
+    <path d="M46 45c0-3.4-2.2-5.8-5-5.8-1.4 0-2.6.6-3.5 1.6.9 1.2 1.5 2.6 1.6 4.2z"/>
+  </g>
+</svg>

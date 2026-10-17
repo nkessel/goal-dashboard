@@ -1,5 +1,6 @@
 "use client";
 
+import { LevelPill } from "./LevelPill";
 import { useState, useTransition } from "react";
 import { sendFriendRequestAction, removeFriendAction } from "@/app/actions";
 import type { Friendship, Profile } from "@/lib/data/types";
@@ -12,9 +13,11 @@ export function FriendDirectory({
   profileId,
   rows,
   theme = "calm",
+  championId = null,
 }: {
   profileId: string;
   rows: Row[];
+  championId?: string | null;
   theme?: Theme;
 }) {
   const [query, setQuery] = useState("");
@@ -36,7 +39,7 @@ export function FriendDirectory({
       />
       <ul className="flex flex-col" style={{ color: "var(--t-ink)" }}>
         {shown.map((row, i) => (
-          <DirectoryRow key={row.profile.id} profileId={profileId} row={row} theme={theme} showDivider={i > 0} />
+          <DirectoryRow championId={championId} key={row.profile.id} profileId={profileId} row={row} theme={theme} showDivider={i > 0} />
         ))}
         {shown.length === 0 && (
           <p className="py-2 text-sm" style={{ color: "var(--t-ink-soft)" }}>
@@ -53,7 +56,9 @@ function DirectoryRow({
   row,
   theme,
   showDivider,
+  championId,
 }: {
+  championId: string | null;
   profileId: string;
   row: Row;
   theme: Theme;
@@ -95,14 +100,7 @@ function DirectoryRow({
         {/* eslint-disable-next-line @next/next/no-img-element -- portrait */}
         <img src={profile.avatar_image_url ?? defaultPortraitFor(profile.id)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" style={{ border: "1.5px solid #a58c66" }} />
         <span className="truncate text-[15px] font-semibold">{profile.name || "Adventurer"}</span>
-        {profile.level >= 8 && (
-          <span
-            className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-            style={{ background: "var(--t-accent-soft)", color: "var(--t-gold-deep)" }}
-          >
-            Lv{profile.level}
-          </span>
-        )}
+        <LevelPill level={profile.level} champion={profile.id === championId} />
       </div>
 
       {!friendship && (

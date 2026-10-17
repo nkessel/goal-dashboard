@@ -109,3 +109,10 @@ export async function updateProfileName(id: string, name: string): Promise<Profi
   if (error) throw new Error(`Failed to update name: ${error.message}`);
   return data;
 }
+
+/** The Champion of Quests: whoever has earned the most XP. */
+export async function getChampion(): Promise<Profile | null> {
+  const { data, error } = await supabaseAdmin().from("profiles").select("*").order("total_xp", { ascending: false }).limit(1).maybeSingle();
+  if (error) return null;
+  return (data as Profile | null) ?? null;
+}

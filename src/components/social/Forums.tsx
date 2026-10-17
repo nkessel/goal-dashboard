@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/settings/Avatar";
+import { LevelPill } from "./LevelPill";
 import { formatRelativeTime } from "@/lib/format-time";
 import { createForumThreadAction, voteForumAction } from "@/app/actions";
 
@@ -20,7 +21,7 @@ export type ThreadView = {
   vote_count: number;
   last_post_at: string;
 };
-export type AuthorView = { id: string; name: string; level: number; avatar_color: string; avatar_image_url: string | null };
+export type AuthorView = { id: string; name: string; level: number; avatar_color: string; avatar_image_url: string | null; champion?: boolean };
 
 const TABS: { key: ForumScope; label: string; blurb: string }[] = [
   { key: "party", label: "Party", blurb: "Just you and your party." },
@@ -43,12 +44,13 @@ export function Byline({ author, at, small = false }: { author: AuthorView | und
       {author ? (
         <Avatar profile={author} size={size} />
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- app crest
-        <img src="/design/ui-shield-sm.png" alt="" width={size * 4} height={size * 4} className="shrink-0" />
+        // eslint-disable-next-line @next/next/no-img-element -- the Guild Hall's crest
+        <img src="/design/guild-crest.svg" alt="" width={size * 4} height={size * 4} className="shrink-0" />
       )}
       <span className="truncate font-semibold" style={{ color: "var(--t-ink)" }}>
         {author?.name ?? "Guild Hall"}
       </span>
+      {author && <LevelPill level={author.level} champion={author.champion} />}
       <span className="shrink-0">· {formatRelativeTime(at)}</span>
     </span>
   );
