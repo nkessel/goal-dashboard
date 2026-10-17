@@ -1587,6 +1587,54 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   .owl-wing-l, .owl-wing-r, .owl-spark { animation: none; }
 }
 
+/* The great toucan spirit (hold the owl) */
+.owl-charging { animation: owl-charge 0.65s ease-in forwards; }
+@keyframes owl-charge {
+  0% { filter: drop-shadow(0 0 0 rgba(140,240,220,0)); transform: scale(1); }
+  70% { transform: scale(0.94) rotate(-3deg); }
+  100% { filter: drop-shadow(0 0 16px rgba(140,240,220,.9)); transform: scale(1.06) rotate(2deg); }
+}
+.poof-puff {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 40% 35%, rgba(255,255,255,.95), rgba(214,236,232,.75) 45%, rgba(160,200,200,0) 72%);
+  transform: translate(-50%, -50%) scale(0.2);
+  animation: poof-puff 0.85s cubic-bezier(.2,.7,.3,1) forwards;
+}
+@keyframes poof-puff {
+  0% { opacity: 0.95; transform: translate(-50%, -50%) scale(0.2); }
+  60% { opacity: 0.85; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--px)), calc(-50% + var(--py))) scale(1.25); }
+}
+.toucan-spirit { animation: toucan-hover 3.2s ease-in-out infinite; }
+@keyframes toucan-hover {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.toucan-aura { animation: toucan-aura 2.6s ease-in-out infinite; transform-origin: 50% 50%; transform-box: fill-box; }
+@keyframes toucan-aura {
+  0%, 100% { opacity: 0.55; transform: scale(0.94); }
+  50% { opacity: 0.95; transform: scale(1.06); }
+}
+.toucan-mote { animation: toucan-mote 3s ease-in-out infinite; }
+@keyframes toucan-mote {
+  0% { opacity: 0; transform: translateY(4px); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+.toucan-wisdom {
+  animation: toucan-wisdom-in 0.35s cubic-bezier(.2,.8,.3,1.2) both;
+}
+@keyframes toucan-wisdom-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .owl-charging, .poof-puff, .toucan-spirit, .toucan-aura, .toucan-mote { animation: none; }
+  .poof-puff { opacity: 0; }
+}
+
 /* Reward ceremony */
 .reward-cele { animation: qc-overlayIn 0.35s ease-out both; }
 @keyframes reward-turn { to { transform: translate(-50%, -50%) rotate(360deg); } }

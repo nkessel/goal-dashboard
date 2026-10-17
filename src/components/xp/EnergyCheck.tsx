@@ -45,6 +45,9 @@ const METRIC_IDEAS = ["Mood", "Focus", "Calm", "Motivation", "Sleep", "Pain"];
 const MAX_METRICS = 6;
 const EXPANDED_KEY = "checkin-expanded";
 
+/** After this long, the check-in bar starts fresh for the next one. */
+const FRESH_AFTER_MS = 30 * 60_000;
+
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 /**
@@ -84,6 +87,9 @@ export function EnergyCheck({
   const [savedVals, setSavedVals] = useState<Record<string, number>>(metricsToday);
   const [expanded, setExpanded] = useState(full);
   const [notes, setNotes] = useState(notesToday);
+  // Events and #tags written since the screen opened — the only ones the open bar shows.
+  const [sessionIds, setSessionIds] = useState<Set<string>>(new Set());
+  const [peek, setPeek] = useState(false);
   const [noting, setNoting] = useState(false);
   const [noteText, setNoteText] = useState("");
   // #tags typed in the box become pills as soon as a space follows them.
@@ -101,8 +107,12 @@ export function EnergyCheck({
   function saveNote(body: string) {
     const temp = { id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, body };
     setNotes((n) => [...n, temp]);
+    setSessionIds((s) => new Set(s).add(temp.id));
     addCheckNoteAction(body)
-      .then((saved) => setNotes((n) => n.map((x) => (x.id === temp.id ? { id: saved.id, body: saved.body } : x))))
+      .then((saved) => {
+        setSessionIds((s) => new Set(s).add(saved.id));
+        setNotes((n) => n.map((x) => (x.id === temp.id ? { id: saved.id, body: saved.body } : x)));
+      })
       .catch((e) => {
         setNotes((n) => n.filter((x) => x.id !== temp.id));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
@@ -138,6 +148,18 @@ export function EnergyCheck({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
 
+  // Half an hour after a check-in, the bar resets for the next one; the last
+  // one stays a tap away ("Last check-in at …").
+  useEffect(() => {
+    const check = () => {
+      if (savedAt && Date.now() - new Date(savedAt).getTime() > FRESH_AFTER_MS) setEditing(true);
+    };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the clock decides when the bar resets
+    check();
+    const t = setInterval(check, 60_000);
+    return () => clearInterval(t);
+  }, [savedAt]);
+
   // Open or closed is remembered on this device.
   useEffect(() => {
     try {
@@ -170,6 +192,7 @@ export function EnergyCheck({
         setSavedAt(res.energy.created_at ?? new Date().toISOString());
         if (all.length) setSavedVals((o) => ({ ...o, ...Object.fromEntries(all.map((r) => [r.metric, r.level])) }));
         setEditing(false);
+        setPeek(false);
         setAdding(false);
         setEditingList(false);
       } catch (e) {
@@ -238,9 +261,9 @@ export function EnergyCheck({
   );
 
   const label = "w-[78px] shrink-0 truncate text-[14.5px] font-semibold";
-  const noteChips = notes.length > 0 && (
+  const chipsFor = (list: typeof notes) => list.length > 0 && (
     <ul className="m-0 flex list-none flex-wrap justify-center gap-1.5 p-0">
-      {notes.map((n) => (
+      {list.map((n) => (
         <li
           key={n.id}
           className="flex h-7 max-w-full items-center gap-1 rounded-full pl-2.5 pr-1 text-[13px]"
@@ -264,6 +287,28 @@ export function EnergyCheck({
           <button type="button" onClick={() => dropNote(n.id)} aria-label={`Remove “${n.body}”`} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[15px] leading-none hover:bg-white/10" style={{ color: "rgba(239,230,204,.7)" }}>
             ×
           </button>
+        </li>
+      ))}
+    </ul>
+  );
+  // The open bar shows only what was written just now, not the last check-in's tags.
+  const noteChips = chipsFor(notes.filter((n) => sessionIds.has(n.id)));
+  const lastSeals = (
+    <ul className="m-0 flex list-none flex-wrap justify-center gap-1.5 p-0">
+      {saved !== null && (
+        <li className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(0,0,0,.28)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+          Energy
+          <b className="font-display text-[17px] tabular-nums" style={{ color: `hsl(${Math.round(((saved - 1) / 9) * 110)} 70% 68%)` }}>
+            {fmt(saved)}
+          </b>
+        </li>
+      )}
+      {metrics.filter((m) => savedVals[m] !== undefined).map((m) => (
+        <li key={m} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(0,0,0,.28)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+          {m}
+          <b className="font-display text-[17px] tabular-nums" style={{ color: "#f2d58a" }}>
+            {fmt(savedVals[m])}
+          </b>
         </li>
       ))}
     </ul>
@@ -472,6 +517,28 @@ export function EnergyCheck({
                     {isSaving ? "…" : "Submit check-in"}
                   </button>
                 </div>
+              </div>
+            )}
+            {!expanded && noteChips}
+            {!expanded && noteInput}
+            {mounted && savedAt && saved !== null && (
+              <div className="flex flex-col items-center gap-1.5 pt-0.5">
+                <div className="flex flex-wrap items-center justify-center gap-x-3 text-[12.5px]" style={{ color: "var(--t-cream)" }}>
+                  <button type="button" onClick={() => setPeek((v) => !v)} aria-expanded={peek} className="underline-offset-2 hover:underline" style={{ opacity: 0.75 }}>
+                    Last check-in at {clock(savedAt)} {peek ? "▾" : "▸"}
+                  </button>
+                  {!expanded && !noting && (
+                    <button type="button" onClick={() => setNoting(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
+                      + Event or #tag
+                    </button>
+                  )}
+                </div>
+                {peek && (
+                  <div className="fade-in flex flex-col items-center gap-1.5">
+                    {lastSeals}
+                    {chipsFor(notes.filter((n) => !sessionIds.has(n.id)))}
+                  </div>
+                )}
               </div>
             )}
           </>

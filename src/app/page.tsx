@@ -1,4 +1,5 @@
 import { auth, signIn } from "@/auth";
+import { LowLightToggle } from "@/components/evening/LowLightToggle";
 import { AppShell } from "@/components/layout/AppShell";
 import { TodayTaskBoard } from "@/components/tasks/TodayTaskBoard";
 import { VictoriesToday } from "@/components/xp/VictoriesToday";
@@ -161,6 +162,7 @@ export default async function Home() {
         }
         evening={
           <div className="flex flex-col gap-6">
+            <LowLightToggle />
             {stats}
             <EveningRites
               rites={eveningRites}

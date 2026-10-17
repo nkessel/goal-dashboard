@@ -9,9 +9,10 @@ import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { RewardEditorDialog } from "@/components/rewards/RewardEditorDialog";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
 import { Moon } from "@/components/evening/BeginEveningButton";
-import { DiamondIcon } from "@/components/ui/Icons";
+import { BoltIcon, DiamondIcon } from "@/components/ui/Icons";
 import { QuestShield } from "@/components/ui/Ornaments";
 import { useEscape } from "@/lib/use-escape";
+import { QuickCheckIn } from "./QuickCheckIn";
 import { EVERYDAY_JOURNAL_KINDS, JOURNAL_KINDS, type JournalKind } from "@/lib/journal-kinds";
 import { ChatIcon, openFeedback } from "@/components/feedback/FeedbackDock";
 
@@ -55,7 +56,7 @@ export function CreateSheet({
   // With both making-things and the journal on offer, the first screen asks which.
   const makeKinds = kinds.filter((k) => k !== "journal");
   const offersChoice = initial !== "journal" && makeKinds.length > 0 && kinds.includes("journal");
-  const [stage, setStage] = useState<"choose" | "make" | "journal">(offersChoice ? "choose" : initial === "journal" ? "journal" : "make");
+  const [stage, setStage] = useState<"choose" | "make" | "journal" | "checkin">(offersChoice ? "choose" : initial === "journal" ? "journal" : "make");
   const sheetRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLSpanElement>(null);
   const [kind, setKind] = useState<CreateKind>(initial ?? makeKinds[0] ?? kinds[0]);
@@ -72,7 +73,7 @@ export function CreateSheet({
   }
 
   const shownKind: CreateKind = stage === "journal" ? "journal" : kind;
-  const tabKinds = stage === "journal" ? [] : makeKinds;
+  const tabKinds = stage === "journal" || stage === "checkin" ? [] : makeKinds;
 
   // Point the little tail exactly at the + (measured, so scrollbars and
   // centring can't throw it off).
@@ -91,7 +92,9 @@ export function CreateSheet({
   });
   const editorKey = shownKind;
   const editor =
-    shownKind === "quest" || shownKind === "now" ? (
+    stage === "checkin" ? (
+      <QuickCheckIn key="checkin" isAdventure={isAdventure} onDone={close} />
+    ) : shownKind === "quest" || shownKind === "now" ? (
       <QuestEditorDialog key={editorKey} mode={{ kind: "create", boardId, todayFull, doingNow: kind === "now", ...(pinToToday ? { pinToBattle: true } : {}) }} theme={theme} onClose={close} />
     ) : shownKind === "reward" ? (
       <RewardEditorDialog key={editorKey} theme={theme} onClose={close} />
@@ -162,6 +165,7 @@ export function CreateSheet({
                 openFeedback();
                 close();
               }} />
+            <ChoiceButton icon={<BoltIcon size={24} />} title="Check in" hint="Energy, mood, an event or #tags — all optional" isAdventure={isAdventure} onClick={() => setStage("checkin")} />
             <ChoiceButton icon={<QuillGlyph />} title="Journal entry" hint="Gratitude, reflections, wins, ideas" isAdventure={isAdventure} onClick={() => setStage("journal")} />
           </div>
         ) : (
@@ -179,7 +183,11 @@ export function CreateSheet({
                 </svg>
               </button>
             )}
-            {stage === "journal" ? (
+            {stage === "checkin" ? (
+              <span className={`flex items-center gap-2 py-1.5 pl-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>
+                <BoltIcon size={18} /> Check in
+              </span>
+            ) : stage === "journal" ? (
               <span className={`flex items-center gap-2 py-1.5 pl-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>
                 <QuillGlyph /> Journal entry
               </span>

@@ -1923,6 +1923,28 @@ export async function saveCheckInAction(energy: number, metrics: { metric: strin
   return { energy: entry, metrics: extra };
 }
 
+/** The check-in metrics being tracked (beyond Energy), in order. */
+export async function getCheckMetricsAction() {
+  const ownerId = await requireProfileId();
+  return energyData.getCheckMetrics(ownerId);
+}
+
+/**
+ * A check-in where every part is optional: energy, any other metrics, and
+ * any events or #tags. Saves only what was given.
+ */
+export async function quickCheckInAction(input: { energy: number | null; metrics: { metric: string; level: number }[]; notes: string[] }) {
+  const ownerId = await requireProfileId();
+  const notes = input.notes.map((n) => n.trim()).filter(Boolean).slice(0, 20);
+  if (input.energy === null && !input.metrics.length && !notes.length) throw new Error("Nothing to check in yet.");
+  if (input.energy !== null) await energyData.logEnergy(ownerId, input.energy);
+  if (input.metrics.length) await energyData.logCheckIns(ownerId, input.metrics);
+  for (const n of notes) await energyData.addCheckNote(ownerId, n);
+  revalidatePath("/");
+  revalidatePath("/insights");
+  return { ok: true };
+}
+
 /** Start or stop tracking a check-in metric. Returns the new list. */
 export async function setCheckMetricsAction(labels: string[]) {
   const ownerId = await requireProfileId();
