@@ -48,7 +48,23 @@ const WISDOM = [
   "Mistakes are maps. Read them, then fly on.",
   "The sun rises for those who show up again.",
   "Ask for help. Even the great toucan has a flock.",
+  "Behold the compound interest of small good things done consistently.",
+  "Make future {name} proud.",
+  "I am the Great Toucan Spirit.",
+  "I bless you with productivity, and flow, and great insight.",
+  "Today's small quest is tomorrow's legend.",
+  "The forest remembers every step you take. Keep walking.",
+  "Your future self is watching — and cheering.",
+  "One quest at a time, {name}. That is the whole secret.",
 ];
+
+/** How the spirit addresses you: a first name, or the whole title if it starts with one. */
+function addressOf(name: string | null) {
+  const n = (name ?? "").trim();
+  if (!n) return "you";
+  const first = n.split(/\s+/)[0];
+  return /^(lord|lady|sir|dame|king|queen|el|la|the|dr\.?|captain|master)$/i.test(first) ? n : first;
+}
 const HOLD_MS = 650;
 
 const easeInOutSine = (t: number) => -(Math.cos(Math.PI * t) - 1) / 2;
@@ -64,7 +80,7 @@ const bez = (a: number, b: number, c: number, d: number, t: number) => {
  * middle stretch), then flares its wings to land on another perch — trailing
  * a little starlight. Motion runs on the compositor, not React renders.
  */
-export function PerchedOwl() {
+export function PerchedOwl({ name = null }: { name?: string | null }) {
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState<Phase>("perched");
   const [facing, setFacing] = useState<1 | -1>(1);
@@ -209,7 +225,7 @@ export function PerchedOwl() {
     if (i === lastWisdom.current) i = (i + 1) % WISDOM.length;
     lastWisdom.current = i;
     const x = Math.max(130, Math.min(window.innerWidth - 130, p.x));
-    setWisdom({ text: WISDOM[i], x, y: p.y - OWL_H - 14 });
+    setWisdom({ text: WISDOM[i].replaceAll("{name}", addressOf(name)), x, y: p.y - OWL_H - 14 });
   }
   useEffect(() => {
     if (!wisdom) return;
