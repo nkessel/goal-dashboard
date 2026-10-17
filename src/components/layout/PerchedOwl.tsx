@@ -510,8 +510,8 @@ function FlyingOwl() {
 /**
  * The great toucan spirit: an ancient, wise and powerful toucan. Midnight
  * plumage with an iridescent sheen, gold-edged wings half-mantled, a sunrise
- * bill traced with filigree, a heavy-lidded knowing eye with sage's brow
- * plumes, a crown of light, a glowing amulet on its golden breast, a slowly
+ * bill traced with filigree, a kind, smiling eye under raised sage's brow
+ * plumes, a crown of light, a teardrop gem pendant on its golden breast, a slowly
  * turning halo of runes, and a sigil it hovers above.
  */
 function ToucanSpirit() {
@@ -604,15 +604,13 @@ function ToucanSpirit() {
   <path d="M23 13c6 1 10 6 10 12 0 4-2 7-6 8-4-2-6-7-6-12 0-4 1-6 2-8z" fill="url(#tc-bib)"/>
   <path d="M24.5 31.5q3.5 1.2 6-1.8" stroke="#d63a2a" strokeWidth="1.7" strokeLinecap="round" fill="none"/>
   <g className="toucan-amulet" filter="url(#tc-glow)">
-    <circle cx="27.5" cy="23.5" r="2.6" fill="none" stroke="#0e7f86" strokeWidth=".7"/>
-    <path d="M27.5 21.2v4.6M25.2 23.5h4.6" stroke="#0e7f86" strokeWidth=".6"/>
-    <circle cx="27.5" cy="23.5" r=".9" fill="#2dd4bf"/>
+    <path d="M24.6 19.4q2.9 2.4 5.8 0" stroke="#c99a2e" strokeWidth=".5" fill="none"/>
+    <path d="M27.5 21.2c1.6 1.6 2.4 3.1 2.4 4.3a2.4 2.4 0 0 1-4.8 0c0-1.2.8-2.7 2.4-4.3z" fill="#2dd4bf" stroke="#d9b45f" strokeWidth=".7"/>
+    <path d="M26.6 24.4q.4-1.3 1.3-2" stroke="#e9fffb" strokeWidth=".55" strokeLinecap="round" fill="none"/>
   </g>
 
-  {/* sage brow plumes sweeping back */}
-  <path d="M27 9c-4-3-10-4-16-2 4 0 7 1 9 3-4-1-8 0-11 2 6 0 11 0 15 1z" fill="#e8f7ff" opacity=".9"/>
-  <path d="M27 9c-4-3-10-4-16-2" stroke="#7ef0dc" strokeWidth=".5" fill="none" opacity=".7"/>
-
+  {/* sage brow plumes, raised kindly */}
+  <path d="M27.5 7.6c-3-2.6-8-3.6-14-2.4 4 .4 6.6 1.4 8.4 2.8-3.6-.6-7 0-10 1.6 5.6-.4 10.4.2 15.6-2z" fill="#e8f7ff" opacity=".9"/>
   {/* crown of light: three plumes with star tips */}
   <path d="M19 6c-2-6-1-11 2-15-1 5 0 10 1 15z" fill="url(#tc-plume)"/>
   <path d="M16 7c-4-4-5-9-4-14 1 5 3 9 6 13z" fill="url(#tc-plume)" opacity=".85"/>
@@ -630,14 +628,15 @@ function ToucanSpirit() {
   <path d="M32 11.2c4-1.6 8.5-2 13-1.2" stroke="#fffbe0" strokeWidth="1" strokeLinecap="round" opacity=".85" fill="none"/>
   <path d="M38 13.6c1.2-1.4 3.2-1.2 3.6.2.4 1.4-1.4 2.2-2.2 1.2M44 12.8c1-1 2.6-.8 2.8.3" stroke="#a8461a" strokeWidth=".55" fill="none" opacity=".75"/>
 
-  {/* wise, half-lidded eye */}
-  <circle cx="24.5" cy="12.8" r="4.1" fill="#1aa3b8" stroke="#0b4d58" strokeWidth=".6"/>
-  <circle cx="24.8" cy="13" r="2.7" fill="url(#tc-iris)" filter="url(#tc-glow)"/>
-  <circle cx="24.9" cy="13.1" r="1.25" fill="#06090f"/>
-  <circle cx="24" cy="12.3" r=".55" fill="#fff"/>
-  <path d="M20.2 12.2q4.3-4.4 8.6 0q-4.3-1.6-8.6 0z" fill="#1b1e3a"/>
-  <path d="M20.2 12.2q4.3-1.6 8.6 0" stroke="#7ef0dc" strokeWidth=".5" fill="none"/>
-
+  {/* kind, smiling eye */}
+  <circle cx="24.5" cy="12.8" r="4.3" fill="#1aa3b8" stroke="#0b4d58" strokeWidth=".6"/>
+  <circle cx="24.7" cy="12.6" r="3" fill="url(#tc-iris)"/>
+  <circle cx="24.8" cy="12.7" r="1.7" fill="#06090f"/>
+  <circle cx="23.8" cy="11.6" r=".8" fill="#fff"/>
+  <circle cx="25.7" cy="13.6" r=".35" fill="#fff" opacity=".8"/>
+  <path d="M20.6 14.6q3.9 3.4 7.8 0q-3.9 2.2-7.8 0z" fill="#1b1e3a"/>
+  <path d="M20.6 14.6q3.9 2.2 7.8 0" stroke="#7ef0dc" strokeWidth=".45" fill="none" opacity=".8"/>
+  <ellipse cx="29.5" cy="17.4" rx="1.6" ry=".9" fill="#ff9aa8" opacity=".45"/>
   {/* floating sigil beneath */}
   <ellipse cx="22" cy="50" rx="15" ry="3.2" fill="none" stroke="#7ef0dc" strokeWidth=".7" opacity=".75" filter="url(#tc-glow)"/>
   <ellipse cx="22" cy="50" rx="10" ry="2" fill="none" stroke="#f2d27e" strokeWidth=".5" strokeDasharray="1.5 1.5" opacity=".8"/>
