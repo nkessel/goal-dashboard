@@ -22,6 +22,26 @@ const SNOOZE_OPTIONS: { label: string; minutes: number }[] = [
   { label: "3 days", minutes: 4320 },
 ];
 
+type Filter = "all" | "party" | "feedback" | "reminders";
+const FILTERS: { key: Filter; label: string; kinds?: string[] }[] = [
+  { key: "all", label: "All" },
+  { key: "party", label: "Party", kinds: ["reaction", "comment", "friend_request", "friend_request_accepted"] },
+  { key: "feedback", label: "Feedback", kinds: ["feedback"] },
+  { key: "reminders", label: "Reminders", kinds: ["reschedule_reminder", "imports"] },
+];
+const GROUPABLE = ["feedback", "reaction", "comment"];
+
+/** Runs of the same kind from the same person become one cluster. */
+function clusters<T extends { kind: string; actor_id: string | null }>(items: T[]): T[][] {
+  const out: T[][] = [];
+  for (const n of items) {
+    const last = out[out.length - 1];
+    if (last && GROUPABLE.includes(n.kind) && last[0].kind === n.kind && last[0].actor_id && last[0].actor_id === n.actor_id) last.push(n);
+    else out.push([n]);
+  }
+  return out;
+}
+
 function when(iso: string, now: number): string {
   const mins = Math.round((now - new Date(iso).getTime()) / 60_000);
   if (mins < 1) return "just now";
@@ -55,6 +75,8 @@ export function NotificationList({
   const [deleted, setDeleted] = useState<{ id: string; body: string } | null>(null);
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRead = (n: Item) => readOverride[n.id] ?? n.is_read;
+  const [filter, setFilter] = useState<Filter>("all");
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
   // A tap outside closes the menu.
   useEffect(() => {
@@ -114,8 +136,9 @@ export function NotificationList({
   // Times are shown in the viewer's own clock, so only once we're in the browser.
   const now = useSyncExternalStore(noop, () => Math.floor(Date.now() / 60_000) * 60_000, () => null);
   const asleep = (n: Item) => hidden.has(n.id) || (!!n.snoozed_until && now !== null && new Date(n.snoozed_until).getTime() > now);
-  const unread = notifications.filter((n) => !isRead(n) && !asleep(n));
-  const read = notifications.filter((n) => isRead(n) && !asleep(n));
+  const inFilter = (n: Item) => FILTERS.find((f) => f.key === filter)!.kinds?.includes(n.kind) ?? true;
+  const unread = notifications.filter((n) => !isRead(n) && !asleep(n) && inFilter(n));
+  const read = notifications.filter((n) => isRead(n) && !asleep(n) && inFilter(n));
   const snoozed = notifications.filter((n) => asleep(n) && !hidden.has(n.id));
   const isAdventure = theme === "adventure";
 
@@ -176,6 +199,11 @@ export function NotificationList({
           <time className="text-[13.5px]" style={{ color: "var(--t-ink-soft)" }} dateTime={n.created_at}>
             {now === null ? " " : when(n.created_at, now)}
           </time>
+          {(n.kind === "reaction" || n.kind === "comment") && n.activity_id && (
+            <Link href={`/feed#activity-${n.activity_id}`} className="mt-1 w-fit text-[14px] font-semibold underline underline-offset-2" style={{ color: isAdventure ? "#6f4f12" : "var(--t-accent)" }}>
+              See it in context
+            </Link>
+          )}
           {n.kind === "feedback" && (
             <Link href="/feedback-review" className="mt-1 w-fit text-[14px] font-semibold underline underline-offset-2" style={{ color: isAdventure ? "#6f4f12" : "var(--t-accent)" }}>
               Review it
@@ -283,6 +311,62 @@ export function NotificationList({
     );
   }
 
+  /** One line for several of the same thing from the same person, e.g. "Daniel Keating sent 6 feedback messages". */
+  function renderCluster(c: Item[], first: boolean) {
+    const key = `g-${c[0].id}`;
+    const open = openGroups.has(key);
+    const head = c[0];
+    const who = head.body.match(/^(.+?) (sent|reacted|commented)/)?.[1] ?? "Someone";
+    const what = head.kind === "feedback" ? `sent ${c.length} feedback messages` : head.kind === "reaction" ? `reacted ${c.length} times` : `left ${c.length} comments`;
+    const anyUnread = c.some((n) => !isRead(n));
+    return (
+      <li key={key} className="flex flex-col py-2" style={first ? undefined : { borderTop: divider }}>
+        <div className="flex items-start gap-3 py-1">
+          <span
+            aria-hidden
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[19px]"
+            style={{
+              background: anyUnread ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "rgba(255,250,238,.55)",
+              border: `1.5px solid ${anyUnread ? "#5a4520" : "#b9a47c"}`,
+            }}
+          >
+            {head.icon}
+            <span className="absolute -bottom-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold" style={{ background: "#2a1c10", color: "#f6dc8e" }}>
+              {c.length}
+            </span>
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
+            <span className="text-[16.5px] leading-snug" style={{ color: "var(--t-ink)", fontWeight: anyUnread ? 600 : 400 }}>
+              {who} {what}
+            </span>
+            <time className="text-[13.5px]" style={{ color: "var(--t-ink-soft)" }} dateTime={head.created_at}>
+              {now === null ? " " : `${when(c[c.length - 1].created_at, now)} – ${when(head.created_at, now)}`}
+            </time>
+            <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <button type="button" onClick={() => setOpenGroups((g) => { const x = new Set(g); if (x.has(key)) x.delete(key); else x.add(key); return x; })} aria-expanded={open} className="flex items-center gap-1 text-[14px] font-semibold" style={{ color: isAdventure ? "#6f4f12" : "var(--t-accent)" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: open ? "rotate(90deg)" : undefined }} className="transition-transform">
+                  <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {open ? "Hide them" : "Show them"}
+              </button>
+              {head.kind === "feedback" && (
+                <Link href="/feedback-review" className="text-[14px] font-semibold underline underline-offset-2" style={{ color: isAdventure ? "#6f4f12" : "var(--t-accent)" }}>
+                  Review them
+                </Link>
+              )}
+              {anyUnread && (
+                <button type="button" onClick={() => c.filter((n) => !isRead(n)).forEach((n) => setRead(n, true))} className="text-[14px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+                  Mark all read
+                </button>
+              )}
+            </span>
+          </div>
+        </div>
+        {open && <ul className="ml-[52px] flex flex-col">{c.map((n, i) => renderRow(n, i === 0))}</ul>}
+      </li>
+    );
+  }
+
   function renderGroup(label: string, items: Item[]) {
     if (items.length === 0) return null;
     return (
@@ -291,7 +375,7 @@ export function NotificationList({
           {label}
         </p>
         <ul className="flex flex-col">
-          {items.map((n, i) => renderRow(n, i === 0))}
+          {clusters(items).map((c, i) => (c.length === 1 ? renderRow(c[0], i === 0) : renderCluster(c, i === 0)))}
         </ul>
       </div>
     );
@@ -319,6 +403,30 @@ export function NotificationList({
           </button>
         </p>
       )}
+      <div role="tablist" aria-label="Show" className="flex flex-wrap justify-center gap-1.5">
+        {FILTERS.map((f) => {
+          const on = f.key === filter;
+          const count = notifications.filter((n) => !isRead(n) && !asleep(n) && (f.kinds?.includes(n.kind) ?? true)).length;
+          return (
+            <button
+              key={f.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => setFilter(f.key)}
+              className="h-9 rounded-full px-3.5 text-[14px] font-semibold"
+              style={
+                on
+                  ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }
+                  : { border: `1px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }
+              }
+            >
+              {f.label}
+              {count > 0 && <span className="ml-1 tabular-nums opacity-75">{count}</span>}
+            </button>
+          );
+        })}
+      </div>
       <section className={`flex flex-col gap-3 rounded-2xl px-5 py-4 ${panelCls}`} style={panelStyle}>
         {notifications.length === 0 ? (
           <p className="py-6 text-center text-[16px] italic" style={{ color: "var(--t-ink-soft)" }}>

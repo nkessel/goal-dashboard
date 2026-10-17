@@ -39,7 +39,8 @@ export function ActivityFeedItem({
 
   return (
     <li
-      className={`flex flex-col gap-3 rounded-2xl px-4 py-4 ${isAdventure ? "parchment parchment-framed" : ""}`}
+      id={`activity-${item.id}`}
+      className={`flex scroll-mt-24 flex-col gap-3 rounded-2xl px-4 py-4 target:ring-2 target:ring-[#d9b45f] ${isAdventure ? "parchment parchment-framed" : ""}`}
       style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >
       <div className="flex items-center gap-2.5">

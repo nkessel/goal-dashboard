@@ -22,7 +22,7 @@ export function CommentThread({
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(comments.length === 0);
+  const [expanded, setExpanded] = useState(true);
   const formRef = useRef<HTMLFormElement>(null);
   const isAdventure = theme === "adventure";
   const dim = { color: isAdventure ? "var(--t-ink-soft)" : "var(--t-ink-soft)" };
