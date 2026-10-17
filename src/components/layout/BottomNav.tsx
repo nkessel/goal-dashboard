@@ -1,5 +1,6 @@
 "use client";
 
+import { PerchedOwl } from "./PerchedOwl";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
@@ -216,6 +217,7 @@ export function BottomNav({ theme }: { theme: Theme }) {
       }}
     >
       <div ref={rowRef} className="relative mx-auto flex w-full max-w-md items-stretch justify-between px-1 sm:max-w-lg md:max-w-xl">
+        {isAdventure && <PerchedOwl />}
         {highlight && (
           <div
             aria-hidden

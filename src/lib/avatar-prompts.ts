@@ -6,6 +6,8 @@
  * and needs to read this list directly.
  */
 export const SAMPLE_AVATAR_PROMPTS = [
+  "wise old owl sage in a starry indigo cloak, holding a brass lantern",
+  "snowy owl knight in silver armor with a feathered helm",
   "battle-worn dwarven warrior with a braided beard and a glowing rune axe",
   "elven ranger with a longbow, hooded cloak, and forest-green leather armor",
   "armored paladin with a golden greatsword and a radiant halo",

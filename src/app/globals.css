@@ -1530,3 +1530,29 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   font-family: var(--font-naskh), "Geeza Pro", "Segoe UI", "Tahoma", system-ui, sans-serif !important;
   text-align: start;
 }
+
+/* The perched owl: an occasional blink, a hop when tapped. */
+@keyframes owl-blink {
+  0%, 94%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.1); }
+}
+.owl-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: owl-blink 6.5s infinite;
+}
+@keyframes owl-hop {
+  0% { transform: translateY(0); }
+  40% { transform: translateY(-6px) rotate(-4deg); }
+  100% { transform: translateY(0); }
+}
+.owl-hop { animation: owl-hop 0.45s ease-out; }
+@keyframes owl-hoot {
+  0% { opacity: 0; transform: translateY(4px); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+.owl-hoot { animation: owl-hoot 1.4s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .owl-eyes, .owl-hop, .owl-hoot { animation: none; }
+}

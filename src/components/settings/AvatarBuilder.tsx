@@ -175,6 +175,36 @@ export function AvatarBuilder({
           </button>
         </div>
 
+        {/* A little advice for a portrait that turns out well. */}
+        <details className="group rounded-md px-2.5 py-1.5" style={{ background: "rgba(217,180,95,.12)", border: `1px dashed ${fieldBorder}` }}>
+          <summary className="flex list-none items-center gap-1.5 text-xs font-semibold" style={{ color: inkColor }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform group-open:rotate-90">
+              <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Tips for a great portrait
+          </summary>
+          <ul className="m-0 mt-1.5 flex list-disc flex-col gap-1 pl-5 text-xs leading-snug" style={{ color: inkSoft }}>
+            <li>
+              <b style={{ color: inkColor }}>Who, wearing what, holding what.</b> &ldquo;An old owl sage in a starry cloak, holding a lantern&rdquo; beats &ldquo;a wizard&rdquo;.
+            </li>
+            <li>
+              <b style={{ color: inkColor }}>Pick a mood.</b> Brave, calm, mischievous, weary — one word changes the whole face.
+            </li>
+            <li>
+              <b style={{ color: inkColor }}>Make it yours.</b> Add something from your real life: your dog, your instrument, the mountains you hike.
+            </li>
+            <li>
+              <b style={{ color: inkColor }}>One character, close up.</b> Portraits read best small when it&rsquo;s a single figure from the shoulders up.
+            </li>
+            <li>
+              <b style={{ color: inkColor }}>Try two styles.</b> The same words in Storybook and Heroic can look like different heroes.
+            </li>
+            <li>
+              Keep it friendly for everyone — portraits are seen by your party.
+            </li>
+          </ul>
+        </details>
+
         <label className="flex items-center gap-1.5 text-xs" style={{ color: inkSoft }}>
           <input
             type="checkbox"
