@@ -571,7 +571,7 @@ body {
   line-height: 1.15;
 }
 [data-theme="adventure"] .parchment input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not(.price-input):not(.bare-input),
-[data-theme="adventure"] .parchment textarea,
+[data-theme="adventure"] .parchment textarea:not(.bare-input),
 [data-theme="adventure"] .parchment select {
   background: rgba(255, 251, 240, 0.72) !important;
   border-color: #b39a6a !important;
@@ -581,7 +581,7 @@ body {
   font-size: 16px;
 }
 [data-theme="adventure"] .parchment input:not(.bare-input):focus,
-[data-theme="adventure"] .parchment textarea:focus,
+[data-theme="adventure"] .parchment textarea:not(.bare-input):focus,
 [data-theme="adventure"] .parchment select:focus {
   outline: 2px solid rgba(168, 138, 63, 0.6);
   outline-offset: 0;
