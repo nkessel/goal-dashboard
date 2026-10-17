@@ -47,9 +47,15 @@ export function Byline({ author, at, small = false }: { author: AuthorView | und
         // eslint-disable-next-line @next/next/no-img-element -- the Guild Hall's crest
         <img src="/design/guild-crest.svg" alt="" width={size * 4} height={size * 4} className="shrink-0" />
       )}
-      <span className="truncate font-semibold" style={{ color: "var(--t-ink)" }}>
-        {author?.name ?? "Guild Hall"}
-      </span>
+      {author ? (
+        <a href={`/friends/${author.id}`} onClick={(e) => e.stopPropagation()} className="truncate font-semibold underline-offset-2 hover:underline" style={{ color: "var(--t-ink)" }}>
+          {author.name}
+        </a>
+      ) : (
+        <span className="truncate font-semibold" style={{ color: "var(--t-ink)" }}>
+          Guild Hall
+        </span>
+      )}
       {author && <LevelPill level={author.level} champion={author.champion} />}
       <span className="shrink-0">· {formatRelativeTime(at)}</span>
     </span>

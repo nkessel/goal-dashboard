@@ -8,6 +8,7 @@ import { Avatar } from "@/components/settings/Avatar";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
+import { SharingSettings } from "@/components/settings/SharingSettings";
 import { SettingsRow } from "@/components/settings/SettingsRow";
 import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
@@ -332,7 +333,12 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </svg>
             }
           >
-            <PrivacyToggle initialIsPublic={profile.is_public} theme={profile.theme} />
+            <div className="flex flex-col gap-4">
+              <SharingSettings initial={profile.share_settings ?? {}} theme={profile.theme} />
+              <div className="pt-3" style={{ borderTop: "1px solid var(--t-card-border)" }}>
+                <PrivacyToggle initialIsPublic={profile.is_public} theme={profile.theme} />
+              </div>
+            </div>
           </SettingsRow>
 
           <SettingsRow

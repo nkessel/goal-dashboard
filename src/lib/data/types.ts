@@ -64,6 +64,8 @@ export type Task = {
   schedule_folder?: string | null;
   /** Percent of this quest's XP sent to each character stat. */
   stat_split?: Record<string, number> | null;
+  /** Hidden from your party, even on screens you share. */
+  is_private?: boolean;
   created_at: string;
   updated_at: string;
   reminder_sent_at: string | null;
@@ -145,6 +147,8 @@ export type Profile = {
   stat_xp?: Record<string, number> | null;
   /** An honorary level (1–99) shown instead of the earned one, when granted. */
   display_level?: number | null;
+  /** Which screens your party can see. */
+  share_settings?: Record<string, boolean> | null;
 };
 
 /** A shared avatar image — either one of the built-in presets or one a user

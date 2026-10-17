@@ -1,6 +1,7 @@
 "use client";
 
 import { LevelPill } from "./LevelPill";
+import Link from "next/link";
 import { shownLevel } from "@/lib/shown-level";
 import { useState, useTransition } from "react";
 import { sendFriendRequestAction, removeFriendAction } from "@/app/actions";
@@ -100,7 +101,13 @@ function DirectoryRow({
       <div className="flex min-w-0 items-center gap-2.5">
         {/* eslint-disable-next-line @next/next/no-img-element -- portrait */}
         <img src={profile.avatar_image_url ?? defaultPortraitFor(profile.id)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" style={{ border: "1.5px solid #a58c66" }} />
-        <span className="truncate text-[15px] font-semibold">{profile.name || "Adventurer"}</span>
+        {friendship?.status === "accepted" ? (
+          <Link href={`/friends/${profile.id}`} className="truncate text-[15px] font-semibold underline-offset-2 hover:underline" title={`See ${profile.name || "their"} profile`}>
+            {profile.name || "Adventurer"}
+          </Link>
+        ) : (
+          <span className="truncate text-[15px] font-semibold">{profile.name || "Adventurer"}</span>
+        )}
         <LevelPill level={shownLevel(profile)} champion={profile.id === championId} />
       </div>
 

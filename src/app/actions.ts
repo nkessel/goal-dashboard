@@ -22,6 +22,7 @@ import * as tomorrowData from "@/lib/data/tomorrow";
 import * as schedulingData from "@/lib/data/scheduling";
 import * as forumData from "@/lib/data/forum";
 import * as statsData from "@/lib/data/stats";
+import * as sharingData from "@/lib/data/sharing";
 import * as bossesData from "@/lib/data/bosses";
 import * as energyData from "@/lib/data/energy";
 import { computeLevelForXp } from "@/lib/levels";
@@ -2112,4 +2113,30 @@ export async function setDisplayLevelAction(level: number) {
   const { error } = await db.from("profiles").update({ display_level: n }).eq("id", ownerId);
   if (error) throw new Error(`Couldn't change it: ${error.message}`);
   revalidatePath("/", "layout");
+}
+
+// ---------------------------------------------------------------------------
+// Sharing with your party
+// ---------------------------------------------------------------------------
+
+export async function setShareSettingsAction(patch: Record<string, boolean>) {
+  const ownerId = await requireProfileId();
+  const next = await sharingData.setShareSettings(ownerId, patch);
+  revalidatePath("/friends", "layout");
+  return next;
+}
+
+export async function setTaskPrivateAction(taskId: string, isPrivate: boolean) {
+  const ownerId = await requireProfileId();
+  await sharingData.setTaskPrivate(ownerId, taskId, isPrivate);
+  revalidatePath("/friends", "layout");
+}
+
+export async function setBoardPrivateAction(boardId: string, isPrivate: boolean) {
+  const ownerId = await requireProfileId();
+  const board = await boardsData.getBoard(boardId, ownerId);
+  if (!board) throw new Error("That board isn't here anymore.");
+  await boardsData.updateBoard(boardId, ownerId, { title: board.title, description: board.description, color: board.color, isPrivate });
+  revalidatePath("/boards", "layout");
+  revalidatePath("/friends", "layout");
 }

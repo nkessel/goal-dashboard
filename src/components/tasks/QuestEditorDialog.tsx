@@ -18,6 +18,7 @@ import {
   scheduleTaskAction,
   setSchedulingAction,
   setTaskStatSplitAction,
+  setTaskPrivateAction,
   setTaskPlacementAction,
   setTaskProgressAction,
   updateTaskAction,
@@ -194,6 +195,11 @@ export function QuestEditorDialog({
   // The scheduling priority list beside the calendar.
   const [toSchedule, setToSchedule] = useState(task?.schedule_rank != null);
   const [schedOpen, setSchedOpen] = useState(false);
+  const [isPriv, setIsPriv] = useState(!!task?.is_private);
+  function changePrivate(v: boolean) {
+    setIsPriv(v);
+    if (task) void setTaskPrivateAction(task.id, v).catch(() => setIsPriv(!v));
+  }
   const [schedPlace, setSchedPlace] = useState<"top" | "unordered" | "bottom">("top");
   const [schedNote, setSchedNote] = useState<string | null>(null);
   /** Existing quests join or leave the list at once; new ones when created. */
@@ -561,6 +567,7 @@ export function QuestEditorDialog({
         if (tempId) resolveOptimisticQuest(tempId, id);
         if (toSchedule) await setSchedulingAction(id, schedPlace).catch(() => {});
         if (Object.keys(statSplit).length) await setTaskStatSplitAction(id, statSplit).catch(() => {});
+        if (isPriv) await setTaskPrivateAction(id, true).catch(() => {});
         const newSteps = (steps ?? []).filter((st) => st.title.trim());
         if (newSteps.length > 0) await saveQuestStepsAction(id, stepPayload(newSteps).map(({ id: _id, ...st }) => st)); // eslint-disable-line @typescript-eslint/no-unused-vars
         paintPortrait(id);
@@ -1426,6 +1433,18 @@ export function QuestEditorDialog({
               <IconScale label="Difficulty" icon="/design/ui-muscle.svg" hint="How hard it is — how much it takes out of you" value={effort} onChange={setEffort} />
               <IconScale label="Energy boost" icon="/design/ui-bolt.png" hint="How much energy finishing it gives you" value={energyGain} onChange={setEnergyGain} />
             </>
+          )}
+
+          {/* Private: never shown to your party */}
+          {!doingNow && (
+            <label className="flex min-h-9 cursor-pointer items-center gap-2.5 text-[14px]" title="Hidden from your party, even on screens you share">
+              <input type="checkbox" checked={isPriv} onChange={(e) => changePrivate(e.target.checked)} />
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "var(--t-ink-soft)" }}>
+                <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="2" />
+                <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2" />
+              </svg>
+              <span>Private quest <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>· hidden from your party</span></span>
+            </label>
           )}
 
           {/* Quest board (the tag on the card) */}

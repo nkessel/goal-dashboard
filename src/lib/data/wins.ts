@@ -17,11 +17,11 @@ export type Win = {
 };
 
 /** Everything you got done (or wrote down) since `sinceISO`, newest first. */
-export async function listWinsSince(ownerId: string, sinceISO: string): Promise<Win[]> {
+export async function listWinsSince(ownerId: string, sinceISO: string, opts: { hidePrivate?: boolean } = {}): Promise<Win[]> {
   const db = supabaseAdmin();
   const sinceDay = sinceISO.slice(0, 10);
   const [tasks, completions, rewards, journal, logins] = await Promise.all([
-    db.from("tasks").select("id, title, completed_at, xp_value, reward_id, icon_key, icon_source").eq("owner_id", ownerId).eq("status", "completed").gte("completed_at", sinceISO).order("completed_at", { ascending: false }).limit(300),
+    db.from("tasks").select("id, title, completed_at, xp_value, reward_id, icon_key, icon_source, is_private").eq("owner_id", ownerId).eq("status", "completed").gte("completed_at", sinceISO).order("completed_at", { ascending: false }).limit(300),
     db.from("rite_completions").select("id, rite_id, day, xp_awarded, completed_at").eq("owner_id", ownerId).gte("day", sinceDay).limit(500),
     db.from("rewards").select("id, title, claimed_at, icon_key").eq("owner_id", ownerId).in("status", ["claimed", "completed"]).gte("claimed_at", sinceISO).limit(100),
     db.from("journal_entries").select("*").eq("owner_id", ownerId).gte("created_at", sinceISO).order("created_at", { ascending: false }).limit(200),
@@ -37,7 +37,7 @@ export async function listWinsSince(ownerId: string, sinceISO: string): Promise<
 
   const wins: Win[] = [
     ...(tasks.data ?? [])
-      .filter((t) => !t.reward_id)
+      .filter((t) => !t.reward_id && !(opts.hidePrivate && t.is_private))
       .map((t) => ({
         id: `q-${t.id}`,
         kind: "quest" as const,
