@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CharacterStats } from "./CharacterStats";
+import { Hearts } from "./Hearts";
 import { HonoraryLevel } from "./HonoraryLevel";
 import { DEFAULT_STATS } from "@/lib/stats";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
@@ -146,6 +147,7 @@ export function XpSummary({
               </div>
             </div>
             <div className="mt-3 flex w-[150px] flex-col gap-1.5 sm:w-[210px]">
+              {typeof profile.hp === "number" && <Hearts hp={profile.hp} />}
               <div
                 className="h-[14px] overflow-hidden rounded-full"
                 style={{ background: "#141a13", border: "1.5px solid var(--t-gold-deep)", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}

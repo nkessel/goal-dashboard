@@ -155,6 +155,8 @@ export type Profile = {
   share_settings?: Record<string, boolean> | null;
   notify_level?: "all" | "highlights" | "essential";
   notify_email?: boolean;
+  /** Health, in half-hearts (0–10). */
+  hp?: number;
 };
 
 /** A shared avatar image — either one of the built-in presets or one a user

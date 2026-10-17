@@ -1,5 +1,6 @@
 import "server-only";
 import * as statsData from "./stats";
+import * as hpData from "./hp";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { logLevelUpActivity } from "./activity";
 import type { Profile } from "./types";
@@ -81,6 +82,8 @@ export async function awardXp(
   if (taskId && kind === "task_completed" && amount !== 0) {
     amount = await statsData.splitTaskXp(ownerId, taskId, amount).catch(() => amount);
   }
+  // Quests restore a little HP.
+  if (taskId && kind === "task_completed" && fullAmount > 0) await hpData.heal(ownerId).catch(() => {});
 
   if (amount !== 0) {
     const { error } = await db.from("xp_events").insert({
