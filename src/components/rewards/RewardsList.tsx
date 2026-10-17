@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { Reward } from "@/lib/data/types";
 import { claimRewardAction, completeRewardAction, unclaimRewardAction, uncompleteRewardAction } from "@/app/actions";
+import { celebrateReward } from "@/components/celebration/RewardCelebration";
 import { RewardEditorDialog } from "./RewardEditorDialog";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 
@@ -29,6 +30,8 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
           res.bonusCoins + res.bonusCoinsFromXp > 0 ? `+${res.bonusCoins + res.bonusCoinsFromXp} coins` : null,
         ].filter(Boolean);
         setPaid({ id: r.id, text: parts.length ? `Well done! ${parts.join(" · ")}` : "Well done!" });
+        if (res.bonusXp > 0 || res.bonusCoins + res.bonusCoinsFromXp > 0)
+          celebrateReward({ title: r.title, iconSrc: r.icon_key?.startsWith("/") || r.icon_key?.startsWith("http") ? r.icon_key : null, xp: res.bonusXp, coins: res.bonusCoins + res.bonusCoinsFromXp, totalXp: res.totalXp ?? null });
         setTimeout(() => setPaid(null), 3200);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't complete that.");

@@ -1584,3 +1584,27 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 @media (prefers-reduced-motion: reduce) {
   .owl-wing-l, .owl-wing-r, .owl-spark { animation: none; }
 }
+
+/* Reward ceremony */
+.reward-cele { animation: qc-overlayIn 0.35s ease-out both; }
+@keyframes reward-turn { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.reward-rays { animation: reward-turn 24s linear infinite; }
+@keyframes reward-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  50% { opacity: 0.9; transform: scale(1) rotate(45deg); }
+}
+.reward-star {
+  background: radial-gradient(circle, #fffbe6 0 30%, #f6dc8e 55%, transparent 72%);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: reward-twinkle 2.2s ease-in-out infinite;
+}
+@keyframes reward-coin {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(0deg); }
+  15% { opacity: 1; }
+  55% { transform: translate(calc(-50% + var(--cx)), calc(-50% + var(--cy))) scale(1) rotate(var(--cr)); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--cx)), calc(-50% + var(--cy) + 160px)) scale(0.8) rotate(calc(var(--cr) * 2)); opacity: 0; }
+}
+.reward-coin { opacity: 0; animation-name: reward-coin; animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1); animation-fill-mode: both; }
+@media (prefers-reduced-motion: reduce) {
+  .reward-rays, .reward-star, .reward-coin { animation: none; }
+}

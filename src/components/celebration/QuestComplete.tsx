@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
 import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction } from "@/app/actions";
+import { celebrateReward } from "./RewardCelebration";
 import type { Task } from "@/lib/data/types";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
@@ -108,7 +109,11 @@ export function QuestComplete(props: QuestCompleteProps) {
         if (!preview) {
           const res = await claimRewardAction(r.id, taskId, { now });
           setChest((c) => (c ? { ...c, coins: res.coins } : c));
-          if (res.received) setReceived({ bonusXp: res.bonusXp, bonusCoins: res.bonusCoins });
+          if (res.received) {
+            setReceived({ bonusXp: res.bonusXp, bonusCoins: res.bonusCoins });
+            if (res.bonusXp > 0 || res.bonusCoins > 0)
+              celebrateReward({ title: r.title, iconSrc: r.icon_key?.startsWith("/") || r.icon_key?.startsWith("http") ? r.icon_key : null, xp: res.bonusXp, coins: res.bonusCoins, totalXp: res.totalXp });
+          }
         } else if (now) {
           setReceived({ bonusXp: r.bonus_xp ?? 0, bonusCoins: r.bonus_coins ?? 0 });
         }

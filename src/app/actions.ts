@@ -1345,17 +1345,18 @@ export async function completeRewardAction(rewardId: string) {
       if (prereq && prereq.status === "open") throw new Error(`Finish “${prereq.title}” first to unlock this reward.`);
     }
     const before = await rewardsData.listRewards(ownerId).then((rs) => rs.find((r) => r.id === rewardId));
-    await finishTask(ownerId, quest.id);
-    return { bonusXp: quest.xp_value, bonusCoins: before?.bonus_coins ?? 0, bonusCoinsFromXp: coinsForXp(quest.xp_value) };
+    const done = await finishTask(ownerId, quest.id);
+    const totalXp = (done as { totalXp?: number | null } | undefined)?.totalXp ?? null;
+    return { bonusXp: quest.xp_value, bonusCoins: before?.bonus_coins ?? 0, bonusCoinsFromXp: coinsForXp(quest.xp_value), totalXp };
   }
   const reward = await rewardsData.completeReward(rewardId, ownerId);
   const bonusXp = reward.bonus_xp ?? 0;
   const bonusCoins = reward.bonus_coins ?? 0;
-  if (bonusXp > 0) await xp.awardXp(ownerId, bonusXp, "task_completed");
+  const award = bonusXp > 0 ? await xp.awardXp(ownerId, bonusXp, "task_completed") : null;
   if (bonusCoins > 0) await rewardsData.addCoins(ownerId, bonusCoins);
   revalidatePath("/rewards");
   revalidatePath("/", "layout");
-  return { bonusXp, bonusCoins, bonusCoinsFromXp: coinsForXp(bonusXp) };
+  return { bonusXp, bonusCoins, bonusCoinsFromXp: coinsForXp(bonusXp), totalXp: award?.totalXp ?? null };
 }
 
 /** Undo a completion (back to accepted) and take back its bonus. */

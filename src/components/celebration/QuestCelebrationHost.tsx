@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { QuestComplete } from "./QuestComplete";
 import { ProgressCelebration, type ProgressCelebrationDetail } from "./ProgressCelebration";
 import { xpToNextLevel } from "@/lib/levels";
+import { RewardCelebration, type RewardCelebrationDetail } from "./RewardCelebration";
 
 export type QuestCelebration = {
   taskId: string;
@@ -38,6 +39,14 @@ export function celebrateProgress(detail: ProgressCelebrationDetail) {
 export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { avatarSrc: string; totalXp: number }) {
   const [current, setCurrent] = useState<QuestCelebration | null>(null);
   const [progress, setProgress] = useState<(ProgressCelebrationDetail & { n: number }) | null>(null);
+  const [reward, setReward] = useState<(RewardCelebrationDetail & { n: number }) | null>(null);
+  useEffect(() => {
+    let n = 0;
+    const on = (e: Event) => setReward({ ...(e as CustomEvent<RewardCelebrationDetail>).detail, n: ++n });
+    window.addEventListener("reward-celebrate", on);
+    return () => window.removeEventListener("reward-celebrate", on);
+  }, []);
+  const rewardScene = reward ? <RewardCelebration key={reward.n} {...reward} onClose={() => setReward(null)} /> : null;
 
   useEffect(() => {
     const on = (e: Event) => setCurrent((e as CustomEvent<QuestCelebration>).detail);
@@ -62,12 +71,19 @@ export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { ava
   }, []);
 
   if (!current) {
-    return progress ? <ProgressCelebration key={progress.n} {...progress} onClose={() => setProgress(null)} /> : null;
+    return (
+      <>
+        {progress ? <ProgressCelebration key={progress.n} {...progress} onClose={() => setProgress(null)} /> : null}
+        {rewardScene}
+      </>
+    );
   }
   const total = current.totalXp ?? shellTotalXp + current.xp;
   const { level, xpIntoLevel, xpForNextLevel } = xpToNextLevel(total);
 
   return (
+    <>
+    {rewardScene}
     <QuestComplete
       key={current.taskId}
       title={current.title}
@@ -84,5 +100,6 @@ export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { ava
       isReward={current.isReward}
       onClose={() => setCurrent(null)}
     />
+    </>
   );
 }
