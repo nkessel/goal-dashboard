@@ -86,19 +86,43 @@ export function EnergyCheck({
   const [notes, setNotes] = useState(notesToday);
   const [noting, setNoting] = useState(false);
   const [noteText, setNoteText] = useState("");
-  function addNote() {
-    const text = noteText.trim();
-    if (!text) return setNoting(false);
-    const temp = { id: `temp-${Date.now()}`, body: text };
+  // #tags typed in the box become pills as soon as a space follows them.
+  const [pendingTags, setPendingTags] = useState<string[]>([]);
+  function typeNote(v: string) {
+    const m = v.match(/(^|\s)#([\p{L}\p{N}_-]{1,24})\s$/u);
+    if (m) {
+      const tag = m[2].toLowerCase();
+      setPendingTags((t) => (t.includes(tag) ? t : [...t, tag]));
+      setNoteText(v.slice(0, v.length - m[0].length + m[1].length));
+      return;
+    }
+    setNoteText(v);
+  }
+  function saveNote(body: string) {
+    const temp = { id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, body };
     setNotes((n) => [...n, temp]);
-    setNoteText("");
-    setNoting(false);
-    addCheckNoteAction(text)
+    addCheckNoteAction(body)
       .then((saved) => setNotes((n) => n.map((x) => (x.id === temp.id ? { id: saved.id, body: saved.body } : x))))
       .catch((e) => {
         setNotes((n) => n.filter((x) => x.id !== temp.id));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
       });
+  }
+  /** Each tag is its own pill; any words are their own event. */
+  function addNote() {
+    let text = noteText.trim();
+    const tags = [...pendingTags];
+    // A last "#tag" without a trailing space still counts as a tag.
+    text = text.replace(/(^|\s)#([\p{L}\p{N}_-]{1,24})(?=\s|$)/gu, (_, sp: string, t: string) => {
+      if (!tags.includes(t.toLowerCase())) tags.push(t.toLowerCase());
+      return sp;
+    }).replace(/\s+/g, " ").trim();
+    if (!text && !tags.length) return setNoting(false);
+    if (text) saveNote(text);
+    for (const t of tags) if (!notes.some((n) => n.body.toLowerCase() === `#${t}`)) saveNote(`#${t}`);
+    setNoteText("");
+    setPendingTags([]);
+    setNoting(false);
   }
   function dropNote(id: string) {
     setNotes((n) => n.filter((x) => x.id !== id));
@@ -217,7 +241,15 @@ export function EnergyCheck({
   const noteChips = notes.length > 0 && (
     <ul className="m-0 flex list-none flex-wrap justify-center gap-1.5 p-0">
       {notes.map((n) => (
-        <li key={n.id} className="flex h-7 max-w-full items-center gap-1 rounded-full pl-2.5 pr-1 text-[13px]" style={{ background: "rgba(242,210,126,.14)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+        <li
+          key={n.id}
+          className="flex h-7 max-w-full items-center gap-1 rounded-full pl-2.5 pr-1 text-[13px]"
+          style={
+            /^#\S+$/.test(n.body)
+              ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 }
+              : { background: "rgba(242,210,126,.14)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }
+          }
+        >
           <span className="truncate">
             {n.body.split(/(#[\p{L}\p{N}_-]+)/u).map((part, i) =>
               part.startsWith("#") ? (
@@ -238,21 +270,32 @@ export function EnergyCheck({
   );
   const noteInput = noting ? (
     <div className="flex w-full items-center gap-1.5">
-      <input
-        autoFocus
-        value={noteText}
-        onChange={(e) => setNoteText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") addNote();
-          if (e.key === "Escape") setNoting(false);
-        }}
-        maxLength={200}
-        placeholder="What happened? e.g. Slept badly #sleep"
-        aria-label="Event or #tag"
-        className="h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-[15px]"
-        style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a", color: "#2a1c10" }}
-      />
-      <button type="button" onClick={addNote} disabled={!noteText.trim()} className="h-9 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+      <div className="flex min-h-9 min-w-0 flex-1 flex-wrap items-center gap-1 rounded-lg border px-1.5 py-1" style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a" }}>
+        {pendingTags.map((t) => (
+          <span key={t} className="flex h-6 items-center gap-0.5 rounded-full pl-2 pr-0.5 text-[13px] font-semibold" style={{ background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10" }}>
+            #{t}
+            <button type="button" onClick={() => setPendingTags((x) => x.filter((y) => y !== t))} aria-label={`Remove #${t}`} className="flex h-5 w-5 items-center justify-center rounded-full text-[13px] leading-none hover:bg-black/10">
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          autoFocus
+          value={noteText}
+          onChange={(e) => typeNote(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") addNote();
+            if (e.key === "Escape") setNoting(false);
+            if (e.key === "Backspace" && !noteText && pendingTags.length) setPendingTags((t) => t.slice(0, -1));
+          }}
+          maxLength={200}
+          placeholder={pendingTags.length ? "more #tags, or what happened" : "What happened? #tags become pills"}
+          aria-label="Event or #tags"
+          className="bare-input h-7 min-w-[120px] flex-1 bg-transparent px-1 text-[15px] focus:outline-none"
+          style={{ color: "#2a1c10" }}
+        />
+      </div>
+      <button type="button" onClick={addNote} disabled={!noteText.trim() && !pendingTags.length} className="h-9 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
         Add
       </button>
       <button type="button" onClick={() => setNoting(false)} aria-label="Cancel" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "rgba(239,230,204,.75)" }}>
