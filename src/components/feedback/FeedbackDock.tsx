@@ -659,7 +659,7 @@ function Segmented<V extends string | number>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={`flex shrink-0 items-stretch gap-0.5 rounded-full p-[3px] ${small ? "h-8 w-fit self-start" : "h-10"}`}
+      className={`flex shrink-0 flex-wrap items-stretch gap-0.5 p-[3px] ${small ? "min-h-8 w-fit max-w-full self-start rounded-[16px]" : "min-h-10 rounded-[20px]"}`}
       style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.12)" }}
     >
       {lead && (
@@ -677,7 +677,7 @@ function Segmented<V extends string | number>({
             aria-checked={on}
             title={o.hint}
             onClick={() => onChange(o.value)}
-            className={`min-w-0 truncate rounded-full font-semibold transition-[background,box-shadow] duration-150 ${small ? "px-3 text-[12.5px]" : "flex-1 px-2 text-[13.5px]"}`}
+            className={`whitespace-nowrap rounded-full font-semibold transition-[background,box-shadow] duration-150 ${small ? "h-[26px] px-3 text-[12.5px]" : "h-[34px] flex-auto px-2.5 text-[13.5px]"}`}
             style={{
               background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
               boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
@@ -694,20 +694,30 @@ function Segmented<V extends string | number>({
 
 function Sent({ kind, xp, isAdventure, onAnother }: { kind: WhenKind; xp: number; isAdventure: boolean; onAnother: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-1.5 px-4 pb-2 pt-2 text-center" role="status">
-      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden className="card-pop-in shrink-0">
-        <circle cx="12" cy="12" r="10.5" fill="#58a04a" stroke="#2f5a26" strokeWidth="1.2" />
-        <path d="M6.8 12.4l3.4 3.4 7-7.6" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <p className={`m-0 ${isAdventure ? "font-display text-[19px]" : "text-[17px] font-bold"}`}>
-        {kind === "future" ? "Saved to the future ideas log" : kind === "refill" ? "Saved for when credits refill" : "Sent. It goes into the next update."}
-      </p>
-      {xp > 0 && (
-        <p className="m-0 text-[16px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
-          +{xp} XP
-        </p>
-      )}
-      <button type="button" onClick={onAnother} className="mt-1 h-10 shrink-0 rounded-full border px-4 text-[14px] font-semibold" style={{ borderColor: "rgba(139,112,64,.5)", color: "var(--t-ink)" }}>
+    <div className="flex flex-col gap-2.5 px-4 pb-2 pt-1" role="status">
+      <div className="flex items-center gap-2.5">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden className="card-pop-in shrink-0">
+          <circle cx="12" cy="12" r="10.5" fill="#58a04a" stroke="#2f5a26" strokeWidth="1.2" />
+          <path d="M6.8 12.4l3.4 3.4 7-7.6" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <p className={`m-0 leading-snug ${isAdventure ? "font-display text-[17px]" : "text-[15.5px] font-bold"}`}>
+            {kind === "future" ? "Saved to the future ideas log" : kind === "refill" ? "Saved for when credits refill" : "Sent — it goes into the next update"}
+          </p>
+          {xp > 0 && (
+            <p className="m-0 text-[14.5px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
+              +{xp} XP
+            </p>
+          )}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onAnother}
+        className="flex h-10 w-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full text-[14.5px] font-bold"
+        style={{ background: isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-accent)", border: isAdventure ? "1.5px solid #8a6116" : undefined, color: isAdventure ? "#2a1c10" : "#fff" }}
+      >
+        <span aria-hidden className="text-[17px] leading-none">+</span>
         Write another
       </button>
     </div>
