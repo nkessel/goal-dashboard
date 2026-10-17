@@ -177,8 +177,6 @@ export function ToucanArt({ equipped = {}, flying = false, size = 52 }: { equipp
         </>
       )}
 
-      {/* sage brow plumes, raised kindly */}
-      <path d="M27.5 7.6c-3-2.6-8-3.6-14-2.4 4 .4 6.6 1.4 8.4 2.8-3.6-.6-7 0-10 1.6 5.6-.4 10.4.2 15.6-2z" fill="#e8f7ff" opacity=".9" />
       {/* crown of light: three plumes with star tips */}
       {!hatHidesPlumes && (
         <>

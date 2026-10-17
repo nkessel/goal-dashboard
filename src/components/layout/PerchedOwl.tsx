@@ -8,8 +8,29 @@ import { cleanToucan, type ToucanState } from "@/lib/toucan";
 /** What it says while you carry it, and when you set it down. */
 // Only the toucan spirit speaks; the owl keeps its silence.
 const SAY_FLYING = ["Wheee!", "To the skies!", "The winds obey me.", "Onward, to wisdom!", "Behold my majestic flight!", "Higher, friend, higher!", "I have soared over many forests."];
-const SAY_LANDING = ["Here I shall dispense wisdom.", "Ah. The view is excellent.", "I approve of this spot."];
-const pick = (list: string[]) => list[Math.floor(Math.random() * list.length)];
+const SAY_LANDING = ["Here I shall dispense wisdom.", "I approve of this spot.", "Ah. The view is excellent.", "This perch will do nicely.", "Rest a moment. Then onward."];
+/** How often each landing line comes up (the view one is a rare treat). */
+const LANDING_WEIGHT: Record<string, number> = { "Ah. The view is excellent.": 0.2 };
+/** Never the same line twice in a row (per list), with optional weights. */
+function picker() {
+  const last: Record<string, string> = {};
+  return (name: string, list: string[], weights: Record<string, number> = {}) => {
+    const pool = list.filter((x) => x !== last[name]);
+    const total = pool.reduce((n, x) => n + (weights[x] ?? 1), 0);
+    let r = Math.random() * total;
+    let out = pool[0];
+    for (const x of pool) {
+      r -= weights[x] ?? 1;
+      if (r <= 0) {
+        out = x;
+        break;
+      }
+    }
+    last[name] = out;
+    return out;
+  };
+}
+const pick = picker();
 
 /** Where the owl can land, worked out from the page each time. */
 function perches(): { x: number; y: number }[] {
@@ -263,7 +284,16 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   useEffect(() => {
     if (!wisdom) return;
     const t = setTimeout(() => setWisdom(null), 5000);
-    return () => clearTimeout(t);
+    // A tap anywhere else puts the wisdom away.
+    const away = (e: PointerEvent) => {
+      if (box.current && e.target instanceof Node && box.current.contains(e.target)) return;
+      setWisdom(null);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("pointerdown", away);
+    };
   }, [wisdom]);
 
   function fly() {
@@ -369,7 +399,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             setWisdom(null);
             setDragging(true);
             setPhase("flying");
-            if (spirit) speakBrief(pick(SAY_FLYING), null);
+            if (spirit) speakBrief(Math.random() < 0.35 ? pick("wise", WISDOM).replaceAll("{name}", addressOf(name)) : pick("fly", SAY_FLYING), null);
           }
           const W = window.innerWidth;
           const H = window.innerHeight;
@@ -390,7 +420,10 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             put(pos.current);
             setPhase("landing");
             setTimeout(() => setPhase("perched"), 260);
-            if (spirit) speakBrief(pick(SAY_LANDING), 2200);
+            if (spirit) {
+              const wise = Math.random() < 0.35;
+              speakBrief(wise ? pick("wise", WISDOM).replaceAll("{name}", addressOf(name)) : pick("land", SAY_LANDING, LANDING_WEIGHT), wise ? 4200 : 2200);
+            }
             at.current = -1;
             try {
               window.localStorage.setItem("owl-perch", "-1");
@@ -443,7 +476,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         <div ref={sayRef} role="status" className="pointer-events-none fixed left-0 top-0 z-[46]">
           <div
             key={say}
-            className="owl-say whitespace-nowrap rounded-2xl px-3 py-1.5 text-[14px] font-semibold"
+            className="owl-say w-max max-w-[240px] rounded-2xl px-3 py-1.5 text-center text-[14px] font-semibold leading-snug"
             style={
               spirit
                 ? { background: "linear-gradient(180deg, rgba(14,38,40,.94), rgba(8,22,26,.96))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.35), 0 4px 12px rgba(0,0,0,.45)" }

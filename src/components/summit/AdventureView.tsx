@@ -1,0 +1,696 @@
+"use client";
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
+import { TaskRow } from "@/components/tasks/TaskRow";
+import type { TaskWithCategory } from "@/lib/data/tasks";
+import { useEscape } from "@/lib/use-escape";
+import { QuestMonogram } from "@/components/tasks/QuestMonogram";
+import { MountainClouds, MountainScene, SCENE_H, SCENE_W, SUMMIT } from "./MountainScene";
+import { VOYAGE_GOAL, VoyageScene, VoyageVeil } from "./VoyageScene";
+import { STARS_GOAL, StarsScene, StarsVeil } from "./StarsScene";
+import { CROSSING_GOAL, CrossingScene, CrossingVeil } from "./CrossingScene";
+
+const dayIndex = (n: number) => Math.floor(Date.now() / 86_400_000) % n;
+
+/** A small wanderer with a cloak, a staff and a lantern. */
+function Wanderer() {
+  return (
+    <svg width="30" height="46" viewBox="0 0 30 46" aria-hidden style={{ overflow: "visible" }}>
+      <defs>
+        <radialGradient id="wanderer-glow" cx=".5" cy=".5" r=".5">
+          <stop offset="0" stopColor="#ffe9a8" stopOpacity=".9" />
+          <stop offset="1" stopColor="#ffc96a" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="15" cy="44" rx="10" ry="2.2" fill="#000" opacity=".35" />
+      <circle className="wanderer-lantern" cx="25" cy="27" r="11" fill="url(#wanderer-glow)" />
+      <path d="M22.5 6L25.5 44" stroke="#5a3e22" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M15 9c4 0 6 4 7 10l2 22c-6 2-12 2-18 0l2-22c1-6 3-10 7-10z" fill="#3b2d4f" />
+      <path d="M15 9c4 0 6 4 7 10l2 22c-2 .7-4 1-6 1l-1-24c0-4-1-7-2-9z" fill="#55426e" />
+      <path d="M9.5 10.5c1-4 3-6.5 5.5-6.5s4.5 2.5 5.5 6.5c-3-1.5-8-1.5-11 0z" fill="#2c2140" />
+      <circle cx="15" cy="9" r="3.2" fill="#e8c9a6" />
+      <path d="M11.5 8.5c1-3 6-3 7 0-2-1-5-1-7 0z" fill="#2c2140" />
+      <path d="M23.5 24.5h3v4.5h-3z" fill="#f2c94c" stroke="#5a3e22" strokeWidth=".7" />
+      <circle cx="25" cy="26.8" r="1.1" fill="#fff6c8" />
+    </svg>
+  );
+}
+
+/** A little sailing ship, its lantern lit. */
+function Ship() {
+  return (
+    <svg width="40" height="42" viewBox="0 0 40 42" aria-hidden style={{ overflow: "visible" }}>
+      <ellipse cx="20" cy="38" rx="17" ry="2.6" fill="#c9d4ff" opacity=".35" />
+      <path d="M4 30h32l-5 7H9z" fill="#4a2f1f" />
+      <path d="M4 30h32" stroke="#7a5236" strokeWidth="1.4" />
+      <path d="M19 30V4" stroke="#3a2416" strokeWidth="1.6" />
+      <path d="M20 5c8 4 11 12 12 22H20z" fill="#f4eee0" />
+      <path d="M18 8c-6 4-9 11-10 19h10z" fill="#e6dccb" />
+      <path d="M19 4l7 2-7 2z" fill="#c8434f" />
+      <circle className="wanderer-lantern" cx="34" cy="29" r="7" fill="#ffd27a" opacity=".55" />
+      <circle cx="34" cy="29" r="1.6" fill="#fff6c8" />
+    </svg>
+  );
+}
+
+/** A small bright wisp of starlight with a trailing tail. */
+function Wisp() {
+  return (
+    <svg width="40" height="30" viewBox="0 0 40 30" aria-hidden style={{ overflow: "visible" }}>
+      <defs>
+        <radialGradient id="wisp-glow" cx=".5" cy=".5" r=".5">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="1" />
+          <stop offset=".35" stopColor="#d6dcff" stopOpacity=".7" />
+          <stop offset="1" stopColor="#a8b4ff" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="wisp-tail" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#c9d0ff" stopOpacity="0" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity=".8" />
+        </linearGradient>
+      </defs>
+      <path d="M0 22Q14 18 28 14" stroke="url(#wisp-tail)" strokeWidth="3" strokeLinecap="round" fill="none" />
+      <circle className="wanderer-lantern" cx="30" cy="14" r="11" fill="url(#wisp-glow)" />
+      <path d="M30 8l1.2 4.8L36 14l-4.8 1.2L30 20l-1.2-4.8L24 14l4.8-1.2z" fill="#fff" />
+    </svg>
+  );
+}
+
+type Quest = { id: string; title: string; xp: number; icon: string | null; done: boolean };
+type Spot = { fx: number; fy: number };
+
+export type WorldKey = "summit" | "voyage" | "stars" | "crossing";
+type World = {
+  key: WorldKey;
+  name: string;
+  glyph: string;
+  goal: { x: number; y: number };
+  goalName: string;
+  /** How far above the goal its label sits, in scene units. */
+  goalPad: number;
+  /** Where the trail begins, in scene units. */
+  head: { x: number; y: number };
+  /** The band the quests can stand in (fractions of the screen height). */
+  top: number;
+  bottom: number;
+  trail: "earth" | "wake" | "lines" | "stones";
+  climb: { turns: number; amp: number; color: string };
+  Scene: () => React.ReactElement;
+  Veil: () => React.ReactElement;
+  Guide: () => React.ReactElement;
+  bg: string;
+  vignette: string;
+  sayings: string[];
+  steps: string;
+};
+
+export const WORLDS: Record<WorldKey, World> = {
+  summit: {
+    key: "summit",
+    name: "The Summit",
+    glyph: "⛰",
+    goal: SUMMIT,
+    goalName: "summit",
+    goalPad: 0,
+    head: { x: 800, y: 830 },
+    top: 0.62,
+    bottom: 0.87,
+    trail: "earth",
+    climb: { turns: 7, amp: 150, color: "#ffe9b0" },
+    Scene: MountainScene,
+    Veil: MountainClouds,
+    Guide: Wanderer,
+    bg: "#141a2e",
+    vignette: "rgba(8,6,20,.45)",
+    steps: "on today's trail",
+    sayings: [
+      "Every summit is reached one step at a time.",
+      "The mountain does not ask you to hurry — only to keep walking.",
+      "Small steps, taken daily, move mountains.",
+      "The view from the top is earned on the trail.",
+      "You don't have to see the whole path. Just the next stone.",
+      "What you do today is the trail you'll stand on tomorrow.",
+    ],
+  },
+  voyage: {
+    key: "voyage",
+    name: "The Voyage",
+    glyph: "⛵",
+    goal: VOYAGE_GOAL,
+    goalName: "lighthouse",
+    goalPad: 14,
+    head: { x: 800, y: 760 },
+    top: 0.52,
+    bottom: 0.87,
+    trail: "wake",
+    climb: { turns: 3, amp: 70, color: "#e6ecff" },
+    Scene: VoyageScene,
+    Veil: VoyageVeil,
+    Guide: Ship,
+    bg: "#070d24",
+    vignette: "rgba(2,4,16,.5)",
+    steps: "islands on today's voyage",
+    sayings: [
+      "A ship in harbour is safe, but that is not what ships are for.",
+      "Steer by the light you can see; the rest of the coast will come.",
+      "Calm seas are made one stroke of the oar at a time.",
+      "The fog lifts for those who keep sailing.",
+      "Every island reached is a world discovered.",
+    ],
+  },
+  stars: {
+    key: "stars",
+    name: "The Constellation",
+    glyph: "✧",
+    goal: STARS_GOAL,
+    goalName: "moon",
+    goalPad: 48,
+    head: { x: 640, y: 690 },
+    top: 0.4,
+    bottom: 0.82,
+    trail: "lines",
+    climb: { turns: 3, amp: 50, color: "#e8e0ff" },
+    Scene: StarsScene,
+    Veil: StarsVeil,
+    Guide: Wisp,
+    bg: "#05040f",
+    vignette: "rgba(0,0,6,.55)",
+    steps: "stars in today's constellation",
+    sayings: [
+      "Each small thing you finish is a star you set in the sky.",
+      "Connect today's stars; one day they'll draw a story.",
+      "Even the brightest constellation began with one point of light.",
+      "Look up. You are further along than you think.",
+      "Stars don't rush, and still they cross the whole sky.",
+    ],
+  },
+  crossing: {
+    key: "crossing",
+    name: "The Crossing",
+    glyph: "♜",
+    goal: CROSSING_GOAL,
+    goalName: "castle",
+    goalPad: 60,
+    head: { x: 860, y: 830 },
+    top: 0.6,
+    bottom: 0.87,
+    trail: "stones",
+    climb: { turns: 4, amp: 60, color: "#ffffff" },
+    Scene: CrossingScene,
+    Veil: CrossingVeil,
+    Guide: Wanderer,
+    bg: "#a9c8e6",
+    vignette: "rgba(30,40,60,.28)",
+    steps: "stones across today's river",
+    sayings: [
+      "Cross the river one stone at a time.",
+      "The far bank is closer with every step you take.",
+      "You don't need to see the castle gate to keep walking toward it.",
+      "Steady feet, steady stones, steady days.",
+      "The current is strong; your steps are stronger.",
+    ],
+  },
+};
+
+const MARK = 50;
+
+function loadSpots(key: string): Record<string, Spot> {
+  try {
+    return JSON.parse(window.localStorage.getItem(key) ?? "{}") as Record<string, Spot>;
+  } catch {
+    return {};
+  }
+}
+/** Where a quest stands by default: a meandering climb, left and right. */
+function defaultSpot(i: number, n: number, top: number, bottom: number, wide: boolean): Spot {
+  const t = n <= 1 ? 0.5 : i / (n - 1);
+  const fy = bottom - 0.06 - t * (bottom - 0.06 - top - 0.03);
+  const sw = wide ? 0.12 : 0.2;
+  const fx = 0.5 + (i % 2 === 0 ? -1 : 1) * (sw - t * sw * 0.4) + Math.sin(i * 1.7) * 0.03;
+  return { fx, fy };
+}
+
+/** Points along a smooth curve, spaced by a gap that may vary with height. */
+function sampleCurve(pts: { x: number; y: number }[], gapAt: (y: number) => number) {
+  const out: { x: number; y: number }[] = [];
+  let carry = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+    let prev = p1;
+    for (let k = 1; k <= 40; k++) {
+      const t = k / 40;
+      const u = 1 - t;
+      const q = {
+        x: u * u * u * p1.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p2.x,
+        y: u * u * u * p1.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p2.y,
+      };
+      carry += Math.hypot(q.x - prev.x, q.y - prev.y);
+      prev = q;
+      if (carry >= gapAt(q.y)) {
+        out.push(q);
+        carry = 0;
+      }
+    }
+  }
+  return out;
+}
+
+/** A smooth curve through points (Catmull-Rom as cubic Béziers), split per segment. */
+function segments(pts: { x: number; y: number }[]) {
+  const out: string[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+    out.push(`M${p1.x.toFixed(1)} ${p1.y.toFixed(1)}C${c1.x.toFixed(1)} ${c1.y.toFixed(1)} ${c2.x.toFixed(1)} ${c2.y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`);
+  }
+  return out;
+}
+
+/**
+ * The secret summit view of today. The mountain's peak is the level boss;
+ * today's quests line a winding trail through the forest below. Drag any
+ * quest and the trail bends to follow (remembered on this device). Past the
+ * last quest, a dotted line climbs into the mist — the way to the top isn't
+ * visible yet, but one day the path will get there.
+ */
+export function AdventureView({
+  world: worldKey,
+  quests,
+  cards = {},
+  boss,
+  level,
+}: {
+  world: WorldKey;
+  quests: Quest[];
+  /** The full quests, so tapping one opens its usual card with every action. */
+  cards?: Record<string, TaskWithCategory>;
+  boss: { title: string; level: number; target: number; progress: number } | null;
+  level: number;
+}) {
+  const world = WORLDS[worldKey] ?? WORLDS.summit;
+  const { top: TOP, bottom: BOTTOM } = world;
+  const posKey = world.key === "summit" ? "summit-path" : `adventure-path:${world.key}`;
+  const router = useRouter();
+  const box = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [spots, setSpots] = useState<Record<string, Spot>>({});
+  const [open, setOpen] = useState<Quest | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const drag = useRef<{ id: string; x0: number; y0: number; moved: boolean } | null>(null);
+  useEscape(() => setOpen(null), !!open);
+
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- saved spots live in this browser only
+    setSpots(loadSpots(posKey));
+  }, [posKey]);
+
+  const list = quests;
+  const { w, h } = size;
+  const spotOf = (q: Quest, i: number) => spots[q.id] ?? defaultSpot(i, list.length, TOP, BOTTOM, w > 760);
+  const pts = list.map((q, i) => {
+    const s = spotOf(q, i);
+    return { x: s.fx * w, y: s.fy * h };
+  });
+  // Where the scene sits on screen (it's drawn to cover the box, anchored to the bottom).
+  const s = Math.max(w / SCENE_W, h / SCENE_H);
+  const ox = (w - SCENE_W * s) / 2;
+  const oy = h - SCENE_H * s;
+  const toScreen = (p: { x: number; y: number }) => ({ x: ox + p.x * s, y: oy + p.y * s });
+  // The trailhead.
+  const head = toScreen(world.head);
+  const trail = [head, ...pts];
+  // Meander: between each pair of stops the trail swings out one way, then the other.
+  const wind: { x: number; y: number }[] = [];
+  trail.forEach((p, i) => {
+    wind.push(p);
+    const q = trail[i + 1];
+    if (!q) return;
+    const dx = q.x - p.x;
+    const dy = q.y - p.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    // Never so wide that neighbouring switchbacks cross.
+    const amp = Math.min(len * 0.2, 12 + 22 * Math.max(0, (p.y / h - TOP) / (1 - TOP)), Math.abs(dy) * 0.45 + 4);
+    const sgn = i % 2 === 0 ? 1 : -1;
+    wind.push({ x: p.x + dx / 3 + nx * amp * sgn, y: p.y + dy / 3 + ny * amp * sgn });
+    wind.push({ x: p.x + (2 * dx) / 3 - nx * amp * 0.7 * sgn, y: p.y + (2 * dy) / 3 - ny * amp * 0.7 * sgn });
+  });
+  const segs = w ? (world.trail === "lines" ? trail.slice(0, -1).map((p, i) => `M${p.x} ${p.y}L${trail[i + 1].x} ${trail[i + 1].y}`) : segments(wind)) : [];
+  const stones = w && world.trail === "stones" ? sampleCurve(wind, (y) => 10 + Math.max(0, Math.min(1, (y / h - TOP) / (1 - TOP))) * 18) : [];
+  // Width falls away with distance, so the trail recedes into the forest.
+  const widthAt = (y: number) => 3 + Math.max(0, Math.min(1, (y / h - TOP) / (1 - TOP))) * 9;
+
+  const peak = toScreen(world.goal);
+  const last = trail[trail.length - 1] ?? head;
+  // The dotted way onward: switchbacks from the last quest, up through the
+  // clouds, narrowing toward the peak.
+  let climb = "";
+  if (w) {
+    const turns = world.climb.turns;
+    const up: { x: number; y: number }[] = [last];
+    for (let k = 1; k < turns; k++) {
+      const t = k / turns;
+      const cx = last.x + (peak.x - last.x) * Math.pow(t, 0.8);
+      const y = last.y + (peak.y - last.y) * (1 - Math.pow(1 - t, 1.25));
+      const amp = (1 - t) * Math.min(w * 0.2, world.climb.amp) + 8;
+      up.push({ x: cx + (k % 2 === 0 ? -1 : 1) * amp, y });
+    }
+    up.push(peak);
+    climb = segments(up).join("");
+  }
+  const nextId = list.find((q) => !q.done)?.id ?? null;
+
+  function save(next: Record<string, Spot>) {
+    setSpots(next);
+    try {
+      window.localStorage.setItem(posKey, JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  function onDown(e: React.PointerEvent, q: Quest) {
+    drag.current = { id: q.id, x0: e.clientX, y0: e.clientY, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function onMove(e: React.PointerEvent) {
+    const d = drag.current;
+    if (!d || !box.current) return;
+    if (!d.moved) {
+      if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
+      d.moved = true;
+      setDragId(d.id);
+      setOpen(null);
+    }
+    const r = box.current.getBoundingClientRect();
+    const fx = Math.max(0.06, Math.min(0.94, (e.clientX - r.left) / r.width));
+    const fy = Math.max(TOP, Math.min(BOTTOM, (e.clientY - r.top) / r.height));
+    setSpots((sp) => ({ ...sp, [d.id]: { fx, fy } }));
+  }
+  function onUp(q: Quest) {
+    const d = drag.current;
+    drag.current = null;
+    setDragId(null);
+    if (!d) return;
+    if (d.moved) save({ ...spots });
+    else setOpen((o) => (o?.id === q.id ? null : q));
+  }
+  const remaining = list.filter((q) => !q.done).length;
+
+  return (
+    <div ref={box} className="summit fixed inset-0 z-[30] select-none overflow-hidden" style={{ background: world.bg, touchAction: "none" }}>
+      <world.Scene />
+
+      {/* the trail and the dotted way onward */}
+      {w > 0 && (
+        <svg className="pointer-events-none absolute inset-0" width={w} height={h} aria-hidden>
+          <defs>
+            <filter id="summit-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2" result="b" />
+              <feMerge>
+                <feMergeNode in="b" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <linearGradient id="summit-climb" gradientUnits="userSpaceOnUse" x1="0" y1={last.y} x2="0" y2={peak.y}>
+            <stop offset="0" stopColor={world.climb.color} stopOpacity=".95" />
+            <stop offset=".3" stopColor={world.climb.color} stopOpacity=".6" />
+            <stop offset=".75" stopColor="#fff3cf" stopOpacity=".35" />
+            <stop offset="1" stopColor="#fffbe8" stopOpacity=".9" />
+          </linearGradient>
+          <path d={climb} stroke="url(#summit-climb)" strokeWidth="3" strokeLinecap="round" strokeDasharray="0 8" fill="none" filter="url(#summit-glow)" />
+        </svg>
+      )}
+      {/* clouds drift over the way up: glimpsed, never quite seen */}
+      <world.Veil />
+      {w > 0 && (
+        <svg className="pointer-events-none absolute inset-0" width={w} height={h} aria-hidden>
+          <defs>
+            <linearGradient id="adv-stone" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#efe8d8" />
+              <stop offset="1" stopColor="#a99d84" />
+            </linearGradient>
+            <radialGradient id="adv-star" cx=".5" cy=".5" r=".5">
+              <stop offset="0" stopColor="#ffffff" stopOpacity=".55" />
+              <stop offset=".4" stopColor="#c9d0ff" stopOpacity=".2" />
+              <stop offset="1" stopColor="#a8b4ff" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          {/* what each quest stands on */}
+          {pts.map((p, i) => {
+            const by = p.y + MARK / 2 - 3;
+            if (world.trail === "wake")
+              return (
+                <g key={`base${i}`}>
+                  <ellipse cx={p.x} cy={by + 3} rx="40" ry="9" fill="none" stroke="#c9d6ff" strokeWidth="1" opacity=".35" />
+                  <ellipse cx={p.x} cy={by} rx="33" ry="8" fill="#d8c38e" />
+                  <ellipse cx={p.x} cy={by - 1.5} rx="26" ry="5.5" fill="#5f8a46" />
+                  <path d={`M${p.x + 22} ${by - 2}q-2 -16 -8 -22M${p.x + 14} ${by - 24}q6 -4 14 0M${p.x + 14} ${by - 24}q-6 -4 -12 2M${p.x + 14} ${by - 24}q4 -8 12 -6`} stroke="#3f6a34" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+                </g>
+              );
+            if (world.trail === "lines") return <circle key={`base${i}`} cx={p.x} cy={p.y} r="46" fill="url(#adv-star)" />;
+            if (world.trail === "stones")
+              return (
+                <g key={`base${i}`}>
+                  <ellipse cx={p.x} cy={by + 4} rx="40" ry="10" fill="none" stroke="#ffffff" strokeWidth="1" opacity=".4" />
+                  <ellipse cx={p.x} cy={by + 2} rx="31" ry="9" fill="#5d5544" />
+                  <ellipse cx={p.x} cy={by} rx="30" ry="8" fill="url(#adv-stone)" />
+                </g>
+              );
+            return null;
+          })}
+          {world.trail === "earth" && (
+            <>
+              {/* a warm glow along the way, then the worn earth of the trail */}
+              {segs.map((d, i) => (
+                <path key={`g${i}`} d={d} stroke="#ffcf7a" strokeWidth={widthAt(wind[i + 1].y) * 3.2} strokeLinecap="round" fill="none" opacity=".12" />
+              ))}
+              {segs.map((d, i) => (
+                <path key={`e${i}`} d={d} stroke="#2e2011" strokeWidth={widthAt(wind[i + 1].y) + 2.5} strokeLinecap="round" fill="none" opacity=".7" />
+              ))}
+              {segs.map((d, i) => (
+                <path key={`p${i}`} d={d} stroke="#d2ad78" strokeWidth={widthAt(wind[i + 1].y)} strokeLinecap="round" fill="none" />
+              ))}
+            </>
+          )}
+          {world.trail === "wake" && (
+            <>
+              {/* the ship's wake: a soft silver line on dark water */}
+              {segs.map((d, i) => (
+                <path key={`g${i}`} d={d} stroke="#bcd0ff" strokeWidth={widthAt(wind[i + 1].y) * 2.6} strokeLinecap="round" fill="none" opacity=".12" />
+              ))}
+              {segs.map((d, i) => (
+                <path key={`p${i}`} d={d} stroke="#e6eeff" strokeWidth={Math.max(1.2, widthAt(wind[i + 1].y) * 0.32)} strokeLinecap="round" fill="none" opacity=".85" />
+              ))}
+            </>
+          )}
+          {world.trail === "lines" && (
+            <>
+              {/* constellation lines */}
+              {segs.map((d, i) => (
+                <path key={`g${i}`} d={d} stroke="#c9d0ff" strokeWidth="5" strokeLinecap="round" fill="none" opacity=".12" />
+              ))}
+              {segs.map((d, i) => (
+                <path key={`p${i}`} d={d} stroke="#e8ecff" strokeWidth="1.3" strokeLinecap="round" fill="none" opacity=".8" filter="url(#summit-glow)" />
+              ))}
+            </>
+          )}
+          {world.trail === "stones" &&
+            stones.map((p, i) => {
+              const k = Math.max(0, Math.min(1, (p.y / h - TOP) / (1 - TOP)));
+              const rx = 4 + k * 9;
+              return (
+                <g key={i}>
+                  <ellipse cx={p.x} cy={p.y + rx * 0.25} rx={rx * 1.5} ry={rx * 0.42} fill="none" stroke="#ffffff" strokeWidth=".8" opacity=".35" />
+                  <ellipse cx={p.x} cy={p.y + rx * 0.12} rx={rx} ry={rx * 0.5} fill="#5d5544" />
+                  <ellipse cx={p.x} cy={p.y} rx={rx} ry={rx * 0.46} fill="url(#adv-stone)" />
+                </g>
+              );
+            })}
+        </svg>
+      )}
+
+      {/* a soft vignette, like an old painting */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, ${world.vignette} 100%)` }} />
+
+      {/* a line for the climb */}
+      {w > 0 && (
+        <p
+          className="summit-saying pointer-events-none absolute left-1/2 m-0 w-[min(88vw,520px)] -translate-x-1/2 text-center font-display italic"
+          style={{ top: world.key === "stars" ? peak.y + 64 * s + 10 : Math.max(peak.y + 70, h * 0.3), fontSize: w < 500 ? 19 : 24, lineHeight: 1.3, color: "#fff7e6", textShadow: "0 2px 12px rgba(40,20,60,.75), 0 0 2px rgba(40,20,60,.6)" }}
+        >
+          {world.sayings[dayIndex(world.sayings.length)]}
+        </p>
+      )}
+
+      {/* the wanderer waits beside the next quest */}
+      {w > 0 && nextId && (() => {
+        const i = list.findIndex((q) => q.id === nextId);
+        const p = pts[i];
+        return p && dragId !== nextId ? (
+          <div className="summit-wanderer pointer-events-none absolute" style={{ left: p.x - MARK / 2 - 28, top: p.y - MARK / 2 - 12, zIndex: Math.round(p.y) + 1 }}>
+            <world.Guide />
+          </div>
+        ) : null;
+      })()}
+
+      {/* the boss at the peak */}
+      {w > 0 && (
+        <div className="summit-boss pointer-events-none absolute" style={{ left: peak.x, top: peak.y - 14 - world.goalPad * s, transform: "translate(-50%, -100%)" }}>
+          <div className="flex flex-col items-center">
+            <div className="max-w-[230px] rounded-xl px-3 py-1.5 text-center" style={{ background: "rgba(20,14,30,.78)", border: "1.5px solid rgba(242,210,126,.7)", boxShadow: "0 0 18px rgba(255,200,120,.35)" }}>
+              <div className="font-display text-[12px] font-bold uppercase tracking-[.18em]" style={{ color: "#f2d27e" }}>
+                ⚔ Level {boss?.level ?? level} boss
+              </div>
+              <div className="text-[14px] italic leading-snug" style={{ color: "#fbf3df" }}>
+                {boss ? boss.title : `The ${world.goalName} of level ${level + 1}`}
+              </div>
+              {boss && boss.target > 1 && (
+                <div className="mt-1 flex justify-center gap-1">
+                  {Array.from({ length: boss.target }, (_, i) => (
+                    <span key={i} className="h-2 w-2 rounded-full" style={{ background: i < boss.progress ? "#f2d27e" : "rgba(242,210,126,.25)" }} />
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="h-3 w-px" style={{ background: "rgba(242,210,126,.7)" }} />
+          </div>
+        </div>
+      )}
+
+      {/* today's quests along the trail */}
+      {w > 0 &&
+        list.map((q, i) => {
+          const p = pts[i];
+          const isNext = q.id === nextId;
+          return (
+            <button
+              key={q.id}
+              type="button"
+              onPointerDown={(e) => onDown(e, q)}
+              onPointerMove={onMove}
+              onPointerUp={() => onUp(q)}
+              onPointerCancel={() => {
+                drag.current = null;
+                setDragId(null);
+              }}
+              aria-label={`${q.title}${q.done ? " (done)" : ""} — tap for details, drag to move`}
+              className={`summit-mark absolute flex flex-col items-center ${dragId === q.id ? "is-dragging" : ""}`}
+              style={{ left: p.x, top: p.y, transform: `translate(-50%, ${-MARK / 2}px)`, zIndex: dragId === q.id ? 5 : Math.round(p.y), cursor: dragId === q.id ? "grabbing" : "grab" }}
+            >
+              <span
+                className={`relative flex items-center justify-center overflow-hidden rounded-full ${isNext ? "summit-next" : ""}`}
+                style={{
+                  width: MARK,
+                  height: MARK,
+                  border: `2.5px solid ${q.done ? "#f2d27e" : "#e9dcb8"}`,
+                  boxShadow: q.done ? "0 0 14px rgba(242,210,126,.7), 0 4px 8px rgba(0,0,0,.5)" : "0 4px 10px rgba(0,0,0,.55)",
+                  filter: q.done ? "saturate(.55) brightness(.9)" : undefined,
+                  background: "#2a1c10",
+                }}
+              >
+                {q.icon ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+                  <img src={q.icon} alt="" draggable={false} className="h-full w-full object-cover" />
+                ) : (
+                  <QuestMonogram id={q.id} title={q.title} size={MARK} />
+                )}
+                {q.done && (
+                  <span className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(20,14,6,.35)" }}>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#f6dc8e" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                )}
+              </span>
+              <span
+                className="mt-1 max-w-[120px] truncate rounded-md px-1.5 py-0.5 text-[11.5px] font-semibold"
+                style={{ background: "rgba(246,236,210,.92)", color: "#2a1c10", border: "1px solid #a58c66", textDecoration: q.done ? "line-through" : undefined, opacity: q.done ? 0.8 : 1 }}
+              >
+                {q.title}
+              </span>
+            </button>
+          );
+        })}
+
+      {/* tapping a quest opens its usual card: complete, edit, schedule, everything */}
+      {open &&
+        createPortal(
+          <div className="fixed inset-0 z-[55] flex items-center justify-center p-4" onClick={() => setOpen(null)}>
+            <div className="overlay-fade-in absolute inset-0" style={{ background: "rgba(8,6,20,.55)" }} />
+            <div className="card-pop-in relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => setOpen(null)}
+                aria-label="Close"
+                className="absolute -top-11 right-0 flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none"
+                style={{ background: "rgba(20,14,30,.7)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.5)" }}
+              >
+                ×
+              </button>
+              {cards[open.id] ? (
+                <ul className="m-0 list-none p-0">
+                  <TaskRow task={cards[open.id]} theme="adventure" categoryLabel={cards[open.id].categoryLabel} onEditorClose={() => router.refresh()} />
+                </ul>
+              ) : (
+                <p className="m-0 rounded-2xl p-4 text-[15px]" style={{ background: "#f6ecd2", color: "#2a1c10" }}>
+                  {open.title}
+                </p>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* way back, and a quiet caption */}
+      <div className="absolute left-3 right-3 top-3 z-[50] flex items-start justify-between gap-3" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <Link href="/" className="flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold" style={{ background: "rgba(20,14,30,.6)", border: "1px solid rgba(242,210,126,.5)", color: "#f6ecd2", backdropFilter: "blur(4px)" }}>
+          ← Today
+        </Link>
+          <nav aria-label="Other paths" className="flex flex-col gap-1.5 self-start rounded-full p-1 sm:flex-row" style={{ background: "rgba(20,14,30,.55)", border: "1px solid rgba(242,210,126,.4)", backdropFilter: "blur(4px)" }}>
+            {Object.values(WORLDS).map((wd) => (
+              <Link
+                key={wd.key}
+                href={wd.key === "summit" ? "/summit" : `/summit?w=${wd.key}`}
+                aria-label={wd.name}
+                aria-current={wd.key === world.key ? "page" : undefined}
+                title={wd.name}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[17px]"
+                style={wd.key === world.key ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", color: "#2a1c10" } : { color: "#f6ecd2" }}
+              >
+                {wd.glyph}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <span className="hidden rounded-full px-3 py-1.5 text-right text-[12.5px] sm:block" style={{ background: "rgba(20,14,30,.45)", color: "rgba(246,236,210,.85)" }}>
+            {world.name} · {list.length === 0 ? "nothing on today's list yet" : remaining === 0 ? "every step taken today ✓" : `${remaining} ${world.steps} · drag to reshape`}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}

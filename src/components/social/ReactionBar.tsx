@@ -22,7 +22,9 @@ export function ReactionBar({
   profileId: string;
   theme?: "calm" | "adventure";
 }) {
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  // Taps show at once; the server catches up behind.
+  const [mineNow, setMineNow] = useState<Record<string, boolean>>({});
   const isAdventure = theme === "adventure";
 
   // Group by emoji -> count + whether the current user reacted with it.
@@ -33,9 +35,14 @@ export function ReactionBar({
     if (r.profile_id === profileId) entry.mine = true;
     grouped.set(r.emoji, entry);
   }
+  for (const [emoji, mine] of Object.entries(mineNow) as [string, boolean][]) {
+    const entry = grouped.get(emoji) ?? { count: 0, mine: false };
+    if (entry.mine !== mine) grouped.set(emoji, { count: Math.max(0, entry.count + (mine ? 1 : -1)), mine });
+  }
 
   function toggle(emoji: string) {
     const mine = grouped.get(emoji)?.mine;
+    setMineNow((m) => ({ ...m, [emoji]: !mine }));
     startTransition(async () => {
       if (mine) {
         await removeReactionAction(activityId, emoji);
@@ -63,7 +70,6 @@ export function ReactionBar({
           <button
             key={emoji}
             type="button"
-            disabled={isPending}
             onClick={() => toggle(emoji)}
             aria-pressed={!!g?.mine}
             className="hover-glow flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px] font-semibold"
@@ -80,7 +86,7 @@ export function ReactionBar({
       {[...grouped.entries()]
         .filter(([e]) => !CHEERS.some((c) => c.emoji === e))
         .map(([emoji, { count, mine }]) => (
-          <button key={emoji} type="button" disabled={isPending} onClick={() => toggle(emoji)} className="h-8 rounded-full px-2 text-[13px]" style={chipStyle(mine)}>
+          <button key={emoji} type="button" onClick={() => toggle(emoji)} className="h-8 rounded-full px-2 text-[13px]" style={chipStyle(mine)}>
             {emoji} {count}
           </button>
         ))}

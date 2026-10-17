@@ -1591,9 +1591,8 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 /* The great toucan spirit (hold the owl) */
 .owl-charging { animation: owl-charge 0.65s ease-in forwards; }
 @keyframes owl-charge {
-  0% { filter: drop-shadow(0 0 0 rgba(140,240,220,0)); transform: scale(1); }
-  70% { transform: scale(0.94) rotate(-3deg); }
-  100% { filter: drop-shadow(0 0 16px rgba(140,240,220,.9)); transform: scale(1.06) rotate(2deg); }
+  0% { filter: drop-shadow(0 0 0 rgba(140,240,220,0)); }
+  100% { filter: drop-shadow(0 0 16px rgba(140,240,220,.9)); }
 }
 .poof-puff {
   position: absolute;
@@ -1627,8 +1626,8 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 @keyframes toucan-tap {
   0% { transform: none; filter: none; }
   18% { transform: translateY(2px) scale(1.04, 0.94); }
-  42% { transform: translateY(-12px) rotate(-6deg) scale(1.08); filter: drop-shadow(0 0 14px rgba(126,240,220,.95)) brightness(1.15); }
-  62% { transform: translateY(-9px) rotate(4deg) scale(1.06); filter: drop-shadow(0 0 10px rgba(242,210,126,.9)); }
+  42% { transform: translateY(-12px) scale(1.06); filter: drop-shadow(0 0 14px rgba(126,240,220,.95)) brightness(1.15); }
+  62% { transform: translateY(-9px) scale(1.05); filter: drop-shadow(0 0 10px rgba(242,210,126,.9)); }
   82% { transform: translateY(1px) scale(1.02, 0.97); }
   100% { transform: none; filter: none; }
 }
@@ -1796,7 +1795,7 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 .summit-next { animation: summit-next 2s ease-in-out infinite; }
 @keyframes summit-next { 0%, 100% { box-shadow: 0 0 0 0 rgba(242,210,126,.8), 0 4px 10px rgba(0,0,0,.55); } 50% { box-shadow: 0 0 0 9px rgba(242,210,126,0), 0 4px 10px rgba(0,0,0,.55); } }
 .summit-mark { transition: transform .15s ease; touch-action: none; }
-.summit-mark.is-dragging { transform: translate(-50%, -88%) scale(1.12) !important; filter: drop-shadow(0 10px 10px rgba(0,0,0,.5)); }
+.summit-mark.is-dragging { transform: translate(-50%, -25px) scale(1.12) !important; transform-origin: 50% 25px; filter: drop-shadow(0 10px 10px rgba(0,0,0,.5)); }
 .summit-boss { animation: ui-fade .6s ease-out both; }
 .summit-saying { animation: summit-saying 2.4s ease-out both; }
 @keyframes summit-saying { from { opacity: 0; transform: translate(-50%, 8px); letter-spacing: .04em; } to { opacity: 1; transform: translate(-50%, 0); letter-spacing: 0; } }

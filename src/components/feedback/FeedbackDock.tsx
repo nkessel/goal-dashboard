@@ -34,7 +34,7 @@ type WhenKind = (typeof WHEN)[number][0];
 /** XP you choose to earn for a piece of feedback. */
 const XP_CHOICES = [1, 2, 3] as const;
 
-type Draft = { id: string; body: string; kind: WhenKind; xp?: number; images?: string[]; page?: string; shot?: string | null; updatedAt?: number; deleted?: boolean };
+type Draft = { id: string; body: string; kind: WhenKind; xp?: number; images?: string[]; page?: string; context?: string; shot?: string | null; updatedAt?: number; deleted?: boolean };
 
 /** Two lists of drafts as one: the newest edit of each wins, and deletions stick. */
 function mergeDrafts(a: Draft[], b: Draft[]): Draft[] {
@@ -265,11 +265,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   }, [openId]);
 
   const startNew = useCallback(() => {
-    const d: Draft = { id: newId(), body: "", kind: "feedback", page: window.location.pathname + window.location.search, shot: null, updatedAt: Date.now() };
-    // A picture of the screen you're on, so the feedback has its context.
-    void captureScreen().then((url) => {
-      if (url) setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, shot: url } : x)));
-    });
+    // The context, in words: the page, any open window and what's in view.
+    const d: Draft = { id: newId(), body: "", kind: "feedback", page: window.location.pathname + window.location.search, context: readContext(), shot: null, updatedAt: Date.now() };
     setConfirmDiscard(false);
     setChoosing(false);
     setSent(null);
@@ -323,7 +320,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         const r = await fetch("/api/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: d.body, kind: d.kind, xp: d.xp ?? 1, images: [...(d.shot ? [d.shot] : []), ...(d.images ?? [])], page: d.page }),
+          body: JSON.stringify({ body: d.body, kind: d.kind, xp: d.xp ?? 1, images: [...(d.shot ? [d.shot] : []), ...(d.images ?? [])], page: d.page, context: d.context }),
         });
         const res = (await r.json().catch(() => ({ ok: false, error: "Couldn't send it." }))) as { ok: boolean; xpAwarded?: number; error?: string };
         if (!r.ok || !res.ok) throw new Error(r.status === 401 || r.status === 403 ? "You've been signed out — sign in again to send (your note is saved)." : (res.error ?? "Couldn't send it."));
@@ -536,7 +533,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             <div className="feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-8">
               <div
                 className={`sticky top-0 z-[3] flex shrink-0 select-none items-center gap-1 px-2 pt-1.5 ${isSent ? "pl-4" : "cursor-move touch-none"}`}
-                style={{ background: isAdventure ? "linear-gradient(180deg, rgba(236,220,184,.97) 70%, rgba(236,220,184,0))" : "var(--t-card)" }}
+                style={{ background: isAdventure ? "#ecdcb8" : "var(--t-card)", borderBottom: `1px solid ${isAdventure ? "rgba(139,112,64,.45)" : "var(--t-card-border)"}`, boxShadow: "0 2px 6px rgba(60,40,10,.08)" }}
                 onPointerDown={isSent ? undefined : (e) => onPanelDown(e, "move")}
                 title={isSent ? undefined : "Drag to move"}
               >
@@ -633,8 +630,38 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 }
 
 /**
+ * What's on screen, in a few words, for the feedback's context: the title of
+ * any open window and the headings in view. No picture is taken.
+ */
+function readContext(): string {
+  try {
+    const bits: string[] = [];
+    const dialog = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].filter((el) => !el.closest("[data-feedback-root]")).pop();
+    const dl = dialog?.getAttribute("aria-label") || dialog?.querySelector("h1,h2,h3")?.textContent;
+    if (dl) bits.push(`open: ${dl.trim().slice(0, 60)}`);
+    const H = window.innerHeight;
+    const heads = [...document.querySelectorAll<HTMLElement>("h1, h2, h3")]
+      .filter((el) => !el.closest("[data-feedback-root]"))
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.bottom > 0 && r.top < H && r.width > 0;
+      })
+      .map((el) => (el.textContent ?? "").replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    const uniq = [...new Set(heads)].slice(0, 3);
+    if (uniq.length) bits.push(`showing: ${uniq.join(", ").slice(0, 120)}`);
+    const max = document.documentElement.scrollHeight - H;
+    if (max > 200) bits.push(`scrolled ${Math.round((window.scrollY / max) * 100)}%`);
+    return bits.join(" · ");
+  } catch {
+    return "";
+  }
+}
+
+/**
  * A picture of the page as it is now (without the feedback box), uploaded
  * and returned as a URL. Uses modern-screenshot, loaded on first use.
+ * Only taken when asked for (the camera button).
  */
 async function captureScreen(): Promise<string | null> {
   try {
@@ -746,6 +773,7 @@ function Composer({
         }}
         options={XP_CHOICES.map((n) => ({ value: n, label: `+${n}`, hint: `Earn ${n} XP for this feedback` }))}
       />
+      <div className="relative flex min-h-0 flex-1 flex-col">
       <textarea
         ref={textRef}
         onPaste={(e) => {
@@ -768,9 +796,45 @@ function Composer({
         placeholder={draft.kind === "future" ? "An idea for later. It goes in the future ideas log." : "What would make this better?"}
         aria-label="Feedback"
         className="min-h-[72px] flex-1 resize-none rounded-lg border px-3 pt-2 text-[16px] leading-relaxed"
-        style={{ borderColor: "var(--t-panel-border)", paddingBottom: 30, scrollPaddingBottom: 30 }}
+        style={{ borderColor: "var(--t-panel-border)", paddingBottom: 40, paddingRight: 12, scrollPaddingBottom: 40 }}
       />
+      {/* Add a picture: in the box's lower right corner */}
+      <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1">
+        {!draft.shot && (
+          <button
+            type="button"
+            onClick={async () => {
+              setUploading(true);
+              const url = await captureScreen();
+              setUploading(false);
+              if (url) onChange({ shot: url });
+              else setAttachError("Couldn't take a picture of this screen.");
+            }}
+            title="Add a picture of this screen"
+            aria-label="Add a picture of this screen"
+            className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]"
+            style={{ color: "var(--t-ink-soft)", background: "rgba(255,255,255,.7)" }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="2" />
+              <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
+        {(draft.images ?? []).length < 4 && (
+          <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)", background: "rgba(255,255,255,.7)" }} title="Attach an image (or paste one into the box)" aria-label="Attach an image">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
+              <circle cx="9" cy="10" r="1.8" fill="currentColor" />
+              <path d="M4 17l5-5 4 4 3-3 4 4" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            </svg>
+            <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => e.target.files && void attach([...e.target.files])} />
+          </label>
+        )}
+      </div>
+      </div>
       {/* Screenshots: paste one into the box, or pick from your device. */}
+      {(draft.shot || (draft.images ?? []).length > 0 || uploading || attachError) && (
       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
         {draft.shot && (
           <span className="relative h-12 w-16 overflow-hidden rounded-lg" style={{ border: "1.5px solid #b39a6a" }} title="A picture of the screen you were on — sent with your feedback">
@@ -791,19 +855,9 @@ function Composer({
           </span>
         ))}
         {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>Attaching…</span>}
-        {(draft.images ?? []).length < 4 && (
-          <label className="flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)", color: "var(--t-ink)" }} title="Attach a screenshot (or paste one into the box)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
-              <circle cx="9" cy="10" r="1.8" fill="currentColor" />
-              <path d="M4 17l5-5 4 4 3-3 4 4" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-            </svg>
-            Image
-            <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => e.target.files && void attach([...e.target.files])} />
-          </label>
-        )}
         {attachError && <span className="text-[12.5px]" style={{ color: "var(--t-warn)" }}>{attachError}</span>}
       </div>
+      )}
       {error && (
         <p className="m-0 shrink-0 text-sm" style={{ color: "var(--t-warn)" }}>
           {error}
