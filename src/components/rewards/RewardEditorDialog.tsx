@@ -13,6 +13,18 @@ import { coinsForXp } from "@/lib/coins";
 
 const PRICE_PRESETS = [0, 5, 10, 25, 50, 100];
 
+/** Slider position (0–100) ↔ price: 1-coin steps to 20, then 5s to 100, then 25s to 500. */
+function sliderToPrice(v: number): number {
+  if (v <= 40) return Math.round(v / 2);
+  if (v <= 72) return 20 + Math.round((v - 40) / 2) * 5;
+  return Math.min(500, 100 + Math.round((v - 72) * (400 / 28) / 25) * 25);
+}
+function priceToSlider(p: number): number {
+  if (p <= 20) return p * 2;
+  if (p <= 100) return 40 + ((p - 20) / 5) * 2;
+  return Math.min(100, 72 + ((p - 100) / 400) * 28);
+}
+
 /** Create or edit a reward: portrait, name, an optional note, and its price in coins. */
 export function RewardEditorDialog({
   reward,
@@ -269,6 +281,22 @@ export function RewardEditorDialog({
                 {p === 0 ? "Free" : p}
               </button>
             ))}
+          </div>
+          {/* Slide to set the price: fine steps low down, bigger ones higher up. */}
+          <div className="relative h-6">
+            <div className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1.5px solid #8a6c2c", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}>
+              <div className="h-full rounded-full transition-[width] duration-150" style={{ width: `${(priceToSlider(price) / 100) * 100}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 8px rgba(242,210,126,.5)" }} />
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={priceToSlider(price)}
+              onChange={(e) => setPrice(sliderToPrice(Number(e.target.value)))}
+              aria-label="Price slider"
+              className="progress-range absolute inset-0 w-full cursor-pointer"
+            />
           </div>
           <p className="m-0 text-[13px]" style={{ color: isAdventure ? "rgba(243,231,203,.75)" : "var(--t-ink-soft)" }}>
             {price === 0

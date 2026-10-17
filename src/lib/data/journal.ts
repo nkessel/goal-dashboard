@@ -50,3 +50,9 @@ export async function deleteJournalEntry(ownerId: string, id: string): Promise<v
   const { error } = await supabaseAdmin().from("journal_entries").delete().eq("owner_id", ownerId).eq("id", id);
   if (error) throw new Error(`Failed to delete entry: ${error.message}`);
 }
+
+/** Screenshots attached to an entry (feedback). */
+export async function setAttachments(ownerId: string, entryId: string, urls: string[]): Promise<void> {
+  const { error } = await supabaseAdmin().from("journal_entries").update({ attachments: urls }).eq("id", entryId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't attach the images: ${error.message}`);
+}

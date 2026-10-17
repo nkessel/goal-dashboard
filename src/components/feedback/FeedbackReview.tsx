@@ -8,6 +8,7 @@ type Item = {
   id: string;
   body: string;
   edited_body: string | null;
+  attachments?: string[];
   kind: string;
   created_at: string;
   review_status: Status | null;
@@ -219,6 +220,16 @@ export function FeedbackReview({ items, theme }: { items: Item[]; theme: "calm" 
                         </button>
                       )}
                     </span>
+                    {(it.attachments ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {(it.attachments ?? []).map((u) => (
+                          <a key={u} href={u} target="_blank" rel="noreferrer" className="block h-24 w-24 overflow-hidden rounded-lg" style={{ border: "1.5px solid #b39a6a" }} title="Open the full screenshot">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- attached screenshot */}
+                            <img src={u} alt="Screenshot from the sender" className="h-full w-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                     {textOf(it) && showOriginal.has(it.id) && (
                       <p className="m-0 whitespace-pre-line border-l-2 pl-2.5 text-[14px] italic" style={{ borderColor: "rgba(139,112,64,.4)", color: "var(--t-ink-soft)" }}>
                         {it.body}

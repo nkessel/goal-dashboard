@@ -13,6 +13,7 @@ import { BackToToday } from "@/components/layout/BackToToday";
 import { BackToSettings } from "@/components/layout/BackToSettings";
 import { FocusTimerPill } from "@/components/one-thing/FocusTimerPill";
 import { FeedbackDock } from "@/components/feedback/FeedbackDock";
+import { NotificationPreview } from "@/components/notifications/NotificationPreview";
 import { Suspense } from "react";
 
 /**
@@ -93,6 +94,7 @@ export async function AppShell({
       {profileId && <FocusTimerPill theme={theme} />}
       {profileId && <BottomNav theme={theme} />}
       {profileId && <FeedbackDock theme={theme} />}
+      {profileId && <NotificationPreview />}
     </div>
   );
 }

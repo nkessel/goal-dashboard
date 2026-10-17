@@ -1576,7 +1576,7 @@ export async function listJournalAction() {
  * A journal entry, or a piece of feedback. Feedback earns the 1–3 XP its
  * writer picked (`feedbackXp`); the result says how much was paid.
  */
-export async function addJournalEntryAction(body: string, mood: number | null, kind: string | null = null, feedbackXp = 0) {
+export async function addJournalEntryAction(body: string, mood: number | null, kind: string | null = null, feedbackXp = 0, attachments: string[] = []) {
   const { id: ownerId, name } = await requireIdentity();
   const text = body.trim();
   if (!text) throw new Error("Write something first.");
@@ -1584,6 +1584,8 @@ export async function addJournalEntryAction(body: string, mood: number | null, k
   const isFeedback = !!k && (feedbackData.FEEDBACK_KINDS as readonly string[]).includes(k);
   const xpAwarded = isFeedback ? Math.max(0, Math.min(3, Math.round(feedbackXp))) : 0;
   const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null, k, xpAwarded);
+  const pics = attachments.filter((u) => typeof u === "string" && /^https:\/\/[^\s]+\/feedback\//.test(u)).slice(0, 4);
+  if (pics.length) await journalData.setAttachments(ownerId, entry.id, pics).catch(() => {});
   // Feedback from someone in the party goes to the owner's review queue.
   if (isFeedback) {
     await feedbackData.notifyReviewers(ownerId, name, text).catch(() => {});
@@ -2177,4 +2179,29 @@ export async function takeOnSharedQuestAction(taskId: string) {
   const { id } = await requireIdentity();
   await partyData.takeOnSharedQuest(id, taskId);
   revalidatePath("/");
+}
+
+/** Unread notifications newer than a moment, newest first (for the little preview toast). */
+export async function newNotificationsAction(sinceISO: string) {
+  const ownerId = await requireProfileId();
+  const list = await notificationsData.listForProfile(ownerId, 10);
+  return list
+    .filter((n) => !n.is_read && n.created_at > sinceISO && !(n.snoozed_until && n.snoozed_until > new Date().toISOString()))
+    .map((n) => ({ id: n.id, kind: n.kind, body: n.body, at: n.created_at, activityId: n.activity_id }));
+}
+
+/** A screenshot for a piece of feedback: shrunk to a sensible size and stored; returns its URL. */
+export async function uploadFeedbackImageAction(formData: FormData) {
+  const ownerId = await requireProfileId();
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("No image was attached.");
+  if (!file.type.startsWith("image/")) throw new Error("That isn't an image.");
+  if (file.size > 8 * 1024 * 1024) throw new Error("That image is too big (8 MB at most).");
+  const sharp = (await import("sharp")).default;
+  const bytes = await sharp(Buffer.from(await file.arrayBuffer())).rotate().resize(1600, 1600, { fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+  const path = `feedback/${ownerId}/${crypto.randomUUID()}.webp`;
+  const db = (await import("@/lib/supabase/server")).supabaseAdmin();
+  const { error } = await db.storage.from("ai-images").upload(path, bytes, { contentType: "image/webp", upsert: false });
+  if (error) throw new Error(`Couldn't store the image: ${error.message}`);
+  return db.storage.from("ai-images").getPublicUrl(path).data.publicUrl;
 }

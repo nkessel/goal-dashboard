@@ -9,6 +9,8 @@ export type FeedbackForReview = {
   body: string;
   /** The owner's rewording, when they edited it before deciding. */
   edited_body: string | null;
+  /** Screenshots the sender attached. */
+  attachments: string[];
   kind: string;
   created_at: string;
   review_status: ReviewStatus | null;
@@ -50,6 +52,7 @@ export async function listFeedbackForReview(): Promise<FeedbackForReview[]> {
     id: r.id as string,
     body: r.body as string,
     edited_body: (r.edited_body as string | null | undefined) ?? null,
+    attachments: Array.isArray(r.attachments) ? (r.attachments as string[]) : [],
     kind: r.kind as string,
     created_at: r.created_at as string,
     review_status: (r.review_status as ReviewStatus | null) ?? null,

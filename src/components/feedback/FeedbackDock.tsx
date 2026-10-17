@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { addJournalEntryAction } from "@/app/actions";
+import { addJournalEntryAction, uploadFeedbackImageAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 
 /** Ask the dock to start (or bring back) feedback from anywhere, e.g. the + sheet. */
@@ -35,7 +35,7 @@ type WhenKind = (typeof WHEN)[number][0];
 /** XP you choose to earn for a piece of feedback. */
 const XP_CHOICES = [1, 2, 3] as const;
 
-type Draft = { id: string; body: string; kind: WhenKind; xp?: number };
+type Draft = { id: string; body: string; kind: WhenKind; xp?: number; images?: string[] };
 type Geom = { x: number; y: number; w: number; h: number };
 /** The round button's top-left corner, in px from the window's top-left. */
 type Pos = { x: number; y: number };
@@ -269,7 +269,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     setError(null);
     startSaving(async () => {
       try {
-        const res = await addJournalEntryAction(d.body, null, d.kind, d.xp ?? 1);
+        const res = await addJournalEntryAction(d.body, null, d.kind, d.xp ?? 1, d.images ?? []);
         // The thank-you stays until it's closed (or another is started).
         setSent({ id: d.id, kind: d.kind, xp: res.xpAwarded });
         setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, body: "" } : x)));
@@ -571,6 +571,22 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   );
 }
 
+/** Scale a screenshot down (max 1600px, JPEG) in the browser so it uploads quickly. */
+async function shrinkImage(f: File): Promise<File> {
+  try {
+    const bmp = await createImageBitmap(f);
+    const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k);
+    c.height = Math.round(bmp.height * k);
+    c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.85));
+    return blob ? new File([blob], "screenshot.jpg", { type: "image/jpeg" }) : f;
+  } catch {
+    return f;
+  }
+}
+
 /** Where it goes, the XP it earns, and what to change. */
 function Composer({
   draft,
@@ -587,6 +603,24 @@ function Composer({
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null);
   const xp = draft.xp ?? 1;
+  const [uploading, setUploading] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  async function attach(files: File[]) {
+    setAttachError(null);
+    setUploading(true);
+    const urls: string[] = [];
+    for (const f of files.slice(0, 4 - (draft.images ?? []).length)) {
+      try {
+        const fd = new FormData();
+        fd.append("file", await shrinkImage(f));
+        urls.push(await uploadFeedbackImageAction(fd));
+      } catch (e) {
+        setAttachError(e instanceof Error ? e.message : "Couldn't attach that image.");
+      }
+    }
+    setUploading(false);
+    if (urls.length) onChange({ images: [...(draft.images ?? []), ...urls] });
+  }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 px-3.5 pb-2 pt-1">
       <Segmented
@@ -614,6 +648,13 @@ function Composer({
       />
       <textarea
         ref={textRef}
+        onPaste={(e) => {
+          const files = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/"));
+          if (files.length) {
+            e.preventDefault();
+            void attach(files);
+          }
+        }}
         data-feedback-text
         autoFocus
         value={draft.body}
@@ -629,6 +670,31 @@ function Composer({
         className="min-h-[72px] flex-1 resize-none rounded-lg border px-3 pt-2 text-[16px] leading-relaxed"
         style={{ borderColor: "var(--t-panel-border)", paddingBottom: 30, scrollPaddingBottom: 30 }}
       />
+      {/* Screenshots: paste one into the box, or pick from your device. */}
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        {(draft.images ?? []).map((u) => (
+          <span key={u} className="relative h-12 w-12 overflow-hidden rounded-lg" style={{ border: "1.5px solid #b39a6a" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- attached screenshot */}
+            <img src={u} alt="Attached screenshot" className="h-full w-full object-cover" />
+            <button type="button" onClick={() => onChange({ images: (draft.images ?? []).filter((x) => x !== u) })} aria-label="Remove this image" className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center rounded-bl-md text-[13px] leading-none" style={{ background: "rgba(0,0,0,.6)", color: "#fff" }}>
+              ×
+            </button>
+          </span>
+        ))}
+        {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>Attaching…</span>}
+        {(draft.images ?? []).length < 4 && (
+          <label className="flex h-8 cursor-pointer items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)", color: "var(--t-ink)" }} title="Attach a screenshot (or paste one into the box)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
+              <circle cx="9" cy="10" r="1.8" fill="currentColor" />
+              <path d="M4 17l5-5 4 4 3-3 4 4" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            </svg>
+            Image
+            <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => e.target.files && void attach([...e.target.files])} />
+          </label>
+        )}
+        {attachError && <span className="text-[12.5px]" style={{ color: "var(--t-warn)" }}>{attachError}</span>}
+      </div>
       {error && (
         <p className="m-0 shrink-0 text-sm" style={{ color: "var(--t-warn)" }}>
           {error}
