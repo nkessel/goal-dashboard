@@ -253,7 +253,7 @@ export function EnergyCheck({
           <span className="truncate">
             {n.body.split(/(#[\p{L}\p{N}_-]+)/u).map((part, i) =>
               part.startsWith("#") ? (
-                <b key={i} style={{ color: "#f2d27e" }}>
+                <b key={i} style={{ color: /^#\S+$/.test(n.body) ? "#2a1c10" : "#f2d27e" }}>
                   {part}
                 </b>
               ) : (
