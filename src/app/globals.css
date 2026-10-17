@@ -1607,6 +1607,21 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   60% { opacity: 0.85; }
   100% { opacity: 0; transform: translate(calc(-50% + var(--px)), calc(-50% + var(--py))) scale(1.25); }
 }
+.poof-ring {
+  position: absolute;
+  pointer-events: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  border: 2px solid rgba(242, 210, 126, 0.95);
+  box-shadow: 0 0 14px rgba(126, 240, 220, 0.9), inset 0 0 10px rgba(255, 241, 184, 0.8);
+  transform: translate(-50%, -50%) scale(0.3);
+  animation: poof-ring 0.8s cubic-bezier(.15,.7,.3,1) forwards;
+}
+@keyframes poof-ring {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(0.3); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(4.2); }
+}
 .toucan-spirit { animation: toucan-hover 3.2s ease-in-out infinite; }
 @keyframes toucan-hover {
   0%, 100% { transform: translateY(0); }
@@ -1630,7 +1645,14 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   from { opacity: 0; transform: translateY(6px) scale(0.92); }
   to { opacity: 1; transform: none; }
 }
+.toucan-halo { transform-origin: 22px 12px; animation: toucan-halo 36s linear infinite; }
+@keyframes toucan-halo { to { transform: rotate(360deg); } }
+.toucan-stars { animation: toucan-twinkle 2.4s ease-in-out infinite; }
+@keyframes toucan-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.toucan-amulet { animation: toucan-amulet 3.4s ease-in-out infinite; }
+@keyframes toucan-amulet { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
+  .toucan-halo, .toucan-stars, .toucan-amulet { animation: none; }
   .owl-charging, .poof-puff, .toucan-spirit, .toucan-aura, .toucan-mote { animation: none; }
   .poof-puff { opacity: 0; }
 }
