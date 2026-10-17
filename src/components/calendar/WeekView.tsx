@@ -55,6 +55,7 @@ export function WeekView({
   const isAdventure = theme === "adventure";
   const days = dayKeys.map((k) => parseDateParam(k));
   const [hourPx, setHourPx] = useState(DEFAULT_HOUR_PX);
+  const [gripY, setGripY] = useState<number | null>(null);
   const HOUR_PX = hourPx;
   useEffect(() => {
     try {
@@ -419,15 +420,44 @@ export function WeekView({
           aria-valuenow={hourPx}
           tabIndex={0}
           title="Drag the times up or down to zoom"
-          className="relative z-[5] cursor-ns-resize touch-none"
+          className="group relative z-[5] cursor-ns-resize touch-none"
           style={{ gridColumn: 1, gridRow: `2 / ${hourCount + 2}` }}
+          onPointerMove={(e) => setGripY(e.clientY - e.currentTarget.getBoundingClientRect().top)}
+          onPointerLeave={() => setGripY(null)}
           onPointerDown={onZoomDown}
           onKeyDown={(e) => {
             if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
             e.preventDefault();
             zoomTo(hourPx + (e.key === "ArrowDown" ? 6 : -6));
           }}
-        />
+        >
+          {/* A gilded rail and grip appear where you can stretch the day. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-1 right-0 top-1 w-[2px] rounded-full opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
+            style={{ background: "linear-gradient(180deg, transparent, rgba(217,180,95,.85) 12%, rgba(217,180,95,.85) 88%, transparent)" }}
+          />
+          {gripY !== null && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -right-[7px] flex h-[34px] w-4 flex-col items-center justify-between rounded-full py-[3px]"
+              style={{
+                top: Math.max(0, gripY - 17),
+                background: "radial-gradient(circle at 40% 30%, #f9e7ad, #d9b45f 60%, #a88a3f)",
+                border: "1px solid #4a3913",
+                boxShadow: "0 2px 6px rgba(60,40,10,.35)",
+              }}
+            >
+              <svg width="9" height="6" viewBox="0 0 10 6" aria-hidden>
+                <path d="M1 5l4-4 4 4" fill="none" stroke="#3b2a14" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="h-[3px] w-[3px] rotate-45" style={{ background: "#3b2a14" }} />
+              <svg width="9" height="6" viewBox="0 0 10 6" aria-hidden>
+                <path d="M1 1l4 4 4-4" fill="none" stroke="#3b2a14" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          )}
+        </div>
 
         {/* Drag-to-add hit cells — one per (day, hour). Rendered before the
             task/event chips below so a chip occupying the same cell stacks

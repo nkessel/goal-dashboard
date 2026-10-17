@@ -823,7 +823,11 @@ export function DayPlanner({
           className="-mt-2 flex h-5 cursor-ns-resize touch-none items-center justify-center"
           title="Drag to resize"
         >
-          <span className="h-1.5 w-12 rounded-full" style={{ background: "rgba(217,180,95,.5)" }} />
+          <span aria-hidden className="flex items-center gap-1.5">
+            <span className="h-[5px] w-[5px] rotate-45" style={{ background: "#d9b45f" }} />
+            <span className="h-[3px] w-12 rounded-full" style={{ background: "linear-gradient(90deg, rgba(217,180,95,.35), #f2d27e, rgba(217,180,95,.35))" }} />
+            <span className="h-[5px] w-[5px] rotate-45" style={{ background: "#d9b45f" }} />
+          </span>
         </div>
       )}
 

@@ -1512,3 +1512,8 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 .slide-in-right {
   animation: slide-in-right 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
+/* A gilded up-down arrow wherever something stretches vertically. */
+.cursor-ns-resize {
+  cursor: url("/design/cursor-resize.svg") 14 14, ns-resize;
+}
