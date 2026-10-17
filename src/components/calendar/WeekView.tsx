@@ -19,6 +19,7 @@ import {
   parseDateParam,
 } from "@/lib/calendar-dates";
 import { CalendarAddPopup } from "./CalendarAddPopup";
+import { CalendarItemMenu, type MenuTarget } from "./CalendarItemMenu";
 import { CalendarTaskChip, getTaskDisplayWindow } from "./CalendarTaskChip";
 import { GoogleEventChip } from "./GoogleEventChip";
 
@@ -56,6 +57,7 @@ export function WeekView({
   const days = dayKeys.map((k) => parseDateParam(k));
   const [hourPx, setHourPx] = useState(DEFAULT_HOUR_PX);
   const [gripY, setGripY] = useState<number | null>(null);
+  const [itemMenu, setItemMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
   const HOUR_PX = hourPx;
   useEffect(() => {
     try {
@@ -539,6 +541,14 @@ export function WeekView({
                 return (
                   <div
                     key={it.key}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setItemMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        target: it.kind === "task" ? { kind: "task", task: it.task, start: it.start, end: it.end } : { kind: "event", title: it.event.title, start: it.start, end: it.end },
+                      });
+                    }}
                     className="pointer-events-auto absolute"
                     style={{
                       top: (it.top / 60) * HOUR_PX + 1,
@@ -572,6 +582,7 @@ export function WeekView({
         })}
       </div>
 
+      {itemMenu && <CalendarItemMenu target={itemMenu.target} x={itemMenu.x} y={itemMenu.y} theme={theme} onClose={() => setItemMenu(null)} />}
       {addRange && (
         <CalendarAddPopup
           start={addRange.start}
