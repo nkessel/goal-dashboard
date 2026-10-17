@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { addJournalEntryAction, uploadFeedbackImageAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 
 /** Ask the dock to start (or bring back) feedback from anywhere, e.g. the + sheet. */
@@ -269,9 +268,15 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     setError(null);
     startSaving(async () => {
       try {
-        const res = await addJournalEntryAction(d.body, null, d.kind, d.xp ?? 1, d.images ?? []);
+        const r = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: d.body, kind: d.kind, xp: d.xp ?? 1, images: d.images ?? [] }),
+        });
+        const res = (await r.json().catch(() => ({ ok: false, error: "Couldn't send it." }))) as { ok: boolean; xpAwarded?: number; error?: string };
+        if (!r.ok || !res.ok) throw new Error(r.status === 401 || r.status === 403 ? "You've been signed out — sign in again to send (your note is saved)." : (res.error ?? "Couldn't send it."));
         // The thank-you stays until it's closed (or another is started).
-        setSent({ id: d.id, kind: d.kind, xp: res.xpAwarded });
+        setSent({ id: d.id, kind: d.kind, xp: res.xpAwarded ?? 0 });
         setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, body: "" } : x)));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't send it. Check your connection and try again.");
@@ -326,8 +331,9 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   // ---- The box: drag by its top, resize from its corner, always in view.
   const mobile = vp.innerW < 640;
   const defaultGeom = (): Geom => {
-    const w = mobile ? vp.innerW - 16 : 380;
-    const h = Math.min(mobile ? 320 : 350, vp.innerH - 170);
+    // Use the screen: nearly all of it on a phone, a generous box on a desktop.
+    const w = mobile ? vp.innerW - 16 : Math.min(460, vp.innerW - 40);
+    const h = mobile ? Math.max(260, vp.h - 150) : Math.min(560, vp.innerH - 170);
     const above = btnPos.y - 12 - h - SUBMIT_DROP;
     return { w, h, x: mobile ? 8 : clamp(btnPos.x + BTN - w, 20, vp.innerW - w - 20), y: above > 60 ? above : 60 };
   };
@@ -613,7 +619,10 @@ function Composer({
       try {
         const fd = new FormData();
         fd.append("file", await shrinkImage(f));
-        urls.push(await uploadFeedbackImageAction(fd));
+        const r = await fetch("/api/feedback/image", { method: "POST", body: fd });
+        const j = (await r.json().catch(() => ({ ok: false }))) as { ok: boolean; url?: string; error?: string };
+        if (!r.ok || !j.ok || !j.url) throw new Error(j.error ?? "Couldn't attach that image.");
+        urls.push(j.url);
       } catch (e) {
         setAttachError(e instanceof Error ? e.message : "Couldn't attach that image.");
       }
