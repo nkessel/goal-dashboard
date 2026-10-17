@@ -40,6 +40,36 @@ export function CelebrationSettings() {
 
   return (
     <div className="flex flex-col gap-3" style={{ color: "var(--t-ink)" }}>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-semibold">When a reward pays out</span>
+        <div role="radiogroup" aria-label="Reward animation" className="flex flex-wrap gap-1.5">
+          {(
+            [
+              ["classic", "Classic", "A short “Well done!” note"],
+              ["ceremony", "Ceremony", "Golden rays, a coin burst and your level bar filling"],
+            ] as const
+          ).map(([v, label, hint]) => {
+            const on = fx.rewardStyle === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                title={hint}
+                onClick={() => update({ rewardStyle: v })}
+                className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left"
+                style={on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}
+              >
+                <span className="text-[14px] font-bold">{label}</span>
+                <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+                  {hint}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <label className="flex min-h-9 items-center gap-2.5 text-sm">
         <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.fxAvatar} onChange={() => update({ fxAvatar: !fx.fxAvatar })} />
         Dust from the avatars

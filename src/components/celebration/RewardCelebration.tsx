@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { CoinIcon } from "@/components/ui/Icons";
 import { xpToNextLevel } from "@/lib/levels";
+import { loadFx } from "@/lib/celebration-fx";
 
 export type RewardCelebrationDetail = {
   title: string;
@@ -14,8 +15,9 @@ export type RewardCelebrationDetail = {
   totalXp?: number | null;
 };
 
-/** Play the reward celebration from anywhere. */
+/** Play the reward ceremony from anywhere — only when chosen in Settings (classic is the default). */
 export function celebrateReward(detail: RewardCelebrationDetail) {
+  if (loadFx().rewardStyle !== "ceremony") return;
   window.dispatchEvent(new CustomEvent("reward-celebrate", { detail }));
 }
 

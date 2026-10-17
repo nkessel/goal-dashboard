@@ -10,9 +10,12 @@ export type FxSettings = {
   fill: number;
   fxAvatar: boolean;
   fxCard: boolean;
+  /** Reward payouts: "classic" (the short note) or "ceremony" (rays, coins, the bar filling). */
+  rewardStyle: "classic" | "ceremony";
 };
 
 export const FX_DEFAULTS: FxSettings = {
+  rewardStyle: "classic",
   dens: 1.7,
   vel: 0.5,
   reach: 0,
