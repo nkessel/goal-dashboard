@@ -92,7 +92,7 @@ export async function AppShell({
       </div>
 
       {profileId && <FocusTimerPill theme={theme} />}
-      {profileId && <BottomNav theme={theme} name={profile?.name ?? null} />}
+      {profileId && <BottomNav theme={theme} name={profile?.name ?? null} toucan={profile?.toucan ?? null} />}
       {profileId && <FeedbackDock theme={theme} />}
       {profileId && <NotificationPreview />}
     </div>

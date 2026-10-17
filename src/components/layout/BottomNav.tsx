@@ -92,7 +92,7 @@ function onTab(item: { href: string; also?: string[] }, pathname: string) {
   return [item.href, ...(item.also ?? [])].some((h) => pathname.startsWith(h));
 }
 
-export function BottomNav({ theme, name = null }: { theme: Theme; name?: string | null }) {
+export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme; name?: string | null; toucan?: unknown }) {
   const pathname = usePathname();
   const navigateWithTransition = useViewTransitionNavigate();
   const isAdventure = theme === "adventure";
@@ -217,7 +217,7 @@ export function BottomNav({ theme, name = null }: { theme: Theme; name?: string 
       }}
     >
       <div ref={rowRef} className="relative mx-auto flex w-full max-w-md items-stretch justify-between px-1 sm:max-w-lg md:max-w-xl">
-        {isAdventure && <PerchedOwl name={name} />}
+        {isAdventure && <PerchedOwl name={name} toucan={toucan} />}
         {highlight && (
           <div
             aria-hidden

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ToucanWorkshop } from "./ToucanWorkshop";
 import { EveningRoutineTile } from "./EveningRoutineTile";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
@@ -297,6 +298,16 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
                 Edit avatar
               </ViewTransitionLink>
             </div>
+          </SettingsRow>
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Toucan Spirit"
+            rightLabel={`${(profile.toucan?.owned ?? []).length} add-on${(profile.toucan?.owned ?? []).length === 1 ? "" : "s"}`}
+            defaultOpen={open === "toucan"}
+            icon={<span style={{ fontSize: 14 }}>🦜</span>}
+          >
+            <ToucanWorkshop initial={profile.toucan ?? null} coins={profile.coins ?? 0} />
           </SettingsRow>
 
           <SettingsRow

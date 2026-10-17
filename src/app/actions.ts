@@ -2227,3 +2227,22 @@ export async function uploadFeedbackImageAction(formData: FormData) {
   if (error) throw new Error(`Couldn't store the image: ${error.message}`);
   return db.storage.from("ai-images").getPublicUrl(path).data.publicUrl;
 }
+
+// ---------------------------------------------------------------------------
+// The great toucan spirit's wardrobe
+
+/** Buy a toucan add-on with coins (it's worn straight away). */
+export async function buyToucanAddonAction(addonId: string) {
+  const ownerId = await requireProfileId();
+  const { buyAddon } = await import("@/lib/data/toucan");
+  const res = await buyAddon(ownerId, addonId);
+  revalidatePath("/settings");
+  return res;
+}
+
+/** Put on (or take off, with null) an owned toucan add-on. */
+export async function equipToucanAction(slot: import("@/lib/toucan").ToucanSlot, addonId: string | null) {
+  const ownerId = await requireProfileId();
+  const { equipAddon } = await import("@/lib/data/toucan");
+  return equipAddon(ownerId, slot, addonId);
+}

@@ -157,6 +157,8 @@ export type Profile = {
   notify_email?: boolean;
   /** Health, in half-hearts (0–10). */
   hp?: number;
+  /** The toucan spirit's add-ons: owned, and worn per slot. */
+  toucan?: { owned?: string[]; equipped?: Record<string, string> } | null;
 };
 
 /** A shared avatar image — either one of the built-in presets or one a user
