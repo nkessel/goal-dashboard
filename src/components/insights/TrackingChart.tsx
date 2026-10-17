@@ -13,11 +13,11 @@ const INK = "#3b2a14";
 const INK_SOFT = "#6b5631";
 const GRID = "rgba(110,85,40,.18)";
 const DAY = 86_400_000;
-const VIEW_KEY = "insights-view";
+const VIEW_KEY = "insights-view-2";
 const SHOWN_KEY = "insights-shown";
 
 type View = { range: 7 | 30 | 90; detail: "daily" | "every"; smooth: boolean; dots: boolean };
-const DEFAULT_VIEW: View = { range: 30, detail: "daily", smooth: true, dots: true };
+const DEFAULT_VIEW: View = { range: 30, detail: "every", smooth: true, dots: true };
 
 const EVENTS: { key: string; label: string; kinds: string[]; glyph: string; color: string }[] = [
   { key: "quests", label: "Quests done", kinds: ["quest"], glyph: "◆", color: "#8a6116" },
@@ -94,15 +94,22 @@ function useWeatherHistory(days: number): Record<string, { hi: number; lo: numbe
 /** Smooth a polyline (Catmull-Rom → cubic Bézier), never overshooting the 1–10 band much. */
 function pathFor(pts: [number, number][], smooth: boolean) {
   if (pts.length === 0) return "";
-  if (!smooth || pts.length < 3) return pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
-  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[i + 2] ?? p2;
-    const t = 0.18;
-    d += `C${(p1[0] + (p2[0] - p0[0]) * t).toFixed(1)},${(p1[1] + (p2[1] - p0[1]) * t).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) * t).toFixed(1)},${(p2[1] - (p3[1] - p1[1]) * t).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  const f = (n: number) => n.toFixed(1);
+  if (!smooth || pts.length < 2) return pts.map(([x, y], i) => `${i ? "L" : "M"}${f(x)},${f(y)}`).join("");
+  // Monotone cubic (Fritsch–Carlson): curvy, never overshooting a reading;
+  // the ends ease in and out so even two readings make a soft curve.
+  const n = pts.length;
+  const dx = pts.slice(1).map((p, i) => p[0] - pts[i][0]);
+  const sl = pts.slice(1).map((p, i) => (dx[i] ? (p[1] - pts[i][1]) / dx[i] : 0));
+  const m = pts.map((_, i) => {
+    if (i === 0 || i === n - 1) return 0;
+    if (sl[i - 1] * sl[i] <= 0) return 0;
+    return (2 * sl[i - 1] * sl[i]) / (sl[i - 1] + sl[i]);
+  });
+  let d = `M${f(pts[0][0])},${f(pts[0][1])}`;
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3;
+    d += `C${f(pts[i][0] + h)},${f(pts[i][1] + m[i] * h)} ${f(pts[i + 1][0] - h)},${f(pts[i + 1][1] - m[i + 1] * h)} ${f(pts[i + 1][0])},${f(pts[i + 1][1])}`;
   }
   return d;
 }
@@ -279,12 +286,14 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
           )}
 
           {/* Grid */}
-          {[1, 4, 7, 10].map((v) => (
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
             <g key={v}>
-              <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" />
-              <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="12" fill={INK_SOFT}>
-                {v}
-              </text>
+              <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" opacity={v % 3 === 1 ? 1 : 0.45} />
+              {v % 3 === 1 && (
+                <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="12" fill={INK_SOFT}>
+                  {v}
+                </text>
+              )}
             </g>
           ))}
           {days.map((d, i) =>
@@ -301,7 +310,18 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
             const pts = s.pts.map((p): [number, number] => [x(p.t), y(p.v)]);
             return (
               <g key={s.metric}>
-                {pts.length > 1 && <path d={pathFor(pts, view.smooth)} fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+                {pts.length > 1 && <path d={pathFor(pts, view.smooth)} fill="none" stroke={s.color} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />}
+                {/* Where it stands now: the latest reading carried on to today. */}
+                {pts.length > 0 && pts[pts.length - 1][0] < x(Date.now()) - 4 && (
+                  <path
+                    d={`M${pts[pts.length - 1][0].toFixed(1)},${pts[pts.length - 1][1].toFixed(1)}H${x(Date.now()).toFixed(1)}`}
+                    stroke={s.color}
+                    strokeWidth="2"
+                    strokeDasharray="2 5"
+                    strokeLinecap="round"
+                    opacity=".6"
+                  />
+                )}
                 {(view.dots || pts.length === 1) && pts.map(([px, py], i) => <circle key={i} cx={px} cy={py} r="4" fill={s.color} stroke="#fbf3df" strokeWidth="2" />)}
               </g>
             );
