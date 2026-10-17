@@ -1556,3 +1556,31 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 @media (prefers-reduced-motion: reduce) {
   .owl-eyes, .owl-hop, .owl-hoot { animation: none; }
 }
+
+/* The owl in flight: wings beat, starlight trails behind. */
+@keyframes owl-flap-l {
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  50% { transform: rotate(18deg) scaleY(0.55); }
+}
+@keyframes owl-flap-r {
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  50% { transform: rotate(-18deg) scaleY(0.55); }
+}
+.owl-wing-l { transform-box: view-box; transform-origin: 18px 24px; animation: owl-flap-l 0.28s ease-in-out infinite; }
+.owl-wing-r { transform-box: view-box; transform-origin: 34px 24px; animation: owl-flap-r 0.28s ease-in-out infinite; }
+@keyframes owl-spark {
+  0% { opacity: 0.95; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: translate(-50%, 6px) scale(0.2) rotate(90deg); }
+}
+.owl-spark {
+  width: 7px;
+  height: 7px;
+  background: radial-gradient(circle, #fffbe6 0 30%, #f6dc8e 55%, transparent 72%);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: owl-spark 0.9s ease-out forwards;
+}
+.owl-perch { cursor: url("/design/cursor-hand.svg") 11 3, pointer; transition: filter 0.2s; }
+.owl-perch:hover { filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 14px rgba(255,236,170,.6)) !important; }
+@media (prefers-reduced-motion: reduce) {
+  .owl-wing-l, .owl-wing-r, .owl-spark { animation: none; }
+}

@@ -21,6 +21,7 @@ export function NotificationsButton({
   return (
     <Link
       href="/notifications"
+      data-bell
       prefetch={true}
       aria-label="Notifications"
       className="relative flex h-10 w-10 items-center justify-center rounded-full"
