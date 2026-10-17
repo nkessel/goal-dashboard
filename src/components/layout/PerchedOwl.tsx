@@ -19,6 +19,19 @@ function perches(): { x: number; y: number }[] {
   ];
 }
 
+/** A spot the owl was dragged to, kept as a share of the screen. */
+function spot(): { x: number; y: number } | null {
+  try {
+    const v = JSON.parse(window.localStorage.getItem("owl-spot") ?? "null") as { fx: number; fy: number } | null;
+    if (!v || !Number.isFinite(v.fx) || !Number.isFinite(v.fy)) return null;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    return { x: Math.max(OWL_W / 2, Math.min(W - OWL_W / 2, v.fx * W)), y: Math.max(OWL_H, Math.min(H - 4, v.fy * H)) };
+  } catch {
+    return null;
+  }
+}
+
 const OWL_W = 52;
 const OWL_H = 56;
 type Phase = "perched" | "takeoff" | "flying" | "gliding" | "landing";
@@ -69,6 +82,9 @@ export function PerchedOwl() {
   const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
   const lastWisdom = useRef(-1);
+  // Drag it anywhere: it stays where you set it down (remembered on this device).
+  const drag = useRef<{ x0: number; y0: number; offX: number; offY: number; moving: boolean } | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   const put = useCallback((p: { x: number; y: number }, tilt = 0, lift = 0) => {
     pos.current = p;
@@ -87,12 +103,19 @@ export function PerchedOwl() {
     } catch {
       /* storage unavailable */
     }
+    const home = () => {
+      if (at.current < 0) {
+        const sp = spot();
+        if (sp) return sp;
+        at.current = 0;
+      }
+      return perches()[at.current] ?? perches()[0];
+    };
     const t = setTimeout(() => {
-      const p = perches()[at.current] ?? perches()[0];
-      put(p);
+      put(home());
       box.current?.classList.add("owl-arrive");
     }, 80);
-    const onResize = () => !busy.current && put(perches()[at.current] ?? perches()[0]);
+    const onResize = () => !busy.current && !drag.current && put(home());
     window.addEventListener("resize", onResize);
     return () => {
       clearTimeout(t);
@@ -191,8 +214,8 @@ export function PerchedOwl() {
   function fly() {
     if (busy.current || !pos.current) return;
     const all = perches();
-    let next = Math.floor(Math.random() * (all.length - 1));
-    if (next >= at.current) next += 1;
+    let next = Math.floor(Math.random() * (at.current < 0 ? all.length : all.length - 1));
+    if (at.current >= 0 && next >= at.current) next += 1;
     const to = all[next];
     const from = pos.current;
     try {
@@ -275,10 +298,53 @@ export function PerchedOwl() {
           if (spirit) speak();
           else fly();
         }}
-        onPointerDown={startHold}
-        onPointerUp={endHold}
-        onPointerLeave={endHold}
-        onPointerCancel={endHold}
+        onPointerDown={(e) => {
+          if (busy.current || !pos.current || e.button > 0) return;
+          drag.current = { x0: e.clientX, y0: e.clientY, offX: e.clientX - pos.current.x, offY: e.clientY - pos.current.y, moving: false };
+          e.currentTarget.setPointerCapture(e.pointerId);
+          startHold();
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          if (!d.moving) {
+            if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
+            d.moving = true;
+            endHold();
+            setWisdom(null);
+            setDragging(true);
+          }
+          const W = window.innerWidth;
+          const H = window.innerHeight;
+          const x = Math.max(OWL_W / 2, Math.min(W - OWL_W / 2, e.clientX - d.offX));
+          const y = Math.max(OWL_H, Math.min(H - 4, e.clientY - d.offY));
+          const prevX = pos.current?.x ?? x;
+          if (Math.abs(x - prevX) > 1.5) setFacing(x > prevX ? 1 : -1);
+          put({ x, y }, Math.max(-12, Math.min(12, (x - prevX) * 0.8)));
+        }}
+        onPointerUp={(e) => {
+          const d = drag.current;
+          drag.current = null;
+          endHold();
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+          if (d?.moving && pos.current) {
+            held.current = true; // not a tap
+            setDragging(false);
+            put(pos.current);
+            at.current = -1;
+            try {
+              window.localStorage.setItem("owl-perch", "-1");
+              window.localStorage.setItem("owl-spot", JSON.stringify({ fx: pos.current.x / window.innerWidth, fy: pos.current.y / window.innerHeight }));
+            } catch {
+              /* storage unavailable */
+            }
+          }
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+          setDragging(false);
+          endHold();
+        }}
         onContextMenu={(e) => e.preventDefault()}
         onKeyDown={(e) => {
           // Keyboard: Shift+Enter transforms.
@@ -289,7 +355,7 @@ export function PerchedOwl() {
         }}
         aria-label={spirit ? "The great toucan spirit — tap for wisdom, hold to return to the owl" : "A snowy owl — tap and it flies to another perch; hold to summon the great toucan spirit"}
         title={spirit ? "The great toucan spirit" : "Hoo!"}
-        className="owl-perch fixed left-0 top-0 z-[45] touch-none select-none p-0"
+        className={`owl-perch fixed left-0 top-0 z-[45] touch-none select-none p-0 ${dragging ? "owl-dragging" : ""}`}
         style={{
           width: OWL_W,
           height: OWL_H,

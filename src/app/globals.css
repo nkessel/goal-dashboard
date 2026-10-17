@@ -1582,6 +1582,7 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   animation: owl-spark 0.9s ease-out forwards;
 }
 .owl-perch { cursor: url("/design/cursor-hand.svg") 11 3, pointer; transition: filter 0.2s; }
+.owl-perch.owl-dragging.owl-dragging { cursor: grabbing; filter: drop-shadow(0 10px 8px rgba(0,0,0,.45)) drop-shadow(0 0 16px rgba(255,236,170,.55)) !important; }
 .owl-perch:hover { filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 14px rgba(255,236,170,.6)) !important; }
 @media (prefers-reduced-motion: reduce) {
   .owl-wing-l, .owl-wing-r, .owl-spark { animation: none; }
