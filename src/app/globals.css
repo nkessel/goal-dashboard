@@ -1848,3 +1848,16 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
     box-shadow: inset 0 0 0 1px rgba(255, 244, 214, 0.45);
   }
 }
+
+/* The menu drops down from the top and settles in the middle. */
+@keyframes menu-drop-in {
+  from { transform: translateY(-100vh); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes menu-drop-out {
+  from { transform: none; opacity: 1; }
+  to { transform: translateY(-100vh); opacity: 0.4; }
+}
+.menu-drop-in { animation: menu-drop-in 0.32s cubic-bezier(0.2, 0.85, 0.25, 1.05) both; }
+.menu-drop-out { animation: menu-drop-out 0.22s ease-in both; }
+@media (prefers-reduced-motion: reduce) { .menu-drop-in, .menu-drop-out { animation-duration: 1ms; } }

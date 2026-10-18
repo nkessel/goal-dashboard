@@ -144,6 +144,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
         <div className="grid grid-cols-2 gap-2.5">
           <Link
             href="/power-ups?from=settings"
+            prefetch
             className={`hover-glow flex items-center gap-2.5 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}
             style={isAdventure ? { borderRadius: 14 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }}
           >
@@ -159,6 +160,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </Link>
           <Link
             href="/rewards?from=settings"
+            prefetch
             className={`hover-glow flex items-center gap-2.5 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}
             style={isAdventure ? { borderRadius: 14 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }}
           >
@@ -175,6 +177,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <EveningRoutineTile isAdventure={isAdventure} />
           <Link
             href="/journal?from=settings"
+            prefetch
             className={`hover-glow flex items-center gap-2.5 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}
             style={isAdventure ? { borderRadius: 14 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }}
           >

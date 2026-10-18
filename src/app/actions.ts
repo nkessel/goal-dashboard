@@ -2203,6 +2203,17 @@ export async function takeOnSharedQuestAction(taskId: string) {
   revalidatePath("/");
 }
 
+/** The latest few notifications for the bell's preview popup. */
+export async function recentNotificationsAction() {
+  const ownerId = await requireProfileId();
+  const list = await notificationsData.listForProfile(ownerId, 8);
+  const now = new Date().toISOString();
+  return list
+    .filter((n) => !(n.snoozed_until && n.snoozed_until > now))
+    .slice(0, 6)
+    .map((n) => ({ id: n.id, kind: n.kind, body: n.body, at: n.created_at, read: n.is_read }));
+}
+
 /** Unread notifications newer than a moment, newest first (for the little preview toast). */
 export async function newNotificationsAction(sinceISO: string) {
   const ownerId = await requireProfileId();

@@ -43,14 +43,15 @@ export async function AppShell({
    */
   wide?: boolean;
 }) {
-  const [profile, imports, missingPortraits] = await Promise.all([
+  // Everything at once, so opening a screen never waits on one query after another.
+  const importsP = profileId ? countImports(profileId) : Promise.resolve({ quests: 0, rewards: 0 });
+  const [profile, , missingPortraits, unreadCount] = await Promise.all([
     profileId ? getProfileById(profileId) : Promise.resolve(null),
-    profileId ? countImports(profileId) : Promise.resolve({ quests: 0, rewards: 0 }),
+    // Imports waiting to be sorted show up as a notification (no popup, no badge on the avatar).
+    profileId ? importsP.then((i) => syncImportsNotification(profileId, i.quests + i.rewards)).catch(() => {}) : Promise.resolve(),
     profileId ? countMissingPortraits(profileId).catch(() => 0) : Promise.resolve(0),
+    profileId ? countUnread(profileId) : Promise.resolve(0),
   ]);
-  // Imports waiting to be sorted show up as a notification (no popup, no badge on the avatar).
-  if (profileId) await syncImportsNotification(profileId, imports.quests + imports.rewards).catch(() => {});
-  const unreadCount = profileId ? await countUnread(profileId) : 0;
   const theme = profile?.theme === "adventure" ? "adventure" : "calm";
   const isAdventure = theme === "adventure";
   const iconColor = isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)";

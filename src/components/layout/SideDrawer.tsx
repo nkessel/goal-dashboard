@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useEscape } from "@/lib/use-escape";
 
 /**
- * A panel that slides in from the right over the current screen. Closing
- * (the ×, the dimmed backdrop, or Escape) slides it away and steps back.
+ * The menu: a panel that drops down from the top and sits centered over the
+ * current screen. Closing (the ×, the dimmed backdrop, or Escape) lifts it
+ * away and steps back.
  */
 export function SideDrawer({ theme, title, children }: { theme: "calm" | "adventure"; title: string; children: React.ReactNode }) {
   const router = useRouter();
@@ -35,11 +36,11 @@ export function SideDrawer({ theme, title, children }: { theme: "calm" | "advent
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`drawer-panel absolute bottom-0 right-0 top-0 flex w-[min(440px,92vw)] flex-col ${closing ? "drawer-slide-out" : "drawer-slide-in"}`}
+        className={`drawer-panel absolute left-1/2 top-1/2 flex max-h-[calc(100dvh-24px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[min(460px,calc(100vw-20px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl ${closing ? "menu-drop-out" : "menu-drop-in"}`}
         style={{
           background: isAdventure ? "linear-gradient(180deg, #1d2617, #141a10)" : "var(--t-bg)",
-          borderLeft: `2px solid ${isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
-          boxShadow: "-18px 0 40px rgba(0,0,0,.45)",
+          border: `2px solid ${isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
+          boxShadow: "0 22px 50px rgba(0,0,0,.5)",
         }}
       >
         <div className="flex items-center justify-between px-5 pb-2 pt-4">
