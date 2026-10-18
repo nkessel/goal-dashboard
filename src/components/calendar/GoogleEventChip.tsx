@@ -99,6 +99,7 @@ export function GoogleEventChip({
         style={{
           // Solid (not see-through) so events fanned over each other stay readable.
           background: isAdventure ? "color-mix(in srgb, #46688a 16%, #efe2c4)" : "#e7ecf9",
+          ...(event.color ? { borderLeft: `3px solid ${event.color}` } : {}),
           border: compact ? "none" : `1px solid ${isAdventure ? "rgba(70,104,138,.45)" : "#a9b8e6"}`,
           borderLeft: `3px solid ${isAdventure ? "#46688a" : "#7f95d6"}`,
           flexDirection: "row",

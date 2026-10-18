@@ -93,7 +93,22 @@ export type GoogleCalendarEvent = {
   start: string; // ISO
   end: string; // ISO
   isAllDay: boolean;
+  /** Which of the person's calendars it's on, and that calendar's colour. */
+  calendarId?: string;
+  color?: string | null;
 };
+
+export type GoogleCalendarInfo = { id: string; name: string; color: string | null; primary: boolean };
+
+/** The calendars in the person's Google list (their own, shared ones, holidays…). */
+export async function listCalendars(accessToken: string): Promise<GoogleCalendarInfo[]> {
+  const calendar = calendarClient(accessToken);
+  const res = await calendar.calendarList.list({ maxResults: 50 });
+  return (res.data.items ?? [])
+    .filter((c) => c.id && !c.deleted && !c.hidden)
+    .map((c) => ({ id: c.id!, name: c.summaryOverride || c.summary || c.id!, color: c.backgroundColor ?? null, primary: !!c.primary }))
+    .sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name));
+}
 
 /**
  * The user's real Google Calendar appointments in a range — read-only,
@@ -105,11 +120,12 @@ export type GoogleCalendarEvent = {
 export async function listEvents(
   accessToken: string,
   timeMin: Date,
-  timeMax: Date
+  timeMax: Date,
+  cal: { id: string; color?: string | null } = { id: "primary" }
 ): Promise<GoogleCalendarEvent[]> {
   const calendar = calendarClient(accessToken);
   const res = await calendar.events.list({
-    calendarId: "primary",
+    calendarId: cal.id,
     timeMin: timeMin.toISOString(),
     timeMax: timeMax.toISOString(),
     singleEvents: true,
@@ -131,7 +147,31 @@ export async function listEvents(
         start: new Date(start).toISOString(),
         end: new Date(end).toISOString(),
         isAllDay,
+        calendarId: cal.id,
+        color: cal.color ?? null,
       };
     })
     .filter((e): e is GoogleCalendarEvent => e !== null);
+}
+
+/** Events from every calendar in the list (up to 12), each tagged with its calendar. */
+export async function listEventsAllCalendars(accessToken: string, timeMin: Date, timeMax: Date): Promise<{ calendars: GoogleCalendarInfo[]; events: GoogleCalendarEvent[] }> {
+  let calendars: GoogleCalendarInfo[] = [];
+  try {
+    calendars = await listCalendars(accessToken);
+  } catch {
+    // Older grants may not cover the calendar list: fall back to the main calendar.
+    return { calendars: [{ id: "primary", name: "My calendar", color: null, primary: true }], events: await listEvents(accessToken, timeMin, timeMax) };
+  }
+  const lists = await Promise.all(calendars.slice(0, 12).map((c) => listEvents(accessToken, timeMin, timeMax, { id: c.id, color: c.color }).catch(() => [] as GoogleCalendarEvent[])));
+  const primaryId = calendars.find((c) => c.primary)?.id;
+  // The same meeting can sit on several calendars; show it once.
+  const seen = new Set<string>();
+  const events = lists.flat().filter((e) => {
+    const k = `${e.title}|${e.start}|${e.end}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  return { calendars: calendars.slice(0, 12).map((c) => (c.id === primaryId ? { ...c, id: c.id } : c)), events };
 }
