@@ -423,17 +423,6 @@ export function TaskRow({
             )}
           </button>
           {menu === "icon" && menuEl("left")}
-          {/* Importance from last night's plan (Today lists them in the order you'll do them). */}
-          {task.is_manual_priority && task.queue_rank != null && (
-            <span
-              title={`#${task.queue_rank + 1} in importance`}
-              aria-label={`Number ${task.queue_rank + 1} in importance`}
-              className="font-display pointer-events-none absolute bottom-0 right-0 z-[3] flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12.5px] font-bold leading-none sm:right-1"
-              style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 1px 3px rgba(0,0,0,.35)" }}
-            >
-              {task.queue_rank + 1}
-            </span>
-          )}
         </div>
 
         {/* Middle: title, description, due + urgency */}

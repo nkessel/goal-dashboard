@@ -118,7 +118,16 @@ export default async function Home() {
   // the Today screen live only on their boards.
   const onToday = openTasks.filter((t) => !t.needs_review);
   const topPriorities = onToday.filter((t) => t.is_manual_priority);
-  const otherTasks = onToday.filter((t) => !t.is_manual_priority && t.in_additional !== false);
+  // Deadlines coming up rise to the top of Additional Quests (soonest first);
+  // everything else keeps the order you gave it.
+  const nowMs = Date.now();
+  const dueSoon = (t: { due_at?: string | null }) => {
+    if (!t.due_at) return false;
+    const ms = Date.parse(t.due_at) - nowMs;
+    return ms < 4 * 86_400_000 && ms > -7 * 86_400_000;
+  };
+  const extras = onToday.filter((t) => !t.is_manual_priority && t.in_additional !== false);
+  const otherTasks = [...extras.filter(dueSoon).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!)), ...extras.filter((t) => !dueSoon(t))];
   const theme = profile?.theme ?? "adventure";
   const stats = profile && (
     <section>
