@@ -236,3 +236,20 @@ export async function addComment(
   if (error) throw new Error(`Failed to add comment: ${error.message}`);
   return data;
 }
+
+/** A few words naming an activity, for notifications: "finishing “Call Mike”". */
+export async function describeActivity(activityId: string): Promise<string | null> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("activity_events").select("kind, task_id, goal_id").eq("id", activityId).maybeSingle<{ kind: string; task_id: string | null; goal_id: string | null }>();
+  if (!data) return null;
+  if (data.kind === "level_up") return "your level-up";
+  if (data.task_id) {
+    const { data: t } = await db.from("tasks").select("title").eq("id", data.task_id).maybeSingle<{ title: string }>();
+    if (t?.title) return `finishing “${t.title.slice(0, 80)}”`;
+  }
+  if (data.goal_id) {
+    const { data: g } = await db.from("goals").select("title").eq("id", data.goal_id).maybeSingle<{ title: string }>();
+    if (g?.title) return `completing “${g.title.slice(0, 80)}”`;
+  }
+  return null;
+}

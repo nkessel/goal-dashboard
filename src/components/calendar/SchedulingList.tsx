@@ -448,7 +448,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
         </div>
       ) : (
         <>
-          {!open && <div className="fixed right-0 top-[38%] z-[35]">{tab}</div>}
+          {!open && <MovableTab>{tab}</MovableTab>}
           {open &&
             createPortal(
               <div className="fixed inset-0 z-[46]" onClick={() => toggle(false)} style={{ background: "rgba(10,8,4,.35)" }}>
@@ -710,5 +710,65 @@ function MoveMenu({ x, y, current, folders, onClose, onPick, onNew }: { x: numbe
       )}
     </div>,
     document.body
+  );
+}
+
+/**
+ * The "To schedule" pull-tab on a phone: drag it up or down the right edge
+ * to wherever it's out of the way (remembered on this device). A tap still opens it.
+ */
+function MovableTab({ children }: { children: React.ReactNode }) {
+  const [top, setTop] = useState<number | null>(null);
+  const drag = useRef<{ y0: number; t0: number; moved: boolean } | null>(null);
+  const movedRecently = useRef(false);
+  useEffect(() => {
+    try {
+      const v = Number(window.localStorage.getItem("schedule-tab-top"));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+      if (v > 0 && v < 1) setTop(v);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const frac = top ?? 0.38;
+  return (
+    <div
+      className="fixed right-0 z-[35] touch-none"
+      style={{ top: `${frac * 100}%` }}
+      onPointerDown={(e) => {
+        drag.current = { y0: e.clientY, t0: frac, moved: false };
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d) return;
+        if (!d.moved && Math.abs(e.clientY - d.y0) < 6) return;
+        if (!d.moved) (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        d.moved = true;
+        setTop(Math.max(0.08, Math.min(0.8, d.t0 + (e.clientY - d.y0) / window.innerHeight)));
+      }}
+      onPointerUp={() => {
+        const d = drag.current;
+        drag.current = null;
+        if (d?.moved) {
+          movedRecently.current = true;
+          try {
+            window.localStorage.setItem("schedule-tab-top", String(top ?? frac));
+          } catch {
+            /* storage unavailable */
+          }
+        }
+      }}
+      onClickCapture={(e) => {
+        // A drag isn't a tap.
+        if (movedRecently.current) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+        movedRecently.current = false;
+      }}
+      title="Drag to move"
+    >
+      {children}
+    </div>
   );
 }

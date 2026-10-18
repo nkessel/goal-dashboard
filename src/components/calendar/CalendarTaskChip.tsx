@@ -17,7 +17,10 @@ export function CalendarTaskChip({
   compact = false,
   timeLabel,
   oneLine = false,
+  portrait = false,
 }: {
+  /** The quest's portrait large above its title, like a card on a quest map. */
+  portrait?: boolean;
   task: Task;
   theme?: "calm" | "adventure";
   showTime?: boolean;
@@ -71,7 +74,9 @@ export function CalendarTaskChip({
     opacity: isCompleted && !isAdventure ? 0.65 : 1,
   };
 
-  const iconSize = compact ? 18 : isAdventure ? 32 : 28;
+  // Portrait cards need a little height; very short slots fall back to a line.
+  const tall = portrait && !oneLine;
+  const iconSize = tall ? 46 : compact ? 18 : isAdventure ? 32 : 28;
 
   return (
     <>
@@ -83,17 +88,17 @@ export function CalendarTaskChip({
         e.stopPropagation();
         setEditing(true);
       }}
-      className={`cal-chip flex h-full w-full min-w-0 overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
+      className={`cal-chip flex h-full w-full min-w-0 overflow-hidden rounded-md ${tall ? "items-center justify-center text-center" : `text-left ${compact ? "items-start" : "items-center"}`}`}
       style={{
         ...cardStyle,
         ...(isAdventure ? { borderLeft: `3px solid ${isCompleted ? "var(--t-good)" : isWarned ? "var(--t-warn)" : "#a88a3f"}` } : {}),
-        flexDirection: "row",
-        gap: compact ? 4 : 8,
-        padding: compact ? "3px 4px" : "6px 8px",
+        flexDirection: tall ? "column" : "row",
+        gap: tall ? 3 : compact ? 4 : 8,
+        padding: tall ? "5px 4px" : compact ? "3px 4px" : "6px 8px",
       }}
     >
       <div
-        className={`${compact ? "hidden" : "flex"} shrink-0 items-center justify-center overflow-hidden rounded-full`}
+        className={`${compact && !tall ? "hidden" : "flex"} shrink-0 items-center justify-center overflow-hidden ${tall ? "rounded-lg" : "rounded-full"}`}
         style={{
           width: iconSize,
           height: iconSize,
@@ -114,9 +119,9 @@ export function CalendarTaskChip({
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className={tall ? "w-full min-w-0" : "min-w-0 flex-1"}>
         <p
-          className={oneLine ? "truncate leading-tight" : compact ? "line-clamp-2 leading-[1.15] [overflow-wrap:normal] [word-break:normal]" : "truncate leading-tight"}
+          className={tall ? "line-clamp-3 leading-[1.15]" : oneLine ? "truncate leading-tight" : compact ? "line-clamp-2 leading-[1.15] [overflow-wrap:normal] [word-break:normal]" : "truncate leading-tight"}
           style={{
             color: "var(--t-ink)",
             fontSize: compact ? 11.5 : 13.5,
@@ -133,7 +138,7 @@ export function CalendarTaskChip({
             task.title
           )}
         </p>
-        {timeLabel && !oneLine && (
+        {timeLabel && !oneLine && !tall && (
           <p className="truncate leading-tight" style={{ color: "var(--t-ink-soft)", fontSize: 10.5 }}>
             {timeLabel}
           </p>

@@ -556,7 +556,7 @@ export function EnergyCheck({
               <button type="button" onClick={() => setEditing(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
                 Check in again
               </button>
-              {!noting && (
+              {full && !noting && (
                 <button type="button" onClick={() => setNoting(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
                   + Event or #tag
                 </button>

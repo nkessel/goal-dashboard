@@ -824,11 +824,12 @@ export async function addReactionAction(activityId: string, emoji: string) {
 
   const ownerId = await activityData.getActivityOwner(activityId);
   if (ownerId) {
+    const what = await activityData.describeActivity(activityId).catch(() => null);
     await notificationsData.createNotification({
       profileId: ownerId,
       actorId: profileId,
       kind: "reaction",
-      body: `${name} reacted ${emoji} to your activity.`,
+      body: `${name} reacted ${emoji} to ${what ?? "your activity"}.`,
       activityId,
     });
   }
@@ -851,11 +852,12 @@ export async function addCommentAction(formData: FormData) {
 
   const ownerId = await activityData.getActivityOwner(activityId);
   if (ownerId) {
+    const what = await activityData.describeActivity(activityId).catch(() => null);
     const notification = await notificationsData.createNotification({
       profileId: ownerId,
       actorId: profileId,
       kind: "comment",
-      body: `${name} commented: "${body.slice(0, 120)}"`,
+      body: `${name} commented on ${what ?? "your activity"}: "${body.slice(0, 120)}"`,
       activityId,
     });
 

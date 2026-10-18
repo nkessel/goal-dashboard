@@ -46,13 +46,21 @@ export function ActivityFeedItem({
     >
       <div className="flex items-center gap-2.5">
         {author ? (
-          <Avatar profile={author} size={12} />
+          <a href={`/friends/${author.id}`} title={`See ${authorName}'s screens`} className="shrink-0 rounded-full">
+            <Avatar profile={author} size={12} />
+          </a>
         ) : (
           <span className="h-9 w-9 shrink-0 rounded-full" style={{ background: "var(--t-ink-soft)" }} />
         )}
         <div className="min-w-0 flex-1">
           <div className="text-[17px] font-semibold leading-tight" style={{ color: "var(--t-ink)" }}>
-            {authorName}{" "}
+            {author ? (
+              <a href={`/friends/${author.id}`} className="underline-offset-2 hover:underline" title={`See ${authorName}'s screens`}>
+                {authorName}
+              </a>
+            ) : (
+              authorName
+            )}{" "}
             {author && (
               <span className="ml-1 rounded-full px-2 py-px align-middle text-[12px] font-semibold" style={{ background: "rgba(42,28,16,.82)", color: "#f2d27e" }}>
                 Lvl {shownLevel(author)}

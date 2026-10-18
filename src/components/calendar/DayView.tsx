@@ -12,11 +12,13 @@ export function DayView({
   tasks,
   events = [],
   theme = "calm",
+  portraits = false,
 }: {
   dateKey: string;
   tasks: Task[];
   events?: GoogleCalendarEvent[];
   theme?: "calm" | "adventure";
+  portraits?: boolean;
 }) {
   const isAdventure = theme === "adventure";
   const date = parseDateParam(dateKey);
@@ -57,7 +59,7 @@ export function DayView({
           );
         })}
       </div>
-      <WeekView dayKeys={[dateKey]} tasks={tasks} events={events} theme={theme} />
+      <WeekView dayKeys={[dateKey]} tasks={tasks} events={events} theme={theme} portraits={portraits} />
     </div>
   );
 }

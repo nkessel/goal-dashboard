@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent, GoogleCalendarInfo } from "@/lib/google-calendar";
 import { DayView } from "./DayView";
@@ -8,8 +9,8 @@ import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
 
 const KEY = "calendar-layers";
-type Layers = { hidden: string[]; quests: boolean; done: boolean; allDay: boolean };
-const DEFAULTS: Layers = { hidden: [], quests: true, done: true, allDay: true };
+type Layers = { hidden: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean };
+const DEFAULTS: Layers = { hidden: [], quests: true, done: true, allDay: true, portraits: false };
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("storage", cb);
@@ -53,8 +54,13 @@ export function CalendarLayers({
   events,
   calendars,
   theme,
+  dateKey,
+  nDays,
 }: {
-  view: "day" | "3day" | "week" | "next7" | "month";
+  dateKey: string;
+  /** Days on screen (1–7) for the slider. */
+  nDays: number;
+  view: "day" | "3day" | "days" | "week" | "next7" | "month";
   dayKeys: string[];
   monthKey: string;
   todayKey: string;
@@ -65,6 +71,8 @@ export function CalendarLayers({
 }) {
   const layers = useSyncExternalStore(subscribe, read, () => DEFAULTS);
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const [days, setDays] = useState(nDays);
   const panel = useRef<HTMLDivElement>(null);
   const isAdventure = theme === "adventure";
   useEffect(() => {
@@ -108,7 +116,26 @@ export function CalendarLayers({
 
   return (
     <div className="flex flex-col gap-2">
-      <div ref={panel} className="relative z-[25] -mt-1 flex justify-end">
+      <div ref={panel} className="relative z-[25] -mt-1 flex items-center justify-end gap-2">
+        {calendars.length > 0 && (() => {
+          const othersOn = calendars.some((c) => !layers.hidden.includes(c.id));
+          return (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={othersOn}
+              onClick={() => set({ hidden: othersOn ? calendars.map((c) => c.id) : [] })}
+              className="flex h-9 items-center gap-2 rounded-full pl-3 pr-1.5 text-[13.5px] font-semibold"
+              style={{ background: isAdventure ? "rgba(14,18,10,.55)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "#f6ecd2" : "var(--t-ink)" }}
+              title={othersOn ? "Hide your other calendars" : "Show your other calendars"}
+            >
+              Google calendars
+              <span className="relative h-5 w-9 rounded-full transition-colors" style={{ background: othersOn ? "#a88a3f" : "rgba(127,127,127,.35)" }}>
+                <span className="absolute top-0.5 h-4 w-4 rounded-full transition-[left]" style={{ left: othersOn ? 18 : 2, background: othersOn ? "#f6dc8e" : "#e5e0d4" }} />
+              </span>
+            </button>
+          );
+        })()}
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
@@ -140,17 +167,41 @@ export function CalendarLayers({
                 Connect Google Calendar to see your other calendars here.
               </p>
             )}
+            {calendars.length > 0 && (
+              <button type="button" onClick={() => set({ quests: true, hidden: calendars.map((c) => c.id) })} className="mx-2 mt-1 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+                Just my quests
+              </button>
+            )}
             <p className="m-0 mt-2 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
               Display
             </p>
+            {view !== "month" && (
+              <label className="flex flex-col gap-1 px-2 py-1.5 text-[14px]" style={{ color: "var(--t-ink)" }}>
+                <span className="flex justify-between">
+                  Days shown <b className="tabular-nums">{days}</b>
+                </span>
+                <input
+                  type="range"
+                  min={1}
+                  max={7}
+                  step={1}
+                  value={days}
+                  onChange={(e) => setDays(Number(e.target.value))}
+                  onPointerUp={() => days !== nDays && router.push(days === 1 ? `/calendar?view=day&date=${dateKey}` : `/calendar?view=days&n=${days}&date=${dateKey}`)}
+                  onKeyUp={() => days !== nDays && router.push(days === 1 ? `/calendar?view=day&date=${dateKey}` : `/calendar?view=days&n=${days}&date=${dateKey}`)}
+                  aria-label="Days shown"
+                />
+              </label>
+            )}
+            {row("Quests as portrait cards", layers.portraits, () => set({ portraits: !layers.portraits }))}
             {row("Finished quests", layers.done, () => set({ done: !layers.done }))}
             {row("All-day events", layers.allDay, () => set({ allDay: !layers.allDay }))}
           </div>
         )}
       </div>
 
-      {view === "day" && <DayView dateKey={dayKeys[0]} tasks={shownTasks} events={shownEvents} theme={theme} />}
-      {(view === "3day" || view === "week" || view === "next7") && <WeekView dayKeys={dayKeys} tasks={shownTasks} events={shownEvents} theme={theme} />}
+      {view === "day" && <DayView dateKey={dayKeys[0]} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} />}
+      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={dayKeys} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} />}
       {view === "month" && <MonthView monthKey={monthKey} todayKey={todayKey} tasks={shownTasks} events={shownEvents} theme={theme} />}
     </div>
   );

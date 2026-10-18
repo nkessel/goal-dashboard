@@ -41,12 +41,7 @@ export function Byline({ author, at, small = false }: { author: AuthorView | und
   const size = small ? 7 : 8;
   return (
     <span className="flex min-w-0 items-center gap-1.5 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-      {author ? (
-        <Avatar profile={author} size={size} />
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- the Guild Hall's crest
-        <img src="/design/guild-crest.svg" alt="" width={size * 4} height={size * 4} className="shrink-0" />
-      )}
+      {author && <Avatar profile={author} size={size} />}
       {author ? (
         <a href={`/friends/${author.id}`} onClick={(e) => e.stopPropagation()} className="truncate font-semibold underline-offset-2 hover:underline" style={{ color: "var(--t-ink)" }}>
           {author.name}

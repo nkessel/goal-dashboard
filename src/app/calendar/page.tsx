@@ -26,11 +26,11 @@ import {
   startOfWeek,
 } from "@/lib/calendar-dates";
 
-type ViewKind = "day" | "3day" | "week" | "next7" | "month";
-const VIEW_LABELS: Record<ViewKind, string> = { day: "Day", "3day": "3 days", week: "Week", next7: "7 days", month: "Month" };
+type ViewKind = "day" | "3day" | "days" | "week" | "next7" | "month";
+const VIEW_LABELS: Record<ViewKind, string> = { day: "Day", "3day": "3 days", days: "Days", week: "Week", next7: "7 days", month: "Month" };
 
 function parseView(v: string | undefined): ViewKind {
-  return v === "day" || v === "3day" || v === "month" || v === "next7" ? v : "week";
+  return v === "day" || v === "3day" || v === "days" || v === "month" || v === "next7" ? v : "week";
 }
 
 /** Today's date in the app's home time zone (the server itself runs on UTC). */
@@ -46,11 +46,13 @@ function todayKey() {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string }>;
+  searchParams: Promise<{ view?: string; date?: string; n?: string }>;
 }) {
   const session = await requireSession();
-  const { view: viewParam, date: dateParam } = await searchParams;
+  const { view: viewParam, date: dateParam, n: nParam } = await searchParams;
   const view = parseView(viewParam);
+  // "Days" shows any number of days from 1 to 7 (the slider in the calendar's settings).
+  const nDays = view === "3day" ? 3 : Math.max(1, Math.min(7, Math.round(Number(nParam) || 2)));
   const date = parseDateParam(dateParam ?? todayKey());
   const today = parseDateParam(todayKey());
 
@@ -79,17 +81,18 @@ export default async function CalendarPage({
     heading = formatMonthHeading(monthStart);
     prevHref = `/calendar?view=month&date=${formatDateParam(addMonths(monthStart, -1))}`;
     nextHref = `/calendar?view=month&date=${formatDateParam(addMonths(monthStart, 1))}`;
-  } else if (view === "3day") {
+  } else if (view === "3day" || view === "days") {
     rangeStart = startOfDay(date);
-    rangeEnd = addDays(rangeStart, 3);
+    rangeEnd = addDays(rangeStart, nDays);
     {
-      const last = addDays(rangeStart, 2);
+      const last = addDays(rangeStart, nDays - 1);
       const a = rangeStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
       const b = last.toLocaleDateString("en-US", last.getMonth() === rangeStart.getMonth() ? { day: "numeric" } : { month: "short", day: "numeric" });
       heading = `${a} – ${b}`;
     }
-    prevHref = `/calendar?view=3day&date=${formatDateParam(addDays(date, -3))}`;
-    nextHref = `/calendar?view=3day&date=${formatDateParam(addDays(date, 3))}`;
+    const q = view === "days" ? `view=days&n=${nDays}` : "view=3day";
+    prevHref = `/calendar?${q}&date=${formatDateParam(addDays(date, -nDays))}`;
+    nextHref = `/calendar?${q}&date=${formatDateParam(addDays(date, nDays))}`;
   } else if (view === "next7") {
     rangeStart = startOfDay(date);
     rangeEnd = addDays(rangeStart, 7);
@@ -235,8 +238,8 @@ export default async function CalendarPage({
           dayKeys={
             view === "day"
               ? [formatDateParam(date)]
-              : view === "3day"
-                ? Array.from({ length: 3 }, (_, i) => formatDateParam(addDays(date, i)))
+              : view === "3day" || view === "days"
+                ? Array.from({ length: nDays }, (_, i) => formatDateParam(addDays(date, i)))
                 : Array.from({ length: 7 }, (_, i) => formatDateParam(addDays(view === "week" ? startOfWeek(date) : date, i)))
           }
           monthKey={formatDateParam(startOfMonth(date))}
@@ -245,6 +248,8 @@ export default async function CalendarPage({
           events={events}
           calendars={calendars}
           theme={theme}
+          dateKey={formatDateParam(date)}
+          nDays={view === "day" ? 1 : view === "3day" || view === "days" ? nDays : view === "month" ? 7 : 7}
         />
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>

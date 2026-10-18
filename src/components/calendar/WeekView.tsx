@@ -46,7 +46,10 @@ export function WeekView({
   tasks,
   events = [],
   theme = "calm",
+  portraits = false,
 }: {
+  /** Show quests as portrait cards (art above the title). */
+  portraits?: boolean;
   /** The columns to show (YYYY-MM-DD, read in the viewer's own time zone) — 7 for a week, 1 for a day. */
   dayKeys: string[];
   tasks: Task[];
@@ -198,6 +201,42 @@ export function WeekView({
   // How wide one day's column is: overlapping items split it into lanes when
   // there's room, and fan out (overlapping, slightly offset) when there isn't.
   const boxRef = useRef<HTMLDivElement>(null);
+  // Pinch to zoom the hours (two fingers on a phone, or a trackpad pinch).
+  const pxNow = useRef(hourPx);
+  pxNow.current = hourPx;
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    let start: { d: number; px: number } | null = null;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) start = { d: dist(e.touches), px: pxNow.current };
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!start || e.touches.length !== 2) return;
+      e.preventDefault();
+      zoomTo(start.px * (dist(e.touches) / start.d));
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) start = null;
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      zoomTo(pxNow.current * Math.exp(-e.deltaY * 0.01));
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("wheel", onWheel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- zoomTo only uses setters and storage
+  }, []);
   const [colWidth, setColWidth] = useState(0);
   useLayoutEffect(() => {
     const el = boxRef.current;
@@ -565,7 +604,7 @@ export function WeekView({
                     {it.kind === "event" ? (
                       <GoogleEventChip event={it.event} theme={theme} compact timeLabel={label} oneLine={oneLine} />
                     ) : (
-                      <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine} />
+                      <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} />
                     )}
                   </div>
                 );
