@@ -135,7 +135,7 @@ export async function listEvents(
 
   return (res.data.items ?? [])
     .filter((e) => e.status !== "cancelled" && e.id)
-    .map((e) => {
+    .map((e): GoogleCalendarEvent | null => {
       const isAllDay = Boolean(e.start?.date && !e.start?.dateTime);
       const start = e.start?.dateTime ?? (e.start?.date ? `${e.start.date}T00:00:00` : undefined);
       const end = e.end?.dateTime ?? (e.end?.date ? `${e.end.date}T23:59:59` : undefined);
