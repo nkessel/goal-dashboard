@@ -159,6 +159,8 @@ export type Profile = {
   hp?: number;
   /** The toucan spirit's add-ons: owned, and worn per slot. */
   toucan?: { owned?: string[]; equipped?: Record<string, string> } | null;
+  /** Private long quests with steps (see lib/missions). */
+  secret_missions?: unknown;
 };
 
 /** A shared avatar image — either one of the built-in presets or one a user

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ToucanWorkshop } from "./ToucanWorkshop";
+import { SecretMissions } from "./SecretMissions";
 import { EveningRoutineTile } from "./EveningRoutineTile";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
@@ -308,6 +309,19 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             icon={<span style={{ fontSize: 14 }}>🦜</span>}
           >
             <ToucanWorkshop initial={profile.toucan ?? null} coins={profile.coins ?? 0} />
+          </SettingsRow>
+
+          <SettingsRow
+            theme={profile.theme}
+            label="Secret Missions"
+            rightLabel={(() => {
+              const n = Array.isArray(profile.secret_missions) ? profile.secret_missions.length : 0;
+              return n ? `${n} sealed` : "None yet";
+            })()}
+            defaultOpen={open === "missions"}
+            icon={<span style={{ fontSize: 14 }}>🗝️</span>}
+          >
+            <SecretMissions initial={profile.secret_missions ?? []} />
           </SettingsRow>
 
           <SettingsRow

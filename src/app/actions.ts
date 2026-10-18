@@ -2246,3 +2246,13 @@ export async function equipToucanAction(slot: import("@/lib/toucan").ToucanSlot,
   const { equipAddon } = await import("@/lib/data/toucan");
   return equipAddon(ownerId, slot, addonId);
 }
+
+// ---------------------------------------------------------------------------
+// Secret missions
+
+/** Save the whole list of secret missions (they're private to their owner). */
+export async function saveSecretMissionsAction(missions: unknown) {
+  const ownerId = await requireProfileId();
+  const { saveMissions } = await import("@/lib/data/missions");
+  return saveMissions(ownerId, missions);
+}
