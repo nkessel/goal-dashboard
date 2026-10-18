@@ -22,7 +22,7 @@ import { EveningRites } from "@/components/evening/EveningRites";
 import { PlanNudge } from "@/components/plan/PlanNudge";
 import { oneStepPerProject } from "@/lib/next-action";
 import { listBoardsForOwner } from "@/lib/data/boards";
-import { getPlanSession } from "@/lib/data/planning";
+import { getPlanSession, lastPairSession } from "@/lib/data/planning";
 import { DailyHabits } from "@/components/habits/DailyHabits";
 import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
 import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckNotesSince } from "@/lib/data/energy";
@@ -98,7 +98,16 @@ export default async function Home() {
   const dom = Number(dayKey.slice(8, 10));
   const nudgeKind: "week" | "month" | null = dom <= 3 ? "month" : dow === 0 || dow === 1 ? "week" : null;
   const nudgeSession = nudgeKind ? await getPlanSession(session.user.id, nudgeKind).catch(() => null) : null;
-  const planNudge = nudgeKind && !nudgeSession?.completed_at ? <PlanNudge kind={nudgeKind} started={!!nudgeSession} /> : null;
+  // The check-in with Mom: on Tuesdays (or once a walk left it half done), then midweek on Fri/Sat.
+  const pair = await getPlanSession(session.user.id, "pair").catch(() => null);
+  const pairData = (pair?.data ?? {}) as { walkedAt?: string | null; partner?: string; mid?: { doneAt?: string | null } };
+  const hadPair = pair || (await lastPairSession(session.user.id).catch(() => null));
+  const pairNudge: "week" | "mid" | null = !hadPair ? null : !pair?.completed_at ? (dow === 2 || pairData.walkedAt ? "week" : null) : (dow === 5 || dow === 6) && !pairData.mid?.doneAt ? "mid" : null;
+  const planNudge = pairNudge ? (
+    <PlanNudge kind={pairNudge === "mid" ? "pair-mid" : "pair"} started={!!pairData.walkedAt} partner={pairData.partner || "Mom"} />
+  ) : nudgeKind && !nudgeSession?.completed_at ? (
+    <PlanNudge kind={nudgeKind} started={!!nudgeSession} />
+  ) : null;
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   // Today's latest reading of each extra check-in metric.
   const metricsToday = Object.fromEntries(

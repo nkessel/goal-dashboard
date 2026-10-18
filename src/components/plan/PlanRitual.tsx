@@ -210,6 +210,9 @@ export function PlanRitual(props: {
             ← Calendar
           </Link>
           <span className="flex-1" />
+          <Link href="/plan?mode=mom" className="rounded-full px-3 py-1.5 text-[13px] font-semibold" style={{ background: "rgba(20,14,30,.45)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.4)" }}>
+            With Mom →
+          </Link>
           <Link href={kind === "week" ? "/plan?mode=month" : "/plan"} className="rounded-full px-3 py-1.5 text-[13px] font-semibold" style={{ background: "rgba(20,14,30,.45)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.4)" }}>
             {kind === "week" ? "Monthly ritual →" : "← Weekly ritual"}
           </Link>

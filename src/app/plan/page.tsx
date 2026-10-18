@@ -2,9 +2,10 @@ import { auth } from "@/auth";
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { PlanRitual } from "@/components/plan/PlanRitual";
+import { PairRitual } from "@/components/plan/PairRitual";
 import { getProfileById } from "@/lib/data/profiles";
 import { listCalendarTasksForOwner, listOpenTasksForOwnerWithCategory } from "@/lib/data/tasks";
-import { focusFollowUp, getPlanSession, lookBack, PLAN_XP, questsToReview, type PlanKind } from "@/lib/data/planning";
+import { focusFollowUp, getPlanSession, lastPairSession, lookBack, PLAN_XP, questsToReview, type PlanKind } from "@/lib/data/planning";
 import { getSchedulingFolders, listSchedulingList } from "@/lib/data/scheduling";
 import { listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { listCheckInsSince } from "@/lib/data/energy";
@@ -12,10 +13,10 @@ import { listEventsAllCalendars, type GoogleCalendarEvent } from "@/lib/google-c
 import { DEFAULT_WHEEL } from "@/components/insights/LifeWheel";
 
 /** The weekly and monthly planning rituals. */
-export default async function PlanPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+export default async function PlanPage({ searchParams }: { searchParams: Promise<{ mode?: string; mid?: string }> }) {
   const session = await requireSession();
-  const { mode } = await searchParams;
-  const kind: PlanKind = mode === "month" ? "month" : "week";
+  const { mode, mid } = await searchParams;
+  const kind: PlanKind = mode === "month" ? "month" : mode === "mom" ? "pair" : "week";
   const ownerId = session.user.id;
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -30,7 +31,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
     listCalendarTasksForOwner(ownerId, new Date(start.getTime() - 86_400_000), end),
     kind === "month" ? listBoardsWithStatsForOwner(ownerId).catch(() => []) : Promise.resolve([]),
     listCheckInsSince(ownerId, new Date(Date.now() - 92 * 86_400_000).toISOString()).catch(() => []),
-    focusFollowUp(ownerId, kind).catch(() => null),
+    kind === "pair" ? Promise.resolve(null) : focusFollowUp(ownerId, kind).catch(() => null),
   ]);
   let events: GoogleCalendarEvent[] = [];
   const s = await auth();
@@ -47,6 +48,25 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const wheelLast: Record<string, { level: number; at: string }> = {};
   for (const c of checks) if (c.metric.startsWith("◎ ")) wheelLast[c.metric.slice(2)] = { level: c.level, at: c.created_at };
   const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  if (kind === "pair") {
+    const last = await lastPairSession(ownerId).catch(() => null);
+    return (
+      <AppShell userLabel={session.user.email ?? ""} profileId={ownerId} wide>
+        <PairRitual
+          xp={PLAN_XP.pair}
+          theme={profile?.theme ?? "adventure"}
+          draft={(draft?.data as Record<string, unknown>) ?? null}
+          sealedAt={draft?.completed_at ?? null}
+          last={last}
+          finished={back.completed.map((t) => ({ id: t.id, title: t.title }))}
+          open={live.map((t) => ({ id: t.id, title: t.title, board: t.categoryLabel }))}
+          midweek={mid === "1"}
+          calendar={{ dayKeys: Array.from({ length: 7 }, (_, i) => dayKey(new Date(start.getTime() + i * 86_400_000))), tasks: calTasks, events, toSchedule, folders }}
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={ownerId} wide>

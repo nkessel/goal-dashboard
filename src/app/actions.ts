@@ -2344,7 +2344,7 @@ export async function saveLifeWheelAction(values: { topic: string; level: number
 export type SeedFate = "schedule" | "quest" | "waiting" | "someday" | "done" | "drop";
 
 /** Keep a ritual's progress (it can be finished later). */
-export async function savePlanDraftAction(kind: "week" | "month", data: Record<string, unknown>) {
+export async function savePlanDraftAction(kind: "week" | "month" | "pair", data: Record<string, unknown>) {
   const ownerId = await requireProfileId();
   const { savePlanDraft } = await import("@/lib/data/planning");
   await savePlanDraft(ownerId, kind, JSON.parse(JSON.stringify(data ?? {})));
@@ -2408,7 +2408,7 @@ export async function reviewQuestAction(taskId: string, choice: "keep" | "schedu
 }
 
 /** Seal the ritual: XP once per week or month. */
-export async function completePlanAction(kind: "week" | "month", data: Record<string, unknown>) {
+export async function completePlanAction(kind: "week" | "month" | "pair", data: Record<string, unknown>) {
   const ownerId = await requireProfileId();
   const { completePlan } = await import("@/lib/data/planning");
   const res = await completePlan(ownerId, kind, JSON.parse(JSON.stringify(data ?? {})));

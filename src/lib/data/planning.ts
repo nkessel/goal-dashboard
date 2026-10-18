@@ -3,12 +3,12 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { awardXp, currentWeekStart } from "./xp";
 import type { Task } from "./types";
 
-export type PlanKind = "week" | "month";
-export const PLAN_XP: Record<PlanKind, number> = { week: 30, month: 60 };
+export type PlanKind = "week" | "month" | "pair";
+export const PLAN_XP: Record<PlanKind, number> = { week: 30, month: 60, pair: 40 };
 
 /** Which week (its Monday) or month ("2026-10") a ritual belongs to. */
 export function periodKey(kind: PlanKind, d = new Date()): string {
-  if (kind === "week") return currentWeekStart();
+  if (kind === "week" || kind === "pair") return currentWeekStart();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
@@ -43,7 +43,7 @@ export async function completePlan(ownerId: string, kind: PlanKind, data: Record
 
 /** What happened over the last week or month, for the look back. */
 export async function lookBack(ownerId: string, kind: PlanKind) {
-  const days = kind === "week" ? 7 : 30;
+  const days = kind === "month" ? 30 : 7;
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const db = supabaseAdmin();
   const [done, xp, energy] = await Promise.all([
@@ -105,4 +105,19 @@ export async function focusFollowUp(ownerId: string, kind: PlanKind): Promise<{ 
     for (const r of rows ?? []) if ((r as { status: string }).status === "completed") done.add((r as { id: string }).id);
   }
   return { periodKey: row.period_key, items: focus.map((f) => ({ ...f, quests: (f.quests ?? []).map((q) => ({ ...q, done: done.has(q.id) })) })) };
+}
+
+/** The last finished check-in with your partner before this week (for what you picked last time). */
+export async function lastPairSession(ownerId: string): Promise<{ periodKey: string; data: Record<string, unknown>; completedAt: string } | null> {
+  const { data } = await supabaseAdmin()
+    .from("planning_sessions")
+    .select("period_key, data, completed_at")
+    .eq("owner_id", ownerId)
+    .eq("kind", "pair")
+    .lt("period_key", periodKey("pair"))
+    .not("completed_at", "is", null)
+    .order("period_key", { ascending: false })
+    .limit(1);
+  const r = data?.[0] as { period_key: string; data: Record<string, unknown>; completed_at: string } | undefined;
+  return r ? { periodKey: r.period_key, data: r.data ?? {}, completedAt: r.completed_at } : null;
 }

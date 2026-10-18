@@ -1,19 +1,41 @@
 import Link from "next/link";
 
-/** A gentle invitation to the weekly or monthly planning ritual. */
-export function PlanNudge({ kind, started }: { kind: "week" | "month"; started: boolean }) {
+type Kind = "week" | "month" | "pair" | "pair-mid";
+
+/** A gentle invitation to a planning ritual (yours, or the check-in with your partner). */
+export function PlanNudge({ kind, started, partner = "Mom" }: { kind: Kind; started: boolean; partner?: string }) {
+  const href = kind === "week" ? "/plan" : kind === "month" ? "/plan?mode=month" : kind === "pair" ? "/plan?mode=mom" : "/plan?mode=mom&mid=1";
+  const title =
+    kind === "pair"
+      ? started
+        ? `Finish your check-in with ${partner}`
+        : `Weekly check-in with ${partner}`
+      : kind === "pair-mid"
+        ? `Midweek check-in with ${partner}`
+        : started
+          ? `Finish planning your ${kind}`
+          : kind === "week"
+            ? "Plan the week ahead"
+            : "A new month — plan it";
+  const sub =
+    kind === "pair"
+      ? started
+        ? "The mind sweep, the calendar, and closing it · +40 XP"
+        : "About 45 minutes, equal time each · +40 XP"
+      : kind === "pair-mid"
+        ? "Ten minutes: one win, what's next, what help you could use"
+        : kind === "week"
+          ? "Look back, empty your head, pick 3 big rocks, put them on the calendar · +30 XP"
+          : "Life wheel, focus, outcomes and key dates · +60 XP";
   return (
-    <Link
-      href={kind === "week" ? "/plan" : "/plan?mode=month"}
-      className="hover-glow parchment parchment-framed flex items-center gap-3 rounded-2xl px-4 py-3"
-    >
-      <span aria-hidden className="relative z-[1] text-[26px]">🗺</span>
+    <Link href={href} className="hover-glow parchment parchment-framed flex items-center gap-3 rounded-2xl px-4 py-3">
+      <span aria-hidden className="relative z-[1] text-[26px]">{kind.startsWith("pair") ? "🤝" : "🗺"}</span>
       <span className="relative z-[1] flex min-w-0 flex-1 flex-col">
         <span className="font-display text-[18px]" style={{ color: "#3b2a14" }}>
-          {started ? `Finish planning your ${kind}` : kind === "week" ? "Plan the week ahead" : "A new month — plan it"}
+          {title}
         </span>
         <span className="text-[13.5px]" style={{ color: "#6b5631" }}>
-          {kind === "week" ? "Look back, empty your head, pick 3 big rocks, put them on the calendar · +30 XP" : "Life wheel, focus, outcomes and key dates · +60 XP"}
+          {sub}
         </span>
       </span>
       <span aria-hidden className="relative z-[1] text-[20px]" style={{ color: "#8a6116" }}>→</span>
