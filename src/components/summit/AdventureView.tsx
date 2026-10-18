@@ -9,9 +9,6 @@ import type { TaskWithCategory } from "@/lib/data/tasks";
 import { useEscape } from "@/lib/use-escape";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { MountainClouds, MountainScene, SCENE_H, SCENE_W, SUMMIT } from "./MountainScene";
-import { VOYAGE_GOAL, VoyageScene, VoyageVeil } from "./VoyageScene";
-import { STARS_GOAL, StarsScene, StarsVeil } from "./StarsScene";
-import { CROSSING_GOAL, CrossingScene, CrossingVeil } from "./CrossingScene";
 
 const dayIndex = (n: number) => Math.floor(Date.now() / 86_400_000) % n;
 
@@ -35,45 +32,6 @@ function Wanderer() {
       <path d="M11.5 8.5c1-3 6-3 7 0-2-1-5-1-7 0z" fill="#2c2140" />
       <path d="M23.5 24.5h3v4.5h-3z" fill="#f2c94c" stroke="#5a3e22" strokeWidth=".7" />
       <circle cx="25" cy="26.8" r="1.1" fill="#fff6c8" />
-    </svg>
-  );
-}
-
-/** A little sailing ship, its lantern lit. */
-function Ship() {
-  return (
-    <svg width="40" height="42" viewBox="0 0 40 42" aria-hidden style={{ overflow: "visible" }}>
-      <ellipse cx="20" cy="38" rx="17" ry="2.6" fill="#c9d4ff" opacity=".35" />
-      <path d="M4 30h32l-5 7H9z" fill="#4a2f1f" />
-      <path d="M4 30h32" stroke="#7a5236" strokeWidth="1.4" />
-      <path d="M19 30V4" stroke="#3a2416" strokeWidth="1.6" />
-      <path d="M20 5c8 4 11 12 12 22H20z" fill="#f4eee0" />
-      <path d="M18 8c-6 4-9 11-10 19h10z" fill="#e6dccb" />
-      <path d="M19 4l7 2-7 2z" fill="#c8434f" />
-      <circle className="wanderer-lantern" cx="34" cy="29" r="7" fill="#ffd27a" opacity=".55" />
-      <circle cx="34" cy="29" r="1.6" fill="#fff6c8" />
-    </svg>
-  );
-}
-
-/** A small bright wisp of starlight with a trailing tail. */
-function Wisp() {
-  return (
-    <svg width="40" height="30" viewBox="0 0 40 30" aria-hidden style={{ overflow: "visible" }}>
-      <defs>
-        <radialGradient id="wisp-glow" cx=".5" cy=".5" r=".5">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="1" />
-          <stop offset=".35" stopColor="#d6dcff" stopOpacity=".7" />
-          <stop offset="1" stopColor="#a8b4ff" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id="wisp-tail" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#c9d0ff" stopOpacity="0" />
-          <stop offset="1" stopColor="#ffffff" stopOpacity=".8" />
-        </linearGradient>
-      </defs>
-      <path d="M0 22Q14 18 28 14" stroke="url(#wisp-tail)" strokeWidth="3" strokeLinecap="round" fill="none" />
-      <circle className="wanderer-lantern" cx="30" cy="14" r="11" fill="url(#wisp-glow)" />
-      <path d="M30 8l1.2 4.8L36 14l-4.8 1.2L30 20l-1.2-4.8L24 14l4.8-1.2z" fill="#fff" />
     </svg>
   );
 }
@@ -106,7 +64,7 @@ type World = {
   steps: string;
 };
 
-export const WORLDS: Record<WorldKey, World> = {
+export const WORLDS: Partial<Record<WorldKey, World>> & { summit: World } = {
   summit: {
     key: "summit",
     name: "The Summit",
@@ -132,84 +90,6 @@ export const WORLDS: Record<WorldKey, World> = {
       "The view from the top is earned on the trail.",
       "You don't have to see the whole path. Just the next stone.",
       "What you do today is the trail you'll stand on tomorrow.",
-    ],
-  },
-  voyage: {
-    key: "voyage",
-    name: "The Voyage",
-    glyph: "⛵",
-    goal: VOYAGE_GOAL,
-    goalName: "lighthouse",
-    goalPad: 14,
-    head: { x: 800, y: 760 },
-    top: 0.52,
-    bottom: 0.87,
-    trail: "wake",
-    climb: { turns: 3, amp: 70, color: "#e6ecff" },
-    Scene: VoyageScene,
-    Veil: VoyageVeil,
-    Guide: Ship,
-    bg: "#070d24",
-    vignette: "rgba(2,4,16,.5)",
-    steps: "islands on today's voyage",
-    sayings: [
-      "A ship in harbour is safe, but that is not what ships are for.",
-      "Steer by the light you can see; the rest of the coast will come.",
-      "Calm seas are made one stroke of the oar at a time.",
-      "The fog lifts for those who keep sailing.",
-      "Every island reached is a world discovered.",
-    ],
-  },
-  stars: {
-    key: "stars",
-    name: "The Constellation",
-    glyph: "✧",
-    goal: STARS_GOAL,
-    goalName: "moon",
-    goalPad: 48,
-    head: { x: 640, y: 690 },
-    top: 0.4,
-    bottom: 0.82,
-    trail: "lines",
-    climb: { turns: 3, amp: 50, color: "#e8e0ff" },
-    Scene: StarsScene,
-    Veil: StarsVeil,
-    Guide: Wisp,
-    bg: "#05040f",
-    vignette: "rgba(0,0,6,.55)",
-    steps: "stars in today's constellation",
-    sayings: [
-      "Each small thing you finish is a star you set in the sky.",
-      "Connect today's stars; one day they'll draw a story.",
-      "Even the brightest constellation began with one point of light.",
-      "Look up. You are further along than you think.",
-      "Stars don't rush, and still they cross the whole sky.",
-    ],
-  },
-  crossing: {
-    key: "crossing",
-    name: "The Crossing",
-    glyph: "♜",
-    goal: CROSSING_GOAL,
-    goalName: "castle",
-    goalPad: 60,
-    head: { x: 860, y: 830 },
-    top: 0.6,
-    bottom: 0.87,
-    trail: "stones",
-    climb: { turns: 4, amp: 60, color: "#ffffff" },
-    Scene: CrossingScene,
-    Veil: CrossingVeil,
-    Guide: Wanderer,
-    bg: "#a9c8e6",
-    vignette: "rgba(30,40,60,.28)",
-    steps: "stones across today's river",
-    sayings: [
-      "Cross the river one stone at a time.",
-      "The far bank is closer with every step you take.",
-      "You don't need to see the castle gate to keep walking toward it.",
-      "Steady feet, steady stones, steady days.",
-      "The current is strong; your steps are stronger.",
     ],
   },
 };
@@ -669,21 +549,6 @@ export function AdventureView({
         <Link href="/" className="flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold" style={{ background: "rgba(20,14,30,.6)", border: "1px solid rgba(242,210,126,.5)", color: "#f6ecd2", backdropFilter: "blur(4px)" }}>
           ← Today
         </Link>
-          <nav aria-label="Other paths" className="flex flex-col gap-1.5 self-start rounded-full p-1 sm:flex-row" style={{ background: "rgba(20,14,30,.55)", border: "1px solid rgba(242,210,126,.4)", backdropFilter: "blur(4px)" }}>
-            {Object.values(WORLDS).map((wd) => (
-              <Link
-                key={wd.key}
-                href={wd.key === "summit" ? "/summit" : `/summit?w=${wd.key}`}
-                aria-label={wd.name}
-                aria-current={wd.key === world.key ? "page" : undefined}
-                title={wd.name}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[17px]"
-                style={wd.key === world.key ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", color: "#2a1c10" } : { color: "#f6ecd2" }}
-              >
-                {wd.glyph}
-              </Link>
-            ))}
-          </nav>
         </div>
         <div className="flex flex-col items-end gap-2">
           <span className="hidden rounded-full px-3 py-1.5 text-right text-[12.5px] sm:block" style={{ background: "rgba(20,14,30,.45)", color: "rgba(246,236,210,.85)" }}>

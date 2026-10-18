@@ -10,7 +10,8 @@ import { xpToNextLevel } from "@/lib/levels";
 export default async function SummitPage({ searchParams }: { searchParams: Promise<{ w?: string }> }) {
   const session = await requireSession();
   const { w } = await searchParams;
-  const world: WorldKey = w === "voyage" || w === "stars" || w === "crossing" ? w : "summit";
+  const world: WorldKey = "summit";
+  void w;
   const [open, done, profile, boss] = await Promise.all([
     listOpenTasksForOwnerWithCategory(session.user.id),
     listCompletedTasksForOwner(session.user.id, 40),

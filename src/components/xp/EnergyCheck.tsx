@@ -1,5 +1,6 @@
 "use client";
 
+import { snapTo, useSliderStep } from "@/lib/use-slider-step";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
@@ -80,6 +81,7 @@ export function EnergyCheck({
   metricsToday?: Record<string, number>;
 }) {
   const [value, setValue] = useState(today ?? 6);
+  const sliderStep = useSliderStep();
   const [saved, setSaved] = useState<number | null>(today);
   const [savedAt, setSavedAt] = useState<string | null>(todayAt);
   const [metrics, setMetrics] = useState<string[]>(initialMetrics);
@@ -367,9 +369,9 @@ export function EnergyCheck({
       type="range"
       min={1}
       max={10}
-      step={0.1}
+      step={sliderStep}
       value={v}
-      onChange={(e) => onChange(Math.round(Number(e.target.value) * 10) / 10)}
+      onChange={(e) => onChange(Math.round(snapTo(Number(e.target.value), sliderStep) * 10) / 10)}
       aria-label={aria}
       className="energy-range min-w-0 flex-1"
       style={{ "--energy-pct": `${((v - 1) / 9) * 100}%`, "--energy-color": color } as React.CSSProperties}

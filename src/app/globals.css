@@ -1639,15 +1639,15 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 .owl-say {
   animation: toucan-wisdom-in 0.25s cubic-bezier(.2,.8,.3,1.2) both;
 }
-.toucan-spirit { animation: toucan-hover 3.2s ease-in-out infinite; }
+.toucan-spirit { animation: none; }
 @keyframes toucan-hover {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
 }
 .toucan-aura { animation: toucan-aura 2.6s ease-in-out infinite; transform-origin: 50% 50%; transform-box: fill-box; }
 @keyframes toucan-aura {
-  0%, 100% { opacity: 0.55; transform: scale(0.94); }
-  50% { opacity: 0.95; transform: scale(1.06); }
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.95; }
 }
 .toucan-mote { animation: toucan-mote 3s ease-in-out infinite; }
 @keyframes toucan-mote {
@@ -1812,3 +1812,7 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
   .summit-stars circle, .summit-crown, .summit-mist, .summit-cloud-a, .summit-cloud-b, .summit-firefly, .summit-next, .summit-saying, .wanderer-lantern, .adv-birds, .adv-bird, .adv-rays { animation: none; }
 }
+
+/* The summit is a still painting: only the quests (and the trail that follows them) move. */
+.summit *, .summit *::before, .summit *::after { animation: none !important; }
+.summit .summit-wanderer { transition: none; }

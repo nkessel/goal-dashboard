@@ -1,5 +1,6 @@
 "use client";
 
+import { snapTo, useSliderStep } from "@/lib/use-slider-step";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getCheckMetricsAction, quickCheckInAction } from "@/app/actions";
@@ -17,6 +18,7 @@ export function QuickCheckIn({ isAdventure, onDone }: { isAdventure: boolean; on
   const [metrics, setMetrics] = useState<string[]>(["Energy"]);
   const [on, setOn] = useState<Record<string, number>>({});
   const [text, setText] = useState("");
+  const sliderStep = useSliderStep();
   const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -116,9 +118,9 @@ export function QuickCheckIn({ isAdventure, onDone }: { isAdventure: boolean; on
                     type="range"
                     min={1}
                     max={10}
-                    step={0.1}
+                    step={sliderStep}
                     value={v}
-                    onChange={(e) => setOn((o) => ({ ...o, [m]: Math.round(Number(e.target.value) * 10) / 10 }))}
+                    onChange={(e) => setOn((o) => ({ ...o, [m]: Math.round(snapTo(Number(e.target.value), sliderStep) * 10) / 10 }))}
                     aria-label={`${m}, 1 to 10`}
                     className="energy-range min-w-0 flex-1"
                     style={{ "--energy-pct": `${((v - 1) / 9) * 100}%`, "--energy-color": m === "Energy" ? `hsl(${hue} 60% 48%)` : "#c9a24a" } as React.CSSProperties}

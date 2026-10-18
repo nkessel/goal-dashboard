@@ -130,7 +130,13 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   const raf = useRef<number | null>(null);
   const busy = useRef(false);
   // Hold the owl and it poofs into the great toucan spirit (and back).
-  const [spirit, setSpirit] = useState(false);
+  const [spirit, setSpirit] = useState(() => {
+    try {
+      return typeof window !== "undefined" && window.localStorage.getItem("owl-spirit") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [charging, setCharging] = useState(false);
   const [wisdom, setWisdom] = useState<{ text: string; x: number; y: number } | null>(null);
   const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -146,6 +152,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     const el = box.current;
     if (!el) return;
     el.style.transform = `translate3d(${(p.x - OWL_W / 2).toFixed(1)}px, ${(p.y - OWL_H - lift).toFixed(1)}px, 0) rotate(${tilt.toFixed(1)}deg)`;
+    el.style.visibility = "visible";
     placeSay();
   }, []);
   /** Keep the speech bubble just above its head. */
@@ -168,8 +175,6 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     setMounted(true);
     try {
       at.current = Number(window.localStorage.getItem("owl-perch") ?? 0) || 0;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- remembered form, readable only after hydration
-      if (window.localStorage.getItem("owl-spirit") === "1") setSpirit(true);
     } catch {
       /* storage unavailable */
     }
@@ -181,14 +186,22 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
       }
       return perches()[at.current] ?? perches()[0];
     };
-    const t = setTimeout(() => {
+    // Place it the moment the page is laid out — no fade, so changing
+    // screens never makes it flicker.
+    let tries = 0;
+    let t = 0;
+    const place = () => {
+      if (!box.current && tries++ < 10) {
+        t = requestAnimationFrame(place);
+        return;
+      }
       put(home());
-      box.current?.classList.add("owl-arrive");
-    }, 80);
+    };
+    t = requestAnimationFrame(place);
     const onResize = () => !busy.current && !drag.current && put(home());
     window.addEventListener("resize", onResize);
     return () => {
-      clearTimeout(t);
+      cancelAnimationFrame(t);
       window.removeEventListener("resize", onResize);
       if (raf.current) cancelAnimationFrame(raf.current);
     };
@@ -457,6 +470,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
           background: "transparent",
           border: 0,
           willChange: "transform",
+          visibility: "hidden",
           filter: "drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 10px rgba(255,236,170,.25))",
         }}
       >
