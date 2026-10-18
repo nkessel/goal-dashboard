@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
@@ -7,7 +6,10 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { getProfileById } from "@/lib/data/profiles";
 import { xpToNextLevel } from "@/lib/data/xp";
 import { listCalendarTasksForOwner } from "@/lib/data/tasks";
-import { listEvents, type GoogleCalendarEvent } from "@/lib/google-calendar";
+import { listCalendars, listEvents, type GoogleCalendarEvent, type GoogleCalendarSource } from "@/lib/google-calendar";
+import { getCalendarPrefs } from "@/lib/data/calendar-sources";
+import { CalendarSources } from "@/components/calendar/CalendarSources";
+import { CalendarNav, CalendarSlide } from "@/components/calendar/CalendarNav";
 import { DayView } from "@/components/calendar/DayView";
 import { WeekView } from "@/components/calendar/WeekView";
 import { MonthView } from "@/components/calendar/MonthView";
@@ -29,7 +31,6 @@ import {
 } from "@/lib/calendar-dates";
 
 type ViewKind = "day" | "3day" | "week" | "next7" | "month";
-const VIEW_LABELS: Record<ViewKind, string> = { day: "Day", "3day": "3 days", week: "Week", next7: "7 days", month: "Month" };
 
 function parseView(v: string | undefined): ViewKind {
   return v === "day" || v === "3day" || v === "month" || v === "next7" ? v : "week";
@@ -111,33 +112,52 @@ export default async function CalendarPage({
   // viewer's time zone aren't cut off (the views place items by local day).
   rangeStart = addDays(rangeStart, -1);
   rangeEnd = addDays(rangeEnd, 1);
-  const [tasks, toSchedule, scheduleFolders] = await Promise.all([
+  const [tasks, toSchedule, scheduleFolders, calendarPrefs] = await Promise.all([
     listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
     listSchedulingList(session.user.id),
     getSchedulingFolders(session.user.id),
+    getCalendarPrefs(session.user.id),
   ]);
-  const todayHref = `/calendar?view=${view}&date=${formatDateParam(today)}`;
 
   // Real Google Calendar appointments, layered onto the same view — separate
   // from quests/tasks the app scheduled itself. Best-effort: a token refresh
   // failure or a Calendar API hiccup shouldn't break the whole page, it just
   // means no appointments show up this load.
-  let events: GoogleCalendarEvent[] = [];
+  const events: GoogleCalendarEvent[] = [];
+  let calendars: GoogleCalendarSource[] = [];
   if (session.googleAccessToken) {
-    try {
-      const importedEventIds = new Set(
-        tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id))
-      );
-      const rawEvents = await listEvents(session.googleAccessToken, rangeStart, rangeEnd);
-      events = rawEvents.filter((e) => !importedEventIds.has(e.id));
-    } catch (err) {
-      console.warn("Failed to load Google Calendar events:", err);
+    const token = session.googleAccessToken;
+    const importedEventIds = new Set(
+      tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id))
+    );
+    // Every calendar the person has, each on or off (by default, as in Google).
+    calendars = await listCalendars(token).catch((err) => {
+      console.warn("Failed to list Google calendars:", err);
+      return [] as GoogleCalendarSource[];
+    });
+    const shown = calendars.length
+      ? calendars.filter((c) => calendarPrefs.on[c.id] ?? c.selected).slice(0, 20)
+      : [{ id: "primary", name: "Calendar", color: null, primary: true, selected: true, writable: true }];
+    const lists = await Promise.all(
+      shown.map((c) =>
+        listEvents(token, rangeStart, rangeEnd, c).catch((err) => {
+          console.warn(`Failed to load events from ${c.name}:`, err);
+          return [] as GoogleCalendarEvent[];
+        })
+      )
+    );
+    const seenIds = new Set<string>();
+    for (const e of lists.flat()) {
+      if (importedEventIds.has(e.id) || seenIds.has(e.id)) continue;
+      seenIds.add(e.id);
+      events.push(e);
     }
   }
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex gap-4">
+      {calendars.length > 0 && <CalendarSources calendars={calendars} prefs={calendarPrefs} theme={theme} />}
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <PageHeader isAdventure={isAdventure} title="Quest Calendar" calmTitle="Calendar" />
         {!session.googleAccessToken && <ConnectCalendar isAdventure={isAdventure} />}
@@ -165,71 +185,17 @@ export default async function CalendarPage({
           Synced with Google Calendar
         </div>
 
-        {/* View toggle */}
-        <div
-          className="flex rounded-full p-1"
-          style={{
-            background: isAdventure ? "var(--t-nav-bg)" : "var(--t-accent-soft)",
-            border: isAdventure ? "1px solid rgba(209,161,60,.35)" : undefined,
-          }}
-        >
-          {(["day", "3day", "week", "next7", "month"] as const).map((v) => {
-            const active = v === view;
-            return (
-              <Link
-                key={v}
-                href={`/calendar?view=${v}&date=${formatDateParam(date)}`}
-                className={`flex-1 rounded-full py-1.5 text-center text-xs font-semibold capitalize ${isAdventure ? "font-display" : ""}`}
-                style={{
-                  background: active ? (isAdventure ? "var(--t-gold)" : "var(--t-accent)") : "transparent",
-                  color: active ? (isAdventure ? "#2a1c10" : "#fff") : isAdventure ? "var(--t-nav-inactive)" : "var(--t-ink-soft)",
-                }}
-              >
-                {VIEW_LABELS[v]}
-              </Link>
-            );
-          })}
-        </div>
+        <CalendarNav
+          view={view}
+          dateKey={formatDateParam(date)}
+          todayKey={formatDateParam(today)}
+          heading={heading}
+          prevHref={prevHref}
+          nextHref={nextHref}
+          isAdventure={isAdventure}
+        />
 
-        {/* Prev / heading / next */}
-        <div className="flex items-center justify-between">
-          <Link href={prevHref} aria-label="Previous" className="flex h-8 w-8 items-center justify-center">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M15 5l-7 7 7 7"
-                stroke={isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)"}
-                strokeWidth="2"
-                fill="none"
-              />
-            </svg>
-          </Link>
-          <div className="flex flex-col items-center">
-            <span
-              className={isAdventure ? "font-display text-sm" : "text-sm font-semibold"}
-              style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
-            >
-              {heading}
-            </span>
-            <Link
-              href={todayHref}
-              className="text-[11px] underline"
-              style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-accent)" }}
-            >
-              Today
-            </Link>
-          </div>
-          <Link href={nextHref} aria-label="Next" className="flex h-8 w-8 items-center justify-center">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M9 5l7 7-7 7"
-                stroke={isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)"}
-                strokeWidth="2"
-                fill="none"
-              />
-            </svg>
-          </Link>
-        </div>
-
+        <CalendarSlide slideKey={`${view}:${formatDateParam(date)}`}>
         {view === "day" && <DayView dateKey={formatDateParam(date)} tasks={tasks} events={events} theme={theme} />}
         {view === "3day" && (
           <WeekView dayKeys={Array.from({ length: 3 }, (_, i) => formatDateParam(addDays(date, i)))} tasks={tasks} events={events} theme={theme} />
@@ -245,6 +211,7 @@ export default async function CalendarPage({
         {view === "month" && (
           <MonthView monthKey={formatDateParam(startOfMonth(date))} todayKey={formatDateParam(today)} tasks={tasks} events={events} theme={theme} />
         )}
+        </CalendarSlide>
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
       <SchedulingDrawer tasks={toSchedule} folders={scheduleFolders} theme={theme} />

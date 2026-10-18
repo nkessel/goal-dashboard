@@ -73,17 +73,48 @@ export async function deleteCalendarEvent(accessToken: string, eventId: string):
 export async function updateCalendarEvent(
   accessToken: string,
   eventId: string,
-  input: { start: Date; end: Date }
+  input: { start?: Date; end?: Date; title?: string; description?: string | null },
+  calendarId = "primary"
 ): Promise<void> {
   const calendar = calendarClient(accessToken);
   await calendar.events.patch({
-    calendarId: "primary",
+    calendarId,
     eventId,
     requestBody: {
-      start: { dateTime: input.start.toISOString() },
-      end: { dateTime: input.end.toISOString() },
+      ...(input.start ? { start: { dateTime: input.start.toISOString() } } : {}),
+      ...(input.end ? { end: { dateTime: input.end.toISOString() } } : {}),
+      ...(input.title !== undefined ? { summary: input.title } : {}),
+      ...(input.description !== undefined ? { description: input.description ?? "" } : {}),
     },
   });
+}
+
+/** One of the person's Google calendars (their own, shared ones, holidays…). */
+export type GoogleCalendarSource = {
+  id: string;
+  name: string;
+  color: string | null;
+  primary: boolean;
+  /** Shown in Google Calendar itself (the default here too). */
+  selected: boolean;
+  /** Events on it can be moved and edited. */
+  writable: boolean;
+};
+
+export async function listCalendars(accessToken: string): Promise<GoogleCalendarSource[]> {
+  const calendar = calendarClient(accessToken);
+  const res = await calendar.calendarList.list({ maxResults: 250 });
+  return (res.data.items ?? [])
+    .filter((c) => c.id && !c.deleted && !c.hidden)
+    .map((c) => ({
+      id: c.id!,
+      name: c.summaryOverride || c.summary || c.id!,
+      color: c.backgroundColor ?? null,
+      primary: Boolean(c.primary),
+      selected: Boolean(c.selected || c.primary),
+      writable: c.accessRole === "owner" || c.accessRole === "writer",
+    }))
+    .sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name));
 }
 
 export type GoogleCalendarEvent = {
@@ -93,6 +124,12 @@ export type GoogleCalendarEvent = {
   start: string; // ISO
   end: string; // ISO
   isAllDay: boolean;
+  /** Which calendar it's on ("primary" when unknown). */
+  calendarId?: string;
+  /** That calendar's colour. */
+  color?: string | null;
+  /** Can be moved and edited from here. */
+  editable?: boolean;
 };
 
 /**
@@ -105,11 +142,12 @@ export type GoogleCalendarEvent = {
 export async function listEvents(
   accessToken: string,
   timeMin: Date,
-  timeMax: Date
+  timeMax: Date,
+  source: { id: string; color?: string | null; writable?: boolean } = { id: "primary", writable: true }
 ): Promise<GoogleCalendarEvent[]> {
   const calendar = calendarClient(accessToken);
   const res = await calendar.events.list({
-    calendarId: "primary",
+    calendarId: source.id,
     timeMin: timeMin.toISOString(),
     timeMax: timeMax.toISOString(),
     singleEvents: true,
@@ -119,7 +157,7 @@ export async function listEvents(
 
   return (res.data.items ?? [])
     .filter((e) => e.status !== "cancelled" && e.id)
-    .map((e) => {
+    .map((e): GoogleCalendarEvent | null => {
       const isAllDay = Boolean(e.start?.date && !e.start?.dateTime);
       const start = e.start?.dateTime ?? (e.start?.date ? `${e.start.date}T00:00:00` : undefined);
       const end = e.end?.dateTime ?? (e.end?.date ? `${e.end.date}T23:59:59` : undefined);
@@ -131,6 +169,10 @@ export async function listEvents(
         start: new Date(start).toISOString(),
         end: new Date(end).toISOString(),
         isAllDay,
+        calendarId: source.id,
+        color: source.color ?? null,
+        // Only the organiser's copy can be changed; invitations stay as they are.
+        editable: Boolean(source.writable) && (e.organizer?.self ?? true) && !e.recurringEventId,
       };
     })
     .filter((e): e is GoogleCalendarEvent => e !== null);

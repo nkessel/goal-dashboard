@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { formatTimeRange } from "@/lib/calendar-dates";
+import { updateGoogleEventAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 
 const HIDDEN_KEY = "hidden-gcal-events-v1";
@@ -61,6 +62,30 @@ export function GoogleEventChip({
   useEscape(() => setOpen(false), open);
   const [converted, setConverted] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [editTitle, setEditTitle] = useState(event.title);
+  const [editStart, setEditStart] = useState(() => toLocalInput(event.start));
+  const [editEnd, setEditEnd] = useState(() => toLocalInput(event.end));
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const canEdit = event.editable !== false && !event.isAllDay;
+
+  async function saveEdits() {
+    setEditError(null);
+    setSaving(true);
+    try {
+      await updateGoogleEventAction(event.id, event.calendarId ?? "primary", {
+        title: editTitle,
+        startISO: new Date(editStart).toISOString(),
+        endISO: new Date(editEnd).toISOString(),
+      });
+      setOpen(false);
+      router.refresh();
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Couldn't save.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (hidden || (converted && !creating)) return null;
 
@@ -98,9 +123,10 @@ export function GoogleEventChip({
         className={`cal-chip flex h-full w-full overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
         style={{
           // Solid (not see-through) so events fanned over each other stay readable.
-          background: isAdventure ? "color-mix(in srgb, #46688a 16%, #efe2c4)" : "#e7ecf9",
-          border: compact ? "none" : `1px solid ${isAdventure ? "rgba(70,104,138,.45)" : "#a9b8e6"}`,
-          borderLeft: `3px solid ${isAdventure ? "#46688a" : "#7f95d6"}`,
+          // Tinted with its calendar's own colour.
+          background: `color-mix(in srgb, ${event.color ?? (isAdventure ? "#46688a" : "#7f95d6")} ${isAdventure ? 18 : 22}%, ${isAdventure ? "#efe2c4" : "#ffffff"})`,
+          border: compact ? "none" : `1px solid color-mix(in srgb, ${event.color ?? "#46688a"} 45%, transparent)`,
+          borderLeft: `3px solid ${event.color ?? (isAdventure ? "#46688a" : "#7f95d6")}`,
           flexDirection: "row",
           gap: compact ? 0 : 8,
           padding: compact ? "3px 4px 3px 5px" : "6px 8px",
@@ -173,6 +199,41 @@ export function GoogleEventChip({
             <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
               Google Calendar appointment · {event.isAllDay ? "All day" : formatTimeRange(start, end)}
             </p>
+            {canEdit && (
+              <div className="flex flex-col gap-2 rounded-xl p-2.5" style={{ background: "rgba(120,90,40,.08)" }}>
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  aria-label="Event title"
+                  className="h-10 rounded-lg border px-2.5 text-[16px] font-semibold"
+                  style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.6)", color: "var(--t-ink)" }}
+                />
+                <div className="grid grid-cols-2 gap-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                  <label className="flex flex-col gap-0.5">
+                    Starts
+                    <input type="datetime-local" step={900} value={editStart} onChange={(e) => setEditStart(e.target.value)} className="h-9 rounded-lg border px-1.5 text-[15px]" style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.6)", color: "var(--t-ink)" }} />
+                  </label>
+                  <label className="flex flex-col gap-0.5">
+                    Ends
+                    <input type="datetime-local" step={900} value={editEnd} onChange={(e) => setEditEnd(e.target.value)} className="h-9 rounded-lg border px-1.5 text-[15px]" style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.6)", color: "var(--t-ink)" }} />
+                  </label>
+                </div>
+                {editError && (
+                  <p className="m-0 text-[13px] font-semibold" style={{ color: "var(--t-warn)" }}>
+                    {editError}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={saveEdits}
+                  disabled={saving || !editTitle.trim()}
+                  className="h-9 self-end rounded-full px-4 text-[14px] font-semibold disabled:opacity-50"
+                  style={{ border: `1.5px solid ${isAdventure ? "#a88a3f" : "var(--t-accent)"}`, color: "var(--t-ink)" }}
+                >
+                  {saving ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            )}
             {event.description && (
               <p className="text-sm" style={{ color: "var(--t-ink)" }}>
                 {event.description}
@@ -218,4 +279,11 @@ export function GoogleEventChip({
       )}
     </>
   );
+}
+
+/** "2026-10-18T09:30" in the viewer's own time zone, for a datetime-local field. */
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }

@@ -2298,3 +2298,44 @@ export async function releaseMissionStepsAction(missionId: string) {
   await supabaseAdmin().from("tasks").update({ mission_id: null }).eq("owner_id", ownerId).eq("mission_id", missionId);
   revalidatePath("/");
 }
+
+// ---------------------------------------------------------------------------
+// Calendar: which Google calendars show, and editing Google events in place
+// ---------------------------------------------------------------------------
+
+/** Save which calendars are on and how they're grouped into folders. */
+export async function saveCalendarPrefsAction(prefs: import("@/lib/data/calendar-sources").CalendarPrefs) {
+  const ownerId = await requireProfileId();
+  const { saveCalendarPrefs } = await import("@/lib/data/calendar-sources");
+  await saveCalendarPrefs(ownerId, prefs);
+  revalidatePath("/calendar");
+}
+
+/** Move, resize, rename or re-describe a Google Calendar event. */
+export async function updateGoogleEventAction(
+  eventId: string,
+  calendarId: string,
+  input: { startISO?: string; endISO?: string; title?: string; description?: string | null }
+) {
+  const { accessToken } = await requireSessionMaybeGoogle();
+  if (!accessToken) throw new Error("Connect Google Calendar first.");
+  const { updateCalendarEvent } = await import("@/lib/google-calendar");
+  if (input.startISO && input.endISO && new Date(input.endISO) <= new Date(input.startISO)) throw new Error("It has to end after it starts.");
+  try {
+    await updateCalendarEvent(
+      accessToken,
+      eventId,
+      {
+        start: input.startISO ? new Date(input.startISO) : undefined,
+        end: input.endISO ? new Date(input.endISO) : undefined,
+        title: input.title?.trim() || undefined,
+        description: input.description,
+      },
+      calendarId || "primary"
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(/forbidden|insufficient|403/i.test(msg) ? "Google won't let this event be changed from here (it may belong to someone else)." : `Couldn't update the event: ${msg}`);
+  }
+  revalidatePath("/calendar");
+}
