@@ -7,10 +7,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { getProfileById } from "@/lib/data/profiles";
 import { xpToNextLevel } from "@/lib/data/xp";
 import { listCalendarTasksForOwner } from "@/lib/data/tasks";
-import { listEvents, type GoogleCalendarEvent } from "@/lib/google-calendar";
-import { DayView } from "@/components/calendar/DayView";
-import { WeekView } from "@/components/calendar/WeekView";
-import { MonthView } from "@/components/calendar/MonthView";
+import { listEventsAllCalendars, type GoogleCalendarEvent, type GoogleCalendarInfo } from "@/lib/google-calendar";
+import { CalendarLayers } from "@/components/calendar/CalendarLayers";
 import { SchedulingDrawer } from "@/components/calendar/SchedulingList";
 import { getSchedulingFolders, listSchedulingList } from "@/lib/data/scheduling";
 import {
@@ -123,13 +121,15 @@ export default async function CalendarPage({
   // failure or a Calendar API hiccup shouldn't break the whole page, it just
   // means no appointments show up this load.
   let events: GoogleCalendarEvent[] = [];
+  let calendars: GoogleCalendarInfo[] = [];
   if (session.googleAccessToken) {
     try {
       const importedEventIds = new Set(
         tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id))
       );
-      const rawEvents = await listEvents(session.googleAccessToken, rangeStart, rangeEnd);
-      events = rawEvents.filter((e) => !importedEventIds.has(e.id));
+      const all = await listEventsAllCalendars(session.googleAccessToken, rangeStart, rangeEnd);
+      calendars = all.calendars;
+      events = all.events.filter((e) => !importedEventIds.has(e.id));
     } catch (err) {
       console.warn("Failed to load Google Calendar events:", err);
     }
@@ -230,21 +230,22 @@ export default async function CalendarPage({
           </Link>
         </div>
 
-        {view === "day" && <DayView dateKey={formatDateParam(date)} tasks={tasks} events={events} theme={theme} />}
-        {view === "3day" && (
-          <WeekView dayKeys={Array.from({ length: 3 }, (_, i) => formatDateParam(addDays(date, i)))} tasks={tasks} events={events} theme={theme} />
-        )}
-        {(view === "week" || view === "next7") && (
-          <WeekView
-            dayKeys={Array.from({ length: 7 }, (_, i) => formatDateParam(addDays(view === "week" ? startOfWeek(date) : date, i)))}
-            tasks={tasks}
-            events={events}
-            theme={theme}
-          />
-        )}
-        {view === "month" && (
-          <MonthView monthKey={formatDateParam(startOfMonth(date))} todayKey={formatDateParam(today)} tasks={tasks} events={events} theme={theme} />
-        )}
+        <CalendarLayers
+          view={view}
+          dayKeys={
+            view === "day"
+              ? [formatDateParam(date)]
+              : view === "3day"
+                ? Array.from({ length: 3 }, (_, i) => formatDateParam(addDays(date, i)))
+                : Array.from({ length: 7 }, (_, i) => formatDateParam(addDays(view === "week" ? startOfWeek(date) : date, i)))
+          }
+          monthKey={formatDateParam(startOfMonth(date))}
+          todayKey={formatDateParam(today)}
+          tasks={tasks}
+          events={events}
+          calendars={calendars}
+          theme={theme}
+        />
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
       <SchedulingDrawer tasks={toSchedule} folders={scheduleFolders} theme={theme} />
