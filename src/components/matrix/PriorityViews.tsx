@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { TaskWithBoard } from "@/lib/data/tasks";
 import type { Board } from "@/lib/data/types";
+import { oneStepPerProject } from "@/lib/next-action";
 import { DEFAULT_WEIGHTS, scoreAll, type Weights } from "@/lib/priority";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { PriorityMatrix } from "./PriorityMatrix";
@@ -108,7 +109,8 @@ export function PriorityViews({
   }
 
   // Imports still waiting for review stay out of the lab.
-  const live = tasks.filter((t) => !t.needs_review);
+  // A project shows only its next step, so the views point at what's next.
+  const live = oneStepPerProject(tasks.filter((t) => !t.needs_review), boards);
   const scored = now ? scoreAll(live, weights, now) : [];
   const open = (t: TaskWithBoard) => setEditing(t);
 

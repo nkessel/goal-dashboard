@@ -20,6 +20,8 @@ import { DayNightFlip } from "@/components/evening/DayNightFlip";
 import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
 import { PlanNudge } from "@/components/plan/PlanNudge";
+import { oneStepPerProject } from "@/lib/next-action";
+import { listBoardsForOwner } from "@/lib/data/boards";
 import { getPlanSession } from "@/lib/data/planning";
 import { DailyHabits } from "@/components/habits/DailyHabits";
 import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
@@ -108,10 +110,11 @@ export default async function Home() {
   const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, kind: r.kind ?? null, icon_key: r.icon_source ? r.icon_key : null, icon_source: r.icon_source ?? null, coin_value: r.coin_value ?? null, estimate_minutes: r.estimate_minutes ?? null });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
   // Habit streaks look back a few months; skips end a streak. Journal entries join today's victories.
-  const [habitHistory, habitSkips, journal] = await Promise.all([
+  const [habitHistory, habitSkips, journal, projectBoards] = await Promise.all([
     habits?.length ? listCompletionsFor(session.user.id, habits.map((h) => h.id), daysAgoISO(120).slice(0, 10)) : Promise.resolve([]),
     listHabitSkips(session.user.id, daysAgoISO(120).slice(0, 10)),
     listJournalEntries(session.user.id, 150).catch(() => null),
+    listBoardsForOwner(session.user.id).catch(() => []),
   ]);
   const eveningRites = rites?.filter((r) => r.slot !== "day").map(riteView) ?? null;
   // Imports wait for approval before they show here at all; quests taken off
@@ -126,8 +129,10 @@ export default async function Home() {
     const ms = Date.parse(t.due_at) - nowMs;
     return ms < 4 * 86_400_000 && ms > -7 * 86_400_000;
   };
-  const extras = onToday.filter((t) => !t.is_manual_priority && t.in_additional !== false);
-  const otherTasks = [...extras.filter(dueSoon).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!)), ...extras.filter((t) => !dueSoon(t))];
+  // A project (a board on your matrix) offers just its next step here.
+  const extras = oneStepPerProject(onToday.filter((t) => !t.is_manual_priority && t.in_additional !== false), projectBoards, openTasks);
+  const soon = extras.filter(dueSoon).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
+  const otherTasks = [...soon, ...extras.filter((t) => !dueSoon(t))];
   const theme = profile?.theme ?? "adventure";
   const stats = profile && (
     <section>

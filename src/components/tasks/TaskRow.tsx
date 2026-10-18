@@ -4,9 +4,10 @@ import { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction } from "@/app/actions";
+import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, setNextStepAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
+import { earlyBirdBonus } from "@/lib/next-action";
 import { QuestActionMenu, SnoozeGlyph, type QuestAction } from "./QuestActionMenu";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { celebrateQuest, updateQuestCelebration } from "@/components/celebration/QuestCelebrationHost";
@@ -59,8 +60,11 @@ export function TaskRow({
   sortable,
   listMoves,
   onEditorClose,
+  compact = false,
 }: {
   task: Task;
+  /** A smaller card (on the map): one line of description. */
+  compact?: boolean;
   /** Called after the editor opened from this card closes (e.g. to close a preview popup too). */
   onEditorClose?: () => void;
   /** On a list that can update instantly (Today): move or drop this card
@@ -140,7 +144,6 @@ export function TaskRow({
   const avatarSize = 60;
 
   // Urgency (flames) and importance (bolts), 0–5 each — same icons as the quest editor.
-  const urgencyCount = Math.min(5, Math.max(0, Math.round(task.urgency)));
   const importanceCount = Math.min(5, Math.max(0, Math.round(task.importance)));
 
   const imageUrl = task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null;
@@ -187,6 +190,17 @@ export function TaskRow({
     if (action === "calendar") return setScheduling(true);
     if (action === "focus") return openFocusMode({ ...task, categoryLabel });
     if (action === "earlier") return setDoneEarlier(true);
+    if (action === "nextstep") {
+      startTransition(async () => {
+        try {
+          await setNextStepAction(task.id);
+          listMoves?.notify?.({ text: `Next step: ${task.title}` });
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Couldn't set that.");
+        }
+      });
+      return;
+    }
     if (action === "snooze") {
       // Off today now; back at the top of the day tomorrow. Undo puts it back.
       startTransition(async () => {
@@ -272,6 +286,7 @@ export function TaskRow({
       onToday={task.is_manual_priority || task.in_additional !== false}
       onCalendar={task.is_on_calendar}
       canSnooze={Boolean(listMoves) && task.status === "open"}
+      onBoard={Boolean(task.board_id)}
       align={align}
       anchor={menuAnchor}
       onPick={pick}
@@ -435,7 +450,7 @@ export function TaskRow({
             {task.title}
           </p>
           {task.description && (
-            <p dir="auto" className="user-text line-clamp-3 break-words text-[13.5px] leading-snug sm:text-[14px]" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
+            <p dir="auto" className={`user-text ${compact ? "line-clamp-1" : "line-clamp-3"} break-words text-[13.5px] leading-snug sm:text-[14px]`} style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
               {task.description}
             </p>
           )}
@@ -459,25 +474,15 @@ export function TaskRow({
                 {isWarned && " — rescheduled often"}
               </span>
             )}
-            {urgencyCount > 0 && (
-              <span className="flex items-center gap-2.5">
-                {(task.is_on_calendar || task.reschedule_count > 0) && (
-                  <span style={{ width: 1, height: 16, background: dividerColor }} aria-hidden />
-                )}
-                <span className="flex items-center gap-1" title={`Urgency ${task.urgency.toFixed(1)}`}>
-                  {Array.from({ length: urgencyCount }).map((_, i) =>
-                    isAdventure ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                      <img key={i} src="/design/ui-hourglass.svg" alt="" width={15} height={15} />
-                    ) : (
-                      <span key={i} style={{ color: "var(--t-clay)", fontSize: 12 }}>
-                        &#9679;
-                      </span>
-                    )
-                  )}
+            {(() => {
+              // Get ahead of the deadline: finishing early pays a bonus.
+              const bonus = task.status === "open" ? earlyBirdBonus(task) : 0;
+              return bonus > 0 ? (
+                <span className="flex items-center gap-1 font-semibold" style={{ color: isAdventure ? "#5a7a2a" : "var(--t-accent)" }} title="Finish it 2+ days before it's due for bonus XP">
+                  🐦 +{bonus} XP if done early
                 </span>
-              </span>
-            )}
+              ) : null;
+            })()}
           </div>
           {((task.progress ?? 0) > 0 || (task.steps_total ?? 0) > 0) && (
             <div className="mt-2 flex items-center gap-2" title={`${task.progress ?? 0}% done`}>

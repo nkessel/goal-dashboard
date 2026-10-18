@@ -72,7 +72,7 @@ export type XpAwardResult = {
 export async function awardXp(
   ownerId: string,
   amount: number,
-  kind: "task_completed" | "daily_check_in" | "streak_bonus" | "planning_ritual",
+  kind: "task_completed" | "daily_check_in" | "streak_bonus" | "planning_ritual" | "early_bird",
   taskId?: string
 ): Promise<XpAwardResult> {
   const db = supabaseAdmin();

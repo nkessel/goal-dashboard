@@ -100,23 +100,31 @@ function useViewport(): Viewport | null {
   const [vp, setVp] = useState<Viewport | null>(null);
   useEffect(() => {
     const vv = window.visualViewport;
-    const update = () => {
+    const read = () => {
+      pending = 0;
       const zoomed = !!vv && vv.scale > 1.05;
-      setVp({
-        left: vv && !zoomed ? vv.offsetLeft : 0,
-        top: vv && !zoomed ? vv.offsetTop : 0,
-        w: vv && !zoomed ? vv.width : window.innerWidth,
-        h: vv && !zoomed ? vv.height : window.innerHeight,
+      const next = {
+        left: Math.round(vv && !zoomed ? vv.offsetLeft : 0),
+        top: Math.round(vv && !zoomed ? vv.offsetTop : 0),
+        w: Math.round(vv && !zoomed ? vv.width : window.innerWidth),
+        h: Math.round(vv && !zoomed ? vv.height : window.innerHeight),
         innerW: window.innerWidth,
         innerH: window.innerHeight,
-      });
+      };
+      // Only re-render when something actually changed (at most once a frame).
+      setVp((p) => (p && p.left === next.left && p.top === next.top && p.w === next.w && p.h === next.h && p.innerW === next.innerW && p.innerH === next.innerH ? p : next));
     };
-    const raf = requestAnimationFrame(update);
+    let pending = 0;
+    const update = () => {
+      if (!pending) pending = requestAnimationFrame(read);
+    };
+    const raf = requestAnimationFrame(read);
     vv?.addEventListener("resize", update);
     vv?.addEventListener("scroll", update);
     window.addEventListener("resize", update);
     return () => {
       cancelAnimationFrame(raf);
+      if (pending) cancelAnimationFrame(pending);
       vv?.removeEventListener("resize", update);
       vv?.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
@@ -744,6 +752,8 @@ function Composer({
   const xp = draft.xp ?? 1;
   const [uploading, setUploading] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
+  // Tap an attachment to see it full size.
+  const [viewing, setViewing] = useState<string | null>(null);
   async function attach(files: File[]) {
     setAttachError(null);
     setUploading(true);
@@ -851,20 +861,13 @@ function Composer({
       {/* Screenshots: paste one into the box, or pick from your device. */}
       {(draft.shot || (draft.images ?? []).length > 0 || uploading || attachError) && (
       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-        {draft.shot && (
-          <span className="relative h-12 w-16 overflow-hidden rounded-lg" style={{ border: "1.5px solid #b39a6a" }} title="A picture of the screen you were on — sent with your feedback">
-            {/* eslint-disable-next-line @next/next/no-img-element -- screen picture */}
-            <img src={draft.shot} alt="The screen you were on" className="h-full w-full object-cover object-top" />
-            <button type="button" onClick={() => onChange({ shot: null })} aria-label="Don't send the screen picture" className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center rounded-bl-md text-[13px] leading-none" style={{ background: "rgba(0,0,0,.6)", color: "#fff" }}>
-              ×
+        {[...(draft.shot ? [{ url: draft.shot, label: "Screen picture", remove: () => onChange({ shot: null }) }] : []), ...(draft.images ?? []).map((u, i) => ({ url: u, label: (draft.images ?? []).length > 1 ? `Image ${i + 1}` : "Image", remove: () => onChange({ images: (draft.images ?? []).filter((x) => x !== u) }) }))].map((a) => (
+          <span key={a.url} className="flex h-7 items-center rounded-full pl-1" style={{ border: "1px solid var(--t-panel-border)", background: "rgba(255,255,255,.55)" }}>
+            <button type="button" onClick={() => setViewing(a.url)} className="flex h-6 items-center gap-1 rounded-full px-1.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)" }} title="See it full size">
+              <span aria-hidden>📎</span>
+              {a.label}
             </button>
-          </span>
-        )}
-        {(draft.images ?? []).map((u) => (
-          <span key={u} className="relative h-12 w-12 overflow-hidden rounded-lg" style={{ border: "1.5px solid #b39a6a" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- attached screenshot */}
-            <img src={u} alt="Attached screenshot" className="h-full w-full object-cover" />
-            <button type="button" onClick={() => onChange({ images: (draft.images ?? []).filter((x) => x !== u) })} aria-label="Remove this image" className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center rounded-bl-md text-[13px] leading-none" style={{ background: "rgba(0,0,0,.6)", color: "#fff" }}>
+            <button type="button" onClick={a.remove} aria-label={`Remove ${a.label.toLowerCase()}`} className="flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none hover:bg-black/10" style={{ color: "var(--t-ink-soft)" }}>
               ×
             </button>
           </span>
@@ -878,6 +881,17 @@ function Composer({
           {error}
         </p>
       )}
+      {viewing &&
+        createPortal(
+          <div role="dialog" aria-label="Attachment" className="fixed inset-0 z-[90] flex items-center justify-center p-4" style={{ background: "rgba(10,8,14,.82)" }} onClick={() => setViewing(null)}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- attachment, full size */}
+            <img src={viewing} alt="Attachment, full size" className="max-h-full max-w-full rounded-lg object-contain" style={{ boxShadow: "0 12px 40px rgba(0,0,0,.6)" }} />
+            <button type="button" onClick={() => setViewing(null)} aria-label="Close" className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-[22px]" style={{ background: "rgba(255,255,255,.15)", color: "#fff" }}>
+              ×
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

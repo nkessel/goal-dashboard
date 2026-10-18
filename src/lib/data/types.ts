@@ -12,6 +12,8 @@ export type Board = {
   parent_board_id: string | null;
   /** On the Priority Matrix as one item: 'plot' (map), 'unplotted', 'later'; null = not on it. */
   matrix_state?: "plot" | "unplotted" | "later" | null;
+  /** The project's chosen next action (a quest on this board). */
+  next_task_id?: string | null;
   importance?: number;
   urgency?: number;
   effort?: number;

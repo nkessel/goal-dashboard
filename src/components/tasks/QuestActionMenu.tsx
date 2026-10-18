@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 
-export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "earlier" | "delete";
+export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "earlier" | "nextstep" | "delete";
 
 /**
  * The quest card's action list — opened from the card's icon (the blank
@@ -17,6 +17,7 @@ export function QuestActionMenu({
   onToday = true,
   onCalendar,
   canSnooze = false,
+  onBoard = false,
   align,
   anchor,
   onPick,
@@ -24,6 +25,8 @@ export function QuestActionMenu({
 }: {
   /** Offer "Snooze until tomorrow" (quests on the Today screen). */
   canSnooze?: boolean;
+  /** On a board: offer making it that project's next step. */
+  onBoard?: boolean;
   isAdventure: boolean;
   inBattle: boolean;
   /** The quest is a reward being claimed: "Complete this reward". */
@@ -96,6 +99,7 @@ export function QuestActionMenu({
     // In Additional Quests, taking it out of that list takes it off the Today screen.
     ...(onToday && !inBattle ? [{ key: "offtoday" as const, icon: <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />, label: isAdventure ? "Remove from Additional Quests" : "Remove from More tasks" }] : []),
     { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule on calendar" : "Schedule on calendar" },
+    ...(onBoard && !isReward ? [{ key: "nextstep" as const, icon: <Glyph d="M5 12h12M13 7l5 5-5 5" />, label: "Make it the board's next step" }] : []),
     ...(!isReward ? [{ key: "earlier" as const, icon: <Glyph d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3h3" />, label: "Already completed…" }] : []),
     { key: "delete", icon: <Glyph d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, label: isReward ? "Delete reward" : isAdventure ? "Delete quest" : "Delete task" },
   ];

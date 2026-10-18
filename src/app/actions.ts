@@ -43,6 +43,7 @@ import {
   listEvents,
 } from "@/lib/google-calendar";
 import { coinsForXp } from "@/lib/coins";
+import { earlyBirdBonus } from "@/lib/next-action";
 
 async function requireProfileId(): Promise<string> {
   const session = await auth();
@@ -387,10 +388,21 @@ async function finishTask(ownerId: string, taskId: string, completedAt?: string)
   }
   // A boss's session quest counts toward defeating it.
   if (completed.boss_id) await bossStep(ownerId, completed.boss_id, 1).catch(() => {});
+  // Done well before its deadline: the early-bird bonus.
+  const early = earlyBirdBonus(completed, completedAt ? Date.parse(completedAt) : Date.now());
+  if (early > 0) {
+    const award = await xp.awardXp(ownerId, early, "early_bird", taskId).catch(() => null);
+    if (award) {
+      totalXp = award.totalXp;
+      coinsEarned += award.coins === null ? 0 : award.coinsEarned;
+    }
+  }
+  // A project's next action is done: the next one takes its place.
+  await supabaseAdmin().from("boards").update({ next_task_id: null }).eq("owner_id", ownerId).eq("next_task_id", taskId);
   revalidatePath("/");
   revalidatePath("/matrix");
   // Lets the quest-complete celebration fill the XP bar to the real total.
-  return { totalXp, coinsEarned, rewardCompleted };
+  return { totalXp, coinsEarned, rewardCompleted, earlyBird: early };
 }
 
 /** Full edit from the quest-card edit dialog (title/description/importance/urgency/xp/estimate). */
@@ -2403,4 +2415,19 @@ export async function completePlanAction(kind: "week" | "month", data: Record<st
   revalidatePath("/");
   revalidatePath("/plan");
   return res;
+}
+
+// ---------------------------------------------------------------------------
+// Project next actions
+
+/** Make a quest its board's next action (the one step priority views show). */
+export async function setNextStepAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  const { data } = await supabaseAdmin().from("tasks").select("board_id").eq("id", taskId).eq("owner_id", ownerId).maybeSingle<{ board_id: string | null }>();
+  if (!data?.board_id) throw new Error("This quest isn't on a board yet.");
+  const { error } = await supabaseAdmin().from("boards").update({ next_task_id: taskId }).eq("id", data.board_id).eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't save that: ${error.message}`);
+  revalidatePath("/");
+  revalidatePath("/matrix");
+  revalidatePath("/boards");
 }

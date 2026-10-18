@@ -10,6 +10,7 @@ import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { QuestCardPopup } from "@/components/tasks/QuestCardPopup";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { BoardSeal } from "@/components/boards/BoardSeal";
+import { nextActionOf } from "@/lib/next-action";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { useEscape } from "@/lib/use-escape";
 import { collapseBoardOnMatrixAction, confirmImportAction, expandBoardOnMatrixAction, placeOnMatrixAction, setMatrixStateAction } from "@/app/actions";
@@ -40,6 +41,8 @@ type Item = {
   board?: MatrixBoard;
   boardTitle: string | null;
   openQuests?: number;
+  /** A project board shows as its next action. */
+  next?: TaskWithBoard;
 };
 
 type Override = { importance?: number; urgency?: number; effort?: number; state?: string | null };
@@ -179,6 +182,7 @@ export function PriorityMatrix({
 
   const items: Item[] = [];
   const hiddenQuests: TaskWithBoard[] = [];
+  const projectIds = new Set((boards ?? []).filter((b) => (overrides[`b:${b.id}`]?.state !== undefined ? overrides[`b:${b.id}`]?.state : b.matrix_state)).map((b) => b.id));
   for (const t of initialTasks) {
     const key = `t:${t.id}`;
     const ov = overrides[key] ?? {};
@@ -188,6 +192,8 @@ export function PriorityMatrix({
       continue;
     }
     if (boards && hiddenBoards.has(t.board_id ?? "none")) continue;
+    // A project on the matrix shows only its next step (as the board's icon).
+    if (t.board_id && projectIds.has(t.board_id)) continue;
     const importance = ov.importance ?? t.importance;
     const urgency = ov.urgency ?? t.urgency;
     const rawEffort = ov.effort ?? t.effort ?? 0;
@@ -223,20 +229,23 @@ export function PriorityMatrix({
     const urgency = ov.urgency ?? b.urgency ?? 0;
     const effort = ov.effort ?? b.effort ?? 0;
     const lot: Lot = state === "later" ? "later" : state === "unplotted" ? "unplotted" : rated(importance, urgency, effort > 0) ? "map" : "unplotted";
+    const next = nextActionOf(b, initialTasks) ?? undefined;
     items.push({
       key,
       kind: "board",
       id: b.id,
-      title: b.title,
-      description: b.description ?? null,
+      title: next ? next.title : b.title,
+      next,
+      task: next,
+      description: next ? (next.description ?? null) : (b.description ?? null),
       importance,
       urgency,
       effort: effort || 2.5,
       effortKnown: effort > 0,
-      img: artOf(b),
+      img: (next && artOf(next)) || artOf(b),
       lot,
       board: b,
-      boardTitle: null,
+      boardTitle: next ? b.title : null,
       openQuests: openCount.get(b.id) ?? 0,
     });
   }
@@ -301,6 +310,7 @@ export function PriorityMatrix({
   function tap(item: Item, source: Lot) {
     if (source === "map") {
       if (item.kind === "task") setViewingTaskId(item.id);
+      else if (item.next) setViewingTaskId(item.next.id);
       else setEditingBoardId(item.id);
     } else {
       startPlot([item.key]);
@@ -530,7 +540,7 @@ export function PriorityMatrix({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => (plotItem.kind === "task" ? setEditingTaskId(plotItem.id) : setEditingBoardId(plotItem.id))}
+                  onClick={() => (plotItem.kind === "task" ? setEditingTaskId(plotItem.id) : plotItem.next ? setEditingTaskId(plotItem.next.id) : setEditingBoardId(plotItem.id))}
                   className="h-9 rounded-full border px-3.5 text-[13.5px] font-semibold"
                   style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)" }}
                 >
@@ -887,7 +897,7 @@ export function PriorityMatrix({
             if (action === "expand-ask") return setCtx({ ...ctx, expand: true });
             setCtx(null);
             setError(null);
-            if (action === "open") return item.kind === "task" ? setViewingTaskId(item.id) : setEditingBoardId(item.id);
+            if (action === "open") return item.kind === "task" ? setViewingTaskId(item.id) : item.next ? setViewingTaskId(item.next.id) : setEditingBoardId(item.id);
             if (action === "later" || action === "unplotted" || action === "trash") return move(item, action);
             startTransition(async () => {
               try {
@@ -958,7 +968,7 @@ function Portrait({ item, size, ring = false, warn = false }: { item: Item; size
 function Facts({ item, theme }: { item: Item; theme: "calm" | "adventure" }) {
   const t = item.task;
   const facts: string[] = [];
-  if (item.kind === "board") facts.push(`Board · ${item.openQuests ?? 0} open quests`);
+  if (item.kind === "board") facts.push(item.next ? `Next step · ${item.boardTitle} (${item.openQuests ?? 0} open)` : `Board · ${item.openQuests ?? 0} open quests`);
   else if (item.boardTitle) facts.push(item.boardTitle);
   if (t?.due_at) facts.push(`Due ${new Date(t.due_at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`);
   if (t?.estimate_minutes != null) facts.push(`⏱ ${t.estimate_minutes < 60 ? `${t.estimate_minutes}m` : `${Math.round((t.estimate_minutes / 60) * 10) / 10}h`}`);

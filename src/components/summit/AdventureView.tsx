@@ -343,8 +343,9 @@ export function AdventureView({
     // Wide, lazy S-bends (more of them on long stretches), like the climb
     // above — but never so wide that neighbouring stretches cross.
     const depth = Math.max(0, Math.min(1, (p.y / h - TOP) / (1 - TOP)));
-    const amp = Math.min(len * 0.22, 14 + 30 * depth, Math.abs(dy) * 0.35 + 6);
-    const bends = len > 300 ? 4 : len > 160 ? 3 : 2;
+    // Gentle and flowing: one soft sweep per stretch (two on long ones) — curvy, not twisty.
+    const amp = Math.min(len * 0.2, 12 + 26 * depth, Math.abs(dy) * 0.4 + 10);
+    const bends = len > 260 ? 2 : 1;
     // First bend swings away from where the trail just came from, so
     // neighbouring stretches part rather than cross.
     const prev = trail[i - 1];
@@ -368,16 +369,16 @@ export function AdventureView({
   if (w) {
     const turns = world.climb.turns;
     const up: { x: number; y: number }[] = [last];
+    // Switchbacks sweep from one flank of the mountain to the other,
+    // narrowing toward the peak — always on the mountain's face.
+    const startSide = last.x < peak.x ? 1 : -1;
     for (let k = 1; k < turns; k++) {
       const t = k / turns;
-      const cx = last.x + (peak.x - last.x) * Math.pow(t, 0.8);
       const y = last.y + (peak.y - last.y) * (1 - Math.pow(1 - t, 1.25));
-      const amp = (1 - t) * Math.min(w * 0.2, world.climb.amp) + 8;
-      // Keep each switchback on the mountain's face, inside its slopes.
       const below = Math.max(0, y - peak.y);
-      const minX = peak.x - below * SLOPE_L * 0.78;
-      const maxX = peak.x + below * SLOPE_R * 0.78;
-      up.push({ x: Math.max(minX, Math.min(maxX, cx + (k % 2 === 0 ? -1 : 1) * amp)), y });
+      const side = k % 2 === 1 ? startSide : -startSide;
+      const half = Math.min(w * 0.42, below * (side < 0 ? SLOPE_L : SLOPE_R) * 0.72);
+      up.push({ x: peak.x + side * half * (0.75 + 0.25 * (1 - t)), y });
     }
     up.push(peak);
     climb = segments(up).join("");
@@ -506,6 +507,8 @@ export function AdventureView({
           width: w || "100%",
           height: h || "100%",
           transformOrigin: "0 0",
+          // Its own layer: typing, keyboards or a resize elsewhere don't make the painted world redraw.
+          willChange: "transform",
           transform: arriving ? "translate(0, 6%) scale(1.18)" : `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})`,
           filter: arriving ? "blur(6px) brightness(.6)" : undefined,
           transition: arriving ? "none" : pan.current ? "none" : "transform 1.6s cubic-bezier(.2,.7,.2,1), filter 1.4s ease-out",
@@ -717,21 +720,53 @@ export function AdventureView({
             const top = Math.max(64, Math.min(h - 160, p.y - 40));
             const card = cards[q.id];
             return (
-              <div key={q.id} role="group" aria-label={q.title} className="summit-card fade-in absolute" style={{ left, top, width: CW, transform: "scale(.86)", transformOrigin: "0 0", zIndex: dragId === q.id ? 999 : 400 + Math.round(p.y) }}>
-                <div
-                  {...handlers}
-                  className={`flex h-6 items-center justify-center rounded-t-xl ${dragId === q.id ? "is-dragging" : ""}`}
-                  style={{ background: "rgba(42,28,16,.75)", cursor: dragId === q.id ? "grabbing" : "grab", touchAction: "none" }}
-                  title="Drag to move · tap to fold back into its token"
+              <div
+                key={q.id}
+                role="group"
+                aria-label={`${q.title} — drag to move`}
+                className={`summit-card fade-in absolute ${dragId === q.id ? "is-dragging" : ""}`}
+                style={{ left, top, width: CW, transform: "scale(.86)", transformOrigin: "0 0", zIndex: dragId === q.id ? 999 : 400 + Math.round(p.y), cursor: dragId === q.id ? "grabbing" : "grab", touchAction: "none" }}
+                onPointerDown={(e) => {
+                  if (e.button > 0) return;
+                  const r = box.current?.getBoundingClientRect();
+                  const k = r && w ? r.width / w : 1;
+                  drag.current = { id: q.id, x0: e.clientX, y0: e.clientY, moved: false, offX: e.clientX - (r?.left ?? 0) - p.x * k, offY: e.clientY - (r?.top ?? 0) - p.y * k };
+                }}
+                onPointerMove={(e) => {
+                  const d = drag.current;
+                  if (!d || d.id !== q.id) return;
+                  // Only once it really moves does it become a drag (taps still reach the card).
+                  if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) >= 6 && !e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.setPointerCapture(e.pointerId);
+                  onMove(e);
+                }}
+                onPointerUp={() => {
+                  const d = drag.current;
+                  drag.current = null;
+                  setDragId(null);
+                  if (d?.moved) save({ ...spots });
+                }}
+                onPointerCancel={() => {
+                  drag.current = null;
+                  setDragId(null);
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setCardsOn((c) => { const x = new Set(c); x.delete(q.id); return x; })}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Fold back into its token"
+                  title="Fold back into its token"
+                  className="absolute -right-2 -top-2 z-[5] flex h-7 w-7 items-center justify-center rounded-full text-[16px] leading-none"
+                  style={{ background: "rgba(42,28,16,.88)", color: "#f2d27e", border: "1.5px solid rgba(242,210,126,.7)" }}
                 >
-                  <span aria-hidden className="h-1 w-10 rounded-full" style={{ background: "rgba(242,210,126,.8)" }} />
-                </div>
+                  ×
+                </button>
                 {card ? (
                   <ul className="m-0 list-none p-0">
-                    <TaskRow task={card} theme="adventure" categoryLabel={card.categoryLabel} onEditorClose={() => router.refresh()} />
+                    <TaskRow task={card} theme="adventure" categoryLabel={card.categoryLabel} onEditorClose={() => router.refresh()} compact />
                   </ul>
                 ) : (
-                  <p className="m-0 rounded-b-xl p-3 text-[15px] font-semibold" style={{ background: "#f6ecd2", color: "#2a1c10" }}>
+                  <p className="m-0 rounded-xl p-3 text-[15px] font-semibold" style={{ background: "#f6ecd2", color: "#2a1c10" }}>
                     {q.title}
                   </p>
                 )}
@@ -773,7 +808,7 @@ export function AdventureView({
                 )}
               </span>
               <span
-                className="mt-1 max-w-[120px] truncate rounded-md px-1.5 py-0.5 text-[11.5px] font-semibold"
+                className="mt-1 w-max max-w-[150px] rounded-md px-1.5 py-0.5 text-center text-[11.5px] font-semibold leading-tight"
                 style={{ background: "rgba(246,236,210,.92)", color: "#2a1c10", border: "1px solid #a58c66", textDecoration: q.done ? "line-through" : undefined, opacity: q.done ? 0.8 : 1 }}
               >
                 {q.title}

@@ -139,6 +139,16 @@ export function EnergyCheck({
   }
   const [adding, setAdding] = useState(false);
   const [editingList, setEditingList] = useState(false);
+  // Arrived from "Edit check-in" on Today: open the editing straight away.
+  useEffect(() => {
+    if (!full) return;
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is only readable after hydration
+      if (new URLSearchParams(window.location.search).get("edit") === "checkin") setEditingList(true);
+    } catch {
+      /* no URL */
+    }
+  }, [full]);
   const [newMetric, setNewMetric] = useState("");
   const mayOffer = useSyncExternalStore(subscribeMinute, readMayOffer, () => false);
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
@@ -336,20 +346,6 @@ export function EnergyCheck({
       </button>
     </div>
   ) : null;
-  const noteButton = (
-    <button
-      type="button"
-      onClick={() => setNoting(true)}
-      className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold"
-      style={{ border: "1px dashed rgba(217,180,95,.6)", color: "var(--t-cream)" }}
-      title="Write in something that happened, or a #tag"
-    >
-      <span aria-hidden style={{ color: "var(--t-gold)" }}>
-        🏷
-      </span>
-      Event or #tag
-    </button>
-  );
   const slider = (v: number, onChange: (n: number) => void, aria: string, color: string) => (
     <input
       type="range"
@@ -424,6 +420,33 @@ export function EnergyCheck({
                   );
                 })}
 
+                {/* Beneath the metrics: add another, or log an event / #tag. */}
+                {!adding && !noting && (
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden className="w-5 shrink-0" />
+                    {metrics.length < MAX_METRICS && (
+                      <button
+                        type="button"
+                        onClick={() => setAdding(true)}
+                        className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
+                        style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
+                        title="Add a new check-in metric"
+                      >
+                        <span aria-hidden style={{ color: "var(--t-gold)" }}>+</span> New
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setNoting(true)}
+                      className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
+                      style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
+                      title="Write in something that happened, or a #tag"
+                    >
+                      <span aria-hidden style={{ color: "var(--t-gold)" }}>+</span> Tag / event
+                    </button>
+                  </div>
+                )}
+
                 {adding && (
                   <div className="reveal flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid rgba(217,180,95,.3)" }}>
                     <div className="flex items-center gap-1.5">
@@ -468,32 +491,24 @@ export function EnergyCheck({
 
                 {noteChips}
                 {noteInput}
-                {/* [Edit metrics] · Add new check-in metric · Event or #tag · Submit check-in */}
+                {/* Edit check-in · Submit check-in */}
                 <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 pt-0.5">
-                  {!noting && noteButton}
-                  {metrics.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setEditingList((v) => !v)}
-                      aria-pressed={editingList}
-                      className="h-8 rounded-full px-2.5 text-[13.5px] underline-offset-2 hover:underline"
-                      style={{ color: "rgba(239,230,204,.75)" }}
-                    >
-                      {editingList ? "Done editing" : "Edit metrics"}
-                    </button>
-                  )}
-                  {metrics.length < MAX_METRICS && !adding && (
-                    <button
-                      type="button"
-                      onClick={() => setAdding(true)}
-                      className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[14px] font-semibold"
-                      style={{ border: "1px dashed rgba(217,180,95,.6)", color: "var(--t-cream)" }}
-                    >
-                      <span aria-hidden className="text-[16px] leading-none" style={{ color: "var(--t-gold)" }}>
-                        +
-                      </span>
-                      Add new check-in metric
-                    </button>
+                  {full ? (
+                    metrics.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingList((v) => !v)}
+                        aria-pressed={editingList}
+                        className="h-8 rounded-full px-2.5 text-[13.5px] underline-offset-2 hover:underline"
+                        style={{ color: "rgba(239,230,204,.75)" }}
+                      >
+                        {editingList ? "Done editing" : "Edit check-in"}
+                      </button>
+                    )
+                  ) : (
+                    <Link href="/insights?edit=checkin" className="flex h-8 items-center rounded-full px-2.5 text-[13.5px] underline-offset-2 hover:underline" style={{ color: "rgba(239,230,204,.75)" }}>
+                      Edit check-in
+                    </Link>
                   )}
                   <button
                     type="button"
