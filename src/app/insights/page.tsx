@@ -8,6 +8,7 @@ import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckInsSince, listC
 import { appDayKey } from "@/lib/data/tomorrow";
 import { EnergyCheck } from "@/components/xp/EnergyCheck";
 import { EventLog } from "@/components/insights/EventLog";
+import { DEFAULT_WHEEL, LifeWheel } from "@/components/insights/LifeWheel";
 import { listWinsSince } from "@/lib/data/wins";
 
 export default async function InsightsPage() {
@@ -31,6 +32,12 @@ export default async function InsightsPage() {
   ) as Record<string, number>;
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
+  // The life wheel's readings are kept apart from the chart's metrics.
+  const WHEEL = "◎ ";
+  const wheelTopics = profile?.life_wheel?.topics?.length ? profile.life_wheel.topics : DEFAULT_WHEEL;
+  const wheelLast: Record<string, { level: number; at: string }> = {};
+  for (const c of checks) if (c.metric.startsWith(WHEEL)) wheelLast[c.metric.slice(WHEEL.length)] = { level: c.level, at: c.created_at };
+  const chartChecks = checks.filter((c) => !c.metric.startsWith(WHEEL));
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
@@ -56,11 +63,21 @@ export default async function InsightsPage() {
           </h2>
           <EventLog notes={notes.map((n) => ({ id: n.id, body: n.body, created_at: n.created_at }))} />
         </section>
+        <section
+          aria-label="Life wheel"
+          className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
+          style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
+        >
+          <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
+            Life wheel <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— how each part of life feels</span>
+          </h2>
+          <LifeWheel topics={wheelTopics} last={wheelLast} />
+        </section>
         <InsightsView
           theme={theme}
           readings={[
             ...energy.map((e) => ({ metric: "Energy", level: e.level, at: e.created_at })),
-            ...checks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at })),
+            ...chartChecks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at })),
           ]}
           metrics={["Energy", ...metrics]}
           wins={[

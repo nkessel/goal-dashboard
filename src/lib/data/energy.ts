@@ -126,7 +126,7 @@ export function tagsIn(text: string): string[] {
   return [...new Set([...text.matchAll(/#([\p{L}\p{N}_-]{1,24})/gu)].map((m) => m[1].toLowerCase()))].slice(0, 8);
 }
 
-export async function addCheckNote(ownerId: string, text: string, atISO?: string | null): Promise<CheckNote> {
+export async function addCheckNote(ownerId: string, text: string, atISO?: string | null, allDay = false): Promise<CheckNote> {
   const body = text.replace(/\s+/g, " ").trim().slice(0, 200);
   if (!body) throw new Error("Write something first.");
   // Logged for another moment (earlier today, yesterday…): up to 90 days back, never in the future.
@@ -134,11 +134,12 @@ export async function addCheckNote(ownerId: string, text: string, atISO?: string
   if (atISO) {
     const t = Date.parse(atISO);
     if (!Number.isFinite(t)) throw new Error("That time doesn't look right.");
-    if (t > Date.now() + 60_000) throw new Error("That's in the future.");
+    // An all-day event can be for today (it's stamped at noon).
+    if (t > Date.now() + (allDay ? 86_400_000 : 60_000)) throw new Error("That's in the future.");
     if (t < Date.now() - 90 * 86_400_000) throw new Error("That's more than 90 days ago.");
     at = new Date(t).toISOString();
   }
-  const { data, error } = await supabaseAdmin().from("check_in_notes").insert({ owner_id: ownerId, body, tags: tagsIn(body), ...(at ? { created_at: at } : {}) }).select("id, body, tags, created_at").single();
+  const { data, error } = await supabaseAdmin().from("check_in_notes").insert({ owner_id: ownerId, body, tags: tagsIn(body), ...(at ? { created_at: at } : {}), ...(allDay ? { all_day: true } : {}) }).select("id, body, tags, created_at").single();
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   return data as CheckNote;
 }

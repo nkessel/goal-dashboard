@@ -207,14 +207,89 @@ export function AdventureView({
   const [navH, setNavH] = useState(0);
   useEscape(() => setAdding(null), !!adding);
 
+  // The map is sized once to the screen it opens on, then stays that size —
+  // a keyboard sliding up (or any squeeze) never shrinks the mountain. Only a
+  // change of width (turning the phone) re-fits it.
+  const viewRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const el = box.current;
+    const el = viewRef.current;
     if (!el) return;
-    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    let lastW = 0;
+    const measure = () => {
+      if (el.clientWidth === lastW) return;
+      lastW = el.clientWidth;
+      setSize({ w: el.clientWidth, h: Math.max(el.clientHeight, 420) });
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+  // Pan and zoom like a map.
+  const [cam, setCam] = useState({ x: 0, y: 0, z: 1 });
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pan = useRef<{ x0: number; y0: number; cx: number; cy: number; moved: boolean; pinch?: { d: number; z: number; mx: number; my: number } } | null>(null);
+  const clampCam = (c: { x: number; y: number; z: number }) => {
+    const z = Math.max(1, Math.min(3, c.z));
+    const vw = viewRef.current?.clientWidth ?? size.w;
+    const vh = viewRef.current?.clientHeight ?? size.h;
+    return { z, x: Math.min(0, Math.max(vw - size.w * z, c.x)), y: Math.min(0, Math.max(Math.min(0, vh - size.h * z), c.y)) };
+  };
+  const isMapBackground = (t: EventTarget | null) => t instanceof Element && !t.closest("button, a, input, textarea, select, [role=group], [data-no-pan], .summit-hit");
+  function onViewDown(e: React.PointerEvent) {
+    if (!isMapBackground(e.target)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()];
+      pan.current = { x0: 0, y0: 0, cx: cam.x, cy: cam.y, moved: true, pinch: { d: Math.hypot(a.x - b.x, a.y - b.y), z: cam.z, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 } };
+    } else pan.current = { x0: e.clientX, y0: e.clientY, cx: cam.x, cy: cam.y, moved: false };
+  }
+  function onViewMove(e: React.PointerEvent) {
+    if (!pointers.current.has(e.pointerId) || !pan.current) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = pan.current;
+    if (p.pinch && pointers.current.size >= 2) {
+      const [a, b] = [...pointers.current.values()];
+      const z = Math.max(1, Math.min(3, p.pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / p.pinch.d)));
+      const r = viewRef.current!.getBoundingClientRect();
+      const mx = p.pinch.mx - r.left;
+      const my = p.pinch.my - r.top;
+      // Keep the point between the fingers still while zooming.
+      setCam(clampCam({ z, x: mx - ((mx - p.cx) / p.pinch.z) * z, y: my - ((my - p.cy) / p.pinch.z) * z }));
+      return;
+    }
+    if (!p.moved && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < 6) return;
+    p.moved = true;
+    setCam((c) => clampCam({ ...c, x: p.cx + e.clientX - p.x0, y: p.cy + e.clientY - p.y0 }));
+  }
+  function onViewUp(e: React.PointerEvent) {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.delete(e.pointerId);
+    const p = pan.current;
+    if (pointers.current.size === 0) {
+      pan.current = null;
+      // A tap on the open map tucks any cards back into tokens.
+      if (p && !p.moved) {
+        setCardsOn(new Set());
+        setAdding(null);
+      }
+    }
+  }
+  function onWheel(e: React.WheelEvent) {
+    const r = viewRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const z = Math.max(1, Math.min(3, cam.z * Math.exp(-e.deltaY * 0.0015)));
+    const mx = e.clientX - r.left;
+    const my = e.clientY - r.top;
+    setCam(clampCam({ z, x: mx - ((mx - cam.x) / cam.z) * z, y: my - ((my - cam.y) / cam.z) * z }));
+  }
+  // The way in: a short, magical ascent onto the map.
+  const [arriving, setArriving] = useState(true);
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const t = setTimeout(() => setArriving(false), reduce ? 0 : 2600);
+    return () => clearTimeout(t);
   }, []);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- saved spots live in this browser only
@@ -303,7 +378,8 @@ export function AdventureView({
   }
   function onDown(e: React.PointerEvent, q: Quest, anchor: { x: number; y: number }) {
     const r = box.current?.getBoundingClientRect();
-    drag.current = { id: q.id, x0: e.clientX, y0: e.clientY, moved: false, offX: e.clientX - (r?.left ?? 0) - anchor.x, offY: e.clientY - (r?.top ?? 0) - anchor.y };
+    const k = r && w ? r.width / w : 1;
+    drag.current = { id: q.id, x0: e.clientX, y0: e.clientY, moved: false, offX: e.clientX - (r?.left ?? 0) - anchor.x * k, offY: e.clientY - (r?.top ?? 0) - anchor.y * k };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
   function saveOrder(next: string[]) {
@@ -389,7 +465,28 @@ export function AdventureView({
   const remaining = list.filter((q) => !q.done).length;
 
   return (
-    <div ref={box} className="summit fixed inset-x-0 top-0 z-[30] select-none overflow-hidden" style={{ background: world.bg, touchAction: "none", bottom: navH }}>
+    <div
+      ref={viewRef}
+      className="summit fixed inset-x-0 top-0 z-[30] select-none overflow-hidden"
+      style={{ background: world.bg, touchAction: "none", bottom: navH }}
+      onPointerDown={onViewDown}
+      onPointerMove={onViewMove}
+      onPointerUp={onViewUp}
+      onPointerCancel={onViewUp}
+      onWheel={onWheel}
+    >
+      <div
+        ref={box}
+        className="absolute left-0 top-0"
+        style={{
+          width: w || "100%",
+          height: h || "100%",
+          transformOrigin: "0 0",
+          transform: arriving ? "translate(0, 6%) scale(1.18)" : `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})`,
+          filter: arriving ? "blur(6px) brightness(.6)" : undefined,
+          transition: arriving ? "none" : pan.current ? "none" : "transform 1.6s cubic-bezier(.2,.7,.2,1), filter 1.4s ease-out",
+        }}
+      >
       <world.Scene />
 
       {/* the trail and the dotted way onward */}
@@ -509,6 +606,7 @@ export function AdventureView({
             <path
               key={`hit${i}`}
               d={d}
+              className="summit-hit"
               stroke="transparent"
               strokeWidth="26"
               fill="none"
@@ -516,7 +614,8 @@ export function AdventureView({
               onClick={(e) => {
                 const r = box.current?.getBoundingClientRect();
                 if (!r) return;
-                setAdding({ x: e.clientX - r.left, y: e.clientY - r.top, at: Math.min(list.length, Math.floor(i / 3)) });
+                const k = w / r.width;
+                setAdding({ x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k, at: Math.min(list.length, Math.floor(i / 3)) });
               }}
             />
           ))}
@@ -587,47 +686,31 @@ export function AdventureView({
             },
           };
           if (asCard) {
-            // The card stays on screen; if it has to shift, the path still runs to the quest's spot beneath it.
-            const CW = 228;
-            const left = Math.max(8, Math.min(w - CW - 8, p.x - CW / 2));
-            const top = Math.max(64, Math.min(h - 120, p.y - 52));
+            // The quest's own card, a little smaller. It stays on screen; if it has to shift,
+            // the path still runs to the quest's spot beneath it. Drag it by its grip.
+            const CW = 300;
+            const left = Math.max(8, Math.min(w - CW * 0.86 - 8, p.x - (CW * 0.86) / 2));
+            const top = Math.max(64, Math.min(h - 160, p.y - 40));
+            const card = cards[q.id];
             return (
-              <div
-                key={q.id}
-                {...handlers}
-                role="group"
-                aria-label={q.title}
-                className={`summit-card fade-in absolute flex flex-col gap-2 rounded-2xl p-2.5 ${dragId === q.id ? "is-dragging" : ""}`}
-                style={{ left, top, width: CW, zIndex: dragId === q.id ? 999 : 400 + Math.round(p.y), cursor: dragId === q.id ? "grabbing" : "grab", background: "linear-gradient(180deg,#f6ecd2,#e9d8ae)", border: "1.5px solid #8b7040", boxShadow: "0 8px 20px rgba(0,0,0,.45)", color: "#2a1c10", touchAction: "none" }}
-              >
-                <div className="flex items-start gap-2">
-                  <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full" style={{ border: "1.5px solid #a58c66" }}>
-                    {q.icon ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- quest portrait
-                      <img src={q.icon} alt="" draggable={false} className="h-full w-full object-cover" />
-                    ) : (
-                      <QuestMonogram id={q.id} title={q.title} size={36} />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 block text-[14px] font-semibold leading-snug" style={{ textDecoration: q.done ? "line-through" : undefined }}>
-                      {q.title}
-                    </span>
-                    <span className="block text-[12px]" style={{ color: "#6b5631" }}>
-                      {q.done ? "Done today ✓" : `+${q.xp} XP`}
-                    </span>
-                  </span>
+              <div key={q.id} role="group" aria-label={q.title} className="summit-card fade-in absolute" style={{ left, top, width: CW, transform: "scale(.86)", transformOrigin: "0 0", zIndex: dragId === q.id ? 999 : 400 + Math.round(p.y) }}>
+                <div
+                  {...handlers}
+                  className={`flex h-6 items-center justify-center rounded-t-xl ${dragId === q.id ? "is-dragging" : ""}`}
+                  style={{ background: "rgba(42,28,16,.75)", cursor: dragId === q.id ? "grabbing" : "grab", touchAction: "none" }}
+                  title="Drag to move · tap to fold back into its token"
+                >
+                  <span aria-hidden className="h-1 w-10 rounded-full" style={{ background: "rgba(242,210,126,.8)" }} />
                 </div>
-                <div className="flex gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
-                  {!q.done && (
-                    <button type="button" disabled={busy} onClick={() => complete(q)} className="h-8 flex-1 rounded-full text-[13px] font-bold disabled:opacity-60" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116" }}>
-                      Complete ✓
-                    </button>
-                  )}
-                  <button type="button" onClick={() => setOpen(q)} className="h-8 flex-1 rounded-full text-[13px] font-semibold" style={{ border: "1px solid #a58c66" }}>
-                    Open card
-                  </button>
-                </div>
+                {card ? (
+                  <ul className="m-0 list-none p-0">
+                    <TaskRow task={card} theme="adventure" categoryLabel={card.categoryLabel} onEditorClose={() => router.refresh()} />
+                  </ul>
+                ) : (
+                  <p className="m-0 rounded-b-xl p-3 text-[15px] font-semibold" style={{ background: "#f6ecd2", color: "#2a1c10" }}>
+                    {q.title}
+                  </p>
+                )}
               </div>
             );
           }
@@ -757,6 +840,8 @@ export function AdventureView({
           document.body
         )}
 
+      </div>
+
       {/* way back, and a quiet caption */}
       <div className="absolute left-3 right-3 top-3 z-[50] flex items-start justify-between gap-3" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
@@ -770,6 +855,35 @@ export function AdventureView({
           </span>
         </div>
       </div>
+      {arriving && typeof document !== "undefined" && createPortal(<Ascent />, document.body)}
+    </div>
+  );
+}
+
+/**
+ * The way into the summit: the screen falls dark, a ring of golden runes
+ * kindles and turns, starlight rises past like an ascent, a line of words
+ * glows and fades — and the veil lifts onto the map.
+ */
+function Ascent() {
+  return (
+    <div className="ascent pointer-events-none fixed inset-0 z-[70]" aria-hidden>
+      <div className="ascent-veil" />
+      {Array.from({ length: 36 }, (_, i) => (
+        <span key={i} className="ascent-mote" style={{ left: `${(i * 37) % 100}%`, animationDelay: `${(i % 9) * 0.12}s`, animationDuration: `${1.4 + (i % 5) * 0.25}s`, width: 2 + (i % 3), height: 10 + (i % 4) * 8 }} />
+      ))}
+      <svg className="ascent-ring" viewBox="-110 -110 220 220" width="260" height="260">
+        <circle r="96" fill="none" stroke="#f2d27e" strokeWidth="1.2" strokeDasharray="3 5" opacity=".8" />
+        <circle r="80" fill="none" stroke="#9ff5e4" strokeWidth=".8" opacity=".6" />
+        <circle r="62" fill="none" stroke="#f2d27e" strokeWidth="1.6" opacity=".9" />
+        {Array.from({ length: 12 }, (_, i) => (
+          <g key={i} transform={`rotate(${i * 30}) translate(0 -88)`}>
+            <path d={["M-3 -4l3 8 3-8", "M-3 0h6M0 -4v8", "M-3 4l3-8 3 8z", "M-3 -3l6 6M3 -3l-6 6"][i % 4]} stroke="#fff1b8" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          </g>
+        ))}
+        <path d="M0 -40L9 -9 40 0 9 9 0 40 -9 9 -40 0 -9 -9Z" fill="#fff6d8" opacity=".9" />
+      </svg>
+      <p className="ascent-words font-display">The hidden path reveals itself…</p>
     </div>
   );
 }

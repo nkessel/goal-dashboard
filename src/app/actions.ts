@@ -2092,9 +2092,9 @@ export async function setIdeaStatusAction(threadId: string, status: forumData.Id
 // Check-in notes and #tags
 // ---------------------------------------------------------------------------
 
-export async function addCheckNoteAction(text: string, atISO?: string | null) {
+export async function addCheckNoteAction(text: string, atISO?: string | null, allDay = false) {
   const ownerId = await requireProfileId();
-  const note = await energyData.addCheckNote(ownerId, text, atISO);
+  const note = await energyData.addCheckNote(ownerId, text, atISO, allDay);
   revalidatePath("/insights");
   return note;
 }
@@ -2299,4 +2299,29 @@ export async function releaseMissionStepsAction(missionId: string) {
   const { supabaseAdmin } = await import("@/lib/supabase/server");
   await supabaseAdmin().from("tasks").update({ mission_id: null }).eq("owner_id", ownerId).eq("mission_id", missionId);
   revalidatePath("/");
+}
+
+// ---------------------------------------------------------------------------
+// Life wheel (Insights): pick the areas of your life, then rate each 1–10.
+
+const WHEEL_PREFIX = "◎ ";
+
+/** Save which areas the life wheel has (in order). */
+export async function setLifeWheelTopicsAction(topics: string[]) {
+  const ownerId = await requireProfileId();
+  const clean = [...new Set(topics.map((t) => t.replace(/\s+/g, " ").trim().slice(0, 20)).filter(Boolean))].slice(0, 12);
+  const { supabaseAdmin } = await import("@/lib/supabase/server");
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { topics: clean } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  revalidatePath("/insights");
+  return clean;
+}
+
+/** A life-wheel check-in: one reading per area. */
+export async function saveLifeWheelAction(values: { topic: string; level: number }[]) {
+  const ownerId = await requireProfileId();
+  const rows = values.slice(0, 12).map((v) => ({ metric: WHEEL_PREFIX + v.topic.slice(0, 20), level: Math.max(1, Math.min(10, Number(v.level) || 5)) }));
+  if (!rows.length) throw new Error("Nothing to save yet.");
+  await energyData.logCheckIns(ownerId, rows);
+  revalidatePath("/insights");
 }

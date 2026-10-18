@@ -161,6 +161,8 @@ export type Profile = {
   hp?: number;
   /** The toucan spirit's add-ons: owned, and worn per slot. */
   toucan?: { owned?: string[]; equipped?: Record<string, string> } | null;
+  /** The life wheel's areas (Insights). */
+  life_wheel?: { topics?: string[] } | null;
   /** Private long quests with steps (see lib/missions). */
   secret_missions?: unknown;
 };

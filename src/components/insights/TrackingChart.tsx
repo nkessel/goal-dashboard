@@ -292,6 +292,14 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
             setHover(i >= 0 && i < n ? i : null);
           }}
           onPointerLeave={() => setHover(null)}
+          onClick={(e) => {
+            // Tap a day to log an event on it.
+            const r = e.currentTarget.getBoundingClientRect();
+            const px = ((e.clientX - r.left) / r.width) * W;
+            const i = Math.floor(((px - L) / (W - L - R)) * n);
+            if (i >= 0 && i < n) window.dispatchEvent(new CustomEvent("insights-add-event", { detail: { date: dayKey(days[i]) } }));
+          }}
+          style={{ cursor: "copy" }}
         >
           {/* Weather strip */}
           {showWeather && weather && (

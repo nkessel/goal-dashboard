@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addCheckNoteAction, deleteCheckNoteAction } from "@/app/actions";
 
@@ -27,7 +27,24 @@ export function EventLog({ notes }: { notes: Note[] }) {
   const [text, setText] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [when, setWhen] = useState<When>("now");
-  const [picked, setPicked] = useState(() => localInput(new Date()));
+  const [pickDate, setPickDate] = useState(() => localInput(new Date()).slice(0, 10));
+  const [pickTime, setPickTime] = useState(() => localInput(new Date()).slice(11, 16));
+  const [allDay, setAllDay] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  // Tapping a day on the chart opens this, set to that day.
+  useEffect(() => {
+    const h = (e: Event) => {
+      const date = (e as CustomEvent<{ date: string }>).detail?.date;
+      if (!date) return;
+      setOpen(true);
+      setWhen("pick");
+      setPickDate(date);
+      setAllDay(false);
+      setTimeout(() => boxRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    };
+    window.addEventListener("insights-add-event", h);
+    return () => window.removeEventListener("insights-add-event", h);
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [gone, setGone] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
@@ -44,6 +61,16 @@ export function EventLog({ notes }: { notes: Note[] }) {
   }
   function atISO(): string | null {
     const d = new Date();
+    if (allDay) {
+      // All day: stamped at noon on that day.
+      if (when === "yesterday") d.setDate(d.getDate() - 1);
+      if (when === "pick") {
+        const t = new Date(`${pickDate}T12:00`);
+        return Number.isFinite(t.getTime()) ? t.toISOString() : null;
+      }
+      d.setHours(12, 0, 0, 0);
+      return d.toISOString();
+    }
     if (when === "now") return null;
     if (when === "morning") {
       d.setHours(9, 0, 0, 0);
@@ -53,7 +80,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
       d.setDate(d.getDate() - 1);
       return d.toISOString();
     }
-    const t = new Date(picked);
+    const t = new Date(`${pickDate}T${pickTime || "12:00"}`);
     return Number.isFinite(t.getTime()) ? t.toISOString() : null;
   }
   function save() {
@@ -70,11 +97,12 @@ export function EventLog({ notes }: { notes: Note[] }) {
     setError(null);
     startTransition(async () => {
       try {
-        if (words) await addCheckNoteAction(words, at);
-        for (const t of all) await addCheckNoteAction(`#${t}`, at);
+        if (words) await addCheckNoteAction(words, at, allDay);
+        for (const t of all) await addCheckNoteAction(`#${t}`, at, allDay);
         setText("");
         setTags([]);
         setWhen("now");
+        setAllDay(false);
         setOpen(false);
         router.refresh();
       } catch (e) {
@@ -96,7 +124,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
           <span aria-hidden>🏷</span> Log an event or #tag
         </button>
       ) : (
-        <div className="reveal flex flex-col gap-2 rounded-xl p-3" style={{ background: "rgba(255,250,235,.6)", border: "1px solid rgba(110,85,40,.25)" }}>
+        <div ref={boxRef} className="reveal flex flex-col gap-2 rounded-xl p-3" style={{ background: "rgba(255,250,235,.6)", border: "1px solid rgba(110,85,40,.25)" }}>
           <div className="flex min-h-10 flex-wrap items-center gap-1 rounded-lg border px-1.5 py-1" style={{ background: "rgba(255,255,255,.65)", borderColor: "#b39a6a" }}>
             {tags.map((t) => (
               <span key={t} className="flex h-6 items-center gap-0.5 rounded-full pl-2 pr-0.5 text-[13px] font-semibold" style={{ background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10" }}>
@@ -131,7 +159,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
                 ["now", "Now"],
                 ["morning", "This morning"],
                 ["yesterday", "Yesterday"],
-                ["pick", "Pick a time…"],
+                ["pick", "Pick a day…"],
               ] as const
             ).map(([k, label]) => (
               <button key={k} type="button" role="radio" aria-checked={when === k} onClick={() => setWhen(k)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={chip(when === k)}>
@@ -140,15 +168,29 @@ export function EventLog({ notes }: { notes: Note[] }) {
             ))}
             {when === "pick" && (
               <input
-                type="datetime-local"
-                value={picked}
-                max={localInput(new Date())}
-                onChange={(e) => setPicked(e.target.value)}
-                aria-label="When it happened"
+                type="date"
+                value={pickDate}
+                max={localInput(new Date()).slice(0, 10)}
+                onChange={(e) => setPickDate(e.target.value)}
+                aria-label="Which day"
                 className="h-8 rounded-lg border px-2 text-[14px]"
                 style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.65)", color: INK }}
               />
             )}
+            {when === "pick" && !allDay && (
+              <input
+                type="time"
+                value={pickTime}
+                onChange={(e) => setPickTime(e.target.value)}
+                aria-label="What time"
+                className="h-8 rounded-lg border px-2 text-[14px]"
+                style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.65)", color: INK }}
+              />
+            )}
+            <label className="flex h-8 items-center gap-1.5 px-1 text-[13.5px] font-semibold" style={{ color: INK }}>
+              <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
+              All day
+            </label>
           </div>
           {error && (
             <p className="m-0 text-[13px]" style={{ color: "var(--t-warn)" }}>
