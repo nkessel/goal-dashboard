@@ -75,7 +75,7 @@ export async function boardNamed(ownerId: string, title: string): Promise<string
   const { data } = await db.from("boards").select("id").eq("owner_id", ownerId).ilike("title", title).limit(1);
   if (data?.[0]?.id) return data[0].id as string;
   const { createBoard } = await import("./boards");
-  const b = await createBoard(ownerId, { title, isPrivate: true });
+  const b = await createBoard(ownerId, { title, isPrivate: false });
   return b.id;
 }
 

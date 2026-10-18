@@ -7,8 +7,8 @@ export const SHARE_SCREENS = [
 ] as const;
 export type ShareKey = (typeof SHARE_SCREENS)[number]["key"];
 export type ShareSettings = Partial<Record<ShareKey, boolean>>;
-/** Only Today is shared until you choose otherwise. */
-export const SHARE_DEFAULTS: Record<ShareKey, boolean> = { today: true, boards: false, calendar: false, insights: false };
+/** Everything is shared with your party (and only your party) until you choose otherwise. */
+export const SHARE_DEFAULTS: Record<ShareKey, boolean> = { today: true, boards: true, calendar: true, insights: true };
 export function shares(s: ShareSettings | null | undefined, k: ShareKey): boolean {
   return s?.[k] ?? SHARE_DEFAULTS[k];
 }
