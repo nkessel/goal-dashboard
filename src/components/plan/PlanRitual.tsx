@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { completePlanAction, processSeedsAction, reviewQuestAction, savePlanDraftAction, setBigRocksAction, type SeedFate } from "@/app/actions";
+import { completePlanAction, processSeedsAction, reviewQuestAction, saveLifeWheelAction, savePlanDraftAction, setBigRocksAction, type SeedFate } from "@/app/actions";
 import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 import { LifeWheel } from "@/components/insights/LifeWheel";
 import { WeekView } from "@/components/calendar/WeekView";
 import { SchedulingDrawer } from "@/components/calendar/SchedulingList";
 import type { Task } from "@/lib/data/types";
+import { FocusFollowUp, FocusPlanner, type Focus } from "./FocusPlanner";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 
 type Kind = "week" | "month";
@@ -21,7 +22,7 @@ type Draft = {
   tryNext: string;
   seeds: Seed[];
   rocks: string[];
-  focusAreas: string[];
+  focus: Focus[];
   outcomes: string[];
   reviewed: Record<string, string>;
 };
@@ -63,6 +64,7 @@ const STEPS: Record<Kind, { key: string; title: string; blurb: string }[]> = {
     { key: "sweep", title: "Empty your head", blurb: "Write down everything that's on your mind. One thing per line." },
     { key: "sort", title: "Sort the haul", blurb: "Decide what each thing is. Nothing has to be done yet — just put it where it belongs." },
     { key: "review", title: "Get current", blurb: "Quests that are overdue or have sat untouched. Keep, schedule, park or let go." },
+    { key: "focus", title: "Lift one area", blurb: "Pick a part of your life to lift this week, where you'd like it by Sunday, and the quests that will get it there." },
     { key: "rocks", title: "Big rocks", blurb: "Pick up to three things that would make this week a good week. They go first." },
     { key: "place", title: "Place it on the calendar", blurb: "Tap a quest in the scheduling list, then tap a time. Big rocks first." },
     { key: "seal", title: "Seal the week", blurb: "" },
@@ -92,6 +94,7 @@ export function PlanRitual(props: {
   theme: "calm" | "adventure";
   draft: Record<string, unknown> | null;
   sealedAt: string | null;
+  followUp: { periodKey: string; items: (Omit<Focus, "quests"> & { quests: { id: string; title: string; done: boolean }[] })[] } | null;
   back: { days: number; completed: { id: string; title: string; xp_value: number; completed_at: string }[]; xpTotal: number; energyAvg: number | null };
   open: { id: string; title: string; xp: number; board: string | null; due: string | null }[];
   review: { overdue: Lite[]; stale: Lite[] };
@@ -110,7 +113,7 @@ export function PlanRitual(props: {
     tryNext: "",
     seeds: [],
     rocks: [],
-    focusAreas: [],
+    focus: [],
     outcomes: ["", "", ""],
     reviewed: {},
     ...((props.draft ?? {}) as Partial<Draft>),
@@ -176,6 +179,9 @@ export function PlanRitual(props: {
     start(async () => {
       try {
         if (d.rocks.length) await setBigRocksAction(d.rocks);
+        // Where each focus area is now goes onto the life wheel too.
+        const moved = (d.focus ?? []).filter((f) => f.from !== null && f.from !== props.wheel.last[f.area]?.level).map((f) => ({ topic: f.area, level: f.from! }));
+        if (moved.length) await saveLifeWheelAction(moved).catch(() => null);
         const res = await completePlanAction(kind, d);
         setSealed(new Date().toISOString());
         if (res.xp > 0) celebrateProgress({ title: kind === "week" ? "The week is planned" : "The month is planned", xp: res.xp, fromPct: 0, toPct: 100, heading: "Ritual complete!", barCaption: kind === "week" ? "See you next week, adventurer" : "A new month, well begun" });
@@ -187,10 +193,12 @@ export function PlanRitual(props: {
   }
 
   const rockChoices = useMemo(() => {
-    const made = d.seeds.filter((s) => s.made && s.made !== "dropped" && (s.fate === "schedule" || s.fate === "quest")).map((s) => ({ id: s.made!, title: s.text, board: null as string | null }));
+    const focusQ = (d.focus ?? []).flatMap((f) => f.quests.map((q) => ({ id: q.id, title: q.title, board: f.area as string | null })));
+    const made0 = d.seeds.filter((s) => s.made && s.made !== "dropped" && (s.fate === "schedule" || s.fate === "quest")).map((s) => ({ id: s.made!, title: s.text, board: null as string | null }));
+    const made = [...focusQ, ...made0.filter((m) => !focusQ.some((f) => f.id === m.id))];
     const seen = new Set(made.map((m) => m.id));
     return [...made, ...props.open.filter((o) => !seen.has(o.id)).map((o) => ({ id: o.id, title: o.title, board: o.board }))];
-  }, [d.seeds, props.open]);
+  }, [d.seeds, d.focus, props.open]);
   const [rockFilter, setRockFilter] = useState("");
 
   return (
@@ -242,6 +250,7 @@ export function PlanRitual(props: {
         <div className="relative z-[1] flex flex-col gap-3">
           {step.key === "look" && (
             <>
+              {props.followUp && <FocusFollowUp kind={kind} items={props.followUp.items} last={props.wheel.last} />}
               <div className="flex flex-wrap gap-2">
                 <Stat label="Quests finished" value={String(props.back.completed.length)} />
                 <Stat label="XP earned" value={props.back.xpTotal.toLocaleString()} />
@@ -270,28 +279,9 @@ export function PlanRitual(props: {
 
           {step.key === "focus" && (
             <>
-              <p className="m-0 text-[13px] font-bold uppercase tracking-[.12em]" style={{ color: SOFT }}>
-                Areas to focus on
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {props.wheel.topics.map((t) => {
-                  const on = d.focusAreas.includes(t);
-                  const lvl = props.wheel.last[t]?.level;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => set({ focusAreas: on ? d.focusAreas.filter((x) => x !== t) : [...d.focusAreas, t].slice(0, 3) })}
-                      className="h-9 rounded-full px-3 text-[14px] font-semibold"
-                      style={on ? gold : { border: "1px solid #a58c66", color: INK }}
-                    >
-                      {t}
-                      {lvl !== undefined && <span className="ml-1 text-[12px] opacity-70">{lvl}/10</span>}
-                    </button>
-                  );
-                })}
-              </div>
+              <FocusPlanner kind={kind} topics={props.wheel.topics} last={props.wheel.last} focus={d.focus ?? []} onChange={(focus) => set({ focus })} open={props.open} max={kind === "week" ? 2 : 3} />
+              {kind === "month" && (
+              <>
               <p className="m-0 mt-1 text-[13px] font-bold uppercase tracking-[.12em]" style={{ color: SOFT }}>
                 Up to three outcomes for the month
               </p>
@@ -307,6 +297,8 @@ export function PlanRitual(props: {
                   maxLength={140}
                 />
               ))}
+              </>
+              )}
             </>
           )}
 
@@ -450,7 +442,13 @@ export function PlanRitual(props: {
                   {d.seeds.filter((s) => s.made && s.made !== "dropped").length} things captured and sorted
                 </li>
                 {d.rocks.length > 0 && <li>{d.rocks.length} big rock{d.rocks.length === 1 ? "" : "s"} at the top of your scheduling list</li>}
-                {kind === "month" && (d.focusAreas ?? []).length > 0 && <li>Focusing on: {d.focusAreas.join(" · ")}</li>}
+                {(d.focus ?? []).map((f) => (
+                  <li key={f.area}>
+                    {f.area}: {f.from !== null ? `${f.from} → ` : "aim for "}
+                    {f.target}
+                    {f.quests.length ? ` · ${f.quests.length} quest${f.quests.length === 1 ? "" : "s"}` : ""}
+                  </li>
+                ))}
                 {kind === "month" && d.outcomes.some((o) => o.trim()) && (
                   <li>Aiming for: {d.outcomes.filter((o) => o.trim()).join(" · ")}</li>
                 )}

@@ -78,3 +78,31 @@ export async function boardNamed(ownerId: string, title: string): Promise<string
   const b = await createBoard(ownerId, { title, isPrivate: true });
   return b.id;
 }
+
+export type FocusPlan = { area: string; from: number | null; target: number; quests: { id: string; title: string }[] };
+
+/**
+ * Last week's (or month's) focus areas, for the look back: where each area
+ * started, where you aimed it, and which of its quests got done.
+ */
+export async function focusFollowUp(ownerId: string, kind: PlanKind): Promise<{ periodKey: string; items: (Omit<FocusPlan, "quests"> & { quests: { id: string; title: string; done: boolean }[] })[] } | null> {
+  const db = supabaseAdmin();
+  const { data } = await db
+    .from("planning_sessions")
+    .select("period_key, data")
+    .eq("owner_id", ownerId)
+    .eq("kind", kind)
+    .lt("period_key", periodKey(kind))
+    .order("period_key", { ascending: false })
+    .limit(1);
+  const row = data?.[0] as { period_key: string; data: { focus?: FocusPlan[] } } | undefined;
+  const focus = (row?.data?.focus ?? []).filter((f) => f && f.area);
+  if (!row || !focus.length) return null;
+  const ids = focus.flatMap((f) => (f.quests ?? []).map((q) => q.id));
+  const done = new Set<string>();
+  if (ids.length) {
+    const { data: rows } = await db.from("tasks").select("id, status").in("id", ids);
+    for (const r of rows ?? []) if ((r as { status: string }).status === "completed") done.add((r as { id: string }).id);
+  }
+  return { periodKey: row.period_key, items: focus.map((f) => ({ ...f, quests: (f.quests ?? []).map((q) => ({ ...q, done: done.has(q.id) })) })) };
+}

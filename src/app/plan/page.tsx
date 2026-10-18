@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { PlanRitual } from "@/components/plan/PlanRitual";
 import { getProfileById } from "@/lib/data/profiles";
 import { listCalendarTasksForOwner, listOpenTasksForOwnerWithCategory } from "@/lib/data/tasks";
-import { getPlanSession, lookBack, PLAN_XP, questsToReview, type PlanKind } from "@/lib/data/planning";
+import { focusFollowUp, getPlanSession, lookBack, PLAN_XP, questsToReview, type PlanKind } from "@/lib/data/planning";
 import { getSchedulingFolders, listSchedulingList } from "@/lib/data/scheduling";
 import { listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { listCheckInsSince } from "@/lib/data/energy";
@@ -20,7 +20,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const end = new Date(start.getTime() + 8 * 86_400_000);
-  const [profile, draft, back, open, toSchedule, folders, calTasks, boards, checks] = await Promise.all([
+  const [profile, draft, back, open, toSchedule, folders, calTasks, boards, checks, followUp] = await Promise.all([
     getProfileById(ownerId),
     getPlanSession(ownerId, kind).catch(() => null),
     lookBack(ownerId, kind),
@@ -29,7 +29,8 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
     getSchedulingFolders(ownerId),
     listCalendarTasksForOwner(ownerId, new Date(start.getTime() - 86_400_000), end),
     kind === "month" ? listBoardsWithStatsForOwner(ownerId).catch(() => []) : Promise.resolve([]),
-    kind === "month" ? listCheckInsSince(ownerId, new Date(Date.now() - 92 * 86_400_000).toISOString()).catch(() => []) : Promise.resolve([]),
+    listCheckInsSince(ownerId, new Date(Date.now() - 92 * 86_400_000).toISOString()).catch(() => []),
+    focusFollowUp(ownerId, kind).catch(() => null),
   ]);
   let events: GoogleCalendarEvent[] = [];
   const s = await auth();
@@ -56,6 +57,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
         draft={(draft?.data as Record<string, unknown>) ?? null}
         sealedAt={draft?.completed_at ?? null}
         back={back}
+        followUp={followUp}
         open={live.map((t) => ({ id: t.id, title: t.title, xp: t.xp_value, board: t.categoryLabel, due: t.due_at ?? null }))}
         review={{ overdue: review.overdue.map((t) => ({ id: t.id, title: t.title, due: t.due_at ?? null, board: t.categoryLabel })), stale: review.stale.map((t) => ({ id: t.id, title: t.title, due: t.due_at ?? null, board: t.categoryLabel })) }}
         someday={live.filter((t) => t.categoryLabel === "Someday / Maybe").map((t) => ({ id: t.id, title: t.title, due: null, board: t.categoryLabel }))}
