@@ -141,11 +141,13 @@ function OneThingView({
       setConfirmExit(true);
       return;
     }
-    // Leaving with a paused or unused timer: let it go.
-    if (t.runStart === null) resetFocusTimer();
     setConfirmExit(false);
     setClosing(true);
-    setTimeout(onClose, 200);
+    setTimeout(() => {
+      // Leaving with a paused or unused timer: let it go.
+      if (getFocusTimer().runStart === null) resetFocusTimer();
+      onClose();
+    }, 200);
   }
 
   function exitKeepingTimer() {
@@ -155,10 +157,12 @@ function OneThingView({
   }
 
   function exitPausing() {
-    resetFocusTimer();
     setConfirmExit(false);
     setClosing(true);
-    setTimeout(onClose, 200);
+    setTimeout(() => {
+      resetFocusTimer();
+      onClose();
+    }, 200);
   }
 
   function next() {

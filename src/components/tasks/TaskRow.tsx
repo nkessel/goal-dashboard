@@ -12,7 +12,7 @@ import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { celebrateQuest, updateQuestCelebration } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { QuestMonogram } from "./QuestMonogram";
-import { FocusMode } from "@/components/one-thing/OneThing";
+import { openFocusMode } from "@/lib/focus-timer";
 import { coinsForXp } from "@/lib/coins";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
@@ -104,7 +104,6 @@ export function TaskRow({
   const [menu, setMenu] = useState<"icon" | "dots" | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [scheduling, setScheduling] = useState(false);
-  const [focusing, setFocusing] = useState(false);
   const [doneEarlier, setDoneEarlier] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +185,7 @@ export function TaskRow({
     setError(null);
     if (action === "edit") return setEditing(true);
     if (action === "calendar") return setScheduling(true);
-    if (action === "focus") return setFocusing(true);
+    if (action === "focus") return openFocusMode({ ...task, categoryLabel });
     if (action === "earlier") return setDoneEarlier(true);
     if (action === "snooze") {
       // Off today now; back at the top of the day tomorrow. Undo puts it back.
@@ -602,7 +601,6 @@ export function TaskRow({
           }}
         />
       )}
-      {focusing && <FocusMode task={{ ...task, categoryLabel }} theme={theme} onClose={() => setFocusing(false)} />}
       {doneEarlier && <DoneEarlierDialog title={task.title} isAdventure={isAdventure} onPick={completeEarlier} onClose={() => setDoneEarlier(false)} />}
       </div>
     </div>

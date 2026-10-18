@@ -19,9 +19,11 @@ export type FocusTimerState = {
   runStart: number | null;
   /** The focus view for this quest is on screen. */
   open: boolean;
+  /** The app-wide focus view should be shown (see FocusTimerPill). Per window, never saved. */
+  showing: boolean;
 };
 
-const EMPTY: FocusTimerState = { task: null, mode: "countdown", length: 25, elapsed: 0, runStart: null, open: false };
+const EMPTY: FocusTimerState = { task: null, mode: "countdown", length: 25, elapsed: 0, runStart: null, open: false, showing: false };
 let state: FocusTimerState = EMPTY;
 const listeners = new Set<() => void>();
 
@@ -39,7 +41,8 @@ function fromStored(raw: string | null, keepOpen: boolean): FocusTimerState {
   try {
     const saved = JSON.parse(raw) as Partial<FocusTimerState>;
     if (!saved.task) return EMPTY;
-    return { ...EMPTY, ...saved, open: keepOpen && state.task?.id === saved.task.id ? state.open : false };
+    const same = keepOpen && state.task?.id === saved.task.id;
+    return { ...EMPTY, ...saved, open: same ? state.open : false, showing: same ? state.showing : false };
   } catch {
     return EMPTY;
   }
@@ -64,7 +67,7 @@ function persist() {
   try {
     if (!state.task) window.localStorage.removeItem(STORAGE_KEY);
     else {
-      const { open: _open, ...rest } = state; // eslint-disable-line @typescript-eslint/no-unused-vars
+      const { open: _open, showing: _showing, ...rest } = state; // eslint-disable-line @typescript-eslint/no-unused-vars
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(rest));
     }
   } catch {
@@ -123,4 +126,23 @@ export function useFocusTimer(): FocusTimerState {
     getFocusTimer,
     () => EMPTY
   );
+}
+
+/**
+ * Open focus mode for a quest. One app-wide host shows it, so it never
+ * depends on (or closes with) the card or popup it was opened from.
+ */
+export function openFocusMode(task: NonNullable<FocusTimerState["task"]>) {
+  load();
+  const minutes = task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25;
+  if (state.task?.id === task.id) state = { ...state, task, showing: true };
+  else if (state.task && state.runStart !== null) state = { ...state, showing: true }; // a timer is running for another quest: show that one
+  else state = { ...EMPTY, task, length: minutes, showing: true };
+  persist();
+  emit();
+  window.dispatchEvent(new CustomEvent("focus-mode-open"));
+}
+
+export function closeFocusMode() {
+  setFocusTimer({ showing: false });
 }

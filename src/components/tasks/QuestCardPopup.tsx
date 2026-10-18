@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { TaskRow } from "./TaskRow";
@@ -22,6 +22,13 @@ export function QuestCardPopup({
   onClose: () => void;
 }) {
   useEscape(() => requestClose());
+  // Focus mode opened from this card takes over the screen: step aside.
+  const onFocusOpen = useEffectEvent(() => requestClose());
+  useEffect(() => {
+    const h = () => onFocusOpen();
+    window.addEventListener("focus-mode-open", h);
+    return () => window.removeEventListener("focus-mode-open", h);
+  }, []);
   const [closing, setClosing] = useState(false);
   const isAdventure = theme === "adventure";
 

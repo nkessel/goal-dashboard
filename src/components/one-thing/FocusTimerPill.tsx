@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { resetFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
+import { closeFocusMode, openFocusMode, resetFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
 import { FocusMode } from "./OneThing";
 
 const POS_KEY = "focus-pill-pos";
@@ -10,7 +10,6 @@ const POS_KEY = "focus-pill-pos";
 export function FocusTimerPill({ theme }: { theme: "calm" | "adventure" }) {
   const t = useFocusTimer();
   const [tick, setTick] = useState(0);
-  const [reopen, setReopen] = useState(false);
   const running = t.runStart !== null;
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
@@ -30,7 +29,8 @@ export function FocusTimerPill({ theme }: { theme: "calm" | "adventure" }) {
     return () => window.clearInterval(id);
   }, [running]);
 
-  if (reopen && t.task) return <FocusMode task={t.task} theme={theme} onClose={() => setReopen(false)} />;
+  // App-wide host for focus mode (opened from any quest's menu, or this pill).
+  if (t.showing && t.task) return <FocusMode key={t.task.id} task={t.task} theme={theme} onClose={closeFocusMode} />;
   if (!t.task || t.open) return null;
   const spent = spentSeconds(t, running ? tick || t.runStart! : 0);
   if (!running && spent === 0) return null;
@@ -77,7 +77,7 @@ export function FocusTimerPill({ theme }: { theme: "calm" | "adventure" }) {
         }
       }}
     >
-      <button type="button" onClick={() => setReopen(true)} className="flex min-w-0 items-center gap-2 rounded-full px-2.5 py-1" title="Back to focus mode">
+      <button type="button" onClick={() => t.task && openFocusMode(t.task)} className="flex min-w-0 items-center gap-2 rounded-full px-2.5 py-1" title="Back to focus mode">
         <span className="font-display text-[18px] tabular-nums" style={{ color: counting && left < 0 ? "#f3a58f" : "var(--t-gold)" }}>
           {clock}
         </span>
