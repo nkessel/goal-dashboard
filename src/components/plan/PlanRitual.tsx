@@ -21,7 +21,7 @@ type Draft = {
   tryNext: string;
   seeds: Seed[];
   rocks: string[];
-  focusBoards: string[];
+  focusAreas: string[];
   outcomes: string[];
   reviewed: Record<string, string>;
 };
@@ -70,7 +70,7 @@ const STEPS: Record<Kind, { key: string; title: string; blurb: string }[]> = {
   month: [
     { key: "look", title: "Look back", blurb: "The month behind you: what you finished, what you learned." },
     { key: "wheel", title: "Life wheel", blurb: "How does each part of your life feel right now?" },
-    { key: "focus", title: "This month's focus", blurb: "Pick the boards that matter most this month, and up to three outcomes to aim for." },
+    { key: "focus", title: "This month's focus", blurb: "Which parts of your life get extra love this month? Then name up to three outcomes to aim for." },
     { key: "sweep", title: "Empty your head", blurb: "Everything on your mind for the month ahead. One thing per line." },
     { key: "sort", title: "Sort the haul", blurb: "Decide what each thing is." },
     { key: "someday", title: "Someday / Maybe", blurb: "Anything here ready to come alive this month?" },
@@ -110,7 +110,7 @@ export function PlanRitual(props: {
     tryNext: "",
     seeds: [],
     rocks: [],
-    focusBoards: [],
+    focusAreas: [],
     outcomes: ["", "", ""],
     reviewed: {},
     ...((props.draft ?? {}) as Partial<Draft>),
@@ -271,21 +271,23 @@ export function PlanRitual(props: {
           {step.key === "focus" && (
             <>
               <p className="m-0 text-[13px] font-bold uppercase tracking-[.12em]" style={{ color: SOFT }}>
-                Focus boards
+                Areas to focus on
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {props.boards.map((b) => {
-                  const on = d.focusBoards.includes(b.id);
+                {props.wheel.topics.map((t) => {
+                  const on = d.focusAreas.includes(t);
+                  const lvl = props.wheel.last[t]?.level;
                   return (
                     <button
-                      key={b.id}
+                      key={t}
                       type="button"
                       aria-pressed={on}
-                      onClick={() => set({ focusBoards: on ? d.focusBoards.filter((x) => x !== b.id) : [...d.focusBoards, b.id].slice(0, 3) })}
+                      onClick={() => set({ focusAreas: on ? d.focusAreas.filter((x) => x !== t) : [...d.focusAreas, t].slice(0, 3) })}
                       className="h-9 rounded-full px-3 text-[14px] font-semibold"
                       style={on ? gold : { border: "1px solid #a58c66", color: INK }}
                     >
-                      {b.title} <span className="text-[12px] opacity-70">{b.open}</span>
+                      {t}
+                      {lvl !== undefined && <span className="ml-1 text-[12px] opacity-70">{lvl}/10</span>}
                     </button>
                   );
                 })}
@@ -448,6 +450,7 @@ export function PlanRitual(props: {
                   {d.seeds.filter((s) => s.made && s.made !== "dropped").length} things captured and sorted
                 </li>
                 {d.rocks.length > 0 && <li>{d.rocks.length} big rock{d.rocks.length === 1 ? "" : "s"} at the top of your scheduling list</li>}
+                {kind === "month" && (d.focusAreas ?? []).length > 0 && <li>Focusing on: {d.focusAreas.join(" · ")}</li>}
                 {kind === "month" && d.outcomes.some((o) => o.trim()) && (
                   <li>Aiming for: {d.outcomes.filter((o) => o.trim()).join(" · ")}</li>
                 )}
