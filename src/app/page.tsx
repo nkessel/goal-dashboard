@@ -19,6 +19,8 @@ import { listJournalEntries } from "@/lib/data/journal";
 import { DayNightFlip } from "@/components/evening/DayNightFlip";
 import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
+import { PlanNudge } from "@/components/plan/PlanNudge";
+import { getPlanSession } from "@/lib/data/planning";
 import { DailyHabits } from "@/components/habits/DailyHabits";
 import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
 import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckNotesSince } from "@/lib/data/energy";
@@ -88,6 +90,13 @@ export default async function Home() {
     latestCheckIns(session.user.id, daysAgoISO(2)).catch(() => ({})),
     listCheckNotesSince(session.user.id, daysAgoISO(2)).catch(() => []),
   ]);
+  // Sunday/Monday: nudge toward the weekly ritual; the first days of a month, the monthly one.
+  const dayKey = appDayKey();
+  const dow = new Date(`${dayKey}T12:00:00Z`).getUTCDay();
+  const dom = Number(dayKey.slice(8, 10));
+  const nudgeKind: "week" | "month" | null = dom <= 3 ? "month" : dow === 0 || dow === 1 ? "week" : null;
+  const nudgeSession = nudgeKind ? await getPlanSession(session.user.id, nudgeKind).catch(() => null) : null;
+  const planNudge = nudgeKind && !nudgeSession?.completed_at ? <PlanNudge kind={nudgeKind} started={!!nudgeSession} /> : null;
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   // Today's latest reading of each extra check-in metric.
   const metricsToday = Object.fromEntries(
@@ -133,6 +142,7 @@ export default async function Home() {
         day={
           <div className="flex flex-col gap-6">
             {stats}
+            {planNudge}
             <TodayTaskBoard
               priorityTasks={topPriorities}
               otherTasks={otherTasks}

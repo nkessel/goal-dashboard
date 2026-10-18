@@ -2325,3 +2325,82 @@ export async function saveLifeWheelAction(values: { topic: string; level: number
   await energyData.logCheckIns(ownerId, rows);
   revalidatePath("/insights");
 }
+
+// ---------------------------------------------------------------------------
+// Planning rituals (weekly and monthly)
+
+export type SeedFate = "schedule" | "quest" | "waiting" | "someday" | "done" | "drop";
+
+/** Keep a ritual's progress (it can be finished later). */
+export async function savePlanDraftAction(kind: "week" | "month", data: Record<string, unknown>) {
+  const ownerId = await requireProfileId();
+  const { savePlanDraft } = await import("@/lib/data/planning");
+  await savePlanDraft(ownerId, kind, JSON.parse(JSON.stringify(data ?? {})));
+}
+
+/**
+ * Turn the mind sweep into real things: quests to schedule (onto the
+ * scheduling list), quests for the lists, Waiting For and Someday / Maybe
+ * (each on its own private board), and two-minute jobs already done.
+ */
+export async function processSeedsAction(seeds: { text: string; fate: SeedFate }[]) {
+  const ownerId = await requireProfileId();
+  const { boardNamed } = await import("@/lib/data/planning");
+  const made: { text: string; fate: SeedFate; id: string }[] = [];
+  let waitingBoard: string | null = null;
+  let somedayBoard: string | null = null;
+  for (const s of seeds.slice(0, 80)) {
+    const title = s.text.replace(/\s+/g, " ").trim().slice(0, 140);
+    if (!title || s.fate === "drop") continue;
+    let boardId: string | null = null;
+    if (s.fate === "waiting") boardId = waitingBoard ??= await boardNamed(ownerId, "Waiting For");
+    if (s.fate === "someday") boardId = somedayBoard ??= await boardNamed(ownerId, "Someday / Maybe");
+    const task = await tasksData.createTask(ownerId, { title, importance: 2.5, urgency: 2.5, xpValue: s.fate === "done" ? 5 : 20, boardId });
+    if (s.fate === "schedule" || s.fate === "waiting" || s.fate === "someday") await tasksData.setTaskInAdditional(task.id, ownerId, false).catch(() => null);
+    if (s.fate === "schedule") await schedulingData.addToSchedulingList(ownerId, task.id, "bottom");
+    if (s.fate === "done") await finishTask(ownerId, task.id);
+    made.push({ text: title, fate: s.fate, id: task.id });
+  }
+  revalidatePath("/");
+  revalidatePath("/calendar");
+  revalidatePath("/plan");
+  return made;
+}
+
+/** Big rocks: to the top of the scheduling list, in the order chosen. */
+export async function setBigRocksAction(taskIds: string[]) {
+  const ownerId = await requireProfileId();
+  for (const id of [...taskIds].slice(0, 5).reverse()) await schedulingData.addToSchedulingList(ownerId, id, "top");
+  revalidatePath("/calendar");
+  revalidatePath("/plan");
+}
+
+/** A stale quest, sorted: keep it, put it up for scheduling, park it in Someday / Maybe, or let it go. */
+export async function reviewQuestAction(taskId: string, choice: "keep" | "schedule" | "someday" | "drop") {
+  const ownerId = await requireProfileId();
+  if (choice === "keep") {
+    // Kept on purpose: it won't come up as stale again for a while.
+    const { supabaseAdmin } = await import("@/lib/supabase/server");
+    await supabaseAdmin().from("tasks").update({ updated_at: new Date().toISOString() }).eq("id", taskId).eq("owner_id", ownerId);
+  }
+  if (choice === "schedule") await schedulingData.addToSchedulingList(ownerId, taskId, "bottom");
+  if (choice === "someday") {
+    const { boardNamed } = await import("@/lib/data/planning");
+    await tasksData.setTaskBoard(taskId, ownerId, await boardNamed(ownerId, "Someday / Maybe"));
+    await tasksData.setManualPriority(taskId, ownerId, false).catch(() => null);
+    await tasksData.setTaskInAdditional(taskId, ownerId, false).catch(() => null);
+  }
+  if (choice === "drop") await deleteTaskAction(taskId);
+  revalidatePath("/plan");
+  revalidatePath("/");
+}
+
+/** Seal the ritual: XP once per week or month. */
+export async function completePlanAction(kind: "week" | "month", data: Record<string, unknown>) {
+  const ownerId = await requireProfileId();
+  const { completePlan } = await import("@/lib/data/planning");
+  const res = await completePlan(ownerId, kind, JSON.parse(JSON.stringify(data ?? {})));
+  revalidatePath("/");
+  revalidatePath("/plan");
+  return res;
+}

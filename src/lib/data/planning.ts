@@ -1,0 +1,80 @@
+import "server-only";
+import { supabaseAdmin } from "@/lib/supabase/server";
+import { awardXp, currentWeekStart } from "./xp";
+import type { Task } from "./types";
+
+export type PlanKind = "week" | "month";
+export const PLAN_XP: Record<PlanKind, number> = { week: 30, month: 60 };
+
+/** Which week (its Monday) or month ("2026-10") a ritual belongs to. */
+export function periodKey(kind: PlanKind, d = new Date()): string {
+  if (kind === "week") return currentWeekStart();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export type PlanSession = { kind: PlanKind; period_key: string; data: Record<string, unknown>; completed_at: string | null };
+
+export async function getPlanSession(ownerId: string, kind: PlanKind, key = periodKey(kind)): Promise<PlanSession | null> {
+  const { data } = await supabaseAdmin().from("planning_sessions").select("kind, period_key, data, completed_at").eq("owner_id", ownerId).eq("kind", kind).eq("period_key", key).maybeSingle<PlanSession>();
+  return data ?? null;
+}
+
+/** Keep the ritual's progress so it can be finished later. */
+export async function savePlanDraft(ownerId: string, kind: PlanKind, data: Record<string, unknown>) {
+  const key = periodKey(kind);
+  const { error } = await supabaseAdmin()
+    .from("planning_sessions")
+    .upsert({ owner_id: ownerId, kind, period_key: key, data, updated_at: new Date().toISOString() }, { onConflict: "owner_id,kind,period_key" });
+  if (error && /planning_sessions/.test(error.message)) throw new Error("Planning needs a quick database update first.");
+  if (error) throw new Error(`Couldn't save your progress: ${error.message}`);
+}
+
+/** Seal the ritual. XP is paid once per week or month. */
+export async function completePlan(ownerId: string, kind: PlanKind, data: Record<string, unknown>): Promise<{ xp: number; totalXp: number | null }> {
+  const key = periodKey(kind);
+  const before = await getPlanSession(ownerId, kind, key);
+  await supabaseAdmin()
+    .from("planning_sessions")
+    .upsert({ owner_id: ownerId, kind, period_key: key, data, completed_at: before?.completed_at ?? new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "owner_id,kind,period_key" });
+  if (before?.completed_at) return { xp: 0, totalXp: null };
+  const res = await awardXp(ownerId, PLAN_XP[kind], "planning_ritual");
+  return { xp: PLAN_XP[kind], totalXp: res.totalXp ?? null };
+}
+
+/** What happened over the last week or month, for the look back. */
+export async function lookBack(ownerId: string, kind: PlanKind) {
+  const days = kind === "week" ? 7 : 30;
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const db = supabaseAdmin();
+  const [done, xp, energy] = await Promise.all([
+    db.from("tasks").select("id, title, xp_value, completed_at").eq("owner_id", ownerId).eq("status", "completed").gte("completed_at", since).order("completed_at", { ascending: false }).limit(60),
+    db.from("xp_events").select("amount").eq("owner_id", ownerId).gte("created_at", since),
+    db.from("energy_log").select("level").eq("owner_id", ownerId).gte("created_at", since),
+  ]);
+  const xpTotal = (xp.data ?? []).reduce((n, r) => n + Number(r.amount ?? 0), 0);
+  const levels = (energy.data ?? []).map((r) => Number(r.level)).filter((n) => Number.isFinite(n));
+  return {
+    days,
+    completed: (done.data ?? []) as { id: string; title: string; xp_value: number; completed_at: string }[],
+    xpTotal,
+    energyAvg: levels.length ? Math.round((levels.reduce((a, b) => a + b, 0) / levels.length) * 10) / 10 : null,
+  };
+}
+
+/** Open quests worth a look: overdue, or sitting untouched for weeks. */
+export function questsToReview<T extends Task>(open: T[]) {
+  const now = Date.now();
+  const overdue = open.filter((t) => t.due_at && Date.parse(t.due_at) < now);
+  const stale = open.filter((t) => !overdue.includes(t) && now - Date.parse(t.updated_at ?? t.created_at) > 21 * 86_400_000 && !t.is_manual_priority);
+  return { overdue, stale: stale.slice(0, 30) };
+}
+
+/** A board by title (made if it doesn't exist yet) — for Someday / Maybe and Waiting For. */
+export async function boardNamed(ownerId: string, title: string): Promise<string> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("boards").select("id").eq("owner_id", ownerId).ilike("title", title).limit(1);
+  if (data?.[0]?.id) return data[0].id as string;
+  const { createBoard } = await import("./boards");
+  const b = await createBoard(ownerId, { title, isPrivate: true });
+  return b.id;
+}
