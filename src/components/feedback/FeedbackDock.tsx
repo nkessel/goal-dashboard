@@ -350,6 +350,21 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 
   // Escape minimizes the feedback box first, before any dialog under it (like an open quest editor).
   useEscape(() => leaveOpen(), !!openId);
+  const sentOpen = !!openId && sent?.id === openId;
+  // Once it's sent, a tap anywhere outside closes the little "Sent" card.
+  useEffect(() => {
+    if (!sentOpen) return;
+    const away = (e: PointerEvent) => {
+      if (e.target instanceof Element && e.target.closest("[data-feedback-root]")) return;
+      requestClose();
+    };
+    const t = setTimeout(() => document.addEventListener("pointerdown", away), 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("pointerdown", away);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-bound only when the sent state changes
+  }, [sentOpen]);
   if (!loaded || !vp) return null;
 
   // ---- The round button: tap to start (or continue) feedback, drag to put it anywhere.
@@ -512,7 +527,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           aria-label="Feedback"
           data-feedback-root
           className="fixed z-[61]"
-          style={{ left: shown.x, top: shown.y, width: shown.w, height: shown.h }}
+          style={{ left: shown.x, top: shown.y, width: shown.w, height: isSent ? "auto" : shown.h }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.stopPropagation();
@@ -522,7 +537,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         >
           {/* Positioning stays on this box; the theme's parchment frame (which sets position: relative) lives inside. */}
           <div
-            className="create-sheet-in relative flex h-full flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl"
+            className={`create-sheet-in relative flex flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl ${isSent ? "" : "h-full"}`}
             style={{
               background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
               border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
@@ -530,7 +545,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             }}
           >
             {/* Everything scrolls together, so a very thin box still reaches it all. */}
-            <div className="feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-8">
+            <div className={`feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${isSent ? "pb-3" : "pb-8"}`}>
               <div
                 className={`sticky top-0 z-[3] flex shrink-0 select-none items-center gap-1 px-2 pt-1.5 ${isSent ? "pl-4" : "cursor-move touch-none"}`}
                 style={{ background: isAdventure ? "#ecdcb8" : "var(--t-card)", borderBottom: `1px solid ${isAdventure ? "rgba(139,112,64,.45)" : "var(--t-card-border)"}`, boxShadow: "0 2px 6px rgba(60,40,10,.08)" }}

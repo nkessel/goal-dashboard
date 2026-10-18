@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ToucanWorkshop } from "./ToucanWorkshop";
+import { OwlCage } from "./OwlCage";
 import { SecretMissions } from "./SecretMissions";
 import { listMissionSteps } from "@/lib/data/missions";
 import { EveningRoutineTile } from "./EveningRoutineTile";
@@ -302,6 +303,8 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </ViewTransitionLink>
             </div>
           </SettingsRow>
+
+          <OwlCage />
 
           <SettingsRow
             theme={profile.theme}

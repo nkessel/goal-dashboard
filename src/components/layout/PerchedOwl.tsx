@@ -10,7 +10,7 @@ import { cleanToucan, type ToucanState } from "@/lib/toucan";
 const SAY_FLYING = ["Wheee!", "To the skies!", "The winds obey me.", "Onward, to wisdom!", "Behold my majestic flight!", "Higher, friend, higher!", "I have soared over many forests."];
 const SAY_LANDING = ["Here I shall dispense wisdom.", "I approve of this spot.", "Ah. The view is excellent.", "This perch will do nicely.", "Rest a moment. Then onward."];
 /** How often each landing line comes up (the view one is a rare treat). */
-const LANDING_WEIGHT: Record<string, number> = { "Ah. The view is excellent.": 0.2 };
+const LANDING_WEIGHT: Record<string, number> = { "Ah. The view is excellent.": 0.2, "I approve of this spot.": 0.35 };
 /** Never the same line twice in a row (per list), with optional weights. */
 function picker() {
   const last: Record<string, string> = {};
@@ -146,6 +146,52 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   const drag = useRef<{ x0: number; y0: number; offX: number; offY: number; moving: boolean } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [taps, setTaps] = useState(0);
+  const flewWise = useRef(false);
+  // Dropped onto the menu button, it goes into its cage (Settings sets it free).
+  const [caged, setCaged] = useState(() => {
+    try {
+      return typeof window !== "undefined" && window.localStorage.getItem("owl-caged") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    const free = (e: Event) => {
+      const at0 = (e as CustomEvent<{ x: number; y: number }>).detail;
+      try {
+        window.localStorage.removeItem("owl-caged");
+      } catch {
+        /* storage unavailable */
+      }
+      setCaged(false);
+      // Out of the cage, then off to a perch.
+      setTimeout(() => {
+        if (at0) put(at0);
+        setTimeout(() => fly(), 60);
+      }, 60);
+    };
+    window.addEventListener("owl-free", free);
+    return () => window.removeEventListener("owl-free", free);
+  });
+  function intoCage(r: DOMRect) {
+    const el = box.current;
+    if (!el) return;
+    setSay(null);
+    el.style.transition = "transform .45s cubic-bezier(.5,0,.9,.4), opacity .45s ease-in";
+    el.style.transform = `translate3d(${(r.left + r.width / 2 - OWL_W / 2).toFixed(1)}px, ${(r.top + r.height / 2 - OWL_H / 2).toFixed(1)}px, 0) scale(.15)`;
+    el.style.opacity = "0";
+    setTimeout(() => {
+      el.style.transition = "";
+      el.style.opacity = "";
+      try {
+        window.localStorage.setItem("owl-caged", "1");
+      } catch {
+        /* storage unavailable */
+      }
+      window.dispatchEvent(new Event("owl-caged"));
+      setCaged(true);
+    }, 470);
+  }
 
   const put = useCallback((p: { x: number; y: number }, tilt = 0, lift = 0) => {
     pos.current = p;
@@ -160,7 +206,9 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     const b = sayRef.current;
     const p = pos.current;
     if (!b || !p) return;
-    const x = Math.max(90, Math.min(window.innerWidth - 90, p.x));
+    // Keep the whole bubble on screen.
+    const half = Math.min(b.offsetWidth || 240, window.innerWidth - 24) / 2 + 10;
+    const x = Math.max(half, Math.min(window.innerWidth - half, p.x));
     b.style.transform = `translate3d(${x.toFixed(1)}px, ${(p.y - OWL_H - 22).toFixed(1)}px, 0) translate(-50%, -100%)`;
   }
   function speakBrief(text: string, ms: number | null) {
@@ -169,6 +217,18 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     if (ms) sayTimer.current = setTimeout(() => setSay(null), ms);
   }
   useEffect(placeSay, [say]);
+  useEffect(() => {
+    if (!say) return;
+    // A tap anywhere else puts the words away (not while carrying it).
+    const away = (e: PointerEvent) => {
+      if (drag.current) return;
+      if (box.current && e.target instanceof Node && box.current.contains(e.target)) return;
+      if (sayTimer.current) clearTimeout(sayTimer.current);
+      setSay(null);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [say]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the page has to exist before we can perch on it
@@ -291,8 +351,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     let i = Math.floor(Math.random() * WISDOM.length);
     if (i === lastWisdom.current) i = (i + 1) % WISDOM.length;
     lastWisdom.current = i;
-    const x = Math.max(130, Math.min(window.innerWidth - 130, p.x));
-    setWisdom({ text: WISDOM[i].replaceAll("{name}", addressOf(name)), x, y: p.y - OWL_H - 14 });
+    speakBrief(WISDOM[i].replaceAll("{name}", addressOf(name)), 5000);
   }
   useEffect(() => {
     if (!wisdom) return;
@@ -381,7 +440,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     }, 170);
   }
 
-  if (!mounted) return null;
+  if (!mounted || caged) return null;
   return createPortal(
     <>
       <div ref={sparks} aria-hidden className="pointer-events-none fixed inset-0 z-[44]" />
@@ -412,7 +471,10 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             setWisdom(null);
             setDragging(true);
             setPhase("flying");
-            if (spirit) speakBrief(Math.random() < 0.35 ? pick("wise", WISDOM).replaceAll("{name}", addressOf(name)) : pick("fly", SAY_FLYING), null);
+            if (spirit) {
+              flewWise.current = Math.random() < 0.35;
+              speakBrief(flewWise.current ? pick("wise", WISDOM).replaceAll("{name}", addressOf(name)) : pick("fly", SAY_FLYING), null);
+            }
           }
           const W = window.innerWidth;
           const H = window.innerHeight;
@@ -427,6 +489,14 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
           drag.current = null;
           endHold();
           if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+          const cage = document.querySelector<HTMLElement>("[data-owl-cage]")?.getBoundingClientRect();
+          if (d?.moving && cage && e.clientX >= cage.left - 6 && e.clientX <= cage.right + 6 && e.clientY >= cage.top - 6 && e.clientY <= cage.bottom + 6) {
+            held.current = true;
+            setDragging(false);
+            setPhase("perched");
+            intoCage(cage);
+            return;
+          }
           if (d?.moving && pos.current) {
             held.current = true; // not a tap
             setDragging(false);
@@ -434,8 +504,9 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             setPhase("landing");
             setTimeout(() => setPhase("perched"), 260);
             if (spirit) {
-              const wise = Math.random() < 0.35;
-              speakBrief(wise ? pick("wise", WISDOM).replaceAll("{name}", addressOf(name)) : pick("land", SAY_LANDING, LANDING_WEIGHT), wise ? 4200 : 2200);
+              // Wisdom shared in flight stays a moment; otherwise a landing line.
+              if (flewWise.current && say) speakBrief(say, 4000);
+              else speakBrief(pick("land", SAY_LANDING, LANDING_WEIGHT), 2200);
             }
             at.current = -1;
             try {

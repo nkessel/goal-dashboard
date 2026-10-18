@@ -33,6 +33,7 @@ export function TopRightAvatar({
     <Link
       href="/settings"
       scroll={false}
+      data-owl-cage
       aria-label={`Menu — signed in as ${label}`}
       className="avatar-link flex h-10 w-10 items-center justify-center overflow-hidden rounded-full"
       style={

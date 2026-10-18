@@ -46,9 +46,6 @@ const METRIC_IDEAS = ["Mood", "Focus", "Calm", "Motivation", "Sleep", "Pain"];
 const MAX_METRICS = 6;
 const EXPANDED_KEY = "checkin-expanded";
 
-/** After this long, the check-in bar starts fresh for the next one. */
-const FRESH_AFTER_MS = 30 * 60_000;
-
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 /**
@@ -150,17 +147,6 @@ export function EnergyCheck({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
 
-  // Half an hour after a check-in, the bar resets for the next one; the last
-  // one stays a tap away ("Last check-in at …").
-  useEffect(() => {
-    const check = () => {
-      if (savedAt && Date.now() - new Date(savedAt).getTime() > FRESH_AFTER_MS) setEditing(true);
-    };
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the clock decides when the bar resets
-    check();
-    const t = setInterval(check, 60_000);
-    return () => clearInterval(t);
-  }, [savedAt]);
 
   // Open or closed is remembered on this device.
   useEffect(() => {
@@ -563,7 +549,7 @@ export function EnergyCheck({
                 </li>
               ))}
             </ul>
-            {noteChips}
+            {chipsFor(notes)}
             {noteInput}
             <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]" style={{ color: "var(--t-cream)" }}>
               {mounted && savedAt && <span style={{ opacity: 0.75 }}>✓ Checked in at {clock(savedAt)}</span>}

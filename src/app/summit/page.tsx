@@ -29,6 +29,11 @@ export default async function SummitPage({ searchParams }: { searchParams: Promi
     ...today.map((t) => ({ id: t.id, title: t.title, xp: t.xp_value, icon: art(t), done: false })),
   ];
   const cards = Object.fromEntries([...doneToday.map((t) => [t.id, { ...t, categoryLabel: null }]), ...today.map((t) => [t.id, t])]);
+  const onTrail = new Set(quests.map((q) => q.id));
+  const others = open
+    .filter((t) => !onTrail.has(t.id) && !t.needs_review && !t.reward_id)
+    .slice(0, 80)
+    .map((t) => ({ id: t.id, title: t.title, xp: t.xp_value }));
   const { level } = xpToNextLevel(profile?.total_xp ?? 0, boss?.level ?? 10);
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
@@ -36,6 +41,7 @@ export default async function SummitPage({ searchParams }: { searchParams: Promi
         world={world}
         quests={quests}
         cards={cards}
+        others={others}
         level={level}
         boss={boss ? { title: boss.title, level: boss.level, target: boss.target, progress: boss.progress } : null}
       />

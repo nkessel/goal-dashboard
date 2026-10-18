@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { addToTopOfTodayAction, completeTaskAction, createQuestAction } from "@/app/actions";
+import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -168,11 +170,14 @@ export function AdventureView({
   world: worldKey,
   quests,
   cards = {},
+  others = [],
   boss,
   level,
 }: {
   world: WorldKey;
   quests: Quest[];
+  /** Open quests not on today's trail, offered when adding a stop to the path. */
+  others?: { id: string; title: string; xp: number }[];
   /** The full quests, so tapping one opens its usual card with every action. */
   cards?: Record<string, TaskWithCategory>;
   boss: { title: string; level: number; target: number; progress: number } | null;
@@ -187,8 +192,20 @@ export function AdventureView({
   const [spots, setSpots] = useState<Record<string, Spot>>({});
   const [open, setOpen] = useState<Quest | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
-  const drag = useRef<{ id: string; x0: number; y0: number; moved: boolean } | null>(null);
+  const drag = useRef<{ id: string; x0: number; y0: number; moved: boolean; offX: number; offY: number } | null>(null);
   useEscape(() => setOpen(null), !!open);
+  // Quests shown as little preview cards on the map (tap a token to toggle).
+  const [cardsOn, setCardsOn] = useState<Set<string>>(new Set());
+  const [doneNow, setDoneNow] = useState<Set<string>>(new Set());
+  // The order of stops along the trail (stops added mid-path keep their place).
+  const orderKey = `${posKey}:order`;
+  const [order, setOrder] = useState<string[]>([]);
+  // Adding a stop where the path was tapped.
+  const [adding, setAdding] = useState<{ x: number; y: number; at: number } | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+  const [busy, startBusy] = useTransition();
+  const [navH, setNavH] = useState(0);
+  useEscape(() => setAdding(null), !!adding);
 
   useLayoutEffect(() => {
     const el = box.current;
@@ -202,9 +219,23 @@ export function AdventureView({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- saved spots live in this browser only
     setSpots(loadSpots(posKey));
-  }, [posKey]);
+    try {
+      setOrder(JSON.parse(window.localStorage.getItem(orderKey) ?? "[]") as string[]);
+    } catch {
+      /* storage unavailable */
+    }
+    // Sit above the bottom navigation, so nothing is hidden behind it.
+    setNavH((document.querySelector("[data-app-nav]") as HTMLElement | null)?.offsetHeight ?? 0);
+  }, [posKey, orderKey]);
 
-  const list = quests;
+  const rank = (id: string) => {
+    const k = order.indexOf(id);
+    return k < 0 ? 1e6 : k;
+  };
+  const list = quests
+    .map((q, i) => ({ q: doneNow.has(q.id) ? { ...q, done: true } : q, i }))
+    .sort((a, b) => rank(a.q.id) - rank(b.q.id) || a.i - b.i)
+    .map((x) => x.q);
   const { w, h } = size;
   const spotOf = (q: Quest, i: number) => spots[q.id] ?? defaultSpot(i, list.length, TOP, BOTTOM, w > 760);
   const pts = list.map((q, i) => {
@@ -218,7 +249,8 @@ export function AdventureView({
   const toScreen = (p: { x: number; y: number }) => ({ x: ox + p.x * s, y: oy + p.y * s });
   // The trailhead.
   const head = toScreen(world.head);
-  const trail = [head, ...pts];
+  // With nothing on the list yet, a short stretch of trail to tap and add to.
+  const trail = list.length ? [head, ...pts] : w ? [head, { x: w * 0.5, y: h * 0.72 }] : [head];
   // Meander: between each pair of stops the trail swings out one way, then the other.
   const wind: { x: number; y: number }[] = [];
   trail.forEach((p, i) => {
@@ -269,9 +301,61 @@ export function AdventureView({
       /* storage unavailable */
     }
   }
-  function onDown(e: React.PointerEvent, q: Quest) {
-    drag.current = { id: q.id, x0: e.clientX, y0: e.clientY, moved: false };
+  function onDown(e: React.PointerEvent, q: Quest, anchor: { x: number; y: number }) {
+    const r = box.current?.getBoundingClientRect();
+    drag.current = { id: q.id, x0: e.clientX, y0: e.clientY, moved: false, offX: e.clientX - (r?.left ?? 0) - anchor.x, offY: e.clientY - (r?.top ?? 0) - anchor.y };
     e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function saveOrder(next: string[]) {
+    setOrder(next);
+    try {
+      window.localStorage.setItem(orderKey, JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  function complete(q: Quest) {
+    setDoneNow((d) => new Set(d).add(q.id));
+    startBusy(async () => {
+      try {
+        const fd = new FormData();
+        fd.set("taskId", q.id);
+        const res = await completeTaskAction(fd);
+        celebrateQuest({ taskId: q.id, title: q.title, xp: q.xp, iconSrc: q.icon, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
+        router.refresh();
+      } catch {
+        setDoneNow((d) => {
+          const x = new Set(d);
+          x.delete(q.id);
+          return x;
+        });
+      }
+    });
+  }
+  /** A stop added where the path was tapped: it joins the trail right there. */
+  function placeNew(id: string) {
+    if (!adding) return;
+    const ids = list.map((q) => q.id);
+    ids.splice(adding.at, 0, id);
+    saveOrder(ids);
+    save({ ...spots, [id]: { fx: adding.x / w, fy: adding.y / h } });
+    setAdding(null);
+    setNewTitle("");
+    router.refresh();
+  }
+  function addNew() {
+    const t = newTitle.trim();
+    if (!t) return;
+    startBusy(async () => {
+      const id = await createQuestAction({ title: t, importance: 2.5, urgency: 2.5, xpValue: 20, pinToBattle: true });
+      if (typeof id === "string") placeNew(id);
+    });
+  }
+  function addExisting(id: string) {
+    startBusy(async () => {
+      await addToTopOfTodayAction(id);
+      placeNew(id);
+    });
   }
   function onMove(e: React.PointerEvent) {
     const d = drag.current;
@@ -283,8 +367,9 @@ export function AdventureView({
       setOpen(null);
     }
     const r = box.current.getBoundingClientRect();
-    const fx = Math.max(0.06, Math.min(0.94, (e.clientX - r.left) / r.width));
-    const fy = Math.max(TOP, Math.min(BOTTOM, (e.clientY - r.top) / r.height));
+    // Anywhere on the map — even up the mountain.
+    const fx = Math.max(0.06, Math.min(0.94, (e.clientX - r.left - d.offX) / r.width));
+    const fy = Math.max(0.12, Math.min(0.97, (e.clientY - r.top - d.offY) / r.height));
     setSpots((sp) => ({ ...sp, [d.id]: { fx, fy } }));
   }
   function onUp(q: Quest) {
@@ -293,12 +378,18 @@ export function AdventureView({
     setDragId(null);
     if (!d) return;
     if (d.moved) save({ ...spots });
-    else setOpen((o) => (o?.id === q.id ? null : q));
+    else
+      setCardsOn((c) => {
+        const x = new Set(c);
+        if (x.has(q.id)) x.delete(q.id);
+        else x.add(q.id);
+        return x;
+      });
   }
   const remaining = list.filter((q) => !q.done).length;
 
   return (
-    <div ref={box} className="summit fixed inset-0 z-[30] select-none overflow-hidden" style={{ background: world.bg, touchAction: "none" }}>
+    <div ref={box} className="summit fixed inset-x-0 top-0 z-[30] select-none overflow-hidden" style={{ background: world.bg, touchAction: "none", bottom: navH }}>
       <world.Scene />
 
       {/* the trail and the dotted way onward */}
@@ -411,6 +502,27 @@ export function AdventureView({
         </svg>
       )}
 
+      {/* tap the path to add a stop right there */}
+      {w > 0 && (
+        <svg className="absolute inset-0" width={w} height={h} style={{ pointerEvents: "none" }} aria-hidden>
+          {segs.map((d, i) => (
+            <path
+              key={`hit${i}`}
+              d={d}
+              stroke="transparent"
+              strokeWidth="26"
+              fill="none"
+              style={{ pointerEvents: "stroke", cursor: "copy" }}
+              onClick={(e) => {
+                const r = box.current?.getBoundingClientRect();
+                if (!r) return;
+                setAdding({ x: e.clientX - r.left, y: e.clientY - r.top, at: Math.min(list.length, Math.floor(i / 3)) });
+              }}
+            />
+          ))}
+        </svg>
+      )}
+
       {/* a soft vignette, like an old painting */}
       <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, ${world.vignette} 100%)` }} />
 
@@ -437,7 +549,7 @@ export function AdventureView({
 
       {/* the boss at the peak */}
       {w > 0 && (
-        <div className="summit-boss pointer-events-none absolute" style={{ left: peak.x, top: peak.y - 14 - world.goalPad * s, transform: "translate(-50%, -100%)" }}>
+        <div className="summit-boss pointer-events-none absolute" style={{ left: peak.x, top: Math.max(130, peak.y - 14 - world.goalPad * s), transform: "translate(-50%, -100%)" }}>
           <div className="flex flex-col items-center">
             <div className="max-w-[230px] rounded-xl px-3 py-1.5 text-center" style={{ background: "rgba(20,14,30,.78)", border: "1.5px solid rgba(242,210,126,.7)", boxShadow: "0 0 18px rgba(255,200,120,.35)" }}>
               <div className="font-display text-[12px] font-bold uppercase tracking-[.18em]" style={{ color: "#f2d27e" }}>
@@ -459,25 +571,74 @@ export function AdventureView({
         </div>
       )}
 
-      {/* today's quests along the trail */}
+      {/* today's quests along the trail: a token, or (tapped) a little preview card */}
       {w > 0 &&
         list.map((q, i) => {
           const p = pts[i];
           const isNext = q.id === nextId;
+          const asCard = cardsOn.has(q.id);
+          const handlers = {
+            onPointerDown: (e: React.PointerEvent) => onDown(e, q, p),
+            onPointerMove: onMove,
+            onPointerUp: () => onUp(q),
+            onPointerCancel: () => {
+              drag.current = null;
+              setDragId(null);
+            },
+          };
+          if (asCard) {
+            // The card stays on screen; if it has to shift, the path still runs to the quest's spot beneath it.
+            const CW = 228;
+            const left = Math.max(8, Math.min(w - CW - 8, p.x - CW / 2));
+            const top = Math.max(64, Math.min(h - 120, p.y - 52));
+            return (
+              <div
+                key={q.id}
+                {...handlers}
+                role="group"
+                aria-label={q.title}
+                className={`summit-card fade-in absolute flex flex-col gap-2 rounded-2xl p-2.5 ${dragId === q.id ? "is-dragging" : ""}`}
+                style={{ left, top, width: CW, zIndex: dragId === q.id ? 999 : 400 + Math.round(p.y), cursor: dragId === q.id ? "grabbing" : "grab", background: "linear-gradient(180deg,#f6ecd2,#e9d8ae)", border: "1.5px solid #8b7040", boxShadow: "0 8px 20px rgba(0,0,0,.45)", color: "#2a1c10", touchAction: "none" }}
+              >
+                <div className="flex items-start gap-2">
+                  <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full" style={{ border: "1.5px solid #a58c66" }}>
+                    {q.icon ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+                      <img src={q.icon} alt="" draggable={false} className="h-full w-full object-cover" />
+                    ) : (
+                      <QuestMonogram id={q.id} title={q.title} size={36} />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="line-clamp-2 block text-[14px] font-semibold leading-snug" style={{ textDecoration: q.done ? "line-through" : undefined }}>
+                      {q.title}
+                    </span>
+                    <span className="block text-[12px]" style={{ color: "#6b5631" }}>
+                      {q.done ? "Done today ✓" : `+${q.xp} XP`}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
+                  {!q.done && (
+                    <button type="button" disabled={busy} onClick={() => complete(q)} className="h-8 flex-1 rounded-full text-[13px] font-bold disabled:opacity-60" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116" }}>
+                      Complete ✓
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setOpen(q)} className="h-8 flex-1 rounded-full text-[13px] font-semibold" style={{ border: "1px solid #a58c66" }}>
+                    Open card
+                  </button>
+                </div>
+              </div>
+            );
+          }
           return (
             <button
               key={q.id}
               type="button"
-              onPointerDown={(e) => onDown(e, q)}
-              onPointerMove={onMove}
-              onPointerUp={() => onUp(q)}
-              onPointerCancel={() => {
-                drag.current = null;
-                setDragId(null);
-              }}
-              aria-label={`${q.title}${q.done ? " (done)" : ""} — tap for details, drag to move`}
+              {...handlers}
+              aria-label={`${q.title}${q.done ? " (done)" : ""} — tap for its card, drag to move`}
               className={`summit-mark absolute flex flex-col items-center ${dragId === q.id ? "is-dragging" : ""}`}
-              style={{ left: p.x, top: p.y, transform: `translate(-50%, ${-MARK / 2}px)`, zIndex: dragId === q.id ? 5 : Math.round(p.y), cursor: dragId === q.id ? "grabbing" : "grab" }}
+              style={{ left: p.x, top: p.y, transform: `translate(-50%, ${-MARK / 2}px)`, zIndex: dragId === q.id ? 999 : Math.round(p.y), cursor: dragId === q.id ? "grabbing" : "grab" }}
             >
               <span
                 className={`relative flex items-center justify-center overflow-hidden rounded-full ${isNext ? "summit-next" : ""}`}
@@ -513,6 +674,59 @@ export function AdventureView({
             </button>
           );
         })}
+
+      {/* adding a stop where the path was tapped */}
+      {adding && (
+        <div
+          className="fade-in absolute z-[1000] w-[260px] rounded-2xl p-3"
+          style={{ left: Math.max(8, Math.min(w - 268, adding.x - 130)), top: Math.max(64, Math.min(h - 300, adding.y + 14)), background: "linear-gradient(180deg,#f6ecd2,#e9d8ae)", border: "1.5px solid #8b7040", boxShadow: "0 10px 26px rgba(0,0,0,.5)", color: "#2a1c10" }}
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-display text-[16px]">A new stop here</span>
+            <button type="button" onClick={() => setAdding(null)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none hover:bg-black/[.06]">
+              ×
+            </button>
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              autoFocus
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addNew()}
+              maxLength={140}
+              placeholder="New quest…"
+              aria-label="New quest"
+              className="h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-[15px]"
+              style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.6)" }}
+            />
+            <button type="button" disabled={busy || !newTitle.trim()} onClick={addNew} className="h-9 rounded-full px-3 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "#2a1c10", color: "#f2d27e" }}>
+              Add
+            </button>
+          </div>
+          {others.length > 0 && (
+            <>
+              <p className="m-0 mt-2.5 text-[12px] font-semibold uppercase tracking-[.12em]" style={{ color: "#6b5631" }}>
+                Or one you already have
+              </p>
+              <ul className="m-0 mt-1 flex max-h-[180px] list-none flex-col overflow-y-auto p-0">
+                {others
+                  .filter((o) => !newTitle.trim() || o.title.toLowerCase().includes(newTitle.trim().toLowerCase()))
+                  .slice(0, 30)
+                  .map((o) => (
+                    <li key={o.id}>
+                      <button type="button" disabled={busy} onClick={() => addExisting(o.id)} className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-[14px] hover:bg-black/[.05] disabled:opacity-60">
+                        <span className="min-w-0 flex-1 truncate">{o.title}</span>
+                        <span className="shrink-0 text-[11.5px]" style={{ color: "#6b5631" }}>
+                          +{o.xp}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
       {/* tapping a quest opens its usual card: complete, edit, schedule, everything */}
       {open &&
@@ -552,7 +766,7 @@ export function AdventureView({
         </div>
         <div className="flex flex-col items-end gap-2">
           <span className="hidden rounded-full px-3 py-1.5 text-right text-[12.5px] sm:block" style={{ background: "rgba(20,14,30,.45)", color: "rgba(246,236,210,.85)" }}>
-            {world.name} · {list.length === 0 ? "nothing on today's list yet" : remaining === 0 ? "every step taken today ✓" : `${remaining} ${world.steps} · drag to reshape`}
+            {list.length === 0 ? "Tap the path to add a quest" : remaining === 0 ? "every step taken today ✓" : `${remaining} ${world.steps} · drag to reshape · tap the path to add`}
           </span>
         </div>
       </div>
