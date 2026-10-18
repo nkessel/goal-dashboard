@@ -12,7 +12,6 @@ import { useEscape } from "@/lib/use-escape";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { MountainClouds, MountainScene, SCENE_H, SCENE_W, SUMMIT } from "./MountainScene";
 
-const dayIndex = (n: number) => Math.floor(Date.now() / 86_400_000) % n;
 
 /** A small wanderer with a cloak, a staff and a lantern. */
 function Wanderer() {
@@ -86,6 +85,7 @@ export const WORLDS: Partial<Record<WorldKey, World>> & { summit: World } = {
     vignette: "rgba(8,6,20,.45)",
     steps: "on today's trail",
     sayings: [
+      "Behold the compound interest of small, good things done consistently.",
       "Every summit is reached one step at a time.",
       "The mountain does not ask you to hurry — only to keep walking.",
       "Small steps, taken daily, move mountains.",
@@ -97,6 +97,9 @@ export const WORLDS: Partial<Record<WorldKey, World>> & { summit: World } = {
 };
 
 const MARK = 50;
+/** How far the great peak's flanks spread per unit of drop (see MountainScene). */
+const SLOPE_L = 0.64;
+const SLOPE_R = 0.67;
 
 function loadSpots(key: string): Record<string, Spot> {
   try {
@@ -109,7 +112,7 @@ function loadSpots(key: string): Record<string, Spot> {
 function defaultSpot(i: number, n: number, top: number, bottom: number, wide: boolean): Spot {
   const t = n <= 1 ? 0.5 : i / (n - 1);
   const fy = bottom - 0.06 - t * (bottom - 0.06 - top - 0.03);
-  const sw = wide ? 0.12 : 0.2;
+  const sw = wide ? 0.085 : 0.2;
   const fx = 0.5 + (i % 2 === 0 ? -1 : 1) * (sw - t * sw * 0.4) + Math.sin(i * 1.7) * 0.03;
   return { fx, fy };
 }
@@ -337,11 +340,20 @@ export function AdventureView({
     const len = Math.hypot(dx, dy) || 1;
     const nx = -dy / len;
     const ny = dx / len;
-    // Never so wide that neighbouring switchbacks cross.
-    const amp = Math.min(len * 0.2, 12 + 22 * Math.max(0, (p.y / h - TOP) / (1 - TOP)), Math.abs(dy) * 0.45 + 4);
-    const sgn = i % 2 === 0 ? 1 : -1;
-    wind.push({ x: p.x + dx / 3 + nx * amp * sgn, y: p.y + dy / 3 + ny * amp * sgn });
-    wind.push({ x: p.x + (2 * dx) / 3 - nx * amp * 0.7 * sgn, y: p.y + (2 * dy) / 3 - ny * amp * 0.7 * sgn });
+    // Wide, lazy S-bends (more of them on long stretches), like the climb
+    // above — but never so wide that neighbouring stretches cross.
+    const depth = Math.max(0, Math.min(1, (p.y / h - TOP) / (1 - TOP)));
+    const amp = Math.min(len * 0.22, 14 + 30 * depth, Math.abs(dy) * 0.35 + 6);
+    const bends = len > 300 ? 4 : len > 160 ? 3 : 2;
+    // First bend swings away from where the trail just came from, so
+    // neighbouring stretches part rather than cross.
+    const prev = trail[i - 1];
+    const sgn = prev ? ((prev.x - p.x) * nx + (prev.y - p.y) * ny > 0 ? -1 : 1) : 1;
+    for (let k = 1; k <= bends; k++) {
+      const f = k / (bends + 1);
+      const side = (k % 2 === 1 ? 1 : -1) * sgn * (bends > 2 ? Math.sin(Math.PI * f) : 1);
+      wind.push({ x: p.x + dx * f + nx * amp * side, y: p.y + dy * f + ny * amp * side });
+    }
   });
   const segs = w ? (world.trail === "lines" ? trail.slice(0, -1).map((p, i) => `M${p.x} ${p.y}L${trail[i + 1].x} ${trail[i + 1].y}`) : segments(wind)) : [];
   const stones = w && world.trail === "stones" ? sampleCurve(wind, (y) => 10 + Math.max(0, Math.min(1, (y / h - TOP) / (1 - TOP))) * 18) : [];
@@ -361,7 +373,11 @@ export function AdventureView({
       const cx = last.x + (peak.x - last.x) * Math.pow(t, 0.8);
       const y = last.y + (peak.y - last.y) * (1 - Math.pow(1 - t, 1.25));
       const amp = (1 - t) * Math.min(w * 0.2, world.climb.amp) + 8;
-      up.push({ x: cx + (k % 2 === 0 ? -1 : 1) * amp, y });
+      // Keep each switchback on the mountain's face, inside its slopes.
+      const below = Math.max(0, y - peak.y);
+      const minX = peak.x - below * SLOPE_L * 0.78;
+      const maxX = peak.x + below * SLOPE_R * 0.78;
+      up.push({ x: Math.max(minX, Math.min(maxX, cx + (k % 2 === 0 ? -1 : 1) * amp)), y });
     }
     up.push(peak);
     climb = segments(up).join("");
@@ -446,7 +462,15 @@ export function AdventureView({
     // Anywhere on the map — even up the mountain.
     const fx = Math.max(0.06, Math.min(0.94, (e.clientX - r.left - d.offX) / r.width));
     const fy = Math.max(0.12, Math.min(0.97, (e.clientY - r.top - d.offY) / r.height));
-    setSpots((sp) => ({ ...sp, [d.id]: { fx, fy } }));
+    // Up on the mountain, a quest stays on its face — never out in the sky.
+    const y = fy * h;
+    const base = oy + 500 * s;
+    let x = fx * w;
+    if (y < base) {
+      const below = Math.max(0, y - peak.y);
+      x = Math.max(peak.x - below * SLOPE_L * 0.8, Math.min(peak.x + below * SLOPE_R * 0.8, x));
+    }
+    setSpots((sp) => ({ ...sp, [d.id]: { fx: w ? x / w : fx, fy } }));
   }
   function onUp(q: Quest) {
     const d = drag.current;
@@ -631,7 +655,7 @@ export function AdventureView({
           className="summit-saying pointer-events-none absolute left-1/2 m-0 w-[min(88vw,520px)] -translate-x-1/2 text-center font-display italic"
           style={{ top: world.key === "stars" ? peak.y + 64 * s + 10 : Math.max(peak.y + 70, h * 0.3), fontSize: w < 500 ? 19 : 24, lineHeight: 1.3, color: "#fff7e6", textShadow: "0 2px 12px rgba(40,20,60,.75), 0 0 2px rgba(40,20,60,.6)" }}
         >
-          {world.sayings[dayIndex(world.sayings.length)]}
+          {world.sayings[0]}
         </p>
       )}
 

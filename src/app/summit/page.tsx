@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
+import { CreateFab } from "@/components/create/CreateFab";
 import { AdventureView, type WorldKey } from "@/components/summit/AdventureView";
 import { listCompletedTasksForOwner, listOpenTasksForOwnerWithCategory } from "@/lib/data/tasks";
 import { getProfileById } from "@/lib/data/profiles";
@@ -45,6 +46,7 @@ export default async function SummitPage({ searchParams }: { searchParams: Promi
         level={level}
         boss={boss ? { title: boss.title, level: boss.level, target: boss.target, progress: boss.progress } : null}
       />
+      <CreateFab kinds={["quest", "journal"]} initial="quest" theme="adventure" label="New quest" />
     </AppShell>
   );
 }

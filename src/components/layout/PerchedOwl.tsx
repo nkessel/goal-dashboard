@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { cleanToucan, type ToucanState } from "@/lib/toucan";
 
@@ -60,6 +61,34 @@ function spot(): { x: number; y: number } | null {
     return null;
   }
 }
+
+/** Is this screen the one a tab leads to? */
+function onScreen(href: string, pathname: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(href + "/");
+}
+/** The bottom-nav tab under a point, if any. */
+function tabAt(x: number, y: number): HTMLAnchorElement | null {
+  for (const a of document.querySelectorAll<HTMLAnchorElement>("[data-app-nav] a[href]")) {
+    const r = a.getBoundingClientRect();
+    if (x >= r.left && x <= r.right && y >= r.top - 4 && y <= r.bottom) return a;
+  }
+  return null;
+}
+/** Hiding places on a screen: tucked half out of sight at an edge. */
+function hidingSpot(seed: number): { x: number; y: number; tilt: number } {
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const spots = [
+    { x: 4, y: H * 0.55, tilt: 18 },
+    { x: W - 4, y: H * 0.38, tilt: -18 },
+    { x: W - 6, y: H * 0.72, tilt: -14 },
+    { x: 6, y: H * 0.3, tilt: 14 },
+  ];
+  return spots[Math.abs(seed) % spots.length];
+}
+const FOUND = ["You found me!", "Ha! Well spotted.", "A keen eye. I am impressed.", "Hide and seek is a sacred art."];
+const HIDING = ["Find me if you can…", "I shall hide. Seek wisely.", "Now you see me…"];
 
 const OWL_W = 52;
 const OWL_H = 56;
@@ -120,6 +149,23 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   const sayRef = useRef<HTMLDivElement>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname() ?? "/";
+  // Dropped onto a tab in the bottom bar, it hides on that screen until found.
+  const [hiding, setHiding] = useState<{ href: string; seed: number } | null>(() => {
+    try {
+      return typeof window !== "undefined" ? (JSON.parse(window.localStorage.getItem("owl-hiding") ?? "null") as { href: string; seed: number } | null) : null;
+    } catch {
+      return null;
+    }
+  });
+  const hidingHere = !!hiding && onScreen(hiding.href, pathname);
+  const hoverTab = useRef<HTMLAnchorElement | null>(null);
+  const markTab = (a: HTMLAnchorElement | null) => {
+    if (hoverTab.current === a) return;
+    if (hoverTab.current) hoverTab.current.classList.remove("owl-hide-target");
+    hoverTab.current = a;
+    if (a) a.classList.add("owl-hide-target");
+  };
   const [phase, setPhase] = useState<Phase>("perched");
   const [facing, setFacing] = useState<1 | -1>(1);
   const at = useRef(0);
@@ -191,6 +237,43 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
       window.dispatchEvent(new Event("owl-caged"));
       setCaged(true);
     }, 470);
+  }
+
+  function intoTab(a: HTMLAnchorElement) {
+    const el = box.current;
+    if (!el) return;
+    const r = a.getBoundingClientRect();
+    const href = a.getAttribute("href") ?? "/";
+    if (spirit) speakBrief(pick("hide", HIDING), 900);
+    el.style.transition = "transform .5s cubic-bezier(.5,0,.9,.4), opacity .5s ease-in";
+    el.style.transform = `translate3d(${(r.left + r.width / 2 - OWL_W / 2).toFixed(1)}px, ${(r.top + r.height / 2 - OWL_H / 2).toFixed(1)}px, 0) scale(.2)`;
+    el.style.opacity = "0";
+    setTimeout(() => {
+      el.style.transition = "";
+      el.style.opacity = "";
+      setSay(null);
+      const h = { href, seed: Math.floor(Math.random() * 1000) };
+      try {
+        window.localStorage.setItem("owl-hiding", JSON.stringify(h));
+      } catch {
+        /* storage unavailable */
+      }
+      setHiding(h);
+    }, 520);
+  }
+  /** Found it: out it pops, and off to a perch. */
+  function found() {
+    try {
+      window.localStorage.removeItem("owl-hiding");
+    } catch {
+      /* storage unavailable */
+    }
+    setHiding(null);
+    if (spirit) speakBrief(pick("found", FOUND), 2600);
+    const p = pos.current;
+    if (p && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) for (let i = 0; i < 12; i++) setTimeout(() => spark(p.x + (Math.random() - 0.5) * 50, p.y - OWL_H / 2 + (Math.random() - 0.5) * 40), i * 30);
+    at.current = -1;
+    setTimeout(() => fly(), 500);
   }
 
   const put = useCallback((p: { x: number; y: number }, tilt = 0, lift = 0) => {
@@ -266,6 +349,29 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
       if (raf.current) cancelAnimationFrame(raf.current);
     };
   }, [put]);
+
+  // In its hiding place on this screen (and back to its perch elsewhere).
+  useEffect(() => {
+    if (!mounted || caged) return;
+    let t = 0;
+    let tries = 0;
+    const place = () => {
+      if (!box.current && tries++ < 10) {
+        t = requestAnimationFrame(place);
+        return;
+      }
+      if (hidingHere && hiding) {
+        const h = hidingSpot(hiding.seed);
+        put({ x: h.x, y: h.y }, h.tilt);
+        setFacing(h.x < window.innerWidth / 2 ? 1 : -1);
+      } else if (!busy.current && !drag.current) {
+        const sp = at.current < 0 ? spot() : null;
+        put(sp ?? perches()[Math.max(0, at.current)] ?? perches()[0]);
+      }
+    };
+    t = requestAnimationFrame(place);
+    return () => cancelAnimationFrame(t);
+  }, [hidingHere, hiding, mounted, caged, put, pathname]);
 
   function spark(x: number, y: number) {
     const host = sparks.current;
@@ -440,7 +546,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     }, 170);
   }
 
-  if (!mounted || caged) return null;
+  if (!mounted || caged || (hiding && !hidingHere)) return null;
   return createPortal(
     <>
       <div ref={sparks} aria-hidden className="pointer-events-none fixed inset-0 z-[44]" />
@@ -452,7 +558,8 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             held.current = false;
             return;
           }
-          if (spirit) speak();
+          if (hidingHere) found();
+          else if (spirit) speak();
           else fly();
         }}
         onPointerDown={(e) => {
@@ -483,6 +590,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
           const prevX = pos.current?.x ?? x;
           if (Math.abs(x - prevX) > 1.5) setFacing(x > prevX ? 1 : -1);
           put({ x, y }, Math.max(-12, Math.min(12, (x - prevX) * 0.8)));
+          markTab(tabAt(e.clientX, e.clientY));
         }}
         onPointerUp={(e) => {
           const d = drag.current;
@@ -490,6 +598,24 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
           endHold();
           if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
           const cage = document.querySelector<HTMLElement>("[data-owl-cage]")?.getBoundingClientRect();
+          markTab(null);
+          const tab = d?.moving ? tabAt(e.clientX, e.clientY) : null;
+          if (d?.moving && hidingHere) {
+            // Carried out of its hiding place: found.
+            try {
+              window.localStorage.removeItem("owl-hiding");
+            } catch {
+              /* storage unavailable */
+            }
+            setHiding(null);
+          }
+          if (tab && !(cage && e.clientX >= cage.left - 6 && e.clientX <= cage.right + 6 && e.clientY >= cage.top - 6 && e.clientY <= cage.bottom + 6)) {
+            held.current = true;
+            setDragging(false);
+            setPhase("perched");
+            intoTab(tab);
+            return;
+          }
           if (d?.moving && cage && e.clientX >= cage.left - 6 && e.clientX <= cage.right + 6 && e.clientY >= cage.top - 6 && e.clientY <= cage.bottom + 6) {
             held.current = true;
             setDragging(false);
@@ -519,6 +645,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         }}
         onPointerCancel={() => {
           drag.current = null;
+          markTab(null);
           setDragging(false);
           setPhase("perched");
           setSay(null);
@@ -534,7 +661,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         }}
         aria-label={spirit ? "The great toucan spirit — tap for wisdom, hold to return to the owl" : "A snowy owl — tap and it flies to another perch; hold to summon the great toucan spirit"}
         title={spirit ? "The great toucan spirit" : "Hoo!"}
-        className={`owl-perch fixed left-0 top-0 z-[45] touch-none select-none p-0 ${dragging ? "owl-dragging" : ""}`}
+        className={`owl-perch fixed left-0 top-0 z-[45] touch-none select-none p-0 ${dragging ? "owl-dragging" : ""} ${hidingHere && !dragging ? "owl-hidden-here" : ""}`}
         style={{
           width: OWL_W,
           height: OWL_H,

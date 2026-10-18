@@ -1583,6 +1583,13 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 }
 .owl-perch { cursor: url("/design/cursor-hand.svg") 11 3, pointer; transition: filter 0.2s; }
 .owl-perch.owl-dragging.owl-dragging { cursor: grabbing; filter: drop-shadow(0 10px 8px rgba(0,0,0,.45)) drop-shadow(0 0 16px rgba(255,236,170,.55)) !important; }
+/* Hiding on a screen until found: a little dimmer, and a curious peek now and then. */
+.owl-perch.owl-hidden-here { filter: brightness(.85) drop-shadow(0 2px 3px rgba(0,0,0,.4)) !important; }
+.owl-perch.owl-hidden-here .owl-body { animation: owl-peek 7s ease-in-out infinite; }
+@keyframes owl-peek { 0%, 78%, 100% { translate: 0 0; } 84%, 92% { translate: 0 -5px; } }
+/* A tab the bird is being dragged over: it can hide there. */
+[data-app-nav] a.owl-hide-target { filter: drop-shadow(0 0 10px rgba(255,226,140,.95)); transform: scale(1.12); transition: transform .15s, filter .15s; }
+@media (prefers-reduced-motion: reduce) { .owl-perch.owl-hidden-here .owl-body { animation: none; } }
 .owl-perch:hover { filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 14px rgba(255,236,170,.6)) !important; }
 @media (prefers-reduced-motion: reduce) {
   .owl-wing-l, .owl-wing-r, .owl-spark { animation: none; }
