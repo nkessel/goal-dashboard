@@ -1,11 +1,13 @@
 "use client";
 
 import { FocusSteps as FocusStepsPanel } from "./FocusSteps";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { useRouter } from "next/navigation";
-import { completeRiteAction, completeTaskAction, listQuestStepsAction, saveQuestStepsAction } from "@/app/actions";
+import { completeRiteAction, completeTaskAction, listQuestStepsAction, saveQuestStepsAction, updateTaskAction } from "@/app/actions";
+import { IconPicker } from "@/components/tasks/IconPicker";
+import { IconScale } from "@/components/tasks/QuestEditorDialog";
 import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
@@ -123,7 +125,35 @@ function OneThingView({
   const byId = new Map(tasks.map((t) => [t.id, t]));
   // Quests finished or removed elsewhere drop out of the deck.
   const live = deck.filter((id) => byId.has(id));
-  const task = index < live.length ? byId.get(live[index]) : undefined;
+  // Edits made right on the card (shown at once, saved in the background).
+  const [patches, setPatches] = useState<Record<string, Partial<TaskWithCategory>>>({});
+  const baseTask = index < live.length ? byId.get(live[index]) : undefined;
+  const patch = baseTask ? patches[baseTask.id] : undefined;
+  // Stable object (a new one each render would make the timer re-adopt it in a loop).
+  const task = useMemo(() => (baseTask ? (patch ? { ...baseTask, ...patch } : baseTask) : undefined), [baseTask, patch]);
+  const editable = !!task && !task.habit;
+
+  function saveField(fields: Partial<TaskWithCategory>) {
+    if (!task || task.habit) return;
+    const next = { ...task, ...fields };
+    setPatches((p) => ({ ...p, [task.id]: { ...p[task.id], ...fields } }));
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateTaskAction(task.id, {
+          title: next.title,
+          description: next.description ?? "",
+          importance: next.importance,
+          urgency: next.urgency,
+          xpValue: next.xp_value,
+          ...("estimate_minutes" in fields ? { estimateMinutes: next.estimate_minutes } : {}),
+          ...("effort" in fields ? { effort: next.effort ?? 0 } : {}),
+        });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't save that change.");
+      }
+    });
+  }
 
   const [confirmExit, setConfirmExit] = useState(false);
   useEscape(() => (confirmExit ? setConfirmExit(false) : requestClose()), !editing);
@@ -258,21 +288,62 @@ function OneThingView({
             }`}
             style={{ borderRadius: 22 }}
           >
-            <Portrait task={task} />
+            {editable ? (
+              <span className="relative z-[1]" title="Change the portrait">
+                <IconPicker
+                  taskId={task.id}
+                  currentIcon={task.icon_key}
+                  currentSource={task.icon_source}
+                  taskTitle={task.title}
+                  taskDescription={task.description}
+                  theme={theme}
+                  size={104}
+                  centered
+                  showEditHint
+                  emptyContent={<QuestMonogram id={task.id} title={task.title} size={104} />}
+                />
+              </span>
+            ) : (
+              <Portrait task={task} />
+            )}
             {task.categoryLabel && (
               <span className="relative z-[1] rounded-md px-2.5 py-0.5 text-[13px]" style={{ background: "rgba(120,90,40,.14)", color: "#5a4a30" }}>
                 {task.categoryLabel}
               </span>
             )}
-            <h2 className="font-display relative z-[1] m-0 text-[28px] leading-tight [text-wrap:balance]" style={{ color: "var(--t-ink)" }}>
-              {task.title}
-            </h2>
-            {task.description && (
-              <p className="relative z-[1] m-0 max-h-[24vh] overflow-y-auto whitespace-pre-line text-[16px] leading-snug" style={{ color: "#4a3c26" }}>
-                {task.description}
-              </p>
+            {editable ? (
+              <>
+                <InlineText
+                  key={`t-${task.id}`}
+                  value={task.title}
+                  onSave={(v) => v.trim() && saveField({ title: v.trim() })}
+                  className="font-display text-[28px] leading-tight [text-wrap:balance]"
+                  label="Quest title"
+                />
+                <InlineText
+                  key={`d-${task.id}`}
+                  value={task.description ?? ""}
+                  multiline
+                  placeholder="Add a description"
+                  onSave={(v) => saveField({ description: v.trim() || null })}
+                  className="max-h-[24vh] overflow-y-auto whitespace-pre-line text-[16px] leading-snug"
+                  label="Description"
+                />
+                <EditableFacts task={task} now={now} onSave={saveField} />
+              </>
+            ) : (
+              <>
+                <h2 className="font-display relative z-[1] m-0 text-[28px] leading-tight [text-wrap:balance]" style={{ color: "var(--t-ink)" }}>
+                  {task.title}
+                </h2>
+                {task.description && (
+                  <p className="relative z-[1] m-0 max-h-[24vh] overflow-y-auto whitespace-pre-line text-[16px] leading-snug" style={{ color: "#4a3c26" }}>
+                    {task.description}
+                  </p>
+                )}
+                <Facts task={task} now={now} />
+              </>
             )}
-            <Facts task={task} now={now} />
             {!focus && (
               <p className="relative z-[1] m-0 text-[14.5px] italic" style={{ color: "#6b5534" }}>
                 {whyThisOne(task, now)}
@@ -398,6 +469,160 @@ function Portrait({ task }: { task: Task }) {
         <QuestMonogram id={task.id} title={task.title} size={104} />
       )}
     </span>
+  );
+}
+
+/** Tap the text to edit it in place; Enter (or tapping away) saves, Escape cancels. */
+function InlineText({
+  value,
+  onSave,
+  className,
+  multiline = false,
+  placeholder,
+  label,
+}: {
+  value: string;
+  onSave: (v: string) => void;
+  className: string;
+  multiline?: boolean;
+  placeholder?: string;
+  label: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const style = { color: multiline ? "#4a3c26" : "var(--t-ink)" };
+  if (draft === null) {
+    return (
+      <button
+        type="button"
+        onClick={() => setDraft(value)}
+        title={`Edit ${label.toLowerCase()}`}
+        className={`inline-edit relative z-[1] m-0 w-full rounded-lg px-1.5 py-0.5 text-center ${className}`}
+        style={{ ...style, opacity: value ? 1 : 0.55, fontStyle: value ? undefined : "italic" }}
+      >
+        {value || placeholder}
+      </button>
+    );
+  }
+  const finish = (save: boolean) => {
+    if (save && draft !== value) onSave(draft);
+    setDraft(null);
+  };
+  const common = {
+    autoFocus: true,
+    value: draft,
+    "aria-label": label,
+    onBlur: () => finish(true),
+    className: `relative z-[1] w-full rounded-lg border px-2 py-1 text-center ${className}`,
+    style: { ...style, borderColor: "#b39a6a", background: "rgba(255,250,238,.7)" },
+  };
+  return multiline ? (
+    <textarea
+      {...common}
+      rows={Math.min(8, Math.max(2, draft.split("\n").length + 1))}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          setDraft(null);
+        }
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) finish(true);
+      }}
+    />
+  ) : (
+    <input
+      {...common}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          setDraft(null);
+        }
+        if (e.key === "Enter") finish(true);
+      }}
+    />
+  );
+}
+
+/** The card's facts, each tappable: time estimate, XP, and the ratings. */
+function EditableFacts({ task, now, onSave }: { task: TaskWithCategory; now: number; onSave: (f: Partial<TaskWithCategory>) => void }) {
+  const [open, setOpen] = useState<"time" | "xp" | "ratings" | null>(null);
+  const [num, setNum] = useState("");
+  const chip = "inline-edit whitespace-nowrap rounded-full px-2 py-0.5";
+  const due = task.due_at ? new Date(task.due_at) : null;
+  function openNum(which: "time" | "xp") {
+    setNum(String(which === "time" ? (task.estimate_minutes ?? "") : task.xp_value));
+    setOpen(which);
+  }
+  function commitNum() {
+    const n = Math.round(Number(num));
+    if (open === "time") onSave({ estimate_minutes: num.trim() === "" ? null : Math.max(1, Math.min(1440, n || 0)) || null });
+    if (open === "xp") onSave({ xp_value: Math.max(0, Math.min(1000, n || 0)) });
+    setOpen(null);
+  }
+  const est = task.estimate_minutes;
+  return (
+    <div className="relative z-[1] flex w-full flex-col items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1.5 text-[14.5px]" style={{ color: "#4a3c26" }}>
+        {due && (
+          <span className="whitespace-nowrap px-1">
+            {due.getTime() < now ? "Was due" : "Due"} {due.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+          </span>
+        )}
+        <button type="button" onClick={() => openNum("time")} className={chip} title="Edit the time estimate">
+          ⏱ {est != null ? (est < 60 ? `${est}m` : `${Math.floor(est / 60)}h${est % 60 ? ` ${est % 60}m` : ""}`) : "add time"}
+        </button>
+        <button type="button" onClick={() => openNum("xp")} className={`${chip} font-bold`} style={{ color: "var(--t-xp)" }} title="Edit the XP">
+          +{task.xp_value} XP
+        </button>
+        <button type="button" onClick={() => setOpen(open === "ratings" ? null : "ratings")} className={chip} title="Edit importance, urgency and difficulty">
+          {task.urgency > 0 || task.importance > 0 ? (
+            <>
+              {"🔥".repeat(Math.round(task.importance))}
+              {task.importance > 0 && task.urgency > 0 ? " " : ""}
+              {"⏳".repeat(Math.round(task.urgency))}
+            </>
+          ) : (
+            "rate it"
+          )}
+        </button>
+        {task.steps_total ? <span className="whitespace-nowrap px-1">{task.steps_done ?? 0}/{task.steps_total} steps</span> : null}
+      </div>
+      {(open === "time" || open === "xp") && (
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            type="number"
+            inputMode="numeric"
+            value={num}
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => setNum(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitNum();
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setOpen(null);
+              }
+            }}
+            aria-label={open === "time" ? "Minutes" : "XP"}
+            className="h-9 w-20 rounded-lg border px-2 text-center text-[16px]"
+            style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.7)" }}
+          />
+          <span className="text-[14px]" style={{ color: "#6b5534" }}>
+            {open === "time" ? "minutes" : "XP"}
+          </span>
+          <button type="button" onClick={commitNum} className="one-thing-primary h-9 rounded-full px-4 text-[14px] font-bold">
+            Save
+          </button>
+        </div>
+      )}
+      {open === "ratings" && (
+        <div className="flex w-full flex-col gap-1 rounded-xl px-3 py-2 text-left" style={{ background: "rgba(120,90,40,.1)", color: "var(--t-ink)" }}>
+          <IconScale label="Importance" icon="/design/ui-flame-sm.png" value={Math.round(task.importance)} onChange={(v) => onSave({ importance: v })} />
+          <IconScale label="Urgency" icon="/design/ui-hourglass.svg" value={Math.round(task.urgency)} onChange={(v) => onSave({ urgency: v })} />
+          <IconScale label="Difficulty" icon="/design/ui-muscle.svg" value={Math.round(task.effort ?? 0)} onChange={(v) => onSave({ effort: v })} />
+        </div>
+      )}
+    </div>
   );
 }
 
