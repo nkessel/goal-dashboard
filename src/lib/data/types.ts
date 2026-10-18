@@ -56,6 +56,8 @@ export type Task = {
   google_calendar_event_id: string | null;
   is_manual_priority: boolean;
   status: "open" | "completed";
+  /** Set on a secret-mission step (hidden until sent to Today). */
+  mission_id?: string | null;
   completed_at: string | null;
   /** When the completion was recorded (may be later than completed_at). */
   logged_at?: string | null;

@@ -13,3 +13,25 @@ export async function saveMissions(ownerId: string, missions: unknown): Promise<
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
+
+/** Every secret-mission step: real quests, linked by mission id. */
+export async function listMissionSteps(ownerId: string) {
+  const { attachStepCounts } = await import("./steps");
+  const { data, error } = await supabaseAdmin()
+    .from("tasks")
+    .select("*")
+    .eq("owner_id", ownerId)
+    .not("mission_id", "is", null)
+    .order("created_at", { ascending: true });
+  if (error) return [];
+  return attachStepCounts(((data ?? []) as import("./types").Task[]).map((t) => ({ ...t, categoryLabel: null as string | null })), ownerId);
+}
+
+/** A new step: a private quest on no board and off Today until sent there. */
+export async function createMissionStep(ownerId: string, missionId: string, title: string, xp: number) {
+  const { createTask } = await import("./tasks");
+  const task = await createTask(ownerId, { title: title.slice(0, 200), xpValue: Math.max(0, Math.min(500, Math.round(xp))) });
+  const { error } = await supabaseAdmin().from("tasks").update({ mission_id: missionId.slice(0, 64), in_additional: false, is_manual_priority: false, is_private: true }).eq("id", task.id).eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't add that step: ${error.message}`);
+  return task.id;
+}

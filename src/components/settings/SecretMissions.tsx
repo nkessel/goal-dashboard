@@ -1,24 +1,35 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { saveSecretMissionsAction } from "@/app/actions";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import { addMissionStepAction, completeTaskAction, deleteTaskAction, releaseMissionStepsAction, reopenTaskAction, saveSecretMissionsAction, sendMissionStepToTodayAction } from "@/app/actions";
+import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
+import { TaskRow } from "@/components/tasks/TaskRow";
+import type { TaskWithCategory } from "@/lib/data/tasks";
 import { cleanMissions, type Mission } from "@/lib/missions";
+import { useEscape } from "@/lib/use-escape";
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+const XP_STEPS = [10, 20, 50, 100];
 
 /**
- * Secret missions: private long quests, sealed like dispatches. Each opens to
- * its steps — tick them off, add more, rename or strike them — and when every
- * step is done the mission is marked accomplished. Only you can see them.
+ * Secret missions: private long quests, sealed like dispatches. Each step is
+ * a real quest — it earns XP, opens in the full quest card (edit, schedule,
+ * break it down…), and can be sent to Today's Quests. Until then, steps stay
+ * hidden everywhere but here. Only you can see them.
  */
-export function SecretMissions({ initial }: { initial: unknown }) {
+export function SecretMissions({ initial, steps }: { initial: unknown; steps: TaskWithCategory[] }) {
+  const router = useRouter();
   const [missions, setMissions] = useState<Mission[]>(() => cleanMissions(initial));
   const [open, setOpen] = useState<string | null>(() => cleanMissions(initial)[0]?.id ?? null);
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [card, setCard] = useState<TaskWithCategory | null>(null);
   const [, start] = useTransition();
   const lastSaved = useRef(missions);
+  useEscape(() => setCard(null), !!card);
 
   function commit(next: Mission[]) {
     setMissions(next);
@@ -32,16 +43,6 @@ export function SecretMissions({ initial }: { initial: unknown }) {
       }
     });
   }
-  const update = (id: string, fn: (m: Mission) => Mission) =>
-    commit(
-      missions.map((m) => {
-        if (m.id !== id) return m;
-        const n = fn(m);
-        const all = n.steps.length > 0 && n.steps.every((s) => s.done);
-        return { ...n, doneAt: all ? (n.doneAt ?? new Date().toISOString()) : null };
-      })
-    );
-
   function addMission() {
     const t = title.trim();
     if (!t) return setAdding(false);
@@ -55,16 +56,23 @@ export function SecretMissions({ initial }: { initial: unknown }) {
   return (
     <div className="flex flex-col gap-2.5">
       <p className="m-0 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-        Private long quests, sealed for your eyes only. Nobody in your party can see them.
+        Private long quests, sealed for your eyes only. Each step is a quest that earns XP — send one to Today when you&apos;re ready.
       </p>
       {missions.map((m) => (
         <MissionCard
           key={m.id}
           mission={m}
+          steps={steps.filter((t) => t.mission_id === m.id)}
           open={open === m.id}
           onToggle={() => setOpen(open === m.id ? null : m.id)}
-          onChange={(fn) => update(m.id, fn)}
-          onDelete={() => commit(missions.filter((x) => x.id !== m.id))}
+          onChange={(fn) => commit(missions.map((x) => (x.id === m.id ? fn(x) : x)))}
+          onDelete={() => {
+            commit(missions.filter((x) => x.id !== m.id));
+            void releaseMissionStepsAction(m.id).then(() => router.refresh());
+          }}
+          onOpenCard={setCard}
+          onError={setError}
+          refresh={() => router.refresh()}
         />
       ))}
       {adding ? (
@@ -97,28 +105,111 @@ export function SecretMissions({ initial }: { initial: unknown }) {
           {error}
         </p>
       )}
+
+      {/* A step's full quest card: edit, schedule, break it down, everything. */}
+      {card &&
+        createPortal(
+          <div className="fixed inset-0 z-[55] flex items-center justify-center p-4" onClick={() => setCard(null)}>
+            <div className="overlay-fade-in absolute inset-0" style={{ background: "rgba(8,6,20,.55)" }} />
+            <div className="card-pop-in relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <button type="button" onClick={() => setCard(null)} aria-label="Close" className="absolute -top-11 right-0 flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none" style={{ background: "rgba(20,14,30,.7)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.5)" }}>
+                ×
+              </button>
+              <ul className="m-0 list-none p-0">
+                <TaskRow task={card} theme="adventure" categoryLabel={null} onEditorClose={() => router.refresh()} />
+              </ul>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
 
-function MissionCard({ mission: m, open, onToggle, onChange, onDelete }: { mission: Mission; open: boolean; onToggle: () => void; onChange: (fn: (m: Mission) => Mission) => void; onDelete: () => void }) {
+function MissionCard({
+  mission: m,
+  steps,
+  open,
+  onToggle,
+  onChange,
+  onDelete,
+  onOpenCard,
+  onError,
+  refresh,
+}: {
+  mission: Mission;
+  steps: TaskWithCategory[];
+  open: boolean;
+  onToggle: () => void;
+  onChange: (fn: (m: Mission) => Mission) => void;
+  onDelete: () => void;
+  onOpenCard: (t: TaskWithCategory) => void;
+  onError: (e: string | null) => void;
+  refresh: () => void;
+}) {
   const [step, setStep] = useState("");
+  const [xp, setXp] = useState(20);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(m.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const done = m.steps.filter((s) => s.done).length;
-  const accomplished = !!m.doneAt;
+  const [confirmStep, setConfirmStep] = useState<string | null>(null);
+  // Changes shown at once while the server catches up.
+  const [doneNow, setDoneNow] = useState<Record<string, boolean>>({});
+  const [todayNow, setTodayNow] = useState<Record<string, boolean>>({});
+  const [pending, setPending] = useState<{ title: string; xp: number }[]>([]);
+  const [, start] = useTransition();
 
+  const isDone = (t: TaskWithCategory) => doneNow[t.id] ?? t.status === "completed";
+  const onToday = (t: TaskWithCategory) => todayNow[t.id] ?? (t.is_manual_priority || t.in_additional === true);
+  const done = steps.filter(isDone).length;
+  const total = steps.length + pending.length;
+  const accomplished = steps.length > 0 && pending.length === 0 && done === steps.length;
+  const xpLeft = steps.filter((t) => !isDone(t)).reduce((n, t) => n + t.xp_value, 0);
+
+  function run(fn: () => Promise<unknown>, undo?: () => void) {
+    onError(null);
+    start(async () => {
+      try {
+        await fn();
+        refresh();
+      } catch (e) {
+        undo?.();
+        onError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
+  function toggleDone(t: TaskWithCategory) {
+    const next = !isDone(t);
+    setDoneNow((d) => ({ ...d, [t.id]: next }));
+    run(
+      async () => {
+        if (next) {
+          const fd = new FormData();
+          fd.set("taskId", t.id);
+          const res = await completeTaskAction(fd);
+          celebrateQuest({ taskId: t.id, title: t.title, xp: t.xp_value, iconSrc: (t.icon_source === "ai" || t.icon_source === "library") && t.icon_key ? t.icon_key : null, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
+        } else await reopenTaskAction(t.id);
+      },
+      () => setDoneNow((d) => ({ ...d, [t.id]: !next }))
+    );
+  }
   function addStep() {
     const t = step.trim();
     if (!t) return;
-    onChange((x) => ({ ...x, steps: [...x.steps, { id: newId(), title: t, done: false }] }));
+    const p = { title: t, xp };
+    setPending((ps) => [...ps, p]);
     setStep("");
+    run(
+      async () => {
+        await addMissionStepAction(m.id, t, xp);
+        setPending((ps) => ps.filter((x) => x !== p));
+      },
+      () => setPending((ps) => ps.filter((x) => x !== p))
+    );
   }
 
   return (
     <div className="relative overflow-hidden rounded-2xl" style={{ background: "linear-gradient(180deg,#efe2c2,#e4d1a6)", border: "1.5px solid #8b7040", boxShadow: "0 3px 10px rgba(60,40,10,.18)" }}>
-      {/* the seal */}
       <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 px-3.5 py-3 text-left">
         <span
           aria-hidden
@@ -135,9 +226,10 @@ function MissionCard({ mission: m, open, onToggle, onChange, onDelete }: { missi
             {m.title}
           </span>
         </span>
-        {m.steps.length > 0 && (
-          <span className="shrink-0 text-[12.5px] tabular-nums" style={{ color: "#6b5631" }}>
-            {done}/{m.steps.length}
+        {total > 0 && (
+          <span className="shrink-0 text-right text-[12.5px] tabular-nums leading-tight" style={{ color: "#6b5631" }}>
+            {done}/{total}
+            {xpLeft > 0 && <span className="block text-[11px]">{xpLeft} XP to earn</span>}
           </span>
         )}
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: open ? "rotate(90deg)" : undefined }}>
@@ -147,35 +239,97 @@ function MissionCard({ mission: m, open, onToggle, onChange, onDelete }: { missi
 
       {open && (
         <div className="reveal flex flex-col gap-2 px-3.5 pb-3.5">
-          {m.steps.length > 0 && (
+          {total > 0 && (
             <div className="h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(70,50,20,.15)" }}>
-              <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${(done / m.steps.length) * 100}%`, background: "linear-gradient(90deg,#d9b45f,#f2d27e)" }} />
+              <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${(done / total) * 100}%`, background: "linear-gradient(90deg,#d9b45f,#f2d27e)" }} />
             </div>
           )}
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
-            {m.steps.map((s) => (
-              <li key={s.id} className="group flex min-h-10 items-center gap-2.5 rounded-lg px-1.5 hover:bg-black/[.04]">
-                <input type="checkbox" checked={s.done} onChange={() => onChange((x) => ({ ...x, steps: x.steps.map((y) => (y.id === s.id ? { ...y, done: !y.done } : y)) }))} aria-label={`Done: ${s.title}`} />
-                <span className="min-w-0 flex-1 text-[15px] leading-snug" style={{ color: "#2a1c10", textDecoration: s.done ? "line-through" : undefined, opacity: s.done ? 0.6 : 1 }}>
-                  {s.title}
+            {steps.map((t) => {
+              const d = isDone(t);
+              const today = onToday(t);
+              return (
+                <li key={t.id} className="group flex min-h-11 items-center gap-2 rounded-lg px-1.5 hover:bg-black/[.04]">
+                  <input type="checkbox" checked={d} onChange={() => toggleDone(t)} aria-label={`Done: ${t.title}`} />
+                  <button type="button" onClick={() => onOpenCard(t)} title="Open the quest card" className="min-w-0 flex-1 text-left text-[15px] leading-snug underline-offset-2 hover:underline" style={{ color: "#2a1c10", textDecoration: d ? "line-through" : undefined, opacity: d ? 0.6 : 1 }}>
+                    {t.title}
+                  </button>
+                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-bold tabular-nums" style={{ background: "rgba(217,180,95,.35)", color: "#5a3e12" }}>
+                    +{t.xp_value} XP
+                  </span>
+                  {!d &&
+                    (today ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTodayNow((x) => ({ ...x, [t.id]: false }));
+                          run(() => sendMissionStepToTodayAction(t.id, false), () => setTodayNow((x) => ({ ...x, [t.id]: true })));
+                        }}
+                        title="On Today's Quests — tap to take it off"
+                        className="h-8 shrink-0 rounded-full px-2.5 text-[12px] font-semibold"
+                        style={{ background: "#2a1c10", color: "#f2d27e" }}
+                      >
+                        ☀ On Today
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTodayNow((x) => ({ ...x, [t.id]: true }));
+                          run(() => sendMissionStepToTodayAction(t.id, true), () => setTodayNow((x) => ({ ...x, [t.id]: false })));
+                        }}
+                        title="Send to Today's Quests"
+                        className="h-8 shrink-0 rounded-full px-2.5 text-[12px] font-semibold"
+                        style={{ border: "1px solid #a58c66", color: "#2a1c10" }}
+                      >
+                        → Today
+                      </button>
+                    ))}
+                  {confirmStep === t.id ? (
+                    <span className="flex shrink-0 items-center gap-1 text-[12px]">
+                      <button type="button" onClick={() => run(() => deleteTaskAction(t.id))} className="font-semibold underline" style={{ color: "var(--t-warn)" }}>
+                        Remove
+                      </button>
+                      <button type="button" onClick={() => setConfirmStep(null)} className="underline" style={{ color: "#6b5631" }}>
+                        Keep
+                      </button>
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => setConfirmStep(t.id)} aria-label={`Remove “${t.title}”`} className="flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-[17px] opacity-40 hover:bg-black/[.06] group-hover:opacity-100" style={{ color: "#6b5631" }}>
+                      ×
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+            {pending.map((p, i) => (
+              <li key={`p${i}`} className="flex min-h-11 items-center gap-2 px-1.5 opacity-60">
+                <input type="checkbox" disabled aria-label="Saving" />
+                <span className="flex-1 text-[15px]" style={{ color: "#2a1c10" }}>
+                  {p.title}
                 </span>
-                <button type="button" onClick={() => onChange((x) => ({ ...x, steps: x.steps.filter((y) => y.id !== s.id) }))} aria-label={`Remove “${s.title}”`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[17px] opacity-40 hover:bg-black/[.06] group-hover:opacity-100" style={{ color: "#6b5631" }}>
-                  ×
-                </button>
+                <span className="text-[11.5px]">saving…</span>
               </li>
             ))}
           </ul>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               value={step}
               onChange={(e) => setStep(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addStep()}
               maxLength={200}
-              placeholder={m.steps.length ? "Next step…" : "First step…"}
+              placeholder={total ? "Next step…" : "First step…"}
               aria-label="Add a step"
-              className="h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-[15px]"
+              className="h-9 min-w-[160px] flex-1 rounded-lg border px-2.5 text-[15px]"
               style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.55)", color: "#2a1c10" }}
             />
+            <select value={xp} onChange={(e) => setXp(Number(e.target.value))} aria-label="XP for this step" className="h-9 rounded-lg border px-1.5 text-[14px]" style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.55)", color: "#2a1c10" }}>
+              {XP_STEPS.map((n) => (
+                <option key={n} value={n}>
+                  +{n} XP
+                </option>
+              ))}
+            </select>
             <button type="button" onClick={addStep} disabled={!step.trim()} className="h-9 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "#2a1c10", color: "#f2d27e" }}>
               Add
             </button>
@@ -227,7 +381,7 @@ function MissionCard({ mission: m, open, onToggle, onChange, onDelete }: { missi
             )}
             {confirmDelete ? (
               <span className="flex items-center gap-2">
-                Burn this mission?
+                Burn this mission? (Its steps stay as quests.)
                 <button type="button" onClick={onDelete} className="font-semibold underline" style={{ color: "var(--t-warn)" }}>
                   Yes, burn it
                 </button>

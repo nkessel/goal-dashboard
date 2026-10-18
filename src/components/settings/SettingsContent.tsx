@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ToucanWorkshop } from "./ToucanWorkshop";
 import { SecretMissions } from "./SecretMissions";
+import { listMissionSteps } from "@/lib/data/missions";
 import { EveningRoutineTile } from "./EveningRoutineTile";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
@@ -28,11 +29,12 @@ const ICON_STROKE = { strokeWidth: 1.6, fill: "none" as const };
 
 /** Everything in Settings below its title — shared by the Settings page and the slide-out menu. */
 export async function SettingsContent({ userId, open }: { userId: string; open?: string }) {
-  const [session, profile, imports, admin] = await Promise.all([
+  const [session, profile, imports, admin, missionSteps] = await Promise.all([
     auth(),
     getProfileById(userId),
     countImports(userId).catch(() => ({ quests: 0, rewards: 0 })),
     isAdmin(userId),
+    listMissionSteps(userId).catch(() => []),
   ]);
   const newFeedback = admin ? await countUnreviewed() : 0;
   if (!profile) notFound();
@@ -321,7 +323,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             defaultOpen={open === "missions"}
             icon={<span style={{ fontSize: 14 }}>🗝️</span>}
           >
-            <SecretMissions initial={profile.secret_missions ?? []} />
+            <SecretMissions initial={profile.secret_missions ?? []} steps={missionSteps} />
           </SettingsRow>
 
           <SettingsRow

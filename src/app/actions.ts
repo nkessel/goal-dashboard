@@ -2256,3 +2256,34 @@ export async function saveSecretMissionsAction(missions: unknown) {
   const { saveMissions } = await import("@/lib/data/missions");
   return saveMissions(ownerId, missions);
 }
+
+/** Add a step to a secret mission: it's a real quest (XP, editor, Today), kept private. */
+export async function addMissionStepAction(missionId: string, title: string, xp = 20) {
+  const ownerId = await requireProfileId();
+  const t = title.replace(/\s+/g, " ").trim();
+  if (!t) throw new Error("Give the step a name.");
+  const { createMissionStep } = await import("@/lib/data/missions");
+  const id = await createMissionStep(ownerId, missionId, t, xp);
+  revalidatePath("/settings");
+  return id;
+}
+
+/** Send a mission step to Today's Quests, or take it back off. */
+export async function sendMissionStepToTodayAction(taskId: string, onToday: boolean) {
+  const ownerId = await requireProfileId();
+  if (onToday) await tasksData.pinToTopOfToday(taskId, ownerId);
+  else {
+    await tasksData.setManualPriority(taskId, ownerId, false);
+    await tasksData.setTaskInAdditional(taskId, ownerId, false);
+  }
+  revalidatePath("/");
+  revalidatePath("/settings");
+}
+
+/** A mission was burned: its steps become ordinary quests. */
+export async function releaseMissionStepsAction(missionId: string) {
+  const ownerId = await requireProfileId();
+  const { supabaseAdmin } = await import("@/lib/supabase/server");
+  await supabaseAdmin().from("tasks").update({ mission_id: null }).eq("owner_id", ownerId).eq("mission_id", missionId);
+  revalidatePath("/");
+}

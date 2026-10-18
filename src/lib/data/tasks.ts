@@ -13,6 +13,8 @@ export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
     .eq("owner_id", ownerId)
     .eq("status", "open")
     .eq("is_aspiration", false)
+    // Secret-mission steps stay hidden until sent to Today.
+    .or("mission_id.is.null,is_manual_priority.eq.true,in_additional.eq.true")
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
@@ -41,6 +43,8 @@ export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promis
     .eq("owner_id", ownerId)
     .eq("status", "open")
     .eq("is_aspiration", false)
+    // Secret-mission steps stay hidden until sent to Today.
+    .or("mission_id.is.null,is_manual_priority.eq.true,in_additional.eq.true")
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
@@ -268,6 +272,7 @@ export async function listOpenTasksWithBoardForOwner(
     .eq("owner_id", ownerId)
     .eq("status", "open")
     .eq("is_aspiration", false)
+    .or("mission_id.is.null,is_manual_priority.eq.true,in_additional.eq.true")
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
@@ -308,6 +313,7 @@ export async function listUnboardedTasks(ownerId: string): Promise<Task[]> {
     .eq("owner_id", ownerId)
     .is("board_id", null)
     .is("reward_id", null)
+    .is("mission_id", null)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw new Error(`Failed to list uncategorized quests: ${error.message}`);
