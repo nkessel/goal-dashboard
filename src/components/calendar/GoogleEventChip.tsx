@@ -95,7 +95,7 @@ export function GoogleEventChip({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`hover-glow flex h-full w-full overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
+        className={`cal-chip flex h-full w-full overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
         style={{
           // Solid (not see-through) so events fanned over each other stay readable.
           background: isAdventure ? "color-mix(in srgb, #46688a 16%, #efe2c4)" : "#e7ecf9",

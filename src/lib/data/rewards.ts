@@ -202,7 +202,8 @@ export async function listClaimedSince(ownerId: string, sinceISO: string): Promi
     .select("*")
     .eq("owner_id", ownerId)
     .in("status", ["claimed", "completed"])
-    .gte("claimed_at", sinceISO)
+    // Accepted recently, or received recently (even if accepted long ago).
+    .or(`claimed_at.gte.${sinceISO},completed_at.gte.${sinceISO}`)
     .order("claimed_at", { ascending: false });
   if (error) throw new Error(`Failed to list claimed rewards: ${error.message}`);
   return data ?? [];

@@ -83,7 +83,7 @@ export function CalendarTaskChip({
         e.stopPropagation();
         setEditing(true);
       }}
-      className={`hover-glow flex h-full w-full min-w-0 overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
+      className={`cal-chip flex h-full w-full min-w-0 overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
       style={{
         ...cardStyle,
         ...(isAdventure ? { borderLeft: `3px solid ${isCompleted ? "var(--t-good)" : isWarned ? "var(--t-warn)" : "#a88a3f"}` } : {}),

@@ -183,7 +183,6 @@ export function QuestComplete(props: QuestCompleteProps) {
   const puff0 = useMemo(() => puffDust(fx), [fx]);
   const amb = useMemo(() => embers(fx), [fx]);
 
-  const remaining = questXp - gained;
 
   // Editing replaces the celebration (it comes back when the editor closes),
   // so the two never draw over each other.
@@ -351,8 +350,9 @@ export function QuestComplete(props: QuestCompleteProps) {
               <div className="w-px shrink-0" style={{ background: "#b9a47c" }} />
 
               <div className="relative flex w-[66px] shrink-0 flex-col items-center justify-center gap-0.5">
-                <span className="text-base font-bold leading-none" style={{ color: remaining === 0 ? "#8a7d5f" : "#4f6d3c" }}>XP</span>
-                <span className="text-[38px] font-bold leading-none tabular-nums" style={{ color: remaining === 0 ? "#8a7d5f" : "#4f6d3c" }}>{remaining}</span>
+                {/* The quest's own XP stays put; only the level bar below fills. */}
+                <span className="text-base font-bold leading-none" style={{ color: "#4f6d3c" }}>XP</span>
+                <span className="text-[38px] font-bold leading-none tabular-nums" style={{ color: "#4f6d3c" }}>{questXp}</span>
               </div>
             </div>
           </div>

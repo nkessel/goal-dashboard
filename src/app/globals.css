@@ -1839,3 +1839,12 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 .cage-words { position: absolute; margin: 0; transform: translate(-50%, 0); font-size: 30px; color: #f6dc8e; text-shadow: 0 2px 10px rgba(0,0,0,.5), 0 0 18px rgba(255,214,120,.8); animation: cage-words 2.2s ease-out .2s both; }
 @keyframes cage-words { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.8); } 25% { opacity: 1; transform: translate(-50%, 0) scale(1.1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -20px) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .cage-burst, .cage-rays, .cage-spark, .cage-flyer, .cage-words, .cage-bird { animation-duration: .01s !important; } }
+
+/* Calendar events: a quiet hover — a hair brighter with a thin edge, no glow. */
+.cal-chip { transition: filter 140ms ease, box-shadow 140ms ease; }
+@media (hover: hover) {
+  .cal-chip:hover {
+    filter: brightness(1.04);
+    box-shadow: inset 0 0 0 1px rgba(255, 244, 214, 0.45);
+  }
+}
