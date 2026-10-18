@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
-import { scheduleTaskAction } from "@/app/actions";
+import { scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE, type Carried } from "@/lib/schedule-carry";
 import { WeatherLocation, useWeatherPlaceName } from "@/components/ui/WeatherLocation";
 import Link from "next/link";
@@ -203,7 +203,9 @@ export function WeekView({
   const boxRef = useRef<HTMLDivElement>(null);
   // Pinch to zoom the hours (two fingers on a phone, or a trackpad pinch).
   const pxNow = useRef(hourPx);
-  pxNow.current = hourPx;
+  useEffect(() => {
+    pxNow.current = hourPx;
+  }, [hourPx]);
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
@@ -235,7 +237,6 @@ export function WeekView({
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("wheel", onWheel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- zoomTo only uses setters and storage
   }, []);
   const [colWidth, setColWidth] = useState(0);
   useLayoutEffect(() => {
@@ -257,6 +258,138 @@ export function WeekView({
   /** Minutes from the top of the grid, clamped to it. */
   const offset = (d: Date, day: Date) => Math.min(gridMinutes, Math.max(0, (d.getTime() - gridStart(day)) / 60_000));
 
+  // Drag a quest or event to move it (to another day, too), or its bottom
+  // edge to change how long it runs — snapping to the quarter hour. A mouse
+  // drags after a few pixels; a finger holds for a moment first.
+  type Span = { dayIndex: number; top: number; bottom: number };
+  const [moving, setMoving] = useState<(Span & { key: string }) | null>(null);
+  const [pending, setPending] = useState<Record<string, Span>>({});
+  const [seenData, setSeenData] = useState({ tasks, events });
+  if (seenData.tasks !== tasks || seenData.events !== events) {
+    setSeenData({ tasks, events });
+    setPending({});
+  }
+  const drag = useRef<{
+    key: string;
+    kind: "move" | "resize";
+    pointerId: number;
+    touch: boolean;
+    x0: number;
+    y0: number;
+    from: Span;
+    to: Span;
+    active: boolean;
+    timer?: number;
+    item: { kind: "task"; task: Task } | { kind: "event"; event: GoogleCalendarEvent };
+  } | null>(null);
+  const justDragged = useRef(false);
+
+  function startItemDrag(e: React.PointerEvent, key: string, span: Span, item: { kind: "task"; task: Task } | { kind: "event"; event: GoogleCalendarEvent }) {
+    if (carried) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const kind = (e.target as HTMLElement).closest("[data-resize]") ? "resize" : "move";
+    const touch = e.pointerType !== "mouse";
+    const d = { key, kind, pointerId: e.pointerId, touch, x0: e.clientX, y0: e.clientY, from: span, to: span, active: false, timer: undefined as number | undefined, item } as NonNullable<typeof drag.current>;
+    if (touch) {
+      d.timer = window.setTimeout(() => {
+        if (drag.current !== d) return;
+        d.active = true;
+        navigator.vibrate?.(8);
+        setMoving({ key, ...span });
+      }, 320);
+    }
+    drag.current = d;
+  }
+
+  const onDragMove = useEffectEvent((e: PointerEvent) => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.pointerId) return;
+    const dist = Math.hypot(e.clientX - d.x0, e.clientY - d.y0);
+    if (!d.active) {
+      if (d.touch) {
+        if (dist > 8) {
+          window.clearTimeout(d.timer);
+          drag.current = null; // a scroll, not a drag
+        }
+        return;
+      }
+      if (dist <= 4) return;
+      d.active = true;
+    }
+    const dMin = Math.round((((e.clientY - d.y0) / HOUR_PX) * 60) / SNAP) * SNAP;
+    const len = d.from.bottom - d.from.top;
+    let to: Span;
+    if (d.kind === "resize") {
+      to = { ...d.from, bottom: Math.max(d.from.top + SNAP, Math.min(gridMinutes, d.from.bottom + dMin)) };
+    } else {
+      const dDay = colWidth > 0 ? Math.round((e.clientX - d.x0) / (colWidth + 2)) : 0;
+      const top = Math.max(0, Math.min(gridMinutes - len, Math.round((d.from.top + dMin) / SNAP) * SNAP));
+      to = { dayIndex: Math.max(0, Math.min(days.length - 1, d.from.dayIndex + dDay)), top, bottom: top + len };
+    }
+    d.to = to;
+    setMoving({ key: d.key, ...to });
+  });
+
+  const onDragUp = useEffectEvent((e: PointerEvent) => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.pointerId) return;
+    window.clearTimeout(d.timer);
+    drag.current = null;
+    setMoving(null);
+    if (!d.active) return;
+    justDragged.current = true;
+    window.setTimeout(() => (justDragged.current = false), 0);
+    const { dayIndex, top, bottom } = d.to;
+    if (dayIndex === d.from.dayIndex && top === d.from.top && bottom === d.from.bottom) return;
+    const day = days[dayIndex];
+    if (!day) return;
+    const start = minuteDate(day, top).toISOString();
+    const end = minuteDate(day, bottom).toISOString();
+    setPending((p) => ({ ...p, [d.key]: d.to }));
+    setPlaceError(null);
+    void (async () => {
+      try {
+        if (d.item.kind === "task") await scheduleTaskAction(d.item.task.id, start, end);
+        else await updateGoogleEventAction(d.item.event.id, d.item.event.calendarId ?? "primary", { startISO: start, endISO: end });
+        router.refresh();
+      } catch (err) {
+        setPending((p) => {
+          const n = { ...p };
+          delete n[d.key];
+          return n;
+        });
+        setPlaceError(err instanceof Error ? err.message : "Couldn't move that.");
+      }
+    })();
+  });
+
+  const onDragCancel = useEffectEvent((e: PointerEvent) => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.pointerId) return;
+    window.clearTimeout(d.timer);
+    drag.current = null;
+    setMoving(null);
+  });
+
+  useEffect(() => {
+    const mv = (e: PointerEvent) => onDragMove(e);
+    const up = (e: PointerEvent) => onDragUp(e);
+    const cancel = (e: PointerEvent) => onDragCancel(e);
+    const tm = (e: TouchEvent) => {
+      if (drag.current?.active) e.preventDefault();
+    };
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    document.addEventListener("touchmove", tm, { passive: false });
+    return () => {
+      window.removeEventListener("pointermove", mv);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      document.removeEventListener("touchmove", tm);
+    };
+  }, []);
+
   type Item =
     | { kind: "task"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; task: Task }
     | { kind: "event"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; event: GoogleCalendarEvent };
@@ -276,6 +409,14 @@ export function WeekView({
     if (dayIndex === -1) continue;
     const top = offset(start, days[dayIndex]);
     items.push({ kind: "task", key: `t-${task.id}`, dayIndex, top, bottom: Math.max(top + 20, offset(end, days[dayIndex])), start, end, task });
+  }
+
+  // An item being dragged (or just dropped, until fresh data arrives) shows at its new spot.
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const o = moving?.key === it.key ? moving : pending[it.key];
+    if (!o || !days[o.dayIndex]) continue;
+    items[i] = { ...it, dayIndex: o.dayIndex, top: o.top, bottom: o.bottom, start: minuteDate(days[o.dayIndex], o.top), end: minuteDate(days[o.dayIndex], o.bottom) };
   }
 
   // Side-by-side lanes for overlapping items on the same day.
@@ -577,9 +718,19 @@ export function WeekView({
                 // Too narrow to split (phones, multi-day views): fan out instead.
                 const fan = l.count > 1 && colWidth > 0 && colWidth / l.count < 46;
                 const step = Math.min(8, colWidth / (l.count + 2));
+                const canDrag = it.kind === "task" || (it.event.editable !== false && !it.event.isAllDay);
+                const isMoving = moving?.key === it.key;
                 return (
                   <div
                     key={it.key}
+                    onPointerDownCapture={canDrag ? (e) => startItemDrag(e, it.key, { dayIndex: it.dayIndex, top: it.top, bottom: it.bottom }, it.kind === "task" ? { kind: "task", task: it.task } : { kind: "event", event: it.event }) : undefined}
+                    onClickCapture={(e) => {
+                      // The end of a drag isn't a tap on the chip.
+                      if (justDragged.current) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }
+                    }}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setItemMenu({
@@ -598,13 +749,18 @@ export function WeekView({
                       boxShadow: fan && l.lane > 0 ? "-2px 0 4px rgba(60,40,10,.25)" : undefined,
                       borderRadius: 6,
                       // Faded but still opaque, so past items fanned over each other stay legible.
-                      filter: past ? "saturate(.2) contrast(.6) brightness(1.12)" : undefined,
+                      filter: past && !isMoving ? "saturate(.2) contrast(.6) brightness(1.12)" : undefined,
+                      ...(isMoving ? { zIndex: 40, boxShadow: "0 8px 18px rgba(40,25,5,.35)", outline: "2px solid rgba(217,180,95,.9)", cursor: "grabbing" } : {}),
+                      touchAction: canDrag ? "pan-y" : undefined,
                     }}
                   >
                     {it.kind === "event" ? (
                       <GoogleEventChip event={it.event} theme={theme} compact timeLabel={label} oneLine={oneLine} />
                     ) : (
                       <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} />
+                    )}
+                    {canDrag && height >= 18 && (
+                      <div data-resize aria-hidden title="Drag to change how long it runs" className="cal-resize absolute inset-x-1 bottom-0 h-[7px] cursor-ns-resize" />
                     )}
                   </div>
                 );

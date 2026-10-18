@@ -5,10 +5,10 @@ import { AppShell } from "@/components/layout/AppShell";
 import { CreateFab } from "@/components/create/CreateFab";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getProfileById } from "@/lib/data/profiles";
-import { xpToNextLevel } from "@/lib/data/xp";
 import { listCalendarTasksForOwner } from "@/lib/data/tasks";
 import { listEventsAllCalendars, type GoogleCalendarEvent, type GoogleCalendarInfo } from "@/lib/google-calendar";
 import { CalendarLayers } from "@/components/calendar/CalendarLayers";
+import { CalendarSlide, SlideLink } from "@/components/calendar/CalendarNav";
 import { SchedulingDrawer } from "@/components/calendar/SchedulingList";
 import { getSchedulingFolders, listSchedulingList } from "@/lib/data/scheduling";
 import {
@@ -28,6 +28,8 @@ import {
 
 type ViewKind = "day" | "3day" | "days" | "week" | "next7" | "month";
 const VIEW_LABELS: Record<ViewKind, string> = { day: "Day", "3day": "3 days", days: "Days", week: "Week", next7: "7 days", month: "Month" };
+/** Wider views sit to the right, so switching slides the way the tabs read. */
+const VIEW_ORDER: Record<ViewKind, number> = { day: 0, days: 1, "3day": 1, week: 2, next7: 3, month: 4 };
 
 function parseView(v: string | undefined): ViewKind {
   return v === "day" || v === "3day" || v === "days" || v === "month" || v === "next7" ? v : "week";
@@ -59,7 +61,6 @@ export default async function CalendarPage({
   const profile = await getProfileById(session.user.id);
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
-  const level = profile ? xpToNextLevel(profile.total_xp).level : 1;
 
   let rangeStart: Date;
   let rangeEnd: Date;
@@ -202,8 +203,9 @@ export default async function CalendarPage({
           {(["day", "3day", "week", "next7", "month"] as const).map((v) => {
             const active = v === view;
             return (
-              <Link
+              <SlideLink
                 key={v}
+                dir={VIEW_ORDER[v] === VIEW_ORDER[view] ? "fade" : VIEW_ORDER[v] > VIEW_ORDER[view] ? "left" : "right"}
                 href={`/calendar?view=${v}&date=${formatDateParam(date)}`}
                 className={`flex-1 rounded-full py-1.5 text-center text-xs font-semibold capitalize ${isAdventure ? "font-display" : ""}`}
                 style={{
@@ -212,14 +214,14 @@ export default async function CalendarPage({
                 }}
               >
                 {VIEW_LABELS[v]}
-              </Link>
+              </SlideLink>
             );
           })}
         </div>
 
         {/* Prev / heading / next */}
         <div className="flex items-center justify-between">
-          <Link href={prevHref} aria-label="Previous" className="flex h-8 w-8 items-center justify-center">
+          <SlideLink dir="right" href={prevHref} aria-label="Previous" className="flex h-10 w-10 items-center justify-center rounded-full">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
                 d="M15 5l-7 7 7 7"
@@ -228,7 +230,7 @@ export default async function CalendarPage({
                 fill="none"
               />
             </svg>
-          </Link>
+          </SlideLink>
           <div className="flex flex-col items-center">
             <span
               className={isAdventure ? "font-display text-sm" : "text-sm font-semibold"}
@@ -236,15 +238,16 @@ export default async function CalendarPage({
             >
               {heading}
             </span>
-            <Link
+            <SlideLink
+              dir={formatDateParam(today) === formatDateParam(date) ? "fade" : today > date ? "left" : "right"}
               href={todayHref}
               className="text-[11px] underline"
               style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-accent)" }}
             >
               Today
-            </Link>
+            </SlideLink>
           </div>
-          <Link href={nextHref} aria-label="Next" className="flex h-8 w-8 items-center justify-center">
+          <SlideLink dir="left" href={nextHref} aria-label="Next" className="flex h-10 w-10 items-center justify-center rounded-full">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
                 d="M9 5l7 7-7 7"
@@ -253,9 +256,10 @@ export default async function CalendarPage({
                 fill="none"
               />
             </svg>
-          </Link>
+          </SlideLink>
         </div>
 
+        <CalendarSlide slideKey={`${view}|${nDays}|${formatDateParam(rangeStart)}`}>
         <CalendarLayers
           view={view}
           dayKeys={
@@ -274,6 +278,7 @@ export default async function CalendarPage({
           dateKey={formatDateParam(date)}
           nDays={view === "day" ? 1 : view === "3day" || view === "days" ? nDays : view === "month" ? 7 : 7}
         />
+        </CalendarSlide>
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
       <SchedulingDrawer tasks={toSchedule} folders={scheduleFolders} theme={theme} />
