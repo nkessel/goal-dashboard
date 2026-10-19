@@ -59,7 +59,7 @@ export function XpSummary({
   checkMetrics?: string[];
   /** Today's latest reading of each. */
   metricsToday?: Record<string, number>;
-  notesToday?: { id: string; body: string }[];
+  notesToday?: { id: string; body: string; at?: string }[];
   /** The boss standing in the way of the next level (null = none set). */
   boss?: BossView | null;
   /** False before the bosses table exists (no "set a boss" prompt then). */

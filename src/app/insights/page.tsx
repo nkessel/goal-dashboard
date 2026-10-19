@@ -52,7 +52,7 @@ export default async function InsightsPage() {
           <h2 className={`m-0 text-center ${isAdventure ? "font-display text-[20px]" : "text-[16px] font-bold"}`} style={{ color: "#f2d27e" }}>
             Check in
           </h2>
-          <EnergyCheck full today={energyToday} todayAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null} metrics={metrics} metricsToday={metricsToday} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey()).map((n) => ({ id: n.id, body: n.body }))} />
+          <EnergyCheck full today={energyToday} todayAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null} metrics={metrics} metricsToday={metricsToday} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey()).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
         </section>
         <section
           aria-label="Events and tags"

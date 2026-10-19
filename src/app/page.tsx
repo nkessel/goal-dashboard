@@ -160,7 +160,7 @@ export default async function Home() {
         energyAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null}
         checkMetrics={checkMetrics}
         metricsToday={metricsToday}
-        notesToday={recentNotes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey()).map((n) => ({ id: n.id, body: n.body }))}
+        notesToday={recentNotes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey()).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))}
       />
     </section>
   );

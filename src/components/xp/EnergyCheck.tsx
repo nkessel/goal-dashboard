@@ -65,7 +65,7 @@ export function EnergyCheck({
   notesToday = [],
 }: {
   /** Today's write-in events and #tags. */
-  notesToday?: { id: string; body: string }[];
+  notesToday?: { id: string; body: string; at?: string }[];
   /** The Insights screen's full check-in: every metric shown, no link back to Insights. */
   full?: boolean;
   /** Today's latest check-in, if any. */
@@ -567,7 +567,8 @@ export function EnergyCheck({
                 </li>
               ))}
             </ul>
-            {chipsFor(notes)}
+            {/* Only what came with this check-in: written in the half hour before it, or since. */}
+            {chipsFor(notes.filter((n) => sessionIds.has(n.id) || !("at" in n) || !n.at || !savedAt || new Date(n.at).getTime() >= new Date(savedAt).getTime() - 30 * 60_000))}
             {noteInput}
             <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]" style={{ color: "var(--t-cream)" }}>
               {mounted && savedAt && <span style={{ opacity: 0.75 }}>✓ Checked in at {clock(savedAt)}</span>}
