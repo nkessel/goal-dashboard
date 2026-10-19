@@ -9,6 +9,8 @@ export type CommentWithAuthor = {
   created_at: string;
   authorName: string;
   authorLevel: number;
+  /** Their profile, so the name opens their screens. */
+  authorId?: string | null;
 };
 
 export function CommentThread({
@@ -47,7 +49,13 @@ export function CommentThread({
           {comments.map((c) => (
             <li key={c.id} className="text-xs" style={{ color: "var(--t-ink)" }}>
               <span className="font-semibold">
-                {c.authorName}
+                {c.authorId ? (
+                  <a href={`/friends/${c.authorId}`} className="underline-offset-2 hover:underline" title={`See ${c.authorName}'s screens`}>
+                    {c.authorName}
+                  </a>
+                ) : (
+                  c.authorName
+                )}
                 {c.authorLevel >= 8 && (
                   <span className="ml-1" style={{ color: "var(--t-gold-deep)" }}>
                     Lv{c.authorLevel}

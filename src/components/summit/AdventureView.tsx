@@ -742,7 +742,7 @@ export function AdventureView({
           if (asCard) {
             // The quest's own card, a little smaller. It stays on screen; if it has to shift,
             // the path still runs to the quest's spot beneath it. Drag it by its grip.
-            const CW = 300;
+            const CW = 272;
             const left = Math.max(8, Math.min(w - CW * 0.86 - 8, p.x - (CW * 0.86) / 2));
             const top = Math.max(64, Math.min(h - 160, p.y - 40));
             const card = cards[q.id];

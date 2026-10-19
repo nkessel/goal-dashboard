@@ -27,7 +27,8 @@ export default async function InsightsPage() {
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   const metricsToday = Object.fromEntries(
     Object.entries(lastReadings as Record<string, { level: number; at: string }>)
-      .filter(([, r]) => appDayKey(new Date(r.at)) === appDayKey())
+      // Only what was part of the latest check-in: a metric skipped then isn't shown.
+      .filter(([, r]) => appDayKey(new Date(r.at)) === appDayKey() && !!lastEnergy && Math.abs(new Date(r.at).getTime() - new Date(lastEnergy.created_at).getTime()) < 120_000)
       .map(([k, r]) => [k, r.level])
   ) as Record<string, number>;
   const theme = profile?.theme ?? "adventure";

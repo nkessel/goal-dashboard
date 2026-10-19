@@ -9,9 +9,9 @@ const subscribe = (cb: () => void) => {
   return () => m.removeEventListener("change", cb);
 };
 
-/** Check-in sliders: halves on touch screens (easier to hit), tenths with a mouse. */
+/** Check-in sliders move in halves everywhere (easy to hit, still fine-grained). */
 export function useSliderStep(): number {
-  return useSyncExternalStore(subscribe, () => (window.matchMedia(QUERY).matches ? 0.5 : 0.1), () => 0.1);
+  return useSyncExternalStore(subscribe, () => 0.5, () => 0.5);
 }
 
 export const snapTo = (v: number, step: number) => Math.round(v / step) * step;

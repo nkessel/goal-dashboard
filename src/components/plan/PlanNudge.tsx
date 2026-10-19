@@ -2,6 +2,31 @@ import Link from "next/link";
 
 type Kind = "week" | "month" | "pair" | "pair-mid";
 
+/**
+ * The people and things waiting for a time: a nudge on Today until each is
+ * on the calendar.
+ */
+export function ScheduleNudge({ titles }: { titles: string[] }) {
+  const n = titles.length;
+  const named = titles.slice(0, 2).map((t) => (t.length > 34 ? `${t.slice(0, 33)}…` : t));
+  const rest = n - named.length;
+  return (
+    <Link href="/calendar?view=week" className="hover-glow parchment parchment-framed flex items-center gap-3 rounded-2xl px-4 py-3">
+      <span aria-hidden className="relative z-[1] text-[26px]">📅</span>
+      <span className="relative z-[1] flex min-w-0 flex-1 flex-col">
+        <span className="font-display text-[18px]" style={{ color: "#3b2a14" }}>
+          {n === 1 ? "1 thing is waiting for a time" : `${n} things are waiting for a time`}
+        </span>
+        <span className="truncate text-[13.5px]" style={{ color: "#6b5631" }}>
+          {named.join(" · ")}
+          {rest > 0 ? ` · +${rest} more` : ""} — give {n === 1 ? "it" : "them"} a spot on the calendar
+        </span>
+      </span>
+      <span aria-hidden className="relative z-[1] text-[20px]" style={{ color: "#8a6116" }}>→</span>
+    </Link>
+  );
+}
+
 /** A gentle invitation to a planning ritual (yours, or the check-in with your partner). */
 export function PlanNudge({ kind, started, partner = "Mom" }: { kind: Kind; started: boolean; partner?: string }) {
   const href = kind === "week" ? "/plan" : kind === "month" ? "/plan?mode=month" : kind === "pair" ? "/plan?mode=mom" : "/plan?mode=mom&mid=1";

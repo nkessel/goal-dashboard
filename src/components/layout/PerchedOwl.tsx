@@ -9,7 +9,7 @@ import { cleanToucan, type ToucanState } from "@/lib/toucan";
 /** What it says while you carry it, and when you set it down. */
 // Only the toucan spirit speaks; the owl keeps its silence.
 const SAY_FLYING = ["Wheee!", "To the skies!", "The winds obey me.", "Onward, to wisdom!", "Behold my majestic flight!", "Higher, friend, higher!", "I have soared over many forests."];
-const SAY_LANDING = ["Here I shall dispense wisdom.", "I approve of this spot.", "Ah. The view is excellent.", "This perch will do nicely.", "Rest a moment. Then onward."];
+const SAY_LANDING = ["Here I shall dispense wisdom.", "I approve of this spot.", "Ah. The view is excellent.", "This perch will do nicely."];
 /** How often each landing line comes up (the view one is a rare treat). */
 const LANDING_WEIGHT: Record<string, number> = { "Ah. The view is excellent.": 0.2, "I approve of this spot.": 0.35 };
 /** Never the same line twice in a row (per list), with optional weights. */
@@ -292,7 +292,12 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     // Keep the whole bubble on screen.
     const half = Math.min(b.offsetWidth || 240, window.innerWidth - 24) / 2 + 10;
     const x = Math.max(half, Math.min(window.innerWidth - half, p.x));
-    b.style.transform = `translate3d(${x.toFixed(1)}px, ${(p.y - OWL_H - 22).toFixed(1)}px, 0) translate(-50%, -100%)`;
+    // Above its head, unless that would run off the top: then just below its feet.
+    const above = p.y - OWL_H - 22;
+    const fits = above - (b.offsetHeight || 80) >= 8;
+    b.style.transform = fits
+      ? `translate3d(${x.toFixed(1)}px, ${above.toFixed(1)}px, 0) translate(-50%, -100%)`
+      : `translate3d(${x.toFixed(1)}px, ${(p.y + 10).toFixed(1)}px, 0) translate(-50%, 0)`;
   }
   function speakBrief(text: string, ms: number | null) {
     if (sayTimer.current) clearTimeout(sayTimer.current);

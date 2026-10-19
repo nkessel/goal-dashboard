@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -38,6 +38,21 @@ export function DailyHabits({
   const [pop, setPop] = useState<{ id: string; xp: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [menuUp, setMenuUp] = useState(false);
+  // A tap anywhere outside the open menu closes it.
+  useEffect(() => {
+    if (!menuFor) return;
+    const close = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.("[data-habit-menu]")) setMenuFor(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenuFor(null);
+    document.addEventListener("pointerdown", close, true);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", close, true);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [menuFor]);
   const [confirmSkip, setConfirmSkip] = useState<string | null>(null);
   const [focusing, setFocusing] = useState<RiteView | null>(null);
   const [skipOverride, setSkipOverride] = useState<Record<string, boolean>>({});
@@ -274,7 +289,13 @@ export function DailyHabits({
                       type="button"
                       onMouseDown={(e) => e.stopPropagation()}
                       onTouchStart={(e) => e.stopPropagation()}
-                      onClick={() => setMenuFor(menuFor === h.id ? null : h.id)}
+                      onClick={(e) => {
+                        // Near the bottom of the screen the menu opens upward so it isn't cut off.
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setMenuUp(window.innerHeight - r.bottom < 200);
+                        setMenuFor(menuFor === h.id ? null : h.id);
+                      }}
+                      data-habit-menu
                       aria-label={`More for ${h.title}`}
                       aria-expanded={menuFor === h.id}
                       className="relative z-[1] -mr-1 flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-[18px] leading-none"
@@ -284,8 +305,21 @@ export function DailyHabits({
                     </button>
                   )}
                   {menuFor === h.id && (
-                    <div className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 190 }}>
+                    <div data-habit-menu role="menu" className={`card-pop-in absolute right-2 z-30 flex flex-col overflow-hidden rounded-xl parchment ${menuUp ? "bottom-full mb-1" : "top-full mt-1"}`} style={{ borderRadius: 12, minWidth: 190 }}>
                       <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuFor(null);
+                          setEditing(h);
+                        }}
+                        className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5"
+                      >
+                        <span aria-hidden className="w-[18px] text-center">✎</span> Edit habit
+                      </button>
+                      <button
+                        role="menuitem"
+                        style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
                         type="button"
                         onClick={() => {
                           setMenuFor(null);

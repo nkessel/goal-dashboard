@@ -19,7 +19,8 @@ import { listJournalEntries } from "@/lib/data/journal";
 import { DayNightFlip } from "@/components/evening/DayNightFlip";
 import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
-import { PlanNudge } from "@/components/plan/PlanNudge";
+import { PlanNudge, ScheduleNudge } from "@/components/plan/PlanNudge";
+import { listSchedulingList } from "@/lib/data/scheduling";
 import { oneStepPerProject } from "@/lib/next-action";
 import { listBoardsForOwner } from "@/lib/data/boards";
 import { getPlanSession, lastPairSession } from "@/lib/data/planning";
@@ -107,12 +108,17 @@ export default async function Home() {
     <PlanNudge kind={pairNudge === "mid" ? "pair-mid" : "pair"} started={!!pairData.walkedAt} partner={pairData.partner || "Mom"} />
   ) : nudgeKind && !nudgeSession?.completed_at ? (
     <PlanNudge kind={nudgeKind} started={!!nudgeSession} />
-  ) : null;
+  ) : await (async () => {
+    // Otherwise: whatever's on the scheduling list and not on the calendar yet keeps asking for a time.
+    const waiting = (await listSchedulingList(session.user.id).catch(() => [])).filter((t) => !t.is_on_calendar);
+    return waiting.length ? <ScheduleNudge titles={waiting.map((t) => t.title)} /> : null;
+  })();
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   // Today's latest reading of each extra check-in metric.
   const metricsToday = Object.fromEntries(
     Object.entries(lastReadings as Record<string, { level: number; at: string }>)
-      .filter(([, r]) => appDayKey(new Date(r.at)) === appDayKey())
+      // Only what was part of the latest check-in: a metric skipped then isn't shown.
+      .filter(([, r]) => appDayKey(new Date(r.at)) === appDayKey() && !!lastEnergy && Math.abs(new Date(r.at).getTime() - new Date(lastEnergy.created_at).getTime()) < 120_000)
       .map(([k, r]) => [k, r.level])
   ) as Record<string, number>;
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;

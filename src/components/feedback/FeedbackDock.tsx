@@ -202,6 +202,9 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [pos, setPos] = useState<Pos | null>(null);
   const [dragPos, setDragPos] = useState<Pos | null>(null);
   const [geom, setGeom] = useState<Geom | null>(null);
+  const [sized, setSized] = useState(false);
+  // Extra height the writing has asked for (per note).
+  const [grow, setGrow] = useState<{ id: string; px: number } | null>(null);
   const [submitX, setSubmitX] = useState<number | null>(null);
   const [submitDrag, setSubmitDrag] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -402,19 +405,26 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 
   // ---- The box: drag by its top, resize from its corner, always in view.
   const mobile = vp.innerW < 640;
+  const growBy = grow && open && grow.id === open.id ? grow.px : 0;
   const defaultGeom = (): Geom => {
-    // Use the screen: nearly all of it on a phone, a generous box on a desktop.
+    // Starts at a comfortable size and grows as you write (up to the screen),
+    // so it only takes the whole screen when it really needs it.
     const w = mobile ? vp.innerW - 16 : Math.min(460, vp.innerW - 40);
-    const h = mobile ? Math.max(260, vp.h - 150) : Math.min(560, vp.innerH - 170);
+    const h = (mobile ? Math.min(340, Math.max(260, vp.h - 150)) : Math.min(380, vp.innerH - 170)) + growBy;
     const above = btnPos.y - 12 - h - SUBMIT_DROP;
     return { w, h, x: mobile ? 8 : clamp(btnPos.x + BTN - w, 20, vp.innerW - w - 20), y: above > 60 ? above : 60 };
   };
-  const shown = fit(geom ?? defaultGeom(), vp);
+  const def = defaultGeom();
+  // A size you dragged it to this time stands; otherwise it's as tall as the writing needs.
+  const shown = fit(geom ? { ...geom, h: sized ? geom.h : def.h } : def, vp);
   const isSent = !!open && sent?.id === open.id;
 
   function onPanelDown(e: React.PointerEvent<HTMLElement>, kind: "move" | "resize") {
     if (kind === "move" && (e.target as HTMLElement).closest("button")) return;
-    if (kind === "resize") e.preventDefault();
+    if (kind === "resize") {
+      e.preventDefault();
+      setSized(true);
+    }
     const g = shown;
     const view = vp!;
     let last = g;
@@ -588,7 +598,15 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
               {isSent && sent ? (
                 <Sent kind={sent.kind} xp={sent.xp} isAdventure={isAdventure} onAnother={startNew} />
               ) : (
-                <Composer key={open.id} draft={open} isAdventure={isAdventure} error={error} onChange={update} onSubmit={submit} />
+                <Composer
+                  key={open.id}
+                  draft={open}
+                  isAdventure={isAdventure}
+                  error={error}
+                  onChange={update}
+                  onSubmit={submit}
+                  onOverflow={(px) => setGrow((g) => ({ id: open.id, px: (g?.id === open.id ? g.px : 0) + px }))}
+                />
               )}
             </div>
 
@@ -741,12 +759,15 @@ function Composer({
   error,
   onChange,
   onSubmit,
+  onOverflow,
 }: {
   draft: Draft;
   isAdventure: boolean;
   error: string | null;
   onChange: (patch: Partial<Draft>) => void;
   onSubmit: () => void;
+  /** The writing no longer fits: ask for this much more room. */
+  onOverflow?: (px: number) => void;
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null);
   const xp = draft.xp ?? 1;
@@ -811,7 +832,14 @@ function Composer({
         data-feedback-text
         autoFocus
         value={draft.body}
-        onChange={(e) => onChange({ body: e.target.value })}
+        onChange={(e) => {
+          onChange({ body: e.target.value });
+          const el = e.currentTarget;
+          requestAnimationFrame(() => {
+            const over = el.scrollHeight - el.clientHeight;
+            if (over > 2) onOverflow?.(over + 8);
+          });
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
@@ -864,7 +892,11 @@ function Composer({
         {[...(draft.shot ? [{ url: draft.shot, label: "Screen picture", remove: () => onChange({ shot: null }) }] : []), ...(draft.images ?? []).map((u, i) => ({ url: u, label: (draft.images ?? []).length > 1 ? `Image ${i + 1}` : "Image", remove: () => onChange({ images: (draft.images ?? []).filter((x) => x !== u) }) }))].map((a) => (
           <span key={a.url} className="flex h-7 items-center rounded-full pl-1" style={{ border: "1px solid var(--t-panel-border)", background: "rgba(255,255,255,.55)" }}>
             <button type="button" onClick={() => setViewing(a.url)} className="flex h-6 items-center gap-1 rounded-full px-1.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)" }} title="See it full size">
-              <span aria-hidden>📎</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect x="3.5" y="5" width="17" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+                <circle cx="9" cy="10" r="1.6" fill="currentColor" />
+                <path d="M5 17l4.5-4.5 3 3 2.5-2.5L19.5 17" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+              </svg>
               {a.label}
             </button>
             <button type="button" onClick={a.remove} aria-label={`Remove ${a.label.toLowerCase()}`} className="flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none hover:bg-black/10" style={{ color: "var(--t-ink-soft)" }}>

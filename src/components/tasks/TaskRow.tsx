@@ -141,7 +141,7 @@ export function TaskRow({
   const xpColor = isAdventure ? "var(--t-xp)" : "var(--t-accent)";
   const metaColor = "var(--t-ink-soft)";
   const dividerColor = isAdventure ? "var(--t-divider)" : "var(--t-card-border)";
-  const avatarSize = 60;
+  const avatarSize = compact ? 48 : 60;
 
   // Urgency (flames) and importance (bolts), 0–5 each — same icons as the quest editor.
   const importanceCount = Math.min(5, Math.max(0, Math.round(task.importance)));
@@ -444,17 +444,17 @@ export function TaskRow({
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 pr-1 pt-2">
           <p
             dir="auto"
-            className={`user-text break-words leading-[1.15] ${isAdventure ? "text-[17.5px] font-semibold sm:text-[19px]" : "text-[16px] font-bold"}`}
+            className={`user-text break-words leading-[1.15] ${compact ? (isAdventure ? "text-[15.5px] font-semibold" : "text-[14.5px] font-bold") : isAdventure ? "text-[17.5px] font-semibold sm:text-[19px]" : "text-[16px] font-bold"}`}
             style={{ color: isOverdue ? "var(--t-warn)" : "var(--t-ink)" }}
           >
             {task.title}
           </p>
-          {task.description && (
-            <p dir="auto" className={`user-text ${compact ? "line-clamp-1" : "line-clamp-3"} break-words text-[13.5px] leading-snug sm:text-[14px]`} style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
+          {task.description && !compact && (
+            <p dir="auto" className={`user-text line-clamp-3 break-words text-[13.5px] leading-snug sm:text-[14px]`} style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
               {task.description}
             </p>
           )}
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1" style={{ color: isAdventure ? "#3d3628" : metaColor, fontSize: 13.5 }}>
+          <div className={`${compact ? "mt-1" : "mt-1.5"} flex flex-wrap items-center gap-x-2.5 gap-y-1`} style={{ color: isAdventure ? "#3d3628" : metaColor, fontSize: compact ? 12.5 : 13.5 }}>
             {(task.due_at || (task.is_on_calendar && task.scheduled_start)) && (
               <span className="flex items-center gap-1.5" style={isOverdue ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
                 {isAdventure ? (
@@ -468,7 +468,7 @@ export function TaskRow({
                   : dueLabel((task.due_at ?? task.scheduled_start)!)}
               </span>
             )}
-            {task.reschedule_count > 0 && (
+            {task.reschedule_count > 0 && !compact && (
               <span style={isWarned ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
                 &#8635; {task.reschedule_count}
                 {isWarned && " — rescheduled often"}
@@ -530,9 +530,9 @@ export function TaskRow({
         <div className="shrink-0" style={{ width: 1, background: dividerColor }} aria-hidden />
 
         {/* Right: time, XP, importance */}
-        <div className="flex w-[66px] shrink-0 flex-col items-start justify-center gap-1.5 pt-4 sm:w-[84px] sm:pl-1">
+        <div className={`flex shrink-0 flex-col items-start justify-center ${compact ? "w-[62px] gap-1 pt-3" : "w-[66px] gap-1.5 pt-4 sm:w-[84px] sm:pl-1"}`}>
           {task.estimate_minutes != null && (
-            <span className="flex items-center gap-1.5" style={{ color: "var(--t-ink)", fontSize: 15 }}>
+            <span className="flex items-center gap-1.5" style={{ color: "var(--t-ink)", fontSize: compact ? 13.5 : 15 }}>
               {isAdventure ? (
                 // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
                 <img src="/design/ui-clock.png" alt="" width={16} height={16} />
@@ -543,16 +543,17 @@ export function TaskRow({
             </span>
           )}
           <span
-            className={`whitespace-nowrap leading-none ${isAdventure ? "text-[18px] sm:text-[21px]" : "text-[15px]"}`}
+            className={`whitespace-nowrap leading-none ${compact ? (isAdventure ? "text-[16px]" : "text-[14px]") : isAdventure ? "text-[18px] sm:text-[21px]" : "text-[15px]"}`}
             style={{ color: xpColor, fontWeight: 700 }}
           >
             {isAdventure ? `XP ${task.xp_value}` : `${task.xp_value} pts`}
           </span>
           {importanceCount > 0 && (
-            <span className="flex flex-wrap items-center gap-0.5 sm:gap-[3px]" title={`Importance ${task.importance.toFixed(1)}`}>
+            // Always one row: the flames shrink a little rather than wrap.
+            <span className={`flex flex-nowrap items-center ${compact ? "gap-px" : "gap-px sm:gap-[3px]"}`} title={`Importance ${task.importance.toFixed(1)}`}>
               {Array.from({ length: importanceCount }).map((_, i) =>
                 // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                <img key={i} src="/design/ui-flame-sm.png" alt="" width={14} height={14} className="h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]" />
+                <img key={i} src="/design/ui-flame-sm.png" alt="" width={14} height={14} className={`shrink-0 ${compact ? "h-[11px] w-[11px]" : "h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]"}`} />
               )}
             </span>
           )}

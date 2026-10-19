@@ -82,7 +82,8 @@ export function EnergyCheck({
   const [saved, setSaved] = useState<number | null>(today);
   const [savedAt, setSavedAt] = useState<string | null>(todayAt);
   const [metrics, setMetrics] = useState<string[]>(initialMetrics);
-  const [vals, setVals] = useState<Record<string, number>>(metricsToday);
+  // A new check-in starts blank: only metrics moved this time are saved and shown.
+  const [vals, setVals] = useState<Record<string, number>>({});
   const [savedVals, setSavedVals] = useState<Record<string, number>>(metricsToday);
   const [expanded, setExpanded] = useState(full);
   const [notes, setNotes] = useState(notesToday);
@@ -182,13 +183,14 @@ export function EnergyCheck({
 
   function save() {
     setError(null);
-    const all = expanded ? metrics.map((m) => ({ metric: m, level: vals[m] ?? 5 })) : [];
+    const all = expanded ? metrics.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
     startSaving(async () => {
       try {
         const res = await saveCheckInAction(value, all);
         setSaved(res.energy.level);
         setSavedAt(res.energy.created_at ?? new Date().toISOString());
-        if (all.length) setSavedVals((o) => ({ ...o, ...Object.fromEntries(all.map((r) => [r.metric, r.level])) }));
+        setSavedVals(Object.fromEntries(all.map((r) => [r.metric, r.level])));
+        setVals({});
         setEditing(false);
         setPeek(false);
         setAdding(false);
@@ -219,7 +221,6 @@ export function EnergyCheck({
       return;
     }
     saveMetrics([...metrics, l], metrics);
-    setVals((v) => ({ ...v, [l]: v[l] ?? 5 }));
     setNewMetric("");
     setAdding(false);
   }
@@ -391,16 +392,18 @@ export function EnergyCheck({
             {expanded && (
               <div id="checkin-more" className="reveal flex flex-col gap-1.5 pb-0.5">
                 {metrics.map((m) => {
-                  const v = vals[m] ?? 5;
+                  const set = vals[m] !== undefined;
+                  const v = vals[m] ?? 5.5;
                   return (
-                    <div key={m} className="flex items-center gap-2">
+                    // Untouched metrics sit faded and aren't saved; moving one counts it.
+                    <div key={m} className="flex items-center gap-2 transition-opacity" style={{ opacity: set ? 1 : 0.55 }}>
                       <span aria-hidden className="w-5 shrink-0" />
                       <span className={label} style={{ color: "var(--t-cream)" }} title={m}>
                         {m}
                       </span>
                       {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), `${m}, 1 to 10`, "#c9a24a")}
                       <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: "#f2d58a" }}>
-                        {fmt(v)}
+                        {set ? fmt(v) : "–"}
                       </span>
                       {editingList ? (
                         <button

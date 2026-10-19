@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { CreateFab } from "@/components/create/CreateFab";
@@ -78,9 +79,10 @@ export default async function FeedPage() {
         <PageHeader isAdventure={isAdventure} title="Guild Hall" calmTitle="Friends" />
 
         {champion && champion.total_xp > 0 && (
-          <section
-            aria-label="Champion of Quests"
-            className="flex items-center gap-3 rounded-2xl px-4 py-3"
+          <Link
+            href={champion.id === profileId ? "/" : `/friends/${champion.id}`}
+            aria-label={`Champion of Quests: ${champion.name ?? "Adventurer"}. See their screens`}
+            className="hover-glow flex items-center gap-3 rounded-2xl px-4 py-3"
             style={{ background: "linear-gradient(180deg, rgba(42,32,14,.92), rgba(24,18,8,.92))", border: "1.5px solid rgba(242,210,126,.6)", boxShadow: "0 0 18px rgba(242,210,126,.18)" }}
           >
             <span className="relative shrink-0">
@@ -101,7 +103,7 @@ export default async function FeedPage() {
                 {champion.id === profileId ? " (that's you!)" : ""}
               </span>
             </span>
-          </section>
+          </Link>
         )}
 
         <FriendRequests incoming={incomingWithProfiles} theme={theme} />

@@ -40,7 +40,13 @@ export function SharedBoards({ boards, viewerId, isAdventure }: { boards: Shared
               {b.title}
             </h3>
             <span className="shrink-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              {b.ownerId === viewerId ? "yours" : `${b.ownerName}'s`}
+              {b.ownerId === viewerId ? (
+                "yours"
+              ) : (
+                <a href={`/friends/${b.ownerId}`} className="underline-offset-2 hover:underline" title={`See ${b.ownerName}'s screens`}>
+                  {b.ownerName}&rsquo;s
+                </a>
+              )}
             </span>
           </div>
           <ul className="relative z-[1] m-0 flex list-none flex-col p-0">

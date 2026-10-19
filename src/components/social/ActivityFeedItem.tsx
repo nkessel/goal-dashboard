@@ -35,6 +35,7 @@ export function ActivityFeedItem({
       created_at: c.created_at,
       authorName: p?.name || p?.email || "Someone",
       authorLevel: p?.level ?? 1,
+      authorId: p ? c.profile_id : null,
     };
   });
 

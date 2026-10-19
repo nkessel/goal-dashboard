@@ -137,7 +137,6 @@ export function XpSummary({
                     boxShadow: "inset 0 1px 0 rgba(255,235,180,.2), 0 3px 8px rgba(0,0,0,.5)",
                   }}
                 >
-                  {(boss || bossesEnabled) && nextLevel && <span aria-hidden className="mr-1 text-[12px]">⚔</span>}
                   Lvl {level}
                   {level >= 8 && " · Adventurer"}
                 </div>
