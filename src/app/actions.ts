@@ -2322,7 +2322,8 @@ export async function setLifeWheelTopicsAction(topics: string[]) {
   const ownerId = await requireProfileId();
   const clean = [...new Set(topics.map((t) => t.replace(/\s+/g, " ").trim().slice(0, 20)).filter(Boolean))].slice(0, 12);
   const { supabaseAdmin } = await import("@/lib/supabase/server");
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { topics: clean } }).eq("id", ownerId);
+  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), topics: clean } }).eq("id", ownerId);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/insights");
   return clean;
@@ -2541,4 +2542,34 @@ export async function setChapterTitleAction(title: string) {
   const clean = title.replace(/\s+/g, " ").trim().slice(0, 60);
   await setChapterTitle(ownerId, clean || null);
   revalidatePath("/");
+}
+
+// ---------------------------------------------------------------------------
+// Streaks: things you're keeping away from (kept with your life wheel, private)
+
+/** Save the list of streaks. */
+export async function saveStreaksAction(list: { id: string; name: string; word: string; since: string }[]) {
+  const ownerId = await requireProfileId();
+  const clean = list.slice(0, 12).map((s) => ({
+    id: String(s.id).slice(0, 40),
+    name: s.name.replace(/\s+/g, " ").trim().slice(0, 40) || "Streak",
+    word: s.word.split(",").map((w) => w.replace(/^\s*#/, "").trim().toLowerCase()).filter(Boolean).join(", ").slice(0, 60),
+    since: new Date(Date.parse(s.since) || Date.now()).toISOString(),
+  }));
+  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), streaks: clean } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  revalidatePath("/insights");
+  return clean;
+}
+
+/** A slip: logged as an event with the streak's #word, so the count starts again from then. */
+export async function logSlipAction(word: string, atISO?: string | null) {
+  const ownerId = await requireProfileId();
+  // The first word is the one logged.
+  const w = word.split(",")[0].replace(/^\s*#/, "").replace(/\s+/g, "").toLowerCase().slice(0, 24);
+  if (!w) throw new Error("This streak needs a word first.");
+  const note = await energyData.addCheckNote(ownerId, `#${w}`, atISO ?? null);
+  revalidatePath("/insights");
+  return note;
 }

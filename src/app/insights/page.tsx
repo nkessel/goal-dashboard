@@ -10,6 +10,8 @@ import { EnergyCheck } from "@/components/xp/EnergyCheck";
 import { EventLog } from "@/components/insights/EventLog";
 import { DEFAULT_WHEEL, LifeWheel } from "@/components/insights/LifeWheel";
 import { listWinsSince } from "@/lib/data/wins";
+import { Streaks } from "@/components/insights/Streaks";
+import { slipMatcher } from "@/lib/streaks";
 
 export default async function InsightsPage() {
   const session = await requireSession();
@@ -33,6 +35,12 @@ export default async function InsightsPage() {
   ) as Record<string, number>;
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
+  // Streaks look back a year for slips; their events stay out of the check-in's chips.
+  const streakDefs = profile?.life_wheel?.streaks ?? [];
+  const yearNotes = streakDefs.length ? await listCheckNotesSince(session.user.id, new Date(Date.now() - 365 * 86_400_000).toISOString()) : [];
+  const slipChecks = streakDefs.map((d) => slipMatcher(d.word));
+  const isSlip = (body: string) => slipChecks.some((f) => f(body));
+  const streakNotes = yearNotes.filter((n) => isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, created_at: n.created_at }));
   // The life wheel's readings are kept apart from the chart's metrics.
   const WHEEL = "◎ ";
   const wheelTopics = profile?.life_wheel?.topics?.length ? profile.life_wheel.topics : DEFAULT_WHEEL;
@@ -52,7 +60,7 @@ export default async function InsightsPage() {
           <h2 className={`m-0 text-center ${isAdventure ? "font-display text-[20px]" : "text-[16px] font-bold"}`} style={{ color: "#f2d27e" }}>
             Check in
           </h2>
-          <EnergyCheck full today={energyToday} todayAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null} metrics={metrics} metricsToday={metricsToday} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey()).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
+          <EnergyCheck full today={energyToday} todayAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null} metrics={metrics} metricsToday={metricsToday} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
         </section>
         <section
           aria-label="Events and tags"
@@ -63,6 +71,16 @@ export default async function InsightsPage() {
             Events &amp; #tags <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— log anything, any time</span>
           </h2>
           <EventLog notes={notes.map((n) => ({ id: n.id, body: n.body, created_at: n.created_at }))} />
+        </section>
+        <section
+          aria-label="Streaks"
+          className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
+          style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
+        >
+          <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
+            Streaks <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— what you&rsquo;re keeping away from · just for you</span>
+          </h2>
+          <Streaks initial={streakDefs} notes={streakNotes} />
         </section>
         <section
           aria-label="Life wheel"

@@ -25,6 +25,7 @@ import { oneStepPerProject } from "@/lib/next-action";
 import { listBoardsForOwner } from "@/lib/data/boards";
 import { getPlanSession, getWeekChapter, lastPairSession } from "@/lib/data/planning";
 import { WeekChapter } from "@/components/plan/WeekChapter";
+import { slipMatcher } from "@/lib/streaks";
 import { DailyHabits } from "@/components/habits/DailyHabits";
 import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
 import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckNotesSince } from "@/lib/data/energy";
@@ -102,6 +103,9 @@ export default async function Home() {
   const nudgeSession = nudgeKind ? await getPlanSession(session.user.id, nudgeKind).catch(() => null) : null;
   // The check-in with Mom: on Tuesdays (or once a walk left it half done), then midweek on Fri/Sat.
   const pair = await getPlanSession(session.user.id, "pair").catch(() => null);
+  // Streak slips (Insights) never show in Today's check-in.
+  const slipChecks = (profile?.life_wheel?.streaks ?? []).map((d) => slipMatcher(d.word));
+  const isSlip = (body: string) => slipChecks.some((f) => f(body));
   // This week's big rocks, told as a chapter.
   const chapter = await getWeekChapter(session.user.id, profile?.created_at ?? null).catch(() => null);
   const pairData = (pair?.data ?? {}) as { walkedAt?: string | null; partner?: string; mid?: { doneAt?: string | null } };
@@ -163,7 +167,7 @@ export default async function Home() {
         energyAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null}
         checkMetrics={checkMetrics}
         metricsToday={metricsToday}
-        notesToday={recentNotes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey()).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))}
+        notesToday={recentNotes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))}
       />
     </section>
   );
