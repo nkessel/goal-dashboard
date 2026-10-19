@@ -112,22 +112,52 @@ function loadSpots(key: string): Record<string, Spot> {
 function defaultSpot(i: number, n: number, top: number, bottom: number, wide: boolean): Spot {
   const t = n <= 1 ? 0.5 : i / (n - 1);
   const fy = bottom - 0.06 - t * (bottom - 0.06 - top - 0.03);
-  const sw = wide ? 0.085 : 0.2;
+  const sw = wide ? 0.11 : 0.27;
   const fx = 0.5 + (i % 2 === 0 ? -1 : 1) * (sw - t * sw * 0.4) + Math.sin(i * 1.7) * 0.03;
   return { fx, fy };
 }
 
-/** Points along a smooth curve, spaced by a gap that may vary with height. */
-function sampleCurve(pts: { x: number; y: number }[], gapAt: (y: number) => number) {
-  const out: { x: number; y: number }[] = [];
-  let carry = 0;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i];
+type Pt = { x: number; y: number };
+
+/**
+ * A smooth curve through points as cubic Béziers. At each point the trail
+ * runs along the line between its neighbours, with enough momentum that a
+ * turn becomes a round hairpin (as switchbacks are) instead of a sharp
+ * corner, however close the points sit. No loops: the pull at each point is
+ * capped by the stretches on either side.
+ */
+function bezierPieces(pts: Pt[]): [Pt, Pt, Pt, Pt][] {
+  const n = pts.length;
+  const out: [Pt, Pt, Pt, Pt][] = [];
+  if (n < 2) return out;
+  const len = (a: Pt, b: Pt) => Math.hypot(b.x - a.x, b.y - a.y);
+  const tan: Pt[] = pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)];
+    const b = pts[Math.min(n - 1, i + 1)];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const before = i > 0 ? len(pts[i - 1], p) : Infinity;
+    const after = i < n - 1 ? len(p, pts[i + 1]) : Infinity;
+    const near = Math.min(before, after);
+    // Ends: carry straight on. Turns: momentum from the shorter neighbouring stretch.
+    const mag = i === 0 || i === n - 1 ? near : Math.max(d / 2, near * 0.8);
+    return { x: (dx / d) * mag, y: (dy / d) * mag };
+  });
+  for (let i = 0; i < n - 1; i++) {
     const p1 = pts[i];
     const p2 = pts[i + 1];
-    const p3 = pts[i + 2] ?? p2;
-    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
-    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+    out.push([p1, { x: p1.x + tan[i].x / 3, y: p1.y + tan[i].y / 3 }, { x: p2.x - tan[i + 1].x / 3, y: p2.y - tan[i + 1].y / 3 }, p2]);
+  }
+  return out;
+}
+
+/** Points along a smooth curve, spaced by a gap that may vary with height. */
+function sampleCurve(pts: Pt[], gapAt: (y: number) => number) {
+  const out: Pt[] = [];
+  if (pts.length < 2) return out;
+  let carry = 0;
+  for (const [p1, c1, c2, p2] of bezierPieces(pts)) {
     let prev = p1;
     for (let k = 1; k <= 40; k++) {
       const t = k / 40;
@@ -147,19 +177,11 @@ function sampleCurve(pts: { x: number; y: number }[], gapAt: (y: number) => numb
   return out;
 }
 
-/** A smooth curve through points (Catmull-Rom as cubic Béziers), split per segment. */
-function segments(pts: { x: number; y: number }[]) {
-  const out: string[] = [];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[i + 2] ?? p2;
-    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
-    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
-    out.push(`M${p1.x.toFixed(1)} ${p1.y.toFixed(1)}C${c1.x.toFixed(1)} ${c1.y.toFixed(1)} ${c2.x.toFixed(1)} ${c2.y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`);
-  }
-  return out;
+/** A smooth curve through points, split per segment (each can have its own width). */
+function segments(pts: Pt[]) {
+  if (pts.length < 2) return [];
+  const f = (v: number) => v.toFixed(1);
+  return bezierPieces(pts).map(([p1, c1, c2, p2]) => `M${f(p1.x)} ${f(p1.y)}C${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(p2.x)} ${f(p2.y)}`);
 }
 
 /**
@@ -335,8 +357,12 @@ export function AdventureView({
   const head = toScreen(world.head);
   // With nothing on the list yet, a short stretch of trail to tap and add to.
   const trail = list.length ? [head, ...pts] : w ? [head, { x: w * 0.5, y: h * 0.72 }] : [head];
-  // Meander: between each pair of stops the trail swings out one way, then the other.
-  const wind: { x: number; y: number }[] = [];
+  // The trail sweeps between stops like the switchbacks above: one long, even
+  // curve. Where two stops sit almost straight above each other, the trail
+  // swings out once to the side it's already heading, so it never runs
+  // straight and never wiggles (one bend per stretch at most).
+  const wind: Pt[] = [];
+  let heading = 1; // which way the trail last swung (+1 right, -1 left)
   trail.forEach((p, i) => {
     wind.push(p);
     const q = trail[i + 1];
@@ -344,23 +370,17 @@ export function AdventureView({
     const dx = q.x - p.x;
     const dy = q.y - p.y;
     const len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len;
-    const ny = dx / len;
-    // Wide, lazy S-bends (more of them on long stretches), like the climb
-    // above — but never so wide that neighbouring stretches cross.
-    const depth = Math.max(0, Math.min(1, (p.y / h - TOP) / (1 - TOP)));
-    // Gentle and flowing: one soft sweep per stretch (two on long ones) — curvy, not twisty.
-    const amp = Math.min(len * 0.2, 12 + 26 * depth, Math.abs(dy) * 0.4 + 10);
-    const bends = len > 260 ? 2 : 1;
-    // First bend swings away from where the trail just came from, so
-    // neighbouring stretches part rather than cross.
-    const prev = trail[i - 1];
-    const sgn = prev ? ((prev.x - p.x) * nx + (prev.y - p.y) * ny > 0 ? -1 : 1) : 1;
-    for (let k = 1; k <= bends; k++) {
-      const f = k / (bends + 1);
-      const side = (k % 2 === 1 ? 1 : -1) * sgn * (bends > 2 ? Math.sin(Math.PI * f) : 1);
-      wind.push({ x: p.x + dx * f + nx * amp * side, y: p.y + dy * f + ny * amp * side });
+    const slant = Math.abs(dx) / len;
+    if (slant > 0.55) {
+      heading = dx > 0 ? 1 : -1;
+      return; // already a wide sweep: the spline curves it on its own
     }
+    // Swing to the opposite side from the last sweep, as a switchback would,
+    // more the straighter the stretch is.
+    heading = -heading;
+    const depth = Math.max(0, Math.min(1, (p.y / h - TOP) / (1 - TOP)));
+    const amp = Math.min(len * 0.3, 18 + 34 * depth) * (1 - slant / 0.55) ** 0.7;
+    wind.push({ x: p.x + dx / 2 + heading * amp, y: p.y + dy / 2 });
   });
   const segs = w ? (world.trail === "lines" ? trail.slice(0, -1).map((p, i) => `M${p.x} ${p.y}L${trail[i + 1].x} ${trail[i + 1].y}`) : segments(wind)) : [];
   const stones = w && world.trail === "stones" ? sampleCurve(wind, (y) => 10 + Math.max(0, Math.min(1, (y / h - TOP) / (1 - TOP))) * 18) : [];
@@ -374,10 +394,11 @@ export function AdventureView({
   let climb = "";
   if (w) {
     const turns = world.climb.turns;
-    const up: { x: number; y: number }[] = [last];
+    const up: Pt[] = [last];
     // Switchbacks sweep from one flank of the mountain to the other,
-    // narrowing toward the peak — always on the mountain's face.
-    const startSide = last.x < peak.x ? 1 : -1;
+    // narrowing toward the peak — always on the mountain's face. The first
+    // sweep always heads the same way, so moving a quest never flips the climb.
+    const startSide = -1;
     for (let k = 1; k < turns; k++) {
       const t = k / turns;
       const y = last.y + (peak.y - last.y) * (1 - Math.pow(1 - t, 1.25));
