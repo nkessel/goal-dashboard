@@ -3,6 +3,7 @@
 import { NumberInput } from "@/components/ui/NumberInput";
 import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import {
   completeTaskAction,
@@ -234,6 +235,7 @@ export function QuestEditorDialog({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const [phase, setPhase] = useState<"open" | "closing">("open");
+  const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -572,6 +574,10 @@ export function QuestEditorDialog({
         if (newSteps.length > 0) await saveQuestStepsAction(id, stepPayload(newSteps).map(({ id: _id, ...st }) => st)); // eslint-disable-line @typescript-eslint/no-unused-vars
         paintPortrait(id);
         onCreated?.(id);
+        // The dialog may already be gone by now (it closes as soon as the quest
+        // shows on Today), so ask for fresh data here: the board, matrix or
+        // calendar it was added from shows it straight away.
+        router.refresh();
         if (tempId) {
           // Already closed: light up the real card once it lands.
           setTimeout(() => {

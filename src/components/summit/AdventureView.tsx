@@ -194,6 +194,7 @@ export function AdventureView({
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [spots, setSpots] = useState<Record<string, Spot>>({});
   const [open, setOpen] = useState<Quest | null>(null);
+  const cardDragged = useRef(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const drag = useRef<{ id: string; x0: number; y0: number; moved: boolean; offX: number; offY: number } | null>(null);
   useEscape(() => setOpen(null), !!open);
@@ -231,6 +232,8 @@ export function AdventureView({
   // Pan and zoom like a map.
   const [cam, setCam] = useState({ x: 0, y: 0, z: 1 });
   const pointers = useRef(new Map<number, { x: number; y: number }>());
+  // While a finger is moving the map, the camera follows without easing.
+  const [panning, setPanning] = useState(false);
   const pan = useRef<{ x0: number; y0: number; cx: number; cy: number; moved: boolean; pinch?: { d: number; z: number; mx: number; my: number } } | null>(null);
   const clampCam = (c: { x: number; y: number; z: number }) => {
     const z = Math.max(1, Math.min(3, c.z));
@@ -245,6 +248,7 @@ export function AdventureView({
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
+      setPanning(true);
       pan.current = { x0: 0, y0: 0, cx: cam.x, cy: cam.y, moved: true, pinch: { d: Math.hypot(a.x - b.x, a.y - b.y), z: cam.z, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 } };
     } else pan.current = { x0: e.clientX, y0: e.clientY, cx: cam.x, cy: cam.y, moved: false };
   }
@@ -263,6 +267,7 @@ export function AdventureView({
       return;
     }
     if (!p.moved && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < 6) return;
+    if (!p.moved) setPanning(true);
     p.moved = true;
     setCam((c) => clampCam({ ...c, x: p.cx + e.clientX - p.x0, y: p.cy + e.clientY - p.y0 }));
   }
@@ -272,6 +277,7 @@ export function AdventureView({
     const p = pan.current;
     if (pointers.current.size === 0) {
       pan.current = null;
+      setPanning(false);
       // A tap on the open map tucks any cards back into tokens.
       if (p && !p.moved) {
         setCardsOn(new Set());
@@ -511,7 +517,7 @@ export function AdventureView({
           willChange: "transform",
           transform: arriving ? "translate(0, 6%) scale(1.18)" : `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})`,
           filter: arriving ? "blur(6px) brightness(.6)" : undefined,
-          transition: arriving ? "none" : pan.current ? "none" : "transform 1.6s cubic-bezier(.2,.7,.2,1), filter 1.4s ease-out",
+          transition: arriving ? "none" : panning ? "none" : "transform 1.6s cubic-bezier(.2,.7,.2,1), filter 1.4s ease-out",
         }}
       >
       <world.Scene />
@@ -743,7 +749,22 @@ export function AdventureView({
                   const d = drag.current;
                   drag.current = null;
                   setDragId(null);
-                  if (d?.moved) save({ ...spots });
+                  if (d?.moved) {
+                    save({ ...spots });
+                    cardDragged.current = true;
+                    window.setTimeout(() => (cardDragged.current = false), 0);
+                  }
+                }}
+                onClickCapture={(e) => {
+                  // A tap on the card folds it back into its token; only its menus
+                  // (the ⋯ button and the portrait) open anything.
+                  const t = e.target as HTMLElement;
+                  if (!e.currentTarget.contains(t)) return; // a click inside a menu it opened
+                  if (t.closest('[aria-haspopup="menu"], [role="menu"]')) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (cardDragged.current) return;
+                  setCardsOn((c) => { const x = new Set(c); x.delete(q.id); return x; });
                 }}
                 onPointerCancel={() => {
                   drag.current = null;
