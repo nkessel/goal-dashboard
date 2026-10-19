@@ -2477,7 +2477,8 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
   const from = new Date(fromISO);
   const to = new Date(toISO);
   const hidden = new Set(hiddenCalendars);
-  const busy: { start: number; end: number }[] = [];
+  const busy: { start: number; end: number; cal?: string }[] = [];
+  let calendars: { id: string; name: string; color: string | null; writable: boolean; primary: boolean }[] = [];
   const [quests, profileRes] = await Promise.all([
     tasksData.listCalendarTasksForOwner(profileId, from, to).catch(() => []),
     supabaseAdmin().from("profiles").select("scheduler").eq("id", profileId).maybeSingle<{ scheduler: Record<string, unknown> | null }>(),
@@ -2492,16 +2493,17 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
       const { listEventsAllCalendars } = await import("@/lib/google-calendar");
       const all = await listEventsAllCalendars(accessToken, from, to);
       google = true;
+      calendars = all.calendars.filter((c) => !hidden.has(c.id)).map((c) => ({ id: c.id, name: c.name, color: c.color, writable: c.writable ?? c.primary, primary: c.primary }));
       const own = new Set(quests.map((t) => t.google_calendar_event_id).filter(Boolean));
       for (const e of all.events) {
         if (e.isAllDay || own.has(e.id) || (e.calendarId && hidden.has(e.calendarId))) continue;
-        busy.push({ start: new Date(e.start).getTime(), end: new Date(e.end).getTime() });
+        busy.push({ start: new Date(e.start).getTime(), end: new Date(e.end).getTime(), cal: e.calendarId });
       }
     } catch {
       /* planning still works from the app's own calendar */
     }
   }
-  return { busy, google, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
+  return { busy, google, calendars, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
 }
 
 /** Remember the scheduler's settings and time-of-day choices (on every device). */

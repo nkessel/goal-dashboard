@@ -20,6 +20,8 @@ export type SchedulerSettings = {
   skipWeekends: boolean;
   /** Each quest's preferred time of day (missing = any). */
   prefs: Record<string, TimeOfDay>;
+  /** Calendars whose events don't block time ("just so you know"). Unset = the ones you can't edit. */
+  fyi?: string[];
 };
 
 export const SCHEDULER_DEFAULTS: SchedulerSettings = {
@@ -41,7 +43,7 @@ export type PlanItem = {
   dueAt?: string | null;
 };
 
-export type Busy = { start: number; end: number };
+export type Busy = { start: number; end: number; cal?: string };
 
 export type Placement = {
   id: string;

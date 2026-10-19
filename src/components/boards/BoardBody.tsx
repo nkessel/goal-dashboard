@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBoard, getBoardAncestors, listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { listTasksForBoard, listUnboardedTasks } from "@/lib/data/tasks";
@@ -76,6 +77,14 @@ export function BoardBody({
             {doneCount} of {quests.length} quests done · {xpEarned} {isAdventure ? "XP" : "pts"} earned
           </div>
         </div>
+        <Link
+          href={`/boards/${board.id}/map`}
+          className="hover-glow flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-bold"
+          style={isAdventure ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { background: "var(--t-accent)", color: "#fff" }}
+          title="See this board as a quest map"
+        >
+          <span aria-hidden>🗺</span> Map
+        </Link>
       </div>
 
       {board.description && (

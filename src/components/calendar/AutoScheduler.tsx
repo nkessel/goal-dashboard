@@ -56,6 +56,8 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
   const [settings, setSettings] = useState<SchedulerSettings | null>(null);
   const [busy, setBusy] = useState<Busy[] | null>(null);
   const [google, setGoogle] = useState(true);
+  const [calendars, setCalendars] = useState<{ id: string; name: string; color: string | null; writable: boolean; primary: boolean }[]>([]);
+  const [showCals, setShowCals] = useState(false);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<number | null>(null);
@@ -71,6 +73,7 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
       .then((ctx) => {
         if (!live) return;
         setBusy(ctx.busy);
+        setCalendars(ctx.calendars ?? []);
         setGoogle(ctx.google);
         setSettings({ ...SCHEDULER_DEFAULTS, ...(readLocal() ?? {}), ...((ctx.settings as Partial<SchedulerSettings> | null) ?? {}) });
       })
@@ -106,7 +109,16 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
         .map((t) => ({ id: t.id, title: t.title, minutes: t.estimate_minutes, effort: t.effort ?? null, dueAt: t.due_at ?? null })),
     [tasks, skipped, now]
   );
-  const plan = useMemo(() => (settings && busy ? planSchedule(items, busy, settings, now) : null), [items, busy, settings, now]);
+  // Calendars that only inform (subscriptions, other people's) don't block time unless you say so.
+  const fyi = useMemo(() => new Set(settings?.fyi ?? calendars.filter((c) => !c.writable && !c.primary).map((c) => c.id)), [settings?.fyi, calendars]);
+  const blocking = useMemo(() => busy?.filter((b) => !b.cal || !fyi.has(b.cal)) ?? null, [busy, fyi]);
+  const plan = useMemo(() => (settings && blocking ? planSchedule(items, blocking, settings, now) : null), [items, blocking, settings, now]);
+  function toggleFyi(id: string) {
+    const next = new Set(fyi);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    change({ fyi: [...next] });
+  }
   const byDay = useMemo(() => {
     const groups: { label: string; rows: NonNullable<typeof plan>["placed"] }[] = [];
     for (const p of [...(plan?.placed ?? [])].sort((a, b) => a.start.getTime() - b.start.getTime())) {
@@ -199,6 +211,27 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
               <input type="checkbox" checked={settings.skipWeekends} onChange={(e) => change({ skipWeekends: e.target.checked })} className="h-4 w-4" />
               Keep weekends free
             </label>
+            {calendars.length > 1 && (
+              <button type="button" onClick={() => setShowCals((v) => !v)} aria-expanded={showCals} className="min-h-9 text-[13px] underline underline-offset-2" style={{ color: ink }}>
+                Busy calendars ({calendars.length - [...fyi].filter((id) => calendars.some((c) => c.id === id)).length} of {calendars.length}) {showCals ? "▾" : "▸"}
+              </button>
+            )}
+            {showCals && (
+              <ul className="fade-in m-0 flex w-full list-none flex-col gap-0.5 p-0">
+                <li className="text-[12px]" style={{ color: soft }}>
+                  Ticked calendars block time. Untick the ones that are just so you know (community events, other people&rsquo;s).
+                </li>
+                {calendars.map((c) => (
+                  <li key={c.id}>
+                    <label className="flex min-h-9 items-center gap-2">
+                      <input type="checkbox" checked={!fyi.has(c.id)} onChange={() => toggleFyi(c.id)} className="h-4 w-4" />
+                      <span aria-hidden className="h-3 w-3 shrink-0 rounded-full" style={{ background: c.color ?? "#8a8a8a" }} />
+                      <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
@@ -223,11 +256,16 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
                   const t = taskOf.get(p.id);
                   const pref = settings?.prefs[p.id] ?? "any";
                   return (
-                    <li key={p.id} className="fade-in flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl px-2.5 py-2" style={{ background: isAdventure ? "rgba(255,250,238,.55)" : "var(--t-bg)", border: "1px solid rgba(139,112,64,.25)" }}>
-                      <span className="w-[92px] shrink-0 text-[13px] font-semibold tabular-nums" style={{ color: isAdventure ? "#6b4f1d" : "var(--t-accent)" }}>
-                        {hm(p.start)} – {hm(p.end)}
+                    <li key={p.id} className="fade-in flex flex-col gap-1 rounded-xl px-3 py-2" style={{ background: isAdventure ? "rgba(255,250,238,.55)" : "var(--t-bg)", border: "1px solid rgba(139,112,64,.25)" }}>
+                      <span className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 text-[13px] font-semibold tabular-nums" style={{ color: isAdventure ? "#6b4f1d" : "var(--t-accent)" }}>
+                          {hm(p.start)} – {hm(p.end)}
+                        </span>
+                        <button type="button" onClick={() => setSkipped((s) => new Set(s).add(p.id))} aria-label={`Leave ${p.title} out of this plan`} title="Leave it out this time" className="-my-1 -mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: soft }}>
+                          ×
+                        </button>
                       </span>
-                      <span className="min-w-0 flex-1 text-[14.5px] font-semibold leading-snug" style={{ color: ink }}>
+                      <span className="text-[15px] font-semibold leading-snug" style={{ color: ink }}>
                         {p.title}
                         {p.late && (
                           <span className="ml-1.5 whitespace-nowrap text-[12px] font-bold" style={{ color: "var(--t-warn)" }}>
@@ -240,7 +278,10 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
                           </span>
                         )}
                       </span>
-                      <span className="flex shrink-0 items-center gap-1">
+                      <span className="flex items-center gap-1">
+                        <span className="mr-1 text-[12px]" style={{ color: soft }}>
+                          Best time
+                        </span>
                         <span role="radiogroup" aria-label={`When for ${p.title}`} className="flex rounded-full p-0.5" style={{ background: "rgba(120,90,40,.12)" }}>
                           {TIMES.map((o) => (
                             <button
@@ -257,9 +298,6 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
                             </button>
                           ))}
                         </span>
-                        <button type="button" onClick={() => setSkipped((s) => new Set(s).add(p.id))} aria-label={`Leave ${p.title} out of this plan`} title="Leave it out this time" className="flex h-8 w-8 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: soft }}>
-                          ×
-                        </button>
                       </span>
                     </li>
                   );
