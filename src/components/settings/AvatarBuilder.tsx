@@ -211,7 +211,7 @@ export function AvatarBuilder({
             checked={withBackground}
             onChange={(e) => setWithBackground(e.target.checked)}
           />
-          Illustrated scene background (unchecked = no background)
+          Illustrated scene behind them (off = a plain painted backdrop)
         </label>
 
         <div className="flex flex-col gap-1.5">

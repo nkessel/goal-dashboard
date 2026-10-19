@@ -93,7 +93,7 @@ export function BoardBody({
         </section>
       )}
 
-      <BoardQuestList tasks={allTasks} boardId={board.id} theme={theme} />
+      <BoardQuestList tasks={allTasks} boardId={board.id} nextTaskId={board.next_task_id ?? null} theme={theme} />
     </div>
   );
 }

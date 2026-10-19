@@ -27,6 +27,7 @@ import {
   setSchedulingFoldersAction,
 } from "@/app/actions";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
+import { AutoScheduler } from "./AutoScheduler";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { TaskScheduleControl } from "@/components/tasks/TaskScheduleControl";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE } from "@/lib/schedule-carry";
@@ -71,6 +72,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
   const [folderMenu, setFolderMenu] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [auto, setAuto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   if (seen !== tasks) {
@@ -88,6 +90,8 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
       const v = window.localStorage.getItem(OPEN_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
       setOpen(v === null ? window.matchMedia("(min-width: 1024px)").matches : v === "1");
+      // Arrived from Today's "waiting for a time" card: straight to the auto-scheduler.
+      if (new URLSearchParams(window.location.search).get("auto") === "1") setAuto(true);
     } catch {
       /* storage unavailable */
     }
@@ -272,6 +276,17 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
           To schedule
           {count > 0 && <span className="ml-1.5 text-[13.5px] font-normal" style={{ color: "var(--t-ink-soft)" }}>({count})</span>}
         </span>
+        {count > 0 && (
+          <button
+            type="button"
+            onClick={() => setAuto(true)}
+            className="hover-glow h-8 rounded-full px-3 text-[12.5px] font-bold"
+            style={isAdventure ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { background: "var(--t-accent)", color: "#fff" }}
+            title="Place the whole list into your free time, in order"
+          >
+            ✨ Auto
+          </button>
+        )}
         <button type="button" onClick={() => setAdding(true)} className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)", border: "1px solid #b39a6a" }} title="Add a folder">
           + Folder
         </button>
@@ -480,6 +495,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
         />
       )}
       {editing && <EditTaskModal task={editing} theme={theme} onClose={() => setEditing(null)} />}
+      {auto && <AutoScheduler tasks={flat(groups).map((id) => byId.get(id)!).filter(Boolean)} theme={theme} onClose={() => setAuto(false)} />}
       {scheduling &&
         createPortal(
           <div className="overlay-fade-in fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }} onClick={() => setScheduling(null)}>

@@ -23,7 +23,8 @@ import { PlanNudge, ScheduleNudge } from "@/components/plan/PlanNudge";
 import { listSchedulingList } from "@/lib/data/scheduling";
 import { oneStepPerProject } from "@/lib/next-action";
 import { listBoardsForOwner } from "@/lib/data/boards";
-import { getPlanSession, lastPairSession } from "@/lib/data/planning";
+import { getPlanSession, getWeekChapter, lastPairSession } from "@/lib/data/planning";
+import { WeekChapter } from "@/components/plan/WeekChapter";
 import { DailyHabits } from "@/components/habits/DailyHabits";
 import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
 import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckNotesSince } from "@/lib/data/energy";
@@ -101,6 +102,8 @@ export default async function Home() {
   const nudgeSession = nudgeKind ? await getPlanSession(session.user.id, nudgeKind).catch(() => null) : null;
   // The check-in with Mom: on Tuesdays (or once a walk left it half done), then midweek on Fri/Sat.
   const pair = await getPlanSession(session.user.id, "pair").catch(() => null);
+  // This week's big rocks, told as a chapter.
+  const chapter = await getWeekChapter(session.user.id, profile?.created_at ?? null).catch(() => null);
   const pairData = (pair?.data ?? {}) as { walkedAt?: string | null; partner?: string; mid?: { doneAt?: string | null } };
   const hadPair = pair || (await lastPairSession(session.user.id).catch(() => null));
   const pairNudge: "week" | "mid" | null = !hadPair ? null : !pair?.completed_at ? (dow === 2 || pairData.walkedAt ? "week" : null) : (dow === 5 || dow === 6) && !pairData.mid?.doneAt ? "mid" : null;
@@ -172,6 +175,7 @@ export default async function Home() {
           <div className="flex flex-col gap-6">
             {stats}
             {planNudge}
+            {chapter && <WeekChapter chapter={chapter} theme={profile?.theme ?? "adventure"} />}
             <TodayTaskBoard
               priorityTasks={topPriorities}
               otherTasks={otherTasks}

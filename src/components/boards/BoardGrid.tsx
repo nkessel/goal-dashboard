@@ -30,9 +30,8 @@ import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { CreateSheet } from "@/components/create/CreateSheet";
 import { EditBoardModal } from "./EditBoardModal";
 import { BoardSeal } from "./BoardSeal";
+import { nextActionOf } from "@/lib/next-action";
 
-/** How many open quests each card previews before "N more". */
-const PREVIEW_COUNT = 3;
 /** Where the Uncategorized card sits among the boards (it has no saved order of its own). */
 const LOOSE_KEY = "boards-loose-index";
 
@@ -220,7 +219,9 @@ export function BoardGrid({
 
   function card(board: BoardWithStats, dragging = false) {
     const open = questsOn(board);
-    const previews = open.slice(0, PREVIEW_COUNT);
+    // Fog of war: the card shows the board's next step; the rest waits in the mist.
+    const nextStep = nextActionOf(board, open) ?? open[0];
+    const previews = nextStep ? [nextStep] : [];
     const more = open.length - previews.length;
     const href = `/boards/${board.id}`;
     const rule = isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)";
@@ -278,13 +279,17 @@ export function BoardGrid({
         {/* Quest previews — tap to open, press and drag onto another board to move */}
         {previews.length > 0 && (
           <ul className="-mx-1 flex flex-col border-t pt-1" style={{ borderColor: rule }}>
+            <li aria-hidden className="px-1 pt-0.5 text-[10.5px] font-bold uppercase tracking-[.12em]" style={{ color: isAdventure ? "#8a6116" : "var(--t-accent)" }}>
+              Next step
+            </li>
             {previews.map((q) => (
               <QuestPreview key={q.id} q={q} disabled={dragging} onOpen={() => setOpenQuest(q)} />
             ))}
             {more > 0 && (
               <li>
-                <Link href={href} draggable={false} className="board-quest block rounded-md px-1 py-[3px] text-[12.5px]">
-                  <span style={{ color: soft }}>+{more} more</span>
+                <Link href={href} draggable={false} className="board-quest flex items-center gap-1 rounded-md px-1 py-[3px] text-[12.5px]">
+                  <span aria-hidden>🌫</span>
+                  <span style={{ color: soft }}>{more} more in the mist</span>
                 </Link>
               </li>
             )}

@@ -1026,7 +1026,6 @@ export async function generateAvatarImageAction(
 
   const fullPrompt = buildAvatarPrompt(trimmed, { withBackground, look: styleLook(style) });
   const url = await generateAndStoreImage(fullPrompt, `avatars/${ownerId}-${Date.now()}.jpg`, {
-    transparentBackground: !withBackground,
     pixelate: style === "pixel" ? 48 : undefined,
   });
   await profilesData.updateProfileAvatarImage(ownerId, url);
@@ -1195,7 +1194,7 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
   const have = new Set((existing ?? []).map((f: { name: string }) => f.name));
   for (const style of AVATAR_STYLE_OPTIONS) {
     // Heroic keeps the v2 example Nathan liked.
-    const version = style.key === "heroic" ? "v2" : "v6";
+    const version = style.key === "heroic" ? "v2" : "v7";
     const name = `${style.key}-${version}.png`;
     if (have.has(name)) {
       out[style.key] = db.storage.from("ai-images").getPublicUrl(`style-examples/${name}`).data.publicUrl;
@@ -1204,7 +1203,7 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
     out[style.key] = await generateAndStoreImage(
       buildAvatarPrompt(STYLE_EXAMPLE_SUBJECT, { withBackground: false, look: style.look }),
       `style-examples/${style.key}-${version}.jpg`,
-      { transparentBackground: true, pixelate: style.key === "pixel" ? 48 : undefined }
+      { pixelate: style.key === "pixel" ? 48 : undefined }
     );
   }
   return out;
@@ -2463,4 +2462,81 @@ export async function updateGoogleEventAction(
     throw new Error(/forbidden|insufficient|403/i.test(msg) ? "Google won't let this event be changed from here (it may belong to someone else)." : `Couldn't update the event: ${msg}`);
   }
   revalidatePath("/calendar");
+}
+
+// ---------------------------------------------------------------------------
+// Auto-scheduler: busy times in, the scheduling list placed into free time out
+
+/**
+ * Everything that already takes up time between two moments: Google events
+ * (except calendars switched off on the calendar screen, and all-day ones)
+ * and quests already on the calendar. Plus the saved scheduler settings.
+ */
+export async function schedulerContextAction(fromISO: string, toISO: string, hiddenCalendars: string[] = []) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const from = new Date(fromISO);
+  const to = new Date(toISO);
+  const hidden = new Set(hiddenCalendars);
+  const busy: { start: number; end: number }[] = [];
+  const [quests, profileRes] = await Promise.all([
+    tasksData.listCalendarTasksForOwner(profileId, from, to).catch(() => []),
+    supabaseAdmin().from("profiles").select("scheduler").eq("id", profileId).maybeSingle<{ scheduler: Record<string, unknown> | null }>(),
+  ]);
+  for (const t of quests) {
+    if (t.status !== "open" || !t.scheduled_start || !t.scheduled_end) continue;
+    busy.push({ start: new Date(t.scheduled_start).getTime(), end: new Date(t.scheduled_end).getTime() });
+  }
+  let google = false;
+  if (accessToken) {
+    try {
+      const { listEventsAllCalendars } = await import("@/lib/google-calendar");
+      const all = await listEventsAllCalendars(accessToken, from, to);
+      google = true;
+      const own = new Set(quests.map((t) => t.google_calendar_event_id).filter(Boolean));
+      for (const e of all.events) {
+        if (e.isAllDay || own.has(e.id) || (e.calendarId && hidden.has(e.calendarId))) continue;
+        busy.push({ start: new Date(e.start).getTime(), end: new Date(e.end).getTime() });
+      }
+    } catch {
+      /* planning still works from the app's own calendar */
+    }
+  }
+  return { busy, google, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
+}
+
+/** Remember the scheduler's settings and time-of-day choices (on every device). */
+export async function saveSchedulerSettingsAction(settings: Record<string, unknown>) {
+  const ownerId = await requireProfileId();
+  const clean = JSON.parse(JSON.stringify(settings ?? {}));
+  const { error } = await supabaseAdmin().from("profiles").update({ scheduler: clean }).eq("id", ownerId);
+  if (error) throw new Error(/scheduler/.test(error.message) ? "Saved on this device (your account needs a quick database update to keep it everywhere)." : `Couldn't save: ${error.message}`);
+}
+
+/** Put a whole plan on the calendar: each quest at its time (and on Google Calendar when connected). */
+export async function applyAutoScheduleAction(plan: { taskId: string; startISO: string; endISO: string }[]) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  let done = 0;
+  const failed: string[] = [];
+  for (const p of plan.slice(0, 60)) {
+    try {
+      const task = await tasksData.getTask(p.taskId, profileId);
+      if (!task) continue;
+      await attachCalendarEvent(accessToken, profileId, task, new Date(p.startISO), new Date(p.endISO));
+      done++;
+    } catch {
+      failed.push(p.taskId);
+    }
+  }
+  revalidatePath("/");
+  revalidatePath("/calendar");
+  return { done, failed };
+}
+
+/** Name this week's chapter. */
+export async function setChapterTitleAction(title: string) {
+  const ownerId = await requireProfileId();
+  const { setChapterTitle } = await import("@/lib/data/planning");
+  const clean = title.replace(/\s+/g, " ").trim().slice(0, 60);
+  await setChapterTitle(ownerId, clean || null);
+  revalidatePath("/");
 }

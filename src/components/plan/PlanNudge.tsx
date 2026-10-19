@@ -11,7 +11,7 @@ export function ScheduleNudge({ titles }: { titles: string[] }) {
   const named = titles.slice(0, 2).map((t) => (t.length > 34 ? `${t.slice(0, 33)}…` : t));
   const rest = n - named.length;
   return (
-    <Link href="/calendar?view=week" className="hover-glow parchment parchment-framed flex items-center gap-3 rounded-2xl px-4 py-3">
+    <Link href="/calendar?view=week&auto=1" className="hover-glow parchment parchment-framed flex items-center gap-3 rounded-2xl px-4 py-3">
       <span aria-hidden className="relative z-[1] text-[26px]">📅</span>
       <span className="relative z-[1] flex min-w-0 flex-1 flex-col">
         <span className="font-display text-[18px]" style={{ color: "#3b2a14" }}>
@@ -19,7 +19,7 @@ export function ScheduleNudge({ titles }: { titles: string[] }) {
         </span>
         <span className="truncate text-[13.5px]" style={{ color: "#6b5631" }}>
           {named.join(" · ")}
-          {rest > 0 ? ` · +${rest} more` : ""} — give {n === 1 ? "it" : "them"} a spot on the calendar
+          {rest > 0 ? ` · +${rest} more` : ""} — tap to find {n === 1 ? "it" : "them"} a time
         </span>
       </span>
       <span aria-hidden className="relative z-[1] text-[20px]" style={{ color: "#8a6116" }}>→</span>

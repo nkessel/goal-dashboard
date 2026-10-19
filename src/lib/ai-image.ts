@@ -27,7 +27,8 @@ export function buildAvatarPrompt(subject: string, opts: { withBackground?: bool
 
   return opts.withBackground
     ? `${base}, scenic fantasy background that matches the art style`
-    : `${base}, flat solid ${CHROMA_KEY_HEX} green background with no gradient, no scenery, no vignette, no letters, no numbers, no writing of any kind`;
+    : // A plain painted backdrop, kept as it is (cutting a green screen out left ragged halos).
+      `${base}, plain softly lit warm neutral backdrop with a gentle painted gradient, no scenery, no letters, no numbers, no writing of any kind`;
 }
 
 /** Imported quests/rewards: colored-pencil sketchbook illustration, like the

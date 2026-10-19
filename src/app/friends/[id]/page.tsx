@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { getProfileById, getChampion } from "@/lib/data/profiles";
 import { getShareSettings, isPartyMember } from "@/lib/data/sharing";
-import { listOpenTasksForOwnerWithCategory, listCalendarTasksForOwner } from "@/lib/data/tasks";
+import { listOpenTasksForOwnerWithCategory, listCalendarTasksForOwner, listCompletedTasksForOwner } from "@/lib/data/tasks";
 import { listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { listWinsSince } from "@/lib/data/wins";
 import { getCheckMetrics, listCheckInsSince, listEnergySince } from "@/lib/data/energy";
@@ -138,9 +138,25 @@ function QuestLine({ t }: { t: Task }) {
         )}
       </span>
       <span className="min-w-0 flex-1">
-        <span dir="auto" className="user-text block truncate text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
+        <span dir="auto" className="user-text block text-[15px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
           {t.title}
         </span>
+        {t.description && (
+          <span dir="auto" className="user-text line-clamp-2 block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+            {t.description}
+          </span>
+        )}
+        {(t.due_at || (t.is_on_calendar && t.scheduled_start) || (t.steps_total ?? 0) > 0) && (
+          <span className="block text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+            {[
+              t.due_at ? `Due ${new Date(t.due_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : null,
+              t.is_on_calendar && t.scheduled_start ? `On the calendar ${new Date(t.scheduled_start).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: process.env.APP_TIMEZONE || "America/New_York" })}` : null,
+              (t.steps_total ?? 0) > 0 ? `${t.steps_done ?? 0}/${t.steps_total} steps` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        )}
         {pct > 0 && (
           <span className="mt-1 block h-1.5 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c" }}>
             <span className="block h-full" style={{ width: `${pct}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)" }} />
@@ -182,7 +198,7 @@ async function TodayView({ ownerId, first, card, cardStyle, h2 }: ViewProps) {
             Additional Quests
           </h2>
           <ul className="relative z-[1] m-0 list-none p-0">
-            {more.slice(0, 12).map((t) => (
+            {more.map((t) => (
               <QuestLine key={t.id} t={t} />
             ))}
           </ul>
@@ -194,7 +210,7 @@ async function TodayView({ ownerId, first, card, cardStyle, h2 }: ViewProps) {
             Victories today
           </h2>
           <ul className="relative z-[1] m-0 flex list-none flex-col gap-1 p-0">
-            {wins.slice(0, 15).map((w) => (
+            {wins.map((w) => (
               <li key={w.id} className="flex items-center gap-2 text-[14.5px]" style={{ color: "var(--t-ink)" }}>
                 <span aria-hidden style={{ color: "#58a04a" }}>✓</span>
                 <span className="min-w-0 flex-1 truncate">{w.title}</span>
@@ -209,12 +225,14 @@ async function TodayView({ ownerId, first, card, cardStyle, h2 }: ViewProps) {
 }
 
 async function BoardsView({ ownerId, first, card, cardStyle, h2 }: ViewProps) {
-  const boards = (await listBoardsWithStatsForOwner(ownerId)).filter((b) => !b.is_private && !b.isVirtual);
+  const [allBoards, completed] = await Promise.all([listBoardsWithStatsForOwner(ownerId), listCompletedTasksForOwner(ownerId, 300).catch(() => [])]);
+  const boards = allBoards.filter((b) => !b.is_private && !b.isVirtual);
   if (!boards.length) return <p className={card} style={cardStyle}><span className="relative z-[1]" style={{ color: "var(--t-ink-soft)" }}>{first} has no shared boards.</span></p>;
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {boards.map((b) => {
         const qs = b.openQuests.filter((q) => !q.is_private);
+        const finished = completed.filter((q) => q.board_id === b.id && !q.is_private);
         return (
           <section key={b.id} className={card} style={cardStyle}>
             <h2 className={h2} style={{ color: "var(--t-ink)" }}>
@@ -224,11 +242,27 @@ async function BoardsView({ ownerId, first, card, cardStyle, h2 }: ViewProps) {
               </span>
             </h2>
             <ul className="relative z-[1] m-0 list-none p-0">
-              {qs.slice(0, 5).map((q) => (
+              {qs.map((q) => (
                 <QuestLine key={q.id} t={q} />
               ))}
               {qs.length === 0 && <li className="text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>Nothing open.</li>}
             </ul>
+            {finished.length > 0 && (
+              <details className="relative z-[1]">
+                <summary className="cursor-pointer text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+                  Done lately ({finished.length})
+                </summary>
+                <ul className="m-0 mt-1 flex list-none flex-col gap-1 p-0">
+                  {finished.map((q) => (
+                    <li key={q.id} className="flex items-center gap-2 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
+                      <span aria-hidden style={{ color: "#58a04a" }}>✓</span>
+                      <span dir="auto" className="user-text min-w-0 flex-1 truncate line-through decoration-[rgba(80,60,20,.35)]">{q.title}</span>
+                      <span className="shrink-0 text-[12px] font-bold" style={{ color: "var(--t-xp)" }}>+{q.xp_value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </section>
         );
       })}
@@ -239,15 +273,15 @@ async function BoardsView({ ownerId, first, card, cardStyle, h2 }: ViewProps) {
 async function CalendarView({ ownerId, first, card, cardStyle, h2 }: ViewProps) {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
-  const end = new Date(start.getTime() + 8 * 86_400_000);
+  const end = new Date(start.getTime() + 15 * 86_400_000);
   const tasks = (await listCalendarTasksForOwner(ownerId, start, end)).filter((t) => !t.is_private && t.scheduled_start).sort((a, b) => (a.scheduled_start! < b.scheduled_start! ? -1 : 1));
   return (
     <section className={card} style={cardStyle}>
       <h2 className={h2} style={{ color: "var(--t-ink)" }}>
-        This week
+        The next two weeks
       </h2>
       <ul className="relative z-[1] m-0 flex list-none flex-col gap-1.5 p-0">
-        {tasks.length === 0 && <li className="text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>{first} has nothing scheduled this week.</li>}
+        {tasks.length === 0 && <li className="text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>{first} has nothing scheduled in the next two weeks.</li>}
         {tasks.map((t) => (
           <li key={t.id} className="flex items-baseline gap-3 text-[14.5px]" style={{ color: "var(--t-ink)" }}>
             <time className="w-[118px] shrink-0 text-[13px] tabular-nums" style={{ color: "var(--t-ink-soft)" }} dateTime={t.scheduled_start!}>

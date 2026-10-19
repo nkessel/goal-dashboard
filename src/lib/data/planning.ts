@@ -121,3 +121,49 @@ export async function lastPairSession(ownerId: string): Promise<{ periodKey: str
   const r = data?.[0] as { period_key: string; data: Record<string, unknown>; completed_at: string } | undefined;
   return r ? { periodKey: r.period_key, data: r.data ?? {}, completedAt: r.completed_at } : null;
 }
+
+export type ChapterBeat = { id: string; title: string; done: boolean; icon: string | null; scheduledAt: string | null; dueAt: string | null };
+export type WeekChapter = { number: number; title: string | null; weekOf: string; beats: ChapterBeat[] };
+
+/**
+ * This week as a chapter of the story: the big rocks chosen in the weekly
+ * ritual, and how far along each is. Null when no rocks were chosen.
+ */
+export async function getWeekChapter(ownerId: string, profileCreatedAt?: string | null): Promise<WeekChapter | null> {
+  const s = await getPlanSession(ownerId, "week");
+  const data = (s?.data ?? {}) as { rocks?: string[]; chapterTitle?: string | null };
+  const ids = (data.rocks ?? []).slice(0, 3);
+  if (!ids.length) return null;
+  const { data: rows } = await supabaseAdmin()
+    .from("tasks")
+    .select("id, title, status, icon_key, icon_source, scheduled_start, is_on_calendar, due_at")
+    .eq("owner_id", ownerId)
+    .in("id", ids);
+  const byId = new Map((rows ?? []).map((r) => [r.id as string, r]));
+  const beats = ids
+    .map((id) => byId.get(id))
+    .filter(Boolean)
+    .map((r) => ({
+      id: r!.id as string,
+      title: r!.title as string,
+      done: r!.status === "completed",
+      icon: (r!.icon_source === "ai" || r!.icon_source === "library") && r!.icon_key ? (r!.icon_key as string) : null,
+      scheduledAt: r!.is_on_calendar ? ((r!.scheduled_start as string | null) ?? null) : null,
+      dueAt: (r!.due_at as string | null) ?? null,
+    }));
+  if (!beats.length) return null;
+  const weekOf = s!.period_key;
+  const start = profileCreatedAt ? Date.parse(profileCreatedAt) : Date.parse(weekOf);
+  const number = Math.max(1, Math.floor((Date.parse(weekOf) - start) / (7 * 86_400_000)) + 1);
+  return { number, title: data.chapterTitle ?? null, weekOf, beats };
+}
+
+/** Name this week's chapter (kept with the week's plan). */
+export async function setChapterTitle(ownerId: string, title: string | null) {
+  const s = await getPlanSession(ownerId, "week");
+  const data = { ...((s?.data ?? {}) as Record<string, unknown>), chapterTitle: title };
+  const { error } = await supabaseAdmin()
+    .from("planning_sessions")
+    .upsert({ owner_id: ownerId, kind: "week", period_key: periodKey("week"), data, updated_at: new Date().toISOString() }, { onConflict: "owner_id,kind,period_key" });
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+}
