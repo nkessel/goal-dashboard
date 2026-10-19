@@ -72,6 +72,16 @@ export function buildTreasureIconPrompt(subject: string) {
   );
 }
 
+/** Inventory items: a single object painted like a classic RPG inventory icon, on dark leather. */
+export function buildInventoryIconPrompt(subject: string) {
+  return (
+    `painted fantasy RPG inventory icon of ${subject}, a single everyday object rendered as an adventurer's item, ` +
+    "rich gouache and chalk pastel painting, warm rim light, crisp readable silhouette, the whole object centered and fully visible with a margin, " +
+    "on a softly lit dark brown leather backdrop with a faint golden glow behind the object, " +
+    "absolutely no text, no words, no writing, no labels, no captions, no signature, no letters or numbers"
+  );
+}
+
 export function buildTaskIconPrompt(subject: string) {
   return (
     `single fantasy monster, ${subject}, hi-res RPG concept art, dramatic lighting, intricate detail, ` +

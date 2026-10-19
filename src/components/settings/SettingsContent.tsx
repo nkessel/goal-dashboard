@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ToucanWorkshop } from "./ToucanWorkshop";
+import { BackpackIcon } from "./BackpackIcon";
 import { OwlCage } from "./OwlCage";
 import { SecretMissions } from "./SecretMissions";
 import { listMissionSteps } from "@/lib/data/missions";
@@ -41,6 +42,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
   if (!profile) notFound();
   const openAppearance = open === "appearance";
   const isAdventure = profile.theme === "adventure";
+  const refillCount = (profile.life_wheel?.inventory?.items ?? []).filter((i) => i.status === "empty").length;
   const iconColor = isAdventure ? "#7a5f2a" : "var(--t-accent)";
   const { level, nextLevel, xpIntoLevel, xpForNextLevel } = xpToNextLevel(profile.total_xp);
   const pct = xpForNextLevel ? Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100)) : 100;
@@ -306,6 +308,25 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </ViewTransitionLink>
             </div>
           </SettingsRow>
+
+          <ViewTransitionLink
+            href="/settings/inventory"
+            className={`hover-glow flex items-center gap-3 px-4 py-3.5 ${isAdventure ? "parchment" : ""}`}
+            style={{ ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }), borderRadius: 14 }}
+          >
+            <span className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: isAdventure ? "rgba(209,161,60,.16)" : "var(--t-accent-soft)" }}>
+              <BackpackIcon size={19} />
+            </span>
+            <span className="relative z-[1] flex-1 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
+              Inventory
+            </span>
+            <span className="relative z-[1] text-[13px]" style={{ color: refillCount ? "#9a3b26" : "var(--t-ink-soft)", fontWeight: refillCount ? 700 : 400 }}>
+              {refillCount ? `${refillCount} to refill` : `${(profile.life_wheel?.inventory?.items ?? []).length} items`}
+            </span>
+            <svg className="relative z-[1]" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M9 5l7 7-7 7" stroke="var(--t-ink-soft)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </ViewTransitionLink>
 
           <OwlCage />
 

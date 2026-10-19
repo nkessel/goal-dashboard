@@ -2573,3 +2573,35 @@ export async function logSlipAction(word: string, atISO?: string | null) {
   revalidatePath("/insights");
   return note;
 }
+
+// ---------------------------------------------------------------------------
+// Inventory: the backpack (kept with your other personal extras)
+
+export async function saveInventoryAction(inventory: unknown) {
+  const ownerId = await requireProfileId();
+  const { normalizeInventory } = await import("@/lib/inventory");
+  const clean = normalizeInventory(inventory);
+  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), inventory: clean } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  revalidatePath("/settings");
+  return clean;
+}
+
+/** Paint an inventory item's portrait. */
+export async function paintInventoryItemAction(name: string): Promise<string> {
+  const ownerId = await requireProfileId();
+  const trimmed = name.trim().slice(0, 80);
+  if (!trimmed) throw new Error("Name the item first.");
+  assertFamilyFriendly(trimmed);
+  const { buildInventoryIconPrompt } = await import("@/lib/ai-image");
+  return generateAndStoreImage(buildInventoryIconPrompt(trimmed), `inventory/${ownerId}-${Date.now()}.jpg`);
+}
+
+/** A quest to go refill something from the backpack. */
+export async function makeRefillQuestAction(itemName: string) {
+  const ownerId = await requireProfileId();
+  const task = await tasksData.createTask(ownerId, { title: `Refill: ${itemName.trim().slice(0, 100)}`, importance: 2.5, urgency: 3, xpValue: 10, estimateMinutes: 15 });
+  revalidatePath("/");
+  return task.id;
+}

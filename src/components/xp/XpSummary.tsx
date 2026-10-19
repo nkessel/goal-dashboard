@@ -6,6 +6,8 @@ import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import type { Profile } from "@/lib/data/types";
 import { xpToNextLevel } from "@/lib/data/xp";
 import { Avatar, defaultPortraitFor } from "@/components/settings/Avatar";
+import { RefillBadge } from "@/components/settings/RefillBadge";
+import { normalizeInventory } from "@/lib/inventory";
 import { BossBadge, type BossView } from "./BossLine";
 import { EnergyCheck } from "./EnergyCheck";
 
@@ -111,6 +113,7 @@ export function XpSummary({
                   <img src={profile.avatar_image_url ?? defaultPortraitFor(profile.id)} alt="Avatar" className="h-full w-full object-cover" />
                 </span>
               </Link>
+              <RefillBadge inventory={normalizeInventory(profile.life_wheel?.inventory)} />
               <div className="absolute left-1/2" style={{ bottom: -12, transform: "translateX(-50%)" }}>
               {profile.display_level != null ? (
                 <HonoraryLevel level={profile.display_level}>
