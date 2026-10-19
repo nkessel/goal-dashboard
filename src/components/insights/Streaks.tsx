@@ -13,7 +13,7 @@ const subscribeMinute = (cb: () => void) => {
   const t = setInterval(cb, 60_000);
   return () => clearInterval(t);
 };
-const minuteNow = () => Math.floor(Date.now() / 60_000) * 60_000;
+const minuteNow = () => Math.ceil(Date.now() / 60_000) * 60_000;
 
 const toLocalInput = (ms: number) => {
   const d = new Date(ms);
