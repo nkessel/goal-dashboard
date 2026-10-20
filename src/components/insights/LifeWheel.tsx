@@ -19,7 +19,7 @@ const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; last: Record<string, { level: number; at: string }> }) {
   const router = useRouter();
   const [topics] = useState(initialTopics.length ? initialTopics : DEFAULT_WHEEL);
-  const [vals, setVals] = useState<Record<string, number>>(() => Object.fromEntries((initialTopics.length ? initialTopics : DEFAULT_WHEEL).map((t) => [t, last[t]?.level ?? 5])));
+  const [vals, setVals] = useState<Record<string, number>>(() => Object.fromEntries((initialTopics.length ? initialTopics : DEFAULT_WHEEL).map((t) => [t, last[t.slice(0, 20)]?.level ?? 5])));
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -39,7 +39,7 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
       .filter((p): p is readonly [number, number] => !!p)
       .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
       .join(" ");
-  const hasLast = topics.some((t) => last[t]);
+  const hasLast = topics.some((t) => last[t.slice(0, 20)]);
 
   function setVal(t: string, v: number) {
     setSaved(null);
@@ -117,12 +117,16 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
               <g key={t}>
                 <line x1="0" y1="0" x2={x} y2={y} stroke="rgba(110,85,40,.3)" strokeWidth=".8" />
                 <text x={lx} y={ly} textAnchor={Math.abs(lx) < 8 ? "middle" : lx > 0 ? "start" : "end"} dominantBaseline="middle" fontSize={n > 8 ? 10 : 11.5} fontWeight="600" fill={INK}>
-                  {t}
+                  {splitLabel(t).map((part, k, all) => (
+                    <tspan key={k} x={lx} dy={k === 0 ? `${-(all.length - 1) * 0.55}em` : "1.1em"}>
+                      {part}
+                    </tspan>
+                  ))}
                 </text>
               </g>
             );
           })}
-          {hasLast && <polygon points={poly((t) => last[t]?.level)} fill="rgba(110,85,40,.08)" stroke="rgba(110,85,40,.45)" strokeWidth="1.2" strokeDasharray="3 3" />}
+          {hasLast && <polygon points={poly((t) => last[t.slice(0, 20)]?.level)} fill="rgba(110,85,40,.08)" stroke="rgba(110,85,40,.45)" strokeWidth="1.2" strokeDasharray="3 3" />}
           <polygon points={poly((t) => vals[t])} fill="rgba(217,180,95,.35)" stroke="#a8761c" strokeWidth="2" strokeLinejoin="round" />
           {topics.map((t, i) => {
             const [x, y] = pt(i, vals[t] ?? 5);
@@ -158,4 +162,13 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
       </div>
     </div>
   );
+}
+
+/** Long area names go on two lines (split near the middle, at a space). */
+function splitLabel(t: string): string[] {
+  if (t.length <= 12 || !t.includes(" ")) return [t];
+  const mid = t.length / 2;
+  let best = -1;
+  for (let i = 0; i < t.length; i++) if (t[i] === " " && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+  return best < 0 ? [t] : [t.slice(0, best), t.slice(best + 1)];
 }

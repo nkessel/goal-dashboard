@@ -8,7 +8,7 @@ const HELPERS = new Set(["waiting for", "someday / maybe"]);
 export function wheelAreasFrom(boards: { title: string; parent_board_id: string | null; is_private?: boolean | null }[]): string[] {
   return boards
     .filter((b) => !b.parent_board_id && !HELPERS.has(b.title.trim().toLowerCase()))
-    .map((b) => b.title.replace(/\s+/g, " ").trim().slice(0, 20))
+    .map((b) => b.title.replace(/\s+/g, " ").trim().slice(0, 40))
     .filter((t, i, all) => t && all.indexOf(t) === i)
     .slice(0, 12);
 }

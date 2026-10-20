@@ -180,7 +180,7 @@ export function PlanRitual(props: {
       try {
         if (d.rocks.length) await setBigRocksAction(d.rocks);
         // Where each focus area is now goes onto the life wheel too.
-        const moved = (d.focus ?? []).filter((f) => f.from !== null && f.from !== props.wheel.last[f.area]?.level).map((f) => ({ topic: f.area, level: f.from! }));
+        const moved = (d.focus ?? []).filter((f) => f.from !== null && f.from !== props.wheel.last[f.area.slice(0, 20)]?.level).map((f) => ({ topic: f.area, level: f.from! }));
         if (moved.length) await saveLifeWheelAction(moved).catch(() => null);
         const res = await completePlanAction(kind, d);
         setSealed(new Date().toISOString());

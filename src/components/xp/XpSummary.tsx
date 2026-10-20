@@ -167,7 +167,7 @@ export function XpSummary({
                     // XP keeps counting while the level boss holds the door.
                     <>
                       {xpIntoLevel.toLocaleString("en-US")} / {xpForNextLevel!.toLocaleString("en-US")} XP
-                      <span className="ml-1.5 text-[12px] opacity-80">· +{(xpIntoLevel - xpForNextLevel!).toLocaleString("en-US")} banked</span>
+                      <span className="block text-[11.5px] leading-tight opacity-80">+{(xpIntoLevel - xpForNextLevel!).toLocaleString("en-US")} banked for the next level</span>
                     </>
                   ) : (
                     `${xpIntoLevel.toLocaleString("en-US")} / ${xpForNextLevel!.toLocaleString("en-US")} XP`

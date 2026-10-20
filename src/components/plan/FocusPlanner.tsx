@@ -45,7 +45,7 @@ export function FocusPlanner({
       <div className="flex flex-wrap gap-1.5" aria-label="Life areas">
         {topics.map((t) => {
           const on = chosen.has(t);
-          const lvl = last[t]?.level;
+          const lvl = last[t.slice(0, 20)]?.level;
           return (
             <button
               key={t}
