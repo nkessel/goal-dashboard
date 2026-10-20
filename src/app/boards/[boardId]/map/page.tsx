@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { loadCampaign } from "@/lib/data/campaign";
 import { QuestMap } from "@/components/map/QuestMap";
 import { getProfileById } from "@/lib/data/profiles";
+import { defaultPortraitFor } from "@/components/settings/Avatar";
 
 /** A board as a quest map: one road through every quest in it and the boards inside. */
 export default async function BoardMapPage({ params }: { params: Promise<{ boardId: string }> }) {
@@ -14,7 +15,7 @@ export default async function BoardMapPage({ params }: { params: Promise<{ board
   if (!campaign) notFound();
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
-      <QuestMap board={campaign.board} stops={campaign.stops} initialPrefs={prefs} />
+      <QuestMap board={campaign.board} stops={campaign.stops} initialPrefs={prefs} aspirations={campaign.aspirations} portrait={profile ? (profile.avatar_image_url ?? defaultPortraitFor(profile.id)) : null} />
     </AppShell>
   );
 }

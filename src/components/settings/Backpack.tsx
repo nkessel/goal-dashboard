@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { makeRefillQuestAction, paintInventoryItemAction, saveInventoryAction } from "@/app/actions";
 import { POCKETS, type Inventory, type InventoryItem, type ItemStatus, type PocketKey } from "@/lib/inventory";
@@ -14,15 +14,19 @@ const STATUS: { v: ItemStatus; label: string; hint: string }[] = [
 const SUGGESTIONS = ["Electrolyte mix pod", "Water bottle", "Snacks", "Lip balm", "Hand sanitizer", "Tissues", "Phone charger", "Pain reliever", "Sunscreen", "Gum", "Pens", "Bandages"];
 
 /** One slot: an item's portrait, or an empty leather square to fill. */
-function Slot({ item, painting, onTap, moving }: { item: InventoryItem | null; painting: boolean; onTap: (rect: DOMRect) => void; moving: boolean }) {
+function Slot({ item, painting, onTap, moving, at, onGrab, lifted = false }: { item: InventoryItem | null; painting: boolean; onTap: (rect: DOMRect) => void; moving: boolean; at: string; onGrab?: (e: React.PointerEvent) => void; lifted?: boolean }) {
   const empty = item?.status === "empty";
   return (
     <button
       type="button"
+      data-inv-slot={at}
+      onPointerDown={onGrab}
+      onContextMenu={(e) => item && e.preventDefault()}
       onClick={(e) => onTap(e.currentTarget.getBoundingClientRect())}
+      style={{ WebkitTouchCallout: "none", opacity: lifted ? 0.35 : undefined }}
       aria-haspopup={item ? "menu" : undefined}
       aria-label={item ? `${item.name}${empty ? " — needs refilling" : item.status === "low" ? " — running low" : ""}` : moving ? "Move it here" : "Empty slot: add an item"}
-      className={`inv-slot group relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg ${moving ? "inv-slot-target" : ""}`}
+      className={`inv-slot group relative flex aspect-square w-full select-none items-center justify-center overflow-hidden rounded-lg transition-opacity ${moving ? "inv-slot-target" : ""}`}
     >
       {item ? (
         <>
@@ -65,6 +69,71 @@ export function Backpack({ initial }: { initial: Inventory }) {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
+  // Dragging an item to another slot (press and hold on a phone, then drag).
+  const [drag, setDrag] = useState<{ item: InventoryItem; x: number; y: number; over: string | null } | null>(null);
+  const dragging = useRef(false);
+  const skipClick = useRef(false);
+  useEffect(() => {
+    // While an item is being carried, the page mustn't scroll under the finger.
+    const block = (e: TouchEvent) => dragging.current && e.preventDefault();
+    window.addEventListener("touchmove", block, { passive: false });
+    return () => window.removeEventListener("touchmove", block);
+  }, []);
+  const slotUnder = (x: number, y: number) => document.elementFromPoint(x, y)?.closest("[data-inv-slot]")?.getAttribute("data-inv-slot") ?? null;
+
+  function grab(e: React.PointerEvent, item: InventoryItem | null) {
+    if (!item || e.button !== 0 || moving) return;
+    const touch = e.pointerType !== "mouse";
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const id = e.pointerId;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const begin = (x: number, y: number) => {
+      dragging.current = true;
+      setDrag({ item, x, y, over: null });
+      try {
+        navigator.vibrate?.(12);
+      } catch {}
+    };
+    if (touch) timer = setTimeout(() => begin(x0, y0), 280);
+    const cleanup = () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+    };
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      if (!dragging.current) {
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
+        // On a phone, moving before the hold is a scroll, not a drag.
+        if (touch) return cleanup();
+        begin(ev.clientX, ev.clientY);
+      }
+      ev.preventDefault();
+      setDrag((d) => (d ? { ...d, x: ev.clientX, y: ev.clientY, over: slotUnder(ev.clientX, ev.clientY) } : d));
+    };
+    const finish = (x: number, y: number, drop: boolean) => {
+      cleanup();
+      if (!dragging.current) return;
+      dragging.current = false;
+      skipClick.current = true;
+      setTimeout(() => (skipClick.current = false), 50);
+      setDrag(null);
+      const target = drop ? slotUnder(x, y) : null;
+      if (!target) return;
+      const [pocket, slotStr] = target.split(":") as [PocketKey, string];
+      const slot = Number(slotStr);
+      if (pocket === item.pocket && slot === item.slot) return;
+      const there = at(pocket, slot);
+      persist({ ...inv, items: inv.items.map((i) => (i.id === item.id ? { ...i, pocket, slot } : there && i.id === there.id ? { ...i, pocket: item.pocket, slot: item.slot } : i)) });
+    };
+    const up = (ev: PointerEvent) => ev.pointerId === id && finish(ev.clientX, ev.clientY, true);
+    const cancel = (ev: PointerEvent) => ev.pointerId === id && finish(ev.clientX, ev.clientY, false);
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+  }
 
   function persist(next: Inventory) {
     const prev = inv;
@@ -85,6 +154,7 @@ export function Backpack({ initial }: { initial: Inventory }) {
   };
 
   function tapSlot(pocket: PocketKey, slot: number, rect?: DOMRect) {
+    if (skipClick.current) return;
     const item = at(pocket, slot);
     if (moving) {
       // Move there (swapping with whatever is in the way).
@@ -180,7 +250,15 @@ export function Backpack({ initial }: { initial: Inventory }) {
                 const item = at(p.key, slot);
                 return (
                   <div key={slot} className="flex min-w-0 flex-col items-center gap-1">
-                    <Slot item={item} painting={!!item && painting.has(item.id)} moving={!!moving} onTap={(r) => tapSlot(p.key, slot, r)} />
+                    <Slot
+                      item={item}
+                      at={`${p.key}:${slot}`}
+                      painting={!!item && painting.has(item.id)}
+                      moving={!!moving || (!!drag && drag.over === `${p.key}:${slot}` && drag.item.id !== item?.id)}
+                      lifted={!!drag && drag.item.id === item?.id}
+                      onGrab={(e) => grab(e, item)}
+                      onTap={(r) => tapSlot(p.key, slot, r)}
+                    />
                     <span className="block w-full truncate text-center text-[11px] leading-tight" style={{ color: item ? "rgba(246,236,210,.85)" : "transparent" }}>
                       {item?.name ?? "·"}
                     </span>
@@ -200,6 +278,23 @@ export function Backpack({ initial }: { initial: Inventory }) {
         ))}
       </div>
 
+      <p className="m-0 text-center text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+        Tap an item for its menu · hold and drag to move it
+      </p>
+      {drag &&
+        createPortal(
+          <div aria-hidden className="pointer-events-none fixed z-[90] h-16 w-16 overflow-hidden rounded-xl" style={{ left: drag.x - 32, top: drag.y - 40, transform: "scale(1.08) rotate(-4deg)", boxShadow: "0 14px 28px rgba(0,0,0,.55), 0 0 0 2px #f2d27e", background: "#2a1a10" }}>
+            {drag.item.icon ? (
+              // eslint-disable-next-line @next/next/no-img-element -- item portrait
+              <img src={drag.item.icon} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center px-1 text-center text-[11px] font-semibold" style={{ color: "#f2d27e" }}>
+                {drag.item.name}
+              </span>
+            )}
+          </div>,
+          document.body
+        )}
       {error && (
         <p className="m-0 text-[13.5px] font-semibold" style={{ color: "var(--t-warn)" }}>
           {error}
@@ -347,10 +442,17 @@ function ItemSheet({
   const chip = "flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold";
   const chipStyle = { border: "1px solid #b39a6a", color: "var(--t-ink)", background: "rgba(255,250,238,.5)" };
   const wantsPaint = !item.icon || repaint;
+  // Bring the keyboard up only once the sheet has slid in, so the two don't fight.
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!isNew) return;
+    const t = setTimeout(() => nameRef.current?.focus({ preventScroll: true }), 280);
+    return () => clearTimeout(t);
+  }, [isNew]);
 
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[56] flex items-end justify-center sm:items-center sm:p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={isNew ? "Add an item" : item.name} onClick={(e) => e.stopPropagation()} className="card-pop-in parchment parchment-framed flex max-h-[92svh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-t-2xl p-4 sm:rounded-2xl">
+    <div className="overlay-fade-in fixed inset-0 z-[56] flex items-end justify-center overscroll-contain sm:items-center sm:p-4" style={{ background: "rgba(10,8,4,.3)" }} onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label={isNew ? "Add an item" : item.name} onClick={(e) => e.stopPropagation()} className="sheet-up parchment parchment-framed flex max-h-[92svh] w-full max-w-md flex-col gap-3 overflow-y-auto overscroll-contain rounded-t-2xl p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:rounded-2xl">
         <div className="relative z-[1] flex items-start gap-3">
           <span className="inv-slot relative h-20 w-20 shrink-0 overflow-hidden rounded-xl">
             {item.icon && !repaint ? (
@@ -366,7 +468,7 @@ function ItemSheet({
             <span className="block text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
               {pocket.label} · slot {item.slot + 1}
             </span>
-            <input autoFocus={isNew} value={item.name} onChange={(e) => setItem({ ...item, name: e.target.value })} onKeyDown={(e) => e.key === "Enter" && item.name.trim() && onSave(item, wantsPaint ? { description } : null)} placeholder="What's in this slot?" maxLength={48} className={`${field} mt-1 font-semibold`} style={fieldStyle} aria-label="Item name" />
+            <input ref={nameRef} value={item.name} onChange={(e) => setItem({ ...item, name: e.target.value })} onKeyDown={(e) => e.key === "Enter" && item.name.trim() && onSave(item, wantsPaint ? { description } : null)} placeholder="What's in this slot?" maxLength={48} className={`${field} mt-1 font-semibold`} style={fieldStyle} aria-label="Item name" />
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
             ×

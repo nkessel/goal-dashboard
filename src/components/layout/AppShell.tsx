@@ -2,6 +2,7 @@ import { countUnread, syncImportsNotification } from "@/lib/data/notifications";
 import { getProfileById } from "@/lib/data/profiles";
 import { WeatherSync } from "@/components/ui/WeatherSync";
 import { TopRightAvatar } from "@/components/layout/TopRightAvatar";
+import { isPalette } from "@/lib/palettes";
 import { ThemeOnBody } from "@/components/layout/ThemeOnBody";
 import { NotificationsButton } from "@/components/layout/NotificationsButton";
 import { DailyLogin } from "@/components/xp/DailyLogin";
@@ -54,6 +55,8 @@ export async function AppShell({
     profileId ? countUnread(profileId) : Promise.resolve(0),
   ]);
   const theme = profile?.theme === "adventure" ? "adventure" : "calm";
+  const rawPalette = (profile?.life_wheel as { palette?: unknown } | null | undefined)?.palette;
+  const palette = isPalette(rawPalette) && rawPalette !== "forest" ? rawPalette : undefined;
   const isAdventure = theme === "adventure";
   const iconColor = isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)";
   const widthClass = wide
@@ -61,8 +64,8 @@ export async function AppShell({
     : "max-w-md sm:max-w-lg md:max-w-xl";
 
   return (
-    <div data-theme={theme} className="flex min-h-screen flex-col items-center">
-      <ThemeOnBody theme={theme} />
+    <div data-theme={theme} data-palette={palette} className="flex min-h-screen flex-col items-center">
+      <ThemeOnBody theme={theme} palette={palette ?? null} />
       {profileId && <DailyLogin />}
       {profileId && missingPortraits > 0 && <PortraitPainter missing={missingPortraits} />}
       {profileId && profile && (

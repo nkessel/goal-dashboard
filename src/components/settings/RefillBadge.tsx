@@ -49,8 +49,8 @@ export function RefillBadge({ inventory }: { inventory: Inventory }) {
         className="card-pop-in relative flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
         style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,.6))" }}
       >
-        <BackpackIcon size={35} />
-        <span className="absolute -right-1.5 -top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-[3px] text-[10px] font-bold leading-none tabular-nums" style={{ background: "#d23a2a", color: "#fff", boxShadow: "0 0 0 1.5px #2a1c10" }}>
+        <BackpackIcon size={30} />
+        <span className="absolute -right-1.5 top-0 flex h-[15px] min-w-[15px] items-center justify-center rounded-full px-[3px] text-[10px] font-bold leading-none tabular-nums" style={{ background: "#d23a2a", color: "#fff", boxShadow: "0 0 0 1.5px #2a1c10" }}>
           {items.length}
         </span>
       </button>

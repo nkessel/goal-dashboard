@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEscape } from "@/lib/use-escape";
 
@@ -19,10 +19,22 @@ export function RouteModal({ theme, title, children }: { theme: "calm" | "advent
     setTimeout(() => router.back(), 170);
   }
   useEscape(close);
+  // The screen underneath stays put while this is open.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const was = [html.style.overflow, body.style.overflow, html.style.overscrollBehavior];
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    return () => {
+      [html.style.overflow, body.style.overflow, html.style.overscrollBehavior] = was;
+    };
+  }, []);
 
   return (
     <div data-theme={theme} className="fixed inset-0 z-[55] flex items-center justify-center p-4" style={{ background: "transparent", minHeight: 0 }}>
-      <div className={`absolute inset-0 ${closing ? "overlay-fade-out" : "overlay-fade-in"}`} style={{ background: "var(--t-overlay)" }} onClick={close} />
+      <div className={`absolute inset-0 touch-none ${closing ? "overlay-fade-out" : "overlay-fade-in"}`} style={{ background: "var(--t-overlay)" }} onClick={close} />
       <div
         role="dialog"
         aria-modal="true"
@@ -34,7 +46,7 @@ export function RouteModal({ theme, title, children }: { theme: "calm" | "advent
           color: "var(--t-ink)",
         }}
       >
-        <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+        <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-5">
           <div className="flex items-center justify-between">
             <h2 className={`m-0 ${isAdventure ? "font-display text-[22px]" : "text-lg font-bold"}`}>{title}</h2>
             <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>

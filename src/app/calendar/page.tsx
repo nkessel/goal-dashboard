@@ -169,24 +169,24 @@ export default async function CalendarPage({
           Synced with Google Calendar
         </div>
 
-        <div className="-mb-1 flex justify-end gap-2">
+        <div className="no-scrollbar -mx-5 -mb-1 flex gap-2 overflow-x-auto whitespace-nowrap px-5 sm:mx-0 sm:justify-end sm:px-0">
           <Link
             href="/plan"
-            className="hover-glow flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-bold"
+            className="hover-glow flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-bold"
             style={isAdventure ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { background: "var(--t-accent)", color: "#fff" }}
           >
             <span aria-hidden>🗺</span> Plan my week
           </Link>
           <Link
             href="/plan?mode=month"
-            className="flex h-9 items-center rounded-full px-3 text-[13px] font-semibold"
+            className="flex h-9 shrink-0 items-center rounded-full px-3 text-[13px] font-semibold"
             style={{ border: `1px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
           >
             Plan the month
           </Link>
           <Link
             href="/plan?mode=mom"
-            className="flex h-9 items-center rounded-full px-3 text-[13px] font-semibold"
+            className="flex h-9 shrink-0 items-center rounded-full px-3 text-[13px] font-semibold"
             style={{ border: `1px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
           >
             🤝 With Mom

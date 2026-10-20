@@ -9,25 +9,47 @@ import { cleanToucan, type ToucanState } from "@/lib/toucan";
 /** What it says while you carry it, and when you set it down. */
 // Only the toucan spirit speaks; the owl keeps its silence.
 const SAY_FLYING = ["Wheee!", "To the skies!", "The winds obey me.", "Onward, to wisdom!", "Behold my majestic flight!", "Higher, friend, higher!", "I have soared over many forests."];
-const SAY_LANDING = ["Here I shall dispense wisdom.", "I approve of this spot.", "Ah. The view is excellent.", "This perch will do nicely."];
-/** How often each landing line comes up (the view one is a rare treat). */
-const LANDING_WEIGHT: Record<string, number> = { "Ah. The view is excellent.": 0.2, "I approve of this spot.": 0.35 };
-/** Never the same line twice in a row (per list), with optional weights. */
+const SAY_LANDING = [
+  "Here I shall dispense wisdom.",
+  "I approve of this spot.",
+  "Ah. The view is excellent.",
+  "This perch will do nicely.",
+  "A fine branch, if I say so myself.",
+  "Settled. Carry on, I'm watching.",
+  "From here I can see everything.",
+  "Mm. Sturdy. Good choice.",
+  "I'll keep an eye on things from here.",
+  "Comfortable. You may proceed.",
+  "A toucan could get used to this.",
+  "Landed with grace, as always.",
+];
+/**
+ * A shuffled deck per list: every line comes up once before any repeats, and
+ * the deck is remembered across visits so a fresh page doesn't start over.
+ */
 function picker() {
-  const last: Record<string, string> = {};
-  return (name: string, list: string[], weights: Record<string, number> = {}) => {
-    const pool = list.filter((x) => x !== last[name]);
-    const total = pool.reduce((n, x) => n + (weights[x] ?? 1), 0);
-    let r = Math.random() * total;
-    let out = pool[0];
-    for (const x of pool) {
-      r -= weights[x] ?? 1;
-      if (r <= 0) {
-        out = x;
-        break;
+  const decks: Record<string, string[]> = {};
+  const load = (name: string): string[] => {
+    try {
+      return JSON.parse(localStorage.getItem(`owl-deck-${name}`) ?? "[]");
+    } catch {
+      return [];
+    }
+  };
+  return (name: string, list: string[]) => {
+    let deck = (decks[name] ??= load(name)).filter((x) => list.includes(x));
+    if (!deck.length) {
+      deck = [...list];
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
       }
     }
-    last[name] = out;
+    const out = deck.shift()!;
+    decks[name] = deck;
+    try {
+      localStorage.setItem(`owl-deck-${name}`, JSON.stringify(deck));
+    } catch {}
     return out;
   };
 }
@@ -145,6 +167,8 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     return () => window.removeEventListener("toucan-change", h);
   }, []);
   const [say, setSay] = useState<string | null>(null);
+  // Buttons under the words (for the line they belong to).
+  const [sayActions, setSayActions] = useState<{ for: string; list: { label: string; run: () => void }[] } | null>(null);
   const sayRef = useRef<HTMLDivElement>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -186,7 +210,6 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   const [wisdom, setWisdom] = useState<{ text: string; x: number; y: number } | null>(null);
   const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
-  const lastWisdom = useRef(-1);
   // Drag it anywhere: it stays where you set it down (remembered on this device).
   const drag = useRef<{ x0: number; y0: number; offX: number; offY: number; moving: boolean } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -298,8 +321,9 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
       ? `translate3d(${x.toFixed(1)}px, ${above.toFixed(1)}px, 0) translate(-50%, -100%)`
       : `translate3d(${x.toFixed(1)}px, ${(p.y + 10).toFixed(1)}px, 0) translate(-50%, 0)`;
   }
-  function speakBrief(text: string, ms: number | null) {
+  function speakBrief(text: string, ms: number | null, actions: { label: string; run: () => void }[] | null = null) {
     if (sayTimer.current) clearTimeout(sayTimer.current);
+    setSayActions(actions ? { for: text, list: actions } : null);
     setSay(text);
     if (ms) sayTimer.current = setTimeout(() => setSay(null), ms);
   }
@@ -310,6 +334,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     const away = (e: PointerEvent) => {
       if (drag.current) return;
       if (box.current && e.target instanceof Node && box.current.contains(e.target)) return;
+      if (sayRef.current && e.target instanceof Node && sayRef.current.contains(e.target)) return;
       if (sayTimer.current) clearTimeout(sayTimer.current);
       setSay(null);
     };
@@ -458,11 +483,25 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       for (let i = 0; i < 9; i++) setTimeout(() => spark(p.x + facing * (10 + Math.random() * 26), p.y - OWL_H * 0.75 + (Math.random() - 0.5) * 30), 120 + i * 45);
     }
-    let i = Math.floor(Math.random() * WISDOM.length);
-    if (i === lastWisdom.current) i = (i + 1) % WISDOM.length;
-    lastWisdom.current = i;
-    speakBrief(WISDOM[i].replaceAll("{name}", addressOf(name)), 5000);
+    speakBrief(pick("wise", WISDOM).replaceAll("{name}", addressOf(name)), 6500, [{ label: "💬 Talk with me", run: () => window.dispatchEvent(new CustomEvent("toucan-talk")) }]);
   }
+  // The guide asks it to raise something (a quest slipping): it says so, with buttons.
+  const speakRef = useRef(speakBrief);
+  const shownRef = useRef(false);
+  useEffect(() => {
+    speakRef.current = speakBrief;
+    shownRef.current = mounted && !caged && !(hiding && !hidingHere);
+  });
+  useEffect(() => {
+    const h = (e: Event) => {
+      const d = (e as CustomEvent<{ text: string; actions: { label: string; run: () => void }[] }>).detail;
+      if (!d || !pos.current || !shownRef.current) return;
+      e.preventDefault();
+      speakRef.current(d.text, 16000, d.actions);
+    };
+    window.addEventListener("toucan-nudge", h);
+    return () => window.removeEventListener("toucan-nudge", h);
+  }, []);
   useEffect(() => {
     if (!wisdom) return;
     const t = setTimeout(() => setWisdom(null), 5000);
@@ -636,7 +675,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             if (spirit) {
               // Wisdom shared in flight stays a moment; otherwise a landing line.
               if (flewWise.current && say) speakBrief(say, 4000);
-              else speakBrief(pick("land", SAY_LANDING, LANDING_WEIGHT), 2200);
+              else speakBrief(pick("land", SAY_LANDING), 2200);
             }
             at.current = -1;
             try {
@@ -689,10 +728,10 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         </div>
       </button>
       {say && (
-        <div ref={sayRef} role="status" className="pointer-events-none fixed left-0 top-0 z-[46]">
+        <div ref={sayRef} role="status" className={`fixed left-0 top-0 z-[46] ${sayActions?.for === say ? "" : "pointer-events-none"}`}>
           <div
             key={say}
-            className="owl-say w-max max-w-[240px] rounded-2xl px-3 py-1.5 text-center text-[14px] font-semibold leading-snug"
+            className="owl-say w-max max-w-[260px] rounded-2xl px-3 py-1.5 text-center text-[14px] font-semibold leading-snug"
             style={
               spirit
                 ? { background: "linear-gradient(180deg, rgba(14,38,40,.94), rgba(8,22,26,.96))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.35), 0 4px 12px rgba(0,0,0,.45)" }
@@ -700,6 +739,24 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             }
           >
             {say}
+            {sayActions?.for === say && (
+              <span className="mt-1.5 flex flex-wrap justify-center gap-1.5">
+                {sayActions.list.map((a) => (
+                  <button
+                    key={a.label}
+                    type="button"
+                    onClick={() => {
+                      setSay(null);
+                      a.run();
+                    }}
+                    className="h-8 rounded-full px-3 text-[12.5px] font-bold"
+                    style={spirit ? { background: "rgba(140,240,220,.18)", border: "1px solid rgba(140,240,220,.6)", color: "#e8fff8" } : { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </span>
+            )}
           </div>
         </div>
       )}

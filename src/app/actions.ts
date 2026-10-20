@@ -2712,6 +2712,110 @@ export async function deleteQuestTemplateAction(id: string) {
 }
 
 /** A quest map's look and how far ahead it shows (per board). */
+// ---------------------------------------------------------------------------
+// The toucan as a guide: it watches for important quests slipping, and talks.
+
+async function guideTasks(ownerId: string) {
+  const db = supabaseAdmin();
+  const [tasks, boards] = await Promise.all([
+    tasksData.listOpenTasksWithBoardForOwner(ownerId),
+    db.from("boards").select("id, title").eq("owner_id", ownerId),
+  ]);
+  const names = new Map(((boards.data ?? []) as { id: string; title: string }[]).map((b) => [b.id, b.title]));
+  return tasks
+    .filter((t) => !t.needs_review)
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      importance: t.importance ?? null,
+      urgency: t.urgency ?? null,
+      due_at: t.due_at ?? null,
+      estimate_minutes: t.estimate_minutes ?? null,
+      scheduled_start: t.is_on_calendar ? (t.scheduled_start ?? null) : null,
+      updated_at: t.updated_at ?? null,
+      created_at: t.created_at ?? null,
+      reschedule_count: t.reschedule_count ?? 0,
+      board: t.board_id ? (names.get(t.board_id) ?? null) : null,
+    }));
+}
+
+/** What the toucan keeps an eye on: your open quests (scored in the browser, in your time zone) and what you've waved off. */
+export async function toucanWatchAction() {
+  const ownerId = await requireProfileId();
+  const [tasks, extras] = await Promise.all([guideTasks(ownerId), readExtras(ownerId)]);
+  return { tasks, snoozed: ((extras.toucanSnooze as Record<string, string> | undefined) ?? {}) };
+}
+
+/** "Not now": the toucan won't raise this quest again for a while. */
+export async function snoozeToucanAction(taskId: string, days = 1) {
+  const ownerId = await requireProfileId();
+  const extras = await readExtras(ownerId);
+  const now = Date.now();
+  const kept = Object.fromEntries(Object.entries((extras.toucanSnooze as Record<string, string> | undefined) ?? {}).filter(([, until]) => Date.parse(until) > now));
+  kept[taskId.slice(0, 40)] = new Date(now + Math.max(1, Math.min(30, days)) * 86_400_000).toISOString();
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanSnooze: kept } }).eq("id", ownerId);
+}
+
+/** Save how long a quest will take (the first rung: estimate, schedule, do). */
+export async function setQuestEstimateAction(taskId: string, minutes: number) {
+  const ownerId = await requireProfileId();
+  const m = Math.max(5, Math.min(600, Math.round(minutes)));
+  const { error } = await supabaseAdmin().from("tasks").update({ estimate_minutes: m }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't save the estimate: ${error.message}`);
+  revalidatePath("/");
+}
+
+/** Talk with the toucan about your quests. It sees your open quests (titles, boards, due dates, estimates). */
+export async function askToucanAction(history: { role: "user" | "assistant"; content: string }[]) {
+  const ownerId = await requireProfileId();
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+  if (!accountId || !apiToken) throw new Error("The toucan can't talk yet: the AI service isn't set up.");
+  const [tasks, profile] = await Promise.all([guideTasks(ownerId), profilesData.getProfileById(ownerId)]);
+  const { contextLines, mentioned } = await import("@/lib/toucan-guide");
+  const now = new Date();
+  const when = now.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: process.env.APP_TIMEZONE || "America/New_York" });
+  const who = profile?.name?.split(" ")[0] || "friend";
+  const system =
+    `You are the Great Toucan Spirit, the wise, warm and slightly wry guide who lives in ${who}'s quest app. ` +
+    `It is ${when}. ${who}'s open quests are listed below. Help them see what matters and take the next small step. ` +
+    `The ladder for any quest: 1) estimate how long it takes, 2) put it on the calendar, 3) do it. ` +
+    `Gently but honestly point out important quests that are slipping (due soon, not scheduled, untouched). ` +
+    `When you mention a quest, use its exact title in double quotes so the app can add a "Plan it" button. ` +
+    `Only talk about quests that are in the list; never invent quests, dates or facts. If you're unsure, ask one short question. ` +
+    `Keep replies under 90 words, plain text, no markdown lists longer than 3 items. One toucan flourish at most.\n\n` +
+    `Open quests:\n${contextLines(tasks, now).join("\n") || "(none)"}`;
+  const messages = [{ role: "system", content: system }, ...history.slice(-10).map((m) => ({ role: m.role, content: String(m.content).slice(0, 1200) }))];
+  let reply = "";
+  for (const model of ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct-fast"]) {
+    try {
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ max_tokens: 260, temperature: 0.6, messages }),
+      });
+      if (!res.ok) continue;
+      const json = await res.json();
+      reply = String(json?.result?.response ?? "").trim();
+      if (reply) break;
+    } catch {
+      /* try the next model */
+    }
+  }
+  if (!reply) throw new Error("The toucan is lost in thought. Try again in a moment.");
+  return { reply, quests: mentioned(reply, tasks) };
+}
+
+/** The colour theme for the Adventure look (forest, moonlit, ember…). */
+export async function savePaletteAction(palette: string) {
+  const ownerId = await requireProfileId();
+  const { isPalette } = await import("@/lib/palettes");
+  if (!isPalette(palette)) throw new Error("That isn't one of the colour themes.");
+  const extras = await readExtras(ownerId);
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, palette } }).eq("id", ownerId);
+  revalidatePath("/", "layout");
+}
+
 export async function saveMapPrefsAction(boardId: string, prefs: Record<string, unknown>) {
   const ownerId = await requireProfileId();
   const extras = await readExtras(ownerId);

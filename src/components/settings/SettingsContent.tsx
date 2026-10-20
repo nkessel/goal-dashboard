@@ -11,6 +11,8 @@ import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
 import { countImports } from "@/lib/data/rewards";
 import { Avatar } from "@/components/settings/Avatar";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
+import { PalettePicker } from "@/components/settings/PalettePicker";
+import { isPalette, type PaletteKey } from "@/lib/palettes";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
 import { SharingSettings } from "@/components/settings/SharingSettings";
@@ -316,6 +318,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
                 </p>
                 <ThemeToggle theme={profile.theme} />
               </div>
+              {isAdventure && <PalettePicker current={isPalette((profile.life_wheel as { palette?: unknown } | null)?.palette) ? ((profile.life_wheel as { palette: PaletteKey }).palette) : "forest"} />}
               <ViewTransitionLink
                 href="/settings/avatar"
                 className="hover-glow inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"

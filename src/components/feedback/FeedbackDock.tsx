@@ -63,14 +63,13 @@ const DRAFTS_KEY = "feedback-drafts";
 const LEGACY_DRAFT_KEY = "feedback-draft";
 const BUTTON_KEY = "feedback-button-pos";
 const PANEL_KEY = "feedback-panel";
-const SUBMIT_KEY = "feedback-submit-x";
+/** Phones: how far below the top of the visible screen the box sits. */
+const PHONE_Y_KEY = "feedback-panel-phone-y";
 
 const BTN = 46;
 const MIN_W = 250;
 /** The box can be made very thin; its content then scrolls. */
 const MIN_H = 96;
-/** The Submit button sits across the box's bottom edge, this far below it. */
-const SUBMIT_DROP = 15;
 
 function readJson<T>(key: string): T | null {
   try {
@@ -152,7 +151,18 @@ function useViewport(): Viewport | null {
   return vp;
 }
 
-/** Keep the box inside what's visible (leaving room for Submit under it), shrinking only when it can't fit. */
+/**
+ * On a phone the box keeps one size whether or not the keyboard is up, and
+ * its place is measured from the top of what you can see — so the keyboard
+ * sliding in or out never moves or resizes it. Its top bar (with Submit)
+ * always stays in sight; the rest may sit behind the keyboard if you drag it there.
+ */
+function fitPhone(relY: number, h: number, vp: Viewport): Geom {
+  const hh = clamp(h, 170, Math.max(170, vp.innerH - 90));
+  return { x: vp.left + 8, w: vp.w - 16, h: hh, y: vp.top + clamp(relY, 8, Math.max(8, vp.h - 58)) };
+}
+
+/** Keep the box inside what's visible, shrinking only when it can't fit. */
 function fit(g: Geom, vp: Viewport): Geom {
   const w = clamp(g.w, Math.min(MIN_W, vp.w - 16), vp.w - 16);
   // Sized against the whole screen (not what the keyboard leaves), so it never jumps when typing.
@@ -161,8 +171,8 @@ function fit(g: Geom, vp: Viewport): Geom {
     w,
     h,
     x: clamp(g.x, vp.left + 8, vp.left + vp.w - w - 8),
-    // Down as far as you like, even behind the keyboard, while its top bar stays in reach.
-    y: clamp(g.y, vp.top + 8, Math.max(vp.top + 8, vp.innerH - 64)),
+    // Down as far as you like, while its top bar (with Submit) stays in sight.
+    y: clamp(g.y, vp.top + 8, Math.max(vp.top + 8, vp.top + vp.h - 58)),
   };
 }
 
@@ -233,8 +243,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [sized, setSized] = useState(false);
   // Extra height the writing has asked for (per note).
   const [grow, setGrow] = useState<{ id: string; px: number } | null>(null);
-  const [submitX, setSubmitX] = useState<number | null>(null);
-  const [submitDrag, setSubmitDrag] = useState<number | null>(null);
+  const [phoneY, setPhoneY] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const justDragged = useRef(false);
@@ -256,7 +265,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       .catch(() => {});
     setPos(readJson<Pos>(BUTTON_KEY));
     setGeom(readJson<Geom>(PANEL_KEY));
-    setSubmitX(readJson<number>(SUBMIT_KEY));
+    setPhoneY(readJson<number>(PHONE_Y_KEY));
     setLoaded(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -445,13 +454,14 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     // Starts at a comfortable size and grows as you write (up to the screen),
     // so it only takes the whole screen when it really needs it.
     const w = mobile ? vp.innerW - 16 : Math.min(460, vp.innerW - 40);
-    const h = (mobile ? Math.min(340, Math.max(260, vp.h - 150)) : Math.min(380, vp.innerH - 170)) + growBy;
-    const above = btnPos.y - 12 - h - SUBMIT_DROP;
+    // Phones: sized from the whole screen (never from what the keyboard leaves), so it doesn't jump.
+    const h = mobile ? Math.min(Math.round(clamp(vp.innerH * 0.4, 220, 300)) + growBy, Math.round(vp.innerH * 0.62)) : Math.min(380, vp.innerH - 170) + growBy;
+    const above = btnPos.y - 12 - h;
     return { w, h, x: mobile ? 8 : clamp(btnPos.x + BTN - w, 20, vp.innerW - w - 20), y: above > 60 ? above : 60 };
   };
   const def = defaultGeom();
   // A size you dragged it to this time stands; otherwise it's as tall as the writing needs.
-  const shown = fit(geom ? { ...geom, h: sized ? geom.h : def.h } : def, vp);
+  const shown = mobile ? fitPhone(phoneY ?? 64, sized && geom ? geom.h : def.h, vp) : fit(geom ? { ...geom, h: sized ? geom.h : def.h } : def, vp);
   const isSent = !!open && sent?.id === open.id;
 
   function onPanelDown(e: React.PointerEvent<HTMLElement>, kind: "move" | "resize") {
@@ -467,30 +477,13 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       threshold: kind === "resize" ? 0 : 4,
       onMove: (dx, dy) => {
         last = kind === "move" ? { ...g, x: g.x + dx, y: g.y + dy } : { ...g, w: Math.max(MIN_W, g.w + dx), h: Math.max(MIN_H, g.h + dy) };
-        setGeom(last);
-      },
-      onEnd: (moved) => moved && writeJson(PANEL_KEY, fit(last, view)),
-    });
-  }
-
-  // ---- Submit: on the bottom edge, slid anywhere along it.
-  const SUBMIT_W = 112;
-  const submitLeft = clamp(submitDrag ?? submitX ?? shown.w - SUBMIT_W - 34, 10, shown.w - SUBMIT_W - 30);
-  function onSubmitDown(e: React.PointerEvent<HTMLButtonElement>) {
-    const start = submitLeft;
-    let last = start;
-    pressOrDrag(e, {
-      onMove: (dx) => {
-        last = clamp(start + dx, 10, shown.w - SUBMIT_W - 30);
-        setSubmitDrag(last);
+        if (mobile && kind === "move") setPhoneY(last.y - view.top);
+        else setGeom(last);
       },
       onEnd: (moved) => {
         if (!moved) return;
-        justDragged.current = true;
-        setTimeout(() => (justDragged.current = false), 0);
-        setSubmitX(last);
-        setSubmitDrag(null);
-        writeJson(SUBMIT_KEY, last);
+        if (mobile && kind === "move") writeJson(PHONE_Y_KEY, Math.round(clamp(last.y - view.top, 8, view.h - 58)));
+        else writeJson(PANEL_KEY, fit(last, view));
       },
     });
   }
@@ -598,33 +591,59 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             }}
           >
             {/* Everything scrolls together, so a very thin box still reaches it all. */}
-            <div className={`feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${isSent ? "pb-3" : "pb-8"}`}>
+            <div className={`feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${isSent ? "pb-3" : "pb-3"}`}>
               <div
-                className={`sticky top-0 z-[3] flex shrink-0 select-none items-center gap-1 px-2 pt-1.5 ${isSent ? "pl-4" : "cursor-move touch-none"}`}
-                style={{ background: isAdventure ? "linear-gradient(180deg, #f2e4c2, #e6d3a6)" : "var(--t-card)", borderBottom: `1.5px solid ${isAdventure ? "rgba(168,138,63,.6)" : "var(--t-card-border)"}`, boxShadow: "0 2px 6px rgba(60,40,10,.1)" }}
+                className={`sticky top-0 z-[3] flex shrink-0 select-none items-center gap-1 pl-3 pr-1.5 pt-2 ${isSent ? "" : "cursor-move touch-none"}`}
+                style={{ background: isAdventure ? "linear-gradient(180deg, rgba(243,231,203,.98), rgba(238,220,184,.94))" : "var(--t-card)" }}
                 onPointerDown={isSent ? undefined : (e) => onPanelDown(e, "move")}
                 title={isSent ? undefined : "Drag to move"}
               >
-                {/* A little handle to carry it by, like the top of a scroll. */}
-                {!isSent && <span aria-hidden className="absolute left-1/2 top-1 h-[4px] w-10 -translate-x-1/2 rounded-full" style={{ background: isAdventure ? "rgba(138,97,22,.55)" : "var(--t-card-border)" }} />}
-                <span className={`flex flex-1 items-center gap-1.5 py-1 pl-1.5 pt-2 ${isAdventure ? "font-display text-[18px]" : "text-base font-bold"}`}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <span className={`flex min-w-0 flex-1 items-center gap-1.5 py-1 ${isAdventure ? "font-display text-[17px]" : "text-base font-bold"}`}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
                     <path d="M20 3c-6 1-11 6-13 13l-1.5 4.5L10 19c5-2 9-7 10-16z" fill={isAdventure ? "#e9d49a" : "none"} stroke={isAdventure ? "#6b4a12" : "currentColor"} strokeWidth="1.5" strokeLinejoin="round" />
                     <path d="M7 16l6-6" stroke={isAdventure ? "#6b4a12" : "currentColor"} strokeWidth="1.3" strokeLinecap="round" />
                   </svg>
-                  Feedback
+                  <span className="truncate">Feedback</span>
+                  {/* A small gilt grip: carry the note by its top. */}
+                  {!isSent && (
+                    <svg aria-hidden width="22" height="8" viewBox="0 0 22 8" className="ml-1 shrink-0 opacity-60">
+                      <circle cx="3" cy="4" r="1.6" fill="#8a6116" />
+                      <path d="M11 1l3 3-3 3-3-3z" fill="#8a6116" />
+                      <circle cx="19" cy="4" r="1.6" fill="#8a6116" />
+                    </svg>
+                  )}
                 </span>
                 {!isSent && (
-                  <button type="button" onClick={leaveOpen} aria-label="Minimize" title="Minimize — continue it later from the feedback button" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+                  <button
+                    type="button"
+                    onClick={submit}
+                    disabled={isSaving || !open.body.trim()}
+                    title="Submit feedback (Ctrl + Enter)"
+                    className="hover-glow h-8 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"
+                    style={{
+                      background: isAdventure ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "var(--t-accent)",
+                      color: isAdventure ? "#2a1c10" : "#fff",
+                      border: isAdventure ? "1.5px solid #6b4a12" : undefined,
+                    }}
+                  >
+                    {isSaving ? "Sending…" : "Submit"}
+                  </button>
+                )}
+                {!isSent && (
+                  <button type="button" onClick={leaveOpen} aria-label="Put it away for later" title="Put it away — continue later from the feedback button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5" style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M6 16h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                      <path d="M6 10l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
                 )}
-                <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-                  ×
+                <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5" style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                  </svg>
                 </button>
               </div>
+              {/* A gilt rule instead of a window's title bar edge. */}
+              {isAdventure && <span aria-hidden className="sticky top-[44px] z-[2] mx-4 block h-px shrink-0" style={{ background: "linear-gradient(90deg, transparent, rgba(138,97,22,.55), transparent)" }} />}
 
               {isSent && sent ? (
                 <Sent kind={sent.kind} xp={sent.xp} isAdventure={isAdventure} onAnother={startNew} />
@@ -633,6 +652,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
                   key={open.id}
                   draft={open}
                   isAdventure={isAdventure}
+                  compact={mobile}
                   error={error}
                   onChange={update}
                   onSubmit={submit}
@@ -670,30 +690,6 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             </span>
           </div>
 
-          {/* Submit: always visible, across the bottom edge; slide it along the edge to move it. */}
-          {!isSent && (
-            <button
-              type="button"
-              onPointerDown={onSubmitDown}
-              onClick={() => {
-                if (justDragged.current) return;
-                submit();
-              }}
-              disabled={isSaving || !open.body.trim()}
-              title="Submit feedback (Ctrl + Enter) — drag to slide it along the edge"
-              className={`hover-glow absolute z-[5] h-8 touch-none select-none rounded-full text-[13.5px] font-bold shadow-lg disabled:opacity-60 ${submitDrag !== null ? "cursor-grabbing" : ""}`}
-              style={{
-                left: submitLeft,
-                bottom: -SUBMIT_DROP,
-                width: SUBMIT_W,
-                background: isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-accent)",
-                color: isAdventure ? "#2a1c10" : "#fff",
-                border: isAdventure ? "1.5px solid #8a6116" : undefined,
-              }}
-            >
-              {isSaving ? "Sending…" : "Submit"}
-            </button>
-          )}
         </div>
       )}
       {celebrate && <SentBurst key={celebrate.key} kind={celebrate.kind} xp={celebrate.xp} x={celebrate.x} y={celebrate.y} isAdventure={isAdventure} style={celebrate.style} />}
@@ -866,6 +862,7 @@ async function shrinkImage(f: File): Promise<File> {
 function Composer({
   draft,
   isAdventure,
+  compact = false,
   error,
   onChange,
   onSubmit,
@@ -873,6 +870,8 @@ function Composer({
 }: {
   draft: Draft;
   isAdventure: boolean;
+  /** Phones: the timing row folds into a small chip. */
+  compact?: boolean;
   error: string | null;
   onChange: (patch: Partial<Draft>) => void;
   onSubmit: () => void;
@@ -906,7 +905,7 @@ function Composer({
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 px-3.5 pb-2 pt-1">
-      <Segmented
+      {!compact && <Segmented
         label="Where it goes"
         isAdventure={isAdventure}
         value={draft.kind}
@@ -915,7 +914,7 @@ function Composer({
           textRef.current?.focus();
         }}
         options={WHEN.map(([k, label, hint]) => ({ value: k, label, hint }))}
-      />
+      />}
       <Segmented
         label="XP you earn"
         lead="XP"
@@ -983,6 +982,21 @@ function Composer({
         {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>Attaching…</span>}
         {attachError && <span className="text-[12.5px]" style={{ color: "var(--t-warn)" }}>{attachError}</span>}
         <span className="ml-auto flex items-center gap-1">
+        {compact && (
+          // Phones: when it gets built, as one small chip instead of a whole row.
+          <label className="relative flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" style={{ border: "1px solid var(--t-panel-border)", color: "var(--t-ink)" }} title="When it gets built">
+            <span aria-hidden>{draft.kind === "future" ? "✦" : draft.kind === "refill" ? "↻" : "→"}</span>
+            {WHEN.find(([k]) => k === draft.kind)?.[1]}
+            <span aria-hidden className="text-[10px] opacity-60">▾</span>
+            <select aria-label="When it gets built" value={draft.kind} onChange={(e) => onChange({ kind: e.target.value as WhenKind })} className="absolute inset-0 cursor-pointer opacity-0">
+              {WHEN.map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {!draft.shot && (
           <button
             type="button"

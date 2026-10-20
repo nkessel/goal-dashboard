@@ -49,5 +49,6 @@ export async function loadCampaign(boardId: string, ownerId: string) {
         (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
         (a.created_at ?? "").localeCompare(b.created_at ?? "")
     );
-  return { board: { id: root.id, title: root.title }, stops: [...done, ...open] as CampaignStop[] };
+  const aspirations = ([...((data ?? []) as unknown as Row[]), ...linked] as Row[]).filter((t) => t.is_aspiration && t.status !== "completed").length;
+  return { board: { id: root.id, title: root.title }, stops: [...done, ...open] as CampaignStop[], aspirations };
 }

@@ -237,7 +237,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
       aria-expanded={false}
       aria-label={`Open the scheduling list (${count})`}
       title="To schedule"
-      className="flex w-10 flex-col items-center gap-2 py-3"
+      className={`flex flex-col items-center ${wide ? "w-10 gap-2 py-3" : "w-[30px] gap-1.5 py-2.5"}`}
       style={{
         background: "radial-gradient(circle at 35% 20%, #f6e3a8, #d9b45f 60%, #a88a3f)",
         border: "1.5px solid #4a3913",
@@ -250,11 +250,11 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span className="font-display text-[15px] font-semibold" style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
+      <span className={`font-display font-semibold ${wide ? "text-[15px]" : "text-[13px]"}`} style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
         To schedule
       </span>
       {count > 0 && (
-        <span className="flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12.5px] font-bold" style={{ background: "#2a1c10", color: "#f6dc8e" }}>
+        <span className={`flex items-center justify-center rounded-full px-1 font-bold ${wide ? "h-6 min-w-6 text-[12.5px]" : "h-5 min-w-5 text-[11.5px]"}`} style={{ background: "#2a1c10", color: "#f6dc8e" }}>
           {count}
         </span>
       )}
@@ -746,7 +746,8 @@ function MovableTab({ children }: { children: React.ReactNode }) {
       /* storage unavailable */
     }
   }, []);
-  const frac = top ?? 0.38;
+  // Out of the way by default: below the controls, over the late-day hours.
+  const frac = top ?? 0.6;
   return (
     <div
       className="fixed right-0 z-[35] touch-none"

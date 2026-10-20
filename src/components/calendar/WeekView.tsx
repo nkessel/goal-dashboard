@@ -527,9 +527,17 @@ export function WeekView({
                 if (!w) return null;
                 return (
                   <span className="mt-0.5 flex flex-col items-center text-[11px] leading-tight tabular-nums" style={{ color: "var(--t-ink-soft)" }} title={`High ${w.hi}°, low ${w.lo}°, ${w.rain}% chance of rain`}>
-                    <span>
-                      <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b> {w.lo}°
-                    </span>
+                    {days.length >= 5 ? (
+                      // Narrow columns: high over low, so neighbours never run together.
+                      <>
+                        <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b>
+                        <span className="text-[10px] opacity-80">{w.lo}°</span>
+                      </>
+                    ) : (
+                      <span>
+                        <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b> {w.lo}°
+                      </span>
+                    )}
                     {w.rain >= 30 && <span style={{ color: "#3f6fa8" }}>💧{w.rain}%</span>}
                   </span>
                 );

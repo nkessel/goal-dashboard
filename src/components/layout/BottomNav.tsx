@@ -1,6 +1,7 @@
 "use client";
 
 import { PerchedOwl } from "./PerchedOwl";
+import { ToucanGuide } from "@/components/toucan/ToucanGuide";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
@@ -218,6 +219,7 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
     >
       <div ref={rowRef} className="relative mx-auto flex w-full max-w-md items-stretch justify-between px-1 sm:max-w-lg md:max-w-xl">
         {isAdventure && <PerchedOwl name={name} toucan={toucan} />}
+        {isAdventure && <ToucanGuide />}
         {highlight && (
           <div
             aria-hidden
