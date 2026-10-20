@@ -165,7 +165,7 @@ export function Streaks({ initial, notes: initialNotes }: { initial: StreakDef[]
               <div className="flex flex-wrap items-center gap-2 pt-0.5">
                 <span className="text-[12.5px]" style={{ color: SOFT }}>
                   {reached ? `✦ ${reached}-day mark` : ""}
-                  {next ? `${reached ? " · " : ""}${next - s.days} to ${next} days` : ""}
+                  {next ? `${reached ? " · " : ""}${next - s.days} more ${next - s.days === 1 ? "day" : "days"} to the ${next}-day mark` : ""}
                 </span>
                 <button type="button" onClick={() => setSlipping({ id: def.id, at: toLocalInput(now) })} className="ml-auto h-8 rounded-full px-3 text-[12.5px] font-semibold" style={{ border: "1px solid #b39a6a", color: SOFT }}>
                   Reset
