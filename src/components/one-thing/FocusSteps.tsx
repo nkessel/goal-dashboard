@@ -6,7 +6,7 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { listQuestStepsAction, saveQuestStepsAction } from "@/app/actions";
 
-type Step = { id: string; title: string; done: boolean; xp: number; progress: number; seconds: number };
+type Step = { id: string; title: string; done: boolean; xp: number; progress: number; seconds: number; state?: "skipped" | "failed" | null };
 
 const fmt = (sec: number) => {
   const s = Math.max(0, Math.floor(sec));
@@ -40,7 +40,7 @@ export function FocusSteps({ taskId }: { taskId: string }) {
   useEffect(() => {
     let alive = true;
     listQuestStepsAction(taskId)
-      .then((rows) => alive && setSteps((rows ?? []).map((r) => ({ id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, progress: r.progress ?? 0, seconds: r.seconds_spent ?? 0 }))))
+      .then((rows) => alive && setSteps((rows ?? []).map((r) => ({ id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, progress: r.progress ?? 0, seconds: r.seconds_spent ?? 0, state: r.state ?? null }))))
       .catch(() => alive && setSteps([]));
     try {
       setCarry(window.localStorage.getItem("focus-carry-timer") === "1");
@@ -61,8 +61,8 @@ export function FocusSteps({ taskId }: { taskId: string }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
   if (!steps || steps.length === 0) return null;
-  const open = steps.filter((s) => !s.done);
-  const done = steps.filter((s) => s.done);
+  const open = steps.filter((s) => !s.done && !s.state);
+  const done = steps.filter((s) => s.done || !!s.state);
   const focus = open[0] ?? null;
   const live = elapsed + (running && startedAt.current ? (Date.now() - startedAt.current) / 1000 : 0);
 
@@ -73,7 +73,7 @@ export function FocusSteps({ taskId }: { taskId: string }) {
       try {
         await saveQuestStepsAction(
           taskId,
-          next.map((s) => ({ id: s.id, title: s.title, done: s.done, progress: s.progress, seconds: Math.round(s.seconds) }))
+          next.map((s) => ({ id: s.id, title: s.title, done: s.done, progress: s.progress, seconds: Math.round(s.seconds), state: s.done ? null : (s.state ?? null) }))
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save that step.");
@@ -81,7 +81,7 @@ export function FocusSteps({ taskId }: { taskId: string }) {
     });
   }
   /** The visible order: open steps first (in their order), then the done ones. */
-  const ordered = (list: Step[]) => [...list.filter((s) => !s.done), ...list.filter((s) => s.done)];
+  const ordered = (list: Step[]) => [...list.filter((s) => !s.done && !s.state), ...list.filter((s) => s.done || !!s.state)];
 
   /** Give the time since the last hand-over to step `id`. */
   function pauseInto(list: Step[], id: string | undefined): Step[] {
@@ -126,6 +126,12 @@ export function FocusSteps({ taskId }: { taskId: string }) {
     }
   }
 
+  /** Skip a step, or mark that it didn't happen: it moves out of the way. */
+  function settle(id: string, state: "skipped" | "failed") {
+    const list = pauseInto(steps!, focus?.id).map((x) => (x.id === id ? { ...x, state, done: false, progress: 0 } : x));
+    if (id === focus?.id) handOver();
+    persist(ordered(list));
+  }
   function bringUp(id: string) {
     // The time so far belongs to the step that was in focus.
     const list = pauseInto(steps!, focus?.id);
@@ -165,7 +171,7 @@ export function FocusSteps({ taskId }: { taskId: string }) {
   return (
     <div className="relative z-[1] flex w-full flex-col gap-2 text-left">
       <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: "#6b5534" }}>
-        Steps · {done.length}/{steps.length}
+        Steps · {steps.filter((x) => x.done).length}/{steps.filter((x) => x.state !== "skipped").length}
       </span>
 
       {/* The step in focus */}
@@ -214,6 +220,12 @@ export function FocusSteps({ taskId }: { taskId: string }) {
             <button type="button" onClick={finish} className="hover-glow h-10 flex-1 rounded-full text-[15px] font-bold" style={{ background: "linear-gradient(180deg,#7cc06a,#4f9a3f)", border: "1.5px solid #2f5a26", color: "#fff" }}>
               ✓ Step done{focus.xp ? ` · +${focus.xp} XP` : ""}
             </button>
+            <button type="button" onClick={() => settle(focus.id, "skipped")} className="h-10 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(217,180,95,.5)", color: "#f3e7cb" }} title="Skip this step">
+              ⏭ Skip
+            </button>
+            <button type="button" onClick={() => settle(focus.id, "failed")} className="h-10 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(240,140,120,.55)", color: "#f3b39f" }} title="It didn't happen">
+              ✗ Didn&rsquo;t happen
+            </button>
             <label className="flex min-h-9 cursor-pointer items-center gap-1.5 text-[12.5px]" style={{ color: "#f3e7cb" }} title="When a step is done, keep the clock running for the next one">
               <input type="checkbox" checked={carry} onChange={(e) => setCarryPref(e.target.checked)} />
               Keep timer going
@@ -257,11 +269,13 @@ export function FocusSteps({ taskId }: { taskId: string }) {
       {done.length > 0 && (
         <ul className="m-0 flex list-none flex-col p-0">
           {done.map((s) => (
-            <li key={s.id} className="flex min-h-9 items-center gap-2 text-[14.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              <span aria-hidden style={{ color: "#58a04a" }}>✓</span>
-              <span className="min-w-0 flex-1 truncate line-through">{s.title}</span>
+            <li key={s.id} className="flex min-h-9 items-center gap-2 text-[14.5px]" style={{ color: s.state === "failed" ? "#b5321f" : s.state === "skipped" ? "#9a9286" : "var(--t-ink-soft)" }}>
+              <span aria-hidden style={{ color: s.state === "failed" ? "#b5321f" : s.state === "skipped" ? "#9a9286" : "#58a04a", fontWeight: 700 }}>
+                {s.state === "failed" ? "✗" : s.state === "skipped" ? "⏭" : "✓"}
+              </span>
+              <span className="min-w-0 flex-1 truncate line-through" style={s.state ? { textDecorationColor: "currentColor" } : undefined}>{s.title}</span>
               {s.seconds > 0 && <span className="text-[12px] tabular-nums">{fmt(s.seconds)}</span>}
-              <button type="button" onClick={() => persist(ordered(steps.map((x) => (x.id === s.id ? { ...x, done: false, progress: 0 } : x))))} className="text-[12px] underline" title="Not done after all">
+              <button type="button" onClick={() => persist(ordered(steps.map((x) => (x.id === s.id ? { ...x, done: false, progress: 0, state: null } : x))))} className="text-[12px] underline" title="Back to open">
                 undo
               </button>
             </li>

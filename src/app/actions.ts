@@ -548,7 +548,7 @@ export async function saveQuestStepsAction(taskId: string, steps: stepsData.Step
   revalidatePath("/");
   revalidatePath("/boards", "layout");
   return {
-    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0) })),
+    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null })),
     xpEarned: delta,
     coinsEarned,
   };

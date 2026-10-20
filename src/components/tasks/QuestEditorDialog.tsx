@@ -68,22 +68,24 @@ export type QuestEditorMode =
       prefill?: QuestDraft;
     };
 
-type StepDraft = { key: string; id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number };
+type StepDraft = { key: string; id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number; state?: "skipped" | "failed" | null };
 
 /** What each step is worth (0–1): its own percent, or an equal share of what's left. */
 function stepWeights(list: StepDraft[]): number[] {
-  const fixed = list.reduce((n, st) => n + (st.weight ?? 0), 0);
-  const free = list.filter((st) => !st.weight).length;
+  // A skipped step is left out: the others share the quest between them.
+  const live = list.filter((st) => st.state !== "skipped");
+  const fixed = live.reduce((n, st) => n + (st.weight ?? 0), 0);
+  const free = live.filter((st) => !st.weight).length;
   const rest = Math.max(0, 100 - fixed);
   const total = fixed + (free ? rest : 0) || 1;
-  return list.map((st) => (st.weight ?? (free ? rest / free : 0)) / total);
+  return list.map((st) => (st.state === "skipped" ? 0 : (st.weight ?? (free ? rest / free : 0)) / total));
 }
 /** How much of the quest the steps add up to (0–100). */
 function stepsShare(list: StepDraft[]): number {
   const w = stepWeights(list);
   return Math.round(list.reduce((n, st, i) => n + w[i] * (st.done ? 1 : (st.progress ?? 0) / 100), 0) * 100);
 }
-const stepPayload = (list: StepDraft[]) => list.map(({ id, title, done, xp, weight, progress }) => ({ id, title, done, xp: xp ?? 0, weight: weight ?? null, progress: done ? 100 : (progress ?? 0) }));
+const stepPayload = (list: StepDraft[]) => list.map(({ id, title, done, xp, weight, progress, state }) => ({ id, title, done, xp: xp ?? 0, weight: weight ?? null, progress: done ? 100 : (progress ?? 0), state: done ? null : (state ?? null) }));
 
 const XP_MAX = 350;
 const XP_STEP = 10;
@@ -224,6 +226,7 @@ export function QuestEditorDialog({
   const [boardId, setBoardId] = useState<string | null>(initialBoard);
   const [boardOptions, setBoardOptions] = useState<{ id: string; label: string }[] | null>(null);
   const [alsoOn, setAlsoOn] = useState<string[]>(task?.also_on ?? []);
+  const [stepMenu, setStepMenu] = useState<string | null>(null);
   // Quest templates: ready-made quests to start from (new quests), and saving one (existing quests).
   const [templates, setTemplates] = useState<QuestTemplate[] | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -312,7 +315,7 @@ export function QuestEditorDialog({
     listQuestStepsAction(taskId)
       .then((rows) => {
         if (rows === null) setStepsUnavailable(true);
-        setSteps((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0) })));
+        setSteps((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null })));
       })
       .catch(() => {
         setStepsUnavailable(true);
@@ -334,7 +337,7 @@ export function QuestEditorDialog({
     const share = stepsShare(next);
     if (share !== before) setProgress((p) => (share > before ? Math.max(p, share) : Math.min(p, share)));
   }
-  const setStepDone = (key: string, done: boolean) => updateStep(key, { done, progress: done ? 100 : 0 });
+  const setStepDone = (key: string, done: boolean) => updateStep(key, { done, progress: done ? 100 : 0, state: null });
   function addStep() {
     const t = newStep.trim();
     if (!t) return;
@@ -1208,7 +1211,7 @@ export function QuestEditorDialog({
                 <span className={labelCls}>Steps</span>
                 {steps && steps.length > 0 && (
                   <span className="flex min-w-0 flex-1 items-center gap-2 text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                    {stepsDone}/{steps.length}
+                    {stepsDone}/{steps.filter((st) => st.state !== "skipped").length}
                     {/* How far the steps carry the quest. */}
                     <span className="h-2.5 min-w-[40px] max-w-[140px] flex-1 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 3px rgba(0,0,0,.6)" }} aria-label={`Steps ${stepsShare(steps)}% done`}>
                       <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${stepsShare(steps)}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 6px rgba(242,210,126,.5)" }} />
@@ -1250,18 +1253,29 @@ export function QuestEditorDialog({
                         type="button"
                         role="checkbox"
                         aria-checked={st.done}
-                        aria-label={st.done ? `Untick ${st.title}` : `Tick ${st.title}`}
+                        aria-label={st.state ? `Reopen ${st.title}` : st.done ? `Untick ${st.title}` : `Tick ${st.title}`}
                         disabled={isCompleted}
-                        onClick={() => setStepDone(st.key, !st.done)}
+                        onClick={() => (st.state ? updateStep(st.key, { state: null }) : setStepDone(st.key, !st.done))}
                         className="mt-[5px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px]"
                         style={{
-                          border: `1.5px solid ${st.done ? "var(--t-good)" : isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
-                          background: st.done ? "var(--t-good)" : "transparent",
+                          border: `1.5px solid ${st.done ? "var(--t-good)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#9a9286" : isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
+                          background: st.done ? "var(--t-good)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#b7b0a4" : "transparent",
                         }}
+                        title={st.state === "skipped" ? "Skipped — tap to reopen" : st.state === "failed" ? "Didn't happen — tap to reopen" : undefined}
                       >
                         {st.done && (
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
                             <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                        {st.state === "skipped" && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <path d="M5 6l7 6-7 6M13 6l7 6-7 6" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                        {st.state === "failed" && (
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <path d="M6 6l12 12M18 6L6 18" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" />
                           </svg>
                         )}
                       </button>
@@ -1277,8 +1291,8 @@ export function QuestEditorDialog({
                           }
                         }}
                         ariaLabel="Step"
-                        className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none"
-                        style={{ color: "var(--t-ink)" }}
+                        className={`bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none ${st.state ? "line-through" : ""}`}
+                        style={st.state === "failed" ? { color: "#b5321f", textDecorationColor: "#b5321f" } : st.state === "skipped" ? { color: "#9a9286", textDecorationColor: "#9a9286" } : { color: "var(--t-ink)" }}
                       />
                       {/* What this step is worth, right on the row: its share of the quest (tap to change) and the XP that brings. */}
                       <span className="mt-[3px] flex h-7 shrink-0 items-center gap-1 text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
@@ -1300,18 +1314,52 @@ export function QuestEditorDialog({
                           {Math.round(stepWeights(steps)[si] * xp) + (st.xp ?? 0)} XP
                         </span>
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => removeStep(st.key)}
-                        aria-label={`Remove step ${st.title}`}
-                        className="step-remove h-7 w-7 shrink-0 text-[18px] leading-none"
-                        style={{ color: "var(--t-ink-soft)" }}
-                      >
-                        ×
-                      </button>
+                      <span className="relative shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setStepMenu(stepMenu === st.key ? null : st.key)}
+                          aria-haspopup="menu"
+                          aria-expanded={stepMenu === st.key}
+                          aria-label={`More for ${st.title}`}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]"
+                          style={{ color: "var(--t-ink-soft)" }}
+                        >
+                          ⋯
+                        </button>
+                        {stepMenu === st.key && (
+                          <span role="menu" className="card-pop-in parchment absolute right-0 top-8 z-30 flex w-[170px] flex-col overflow-hidden py-1" style={{ borderRadius: 12, boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
+                            {(
+                              [
+                                ...(st.state !== "skipped" ? [["skip", "⏭", "Skip it", "var(--t-ink)"]] : []),
+                                ...(st.state !== "failed" ? [["fail", "✗", "Didn't happen", "#b5321f"]] : []),
+                                ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),
+                                ["remove", "🗑", "Remove step", "var(--t-ink-soft)"],
+                              ] as [string, string, string, string][]
+                            ).map(([k, icon, label, color]) => (
+                              <button
+                                key={k}
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setStepMenu(null);
+                                  if (k === "skip") updateStep(st.key, { state: "skipped", done: false, progress: 0 });
+                                  if (k === "fail") updateStep(st.key, { state: "failed", done: false, progress: 0 });
+                                  if (k === "open") updateStep(st.key, { state: null, done: false, progress: 0 });
+                                  if (k === "remove") removeStep(st.key);
+                                }}
+                                className="relative z-[1] flex min-h-10 items-center gap-2.5 px-3.5 text-left text-[14.5px] hover:bg-black/5"
+                                style={{ color }}
+                              >
+                                <span aria-hidden className="w-4 text-center">{icon}</span>
+                                {label}
+                              </button>
+                            ))}
+                          </span>
+                        )}
+                      </span>
                     </div>
                     {/* How far along: a slim slider under each open step. */}
-                    {!st.done && !isCompleted && (
+                    {!st.done && !st.state && !isCompleted && (
                       <input
                         type="range"
                         min={0}

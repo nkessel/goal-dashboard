@@ -18,9 +18,11 @@ export type QuestStep = {
   seconds_spent?: number;
   /** XP this step has paid so far. */
   xp_paid?: number;
+  /** Skipped (left out) or failed; null when open or done. */
+  state?: "skipped" | "failed" | null;
 };
 
-export type StepInput = { id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number; seconds?: number };
+export type StepInput = { id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number; seconds?: number; state?: "skipped" | "failed" | null };
 
 /** True when the error just means the quest_steps table hasn't been created yet. */
 function missingTable(error: { code?: string; message: string } | null) {
@@ -46,14 +48,15 @@ export async function attachStepCounts<T extends Task>(tasks: T[], ownerId: stri
   if (tasks.length === 0) return tasks;
   const { data, error } = await supabaseAdmin()
     .from("quest_steps")
-    .select("task_id, done")
+    .select("task_id, done, state")
     .eq("owner_id", ownerId)
     .in("task_id", tasks.map((t) => t.id));
   if (error) return tasks;
   const counts = new Map<string, { total: number; done: number }>();
   for (const s of data ?? []) {
     const c = counts.get(s.task_id as string) ?? { total: 0, done: 0 };
-    c.total += 1;
+    // A skipped step doesn't count against the quest.
+    if (s.state !== "skipped") c.total += 1;
     if (s.done) c.done += 1;
     counts.set(s.task_id as string, c);
   }
@@ -92,6 +95,7 @@ export async function replaceSteps(
       ...(s.weight !== undefined ? { weight: s.weight === null ? null : Math.max(1, Math.min(100, Math.round(s.weight))) } : {}),
       ...(s.progress !== undefined || s.done ? { progress: s.done ? 100 : Math.max(0, Math.min(99, Math.round(s.progress ?? 0))) } : {}),
       ...(s.seconds !== undefined ? { seconds_spent: Math.max(0, Math.round(s.seconds)) } : {}),
+      ...(s.state !== undefined ? { state: s.done ? null : s.state === "skipped" || s.state === "failed" ? s.state : null } : {}),
     };
     if (prev) {
       const same =
@@ -101,7 +105,8 @@ export async function replaceSteps(
         (extra.xp === undefined || extra.xp === (prev.xp ?? 0)) &&
         (extra.weight === undefined || extra.weight === (prev.weight ?? null)) &&
         (extra.progress === undefined || extra.progress === (prev.progress ?? 0)) &&
-        (extra.seconds_spent === undefined || extra.seconds_spent === (prev.seconds_spent ?? 0));
+        (extra.seconds_spent === undefined || extra.seconds_spent === (prev.seconds_spent ?? 0)) &&
+        (extra.state === undefined || extra.state === (prev.state ?? null));
       if (same) continue;
       const { error } = await db
         .from("quest_steps")
