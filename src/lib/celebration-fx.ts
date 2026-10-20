@@ -18,18 +18,17 @@ export type FxSettings = {
   cardStyle?: "card" | "banner";
 };
 
-export type FeedbackStyle = "seal" | "crane" | "star" | "toucan" | "quiet";
+export type FeedbackStyle = "quiet" | "seal" | "crane" | "toucan";
 export const FEEDBACK_STYLES: { key: FeedbackStyle; label: string; hint: string }[] = [
+  { key: "quiet", label: "Submitted ✓", hint: "A clear check and “Feedback submitted”" },
+  { key: "toucan", label: "To the Great Toucan Spirit", hint: "You hand him your letter; he accepts it and powers up" },
   { key: "seal", label: "Wax seal", hint: "The letter is sealed with a stamp and sparks" },
   { key: "crane", label: "Paper crane", hint: "Your note folds into a crane and flies off" },
-  { key: "star", label: "Shooting star", hint: "It streaks off into the sky" },
-  { key: "toucan", label: "Toucan delivery", hint: "The toucan carries your scroll away" },
-  { key: "quiet", label: "Quiet", hint: "Just a small “Sent ✓”" },
 ];
 
 export const FX_DEFAULTS: FxSettings = {
   rewardStyle: "classic",
-  feedbackStyle: "seal",
+  feedbackStyle: "quiet",
   cardStyle: "card",
   dens: 1.7,
   vel: 0.5,
@@ -47,7 +46,12 @@ export function loadFx(): FxSettings {
   let fx: FxSettings = { ...FX_DEFAULTS };
   try {
     const raw = localStorage.getItem(FX_STORAGE_KEY);
-    if (raw) fx = { ...FX_DEFAULTS, ...JSON.parse(raw) };
+    if (raw) {
+      const saved = JSON.parse(raw);
+      fx = { ...FX_DEFAULTS, ...saved };
+      // The new default ("Submitted ✓") applies until a feedback style is chosen on purpose; the shooting star is retired.
+      if (saved.fbv !== 2 || !FEEDBACK_STYLES.some((f) => f.key === fx.feedbackStyle)) fx.feedbackStyle = "quiet";
+    }
   } catch {
     /* storage unavailable */
   }
@@ -60,7 +64,7 @@ export function loadFx(): FxSettings {
 
 export function saveFx(fx: FxSettings): boolean {
   try {
-    localStorage.setItem(FX_STORAGE_KEY, JSON.stringify({ ...fx, savedAt: Date.now() }));
+    localStorage.setItem(FX_STORAGE_KEY, JSON.stringify({ ...fx, fbv: 2, savedAt: Date.now() }));
     return true;
   } catch {
     return false;

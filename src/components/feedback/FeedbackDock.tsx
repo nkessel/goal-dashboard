@@ -232,7 +232,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [celebrate, setCelebrate] = useState<{ key: number; kind: WhenKind; xp: number; x: number; y: number; style: FeedbackStyle } | null>(null);
   useEffect(() => {
     if (!celebrate) return;
-    const t = setTimeout(() => setCelebrate(null), 2600);
+    const t = setTimeout(() => setCelebrate(null), celebrate.style === "toucan" ? 3600 : 2600);
     return () => clearTimeout(t);
   }, [celebrate]);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -702,48 +702,78 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
  * Feedback sent, in the style chosen in Settings: a wax-sealed letter, a
  * paper crane, a shooting star, the toucan carrying it off, or just a word.
  */
-export function SentBurst({ kind, xp, x, y, isAdventure, style = "seal" }: { kind: WhenKind; xp: number; x: number; y: number; isAdventure: boolean; style?: FeedbackStyle }) {
-  const words =
-    kind === "future" ? "Saved for the future" : kind === "refill" ? "Saved for when credits refill" : style === "seal" ? "Sealed & sent" : style === "crane" ? "Off it flies" : style === "star" ? "Sent to the stars" : style === "toucan" ? "Delivered by toucan" : "Sent ✓";
+export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet" }: { kind: WhenKind; xp: number; x: number; y: number; isAdventure: boolean; style?: FeedbackStyle }) {
+  const where = kind === "future" ? "Saved in your future ideas" : kind === "refill" ? "Saved for when credits refill" : "It goes into the next update";
+  const xpTag = xp > 0 && (
+    <b className="ml-2 tabular-nums" style={{ color: "#f2d27e" }}>
+      +{xp} XP
+    </b>
+  );
+  // The default: a clear, calm success card in the middle of the screen.
+  if (style === "quiet")
+    return (
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center p-6">
+        <div className="fb-done flex w-[min(300px,100%)] flex-col items-center gap-2 rounded-3xl px-6 pb-5 pt-6 text-center" style={isAdventure ? { background: "linear-gradient(180deg,#f6ecd2,#ead7aa)", border: "2px solid #a88a3f", color: "#2a1c10", boxShadow: "0 18px 40px rgba(0,0,0,.45)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: "var(--t-ink)", boxShadow: "0 18px 40px rgba(0,0,0,.25)" }}>
+          <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden>
+            <circle className="fb-done-ring" cx="38" cy="38" r="33" fill="none" stroke={isAdventure ? "#3f6a2c" : "var(--t-accent)"} strokeWidth="5" strokeLinecap="round" />
+            <circle className="fb-done-fill" cx="38" cy="38" r="30" fill={isAdventure ? "#4f7d38" : "var(--t-accent)"} />
+            <path className="fb-done-check" d="M24 39.5l9.5 9.5L53 29" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className={`fb-done-words ${isAdventure ? "font-display text-[21px]" : "text-[18px] font-bold"}`}>Feedback submitted</span>
+          <span className="fb-done-sub text-[13.5px]" style={{ color: isAdventure ? "#6b5631" : "var(--t-ink-soft)" }}>
+            {where}
+            {xp > 0 && (
+              <b className="ml-1.5 tabular-nums" style={{ color: isAdventure ? "#3f6a2c" : "var(--t-accent)" }}>
+                · +{xp} XP
+              </b>
+            )}
+          </span>
+        </div>
+      </div>
+    );
+  // Handed to the Great Toucan Spirit: he takes the letter and powers up.
+  if (style === "toucan")
+    return (
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center">
+        <div className="fb-spirit relative flex flex-col items-center">
+          <span aria-hidden className="fb-spirit-rays absolute left-1/2 top-[64px] h-[260px] w-[260px] rounded-full" />
+          <span aria-hidden className="fb-spirit-ring absolute left-1/2 top-[64px] h-[120px] w-[120px] rounded-full" />
+          <span aria-hidden className="fb-spirit-ring fb-spirit-ring-2 absolute left-1/2 top-[64px] h-[120px] w-[120px] rounded-full" />
+          <span className="fb-spirit-bird relative block">
+            <ToucanArt size={120} />
+          </span>
+          <svg className="fb-spirit-letter absolute left-1/2 top-[150px]" width="52" height="38" viewBox="0 0 52 38" aria-hidden>
+            <rect x="2" y="3" width="48" height="32" rx="4" fill="#f6ecd2" stroke="#8a6116" strokeWidth="1.8" />
+            <path d="M3 5l23 16L49 5" fill="none" stroke="#8a6116" strokeWidth="1.6" strokeLinejoin="round" />
+            <circle cx="26" cy="21" r="6" fill="#a3281c" />
+          </svg>
+          {Array.from({ length: 12 }, (_, i) => (
+            <span key={i} aria-hidden className="fb-spirit-spark" style={{ ["--a" as string]: `${i * 30}deg`, ["--d" as string]: `${80 + (i % 3) * 22}px` }} />
+          ))}
+          <span className={`fb-spirit-words mt-3 max-w-[300px] rounded-2xl px-4 py-1.5 text-center ${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ background: "rgba(8,26,29,.92)", color: "#e8fff8", border: "1px solid rgba(140,240,220,.6)", boxShadow: "0 0 18px rgba(120,230,210,.35)" }}>
+            The Great Toucan Spirit accepts your letter
+            {xpTag}
+          </span>
+        </div>
+      </div>
+    );
+  const words = kind === "future" ? "Saved for the future" : kind === "refill" ? "Saved for when credits refill" : style === "seal" ? "Sealed & sent" : "Off it flies";
   const label = (
     <span className={`fb-words mt-2 whitespace-nowrap rounded-full px-3.5 py-1 ${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ background: "rgba(20,14,6,.88)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.55)" }}>
       {words}
-      {xp > 0 && (
-        <b className="ml-2 tabular-nums" style={{ color: "#f2d27e" }}>
-          +{xp} XP
-        </b>
-      )}
+      {xpTag}
     </span>
   );
-  if (style !== "seal")
+  if (style === "crane")
     return (
       <div role="status" aria-live="polite" className="pointer-events-none fixed z-[62]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
-        <div className={`relative flex flex-col items-center ${style === "quiet" ? "fb-quiet" : "fb-burst"}`}>
-          {style === "crane" && (
-            <svg className="fb-crane" width="96" height="72" viewBox="0 0 96 72" aria-hidden>
-              <path d="M4 50l34-8 10-30 8 30 36-26-30 44-18-2z" fill="#f6ecd2" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
-              <path d="M38 42l10 0 8 0M48 12v30" stroke="#8a6116" strokeWidth="1.4" fill="none" />
-              <path d="M4 50l-2-6 8 3" fill="#e9d49a" stroke="#8a6116" strokeWidth="1.5" strokeLinejoin="round" />
-            </svg>
-          )}
-          {style === "star" && (
-            <span className="fb-star relative block" aria-hidden>
-              <span className="fb-star-trail" />
-              <svg width="44" height="44" viewBox="0 0 24 24">
-                <path d="M12 2.5l2.8 5.9 6.4.9-4.6 4.5 1.1 6.4L12 17.2l-5.7 3 1.1-6.4-4.6-4.5 6.4-.9z" fill="#fff3c4" stroke="#d9a83a" strokeWidth="1.3" strokeLinejoin="round" />
-              </svg>
-            </span>
-          )}
-          {style === "toucan" && (
-            <span className="fb-toucan relative block" aria-hidden>
-              <ToucanArt flying size={70} />
-              <svg className="absolute -bottom-3 left-7" width="30" height="20" viewBox="0 0 30 20">
-                <rect x="3" y="4" width="24" height="12" rx="3" fill="#f6ecd2" stroke="#8a6116" strokeWidth="1.5" />
-                <path d="M3 10h24" stroke="#b5321f" strokeWidth="2" />
-              </svg>
-            </span>
-          )}
-          {style !== "quiet" && Array.from({ length: 6 }, (_, i) => <span key={i} aria-hidden className="fb-spark" style={{ ["--a" as string]: `${i * 60 + 15}deg`, ["--d" as string]: `${44 + (i % 2) * 16}px` }} />)}
+        <div className="fb-burst relative flex flex-col items-center">
+          <svg className="fb-crane" width="96" height="72" viewBox="0 0 96 72" aria-hidden>
+            <path d="M4 50l34-8 10-30 8 30 36-26-30 44-18-2z" fill="#f6ecd2" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M38 42l10 0 8 0M48 12v30" stroke="#8a6116" strokeWidth="1.4" fill="none" />
+            <path d="M4 50l-2-6 8 3" fill="#e9d49a" stroke="#8a6116" strokeWidth="1.5" strokeLinejoin="round" />
+          </svg>
+          {Array.from({ length: 6 }, (_, i) => <span key={i} aria-hidden className="fb-spark" style={{ ["--a" as string]: `${i * 60 + 15}deg`, ["--d" as string]: `${44 + (i % 2) * 16}px` }} />)}
           {label}
         </div>
       </div>
@@ -763,14 +793,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "seal" }: { kin
             <path d="M38.6 36.4l2.4 2.4 4.6-5" stroke="#ffd9cf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           </g>
         </svg>
-        <span className={`fb-words mt-2 whitespace-nowrap rounded-full px-3.5 py-1 ${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ background: "rgba(20,14,6,.88)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.55)" }}>
-          {words}
-          {xp > 0 && (
-            <b className="ml-2 tabular-nums" style={{ color: "#f2d27e" }}>
-              +{xp} XP
-            </b>
-          )}
-        </span>
+        {label}
       </div>
     </div>
   );

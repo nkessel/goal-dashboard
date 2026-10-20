@@ -1,5 +1,6 @@
 "use client";
 
+import { talkToToucan } from "@/components/toucan/ToucanGuide";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -287,6 +288,15 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
             ✨ Auto
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => talkToToucan(undefined, "catchup")}
+          className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]"
+          style={{ color: "var(--t-ink)", border: "1px solid #b39a6a" }}
+          title="Coursework catch-up: coming up first, then missed ones from the beginning"
+        >
+          📚
+        </button>
         <button type="button" onClick={() => setAdding(true)} className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)", border: "1px solid #b39a6a" }} title="Add a folder">
           + Folder
         </button>

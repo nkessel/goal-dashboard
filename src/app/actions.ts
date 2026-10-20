@@ -32,7 +32,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { generateAndStoreImage, buildAvatarPrompt, buildQuestScenePrompt, buildTreasureIconPrompt, visualSubjectFor } from "@/lib/ai-image";
 import { styleLook, AVATAR_STYLE_OPTIONS, STYLE_EXAMPLE_SUBJECT } from "@/lib/avatar-prompts";
 import { exportAccountData, type AccountExport } from "@/lib/data/export";
-import type { TaskIconLibraryEntry } from "@/lib/data/types";
+import type { TaskIconLibraryEntry, Task } from "@/lib/data/types";
 import { sendEmail } from "@/lib/email";
 import { findOpenSlots, type Interval } from "@/lib/scheduling";
 import {
@@ -2304,6 +2304,31 @@ export async function sendMissionStepToTodayAction(taskId: string, onToday: bool
   revalidatePath("/settings");
 }
 
+/** Change a mission step: its name, its XP, or which mission it belongs to. */
+export async function editMissionStepAction(taskId: string, patch: { title?: string; xp?: number; missionId?: string }) {
+  const ownerId = await requireProfileId();
+  const up: Record<string, unknown> = {};
+  if (typeof patch.title === "string") {
+    const t = patch.title.replace(/\s+/g, " ").trim().slice(0, 200);
+    if (!t) throw new Error("Give the step a name.");
+    up.title = t;
+  }
+  if (typeof patch.xp === "number") up.xp_value = Math.max(0, Math.min(500, Math.round(patch.xp)));
+  if (typeof patch.missionId === "string" && patch.missionId) up.mission_id = patch.missionId.slice(0, 64);
+  if (!Object.keys(up).length) return;
+  const { error } = await supabaseAdmin().from("tasks").update(up).eq("id", taskId).eq("owner_id", ownerId).not("mission_id", "is", null);
+  if (error) throw new Error(`Couldn't save that: ${error.message}`);
+  revalidatePath("/settings");
+}
+
+/** Put a mission's steps in this order. */
+export async function orderMissionStepsAction(ids: string[]) {
+  const ownerId = await requireProfileId();
+  const db = supabaseAdmin();
+  await Promise.all(ids.slice(0, 100).map((id, i) => db.from("tasks").update({ sort_order: i + 1 }).eq("id", id).eq("owner_id", ownerId).not("mission_id", "is", null)));
+  revalidatePath("/settings");
+}
+
 /** A mission was burned: its steps become ordinary quests. */
 export async function releaseMissionStepsAction(missionId: string) {
   const ownerId = await requireProfileId();
@@ -2715,15 +2740,19 @@ export async function deleteQuestTemplateAction(id: string) {
 // ---------------------------------------------------------------------------
 // The toucan as a guide: it watches for important quests slipping, and talks.
 
-async function guideTasks(ownerId: string) {
+async function guideTasks(ownerId: string, opts: { imports?: boolean } = {}) {
   const db = supabaseAdmin();
-  const [tasks, boards] = await Promise.all([
+  const [tasks, boards, imports] = await Promise.all([
     tasksData.listOpenTasksWithBoardForOwner(ownerId),
-    db.from("boards").select("id, title").eq("owner_id", ownerId),
+    db.from("boards").select("id, title, parent_board_id").eq("owner_id", ownerId),
+    // Imported quests (a syllabus, say) still waiting to be sorted are real work too.
+    opts.imports ? db.from("tasks").select("*").eq("owner_id", ownerId).eq("status", "open").eq("needs_review", true) : Promise.resolve({ data: [] as Task[] }),
   ]);
   const names = new Map(((boards.data ?? []) as { id: string; title: string }[]).map((b) => [b.id, b.title]));
-  return tasks
-    .filter((t) => !t.needs_review)
+  const seen = new Set<string>();
+  const all = [...tasks, ...(((imports as { data: Task[] | null }).data ?? []) as Task[])].filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)));
+  return all
+    .filter((t) => opts.imports || !t.needs_review)
     .map((t) => ({
       id: t.id,
       title: t.title,
@@ -2736,6 +2765,8 @@ async function guideTasks(ownerId: string) {
       created_at: t.created_at ?? null,
       reschedule_count: t.reschedule_count ?? 0,
       board: t.board_id ? (names.get(t.board_id) ?? null) : null,
+      board_id: t.board_id ?? null,
+      needs_review: !!t.needs_review,
     }));
 }
 
@@ -2743,7 +2774,9 @@ async function guideTasks(ownerId: string) {
 export async function toucanWatchAction() {
   const ownerId = await requireProfileId();
   const [tasks, extras] = await Promise.all([guideTasks(ownerId), readExtras(ownerId)]);
-  return { tasks, snoozed: ((extras.toucanSnooze as Record<string, string> | undefined) ?? {}) };
+  const { cleanCoach, duePromises } = await import("@/lib/coach");
+  const coach = cleanCoach(extras.coach);
+  return { tasks, snoozed: ((extras.toucanSnooze as Record<string, string> | undefined) ?? {}), promises: coach.promises.filter((p) => p.status === "open"), due: duePromises(coach) };
 }
 
 /** "Not now": the toucan won't raise this quest again for a while. */
@@ -2752,7 +2785,7 @@ export async function snoozeToucanAction(taskId: string, days = 1) {
   const extras = await readExtras(ownerId);
   const now = Date.now();
   const kept = Object.fromEntries(Object.entries((extras.toucanSnooze as Record<string, string> | undefined) ?? {}).filter(([, until]) => Date.parse(until) > now));
-  kept[taskId.slice(0, 40)] = new Date(now + Math.max(1, Math.min(30, days)) * 86_400_000).toISOString();
+  kept[taskId.slice(0, 40)] = new Date(now + Math.max(0.01, Math.min(30, days)) * 86_400_000).toISOString();
   await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanSnooze: kept } }).eq("id", ownerId);
 }
 
@@ -2765,45 +2798,198 @@ export async function setQuestEstimateAction(taskId: string, minutes: number) {
   revalidatePath("/");
 }
 
-/** Talk with the toucan about your quests. It sees your open quests (titles, boards, due dates, estimates). */
-export async function askToucanAction(history: { role: "user" | "assistant"; content: string }[]) {
+// ---- The Great Toucan Spirit as a guide: memory, promises, and the actions it offers.
+
+async function readCoach(ownerId: string) {
+  const extras = await readExtras(ownerId);
+  const { cleanCoach } = await import("@/lib/coach");
+  return { extras, coach: cleanCoach(extras.coach) };
+}
+async function writeCoach(ownerId: string, extras: Record<string, unknown>, coach: import("@/lib/coach").CoachState) {
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, coach } }).eq("id", ownerId);
+}
+
+/** The conversation so far (recent part), what it remembers and your promises. */
+export async function coachStateAction() {
   const ownerId = await requireProfileId();
+  const { coach } = await readCoach(ownerId);
+  const { duePromises } = await import("@/lib/coach");
+  return { history: coach.history.slice(-24), notes: coach.notes, promises: coach.promises.filter((p) => p.status === "open"), due: duePromises(coach) };
+}
+
+/** Talk with the Great Toucan Spirit. It sees your quests, recent wins and check-ins, and remembers what you've shared. */
+export async function coachAction(message: string) {
+  const ownerId = await requireProfileId();
+  const text = String(message ?? "").trim().slice(0, 2000);
+  if (!text) throw new Error("Say something first.");
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
   if (!accountId || !apiToken) throw new Error("The toucan can't talk yet: the AI service isn't set up.");
-  const [tasks, profile] = await Promise.all([guideTasks(ownerId), profilesData.getProfileById(ownerId)]);
-  const { contextLines, mentioned } = await import("@/lib/toucan-guide");
+  const tz = process.env.APP_TIMEZONE || "America/New_York";
   const now = new Date();
-  const when = now.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: process.env.APP_TIMEZONE || "America/New_York" });
+  const db = supabaseAdmin();
+  const [{ extras, coach }, tasks, profile, wins, checks, boardsRes, aspRes] = await Promise.all([
+    readCoach(ownerId),
+    guideTasks(ownerId, { imports: true }),
+    profilesData.getProfileById(ownerId),
+    winsData.listWinsSince(ownerId, new Date(now.getTime() - 3 * 86_400_000).toISOString()).catch(() => []),
+    energyData.latestCheckIns(ownerId, new Date(now.getTime() - 36 * 3_600_000).toISOString()).catch(() => ({})),
+    db.from("boards").select("id, title, parent_board_id").eq("owner_id", ownerId),
+    db.from("tasks").select("title").eq("owner_id", ownerId).eq("status", "open").eq("is_aspiration", true).limit(12),
+  ]);
+  const { contextLines } = await import("@/lib/toucan-guide");
+  const { coachSystemPrompt, parseReply } = await import("@/lib/coach");
+  const { catchUpPlan, catchUpOrder } = await import("@/lib/catch-up");
+  const fmtWhen = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tz });
   const who = profile?.name?.split(" ")[0] || "friend";
-  const system =
-    `You are the Great Toucan Spirit, the wise, warm and slightly wry guide who lives in ${who}'s quest app. ` +
-    `It is ${when}. ${who}'s open quests are listed below. Help them see what matters and take the next small step. ` +
-    `The ladder for any quest: 1) estimate how long it takes, 2) put it on the calendar, 3) do it. ` +
-    `Gently but honestly point out important quests that are slipping (due soon, not scheduled, untouched). ` +
-    `When you mention a quest, use its exact title in double quotes so the app can add a "Plan it" button. ` +
-    `Only talk about quests that are in the list; never invent quests, dates or facts. If you're unsure, ask one short question. ` +
-    `Keep replies under 90 words, plain text, no markdown lists longer than 3 items. One toucan flourish at most.\n\n` +
-    `Open quests:\n${contextLines(tasks, now).join("\n") || "(none)"}`;
-  const messages = [{ role: "system", content: system }, ...history.slice(-10).map((m) => ({ role: m.role, content: String(m.content).slice(0, 1200) }))];
-  let reply = "";
+  const boards = (boardsRes.data ?? []) as { id: string; title: string; parent_board_id: string | null }[];
+  // Coursework in the agreed order: what's coming up first, then catching up from the beginning.
+  const courseIds = new Set(((extras.catchUp as { boards?: string[] } | undefined)?.boards ?? []).filter((id) => boards.some((b) => b.id === id)));
+  const course = catchUpOrder(catchUpPlan(tasks.filter((t) => t.board_id && courseIds.has(t.board_id)), now)).slice(0, 14);
+  const todayKey = now.toLocaleDateString("en-CA", { timeZone: tz });
+  const today = tasks.filter((t) => t.scheduled_start && new Date(t.scheduled_start).toLocaleDateString("en-CA", { timeZone: tz }) === todayKey).map((t) => `- ${new Date(t.scheduled_start!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: tz })}: "${t.title}"`);
+  const questLines = contextLines(tasks.map((t) => (t.needs_review ? { ...t, title: t.title, board: `${t.board ?? "no board"}, imported, not yet sorted` } : t)), now, 60);
+  const system = coachSystemPrompt({
+    who,
+    when: now.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tz }),
+    quests: [
+      ...(course.length ? [`Coursework, in the order they chose (coming up first, then catching up from the beginning): ${course.map((c, i) => `${i + 1}. "${c.title}"${c.due_at ? ` (due ${fmtWhen(c.due_at)})` : ""}`).join("; ")}`] : []),
+      ...questLines,
+    ],
+    aspirations: ((aspRes.data ?? []) as { title: string }[]).map((a) => `- ${a.title}`),
+    areas: boards.filter((b) => !b.parent_board_id).map((b) => `- ${b.title}`),
+    wins: (wins as { kind: string; title: string; at: string }[]).filter((w) => w.kind !== "login" && w.kind !== "feedback").slice(0, 12).map((w) => `- ${w.title} (${fmtWhen(w.at)})`),
+    checkIn: Object.entries(checks as Record<string, { level: number; at: string }>).slice(0, 8).map(([k, v]) => `- ${k}: ${v.level}`),
+    today,
+    notes: coach.notes.map((n) => `- ${n.text}`),
+    promises: coach.promises.filter((p) => p.status === "open").map((p) => `- ${p.text}${p.due ? ` (for ${fmtWhen(p.due)})` : ""}`),
+  });
+  const history = [...coach.history.slice(-12), { role: "user" as const, content: text }];
+  const messages = [{ role: "system", content: system }, ...history.map((m) => ({ role: m.role, content: m.content }))];
+  let raw = "";
   for (const model of ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct-fast"]) {
     try {
       const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ max_tokens: 260, temperature: 0.6, messages }),
+        body: JSON.stringify({ max_tokens: 520, temperature: 0.65, messages }),
       });
       if (!res.ok) continue;
       const json = await res.json();
-      reply = String(json?.result?.response ?? "").trim();
-      if (reply) break;
+      raw = String(json?.result?.response ?? "").trim();
+      if (raw) break;
     } catch {
       /* try the next model */
     }
   }
-  if (!reply) throw new Error("The toucan is lost in thought. Try again in a moment.");
-  return { reply, quests: mentioned(reply, tasks) };
+  if (!raw) throw new Error("The toucan is lost in thought. Try again in a moment.");
+  const { text: reply, actions } = parseReply(raw, tasks);
+  // What it learns about you, it keeps (you can see and remove each note).
+  const remembered = actions.filter((a): a is Extract<typeof a, { type: "remember" }> => a.type === "remember").map((a) => ({ id: crypto.randomUUID().slice(0, 8), text: a.note, at: now.toISOString() }));
+  const stamp = now.toISOString();
+  const next = {
+    ...coach,
+    history: [...coach.history, { role: "user" as const, content: text, at: stamp }, { role: "assistant" as const, content: reply, at: stamp }].slice(-40),
+    notes: [...coach.notes, ...remembered].slice(-30),
+  };
+  await writeCoach(ownerId, extras, next);
+  return { reply, actions: actions.filter((a) => a.type !== "remember"), remembered };
+}
+
+/** Start the conversation over (what it remembers about you stays, unless you remove it). */
+export async function coachClearAction() {
+  const ownerId = await requireProfileId();
+  const { extras, coach } = await readCoach(ownerId);
+  await writeCoach(ownerId, extras, { ...coach, history: [] });
+}
+
+/** Remove something the toucan remembered. */
+export async function coachForgetAction(noteId: string) {
+  const ownerId = await requireProfileId();
+  const { extras, coach } = await readCoach(ownerId);
+  await writeCoach(ownerId, extras, { ...coach, notes: coach.notes.filter((n) => n.id !== noteId) });
+}
+
+/** Make a promise (a "when…, then I will…"), or settle one: kept, missed or let go. */
+export async function coachPromiseAction(input: { add?: { text: string; when: string | null; questId?: string | null }; settle?: { id: string; status: "kept" | "missed" | "released" }; push?: { id: string; minutes: number } }) {
+  const ownerId = await requireProfileId();
+  const { extras, coach } = await readCoach(ownerId);
+  let promises = coach.promises;
+  if (input.add) {
+    const due = input.add.when ? new Date(input.add.when) : null;
+    promises = [...promises, { id: crypto.randomUUID().slice(0, 8), text: input.add.text.slice(0, 180), due: due && !Number.isNaN(due.getTime()) ? due.toISOString() : null, questId: input.add.questId ?? null, status: "open" as const, at: new Date().toISOString() }];
+  }
+  if (input.settle) promises = promises.map((p) => (p.id === input.settle!.id ? { ...p, status: input.settle!.status } : p));
+  if (input.push) promises = promises.map((p) => (p.id === input.push!.id ? { ...p, due: new Date(Date.now() + input.push!.minutes * 60_000).toISOString() } : p));
+  await writeCoach(ownerId, extras, { ...coach, promises: promises.slice(-30) });
+  return promises.filter((p) => p.status === "open");
+}
+
+/** Add small steps to a quest (after the ones it already has). */
+export async function coachAddStepsAction(taskId: string, titles: string[]) {
+  const ownerId = await requireProfileId();
+  const task = await tasksData.getTask(taskId, ownerId);
+  if (!task) throw new Error("That quest isn't here anymore.");
+  const existing = (await stepsData.listStepsForTask(taskId, ownerId)) ?? [];
+  const fresh = titles.map((t) => t.trim()).filter(Boolean).slice(0, 8);
+  await stepsData.replaceSteps(taskId, ownerId, [
+    ...existing.map((st) => ({ id: st.id, title: st.title, done: st.done, xp: st.xp ?? undefined, weight: st.weight ?? null, progress: st.progress ?? undefined, seconds: st.seconds_spent ?? undefined, state: st.state ?? null })),
+    ...fresh.map((title) => ({ title, done: false })),
+  ]);
+  revalidatePath("/");
+}
+
+/** A quest the toucan suggested (something you named that wasn't on your list yet). */
+export async function coachNewQuestAction(title: string, minutes: number | null) {
+  const ownerId = await requireProfileId();
+  const t = title.replace(/\s+/g, " ").trim().slice(0, 120);
+  if (!t) throw new Error("Give it a name.");
+  const task = await tasksData.createTask(ownerId, { title: t, importance: 3, urgency: 3, xpValue: 15, estimateMinutes: minutes ?? null });
+  revalidatePath("/");
+  return task.id;
+}
+
+// ---- Getting up to date on coursework.
+
+/** Your boards with dated quests (imports included), for the catch-up plan. */
+export async function courseworkAction() {
+  const ownerId = await requireProfileId();
+  const [tasks, extras] = await Promise.all([guideTasks(ownerId, { imports: true }), readExtras(ownerId)]);
+  const dated = tasks.filter((t) => t.due_at && t.board_id);
+  const byBoard = new Map<string, { id: string; title: string; dated: number }>();
+  for (const t of dated) {
+    const b = byBoard.get(t.board_id!) ?? { id: t.board_id!, title: t.board ?? "Board", dated: 0 };
+    b.dated += 1;
+    byBoard.set(t.board_id!, b);
+  }
+  const saved = (extras.catchUp as { boards?: string[] } | undefined)?.boards ?? null;
+  return {
+    boards: [...byBoard.values()].sort((a, b) => b.dated - a.dated),
+    chosen: saved,
+    items: tasks.filter((t) => t.board_id && byBoard.has(t.board_id)).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at, estimate_minutes: t.estimate_minutes, board: t.board, board_id: t.board_id, needs_review: t.needs_review, scheduled_start: t.scheduled_start })),
+  };
+}
+
+/**
+ * Use a catch-up plan: its imported quests become real quests, estimates are
+ * kept, and the whole order goes to the top of your scheduling list (so the
+ * scheduler, the toucan and Today all follow it).
+ */
+export async function applyCatchUpAction(boardIds: string[], orderedIds: string[], estimates: Record<string, number>) {
+  const ownerId = await requireProfileId();
+  const db = supabaseAdmin();
+  const ids = [...new Set(orderedIds)].slice(0, 80);
+  if (ids.length) await db.from("tasks").update({ needs_review: false }).eq("owner_id", ownerId).in("id", ids).eq("needs_review", true);
+  await Promise.all(
+    Object.entries(estimates)
+      .filter(([id, m]) => ids.includes(id) && m > 0)
+      .map(([id, m]) => db.from("tasks").update({ estimate_minutes: Math.max(5, Math.min(600, Math.round(m))) }).eq("owner_id", ownerId).eq("id", id))
+  );
+  const current = (await schedulingData.listSchedulingList(ownerId)).map((t) => t.id).filter((id) => !ids.includes(id));
+  await schedulingData.setSchedulingOrder(ownerId, [...ids, ...current]);
+  const extras = await readExtras(ownerId);
+  await db.from("profiles").update({ life_wheel: { ...extras, catchUp: { boards: boardIds.slice(0, 20), at: new Date().toISOString() } } }).eq("id", ownerId);
+  revalidatePath("/", "layout");
 }
 
 /** The colour theme for the Adventure look (forest, moonlit, ember…). */

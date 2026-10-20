@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { addMissionStepAction, completeTaskAction, deleteTaskAction, releaseMissionStepsAction, reopenTaskAction, saveSecretMissionsAction, sendMissionStepToTodayAction } from "@/app/actions";
+import { addMissionStepAction, completeTaskAction, deleteTaskAction, editMissionStepAction, orderMissionStepsAction, releaseMissionStepsAction, reopenTaskAction, saveSecretMissionsAction, sendMissionStepToTodayAction } from "@/app/actions";
 import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import type { TaskWithCategory } from "@/lib/data/tasks";
@@ -11,7 +11,7 @@ import { cleanMissions, type Mission } from "@/lib/missions";
 import { useEscape } from "@/lib/use-escape";
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
-const XP_STEPS = [10, 20, 50, 100];
+const XP_STEPS = [5, 10, 20, 30, 50, 75, 100];
 
 /**
  * Secret missions: private long quests, sealed like dispatches. Each step is
@@ -58,10 +58,20 @@ export function SecretMissions({ initial, steps }: { initial: unknown; steps: Ta
       <p className="m-0 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
         Private long quests, sealed for your eyes only. Each step is a quest that earns XP — send one to Today when you&apos;re ready.
       </p>
-      {missions.map((m) => (
+      {missions.map((m, mi) => (
         <MissionCard
           key={m.id}
           mission={m}
+          others={missions.filter((x) => x.id !== m.id).map((x) => ({ id: x.id, title: x.title }))}
+          onMove={(dir) => {
+            const j = mi + dir;
+            if (j < 0 || j >= missions.length) return;
+            const next = [...missions];
+            [next[mi], next[j]] = [next[j], next[mi]];
+            commit(next);
+          }}
+          first={mi === 0}
+          last={mi === missions.length - 1}
           steps={steps.filter((t) => t.mission_id === m.id)}
           open={open === m.id}
           onToggle={() => setOpen(open === m.id ? null : m.id)}
@@ -128,6 +138,10 @@ export function SecretMissions({ initial, steps }: { initial: unknown; steps: Ta
 
 function MissionCard({
   mission: m,
+  others,
+  onMove,
+  first,
+  last,
   steps,
   open,
   onToggle,
@@ -138,6 +152,10 @@ function MissionCard({
   refresh,
 }: {
   mission: Mission;
+  others: { id: string; title: string }[];
+  onMove: (dir: -1 | 1) => void;
+  first: boolean;
+  last: boolean;
   steps: TaskWithCategory[];
   open: boolean;
   onToggle: () => void;
@@ -157,14 +175,45 @@ function MissionCard({
   const [doneNow, setDoneNow] = useState<Record<string, boolean>>({});
   const [todayNow, setTodayNow] = useState<Record<string, boolean>>({});
   const [pending, setPending] = useState<{ title: string; xp: number }[]>([]);
+  // Editing a step in place: its name, XP, place and mission.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [names, setNames] = useState<Record<string, string>>({});
+  const [xps, setXps] = useState<Record<string, number>>({});
+  const [order, setOrder] = useState<string[] | null>(null);
+  const shown = order ? order.map((id) => steps.find((t) => t.id === id)).filter((t): t is TaskWithCategory => !!t).concat(steps.filter((t) => !order.includes(t.id))) : steps;
+  const nameOf = (t: TaskWithCategory) => names[t.id] ?? t.title;
+  const xpOf = (t: TaskWithCategory) => xps[t.id] ?? t.xp_value;
+  function rename(t: TaskWithCategory, text: string) {
+    const v = text.replace(/\s+/g, " ").trim();
+    setEditing(null);
+    if (!v || v === nameOf(t)) return;
+    const before = nameOf(t);
+    setNames((n) => ({ ...n, [t.id]: v }));
+    run(() => editMissionStepAction(t.id, { title: v }), () => setNames((n) => ({ ...n, [t.id]: before })));
+  }
+  function setStepXp(t: TaskWithCategory, n: number) {
+    const before = xpOf(t);
+    setXps((x) => ({ ...x, [t.id]: n }));
+    run(() => editMissionStepAction(t.id, { xp: n }), () => setXps((x) => ({ ...x, [t.id]: before })));
+  }
+  function moveStep(t: TaskWithCategory, dir: -1 | 1) {
+    const ids = shown.map((x) => x.id);
+    const i = ids.indexOf(t.id);
+    const j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    setOrder(ids);
+    run(() => orderMissionStepsAction(ids));
+  }
   const [, start] = useTransition();
 
   const isDone = (t: TaskWithCategory) => doneNow[t.id] ?? t.status === "completed";
   const onToday = (t: TaskWithCategory) => todayNow[t.id] ?? (t.is_manual_priority || t.in_additional === true);
   const done = steps.filter(isDone).length;
   const total = steps.length + pending.length;
-  const accomplished = steps.length > 0 && pending.length === 0 && done === steps.length;
-  const xpLeft = steps.filter((t) => !isDone(t)).reduce((n, t) => n + t.xp_value, 0);
+  const accomplished = !!m.doneAt || (steps.length > 0 && pending.length === 0 && done === steps.length);
+  const xpLeft = steps.filter((t) => !isDone(t)).reduce((n, t) => n + (xps[t.id] ?? t.xp_value), 0);
 
   function run(fn: () => Promise<unknown>, undo?: () => void) {
     onError(null);
@@ -245,18 +294,36 @@ function MissionCard({
             </div>
           )}
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
-            {steps.map((t) => {
+            {shown.map((t, si) => {
               const d = isDone(t);
               const today = onToday(t);
               return (
-                <li key={t.id} className="group flex min-h-11 items-center gap-2 rounded-lg px-1.5 hover:bg-black/[.04]">
-                  <input type="checkbox" checked={d} onChange={() => toggleDone(t)} aria-label={`Done: ${t.title}`} />
-                  <button type="button" onClick={() => onOpenCard(t)} title="Open the quest card" className="min-w-0 flex-1 text-left text-[15px] leading-snug underline-offset-2 hover:underline" style={{ color: "#2a1c10", textDecoration: d ? "line-through" : undefined, opacity: d ? 0.6 : 1 }}>
-                    {t.title}
+                <li key={t.id} className="flex flex-col rounded-lg hover:bg-black/[.04]">
+                <div className="group flex min-h-11 items-center gap-2 px-1.5">
+                  <input type="checkbox" checked={d} onChange={() => toggleDone(t)} aria-label={`Done: ${nameOf(t)}`} />
+                  {editing?.id === t.id ? (
+                    <input
+                      autoFocus
+                      value={editing.text}
+                      onChange={(e) => setEditing({ id: t.id, text: e.target.value })}
+                      onBlur={() => rename(t, editing.text)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") rename(t, editing.text);
+                        if (e.key === "Escape") setEditing(null);
+                      }}
+                      maxLength={200}
+                      aria-label="Step name"
+                      className="h-9 min-w-0 flex-1 rounded-md border px-2 text-[15px]"
+                      style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.7)", color: "#2a1c10" }}
+                    />
+                  ) : (
+                    <button type="button" onClick={() => onOpenCard({ ...t, title: nameOf(t), xp_value: xpOf(t) })} onDoubleClick={() => setEditing({ id: t.id, text: nameOf(t) })} title="Open the quest card (double-tap to rename)" className="min-w-0 flex-1 text-left text-[15px] leading-snug underline-offset-2 hover:underline" style={{ color: "#2a1c10", textDecoration: d ? "line-through" : undefined, opacity: d ? 0.6 : 1 }}>
+                      {nameOf(t)}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setStepXp(t, XP_STEPS[(XP_STEPS.indexOf(xpOf(t)) + 1) % XP_STEPS.length] ?? 20)} title="Tap to change its XP" className="shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-bold tabular-nums" style={{ background: "rgba(217,180,95,.35)", color: "#5a3e12" }}>
+                    +{xpOf(t)} XP
                   </button>
-                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-bold tabular-nums" style={{ background: "rgba(217,180,95,.35)", color: "#5a3e12" }}>
-                    +{t.xp_value} XP
-                  </span>
                   {!d &&
                     (today ? (
                       <button
@@ -285,20 +352,63 @@ function MissionCard({
                         → Today
                       </button>
                     ))}
-                  {confirmStep === t.id ? (
-                    <span className="flex shrink-0 items-center gap-1 text-[12px]">
-                      <button type="button" onClick={() => run(() => deleteTaskAction(t.id))} className="font-semibold underline" style={{ color: "var(--t-warn)" }}>
+                  <button type="button" onClick={() => setMenuFor(menuFor === t.id ? null : t.id)} aria-expanded={menuFor === t.id} aria-label={`Edit “${nameOf(t)}”`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px] leading-none hover:bg-black/[.06]" style={{ color: "#6b5631" }}>
+                    ⋯
+                  </button>
+                </div>
+                {menuFor === t.id && (
+                  <div className="reveal flex flex-wrap items-center gap-1.5 px-1.5 pb-2 pl-8 text-[12.5px]" style={{ color: "#2a1c10" }}>
+                    <button type="button" onClick={() => (setEditing({ id: t.id, text: nameOf(t) }), setMenuFor(null))} className="h-8 rounded-full px-2.5 font-semibold" style={{ border: "1px solid #a58c66" }}>
+                      ✎ Rename
+                    </button>
+                    <select value={xpOf(t)} onChange={(e) => setStepXp(t, Number(e.target.value))} aria-label="XP" className="h-8 rounded-full border px-2 font-semibold" style={{ borderColor: "#a58c66", background: "transparent" }}>
+                      {[...new Set([...XP_STEPS, xpOf(t)])].sort((a, b) => a - b).map((n) => (
+                        <option key={n} value={n}>
+                          +{n} XP
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" disabled={si === 0} onClick={() => moveStep(t, -1)} aria-label="Move up" className="h-8 w-8 rounded-full font-bold disabled:opacity-30" style={{ border: "1px solid #a58c66" }}>
+                      ↑
+                    </button>
+                    <button type="button" disabled={si === shown.length - 1} onClick={() => moveStep(t, 1)} aria-label="Move down" className="h-8 w-8 rounded-full font-bold disabled:opacity-30" style={{ border: "1px solid #a58c66" }}>
+                      ↓
+                    </button>
+                    {others.length > 0 && (
+                      <select
+                        value=""
+                        onChange={(e) => e.target.value && run(() => editMissionStepAction(t.id, { missionId: e.target.value }))}
+                        aria-label="Move to another mission"
+                        className="h-8 max-w-[150px] rounded-full border px-2 font-semibold"
+                        style={{ borderColor: "#a58c66", background: "transparent" }}
+                      >
+                        <option value="">Move to…</option>
+                        {others.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button type="button" onClick={() => onOpenCard({ ...t, title: nameOf(t), xp_value: xpOf(t) })} className="h-8 rounded-full px-2.5 font-semibold" style={{ border: "1px solid #a58c66" }}>
+                      Full quest card
+                    </button>
+                    {confirmStep === t.id ? (
+                      <span className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => run(() => deleteTaskAction(t.id))} className="font-semibold underline" style={{ color: "var(--t-warn)" }}>
+                          Remove it
+                        </button>
+                        <button type="button" onClick={() => setConfirmStep(null)} className="underline" style={{ color: "#6b5631" }}>
+                          Keep
+                        </button>
+                      </span>
+                    ) : (
+                      <button type="button" onClick={() => setConfirmStep(t.id)} className="h-8 rounded-full px-2.5 font-semibold" style={{ color: "var(--t-warn)", border: "1px solid rgba(154,74,58,.4)" }}>
                         Remove
                       </button>
-                      <button type="button" onClick={() => setConfirmStep(null)} className="underline" style={{ color: "#6b5631" }}>
-                        Keep
-                      </button>
-                    </span>
-                  ) : (
-                    <button type="button" onClick={() => setConfirmStep(t.id)} aria-label={`Remove “${t.title}”`} className="flex h-8 w-7 shrink-0 items-center justify-center rounded-full text-[17px] opacity-40 hover:bg-black/[.06] group-hover:opacity-100" style={{ color: "#6b5631" }}>
-                      ×
-                    </button>
-                  )}
+                    )}
+                  </div>
+                )}
                 </li>
               );
             })}
@@ -379,6 +489,15 @@ function MissionCard({
                 Rename
               </button>
             )}
+            <button type="button" disabled={first} onClick={() => onMove(-1)} className="underline underline-offset-2 disabled:opacity-40">
+              Move up
+            </button>
+            <button type="button" disabled={last} onClick={() => onMove(1)} className="underline underline-offset-2 disabled:opacity-40">
+              Move down
+            </button>
+            <button type="button" onClick={() => onChange((x) => ({ ...x, doneAt: x.doneAt ? null : new Date().toISOString() }))} className="underline underline-offset-2">
+              {m.doneAt ? "Reopen mission" : "Mark accomplished"}
+            </button>
             {confirmDelete ? (
               <span className="flex items-center gap-2">
                 Burn this mission? (Its steps stay as quests.)

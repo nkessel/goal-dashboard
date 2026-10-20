@@ -85,7 +85,7 @@ export function CelebrationSettings() {
         <span className="text-sm font-semibold">When you send feedback</span>
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
           {FEEDBACK_STYLES.map((o) => {
-            const on = (fx.feedbackStyle ?? "seal") === o.key;
+            const on = (fx.feedbackStyle ?? "quiet") === o.key;
             return (
               <li key={o.key} className="flex items-center gap-2">
                 <button

@@ -66,7 +66,8 @@ export function neglected(tasks: GuideTask[], now = new Date(), snoozed: Record<
     const idle = Math.max(0, (now.getTime() - touched) / DAY);
 
     let score = 0;
-    if (daysToDue !== null) score += daysToDue < 0 ? 6 : daysToDue < 1 ? 5 : daysToDue < 3 ? 4 : daysToDue < 7 ? 2.5 : daysToDue < 14 ? 1 : 0;
+    // Coming up soon outranks already missed (missed ones: oldest first, by a hair).
+    if (daysToDue !== null) score += daysToDue < 0 ? 3.6 + Math.min(0.4, -daysToDue / 100) : daysToDue < 1 ? 6 : daysToDue < 3 ? 5 : daysToDue < 7 ? 3.5 : daysToDue < 14 ? 1.5 : 0;
     score += Math.max(0, imp - 2) * 1.1;
     score += Math.min(3, idle / 4);
     score += Math.min(1.5, (t.reschedule_count ?? 0) * 0.5);

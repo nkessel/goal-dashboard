@@ -18,14 +18,19 @@ export function effortOf(t: Pick<Task, "effort" | "estimate_minutes">): number {
   return 5;
 }
 
-/** Urgency 0–5, raised when a deadline is near or past. */
+/**
+ * Urgency 0–5, raised when a deadline is near or past. What's coming up soon
+ * outranks what's already been missed (getting ahead keeps you afloat; the
+ * missed ones are caught up after, oldest first).
+ */
 export function urgencyOf(t: Pick<Task, "urgency" | "due_at">, now: number): number {
   let u = t.urgency || 0;
   if (t.due_at) {
     const hours = (new Date(t.due_at).getTime() - now) / 3_600_000;
-    if (hours < 0) u = Math.max(u, 5);
-    else if (hours < 24) u = Math.max(u, 4.5);
-    else if (hours < 72) u = Math.max(u, 3.5);
+    if (hours >= 0 && hours < 24) u = Math.max(u, 5);
+    else if (hours >= 0 && hours < 72) u = Math.max(u, 4.5);
+    else if (hours < 0) u = Math.max(u, 4);
+    else if (hours < 168) u = Math.max(u, 3.5);
   }
   return u;
 }
