@@ -119,6 +119,8 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </div>
         </section>
 
+        <ImportsInboxRow quests={imports.quests} rewards={imports.rewards} theme={profile.theme} />
+
         {admin && (
           <Link
             href="/feedback-review"
@@ -141,6 +143,25 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             )}
           </Link>
         )}
+
+        <ViewTransitionLink
+          href="/settings/inventory"
+          className={`hover-glow flex items-center gap-3 px-4 py-3.5 ${isAdventure ? "parchment" : ""}`}
+          style={{ ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }), borderRadius: 14 }}
+        >
+          <span className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: isAdventure ? "rgba(209,161,60,.16)" : "var(--t-accent-soft)" }}>
+            <BackpackIcon size={19} />
+          </span>
+          <span className="relative z-[1] flex-1 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
+            Inventory
+          </span>
+          <span className="relative z-[1] text-[13px]" style={{ color: refillCount ? "#9a3b26" : "var(--t-ink-soft)", fontWeight: refillCount ? 700 : 400 }}>
+            {refillCount ? `${refillCount} to refill` : `${(profile.life_wheel?.inventory?.items ?? []).length} items`}
+          </span>
+          <svg className="relative z-[1]" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M9 5l7 7-7 7" stroke="var(--t-ink-soft)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </ViewTransitionLink>
 
         {/* Quick ways in: Power-ups and the Treasure Chest */}
         <div className="grid grid-cols-2 gap-2.5">
@@ -199,7 +220,6 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
 
         {/* Expandable settings rows */}
         <div className="flex flex-col gap-2.5">
-          <ImportsInboxRow quests={imports.quests} rewards={imports.rewards} theme={profile.theme} />
           <SettingsRow
             theme={profile.theme}
             label="Account"
@@ -309,24 +329,6 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             </div>
           </SettingsRow>
 
-          <ViewTransitionLink
-            href="/settings/inventory"
-            className={`hover-glow flex items-center gap-3 px-4 py-3.5 ${isAdventure ? "parchment" : ""}`}
-            style={{ ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }), borderRadius: 14 }}
-          >
-            <span className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: isAdventure ? "rgba(209,161,60,.16)" : "var(--t-accent-soft)" }}>
-              <BackpackIcon size={19} />
-            </span>
-            <span className="relative z-[1] flex-1 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
-              Inventory
-            </span>
-            <span className="relative z-[1] text-[13px]" style={{ color: refillCount ? "#9a3b26" : "var(--t-ink-soft)", fontWeight: refillCount ? 700 : 400 }}>
-              {refillCount ? `${refillCount} to refill` : `${(profile.life_wheel?.inventory?.items ?? []).length} items`}
-            </span>
-            <svg className="relative z-[1]" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M9 5l7 7-7 7" stroke="var(--t-ink-soft)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </ViewTransitionLink>
 
           <OwlCage />
 

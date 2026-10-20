@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteCheckNoteAction, logSlipAction, saveStreaksAction } from "@/app/actions";
+import { completeRiteAction, deleteCheckNoteAction, logSlipAction, saveStreaksAction } from "@/app/actions";
 import { MILESTONES, streakLabel, streakState, type StreakDef, type StreakNote } from "@/lib/streaks";
 
 const INK = "#3b2a14";
@@ -32,7 +32,9 @@ const wordFrom = (name: string) =>
  * never shared. A slip is an event with the streak's word, so the count picks
  * up events you logged before, and "Reset" just logs one.
  */
-export function Streaks({ initial, notes: initialNotes }: { initial: StreakDef[]; notes: StreakNote[] }) {
+export type HabitStreak = { id: string; title: string; days: number[] | null; icon: string | null; done: string[]; skipped: string[] };
+
+export function Streaks({ initial, notes: initialNotes, habits = [] }: { initial: StreakDef[]; notes: StreakNote[]; habits?: HabitStreak[] }) {
   const router = useRouter();
   const now = useSyncExternalStore(subscribeMinute, minuteNow, () => 0);
   const [defs, setDefs] = useState(initial);
@@ -168,7 +170,7 @@ export function Streaks({ initial, notes: initialNotes }: { initial: StreakDef[]
                   {next ? `${reached ? " · " : ""}${next - s.days} more ${next - s.days === 1 ? "day" : "days"} to the ${next}-day mark` : ""}
                 </span>
                 <button type="button" onClick={() => setSlipping({ id: def.id, at: toLocalInput(now) })} className="ml-auto h-8 rounded-full px-3 text-[12.5px] font-semibold" style={{ border: "1px solid #b39a6a", color: SOFT }}>
-                  Reset
+                  Log a slip
                 </button>
               </div>
               {slipping?.id === def.id && (
@@ -191,6 +193,14 @@ export function Streaks({ initial, notes: initialNotes }: { initial: StreakDef[]
           );
         })}
       </ul>
+
+      {habits.length > 0 && now > 0 && (
+        <ul className="m-0 grid list-none grid-cols-1 gap-2.5 p-0 sm:grid-cols-2" aria-label="Habits">
+          {habits.map((h) => (
+            <HabitCard key={h.id} habit={h} now={now} onLogged={() => router.refresh()} />
+          ))}
+        </ul>
+      )}
 
       {undo && (
         <p className="fade-in m-0 flex items-center gap-2 text-[13.5px]" style={{ color: SOFT }}>
@@ -275,5 +285,99 @@ export function Streaks({ initial, notes: initialNotes }: { initial: StreakDef[]
         </p>
       )}
     </div>
+  );
+}
+
+const dayKeyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** A habit's streak: days in a row it was done (on the days it's due), the last four weeks, and Log it. */
+function HabitCard({ habit, now, onLogged }: { habit: HabitStreak; now: number; onLogged: () => void }) {
+  const [extra, setExtra] = useState<string[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [day, setDay] = useState(() => dayKeyOf(new Date(now)));
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const done = new Set([...habit.done, ...extra]);
+  const skipped = new Set(habit.skipped);
+  const due = (d: Date) => !habit.days || habit.days.length === 0 || habit.days.includes(d.getDay());
+  // Counting back from today (today only counts once it's done).
+  let streak = 0;
+  const d = new Date(now);
+  for (let i = 0; i < 400; i++) {
+    const k = dayKeyOf(d);
+    if (due(d)) {
+      if (done.has(k)) streak++;
+      else if (i > 0 || skipped.has(k)) break;
+    }
+    d.setDate(d.getDate() - 1);
+  }
+  const todayKey = dayKeyOf(new Date(now));
+  const cells = Array.from({ length: 28 }, (_, i) => {
+    const c = new Date(now);
+    c.setDate(c.getDate() - (27 - i));
+    const k = dayKeyOf(c);
+    return { k, done: done.has(k), due: due(c) };
+  });
+  async function log(k: string) {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await completeRiteAction(habit.id, k);
+      setExtra((x) => [...x, k]);
+      setPicking(false);
+      setMsg(k === todayKey ? "Logged for today ✓" : `Logged for ${new Date(`${k}T12:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} ✓`);
+      onLogged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Couldn't log that.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <li className="relative flex flex-col gap-1.5 rounded-xl px-3.5 py-3" style={{ background: "rgba(255,250,238,.6)", border: "1.5px solid rgba(139,112,64,.3)" }}>
+      <div className="flex items-start gap-2">
+        {habit.icon && (
+          // eslint-disable-next-line @next/next/no-img-element -- habit portrait
+          <img src={habit.icon} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" style={{ border: "1.5px solid #a58c66" }} />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold leading-tight" style={{ color: INK }}>
+            {habit.title}
+          </div>
+          <div className="font-display text-[30px] leading-none tabular-nums" style={{ color: streak >= 7 ? "#8a6116" : INK }}>
+            🔥 {streak} {streak === 1 ? "day" : "days"}
+          </div>
+        </div>
+        <span className="mt-0.5 text-[11px] font-bold uppercase tracking-[.1em]" style={{ color: SOFT }}>
+          Habit
+        </span>
+      </div>
+      <div className="flex items-center gap-[3px]" aria-label="The last four weeks">
+        {cells.map((c) => (
+          <span key={c.k} className="h-2.5 flex-1 rounded-full" title={c.done ? "Done" : c.due ? "Not done" : "Not due"} style={{ background: c.done ? GOLD : c.due ? "rgba(139,112,64,.22)" : "rgba(139,112,64,.08)" }} />
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+        <span className="min-w-0 flex-1 text-[12.5px]" style={{ color: SOFT }}>
+          {msg ?? (done.has(todayKey) ? "Done today ✓" : "Not yet today")}
+        </span>
+        {!done.has(todayKey) && (
+          <button type="button" disabled={busy} onClick={() => log(todayKey)} className="h-8 rounded-full px-3 text-[12.5px] font-bold disabled:opacity-60" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+            Log it
+          </button>
+        )}
+        <button type="button" onClick={() => setPicking((v) => !v)} aria-expanded={picking} className="h-8 rounded-full px-3 text-[12.5px] font-semibold" style={{ border: "1px solid #b39a6a", color: SOFT }}>
+          Another day…
+        </button>
+      </div>
+      {picking && (
+        <div className="fade-in flex items-center gap-2 rounded-lg p-2" style={{ background: "rgba(120,90,40,.1)" }}>
+          <input type="date" value={day} max={todayKey} onChange={(e) => setDay(e.target.value)} aria-label="Which day" className="h-10 min-w-0 flex-1 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.7)", color: INK }} />
+          <button type="button" disabled={busy || !day || done.has(day)} onClick={() => log(day)} className="h-10 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+            {done.has(day) ? "Done that day" : "Log it"}
+          </button>
+        </div>
+      )}
+    </li>
   );
 }

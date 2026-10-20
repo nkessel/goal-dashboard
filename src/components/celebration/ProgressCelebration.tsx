@@ -42,10 +42,11 @@ const AUTO_DISMISS = false;
  * closed (so it can be looked at and given feedback on); set
  * AUTO_DISMISS to bring back the self-dismissing version.
  */
-export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct, steps, heading = "Progress made!", barCaption, onClose }: ProgressCelebrationDetail & { onClose: () => void }) {
+export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct, steps, heading = "Progress made!", barCaption, extra, onClose }: ProgressCelebrationDetail & { onClose: () => void; extra?: React.ReactNode }) {
   const [shown, setShown] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [pinned, setPinned] = useState(!AUTO_DISMISS);
+  const hasExtra = !!extra;
   const dismiss = useEffectEvent(() => onClose());
 
   useEffect(() => {
@@ -69,13 +70,15 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
   // Fades away on its own, unless kept open.
   useEffect(() => {
     if (pinned) return;
-    const fade = setTimeout(() => setLeaving(true), 2800);
-    const done = setTimeout(() => dismiss(), 3300);
+    // A line to read (the day's welcome) gets longer before it fades.
+    const fadeAt = hasExtra ? 7000 : 2800;
+    const fade = setTimeout(() => setLeaving(true), fadeAt);
+    const done = setTimeout(() => dismiss(), fadeAt + 500);
     return () => {
       clearTimeout(fade);
       clearTimeout(done);
     };
-  }, [pinned]);
+  }, [pinned, hasExtra]);
 
   return createPortal(
     <div className={`pointer-events-none fixed inset-0 z-[60] flex items-center justify-center p-6 ${leaving ? "pc-leave" : ""}`} role="status" aria-live="polite">
@@ -112,6 +115,12 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
           <p className="m-0 line-clamp-2 text-[14.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
             {title}
           </p>
+          {extra && (
+            // Touching it keeps the card open.
+            <div className="w-full" onPointerDownCapture={() => (setPinned(true), setLeaving(false))}>
+              {extra}
+            </div>
+          )}
 
           <div className="mt-1 w-full">
             <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ background: "rgba(70,50,20,.18)", boxShadow: "inset 0 1px 2px rgba(0,0,0,.2)" }}>

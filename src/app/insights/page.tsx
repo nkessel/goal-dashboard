@@ -1,4 +1,6 @@
 import { requireSession } from "@/lib/session";
+import { listBoardsForOwner } from "@/lib/data/boards";
+import { wheelAreasFrom } from "@/lib/wheel-areas";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CreateFab } from "@/components/create/CreateFab";
@@ -12,6 +14,7 @@ import { DEFAULT_WHEEL, LifeWheel } from "@/components/insights/LifeWheel";
 import { listWinsSince } from "@/lib/data/wins";
 import { Streaks } from "@/components/insights/Streaks";
 import { slipMatcher } from "@/lib/streaks";
+import { listRites, listCompletionsFor, listHabitSkips } from "@/lib/data/rites";
 
 export default async function InsightsPage() {
   const session = await requireSession();
@@ -41,9 +44,26 @@ export default async function InsightsPage() {
   const slipChecks = streakDefs.map((d) => slipMatcher(d.word));
   const isSlip = (body: string) => slipChecks.some((f) => f(body));
   const streakNotes = yearNotes.filter((n) => isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, created_at: n.created_at }));
+  // Habits join the streaks (counted on the days they're due).
+  const rites = await listRites(session.user.id).catch(() => null);
+  const habitRows = (rites ?? []).filter((r) => r.slot === "day");
+  const since120 = new Date(Date.now() - 120 * 86_400_000).toISOString().slice(0, 10);
+  const [habitDone, habitSkipped] = habitRows.length
+    ? await Promise.all([listCompletionsFor(session.user.id, habitRows.map((h) => h.id), since120).catch(() => []), listHabitSkips(session.user.id, since120).catch(() => [])])
+    : [[], []];
+  const habitStreaks = habitRows.map((h) => ({
+    id: h.id,
+    title: h.title,
+    days: (h.days as number[] | null) ?? null,
+    icon: h.icon_source ? (h.icon_key ?? null) : null,
+    done: habitDone.filter((c) => c.rite_id === h.id).map((c) => c.day),
+    skipped: ((habitSkipped ?? []) as { rite_id: string; day: string }[]).filter((c) => c.rite_id === h.id).map((c) => c.day),
+  }));
   // The life wheel's readings are kept apart from the chart's metrics.
   const WHEEL = "◎ ";
-  const wheelTopics = profile?.life_wheel?.topics?.length ? profile.life_wheel.topics : DEFAULT_WHEEL;
+  // The wheel's areas are your top-level boards.
+  const boardAreas = wheelAreasFrom(await listBoardsForOwner(session.user.id).catch(() => []));
+  const wheelTopics = boardAreas.length >= 3 ? boardAreas : profile?.life_wheel?.topics?.length ? profile.life_wheel.topics : DEFAULT_WHEEL;
   const wheelLast: Record<string, { level: number; at: string }> = {};
   for (const c of checks) if (c.metric.startsWith(WHEEL)) wheelLast[c.metric.slice(WHEEL.length)] = { level: c.level, at: c.created_at };
   const chartChecks = checks.filter((c) => !c.metric.startsWith(WHEEL));
@@ -78,9 +98,9 @@ export default async function InsightsPage() {
           style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
         >
           <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
-            Streaks <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— what you&rsquo;re keeping away from · just for you</span>
+            Streaks <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— habits you keep, and what you keep away from · just for you</span>
           </h2>
-          <Streaks initial={streakDefs} notes={streakNotes} />
+          <Streaks initial={streakDefs} notes={streakNotes} habits={habitStreaks} />
         </section>
         <section
           aria-label="Life wheel"

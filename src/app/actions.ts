@@ -2588,10 +2588,10 @@ export async function saveInventoryAction(inventory: unknown) {
   return clean;
 }
 
-/** Paint an inventory item's portrait. */
-export async function paintInventoryItemAction(name: string): Promise<string> {
+/** Paint an inventory item's portrait (from its name, or your own description of the picture). */
+export async function paintInventoryItemAction(name: string, description?: string | null): Promise<string> {
   const ownerId = await requireProfileId();
-  const trimmed = name.trim().slice(0, 80);
+  const trimmed = (description?.trim() || name.trim()).slice(0, 200);
   if (!trimmed) throw new Error("Name the item first.");
   assertFamilyFriendly(trimmed);
   const { buildInventoryIconPrompt } = await import("@/lib/ai-image");
@@ -2617,4 +2617,59 @@ export async function setTaskAlsoOnAction(taskId: string, boardIds: string[]) {
   for (const b of new Set([...(t.also_on ?? []), ...clean])) revalidatePath(`/boards/${b}`);
   revalidatePath("/boards");
   return clean;
+}
+
+/**
+ * An inventory item's picture from a photo: as it is ("photo"), or repainted
+ * as an illustration in the inventory style ("illustrate").
+ */
+export async function inventoryPhotoAction(formData: FormData) {
+  const ownerId = await requireProfileId();
+  const file = formData.get("file");
+  const mode = String(formData.get("mode") || "photo");
+  const name = String(formData.get("name") || "").trim().slice(0, 80) || "an item";
+  if (!(file instanceof File)) throw new Error("No photo was attached.");
+  if (!file.type.startsWith("image/")) throw new Error("That isn't an image.");
+  if (file.size > 12 * 1024 * 1024) throw new Error("That photo is too big (12 MB at most).");
+  const sharp = (await import("sharp")).default;
+  const raw = Buffer.from(await file.arrayBuffer());
+  const db = supabaseAdmin();
+  let bytes: Buffer;
+  const ext = "webp";
+  const type = "image/webp";
+  if (mode === "illustrate") {
+    assertFamilyFriendly(name);
+    const { illustrateFromPhoto, buildInventoryIconPrompt } = await import("@/lib/ai-image");
+    try {
+      bytes = await sharp(await illustrateFromPhoto(raw, buildInventoryIconPrompt(name))).webp({ quality: 86 }).toBuffer();
+    } catch {
+      // The photo painter is unavailable: paint it from its name instead.
+      return generateAndStoreImage(buildInventoryIconPrompt(name), `inventory/${ownerId}-${Date.now()}.jpg`);
+    }
+  } else {
+    bytes = await sharp(raw).rotate().resize(640, 640, { fit: "cover" }).webp({ quality: 84 }).toBuffer();
+  }
+  const path = `inventory/${ownerId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await db.storage.from("ai-images").upload(path, bytes, { contentType: type, upsert: false });
+  if (error) throw new Error(`Couldn't store the picture: ${error.message}`);
+  return db.storage.from("ai-images").getPublicUrl(path).data.publicUrl;
+}
+
+/** Edit a logged event or #tag. */
+export async function updateCheckNoteAction(id: string, text: string) {
+  const ownerId = await requireProfileId();
+  const note = await energyData.updateCheckNote(ownerId, id, text);
+  revalidatePath("/insights");
+  revalidatePath("/");
+  return note;
+}
+
+/** The forecast place, kept on your account (beside your other personal extras). */
+export async function saveWeatherPlaceAction(place: { lat: number; lon: number; name?: string | null }) {
+  const ownerId = await requireProfileId();
+  const lat = Math.round(Number(place.lat) * 100) / 100;
+  const lon = Math.round(Number(place.lon) * 100) / 100;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("That place doesn't look right.");
+  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), weather: { lat, lon, name: place.name?.slice(0, 60) ?? null } } }).eq("id", ownerId);
 }

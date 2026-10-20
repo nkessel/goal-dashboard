@@ -163,7 +163,8 @@ export function QuestEditorDialog({
     const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (create?.powerUp ? 5 : undefined);
     return v != null ? String(v) : "";
   });
-  const [chunk, setChunk] = useState<string>(task?.chunk_minutes ? String(task.chunk_minutes) : "");
+  // Pieces of time are no longer offered; an existing setting is kept as it is.
+  const [chunk] = useState<string>(task?.chunk_minutes ? String(task.chunk_minutes) : "");
   const [dueDate, setDueDate] = useState(localDate(task?.due_at));
   const [dueTime, setDueTime] = useState(localTime(task?.due_at));
   type Placement = "today" | "additional" | "none";
@@ -240,14 +241,13 @@ export function QuestEditorDialog({
   const [stepsDirty, setStepsDirty] = useState(false);
   const [newStep, setNewStep] = useState("");
   const [addingStep, setAddingStep] = useState(false);
-  const [stepOpen, setStepOpen] = useState<string | null>(null);
   const [stepXpPop, setStepXpPop] = useState<number | null>(null);
-  const [breakingDown, setBreakingDown] = useState(false);
   const newStepRef = useRef<HTMLInputElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const [phase, setPhase] = useState<"open" | "closing">("open");
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -445,6 +445,7 @@ export function QuestEditorDialog({
 
   function close() {
     if (phase === "closing") return;
+    setConfirmLeave(false);
     if (autosave) {
       if (dirty || placement !== savedPlacement.current) void persist(true);
       commitProgress();
@@ -660,7 +661,14 @@ export function QuestEditorDialog({
       style={{ background: "var(--t-overlay)" }}
       onClick={(e) => {
         e.stopPropagation();
-        close();
+        // A tap outside first just leaves the field you're in; then it asks before closing.
+        const a = document.activeElement as HTMLElement | null;
+        if (a && panelRef.current?.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) {
+          a.blur();
+          return;
+        }
+        if (confirmLeave) close();
+        else setConfirmLeave(true);
       }}
     >
       <div
@@ -668,8 +676,19 @@ export function QuestEditorDialog({
         role="dialog"
         aria-modal="true"
         aria-label={heading}
-        onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[94dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl ${
+        onClick={(e) => {
+          e.stopPropagation();
+          if (confirmLeave) setConfirmLeave(false);
+        }}
+        onKeyDown={(e) => {
+          // Escape leaves the field (or little form) you're in first; a second one closes the editor.
+          const t = e.target as HTMLElement;
+          if (e.key === "Escape" && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) {
+            e.preventDefault();
+            t.blur();
+          }
+        }}
+        className={`relative flex max-h-[94dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl ${
           phase === "closing" ? exitCls : enterCls
         }`}
         style={{
@@ -678,6 +697,19 @@ export function QuestEditorDialog({
           color: "var(--t-ink)",
         }}
       >
+        {confirmLeave && (
+          <div role="alertdialog" aria-label="Close the editor?" className="card-pop-in absolute inset-x-3 bottom-3 z-30 flex items-center gap-2 rounded-xl px-3.5 py-2.5" style={{ background: "rgba(20,14,6,.94)", border: "1px solid rgba(242,210,126,.55)", boxShadow: "0 8px 24px rgba(0,0,0,.45)" }}>
+            <span className="min-w-0 flex-1 text-[14.5px]" style={{ color: "#f6ecd2" }}>
+              {autosave ? "Done here? Your changes are saved." : "Close the editor?"}
+            </span>
+            <button type="button" onClick={() => setConfirmLeave(false)} className="h-9 rounded-full px-3 text-[13.5px] underline" style={{ color: "rgba(246,236,210,.8)" }}>
+              Keep editing
+            </button>
+            <button type="button" autoFocus onClick={close} className="h-9 rounded-full px-4 text-[13.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+              Close
+            </button>
+          </div>
+        )}
         <div onFocus={keepInView} className="qe-body relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
           {/* Stays put while scrolling, small and out of the way. */}
           <div
@@ -685,8 +717,9 @@ export function QuestEditorDialog({
             className="sticky -top-4 z-20 -mx-4 -mb-1.5 -mt-4 flex items-center justify-between px-4 pb-1 pt-1.5"
             style={{ background: `linear-gradient(180deg, ${isAdventure ? "var(--t-panel)" : "var(--t-card)"} 70%, transparent)` }}
           >
-            <h3 className={`m-0 text-[14.5px] ${isAdventure ? "font-display" : "font-bold"}`} style={{ color: "var(--t-ink-soft)" }}>
-              {heading}
+            {/* The quest's own title stays at the top while you scroll. */}
+            <h3 className={`m-0 min-w-0 flex-1 truncate pr-2 text-[15px] ${isAdventure ? "font-display" : "font-bold"}`} style={{ color: title.trim() ? "var(--t-ink)" : "var(--t-ink-soft)" }} title={title.trim() || heading}>
+              {title.trim() || heading}
             </h3>
             <button type="button" onClick={close} aria-label="Close" className="-mr-1.5 flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
               ×
@@ -1047,27 +1080,13 @@ export function QuestEditorDialog({
             </div>
           )}
 
-          {/* Time to complete, and whether it can be done in pieces */}
+          {/* Time to complete */}
           {!doingNow && (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2.5">
                 {/* eslint-disable-next-line @next/next/no-img-element -- same clock glyph as the quest card */}
                 <img src="/design/ui-clock.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
                 <span className={`${labelCls} min-w-0 flex-1`}>Time to complete</span>
-                {chunk === "" && !breakingDown && (
-                  <button
-                    type="button"
-                    onClick={() => (setBreakingDown(true), setChunk("15"))}
-                    className="hover-glow flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
-                    style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.45)" }}
-                    title="Do it in smaller pieces of time"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-                    </svg>
-                    Break it down
-                  </button>
-                )}
                 <input
                   type="number"
                   onFocus={(e) => e.currentTarget.select()}
@@ -1085,40 +1104,6 @@ export function QuestEditorDialog({
                   min
                 </span>
               </div>
-              {/* Breaking it into pieces stays tucked away until asked for. */}
-              {chunk === "" && !breakingDown ? null : (
-                <div className="reveal flex flex-wrap items-center gap-1.5 pl-[28px] text-[12.5px]">
-                  <span>Do it in</span>
-                  {[10, 15, 25, 45].map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      aria-pressed={chunk === String(m)}
-                      onClick={() => setChunk(String(m))}
-                      className="h-7 rounded-full px-2.5 font-semibold tabular-nums"
-                      style={chunk === String(m) ? { background: "rgba(217,180,95,.55)", border: "1px solid #8a6116" } : { border: `1px solid ${chipBorder}` }}
-                    >
-                      {m}m
-                    </button>
-                  ))}
-                  <input
-                    type="number"
-                    onFocus={(e) => e.currentTarget.select()}
-                    inputMode="numeric"
-                    min={1}
-                    value={["10", "15", "25", "45"].includes(chunk) ? "" : chunk}
-                    placeholder="other"
-                    onChange={(e) => setChunk(e.target.value)}
-                    aria-label="Minutes per piece"
-                    className="h-7 w-14 rounded-full border px-1.5 text-center text-[16px] tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    style={fieldStyle}
-                  />
-                  <span>pieces</span>
-                  <button type="button" onClick={() => (setChunk(""), setBreakingDown(false))} className="ml-1 underline" style={{ color: "var(--t-ink-soft)" }}>
-                    don&apos;t break it down
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -1190,22 +1175,38 @@ export function QuestEditorDialog({
                       <AutoGrowText
                         value={st.title}
                         onChange={(v) => renameStep(st.key, v.replace(/\n/g, " "))}
+                        onKeyDown={(e) => {
+                          // Enter: on to writing the next step.
+                          if (e.key === "Enter" && !isCompleted) {
+                            e.preventDefault();
+                            setAddingStep(true);
+                            requestAnimationFrame(() => newStepRef.current?.focus());
+                          }
+                        }}
                         ariaLabel="Step"
                         className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none"
                         style={{ color: "var(--t-ink)" }}
                       />
-                      {/* Worth / XP at a glance; tap to set them and how far along it is. */}
-                      <button
-                        type="button"
-                        onClick={() => setStepOpen(stepOpen === st.key ? null : st.key)}
-                        aria-expanded={stepOpen === st.key}
-                        aria-label={`Details for ${st.title}`}
-                        className="mt-[3px] flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[12px] font-semibold tabular-nums"
-                        style={{ border: `1px solid ${stepOpen === st.key ? "#8a6116" : "rgba(139,112,64,.3)"}`, color: st.xp || st.weight ? "var(--t-ink)" : "var(--t-ink-soft)" }}
-                      >
-                        {st.weight ? `${st.weight}%` : `${Math.round(stepWeights(steps)[si] * 100)}%`}
-                        {st.xp ? <span style={{ color: "var(--t-xp)" }}>+{st.xp}</span> : null}
-                      </button>
+                      {/* What this step is worth, right on the row: its share of the quest (tap to change) and the XP that brings. */}
+                      <span className="mt-[3px] flex h-7 shrink-0 items-center gap-1 text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={100}
+                          value={st.weight ?? ""}
+                          placeholder={String(Math.round(stepWeights(steps)[si] * 100))}
+                          onChange={(e) => updateStep(st.key, { weight: e.target.value ? Math.max(1, Math.min(100, Math.round(Number(e.target.value)))) : null })}
+                          aria-label={`Share of the quest for ${st.title}, in percent`}
+                          title="Share of the quest (blank = an equal share)"
+                          className="step-worth h-7 w-[34px] rounded-md bg-transparent px-0.5 text-right text-[14px] font-semibold tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none"
+                          style={{ color: st.weight ? "var(--t-ink)" : "var(--t-ink-soft)" }}
+                        />
+                        <span>%</span>
+                        <span className="font-semibold" style={{ color: "var(--t-xp)" }}>
+                          {Math.round(stepWeights(steps)[si] * xp) + (st.xp ?? 0)} XP
+                        </span>
+                      </span>
                       <button
                         type="button"
                         onClick={() => removeStep(st.key)}
@@ -1216,61 +1217,23 @@ export function QuestEditorDialog({
                         ×
                       </button>
                     </div>
-                    {/* A step part-way done shows its own little bar. */}
-                    {!st.done && (st.progress ?? 0) > 0 && stepOpen !== st.key && (
-                      <span className="ml-[26px] mr-9 mt-0.5 block h-2 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 2px rgba(0,0,0,.6)" }}>
-                        <span className="block h-full rounded-full" style={{ width: `${st.progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 5px rgba(242,210,126,.45)" }} />
-                      </span>
-                    )}
-                    {stepOpen === st.key && (
-                      <div className="reveal ml-[26px] mr-1 mt-1 flex flex-col gap-2 rounded-lg px-2.5 py-2 text-[13px]" style={{ background: "rgba(70,50,20,.06)", border: "1px solid rgba(139,112,64,.25)" }}>
-                        <label className="flex items-center gap-2">
-                          <span className="w-[92px] shrink-0">Done so far</span>
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            step={5}
-                            value={st.done ? 100 : (st.progress ?? 0)}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              updateStep(st.key, { progress: v, done: v >= 100 });
-                            }}
-                            className="min-w-0 flex-1"
-                            style={{ accentColor: "#a8812e" }}
-                          />
-                          <span className="w-9 text-right font-semibold tabular-nums">{st.done ? 100 : (st.progress ?? 0)}%</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <span className="w-[92px] shrink-0">Worth</span>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={1}
-                            max={100}
-                            value={st.weight ?? ""}
-                            placeholder={String(Math.round(stepWeights(steps)[si] * 100))}
-                            onChange={(e) => updateStep(st.key, { weight: e.target.value ? Math.max(1, Math.min(100, Math.round(Number(e.target.value)))) : null })}
-                            className="h-8 w-16 rounded-md border px-2 text-right text-[16px] tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                            style={fieldStyle}
-                          />
-                          <span style={{ color: "var(--t-ink-soft)" }}>% of the quest{st.weight ? "" : " (an equal share)"}</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <span className="w-[92px] shrink-0">XP when done</span>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            value={st.xp ? st.xp : ""}
-                            placeholder="0"
-                            onChange={(e) => updateStep(st.key, { xp: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
-                            className="h-8 w-16 rounded-md border px-2 text-right text-[16px] tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                            style={{ ...fieldStyle, color: "var(--t-xp)" }}
-                          />
-                          <span style={{ color: "var(--t-ink-soft)" }}>bonus, on top of the quest&apos;s XP</span>
-                        </label>
-                      </div>
+                    {/* How far along: a slim slider under each open step. */}
+                    {!st.done && !isCompleted && (
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={st.progress ?? 0}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          updateStep(st.key, { progress: v, done: v >= 100 });
+                        }}
+                        aria-label={`How far along ${st.title} is`}
+                        title={`${st.progress ?? 0}% done`}
+                        className="step-progress ml-[26px] mr-9"
+                        style={{ ["--p" as string]: `${st.progress ?? 0}%` }}
+                      />
                     )}
                     </li>
                   ))}
@@ -1290,8 +1253,11 @@ export function QuestEditorDialog({
                             addStep();
                             // Stay on the add row for the next step, whatever re-rendered.
                             requestAnimationFrame(() => newStepRef.current?.focus());
-                          } else if (e.key === "Escape" && !newStep.trim()) {
+                          } else if (e.key === "Escape") {
+                            // Leaves just this row (a second Escape closes the editor).
+                            e.preventDefault();
                             e.stopPropagation();
+                            setNewStep("");
                             setAddingStep(false);
                           }
                         }}
@@ -1678,9 +1644,11 @@ function AutoGrowText({
   ariaLabel,
   className,
   style,
+  onKeyDown,
 }: {
   value: string;
   onChange: (v: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   minRows?: number;
   placeholder?: string;
   ariaLabel: string;
@@ -1700,6 +1668,7 @@ function AutoGrowText({
       value={value}
       rows={minRows}
       onChange={(e) => onChange(e.target.value)}
+      onKeyDown={onKeyDown}
       placeholder={placeholder}
       aria-label={ariaLabel}
       className={`resize-none overflow-hidden ${className ?? ""}`}

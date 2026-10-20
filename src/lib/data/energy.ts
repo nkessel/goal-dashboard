@@ -153,3 +153,11 @@ export async function listCheckNotesSince(ownerId: string, sinceISO: string): Pr
   if (error) return [];
   return (data ?? []) as CheckNote[];
 }
+
+export async function updateCheckNote(ownerId: string, id: string, text: string): Promise<CheckNote> {
+  const body = text.replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!body) throw new Error("Write something first.");
+  const { data, error } = await supabaseAdmin().from("check_in_notes").update({ body, tags: tagsIn(body) }).eq("owner_id", ownerId).eq("id", id).select("id, body, tags, created_at").single();
+  if (error) throw new Error(`Couldn't save that: ${error.message}`);
+  return data as CheckNote;
+}

@@ -18,13 +18,18 @@ export default async function InventoryPage() {
         <div className="flex items-center gap-2.5">
           <ViewTransitionLink
             href="/settings"
-            ariaLabel="Back to settings"
-            className="hover-glow flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-            style={{ background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)", border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}` }}
+            ariaLabel="Back to Settings"
+            className="hover-glow flex h-10 shrink-0 items-center gap-1 rounded-full pl-1.5 pr-3.5 text-[15px]"
+            style={{
+              background: isAdventure ? "rgba(10,12,32,.6)" : "var(--t-card)",
+              border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.45)" : "var(--t-card-border)"}`,
+              color: isAdventure ? "var(--t-cream)" : "var(--t-ink)",
+            }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M15 5l-7 7 7 7" stroke={isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)"} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M14.5 5.5 8 12l6.5 6.5" stroke={isAdventure ? "var(--t-gold)" : "currentColor"} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
+            <span className={isAdventure ? "font-display" : "font-semibold"}>Settings</span>
           </ViewTransitionLink>
           <h1 className="font-display text-xl" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
             Inventory

@@ -40,22 +40,22 @@ export function RefillBadge({ inventory }: { inventory: Inventory }) {
 
   if (!items.length) return null;
   return (
-    <div ref={box} className="absolute -left-2 top-0 z-[5]">
+    <div ref={box} className="absolute -right-2 bottom-2 z-[5] sm:-right-1.5 sm:bottom-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={`${items.length} ${items.length === 1 ? "item needs" : "items need"} refilling`}
-        className="hover-glow card-pop-in relative flex h-8 w-8 items-center justify-center rounded-full"
-        style={{ background: "radial-gradient(circle at 35% 30%, #f3e6c8, #d8c39a)", border: "1.5px solid #4a3913", boxShadow: "0 2px 6px rgba(0,0,0,.45)" }}
+        className="card-pop-in relative flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
+        style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,.6))" }}
       >
-        <BackpackIcon size={18} />
-        <span className="absolute -right-1 -top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-[3px] text-[10px] font-bold leading-none tabular-nums" style={{ background: "#d23a2a", color: "#fff", boxShadow: "0 0 0 1.5px #2a1c10" }}>
+        <BackpackIcon size={35} />
+        <span className="absolute -right-1.5 -top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-[3px] text-[10px] font-bold leading-none tabular-nums" style={{ background: "#d23a2a", color: "#fff", boxShadow: "0 0 0 1.5px #2a1c10" }}>
           {items.length}
         </span>
       </button>
       {open && (
-        <div role="dialog" aria-label="Needs refilling" className="card-pop-in parchment absolute left-0 top-10 flex w-[240px] flex-col gap-1 p-2.5" style={{ borderRadius: 14, boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}>
+        <div role="dialog" aria-label="Needs refilling" className="card-pop-in parchment absolute left-1/2 top-9 flex w-[240px] -translate-x-1/2 flex-col gap-1 p-2.5" style={{ borderRadius: 14, boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}>
           <span className="relative z-[1] px-1 text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
             Needs refilling
           </span>

@@ -16,8 +16,8 @@ const DAY = 86_400_000;
 const VIEW_KEY = "insights-view-2";
 const SHOWN_KEY = "insights-shown";
 
-type View = { range: 7 | 30 | 90; detail: "daily" | "every"; smooth: boolean; dots: boolean };
-const DEFAULT_VIEW: View = { range: 30, detail: "every", smooth: true, dots: true };
+type View = { range: 7 | 30 | 90; detail: "daily" | "every"; smooth: boolean; dots: boolean; marks?: "onLine" | "lines" | "lanes" };
+const DEFAULT_VIEW: View = { range: 30, detail: "every", smooth: true, dots: true, marks: "onLine" };
 
 const EVENTS: { key: string; label: string; kinds: string[]; glyph: string; color: string }[] = [
   { key: "quests", label: "Quests done", kinds: ["quest"], glyph: "◆", color: "#8a6116" },
@@ -198,7 +198,9 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
   const weatherH = showWeather ? 34 : 0;
   const T = 10 + weatherH;
   const plotH = 190;
-  const eventsH = activeEvents.length ? 14 + activeEvents.length * 16 : 0;
+  // Events sit with the lines (on them, or as a marker line) unless kept in their own rows.
+  const marks = view.marks ?? "onLine";
+  const eventsH = activeEvents.length && marks === "lanes" ? 14 + activeEvents.length * 16 : 0;
   const B = 22 + eventsH;
   const H = T + plotH + B;
   const x = (t: number) => L + ((t - start) / (end - start)) * (W - L - R);
@@ -380,8 +382,44 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
             );
           })}
 
+          {/* Events by the lines: a marker line at the moment, or the icon sitting on the day's average. */}
+          {marks !== "lanes" &&
+            activeEvents.flatMap((ev, li) =>
+              wins
+                .filter((w) => ev.kinds.includes(w.kind))
+                .map((w, wi) => {
+                  const t = new Date(w.at).getTime();
+                  if (t < start || t >= end) return null;
+                  const px = x(t);
+                  const di = Math.floor((t - start) / DAY);
+                  if (marks === "lines")
+                    return (
+                      <g key={`${ev.key}-${wi}`}>
+                        <line x1={px} x2={px} y1={T} y2={T + plotH} stroke={ev.color} strokeWidth="1.3" strokeDasharray="3 3" opacity=".75" />
+                        <g transform={`translate(${px.toFixed(1)} ${T + 6 + li * 12})`}>
+                          <EventMark k={ev.key} color={ev.color} size={9} />
+                        </g>
+                      </g>
+                    );
+                  // On the average of the lines shown, at that moment (the middle when there's nothing to sit on).
+                  const near = visible
+                    .map((s) => {
+                      const inDay = s.pts.filter((p) => p.t >= start + di * DAY && p.t < start + (di + 1) * DAY);
+                      return inDay.length ? inDay.reduce((a, p) => a + p.v, 0) / inDay.length : null;
+                    })
+                    .filter((v): v is number => v !== null);
+                  const avgV = near.length ? near.reduce((a, b) => a + b, 0) / near.length : 5.5;
+                  return (
+                    <g key={`${ev.key}-${wi}`} transform={`translate(${px.toFixed(1)} ${(y(avgV) - 1 - (wi % 3) * 3).toFixed(1)})`}>
+                      <circle r="7.5" fill="#fbf3df" stroke={ev.color} strokeWidth="1.2" opacity=".95" />
+                      <EventMark k={ev.key} color={ev.color} size={9} />
+                    </g>
+                  );
+                })
+            )}
+
           {/* Event lanes */}
-          {activeEvents.map((ev, li) => {
+          {marks === "lanes" && activeEvents.map((ev, li) => {
             const ly = T + plotH + 32 + li * 16;
             return (
               <g key={ev.key}>
@@ -459,6 +497,7 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
               <Seg label="Time span" value={String(view.range)} options={[["7", "Week"], ["30", "Month"], ["90", "3 months"]]} onPick={(v) => setV({ range: Number(v) as View["range"] })} />
               <Seg label="Points" value={view.detail} options={[["daily", "Daily average"], ["every", "Every check-in"]]} onPick={(v) => setV({ detail: v as View["detail"] })} />
               <Seg label="Lines" value={view.smooth ? "smooth" : "straight"} options={[["smooth", "Smooth"], ["straight", "Straight"]]} onPick={(v) => setV({ smooth: v === "smooth" })} />
+              <Seg label="Events" value={view.marks ?? "onLine"} options={[["onLine", "On the line"], ["lines", "Marker lines"], ["lanes", "Own rows"]]} onPick={(v) => setV({ marks: v as View["marks"] })} />
               <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
                 <input type="checkbox" checked={view.dots} onChange={() => setV({ dots: !view.dots })} />
                 Show each point

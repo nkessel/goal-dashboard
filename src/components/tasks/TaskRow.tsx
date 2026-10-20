@@ -450,7 +450,7 @@ export function TaskRow({
             {task.title}
           </p>
           {task.description && !compact && (
-            <p dir="auto" className={`user-text line-clamp-3 break-words text-[13.5px] leading-snug sm:text-[14px]`} style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
+            <p dir="auto" className={`user-text line-clamp-2 break-words text-[12.5px] leading-snug sm:text-[13px]`} style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
               {task.description}
             </p>
           )}
@@ -468,12 +468,7 @@ export function TaskRow({
                   : dueLabel((task.due_at ?? task.scheduled_start)!)}
               </span>
             )}
-            {task.reschedule_count > 0 && !compact && (
-              <span style={isWarned ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
-                &#8635; {task.reschedule_count}
-                {isWarned && " — rescheduled often"}
-              </span>
-            )}
+
             {(() => {
               // Get ahead of the deadline: finishing early pays a bonus.
               const bonus = task.status === "open" ? earlyBirdBonus(task) : 0;
@@ -530,7 +525,7 @@ export function TaskRow({
         <div className="shrink-0" style={{ width: 1, background: dividerColor }} aria-hidden />
 
         {/* Right: time, XP, importance */}
-        <div className={`flex shrink-0 flex-col items-start justify-center ${compact ? "w-[62px] gap-1 pt-3" : "w-[66px] gap-1.5 pt-4 sm:w-[84px] sm:pl-1"}`}>
+        <div className={`flex shrink-0 flex-col items-start justify-center ${compact ? "w-[62px] gap-1 pt-3" : "w-[66px] gap-1 pt-1.5 sm:w-[84px] sm:pl-1"}`}>
           {task.estimate_minutes != null && (
             <span className="flex items-center gap-1.5" style={{ color: "var(--t-ink)", fontSize: compact ? 13.5 : 15 }}>
               {isAdventure ? (
@@ -548,6 +543,11 @@ export function TaskRow({
           >
             {isAdventure ? `XP ${task.xp_value}` : `${task.xp_value} pts`}
           </span>
+          {task.reschedule_count > 0 && !compact && (
+            <span className="text-[12px] font-semibold tabular-nums leading-none" style={{ color: isWarned ? "var(--t-warn)" : "var(--t-ink-soft)" }} title={isWarned ? "Rescheduled often" : `Rescheduled ${task.reschedule_count}×`}>
+              &#8635; {task.reschedule_count}
+            </span>
+          )}
           {importanceCount > 0 && (
             // Always one row: the flames shrink a little rather than wrap.
             <span className={`flex flex-nowrap items-center ${compact ? "gap-px" : "gap-px sm:gap-[3px]"}`} title={`Importance ${task.importance.toFixed(1)}`}>

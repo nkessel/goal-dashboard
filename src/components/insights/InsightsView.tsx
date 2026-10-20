@@ -126,7 +126,7 @@ export function InsightsView({ theme, readings, metrics, wins }: { theme: "calm"
   );
 }
 
-const XP_VIEW_KEY = "insights-xp-view";
+const XP_VIEW_KEY = "insights-xp-view-2";
 
 /** Quest kinds counted in the daily tallies, in display order. */
 const TALLIES: { kind: string; one: string; many: string }[] = [
@@ -145,11 +145,13 @@ const TALLIES: { kind: string; one: string; many: string }[] = [
  */
 function XpBars({ days, wins }: { days: Date[]; wins: WinLite[] }) {
   const [hover, setHover] = useState<number | null>(null);
+  // A tapped portrait: what it was, when, and what it earned.
+  const [picked, setPicked] = useState<WinLite | null>(null);
   const [opts, setOpts] = useState<{ icons: boolean; tallies: boolean }>(() => {
     try {
-      return { icons: true, tallies: false, ...(JSON.parse(window.localStorage.getItem(XP_VIEW_KEY) ?? "{}") as object) };
+      return { icons: true, tallies: true, ...(JSON.parse(window.localStorage.getItem(XP_VIEW_KEY) ?? "{}") as object) };
     } catch {
-      return { icons: true, tallies: false };
+      return { icons: true, tallies: true };
     }
   });
   function set(patch: Partial<typeof opts>) {
@@ -177,11 +179,30 @@ function XpBars({ days, wins }: { days: Date[]; wins: WinLite[] }) {
   return (
     <div className="relative z-[1] flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="m-0 min-w-0 flex-1 text-[13.5px] tabular-nums" style={{ color: INK_SOFT }}>
-          {h
-            ? `${h.d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}: ${h.xp} XP`
-            : `${total} XP over two weeks · ${Math.round(total / days.length)} a day on average`}
-        </p>
+        {picked ? (
+          <p className="fade-in m-0 flex min-w-0 flex-1 items-center gap-2 text-[13.5px]" style={{ color: INK }}>
+            {picked.icon && (
+              // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+              <img src={picked.icon} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" style={{ border: "1.5px solid #a58c66" }} />
+            )}
+            <span className="min-w-0 flex-1">
+              <b className="block truncate">{picked.title}</b>
+              <span style={{ color: INK_SOFT }}>
+                {picked.kind === "reward" ? "Reward" : "Quest"} · {new Date(picked.at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                {picked.xp ? ` · +${picked.xp} XP` : ""}
+              </span>
+            </span>
+            <button type="button" onClick={() => setPicked(null)} aria-label="Close" className="h-8 w-8 shrink-0 rounded-full text-[18px] leading-none hover:bg-black/[.06]" style={{ color: INK_SOFT }}>
+              ×
+            </button>
+          </p>
+        ) : (
+          <p className="m-0 min-w-0 flex-1 text-[13.5px] tabular-nums" style={{ color: INK_SOFT }}>
+            {h
+              ? `${h.d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}: ${h.xp} XP`
+              : `${total} XP over two weeks · ${Math.round(total / days.length)} a day on average`}
+          </p>
+        )}
         <label className="flex min-h-8 items-center gap-1.5 text-[13.5px]" style={{ color: INK }}>
           <input type="checkbox" checked={opts.icons} onChange={() => set({ icons: !opts.icons })} />
           Portraits
@@ -193,9 +214,9 @@ function XpBars({ days, wins }: { days: Date[]; wins: WinLite[] }) {
       </div>
 
       <div className={wide ? "-mx-1 overflow-x-auto px-1 pb-1" : ""}>
-        <div className="relative flex" style={{ minWidth: wide ? days.length * 52 : undefined }} onPointerLeave={() => setHover(null)}>
-          {/* Scale */}
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0" style={{ height: BAR_H }}>
+        <div className="relative flex pt-2.5" style={{ minWidth: wide ? days.length * 52 : undefined }} onPointerLeave={() => setHover(null)}>
+          {/* Scale (with room above so its top number isn't cut off) */}
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-2.5" style={{ height: BAR_H }}>
             {[nice, nice / 2, 0].map((v, i) => (
               <div key={v} className="absolute inset-x-0 flex items-center" style={{ top: (i * BAR_H) / 2 - 1 }}>
                 <span className="w-7 shrink-0 pr-1 text-right text-[11px] tabular-nums" style={{ color: INK_SOFT, transform: "translateY(-50%)" }}>
@@ -233,15 +254,10 @@ function XpBars({ days, wins }: { days: Date[]; wins: WinLite[] }) {
                 {opts.icons && icons.length > 0 && (
                   <div className="mt-1 flex flex-col items-center gap-0.5">
                     {icons.slice(0, 3).map((w, k) => (
-                      // eslint-disable-next-line @next/next/no-img-element -- quest portrait
-                      <img
-                        key={k}
-                        src={w.icon!}
-                        alt=""
-                        title={w.title}
-                        className="h-6 w-6 rounded-full object-cover"
-                        style={{ border: `1.5px solid ${w.kind === "reward" ? "#b5521f" : "#a58c66"}` }}
-                      />
+                      <button key={k} type="button" onClick={() => setPicked(w)} aria-label={w.title} title={w.title} className="rounded-full transition-transform hover:scale-110">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- quest portrait */}
+                        <img src={w.icon!} alt="" className="h-6 w-6 rounded-full object-cover" style={{ border: `1.5px solid ${w.kind === "reward" ? "#b5521f" : "#a58c66"}` }} />
+                      </button>
                     ))}
                     {icons.length > 3 && (
                       <span className="text-[10.5px] font-semibold" style={{ color: INK_SOFT }}>

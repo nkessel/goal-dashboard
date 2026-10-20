@@ -362,7 +362,7 @@ export function EnergyCheck({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-[420px] items-start gap-2 px-1">
+    <div className={`mx-auto flex w-full items-start gap-2 px-1 ${full ? "max-w-[640px]" : "max-w-[420px]"}`}>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {editing ? (
           <>
@@ -595,32 +595,33 @@ export function EnergyCheck({
         )}
       </div>
       {low && (
-        <span
-          className="flex h-9 shrink-0 items-stretch overflow-hidden rounded-full"
+        // One small glowing bolt: light quests to get going.
+        <button
+          type="button"
+          onClick={() => setPicking(true)}
+          aria-label="Power-ups: light quests to get going"
+          title="Power-ups: light quests to get going"
+          className="powerup-orb flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
           style={{ background: "radial-gradient(circle at 32% 28%, #fff1b8, #f2c96a 45%, #d9a83a)", border: "1.5px solid #fff3c4", boxShadow: "0 0 12px rgba(255,214,102,.55), 0 2px 6px rgba(0,0,0,.4)" }}
         >
-          <button type="button" onClick={() => setPicking(true)} className="flex items-center gap-1 pl-3 pr-2 text-[13.5px] font-bold" style={{ color: "#2a1c10" }} title="Light quests to get going">
-            <BoltIcon size={16} /> Power-ups
-          </button>
-          <button
-            type="button"
-            onClick={hideForToday}
-            aria-label="Hide Power-ups for today"
-            title="Hide for today"
-            className="flex w-7 items-center justify-center text-[16px] leading-none"
-            style={{ color: "rgba(42,28,16,.7)", borderLeft: "1px solid rgba(90,60,20,.3)" }}
-          >
-            ×
-          </button>
-        </span>
+          <BoltIcon size={18} />
+        </button>
       )}
-      {picking && <TakeoffSheet onClose={() => setPicking(false)} />}
+      {picking && (
+        <TakeoffSheet
+          onClose={() => setPicking(false)}
+          onHide={() => {
+            setPicking(false);
+            hideForToday();
+          }}
+        />
+      )}
     </div>
   );
 }
 
 /** Power-ups and light quests, each with "Add to today" (to the top of Today's Quests). */
-function TakeoffSheet({ onClose }: { onClose: () => void }) {
+function TakeoffSheet({ onClose, onHide }: { onClose: () => void; onHide?: () => void }) {
   useEscape(onClose);
   const [rows, setRows] = useState<Takeoff[] | null>(null);
   const [added, setAdded] = useState<Set<string>>(() => new Set());
@@ -685,6 +686,11 @@ function TakeoffSheet({ onClose }: { onClose: () => void }) {
         <div className="relative z-[1] flex items-center gap-2">
           <BoltIcon size={22} />
           <h3 className="font-display m-0 flex-1 text-[20px]">Power-ups to get going</h3>
+          {onHide && (
+            <button type="button" onClick={onHide} className="text-[12.5px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }} title="Stop offering power-ups today">
+              Not today
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setNaming((v) => !v)}

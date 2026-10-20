@@ -95,6 +95,23 @@ function isTyping(el: EventTarget | null) {
   return t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
 }
 
+/** Unless you choose: 1 XP per paragraph, up to 3. */
+function autoXp(body: string) {
+  return Math.max(1, Math.min(3, body.split(/\n+/).filter((p) => p.trim().length > 0).length));
+}
+
+/** What device the note came from, in a few words. */
+function deviceLabel() {
+  try {
+    const ua = navigator.userAgent;
+    const kind = /iPhone|Android.+Mobile/.test(ua) ? "phone" : /iPad|Android/.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua)) ? "tablet" : "computer";
+    const os = /iPhone|iPad|Macintosh/.test(ua) ? (kind === "computer" ? "Mac" : "iOS") : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : "";
+    return `${kind}${os ? ` (${os})` : ""}, ${window.innerWidth}×${window.innerHeight}`;
+  } catch {
+    return "";
+  }
+}
+
 /** The part of the screen actually visible (above an iPhone keyboard, say). */
 function useViewport(): Viewport | null {
   const [vp, setVp] = useState<Viewport | null>(null);
@@ -136,12 +153,14 @@ function useViewport(): Viewport | null {
 /** Keep the box inside what's visible (leaving room for Submit under it), shrinking only when it can't fit. */
 function fit(g: Geom, vp: Viewport): Geom {
   const w = clamp(g.w, Math.min(MIN_W, vp.w - 16), vp.w - 16);
-  const h = clamp(g.h, Math.min(MIN_H, vp.h - 40), vp.h - 40);
+  // Sized against the whole screen (not what the keyboard leaves), so it never jumps when typing.
+  const h = clamp(g.h, Math.min(MIN_H, vp.innerH - 40), vp.innerH - 40);
   return {
     w,
     h,
     x: clamp(g.x, vp.left + 8, vp.left + vp.w - w - 8),
-    y: clamp(g.y, vp.top + 8, vp.top + vp.h - h - 8 - SUBMIT_DROP - 8),
+    // Down as far as you like, even behind the keyboard, while its top bar stays in reach.
+    y: clamp(g.y, vp.top + 8, Math.max(vp.top + 8, vp.innerH - 64)),
   };
 }
 
@@ -197,6 +216,13 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [sent, setSent] = useState<{ id: string; kind: WhenKind; xp: number } | null>(null);
+  // The little celebration after Submit: it plays and fades by itself.
+  const [celebrate, setCelebrate] = useState<{ key: number; kind: WhenKind; xp: number; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!celebrate) return;
+    const t = setTimeout(() => setCelebrate(null), 2600);
+    return () => clearTimeout(t);
+  }, [celebrate]);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [pos, setPos] = useState<Pos | null>(null);
@@ -277,7 +303,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 
   const startNew = useCallback(() => {
     // The context, in words: the page, any open window and what's in view.
-    const d: Draft = { id: newId(), body: "", kind: "feedback", page: window.location.pathname + window.location.search, context: readContext(), shot: null, updatedAt: Date.now() };
+    const d: Draft = { id: newId(), body: "", kind: "feedback", page: window.location.pathname + window.location.search, context: [readContext(), deviceLabel() && `on a ${deviceLabel()}`].filter(Boolean).join(" · "), shot: null, updatedAt: Date.now() };
     setConfirmDiscard(false);
     setChoosing(false);
     setSent(null);
@@ -326,19 +352,26 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     const d = open;
     if (!d || !d.body.trim() || isSaving) return;
     setError(null);
+    // Straight into the celebration; the note is sent behind it.
+    const xp = d.xp ?? autoXp(d.body);
+    setCelebrate({ key: Date.now(), kind: d.kind, xp, x: shown.x + shown.w / 2, y: shown.y + Math.min(shown.h, 260) / 2 });
+    setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, deleted: true, updatedAt: Date.now() } : x)));
+    setOpenId(null);
     startSaving(async () => {
       try {
         const r = await fetch("/api/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: d.body, kind: d.kind, xp: d.xp ?? 1, images: [...(d.shot ? [d.shot] : []), ...(d.images ?? [])], page: d.page, context: d.context }),
+          body: JSON.stringify({ body: d.body, kind: d.kind, xp: d.xp ?? autoXp(d.body), images: [...(d.shot ? [d.shot] : []), ...(d.images ?? [])], page: d.page, context: d.context }),
         });
         const res = (await r.json().catch(() => ({ ok: false, error: "Couldn't send it." }))) as { ok: boolean; xpAwarded?: number; error?: string };
         if (!r.ok || !res.ok) throw new Error(r.status === 401 || r.status === 403 ? "You've been signed out — sign in again to send (your note is saved)." : (res.error ?? "Couldn't send it."));
-        // The thank-you stays until it's closed (or another is started).
-        setSent({ id: d.id, kind: d.kind, xp: res.xpAwarded ?? 0 });
         setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, body: "", deleted: true, updatedAt: Date.now() } : x)));
       } catch (e) {
+        // It didn't go: bring the note back, just as it was.
+        setCelebrate(null);
+        setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...d, deleted: false, updatedAt: Date.now() } : x)));
+        setOpenId(d.id);
         setError(e instanceof Error ? e.message : "Couldn't send it. Check your connection and try again.");
       }
     });
@@ -566,23 +599,19 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             <div className={`feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${isSent ? "pb-3" : "pb-8"}`}>
               <div
                 className={`sticky top-0 z-[3] flex shrink-0 select-none items-center gap-1 px-2 pt-1.5 ${isSent ? "pl-4" : "cursor-move touch-none"}`}
-                style={{ background: isAdventure ? "#ecdcb8" : "var(--t-card)", borderBottom: `1px solid ${isAdventure ? "rgba(139,112,64,.45)" : "var(--t-card-border)"}`, boxShadow: "0 2px 6px rgba(60,40,10,.08)" }}
+                style={{ background: isAdventure ? "linear-gradient(180deg, #f2e4c2, #e6d3a6)" : "var(--t-card)", borderBottom: `1.5px solid ${isAdventure ? "rgba(168,138,63,.6)" : "var(--t-card-border)"}`, boxShadow: "0 2px 6px rgba(60,40,10,.1)" }}
                 onPointerDown={isSent ? undefined : (e) => onPanelDown(e, "move")}
                 title={isSent ? undefined : "Drag to move"}
               >
-                {!isSent && (
-                  <span aria-hidden className="flex h-9 w-6 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
-                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden>
-                      {[2, 8, 14].map((y) => (
-                        <g key={y}>
-                          <circle cx="2.5" cy={y} r="1.4" />
-                          <circle cx="7.5" cy={y} r="1.4" />
-                        </g>
-                      ))}
-                    </svg>
-                  </span>
-                )}
-                <span className={`flex-1 py-1 ${isAdventure ? "font-display text-[18px]" : "text-base font-bold"}`}>Feedback</span>
+                {/* A little handle to carry it by, like the top of a scroll. */}
+                {!isSent && <span aria-hidden className="absolute left-1/2 top-1 h-[4px] w-10 -translate-x-1/2 rounded-full" style={{ background: isAdventure ? "rgba(138,97,22,.55)" : "var(--t-card-border)" }} />}
+                <span className={`flex flex-1 items-center gap-1.5 py-1 pl-1.5 pt-2 ${isAdventure ? "font-display text-[18px]" : "text-base font-bold"}`}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M20 3c-6 1-11 6-13 13l-1.5 4.5L10 19c5-2 9-7 10-16z" fill={isAdventure ? "#e9d49a" : "none"} stroke={isAdventure ? "#6b4a12" : "currentColor"} strokeWidth="1.5" strokeLinejoin="round" />
+                    <path d="M7 16l6-6" stroke={isAdventure ? "#6b4a12" : "currentColor"} strokeWidth="1.3" strokeLinecap="round" />
+                  </svg>
+                  Feedback
+                </span>
                 {!isSent && (
                   <button type="button" onClick={leaveOpen} aria-label="Minimize" title="Minimize — continue it later from the feedback button" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -665,8 +694,40 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           )}
         </div>
       )}
+      {celebrate && <SentBurst key={celebrate.key} kind={celebrate.kind} xp={celebrate.xp} x={celebrate.x} y={celebrate.y} isAdventure={isAdventure} />}
     </>,
     document.body
+  );
+}
+
+/** Sealed and sent: a wax-sealed letter that stamps, sparkles, and drifts away. */
+function SentBurst({ kind, xp, x, y, isAdventure }: { kind: WhenKind; xp: number; x: number; y: number; isAdventure: boolean }) {
+  const words = kind === "future" ? "Saved for the future" : kind === "refill" ? "Saved for when credits refill" : "Sealed & sent";
+  return (
+    <div role="status" aria-live="polite" className="pointer-events-none fixed z-[62]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
+      <div className="fb-burst relative flex flex-col items-center">
+        {Array.from({ length: 10 }, (_, i) => (
+          <span key={i} aria-hidden className="fb-spark" style={{ ["--a" as string]: `${i * 36}deg`, ["--d" as string]: `${54 + (i % 3) * 14}px` }} />
+        ))}
+        <svg className="fb-letter" width="84" height="64" viewBox="0 0 84 64" aria-hidden>
+          <rect x="3" y="6" width="78" height="52" rx="6" fill="#f6ecd2" stroke="#8a6116" strokeWidth="2" />
+          <path d="M5 9l37 26L79 9" fill="none" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
+          <g className="fb-seal">
+            <circle cx="42" cy="36" r="11" fill="#a3281c" stroke="#5c120b" strokeWidth="1.5" />
+            <circle cx="42" cy="36" r="6.5" fill="none" stroke="#e8836f" strokeWidth="1.2" />
+            <path d="M38.6 36.4l2.4 2.4 4.6-5" stroke="#ffd9cf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </g>
+        </svg>
+        <span className={`fb-words mt-2 whitespace-nowrap rounded-full px-3.5 py-1 ${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ background: "rgba(20,14,6,.88)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.55)" }}>
+          {words}
+          {xp > 0 && (
+            <b className="ml-2 tabular-nums" style={{ color: "#f2d27e" }}>
+              +{xp} XP
+            </b>
+          )}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -770,7 +831,7 @@ function Composer({
   onOverflow?: (px: number) => void;
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null);
-  const xp = draft.xp ?? 1;
+  const xp = draft.xp ?? autoXp(draft.body);
   const [uploading, setUploading] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
   // Tap an attachment to see it full size.
@@ -849,45 +910,11 @@ function Composer({
         placeholder={draft.kind === "future" ? "An idea for later. It goes in the future ideas log." : "What would make this better?"}
         aria-label="Feedback"
         className="min-h-[72px] flex-1 resize-none rounded-lg border px-3 pt-2 text-[16px] leading-relaxed"
-        style={{ borderColor: "var(--t-panel-border)", paddingBottom: 40, paddingRight: 12, scrollPaddingBottom: 40 }}
+        style={{ borderColor: "var(--t-panel-border)", paddingBottom: 10, paddingRight: 12 }}
       />
-      {/* Add a picture: in the box's lower right corner */}
-      <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1">
-        {!draft.shot && (
-          <button
-            type="button"
-            onClick={async () => {
-              setUploading(true);
-              const url = await captureScreen();
-              setUploading(false);
-              if (url) onChange({ shot: url });
-              else setAttachError("Couldn't take a picture of this screen.");
-            }}
-            title="Add a picture of this screen"
-            aria-label="Add a picture of this screen"
-            className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]"
-            style={{ color: "var(--t-ink-soft)", background: "rgba(255,255,255,.7)" }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="2" />
-              <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        )}
-        {(draft.images ?? []).length < 4 && (
-          <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)", background: "rgba(255,255,255,.7)" }} title="Attach an image (or paste one into the box)" aria-label="Attach an image">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
-              <circle cx="9" cy="10" r="1.8" fill="currentColor" />
-              <path d="M4 17l5-5 4 4 3-3 4 4" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-            </svg>
-            <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => e.target.files && void attach([...e.target.files])} />
-          </label>
-        )}
-      </div>
       </div>
       {/* Screenshots: paste one into the box, or pick from your device. */}
-      {(draft.shot || (draft.images ?? []).length > 0 || uploading || attachError) && (
+      {(
       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
         {[...(draft.shot ? [{ url: draft.shot, label: "Screen picture", remove: () => onChange({ shot: null }) }] : []), ...(draft.images ?? []).map((u, i) => ({ url: u, label: (draft.images ?? []).length > 1 ? `Image ${i + 1}` : "Image", remove: () => onChange({ images: (draft.images ?? []).filter((x) => x !== u) }) }))].map((a) => (
           <span key={a.url} className="flex h-7 items-center rounded-full pl-1" style={{ border: "1px solid var(--t-panel-border)", background: "rgba(255,255,255,.55)" }}>
@@ -906,6 +933,39 @@ function Composer({
         ))}
         {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>Attaching…</span>}
         {attachError && <span className="text-[12.5px]" style={{ color: "var(--t-warn)" }}>{attachError}</span>}
+        <span className="ml-auto flex items-center gap-1">
+        {!draft.shot && (
+          <button
+            type="button"
+            onClick={async () => {
+              setUploading(true);
+              const url = await captureScreen();
+              setUploading(false);
+              if (url) onChange({ shot: url });
+              else setAttachError("Couldn't take a picture of this screen.");
+            }}
+            title="Add a picture of this screen"
+            aria-label="Add a picture of this screen"
+            className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]"
+            style={{ color: "var(--t-ink-soft)" }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="2" />
+              <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
+        {(draft.images ?? []).length < 4 && (
+          <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }} title="Attach an image (or paste one into the box)" aria-label="Attach an image">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
+              <circle cx="9" cy="10" r="1.8" fill="currentColor" />
+              <path d="M4 17l5-5 4 4 3-3 4 4" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            </svg>
+            <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => e.target.files && void attach([...e.target.files])} />
+          </label>
+        )}
+        </span>
       </div>
       )}
       {error && (

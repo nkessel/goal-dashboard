@@ -412,3 +412,27 @@ export async function visualSubjectFor(text: string): Promise<string> {
     return raw;
   }
 }
+
+/**
+ * Repaint a photo as an illustration, keeping its shape and layout (image to
+ * image). Returns PNG bytes. Throws when the service isn't available.
+ */
+export async function illustrateFromPhoto(photo: Buffer, prompt: string): Promise<Buffer> {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+  if (!accountId || !apiToken) throw new Error("The painter isn't set up.");
+  // The model works on a 512px square.
+  const square = await sharp(photo).rotate().resize(512, 512, { fit: "cover" }).png().toBuffer();
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/runwayml/stable-diffusion-v1-5-img2img`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: prompt.slice(0, 1500), image: [...square], strength: 0.62, num_steps: 20, guidance: 7.5 }),
+  });
+  if (!res.ok) throw new Error(`Painting the photo failed (${res.status})`);
+  const type = res.headers.get("content-type") ?? "";
+  if (type.includes("json")) {
+    const j = await res.json().catch(() => null);
+    throw new Error(j?.errors?.[0]?.message ?? "Painting the photo failed");
+  }
+  return Buffer.from(await res.arrayBuffer());
+}

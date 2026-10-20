@@ -1965,3 +1965,31 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 .inv-painting { animation: inv-paint 1.4s ease-in-out infinite; }
 @keyframes inv-paint { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .inv-painting { animation: none; } }
+
+/* Feedback sent: the letter stamps its seal, sparks fly, then it drifts up and away. */
+.fb-burst { animation: fb-away 2.6s ease-in forwards; }
+@keyframes fb-away { 0%, 62% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-70px) scale(.85); opacity: 0; } }
+.fb-letter { animation: fb-pop .42s cubic-bezier(.2,1.6,.4,1) both; filter: drop-shadow(0 6px 14px rgba(0,0,0,.45)); }
+@keyframes fb-pop { from { transform: scale(.4) rotate(-8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.fb-seal { transform-origin: 42px 36px; animation: fb-stamp .5s .3s cubic-bezier(.3,1.8,.5,1) both; }
+@keyframes fb-stamp { from { transform: scale(2.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.fb-words { animation: fb-pop .4s .55s cubic-bezier(.2,1.4,.4,1) both; }
+.fb-spark { position: absolute; left: 50%; top: 32px; width: 7px; height: 7px; margin: -3.5px; border-radius: 9999px; background: radial-gradient(circle, #fff6cf, #f2c94c 60%, transparent 70%); animation: fb-spark .9s .45s ease-out both; }
+@keyframes fb-spark { from { transform: rotate(var(--a)) translateX(0) scale(.4); opacity: 1; } to { transform: rotate(var(--a)) translateX(var(--d)) scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .fb-burst, .fb-letter, .fb-seal, .fb-words, .fb-spark { animation-duration: 1ms; } .fb-burst { animation: fb-away-calm 2.6s linear forwards; } @keyframes fb-away-calm { 0%, 80% { opacity: 1; } 100% { opacity: 0; } } }
+
+/* Quest steps: the share is a quiet number until touched; progress is a slim gold slider. */
+.step-worth { border-bottom: 1px dotted rgba(139,112,64,.5); border-radius: 0; }
+.step-worth:focus { border-bottom-color: #8a6116; background: rgba(255,250,235,.6); }
+.step-progress { -webkit-appearance: none; appearance: none; display: block; height: 14px; background: transparent; cursor: pointer; }
+.step-progress::-webkit-slider-runnable-track { height: 4px; border-radius: 9999px; background: linear-gradient(90deg, #d9b45f var(--p, 0%), rgba(20,26,19,.25) var(--p, 0%)); }
+.step-progress::-moz-range-track { height: 4px; border-radius: 9999px; background: linear-gradient(90deg, #d9b45f var(--p, 0%), rgba(20,26,19,.25) var(--p, 0%)); }
+.step-progress::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 9999px; background: #f2d27e; border: 1.5px solid #8a6116; opacity: 0; transition: opacity 120ms ease; }
+.step-progress::-moz-range-thumb { width: 12px; height: 12px; border-radius: 9999px; background: #f2d27e; border: 1.5px solid #8a6116; opacity: 0; }
+.quest-step:hover .step-progress::-webkit-slider-thumb, .step-progress:focus::-webkit-slider-thumb, .step-progress:active::-webkit-slider-thumb { opacity: 1; }
+.quest-step:hover .step-progress::-moz-range-thumb, .step-progress:focus::-moz-range-thumb { opacity: 1; }
+@media (hover: none) { .step-progress::-webkit-slider-thumb { opacity: .85; } .step-progress::-moz-range-thumb { opacity: .85; } }
+
+/* Event input: an inked line on parchment instead of a white box. */
+.event-input { background: linear-gradient(180deg, rgba(255,248,230,.55), rgba(240,226,190,.45)); border: 1px solid rgba(139,112,64,.35); border-bottom: 2px solid #b8913f; box-shadow: inset 0 1px 3px rgba(80,55,20,.12); }
+.event-input:focus-within, .event-input:focus { border-bottom-color: #8a6116; box-shadow: inset 0 1px 3px rgba(80,55,20,.12), 0 2px 0 rgba(217,180,95,.35); }

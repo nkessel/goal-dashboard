@@ -54,7 +54,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  interactiveWidget: "resizes-content",
+  // The keyboard slides over the page instead of squashing the whole layout.
+  interactiveWidget: "resizes-visual",
 };
 
 export default function RootLayout({ children, drawer }: LayoutProps<"/">) {

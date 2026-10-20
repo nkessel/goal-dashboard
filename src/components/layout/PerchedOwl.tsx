@@ -98,7 +98,6 @@ type Phase = "perched" | "takeoff" | "flying" | "gliding" | "landing";
 const WISDOM = [
   "The longest quest begins with one small step. Take it.",
   "Rest is not retreat. Even spirits perch.",
-  "A bright beak is no use unopened. Speak your need.",
   "Finish one thing, and the forest grows quieter.",
   "The river does not hurry, yet it reaches the sea.",
   "What you water, grows. Choose wisely.",

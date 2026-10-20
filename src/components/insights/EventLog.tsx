@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addCheckNoteAction, deleteCheckNoteAction } from "@/app/actions";
+import { addCheckNoteAction, deleteCheckNoteAction, updateCheckNoteAction } from "@/app/actions";
 
 type Note = { id: string; body: string; created_at: string };
 type When = "now" | "morning" | "yesterday" | "pick";
@@ -111,7 +111,32 @@ export function EventLog({ notes }: { notes: Note[] }) {
     });
   }
 
-  const recent = notes.filter((n) => !gone.has(n.id)).slice(-8).reverse();
+  // Today's show; earlier ones wait folded away.
+  const [showEarlier, setShowEarlier] = useState(false);
+  const [openNote, setOpenNote] = useState<string | null>(null);
+  const [editingNote, setEditingNote] = useState<string | null>(null);
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const all = notes.filter((n) => !gone.has(n.id)).slice(-30).reverse();
+  const todayKey = new Date().toDateString();
+  const todays = all.filter((n) => new Date(n.created_at).toDateString() === todayKey);
+  const earlier = all.filter((n) => new Date(n.created_at).toDateString() !== todayKey);
+  const visible = showEarlier ? all : todays;
+  function saveEdit(id: string, v: string) {
+    setEditingNote(null);
+    const text = v.trim();
+    const before = edits[id] ?? notes.find((n) => n.id === id)?.body ?? "";
+    if (!text || text === before) return;
+    setEdits((e) => ({ ...e, [id]: text }));
+    startTransition(async () => {
+      try {
+        await updateCheckNoteAction(id, text);
+        router.refresh();
+      } catch (e) {
+        setEdits((x) => ({ ...x, [id]: before }));
+        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
   const chip = (on: boolean) =>
     on
       ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }
@@ -125,7 +150,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
         </button>
       ) : (
         <div ref={boxRef} className="reveal flex flex-col gap-2 rounded-xl p-3" style={{ background: "rgba(255,250,235,.6)", border: "1px solid rgba(110,85,40,.25)" }}>
-          <div className="flex min-h-10 flex-wrap items-center gap-1 rounded-lg border px-1.5 py-1" style={{ background: "rgba(255,255,255,.65)", borderColor: "#b39a6a" }}>
+          <div className="event-input flex min-h-11 flex-wrap items-center gap-1 rounded-xl px-2 py-1">
             {tags.map((t) => (
               <span key={t} className="flex h-6 items-center gap-0.5 rounded-full pl-2 pr-0.5 text-[13px] font-semibold" style={{ background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10" }}>
                 #{t}
@@ -146,7 +171,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
               maxLength={200}
               placeholder={tags.length ? "more #tags, or what happened" : "What happened? e.g. Missed my medication #meds"}
               aria-label="What happened, or #tags"
-              className="bare-input h-8 min-w-[140px] flex-1 bg-transparent px-1 text-[15px] focus:outline-none"
+              className="bare-input h-8 min-w-[140px] flex-1 bg-transparent px-1 text-[16px] italic focus:outline-none"
               style={{ color: INK }}
             />
           </div>
@@ -208,38 +233,91 @@ export function EventLog({ notes }: { notes: Note[] }) {
         </div>
       )}
 
-      {recent.length > 0 && (
-        <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label="Recent events and tags">
-          {recent.map((n) => {
+      {visible.length > 0 && (
+        <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label="Events and tags">
+          {visible.map((n) => {
             const tag = /^#\S+$/.test(n.body);
+            const body = edits[n.id] ?? n.body;
             return (
-              <li
-                key={n.id}
-                className="flex h-7 max-w-full items-center gap-1 rounded-full pl-2.5 pr-1 text-[13px]"
-                style={tag ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 } : { background: "rgba(255,250,235,.7)", border: "1px solid rgba(139,112,64,.4)", color: INK }}
-                title={new Date(n.created_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-              >
-                <span className="truncate">{n.body}</span>
-                <span className="shrink-0 text-[11.5px] font-normal" style={{ color: INK_SOFT }}>
-                  · {new Date(n.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                </span>
+              <li key={n.id} className="relative max-w-full">
                 <button
                   type="button"
-                  onClick={() => {
-                    setGone((g) => new Set(g).add(n.id));
-                    void deleteCheckNoteAction(n.id).catch(() => setGone((g) => { const x = new Set(g); x.delete(n.id); return x; }));
-                  }}
-                  aria-label={`Remove “${n.body}”`}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[14px] leading-none hover:bg-black/10"
-                  style={{ color: INK_SOFT }}
+                  onClick={() => setOpenNote(openNote === n.id ? null : n.id)}
+                  aria-expanded={openNote === n.id}
+                  className="flex h-7 max-w-[min(100%,240px)] items-center gap-1 rounded-full pl-2 pr-2.5 text-[13px]"
+                  style={tag ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 } : { background: "rgba(255,250,235,.7)", border: "1px solid rgba(139,112,64,.4)", color: INK }}
                 >
-                  ×
+                  {!tag && <EventGlyph />}
+                  <span className="min-w-0 truncate">{body}</span>
                 </button>
+                {openNote === n.id && (
+                  <div role="dialog" aria-label="Event" className="card-pop-in absolute left-0 top-8 z-20 flex w-[min(300px,80vw)] flex-col gap-2 rounded-xl p-3" style={{ background: "#fbf3df", border: "1.5px solid #b39a6a", boxShadow: "0 10px 24px rgba(0,0,0,.25)" }}>
+                    {editingNote === n.id ? (
+                      <input
+                        autoFocus
+                        defaultValue={body}
+                        maxLength={200}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit(n.id, e.currentTarget.value);
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setEditingNote(null);
+                          }
+                        }}
+                        onBlur={(e) => saveEdit(n.id, e.currentTarget.value)}
+                        aria-label="Edit this event"
+                        className="event-input h-10 rounded-lg px-2.5 text-[16px]"
+                        style={{ color: INK }}
+                      />
+                    ) : (
+                      <div className="flex items-start gap-2">
+                        <p className="m-0 min-w-0 flex-1 break-words text-[15px] leading-snug" style={{ color: INK }}>
+                          {body}
+                        </p>
+                        <button type="button" onClick={() => setEditingNote(n.id)} aria-label="Edit" title="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: INK_SOFT }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-[12.5px]" style={{ color: INK_SOFT }}>
+                      <span className="flex-1">{new Date(n.created_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenNote(null);
+                          setGone((g) => new Set(g).add(n.id));
+                          void deleteCheckNoteAction(n.id).catch(() => setGone((g) => { const x = new Set(g); x.delete(n.id); return x; }));
+                        }}
+                        className="underline"
+                        style={{ color: "#9a3b26" }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
               </li>
             );
           })}
         </ul>
       )}
+      {earlier.length > 0 && (
+        <button type="button" onClick={() => setShowEarlier((v) => !v)} aria-expanded={showEarlier} className="self-start text-[13px] underline underline-offset-2" style={{ color: INK_SOFT }}>
+          {showEarlier ? "Hide earlier ones" : `Earlier (${earlier.length}) ▸`}
+        </button>
+      )}
     </div>
+  );
+}
+
+/** A small event marker: a flag on a post. */
+function EventGlyph() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0" style={{ color: "#8a6116" }}>
+      <path d="M6 21V4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M6 4.5h10.5l-2.2 3.6 2.2 3.6H6" fill="currentColor" fillOpacity=".35" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
   );
 }

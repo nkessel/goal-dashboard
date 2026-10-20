@@ -2,16 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { WEATHER_EVENT, WEATHER_KEY } from "@/lib/use-weather";
+import { saveWeatherPlaceAction } from "@/app/actions";
 
 type Place = { name: string; region: string; lat: number; lon: number };
 
 function save(p: { lat: number; lon: number; name?: string }) {
+  const place = { lat: Math.round(p.lat * 100) / 100, lon: Math.round(p.lon * 100) / 100, name: p.name ?? null };
   try {
-    window.localStorage.setItem(WEATHER_KEY, JSON.stringify({ lat: Math.round(p.lat * 100) / 100, lon: Math.round(p.lon * 100) / 100, name: p.name ?? null }));
+    window.localStorage.setItem(WEATHER_KEY, JSON.stringify(place));
   } catch {
     /* storage unavailable */
   }
   window.dispatchEvent(new Event(WEATHER_EVENT));
+  // Kept on your account too, so every device uses the same place until you change it.
+  void saveWeatherPlaceAction(place).catch(() => {});
 }
 
 /** The saved forecast place's name, if any. */
@@ -35,7 +39,7 @@ export function useWeatherPlaceName(): string | null | undefined {
 
 /**
  * "Show weather": use this device's location, or type a city or ZIP code
- * (for browsers that don't share a location). The place is kept on this device.
+ * (for browsers that don't share a location). The place is kept on your account.
  */
 export function WeatherLocation({ dark = false, label = "Show weather", up = false }: { dark?: boolean; label?: string; up?: boolean }) {
   const [open, setOpen] = useState(false);

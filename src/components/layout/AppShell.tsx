@@ -1,5 +1,6 @@
 import { countUnread, syncImportsNotification } from "@/lib/data/notifications";
 import { getProfileById } from "@/lib/data/profiles";
+import { WeatherSync } from "@/components/ui/WeatherSync";
 import { TopRightAvatar } from "@/components/layout/TopRightAvatar";
 import { ThemeOnBody } from "@/components/layout/ThemeOnBody";
 import { NotificationsButton } from "@/components/layout/NotificationsButton";
@@ -93,6 +94,7 @@ export async function AppShell({
       </div>
 
       {profileId && <FocusTimerPill theme={theme} />}
+      {profileId && <WeatherSync place={profile?.life_wheel?.weather ?? null} />}
       {profileId && <BottomNav theme={theme} name={profile?.name ?? null} toucan={profile?.toucan ?? null} />}
       {profileId && <FeedbackDock theme={theme} />}
       {profileId && <NotificationPreview />}

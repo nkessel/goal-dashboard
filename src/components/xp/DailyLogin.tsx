@@ -6,6 +6,7 @@ import { dailyCheckInAction } from "@/app/actions";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { ProgressCelebration } from "@/components/celebration/ProgressCelebration";
 import { xpToNextLevel } from "@/lib/levels";
+import { lineForDay, retireLine } from "@/lib/greetings";
 
 /** The day's first greeting, in the realm's voice. */
 function dawnHeading() {
@@ -26,6 +27,8 @@ type Award = { xp: number; streak: number; coins: number; fromPct: number; toPct
 export function DailyLogin() {
   const router = useRouter();
   const [award, setAward] = useState<Award | null>(null);
+  const [line, setLine] = useState<string | null>(null);
+  const [retired, setRetired] = useState(false);
 
   useEffect(() => {
     // The app's day turns over at 5:30am local time.
@@ -52,6 +55,7 @@ export function DailyLogin() {
             caption = `Level ${after.level} · ${after.xpIntoLevel} / ${after.xpForNextLevel} XP to level ${after.nextLevel}`;
           } else caption = `Level ${after.level} · max level`;
         }
+        setLine(lineForDay(today));
         setAward({ xp: r.xpAwarded, streak: r.streakCount, coins: r.award?.coinsEarned ?? 0, fromPct, toPct, caption });
         router.refresh();
       })
@@ -68,6 +72,27 @@ export function DailyLogin() {
       fromPct={award.fromPct}
       toPct={award.toPct}
       barCaption={award.caption}
+      extra={
+        line ? (
+          <div className="mt-1 flex w-full flex-col items-center gap-1.5" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+            <p className={`m-0 text-[16px] leading-snug ${retired ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
+              {line}
+            </p>
+            <label className="flex cursor-pointer items-center gap-1.5 text-[12px]" style={{ color: "#6b5631" }}>
+              <input
+                type="checkbox"
+                checked={retired}
+                onChange={(e) => {
+                  setRetired(e.target.checked);
+                  retireLine(line, e.target.checked);
+                }}
+                className="h-3.5 w-3.5"
+              />
+              Don&rsquo;t show this line again
+            </label>
+          </div>
+        ) : null
+      }
       onClose={() => setAward(null)}
     />
   );

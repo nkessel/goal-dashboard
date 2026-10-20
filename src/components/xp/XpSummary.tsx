@@ -162,9 +162,19 @@ export function XpSummary({
                 />
               </div>
               <div className="text-center text-[13.5px] tabular-nums tracking-wide sm:text-[15px]" style={{ color: "var(--t-gold)" }}>
-                {nextLevel
-                  ? `${Math.min(xpIntoLevel, xpForNextLevel!).toLocaleString("en-US")} / ${xpForNextLevel!.toLocaleString("en-US")} XP`
-                  : `${profile.total_xp.toLocaleString("en-US")} XP · Max level`}
+                {nextLevel ? (
+                  heldByBoss || xpIntoLevel > xpForNextLevel! ? (
+                    // XP keeps counting while the level boss holds the door.
+                    <>
+                      {xpIntoLevel.toLocaleString("en-US")} / {xpForNextLevel!.toLocaleString("en-US")} XP
+                      <span className="ml-1.5 text-[12px] opacity-80">· +{(xpIntoLevel - xpForNextLevel!).toLocaleString("en-US")} banked</span>
+                    </>
+                  ) : (
+                    `${xpIntoLevel.toLocaleString("en-US")} / ${xpForNextLevel!.toLocaleString("en-US")} XP`
+                  )
+                ) : (
+                  `${profile.total_xp.toLocaleString("en-US")} XP · Max level`
+                )}
               </div>
               <CharacterStats order={Array.isArray(profile.stats) ? profile.stats : [...DEFAULT_STATS]} xp={profile.stat_xp ?? {}} />
             </div>

@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
 import { requireSession } from "@/lib/session";
+import { listBoardsForOwner } from "@/lib/data/boards";
+import { wheelAreasFrom } from "@/lib/wheel-areas";
 import { AppShell } from "@/components/layout/AppShell";
 import { PlanRitual } from "@/components/plan/PlanRitual";
 import { PairRitual } from "@/components/plan/PairRitual";
@@ -45,6 +47,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   }
   const live = open.filter((t) => !t.needs_review && !t.reward_id);
   const review = questsToReview(live);
+  const boardAreas = wheelAreasFrom(await listBoardsForOwner(session.user.id).catch(() => []));
   const wheelLast: Record<string, { level: number; at: string }> = {};
   for (const c of checks) if (c.metric.startsWith("◎ ")) wheelLast[c.metric.slice(2)] = { level: c.level, at: c.created_at };
   const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -82,7 +85,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
         review={{ overdue: review.overdue.map((t) => ({ id: t.id, title: t.title, due: t.due_at ?? null, board: t.categoryLabel })), stale: review.stale.map((t) => ({ id: t.id, title: t.title, due: t.due_at ?? null, board: t.categoryLabel })) }}
         someday={live.filter((t) => t.categoryLabel === "Someday / Maybe").map((t) => ({ id: t.id, title: t.title, due: null, board: t.categoryLabel }))}
         boards={boards.filter((b) => !b.isVirtual).map((b) => ({ id: b.id, title: b.title, open: b.questTotal - b.questDone }))}
-        wheel={{ topics: profile?.life_wheel?.topics?.length ? profile.life_wheel.topics : DEFAULT_WHEEL, last: wheelLast }}
+        wheel={{ topics: boardAreas.length >= 3 ? boardAreas : profile?.life_wheel?.topics?.length ? profile.life_wheel.topics : DEFAULT_WHEEL, last: wheelLast }}
         calendar={{ dayKeys: Array.from({ length: 7 }, (_, i) => dayKey(new Date(start.getTime() + i * 86_400_000))), tasks: calTasks, events, toSchedule, folders }}
       />
     </AppShell>
