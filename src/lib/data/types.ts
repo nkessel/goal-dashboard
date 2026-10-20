@@ -95,6 +95,10 @@ export type Task = {
   is_power_up?: boolean;
   /** The quest board this quest belongs to (null = no board). */
   board_id?: string | null;
+  /** Other boards it also shows on (linked there, still living on board_id). */
+  also_on?: string[] | null;
+  /** On a board it's linked to: the name of the board it lives on. */
+  home_board_title?: string | null;
   /** 0–5: how much energy it takes (0 = unrated). */
   effort?: number;
   /** Kept in view on its board, but not actionable yet (off Today, the map and Power-ups). */

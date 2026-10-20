@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import {
+  setTaskAlsoOnAction,
   completeTaskAction,
   createBoardFromEditorAction,
   createQuestAction,
@@ -217,6 +218,18 @@ export function QuestEditorDialog({
   const initialBoard = task ? (task.board_id ?? null) : (create?.boardId ?? null);
   const [boardId, setBoardId] = useState<string | null>(initialBoard);
   const [boardOptions, setBoardOptions] = useState<{ id: string; label: string }[] | null>(null);
+  const [alsoOn, setAlsoOn] = useState<string[]>(task?.also_on ?? []);
+  const [alsoError, setAlsoError] = useState<string | null>(null);
+  function saveAlsoOn(next: string[]) {
+    if (!task) return;
+    const prev = alsoOn;
+    setAlsoOn(next);
+    setAlsoError(null);
+    setTaskAlsoOnAction(task.id, next).catch((e) => {
+      setAlsoOn(prev);
+      setAlsoError(e instanceof Error ? e.message : "Couldn't save that.");
+    });
+  }
   const isCompleted = task?.status === "completed";
   const progressTracked = typeof task?.xp_awarded === "number";
   const initialProgress = task?.progress ?? 0;
@@ -1504,6 +1517,38 @@ export function QuestEditorDialog({
               fieldStyle={fieldStyle}
             />
           </div>
+
+          {/* Also show it on other boards (it still lives on the one above). */}
+          {task && !review && (
+            <div className="-mt-1 flex flex-wrap items-center gap-1.5 pl-[86px] text-[13px]">
+              <span style={{ color: "var(--t-ink-soft)" }}>Also on</span>
+              {alsoOn.map((id) => (
+                <span key={id} className="flex h-7 items-center gap-0.5 rounded-full pl-2.5 pr-0.5" style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}>
+                  ↗ {boardOptions?.find((o) => o.id === id)?.label ?? "a board"}
+                  <button type="button" onClick={() => saveAlsoOn(alsoOn.filter((x) => x !== id))} aria-label="Unlink from this board" className="flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+                    ×
+                  </button>
+                </span>
+              ))}
+              <select
+                value=""
+                onChange={(e) => e.target.value && saveAlsoOn([...alsoOn, e.target.value])}
+                aria-label="Also show it on another board"
+                className="h-7 max-w-[180px] rounded-full border px-2 text-[13px]"
+                style={{ borderColor: "#b39a6a", background: "transparent", color: "var(--t-ink)" }}
+              >
+                <option value="">+ another board…</option>
+                {(boardOptions ?? [])
+                  .filter((o) => o.id !== boardId && !alsoOn.includes(o.id))
+                  .map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+              </select>
+              {alsoError && <span style={{ color: "var(--t-warn)" }}>{alsoError}</span>}
+            </div>
+          )}
 
           {isCompleted && task && (
             <div

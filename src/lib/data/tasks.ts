@@ -290,7 +290,16 @@ export async function listTasksForBoard(boardId: string, ownerId: string): Promi
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw new Error(`Failed to list board quests: ${error.message}`);
-  return attachStepCounts((data ?? []) as Task[], ownerId);
+  // Quests that live on another board but are linked here too.
+  let linked: Task[] = [];
+  const res = await db.from("tasks").select("*").eq("owner_id", ownerId).contains("also_on", [boardId]).neq("board_id", boardId);
+  if (!res.error && res.data?.length) {
+    const homes = [...new Set((res.data as Task[]).map((t) => t.board_id).filter(Boolean))] as string[];
+    const { data: hb } = await db.from("boards").select("id, title").in("id", homes);
+    const title = new Map((hb ?? []).map((b) => [b.id as string, b.title as string]));
+    linked = (res.data as Task[]).map((t) => ({ ...t, home_board_title: t.board_id ? (title.get(t.board_id) ?? null) : null }));
+  }
+  return attachStepCounts([...((data ?? []) as Task[]), ...linked], ownerId);
 }
 
 /** Queue a quest for a background-painted portrait (see PortraitPainter). */

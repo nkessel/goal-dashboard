@@ -2605,3 +2605,16 @@ export async function makeRefillQuestAction(itemName: string) {
   revalidatePath("/");
   return task.id;
 }
+
+/** Show a quest on other boards too (it keeps living on its own board). */
+export async function setTaskAlsoOnAction(taskId: string, boardIds: string[]) {
+  const ownerId = await requireProfileId();
+  const { data: t } = await supabaseAdmin().from("tasks").select("board_id, also_on").eq("id", taskId).eq("owner_id", ownerId).maybeSingle<{ board_id: string | null; also_on: string[] | null }>();
+  if (!t) throw new Error("Quest not found.");
+  const clean = [...new Set(boardIds.filter((b) => b && b !== t.board_id))].slice(0, 8);
+  const { error } = await supabaseAdmin().from("tasks").update({ also_on: clean }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(/also_on/.test(error.message) ? "Linking to more boards needs a quick database update first." : `Couldn't save: ${error.message}`);
+  for (const b of new Set([...(t.also_on ?? []), ...clean])) revalidatePath(`/boards/${b}`);
+  revalidatePath("/boards");
+  return clean;
+}

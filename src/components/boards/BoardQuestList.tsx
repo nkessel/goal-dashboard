@@ -47,6 +47,8 @@ export function BoardQuestList({
       /* storage unavailable */
     }
   }
+  // A quest linked here from another board wears that board's name.
+  const linkTag = (t: Task) => (boardId && t.board_id && t.board_id !== boardId && t.home_board_title ? `↗ ${t.home_board_title}` : undefined);
   const next = boardId ? (nextActionOf({ id: boardId, next_task_id: nextTaskId }, open) ?? open[0]) : open[0];
   const foggy = open.length > 2 && !!next;
   const rest = foggy ? open.filter((t) => t.id !== next!.id) : open;
@@ -60,7 +62,7 @@ export function BoardQuestList({
             Next step
           </h2>
           <ul className="flex flex-col gap-3">
-            <TaskRow task={next!} theme={theme} />
+            <TaskRow task={next!} theme={theme} categoryLabel={linkTag(next!)} />
           </ul>
         </section>
       )}
@@ -90,7 +92,7 @@ export function BoardQuestList({
         (!foggy || revealed) && (
           <ul className={`flex flex-col gap-3 ${foggy ? "fade-in" : ""}`}>
             {rest.map((t) => (
-              <TaskRow key={t.id} task={t} theme={theme} />
+              <TaskRow key={t.id} task={t} theme={theme} categoryLabel={linkTag(t)} />
             ))}
           </ul>
         )

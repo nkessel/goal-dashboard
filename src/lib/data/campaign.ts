@@ -28,7 +28,15 @@ export async function loadCampaign(boardId: string, ownerId: string) {
     .eq("owner_id", ownerId)
     .in("board_id", [...inside])
     .is("mission_id", null);
-  const rows = ((data ?? []) as unknown as Row[]).filter((t) => !t.needs_review && !t.is_aspiration);
+  // Quests from elsewhere that are linked onto this campaign's boards.
+  const linkedRes = await db
+    .from("tasks")
+    .select("id, title, status, completed_at, icon_key, icon_source, xp_value, sort_order, created_at, due_at, board_id, is_aspiration, is_private, needs_review, also_on")
+    .eq("owner_id", ownerId)
+    .overlaps("also_on", [...inside]);
+  const seenIds = new Set((data ?? []).map((t) => t.id as string));
+  const linked = linkedRes.error ? [] : ((linkedRes.data ?? []) as unknown as (Row & { also_on: string[] })[]).filter((t) => !seenIds.has(t.id)).map((t) => ({ ...t, board_id: t.also_on.find((b) => inside.has(b)) ?? t.board_id }));
+  const rows = ([...((data ?? []) as unknown as Row[]), ...linked] as Row[]).filter((t) => !t.needs_review && !t.is_aspiration);
   const withRegion = rows.map((t) => ({ ...t, region: t.board_id && t.board_id !== boardId ? (names.get(t.board_id) ?? "") : "" }));
   const done = withRegion.filter((t) => t.status === "completed").sort((a, b) => (a.completed_at ?? "").localeCompare(b.completed_at ?? ""));
   const nextIds = new Set(all.filter((b) => inside.has(b.id) && b.next_task_id).map((b) => b.next_task_id!));
