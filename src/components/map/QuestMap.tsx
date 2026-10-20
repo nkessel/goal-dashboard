@@ -4,13 +4,16 @@ import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { CampaignStop } from "@/lib/data/campaign";
-import { getQuestForEditAction } from "@/app/actions";
+import { getQuestForEditAction, saveMapPrefsAction } from "@/app/actions";
+import { DONE_ICONS, DoneGlyph, GOAL_ICONS, GoalGlyph, type DoneIcon, type GoalIcon } from "./MapIcons";
 import { segments, type Pt } from "@/lib/curves";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 
-/** Upcoming steps you can see clearly; beyond them, the mist. */
-const CLEAR_AHEAD = 3;
+/** How the map looks, set per board from its gear. */
+type MapPrefs = { clearAhead: number; fog: boolean; goal: GoalIcon; done: DoneIcon; order: "done-first" | "as-planned"; labels: "all" | "near" };
+const DEFAULT_PREFS: MapPrefs = { clearAhead: 3, fog: true, goal: "castle", done: "check", order: "done-first", labels: "all" };
+const AHEAD = [1, 2, 3, 5, 99];
 const STEP = 112;
 const TOKEN = 56;
 
@@ -20,7 +23,16 @@ const TOKEN = 56;
  * and the rest of the road waits in the mist until you get close. The
  * destination is always in view above it.
  */
-export function QuestMap({ board, stops }: { board: { id: string; title: string }; stops: CampaignStop[] }) {
+export function QuestMap({ board, stops: allStops, initialPrefs = null }: { board: { id: string; title: string }; stops: CampaignStop[]; initialPrefs?: Record<string, unknown> | null }) {
+  const [prefs, setPrefs] = useState<MapPrefs>({ ...DEFAULT_PREFS, ...((initialPrefs ?? {}) as Partial<MapPrefs>) });
+  const [showSettings, setShowSettings] = useState(false);
+  function setPref(patch: Partial<MapPrefs>) {
+    const next = { ...prefs, ...patch };
+    setPrefs(next);
+    void saveMapPrefsAction(board.id, next).catch(() => {});
+  }
+  // "As planned": finished steps keep their place in the road instead of gathering at the start.
+  const stops = prefs.order === "done-first" ? allStops : [...allStops].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.created_at ?? "").localeCompare(b.created_at ?? ""));
   const box = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   const [opening, setOpening] = useState<Task | null>(null);
@@ -40,7 +52,7 @@ export function QuestMap({ board, stops }: { board: { id: string; title: string 
   const n = stops.length;
   const doneCount = stops.filter((s) => s.status === "completed").length;
   const nextIdx = stops.findIndex((s) => s.status !== "completed");
-  const fogFrom = nextIdx < 0 ? n : nextIdx + CLEAR_AHEAD;
+  const fogFrom = !prefs.fog || nextIdx < 0 ? n : nextIdx + prefs.clearAhead;
   const xpEarned = stops.filter((s) => s.status === "completed").reduce((a, s) => a + (s.xp_value ?? 0), 0);
   const xpAhead = stops.filter((s) => s.status !== "completed").reduce((a, s) => a + (s.xp_value ?? 0), 0);
 
@@ -83,7 +95,70 @@ export function QuestMap({ board, stops }: { board: { id: string; title: string 
         <span className="ml-auto text-[13px] tabular-nums" style={{ color: "var(--t-cream)", opacity: 0.8 }}>
           {doneCount} of {n} steps · {xpEarned} XP earned · {xpAhead} ahead
         </span>
+        <button
+          type="button"
+          onClick={() => setShowSettings((v) => !v)}
+          aria-expanded={showSettings}
+          aria-label="Map settings"
+          title="Map settings"
+          className="hover-glow flex h-9 w-9 items-center justify-center rounded-full"
+          style={{ background: "rgba(10,12,32,.6)", border: "1.5px solid rgba(217,180,95,.45)", color: "var(--t-gold)" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.9" />
+            <path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1M18.7 18.7l-2.1-2.1M7.4 7.4L5.3 5.3" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+          </svg>
+        </button>
       </div>
+
+      {showSettings && (
+        <section aria-label="Map settings" className="reveal parchment parchment-framed flex flex-col gap-3 rounded-2xl p-4" style={{ color: "#2a1c10" }}>
+          <Row label="See ahead" hint="How many upcoming steps stand clear of the mist">
+            {AHEAD.map((a) => (
+              <Chip key={a} on={prefs.clearAhead === a} onClick={() => setPref({ clearAhead: a, fog: true })}>
+                {a === 99 ? "All" : a}
+              </Chip>
+            ))}
+            <Chip on={!prefs.fog} onClick={() => setPref({ fog: !prefs.fog })}>
+              No mist
+            </Chip>
+          </Row>
+          <Row label="Destination" hint="What waits at the end of the road">
+            {GOAL_ICONS.map((g) => (
+              <button key={g.key} type="button" onClick={() => setPref({ goal: g.key })} aria-pressed={prefs.goal === g.key} title={g.label} className="flex flex-col items-center gap-0.5 rounded-xl px-1.5 pb-1 pt-1.5" style={{ background: prefs.goal === g.key ? "rgba(217,180,95,.4)" : "transparent", border: `1.5px solid ${prefs.goal === g.key ? "#8a6116" : "transparent"}` }}>
+                <GoalGlyph icon={g.key} size={38} />
+                <span className="text-[11px] font-semibold">{g.label}</span>
+              </button>
+            ))}
+          </Row>
+          <Row label="Steps taken" hint="The mark on a finished step">
+            {DONE_ICONS.map((d) => (
+              <button key={d.key} type="button" onClick={() => setPref({ done: d.key })} aria-pressed={prefs.done === d.key} title={d.label} className="flex flex-col items-center gap-0.5 rounded-xl px-1.5 pb-1 pt-1.5" style={{ background: prefs.done === d.key ? "rgba(217,180,95,.4)" : "transparent", border: `1.5px solid ${prefs.done === d.key ? "#8a6116" : "transparent"}` }}>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "2px solid #f2d27e" }}>
+                  <DoneGlyph icon={d.key} size={20} />
+                </span>
+                <span className="text-[11px] font-semibold">{d.label}</span>
+              </button>
+            ))}
+          </Row>
+          <Row label="Order" hint="Where finished steps sit on the road">
+            <Chip on={prefs.order === "done-first"} onClick={() => setPref({ order: "done-first" })}>
+              Done first
+            </Chip>
+            <Chip on={prefs.order === "as-planned"} onClick={() => setPref({ order: "as-planned" })}>
+              As planned
+            </Chip>
+          </Row>
+          <Row label="Names" hint="Which steps show their names">
+            <Chip on={prefs.labels === "all"} onClick={() => setPref({ labels: "all" })}>
+              Every step
+            </Chip>
+            <Chip on={prefs.labels === "near"} onClick={() => setPref({ labels: "near" })}>
+              Only nearby
+            </Chip>
+          </Row>
+        </section>
+      )}
 
       <div ref={box} className="quest-map parchment parchment-framed relative overflow-hidden rounded-2xl" style={{ height: H }}>
         {w > 0 && (
@@ -113,9 +188,7 @@ export function QuestMap({ board, stops }: { board: { id: string; title: string 
         {/* The destination: always in view, high above the mist. */}
         {w > 0 && (
           <div className="absolute z-[4] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: goal.x, top: goal.y }}>
-            <span aria-hidden className={`text-[44px] leading-none ${nextIdx < 0 ? "map-goal-won" : ""}`}>
-              🏰
-            </span>
+            <GoalGlyph icon={prefs.goal} size={58} glow={nextIdx < 0} />
             <span className="font-display mt-1 max-w-[240px] rounded-full px-3 py-0.5 text-center text-[15px]" style={{ background: "rgba(42,28,16,.85)", color: "#f2d27e", border: "1px solid rgba(242,210,126,.6)" }}>
               {nextIdx < 0 ? `${board.title} — conquered!` : board.title}
             </span>
@@ -171,9 +244,7 @@ export function QuestMap({ board, stops }: { board: { id: string; title: string 
                       </span>
                     ) : done && !art ? (
                       <span className="flex h-full w-full items-center justify-center" style={{ background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)" }}>
-                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#3b2a10" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <DoneGlyph icon={prefs.done} size={26} />
                       </span>
                     ) : art ? (
                       // eslint-disable-next-line @next/next/no-img-element -- quest portrait
@@ -190,7 +261,7 @@ export function QuestMap({ board, stops }: { board: { id: string; title: string 
                     )}
                   </span>
                 </button>
-                {!fogged && (
+                {!fogged && (prefs.labels === "all" || done ? prefs.labels === "all" || i >= nextIdx - 1 : true) && (
                   <span
                     className="absolute z-[2] flex max-w-[42%] -translate-y-1/2 flex-col"
                     style={{ top: p.y, ...(right ? { left: p.x + TOKEN / 2 + 10 } : { right: w - p.x + TOKEN / 2 + 10, alignItems: "flex-end", textAlign: "right" }) }}
@@ -231,5 +302,27 @@ export function QuestMap({ board, stops }: { board: { id: string; title: string 
       )}
       {opening && <EditTaskModal task={opening} theme="adventure" onClose={() => setOpening(null)} />}
     </div>
+  );
+}
+
+function Row({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
+  return (
+    <div className="relative z-[1] flex flex-col gap-1.5">
+      <span className="flex items-baseline gap-2">
+        <span className="font-display text-[16px]">{label}</span>
+        <span className="text-[12px]" style={{ color: "#6b5631" }}>
+          {hint}
+        </span>
+      </span>
+      <div className="flex flex-wrap items-end gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={on} className="h-9 min-w-9 rounded-full px-3 text-[13.5px] font-semibold" style={on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913" } : { border: "1px solid rgba(139,112,64,.45)" }}>
+      {children}
+    </button>
   );
 }

@@ -2710,3 +2710,11 @@ export async function deleteQuestTemplateAction(id: string) {
   await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, templates: next } }).eq("id", ownerId);
   return next;
 }
+
+/** A quest map's look and how far ahead it shows (per board). */
+export async function saveMapPrefsAction(boardId: string, prefs: Record<string, unknown>) {
+  const ownerId = await requireProfileId();
+  const extras = await readExtras(ownerId);
+  const all = { ...((extras.mapPrefs as Record<string, unknown>) ?? {}), [boardId.slice(0, 40)]: JSON.parse(JSON.stringify(prefs ?? {})) };
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, mapPrefs: all } }).eq("id", ownerId);
+}
