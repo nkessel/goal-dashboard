@@ -2673,3 +2673,40 @@ export async function saveWeatherPlaceAction(place: { lat: number; lon: number; 
   const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
   await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), weather: { lat, lon, name: place.name?.slice(0, 60) ?? null } } }).eq("id", ownerId);
 }
+
+// ---------------------------------------------------------------------------
+// Quest templates (kept with your other personal extras)
+
+async function readExtras(ownerId: string) {
+  const { data } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
+  return data?.life_wheel ?? {};
+}
+
+export async function listQuestTemplatesAction() {
+  const ownerId = await requireProfileId();
+  const { normalizeTemplates } = await import("@/lib/quest-templates");
+  return normalizeTemplates((await readExtras(ownerId)).templates);
+}
+
+/** Add a template, or replace the one with the same id. */
+export async function saveQuestTemplateAction(tpl: unknown) {
+  const ownerId = await requireProfileId();
+  const { normalizeTemplates } = await import("@/lib/quest-templates");
+  const [clean] = normalizeTemplates([tpl]);
+  if (!clean) throw new Error("That template needs a title.");
+  const extras = await readExtras(ownerId);
+  const list = normalizeTemplates(extras.templates).filter((t) => t.id !== clean.id);
+  const next = [...list, clean].sort((a, b) => a.name.localeCompare(b.name));
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, templates: next } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save the template: ${error.message}`);
+  return next;
+}
+
+export async function deleteQuestTemplateAction(id: string) {
+  const ownerId = await requireProfileId();
+  const { normalizeTemplates } = await import("@/lib/quest-templates");
+  const extras = await readExtras(ownerId);
+  const next = normalizeTemplates(extras.templates).filter((t) => t.id !== id);
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, templates: next } }).eq("id", ownerId);
+  return next;
+}
