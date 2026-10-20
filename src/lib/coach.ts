@@ -7,14 +7,15 @@
 
 export type CoachMsg = { role: "user" | "assistant"; content: string; at?: string };
 export type CoachNote = { id: string; text: string; at: string };
-export type CoachPromise = { id: string; text: string; due: string | null; questId?: string | null; status: "open" | "kept" | "missed" | "released"; at: string };
+/** A promise or reminder. `next` ("Dad") means "next time": it comes up when a calendar event that mentions it is near. */
+export type CoachPromise = { id: string; text: string; due: string | null; next?: string | null; questId?: string | null; status: "open" | "kept" | "missed" | "released"; at: string };
 export type CoachState = { history: CoachMsg[]; notes: CoachNote[]; promises: CoachPromise[] };
 
 export type CoachAction =
   | { type: "steps"; questId: string; quest: string; steps: string[] }
   | { type: "plan"; questId: string; quest: string }
   | { type: "start"; questId: string; quest: string; minutes: number }
-  | { type: "promise"; text: string; when: string | null; questId: string | null }
+  | { type: "promise"; text: string; when: string | null; next: string | null; questId: string | null }
   | { type: "newquest"; title: string; minutes: number | null }
   | { type: "journal"; text: string }
   | { type: "remember"; note: string };
@@ -74,7 +75,9 @@ export function parseReply(raw: string, quests: { id: string; title: string }[])
       if (!text) continue;
       const when = s(o.when, 30);
       const q = s(o.quest) ? matchQuest(s(o.quest), quests) : null;
-      out.push({ type, text, when: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(when) ? when.slice(0, 16) : null, questId: q?.id ?? null });
+      const at = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(when) ? when.slice(0, 16) : null;
+      const next = at ? null : s(o.next, 40) || null;
+      out.push({ type, text, when: at, next, questId: q?.id ?? null });
     } else if (type === "newquest") {
       const title = s(o.title, 120);
       if (title && !matchQuest(title, quests)) out.push({ type, title, minutes: Number(o.minutes) > 0 ? Math.min(480, Math.round(Number(o.minutes))) : null });
@@ -87,6 +90,29 @@ export function parseReply(raw: string, quests: { id: string; title: string }[])
     }
   }
   return { text, actions: out.slice(0, 4) };
+}
+
+/** Does a calendar event mention this "next time" word (whole word, any case)? */
+export function eventMentions(title: string, next: string) {
+  const w = next.trim().toLowerCase().replace(/^(my|the)\s+/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return !!w && new RegExp(`(^|[^a-z0-9])${w}('?s)?([^a-z0-9]|$)`, "i").test(title);
+}
+
+/**
+ * What's worth bringing up now, besides promises whose time has passed:
+ * "next time" reminders whose calendar event is near (soonest first), and
+ * reminders with no time at all, to keep in mind.
+ */
+export function readyReminders(promises: CoachPromise[], events: { title: string; start: string; end: string }[]) {
+  const open = promises.filter((p) => p.status === "open");
+  const nextNear = open
+    .filter((p) => p.next)
+    .flatMap((p) => {
+      const e = events.filter((ev) => eventMentions(ev.title, p.next!)).sort((a, b) => Date.parse(a.start) - Date.parse(b.start))[0];
+      return e ? [{ promise: p, event: e }] : [];
+    });
+  const standing = open.filter((p) => !p.due && !p.next);
+  return { nextNear, standing };
 }
 
 /** Promises whose time has come and that haven't been followed up. */
@@ -117,13 +143,13 @@ export function coachSystemPrompt(o: {
 {"type":"steps","quest":"<exact title>","steps":["tiny concrete step", ...]}  (2–6 steps)
 {"type":"plan","quest":"<exact title>"}  (estimate it and give it a time)
 {"type":"start","quest":"<exact title>","minutes":10}  (begin together now)
-{"type":"promise","text":"When …, I will …","when":"YYYY-MM-DDTHH:MM","quest":"<exact title or empty>"}  (also for "remind me…": set "when" if they gave a time, otherwise use "" and ask when they'd like the reminder)
+{"type":"promise","text":"When …, I will …","when":"YYYY-MM-DDTHH:MM","next":"","quest":"<exact title or empty>"}  (also for every "remind me…" / "don't let me forget…", one promise per thing. "when": if they gave a time. "next": for "next time I see/visit/am at X", the one word for X as it would appear on their calendar, e.g. "Dad" or "Tiffany". Neither? Leave both empty: it's kept in mind and brought up when they open the app. The card is the confirmation, so don't ask "shall I?")
 {"type":"newquest","title":"…","minutes":20}  (only for something they named that isn't in the list)
 {"type":"journal","text":"…"}  (save a reflection they wrote, in their words)
 {"type":"remember","note":"…"}  (a lasting fact about them: values, what helps, what's hard. Never for reminders, errands or to-dos)
 Offer actions only when they fit; often none. Omit the ACTIONS line when there are none.`,
     block("What you remember about them", o.notes),
-    block("Promises they've made", o.promises),
+    block("Their promises and reminders (if they mention being with someone or somewhere marked \"next time\", bring that reminder up)", o.promises),
     block("Their life areas (boards)", o.areas),
     block("Their aspirations (dreams, not yet quests)", o.aspirations),
     block("Done recently", o.wins),

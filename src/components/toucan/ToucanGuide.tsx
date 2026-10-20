@@ -61,20 +61,52 @@ export function ToucanGuide() {
     return () => window.removeEventListener("toucan-talk", h);
   }, []);
 
-  // Once a day, on Today, a little while after you arrive.
+  // On Today, a little while after you arrive: a reminder first (each one once a
+  // day), otherwise, once a day, a quest that's been waiting.
   useEffect(() => {
     if (pathname !== "/") return;
-    try {
-      if (window.localStorage.getItem(NUDGE_DAY_KEY) === todayKey()) return;
-    } catch {
-      return;
-    }
     const t = setTimeout(async () => {
       const watch = await toucanWatchAction().catch(() => null);
       if (!watch) return;
+      const day = todayKey();
+      const shown = (id: string) => {
+        try {
+          return window.localStorage.getItem(`toucan-reminded:${id}`) === day;
+        } catch {
+          return true;
+        }
+      };
+      const mark = (id: string) => {
+        try {
+          window.localStorage.setItem(`toucan-reminded:${id}`, day);
+        } catch {}
+      };
+      const done = (p: CoachPromise) => ({ label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: p.id, status: "kept" } }).then(() => window.dispatchEvent(new Event("toucan-promises"))).catch(() => {}) });
+      const later = { label: "Later", run: () => {} };
+      const say = (text: string, actions: { label: string; run: () => void }[]) => window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text, actions } }));
+      // "Next time" reminders whose calendar event is near.
+      const near = (watch.nextNear as { promise: CoachPromise; event: { title: string; start: string } }[]).find((n) => !shown(n.promise.id));
+      if (near) {
+        mark(near.promise.id);
+        const start = Date.parse(near.event.start);
+        const whenText = start <= Date.now() ? "now" : `at ${new Date(start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${new Date(start).toDateString() === new Date().toDateString() ? "" : " tomorrow"}`;
+        say(`“${near.event.title}” is ${whenText}. Remember: ${near.promise.text}`, [done(near.promise), later]);
+        return;
+      }
+      // Reminders with no time: kept in mind, brought up once a day.
+      const standing = (watch.standing as CoachPromise[]).filter((p) => !shown(p.id));
+      if (standing.length) {
+        standing.forEach((p) => mark(p.id));
+        const [first, ...rest] = standing;
+        say(`Don't forget: ${first.text}${rest.length ? ` (and ${rest.length} more: ${rest.map((p) => p.text).join("; ")})` : ""}`, [done(first), later]);
+        return;
+      }
       try {
-        window.localStorage.setItem(NUDGE_DAY_KEY, todayKey());
-      } catch {}
+        if (window.localStorage.getItem(NUDGE_DAY_KEY) === day) return;
+        window.localStorage.setItem(NUDGE_DAY_KEY, day);
+      } catch {
+        return;
+      }
       // A promise whose time has passed comes first: how did it go?
       const owed = watch.due[0] as CoachPromise | undefined;
       if (owed) {
@@ -141,6 +173,28 @@ export function ToucanGuide() {
             );
             if (unseen) talkToToucan(undefined, "talk");
           }, Math.max(0, ms))
+        );
+      }
+      // "Next time": when the event starts, the toucan says so.
+      for (const n of (w.nextNear ?? []) as { promise: CoachPromise; event: { title: string; start: string } }[]) {
+        const ms = Date.parse(n.event.start) - Date.now();
+        if (ms <= 0 || ms > 12 * 3_600_000) continue;
+        timers.push(
+          setTimeout(() => {
+            const unseen = window.dispatchEvent(
+              new CustomEvent("toucan-nudge", {
+                cancelable: true,
+                detail: {
+                  text: `“${n.event.title}” is starting. Remember: ${n.promise.text}`,
+                  actions: [
+                    { label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: n.promise.id, status: "kept" } }).then(arm).catch(() => {}) },
+                    { label: "Later", run: () => {} },
+                  ],
+                },
+              })
+            );
+            if (unseen) talkToToucan(undefined, "talk");
+          }, ms)
         );
       }
     };
@@ -345,16 +399,16 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose }: { initial
               {promises.length > 0 && (
                 <>
                   <span className="mt-1 text-[12px] font-bold uppercase tracking-[.14em]" style={{ color: "rgba(140,240,220,.8)" }}>
-                    Your promises
+                    Reminders &amp; promises
                   </span>
                   {promises.map((p) => (
                     <span key={p.id} className="flex items-start gap-2 text-[13.5px] leading-snug">
                       <span className="flex-1">
                         {p.text}
-                        {p.due && <span style={{ color: "rgba(232,255,248,.6)" }}> · {when(p.due)}</span>}
+                        {(p.due || p.next) && <span style={{ color: "rgba(232,255,248,.6)" }}> · {p.due ? when(p.due) : `next time: ${p.next}`}</span>}
                       </span>
                       <button type="button" onClick={() => void settle(p, "kept")} className="shrink-0 text-[12px] underline">
-                        Kept
+                        Done
                       </button>
                       <button type="button" onClick={() => void settle(p, "released")} className="shrink-0 text-[12px] underline opacity-70">
                         Let go
@@ -566,21 +620,22 @@ function ActionCard({ action: a, onPlan, onPromise }: { action: CoachAction; onP
     return (
       <div className="flex w-[88%] flex-col gap-1.5 rounded-2xl p-3" style={{ ...box, border: "1px solid rgba(242,210,126,.45)" }}>
         <span className="text-[14px] leading-snug">
-          “{a.text}”{a.when && <span style={{ color: "rgba(232,255,248,.6)" }}> · {when(a.when)}</span>}
+          “{a.text}”
+          <span style={{ color: "rgba(232,255,248,.6)" }}> · {a.when ? when(a.when) : a.next ? `next time: ${a.next}` : "I'll bring it up when you open the app"}</span>
         </span>
         {state === "idle" || state === "busy" ? (
           <Pill
             strong
             onClick={() =>
               void run(async () => {
-                const list = await coachPromiseAction({ add: { text: a.text, when: a.when ? new Date(a.when).toISOString() : null, questId: a.questId } });
+                const list = await coachPromiseAction({ add: { text: a.text, when: a.when ? new Date(a.when).toISOString() : null, next: a.next, questId: a.questId } });
                 const added = list[list.length - 1];
                 if (added) onPromise(added);
                 window.dispatchEvent(new Event("toucan-promises"));
-              }, a.when ? "Promised. I'll remind you when it's time ✓" : "Promised ✓")
+              }, a.when ? "Saved. I'll remind you when it's time ✓" : a.next ? `Saved. I'll remind you next time you see ${a.next} ✓` : "Saved. I'll keep it in mind ✓")
             }
           >
-            Make this promise
+            {/^when\b/i.test(a.text) ? "Make this promise" : "🔔 Remind me"}
           </Pill>
         ) : (
           doneLine
