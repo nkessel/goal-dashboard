@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { loadFx, type FeedbackStyle } from "@/lib/celebration-fx";
+import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 
@@ -217,7 +219,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [openId, setOpenId] = useState<string | null>(null);
   const [sent, setSent] = useState<{ id: string; kind: WhenKind; xp: number } | null>(null);
   // The little celebration after Submit: it plays and fades by itself.
-  const [celebrate, setCelebrate] = useState<{ key: number; kind: WhenKind; xp: number; x: number; y: number } | null>(null);
+  const [celebrate, setCelebrate] = useState<{ key: number; kind: WhenKind; xp: number; x: number; y: number; style: FeedbackStyle } | null>(null);
   useEffect(() => {
     if (!celebrate) return;
     const t = setTimeout(() => setCelebrate(null), 2600);
@@ -354,7 +356,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     setError(null);
     // Straight into the celebration; the note is sent behind it.
     const xp = d.xp ?? autoXp(d.body);
-    setCelebrate({ key: Date.now(), kind: d.kind, xp, x: shown.x + shown.w / 2, y: shown.y + Math.min(shown.h, 260) / 2 });
+    setCelebrate({ key: Date.now(), kind: d.kind, xp, x: shown.x + shown.w / 2, y: shown.y + Math.min(shown.h, 260) / 2, style: loadFx().feedbackStyle ?? "seal" });
     setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, deleted: true, updatedAt: Date.now() } : x)));
     setOpenId(null);
     startSaving(async () => {
@@ -694,15 +696,62 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           )}
         </div>
       )}
-      {celebrate && <SentBurst key={celebrate.key} kind={celebrate.kind} xp={celebrate.xp} x={celebrate.x} y={celebrate.y} isAdventure={isAdventure} />}
+      {celebrate && <SentBurst key={celebrate.key} kind={celebrate.kind} xp={celebrate.xp} x={celebrate.x} y={celebrate.y} isAdventure={isAdventure} style={celebrate.style} />}
     </>,
     document.body
   );
 }
 
-/** Sealed and sent: a wax-sealed letter that stamps, sparkles, and drifts away. */
-function SentBurst({ kind, xp, x, y, isAdventure }: { kind: WhenKind; xp: number; x: number; y: number; isAdventure: boolean }) {
-  const words = kind === "future" ? "Saved for the future" : kind === "refill" ? "Saved for when credits refill" : "Sealed & sent";
+/**
+ * Feedback sent, in the style chosen in Settings: a wax-sealed letter, a
+ * paper crane, a shooting star, the toucan carrying it off, or just a word.
+ */
+export function SentBurst({ kind, xp, x, y, isAdventure, style = "seal" }: { kind: WhenKind; xp: number; x: number; y: number; isAdventure: boolean; style?: FeedbackStyle }) {
+  const words =
+    kind === "future" ? "Saved for the future" : kind === "refill" ? "Saved for when credits refill" : style === "seal" ? "Sealed & sent" : style === "crane" ? "Off it flies" : style === "star" ? "Sent to the stars" : style === "toucan" ? "Delivered by toucan" : "Sent ✓";
+  const label = (
+    <span className={`fb-words mt-2 whitespace-nowrap rounded-full px-3.5 py-1 ${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ background: "rgba(20,14,6,.88)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.55)" }}>
+      {words}
+      {xp > 0 && (
+        <b className="ml-2 tabular-nums" style={{ color: "#f2d27e" }}>
+          +{xp} XP
+        </b>
+      )}
+    </span>
+  );
+  if (style !== "seal")
+    return (
+      <div role="status" aria-live="polite" className="pointer-events-none fixed z-[62]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
+        <div className={`relative flex flex-col items-center ${style === "quiet" ? "fb-quiet" : "fb-burst"}`}>
+          {style === "crane" && (
+            <svg className="fb-crane" width="96" height="72" viewBox="0 0 96 72" aria-hidden>
+              <path d="M4 50l34-8 10-30 8 30 36-26-30 44-18-2z" fill="#f6ecd2" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M38 42l10 0 8 0M48 12v30" stroke="#8a6116" strokeWidth="1.4" fill="none" />
+              <path d="M4 50l-2-6 8 3" fill="#e9d49a" stroke="#8a6116" strokeWidth="1.5" strokeLinejoin="round" />
+            </svg>
+          )}
+          {style === "star" && (
+            <span className="fb-star relative block" aria-hidden>
+              <span className="fb-star-trail" />
+              <svg width="44" height="44" viewBox="0 0 24 24">
+                <path d="M12 2.5l2.8 5.9 6.4.9-4.6 4.5 1.1 6.4L12 17.2l-5.7 3 1.1-6.4-4.6-4.5 6.4-.9z" fill="#fff3c4" stroke="#d9a83a" strokeWidth="1.3" strokeLinejoin="round" />
+              </svg>
+            </span>
+          )}
+          {style === "toucan" && (
+            <span className="fb-toucan relative block" aria-hidden>
+              <ToucanArt flying size={70} />
+              <svg className="absolute -bottom-3 left-7" width="30" height="20" viewBox="0 0 30 20">
+                <rect x="3" y="4" width="24" height="12" rx="3" fill="#f6ecd2" stroke="#8a6116" strokeWidth="1.5" />
+                <path d="M3 10h24" stroke="#b5321f" strokeWidth="2" />
+              </svg>
+            </span>
+          )}
+          {style !== "quiet" && Array.from({ length: 6 }, (_, i) => <span key={i} aria-hidden className="fb-spark" style={{ ["--a" as string]: `${i * 60 + 15}deg`, ["--d" as string]: `${44 + (i % 2) * 16}px` }} />)}
+          {label}
+        </div>
+      </div>
+    );
   return (
     <div role="status" aria-live="polite" className="pointer-events-none fixed z-[62]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
       <div className="fb-burst relative flex flex-col items-center">

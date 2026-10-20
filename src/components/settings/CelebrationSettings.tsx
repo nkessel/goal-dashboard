@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FX_DEFAULTS, loadFx, saveFx, type FxSettings } from "@/lib/celebration-fx";
+import { useEffect, useState, useRef } from "react";
+import { FEEDBACK_STYLES, FX_DEFAULTS, loadFx, saveFx, type FeedbackStyle, type FxSettings } from "@/lib/celebration-fx";
+import { SentBurst } from "@/components/feedback/FeedbackDock";
+import { ProgressCelebration } from "@/components/celebration/ProgressCelebration";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
 
 type NumKey = "dens" | "vel" | "reach" | "size" | "embers" | "fill";
@@ -19,6 +21,14 @@ export function CelebrationSettings() {
   const [fx, setFx] = useState<FxSettings>(FX_DEFAULTS);
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState(false);
+  const [sentPreview, setSentPreview] = useState<{ key: number; style: FeedbackStyle } | null>(null);
+  const [cardPreview, setCardPreview] = useState(0);
+  const plays = useRef(0);
+  function playSent(style: FeedbackStyle) {
+    const key = ++plays.current;
+    setSentPreview({ key, style });
+    setTimeout(() => setSentPreview((p) => (p && p.key === key ? null : p)), 2700);
+  }
 
   // localStorage is only readable after hydration.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -70,6 +80,74 @@ export function CelebrationSettings() {
           })}
         </div>
       </div>
+      {/* When feedback is sent */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-semibold">When you send feedback</span>
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {FEEDBACK_STYLES.map((o) => {
+            const on = (fx.feedbackStyle ?? "seal") === o.key;
+            return (
+              <li key={o.key} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => {
+                    update({ feedbackStyle: o.key });
+                    playSent(o.key);
+                  }}
+                  className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left"
+                  style={on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}
+                >
+                  <span className="text-[14px] font-bold">{o.label}</span>
+                  <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+                    {o.hint}
+                  </span>
+                </button>
+                <button type="button" onClick={() => playSent(o.key)} className="h-9 shrink-0 rounded-full px-3 text-[12.5px] font-semibold" style={{ border: "1px solid var(--t-card-border)", color: "var(--t-ink)" }} aria-label={`Preview ${o.label}`}>
+                  ▶ Preview
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {/* Progress and the daily welcome */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-semibold">Progress and the daily welcome</span>
+        <div role="radiogroup" aria-label="Progress style" className="flex flex-wrap gap-1.5">
+          {(
+            [
+              ["card", "Card", "A card in the middle, with confetti"],
+              ["banner", "Banner", "A slim banner slides down from the top"],
+            ] as const
+          ).map(([v, label, hint]) => {
+            const on = (fx.cardStyle ?? "card") === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                title={hint}
+                onClick={() => {
+                  update({ cardStyle: v });
+                  setCardPreview((n) => n + 1);
+                }}
+                className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left"
+                style={on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}
+              >
+                <span className="text-[14px] font-bold">{label}</span>
+                <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+                  {hint}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <label className="flex min-h-9 items-center gap-2.5 text-sm">
         <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.fxAvatar} onChange={() => update({ fxAvatar: !fx.fxAvatar })} />
         Dust from the avatars
@@ -112,6 +190,21 @@ export function CelebrationSettings() {
       </div>
       <p className="min-h-4 text-center text-xs" style={{ color: "var(--t-ink-soft)" }} aria-live="polite">{note}</p>
 
+      {sentPreview && (
+        <SentBurst key={sentPreview.key} kind="feedback" xp={2} x={typeof window === "undefined" ? 200 : window.innerWidth / 2} y={typeof window === "undefined" ? 300 : window.innerHeight / 2} isAdventure style={sentPreview.style} />
+      )}
+      {cardPreview > 0 && (
+        <ProgressCelebration
+          key={cardPreview}
+          heading="A new day dawns, adventurer"
+          title="🔥 8-day streak — keep it going"
+          xp={10}
+          fromPct={40}
+          toPct={55}
+          barCaption="Level 4 · 1,960 / 2,500 XP to level 5"
+          onClose={() => setCardPreview(0)}
+        />
+      )}
       {preview && (
         <QuestComplete
           preview

@@ -12,10 +12,25 @@ export type FxSettings = {
   fxCard: boolean;
   /** Reward payouts: "classic" (the short note) or "ceremony" (rays, coins, the bar filling). */
   rewardStyle: "classic" | "ceremony";
+  /** What plays when feedback is sent. */
+  feedbackStyle?: FeedbackStyle;
+  /** Progress and the daily welcome: the full card, or a slim banner at the top. */
+  cardStyle?: "card" | "banner";
 };
+
+export type FeedbackStyle = "seal" | "crane" | "star" | "toucan" | "quiet";
+export const FEEDBACK_STYLES: { key: FeedbackStyle; label: string; hint: string }[] = [
+  { key: "seal", label: "Wax seal", hint: "The letter is sealed with a stamp and sparks" },
+  { key: "crane", label: "Paper crane", hint: "Your note folds into a crane and flies off" },
+  { key: "star", label: "Shooting star", hint: "It streaks off into the sky" },
+  { key: "toucan", label: "Toucan delivery", hint: "The toucan carries your scroll away" },
+  { key: "quiet", label: "Quiet", hint: "Just a small “Sent ✓”" },
+];
 
 export const FX_DEFAULTS: FxSettings = {
   rewardStyle: "classic",
+  feedbackStyle: "seal",
+  cardStyle: "card",
   dens: 1.7,
   vel: 0.5,
   reach: 0,

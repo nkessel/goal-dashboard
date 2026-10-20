@@ -3,6 +3,7 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { CoinIcon } from "@/components/ui/Icons";
+import { loadFx } from "@/lib/celebration-fx";
 
 export type ProgressCelebrationDetail = {
   title: string;
@@ -47,6 +48,8 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
   const [leaving, setLeaving] = useState(false);
   const [pinned, setPinned] = useState(!AUTO_DISMISS);
   const hasExtra = !!extra;
+  // Settings › Visual effects: the full card, or a slim banner across the top.
+  const [banner] = useState(() => (typeof window === "undefined" ? false : loadFx().cardStyle === "banner"));
   const dismiss = useEffectEvent(() => onClose());
 
   useEffect(() => {
@@ -81,9 +84,9 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
   }, [pinned, hasExtra]);
 
   return createPortal(
-    <div className={`pointer-events-none fixed inset-0 z-[60] flex items-center justify-center p-6 ${leaving ? "pc-leave" : ""}`} role="status" aria-live="polite">
+    <div className={`pointer-events-none fixed inset-0 z-[60] flex justify-center ${banner ? "items-start px-3 pt-[max(12px,env(safe-area-inset-top))]" : "items-center p-6"} ${leaving ? "pc-leave" : ""}`} role="status" aria-live="polite">
       <div className="relative">
-        <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
+        <div aria-hidden className={`pointer-events-none absolute left-1/2 top-1/2 ${banner ? "hidden" : ""}`}>
           {PIECES.map((p, i) => (
             <span
               key={i}
@@ -107,9 +110,9 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
         </div>
 
         <div
-          className="pc-card parchment pointer-events-auto relative flex w-[290px] flex-col items-center gap-2 rounded-2xl px-6 pb-5 pt-5 text-center"
+          className={`pc-card parchment pointer-events-auto relative flex flex-col rounded-2xl ${banner ? "pc-banner w-[min(440px,94vw)] items-center gap-1 px-4 pb-2.5 pt-2.5 text-center" : "w-[290px] items-center gap-2 px-6 pb-5 pt-5 text-center"}`}
         >
-          <p className="font-display m-0 text-[25px] leading-none" style={{ color: "var(--t-ink)" }}>
+          <p className={`font-display m-0 leading-none ${banner ? "text-[19px]" : "text-[25px]"}`} style={{ color: "var(--t-ink)" }}>
             {heading}
           </p>
           <p className="m-0 line-clamp-2 text-[14.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
