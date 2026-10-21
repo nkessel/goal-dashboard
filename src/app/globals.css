@@ -638,7 +638,7 @@ body {
   border: 1.5px solid #5a3f0c;
 }
 .progress-range:disabled {
-  cursor: not-allowed;
+  cursor: url("/design/cursor-no.svg") 3 2, not-allowed;
 }
 
 /* Speed-dial choices rise out of the + button. */
@@ -983,7 +983,7 @@ html[data-evening] [data-theme="adventure"] {
 /* Everything you can click answers the pointer: a soft brighten on hover,
    a slight dim when pressed. (.hover-glow adds a glow on top for cards.) */
 :where(a[href], button:not(:disabled), [role="button"], summary, select, label:has(> input[type="checkbox"])) {
-  cursor: pointer;
+  cursor: url("/design/cursor-hand.svg") 11 3, pointer;
   transition: filter 140ms ease, box-shadow 150ms ease, border-color 150ms ease, color 140ms ease;
 }
 @media (hover: hover) {
@@ -1285,7 +1285,7 @@ html[data-evening] [data-theme="adventure"] {
   appearance: none;
   height: 28px;
   background: transparent;
-  cursor: pointer;
+  cursor: url("/design/cursor-hand.svg") 11 3, pointer;
   touch-action: pan-y;
 }
 .energy-range::-webkit-slider-runnable-track {
@@ -1582,7 +1582,7 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   animation: owl-spark 0.9s ease-out forwards;
 }
 .owl-perch { cursor: url("/design/cursor-hand.svg") 11 3, pointer; transition: filter 0.2s; }
-.owl-perch.owl-dragging.owl-dragging { cursor: grabbing; filter: drop-shadow(0 10px 8px rgba(0,0,0,.45)) drop-shadow(0 0 16px rgba(255,236,170,.55)) !important; }
+.owl-perch.owl-dragging.owl-dragging { cursor: url("/design/cursor-grabbing.svg") 13 12, grabbing; filter: drop-shadow(0 10px 8px rgba(0,0,0,.45)) drop-shadow(0 0 16px rgba(255,236,170,.55)) !important; }
 /* Hiding on a screen until found: a little dimmer, and a curious peek now and then. */
 .owl-perch.owl-hidden-here { filter: brightness(.85) drop-shadow(0 2px 3px rgba(0,0,0,.4)) !important; }
 .owl-perch.owl-hidden-here .owl-body { animation: owl-peek 7s ease-in-out infinite; }
@@ -1870,7 +1870,7 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .menu-drop-in, .menu-drop-out { animation-duration: 1ms; } }
 
 /* Focus card: anything editable shows a soft dotted edge when you point at it. */
-.inline-edit { cursor: text; transition: background-color 120ms ease, box-shadow 120ms ease; }
+.inline-edit { cursor: url("/design/cursor-text.svg") 12 14, text; transition: background-color 120ms ease, box-shadow 120ms ease; }
 @media (hover: hover) {
   .inline-edit:hover { background-color: rgba(120, 90, 40, 0.08); box-shadow: inset 0 0 0 1px rgba(139, 112, 64, 0.35); filter: none; }
 }
@@ -1981,7 +1981,7 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 /* Quest steps: the share is a quiet number until touched; progress is a slim gold slider. */
 .step-worth { border-bottom: 1px dotted rgba(139,112,64,.5); border-radius: 0; }
 .step-worth:focus { border-bottom-color: #8a6116; background: rgba(255,250,235,.6); }
-.step-progress { -webkit-appearance: none; appearance: none; display: block; height: 14px; background: transparent; cursor: pointer; }
+.step-progress { -webkit-appearance: none; appearance: none; display: block; height: 14px; background: transparent; cursor: url("/design/cursor-hand.svg") 11 3, pointer; }
 .step-progress::-webkit-slider-runnable-track { height: 4px; border-radius: 9999px; background: linear-gradient(90deg, #d9b45f var(--p, 0%), rgba(20,26,19,.25) var(--p, 0%)); }
 .step-progress::-moz-range-track { height: 4px; border-radius: 9999px; background: linear-gradient(90deg, #d9b45f var(--p, 0%), rgba(20,26,19,.25) var(--p, 0%)); }
 .step-progress::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 9999px; background: #f2d27e; border: 1.5px solid #8a6116; opacity: 0; transition: opacity 120ms ease; }
@@ -2240,3 +2240,53 @@ body[data-palette="grove"] { background-color: #1e3418; }
 .fb-spirit-spark { position: absolute; left: 50%; top: 64px; width: 8px; height: 8px; margin: -4px; border-radius: 9999px; background: radial-gradient(circle, #f2fffb, #8cf0dc 55%, transparent 70%); animation: fb-spark 1.1s 1.5s ease-out both; }
 .fb-spirit-words { animation: fb-pop .45s 1.8s cubic-bezier(.2,1.4,.4,1) both; }
 @media (prefers-reduced-motion: reduce) { .fb-done, .fb-done-ring, .fb-done-fill, .fb-done-check, .fb-done-words, .fb-done-sub, .fb-spirit-bird, .fb-spirit-letter, .fb-spirit-ring, .fb-spirit-rays, .fb-spirit-spark, .fb-spirit-words { animation-duration: 1ms; animation-delay: 0s; } }
+
+/* The rest of the themed cursor set, so the system cursor never leaks through:
+   typing, holding and carrying, moving, resizing, and "not right now". */
+@layer base {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="button"]):not([type="submit"]),
+  textarea,
+  [contenteditable="true"],
+  [contenteditable=""] {
+    cursor: url("/design/cursor-text.svg") 12 14, text;
+  }
+  [draggable="true"] {
+    cursor: url("/design/cursor-grab.svg") 13 12, grab;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: url("/design/cursor-no.svg") 3 2, not-allowed;
+  }
+}
+.cursor-text,
+.inline-edit {
+  cursor: url("/design/cursor-text.svg") 12 14, text;
+}
+.cursor-grab {
+  cursor: url("/design/cursor-grab.svg") 13 12, grab;
+}
+.cursor-grabbing,
+.owl-perch.owl-dragging.owl-dragging,
+body:has(.cursor-grabbing) {
+  cursor: url("/design/cursor-grabbing.svg") 13 12, grabbing;
+}
+.cursor-move {
+  cursor: url("/design/cursor-move.svg") 14 14, move;
+}
+.cursor-nwse-resize {
+  cursor: url("/design/cursor-resize-diag.svg") 14 14, nwse-resize;
+}
+.cursor-not-allowed {
+  cursor: url("/design/cursor-no.svg") 3 2, not-allowed;
+}
+.cursor-default {
+  cursor: url("/design/cursor-arrow.svg") 3 2, default;
+}
+/* Buttons sitting inside a draggable bar keep the hand (the bar's move cursor stops at them). */
+.cursor-move button:not(:disabled),
+.cursor-grab button:not(:disabled) {
+  cursor: url("/design/cursor-hand.svg") 11 3, pointer;
+}
+.cursor-move button:disabled {
+  cursor: url("/design/cursor-no.svg") 3 2, not-allowed;
+}

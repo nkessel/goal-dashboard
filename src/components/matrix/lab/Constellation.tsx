@@ -92,7 +92,7 @@ export function Constellation<T extends LabTask>({
               tabIndex={0}
               role="button"
               aria-label={`${st.s.task.title}, priority ${Math.round(st.s.score * 100)}`}
-              style={{ cursor: "pointer", outline: "none" }}
+              style={{ cursor: 'url("/design/cursor-hand.svg") 11 3, pointer', outline: "none" }}
               onPointerEnter={(e) => e.pointerType === "mouse" && show(e, st)}
               onPointerLeave={(e) => e.pointerType === "mouse" && setTip(null)}
               onFocus={(e) => show(e, st)}

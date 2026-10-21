@@ -132,7 +132,7 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
             const [x, y] = pt(i, vals[t] ?? 5);
             const [vx, vy] = pt(i, Math.min(10, (vals[t] ?? 5) + 1.3));
             return (
-              <g key={t} style={{ cursor: "grab" }}>
+              <g key={t} style={{ cursor: 'url("/design/cursor-grab.svg") 13 12, grab' }}>
                 {/* A generous, invisible grip around each marker for fingers. */}
                 <circle cx={x} cy={y} r="18" fill="transparent" />
                 <circle cx={x} cy={y} r="8.5" fill="#f2d27e" stroke="#5a3e12" strokeWidth="1.6" />

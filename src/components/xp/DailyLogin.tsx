@@ -8,12 +8,18 @@ import { ProgressCelebration } from "@/components/celebration/ProgressCelebratio
 import { xpToNextLevel } from "@/lib/levels";
 import { lineForDay, retireLine } from "@/lib/greetings";
 
-/** The day's first greeting, in the realm's voice. */
-function dawnHeading() {
+/** The day's first greeting: a small cheer for arriving, in the realm's voice (a different one each day). */
+const HEADINGS = {
+  morning: ["Huzzah! The day's first step is taken", "Here you are, bright and early!", "The sun rose, and so did you!", "Look who's here at first light!"],
+  day: ["Huzzah! Here you are!", "The realm rejoices: you've arrived!", "And there you are, right on time!", "Hail, traveller! You made it!", "Trumpets, please: you're here!"],
+  evening: ["Here you are, even now. Huzzah!", "The lanterns are lit for your arrival!", "You came, and the evening is brighter for it!", "Look who walked through the door tonight!"],
+};
+function dawnHeading(dayKey: string) {
   const h = new Date().getHours();
-  if (h < 12) return "A new day dawns, adventurer";
-  if (h < 17) return "Welcome back, adventurer";
-  return "The road calls once more";
+  const list = h < 12 ? HEADINGS.morning : h < 17 ? HEADINGS.day : HEADINGS.evening;
+  let n = 0;
+  for (const c of dayKey) n = (n * 31 + c.charCodeAt(0)) >>> 0;
+  return list[n % list.length];
 }
 
 type Award = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
@@ -65,7 +71,7 @@ export function DailyLogin() {
   if (!award) return null;
   return (
     <ProgressCelebration
-      heading={dawnHeading()}
+      heading={dawnHeading(eveningDayKey())}
       title={award.streak > 1 ? `🔥 ${award.streak}-day streak — keep it going` : "Day one of a new streak"}
       xp={award.xp}
       coinsEarned={award.coins}

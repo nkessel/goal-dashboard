@@ -760,7 +760,7 @@ function MovableTab({ children }: { children: React.ReactNode }) {
   const frac = top ?? 0.6;
   return (
     <div
-      className="fixed right-0 z-[35] touch-none"
+      className="cursor-grab fixed right-0 z-[35] touch-none"
       style={{ top: `${frac * 100}%` }}
       onPointerDown={(e) => {
         drag.current = { y0: e.clientY, t0: frac, moved: false };

@@ -283,7 +283,7 @@ export function Backpack({ initial }: { initial: Inventory }) {
       </p>
       {drag &&
         createPortal(
-          <div aria-hidden className="pointer-events-none fixed z-[90] h-16 w-16 overflow-hidden rounded-xl" style={{ left: drag.x - 32, top: drag.y - 40, transform: "scale(1.08) rotate(-4deg)", boxShadow: "0 14px 28px rgba(0,0,0,.55), 0 0 0 2px #f2d27e", background: "#2a1a10" }}>
+          <div aria-hidden className="cursor-grabbing pointer-events-none fixed z-[90] h-16 w-16 overflow-hidden rounded-xl" style={{ left: drag.x - 32, top: drag.y - 40, transform: "scale(1.08) rotate(-4deg)", boxShadow: "0 14px 28px rgba(0,0,0,.55), 0 0 0 2px #f2d27e", background: "#2a1a10" }}>
             {drag.item.icon ? (
               // eslint-disable-next-line @next/next/no-img-element -- item portrait
               <img src={drag.item.icon} alt="" className="h-full w-full object-cover" />

@@ -95,7 +95,7 @@ export function Lens<T extends LabTask>({ scored, isAdventure, onOpen }: { score
             return (
               <g
                 key={s.task.id}
-                style={{ transform: `translate(${x}px, ${y}px)`, transition: "transform 450ms cubic-bezier(.2,.8,.2,1)", cursor: "pointer" }}
+                style={{ transform: `translate(${x}px, ${y}px)`, transition: "transform 450ms cubic-bezier(.2,.8,.2,1)", cursor: 'url("/design/cursor-hand.svg") 11 3, pointer' }}
                 role="button"
                 tabIndex={0}
                 aria-label={s.task.title}

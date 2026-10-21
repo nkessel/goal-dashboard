@@ -590,11 +590,9 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
               color: "var(--t-ink)",
             }}
           >
-            {/* Everything scrolls together, so a very thin box still reaches it all. */}
-            <div className={`feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${isSent ? "pb-3" : "pb-3"}`}>
+            {/* The title sits on the same parchment as the note (no separate bar); the writing scrolls below it. */}
               <div
-                className={`sticky top-0 z-[3] flex shrink-0 select-none items-center gap-1 pl-3 pr-1.5 pt-2 ${isSent ? "" : "cursor-move touch-none"}`}
-                style={{ background: isAdventure ? "linear-gradient(180deg, rgba(243,231,203,.98), rgba(238,220,184,.94))" : "var(--t-card)" }}
+                className={`relative z-[2] flex shrink-0 select-none items-center gap-1 pb-0.5 pl-3.5 pr-1.5 pt-2 ${isSent ? "" : "cursor-move touch-none"}`}
                 onPointerDown={isSent ? undefined : (e) => onPanelDown(e, "move")}
                 title={isSent ? undefined : "Drag to move"}
               >
@@ -604,14 +602,6 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
                     <path d="M7 16l6-6" stroke={isAdventure ? "#6b4a12" : "currentColor"} strokeWidth="1.3" strokeLinecap="round" />
                   </svg>
                   <span className="truncate">Feedback</span>
-                  {/* A small gilt grip: carry the note by its top. */}
-                  {!isSent && (
-                    <svg aria-hidden width="22" height="8" viewBox="0 0 22 8" className="ml-1 shrink-0 opacity-60">
-                      <circle cx="3" cy="4" r="1.6" fill="#8a6116" />
-                      <path d="M11 1l3 3-3 3-3-3z" fill="#8a6116" />
-                      <circle cx="19" cy="4" r="1.6" fill="#8a6116" />
-                    </svg>
-                  )}
                 </span>
                 {!isSent && (
                   <button
@@ -642,8 +632,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
                   </svg>
                 </button>
               </div>
-              {/* A gilt rule instead of a window's title bar edge. */}
-              {isAdventure && <span aria-hidden className="sticky top-[44px] z-[2] mx-4 block h-px shrink-0" style={{ background: "linear-gradient(90deg, transparent, rgba(138,97,22,.55), transparent)" }} />}
+            <div className={`feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${isSent ? "pb-3" : "pb-3"}`}>
 
               {isSent && sent ? (
                 <Sent kind={sent.kind} xp={sent.xp} isAdventure={isAdventure} onAnother={startNew} />

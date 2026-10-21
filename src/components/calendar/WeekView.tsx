@@ -657,7 +657,7 @@ export function WeekView({
           <div
             key={`hit-${dayIndex}`}
             className="relative select-none"
-            style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}`, cursor: "pointer", touchAction: "pan-y" }}
+            style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}`, cursor: 'url("/design/cursor-hand.svg") 11 3, pointer', touchAction: "pan-y" }}
             onPointerDown={(e) => pickDown(e, dayIndex)}
             onPointerMove={(e) => {
               if (carried && e.pointerType === "mouse") setGhost({ dayIndex, min: minuteAt(e) });
@@ -758,7 +758,7 @@ export function WeekView({
                       borderRadius: 6,
                       // Faded but still opaque, so past items fanned over each other stay legible.
                       filter: past && !isMoving ? "saturate(.2) contrast(.6) brightness(1.12)" : undefined,
-                      ...(isMoving ? { zIndex: 40, boxShadow: "0 8px 18px rgba(40,25,5,.35)", outline: "2px solid rgba(217,180,95,.9)", cursor: "grabbing" } : {}),
+                      ...(isMoving ? { zIndex: 40, boxShadow: "0 8px 18px rgba(40,25,5,.35)", outline: "2px solid rgba(217,180,95,.9)", cursor: 'url("/design/cursor-grabbing.svg") 13 12, grabbing' } : {}),
                       touchAction: canDrag ? "pan-y" : undefined,
                     }}
                   >

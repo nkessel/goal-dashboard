@@ -598,7 +598,7 @@ export function AdventureView({
               stroke="transparent"
               strokeWidth="26"
               fill="none"
-              style={{ pointerEvents: "stroke", cursor: "copy" }}
+              style={{ pointerEvents: "stroke", cursor: 'url("/design/cursor-hand.svg") 11 3, copy' }}
               onClick={(e) => {
                 const r = box.current?.getBoundingClientRect();
                 if (!r) return;

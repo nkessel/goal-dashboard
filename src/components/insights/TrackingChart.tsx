@@ -301,7 +301,7 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
             const i = Math.floor(((px - L) / (W - L - R)) * n);
             if (i >= 0 && i < n) window.dispatchEvent(new CustomEvent("insights-add-event", { detail: { date: dayKey(days[i]) } }));
           }}
-          style={{ cursor: "copy" }}
+          style={{ cursor: 'url("/design/cursor-hand.svg") 11 3, copy' }}
         >
           {/* Weather strip */}
           {showWeather && weather && (
