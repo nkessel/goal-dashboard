@@ -4,7 +4,8 @@ import { snapTo, useSliderStep } from "@/lib/use-slider-step";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { addCheckNoteAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, setCheckMetricsAction } from "@/app/actions";
+import { addCheckNoteAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
+import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft } from "./NightFields";
 import { BoltIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
@@ -157,7 +158,19 @@ export function EnergyCheck({
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
-
+  // The Wheel of Time: the day's first check-in also asks about last night.
+  const [wheel, setWheel] = useState<{ effort: string[]; hindrances: string[] } | null>(null);
+  const [night, setNight] = useState<NightDraft>(EMPTY_NIGHT);
+  useEffect(() => {
+    if (today !== null) return;
+    let live = true;
+    wheelOfTimeAction()
+      .then((w) => live && !w.loggedToday && setWheel({ effort: w.effort, hindrances: w.hindrances }))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [today]);
 
   // Open or closed is remembered on this device.
   useEffect(() => {
@@ -186,6 +199,11 @@ export function EnergyCheck({
     const all = expanded ? metrics.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
     startSaving(async () => {
       try {
+        if (wheel && !nightIsEmpty(night)) {
+          await saveNightAction({ bed: night.bed || null, wake: night.wake || null, effort: night.effort, hindrances: night.hindrances });
+          setWheel(null);
+          setNight(EMPTY_NIGHT);
+        }
         const res = await saveCheckInAction(value, all);
         setSaved(res.energy.level);
         setSavedAt(res.energy.created_at ?? new Date().toISOString());
@@ -366,6 +384,7 @@ export function EnergyCheck({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {editing ? (
           <>
+            {wheel && <NightFields value={night} onChange={setNight} effort={wheel.effort} hindrances={wheel.hindrances} />}
             <div className="flex items-center gap-2">
               {caret}
               <span className={label} style={{ color: "var(--t-cream)" }}>
