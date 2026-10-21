@@ -40,9 +40,12 @@ export function CreateSheet({
   boardId,
   todayFull = false,
   pinToToday = false,
+  followUpOf,
   theme = "calm",
   onClose,
 }: {
+  /** "Add a follow-up quest": the new quest comes right after this one in its sequence. */
+  followUpOf?: { id: string; title: string };
   /** Opened from Today's Quests' own +: the new quest goes straight there. */
   pinToToday?: boolean;
   kinds: CreateKind[];
@@ -102,7 +105,7 @@ export function CreateSheet({
     stage === "checkin" ? (
       <QuickCheckIn key="checkin" isAdventure={isAdventure} onDone={close} />
     ) : shownKind === "quest" || shownKind === "now" ? (
-      <QuestEditorDialog key={editorKey} mode={{ kind: "create", boardId, todayFull, doingNow: kind === "now", ...(pinToToday ? { pinToBattle: true } : {}) }} theme={theme} onClose={close} />
+      <QuestEditorDialog key={editorKey} mode={{ kind: "create", boardId, todayFull, doingNow: kind === "now", ...(pinToToday ? { pinToBattle: true } : {}), ...(followUpOf ? { after: followUpOf } : {}) }} theme={theme} onClose={close} />
     ) : shownKind === "reward" ? (
       <RewardEditorDialog key={editorKey} theme={theme} onClose={close} />
     ) : shownKind === "rite" || shownKind === "habit" ? (

@@ -24,11 +24,15 @@ export type Rite = {
   coin_value?: number | null;
   /** Minutes it usually takes (for focus mode's timer). */
   estimate_minutes?: number | null;
+  /** Sub-habits: a checklist ticked off each day (the last tick completes the habit). */
+  steps?: RiteStep[] | null;
   sort_order: number;
   archived: boolean;
   created_at: string;
   updated_at: string;
 };
+
+export type RiteStep = { id: string; title: string };
 
 export type RiteCompletion = {
   id: string;
@@ -305,4 +309,40 @@ export async function reorderRites(ownerId: string, ids: string[]): Promise<void
   const results = await Promise.all(ids.map((id, i) => db.from("rites").update({ sort_order: i }).eq("id", id).eq("owner_id", ownerId)));
   const failed = results.find((r) => r.error);
   if (failed?.error) throw new Error(`Failed to reorder rites: ${failed.error.message}`);
+}
+
+/** Clean a sub-habit list from the editor. */
+export function cleanRiteSteps(raw: unknown): RiteStep[] {
+  return (Array.isArray(raw) ? raw : [])
+    .map((x) => (x ?? {}) as Partial<RiteStep>)
+    .filter((x) => typeof x.id === "string" && typeof x.title === "string" && x.title.trim())
+    .map((x) => ({ id: x.id!.slice(0, 40), title: x.title!.replace(/\s+/g, " ").trim().slice(0, 120) }))
+    .slice(0, 20);
+}
+
+export async function setRiteSteps(ownerId: string, riteId: string, steps: RiteStep[]): Promise<void> {
+  const { error } = await supabaseAdmin().from("rites").update({ steps, updated_at: new Date().toISOString() }).eq("id", riteId).eq("owner_id", ownerId);
+  if (error && /steps/.test(error.message)) throw new Error("Sub-habits need a quick database update first.");
+  if (error) throw new Error(`Couldn't save the sub-habits: ${error.message}`);
+}
+
+/** Sub-habit ticks on or after `sinceDay`; null before migration 0065. */
+export async function listRiteStepChecks(ownerId: string, sinceDay: string): Promise<{ rite_id: string; step_id: string; day: string }[] | null> {
+  const { data, error } = await supabaseAdmin().from("rite_step_checks").select("rite_id, step_id, day").eq("owner_id", ownerId).gte("day", sinceDay);
+  if (error) return null;
+  return (data ?? []) as { rite_id: string; step_id: string; day: string }[];
+}
+
+export async function setRiteStepCheck(ownerId: string, riteId: string, stepId: string, day: string, on: boolean): Promise<void> {
+  const db = supabaseAdmin();
+  if (on) {
+    const { error } = await db.from("rite_step_checks").insert({ owner_id: ownerId, rite_id: riteId, step_id: stepId, day });
+    if (error && error.code !== "23505") {
+      if (/rite_step_checks/.test(error.message)) throw new Error("Sub-habits need a quick database update first.");
+      throw new Error(`Couldn't tick that: ${error.message}`);
+    }
+  } else {
+    const { error } = await db.from("rite_step_checks").delete().eq("owner_id", ownerId).eq("rite_id", riteId).eq("step_id", stepId).eq("day", day);
+    if (error) throw new Error(`Couldn't untick that: ${error.message}`);
+  }
 }

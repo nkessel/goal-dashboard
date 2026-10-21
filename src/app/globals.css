@@ -2215,7 +2215,9 @@ body[data-palette="grove"] { background-color: #1e3418; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* Feedback submitted: the check draws itself, then the card fades. (--fb-pace stretches or quickens it, from Settings.) */
-.fb-done { animation: fb-done calc(2.2s * var(--fb-pace, 1)) cubic-bezier(.2,.8,.2,1) both; }
+.fb-done { animation: fb-done var(--fb-hold, 2.2s) cubic-bezier(.2,.8,.2,1) both; }
+.fb-done.fb-done-stay { animation: fb-done-in calc(.3s * var(--fb-pace, 1)) cubic-bezier(.2,.8,.2,1) both; }
+@keyframes fb-done-in { 0% { transform: scale(.88) translateY(10px); opacity: 0; } 100% { transform: none; opacity: 1; } }
 @keyframes fb-done { 0% { transform: scale(.88) translateY(10px); opacity: 0; } 8% { transform: none; opacity: 1; } 86% { transform: none; opacity: 1; } 100% { transform: translateY(-8px); opacity: 0; } }
 .fb-done-ring { stroke-dasharray: 208; stroke-dashoffset: 208; transform: rotate(-90deg); transform-origin: 38px 38px; animation: fb-draw calc(.38s * var(--fb-pace, 1)) calc(.09s * var(--fb-pace, 1)) ease-out forwards; }
 .fb-done-fill { transform-origin: 38px 38px; transform: scale(0); animation: fb-fill calc(.24s * var(--fb-pace, 1)) calc(.38s * var(--fb-pace, 1)) cubic-bezier(.3,1.6,.5,1) forwards; }

@@ -24,6 +24,7 @@ import {
   setSchedulingAction,
   setTaskStatSplitAction,
   setTaskPrivateAction,
+  sequenceLinkAction,
   setTaskPlacementAction,
   setTaskProgressAction,
   updateTaskAction,
@@ -42,6 +43,7 @@ import { freshKey, loadDrafts, removeDraft, saveDraft, type QuestDraftSave } fro
 import { addOptimisticQuest, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { CoinIcon } from "@/components/ui/Icons";
 import { StatSplitEditor } from "./StatSplitEditor";
+import { QuestPicker, SequenceDialog } from "./Sequence";
 import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
 import type { QuestTemplate } from "@/lib/quest-templates";
 
@@ -70,6 +72,8 @@ export type QuestEditorMode =
       /** Place the new quest on the calendar (e.g. from a Google event). */
       schedule?: { startISO: string; endISO: string; googleEventId?: string };
       prefill?: QuestDraft;
+      /** A follow-up: the new quest waits right after this one. */
+      after?: { id: string; title: string };
     };
 
 type StepDraft = { key: string; id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number; state?: "skipped" | "failed" | null; parentKey?: string | null };
@@ -221,6 +225,15 @@ export function QuestEditorDialog({
   const savedPlacement = useRef<Placement>(initialPlacement);
   const todayFull = false;
   const [draftIcon, setDraftIcon] = useState<{ url: string; source: "library" | "ai" } | null>(null);
+  /** New quests: what to paint instead of the title (blank = paint the title). */
+  const [artPrompt, setArtPrompt] = useState("");
+  /** Where a new quest sits in a sequence: after (waits for) or before (unlocks) other quests. */
+  const [seqLinks, setSeqLinks] = useState<{ rel: "after" | "before"; pick: { id?: string; title: string } }[]>(() =>
+    mode.kind === "create" && mode.after ? [{ rel: "after", pick: mode.after }] : []
+  );
+  const [seqOpen, setSeqOpen] = useState(() => mode.kind === "create" && !!mode.after);
+  const [seqAdding, setSeqAdding] = useState<"after" | "before" | null>(null);
+  const [seqDialog, setSeqDialog] = useState(false);
   const initialSlot =
     task?.is_on_calendar && task.scheduled_start && task.scheduled_end
       ? { start: task.scheduled_start, end: task.scheduled_end }
@@ -261,6 +274,7 @@ export function QuestEditorDialog({
   const [boardOptions, setBoardOptions] = useState<{ id: string; label: string }[] | null>(null);
   const [alsoOn, setAlsoOn] = useState<string[]>(task?.also_on ?? []);
   const [stepMenu, setStepMenu] = useState<string | null>(null);
+  const [shareStep, setShareStep] = useState<string | null>(null);
   // Quest templates: ready-made quests to start from (new quests), and saving one (existing quests).
   const [templates, setTemplates] = useState<QuestTemplate[] | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -729,7 +743,7 @@ export function QuestEditorDialog({
 
   /** New quests without a picked portrait get one painted in the background. */
   function paintPortrait(id: string) {
-    const prompt = [title.trim(), description.trim()].filter(Boolean).join(" — ");
+    const prompt = artPrompt.trim() || [title.trim(), description.trim()].filter(Boolean).join(" — ");
     if (!draftIcon && prompt) void generateTaskIconAction(id, prompt).catch(() => {});
   }
 
@@ -784,7 +798,8 @@ export function QuestEditorDialog({
           return;
         }
         // Show it on Today straight away; the server catches up behind it.
-        const showNow = !fixedSchedule && placement !== "none";
+        // A quest that waits behind another stays out of sight, so no instant card for it.
+        const showNow = !fixedSchedule && placement !== "none" && !seqLinks.some((l) => l.rel === "after");
         const tempId = showNow
           ? addOptimisticQuest({ title: title.trim(), description: description.trim() || null, xp, estimate: est, placement: placement === "today" ? "today" : "additional", iconUrl: draftIcon?.url ?? null })
           : null;
@@ -827,6 +842,16 @@ export function QuestEditorDialog({
         if (toSchedule) await setSchedulingAction(id, schedPlace).catch(() => {});
         if (Object.keys(statSplit).length) await setTaskStatSplitAction(id, statSplit).catch(() => {});
         if (isPriv) await setTaskPrivateAction(id, true).catch(() => {});
+        for (const l of seqLinks) {
+          const { id: other, title: name } = l.pick;
+          const link =
+            l.rel === "after"
+              ? other
+                ? sequenceLinkAction(other, "after", { id })
+                : sequenceLinkAction(id, "before", { title: name })
+              : sequenceLinkAction(id, "after", other ? { id: other } : { title: name });
+          await link.catch(() => {});
+        }
         const newSteps = (steps ?? []).filter((st) => st.title.trim());
         if (newSteps.length > 0) await saveQuestStepsAction(id, stepPayload(newSteps).map(({ id: _id, ...st }) => st)); // eslint-disable-line @typescript-eslint/no-unused-vars
         paintPortrait(id);
@@ -876,6 +901,20 @@ export function QuestEditorDialog({
     });
   }
 
+  // Ctrl/⌘+S saves, like Ctrl/⌘+Enter (which the + sheet handles when the editor sits inside it).
+  const onSaveKey = useEffectEvent((e: KeyboardEvent) => {
+    const s = e.key === "s" || e.key === "S";
+    if (!(e.ctrlKey || e.metaKey) || !(s || (e.key === "Enter" && !embedded))) return;
+    if (e.target instanceof Element && e.target.closest("[data-feedback-root]")) return;
+    e.preventDefault();
+    if (autosave) close();
+    else if (!isSaving && title.trim()) save();
+  });
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => onSaveKey(e);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
   /** iOS: keep the field you're typing in above the keyboard. */
   function keepInView(e: React.FocusEvent<HTMLDivElement>) {
     const el = e.target as HTMLElement;
@@ -1025,17 +1064,31 @@ export function QuestEditorDialog({
                   showEditHint
                 />
               ) : (
-                <IconPicker
-                  currentIcon={draftIcon?.url ?? null}
-                  currentSource={draftIcon?.source ?? "monster"}
-                  taskTitle={title}
-                  taskDescription={description}
-                  theme={theme}
-                  size={72}
-                  emptyContent={empty}
-                  showEditHint
-                  onDraftChange={(url, source) => setDraftIcon(url ? { url, source } : null)}
-                />
+                <>
+                  <IconPicker
+                    currentIcon={draftIcon?.url ?? null}
+                    currentSource={draftIcon?.source ?? "monster"}
+                    taskTitle={artPrompt.trim() || title}
+                    taskDescription={artPrompt.trim() ? "" : description}
+                    theme={theme}
+                    size={72}
+                    emptyContent={empty}
+                    showEditHint
+                    onDraftChange={(url, source) => setDraftIcon(url ? { url, source } : null)}
+                  />
+                  {/* Paint something other than the title (blank = the title). */}
+                  {!draftIcon && !doingNow && (
+                    <input
+                      value={artPrompt}
+                      onChange={(e) => setArtPrompt(e.target.value)}
+                      placeholder="paint…"
+                      aria-label="What the portrait should show (instead of the title)"
+                      title="What the portrait should show, if not the title"
+                      className="h-6 w-[76px] rounded-md border bg-transparent px-1.5 text-center text-[11.5px] placeholder:italic"
+                      style={{ ...fieldStyle, background: "transparent" }}
+                    />
+                  )}
+                </>
               )}
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -1517,7 +1570,7 @@ export function QuestEditorDialog({
                           border: `1.5px solid ${checked ? "var(--t-good)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#9a9286" : isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
                           background: checked ? "var(--t-good)" : st.state === "failed" ? "#b5321f" : st.state === "skipped" ? "#b7b0a4" : "transparent",
                         }}
-                        title={st.state === "skipped" ? "Skipped — tap to reopen" : st.state === "failed" ? "Didn't happen — tap to reopen" : undefined}
+                        title={st.state === "skipped" ? "Skipped — tap to reopen" : st.state === "failed" ? "Failed — tap to reopen" : undefined}
                       >
                         {checked && (
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -1562,20 +1615,17 @@ export function QuestEditorDialog({
                       {/* What this step is worth, right on the row: its share of the quest (tap to change) and the XP that brings. */}
                       {!isHolder && (
                       <span className="mt-[3px] flex h-7 shrink-0 items-center gap-1 text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={1}
-                          max={100}
-                          value={st.weight ?? ""}
-                          placeholder={String(Math.round((wOf.get(st.key) ?? 0) * 100))}
-                          onChange={(e) => updateStep(st.key, { weight: e.target.value ? Math.max(1, Math.min(100, Math.round(Number(e.target.value)))) : null })}
-                          aria-label={`Share of the quest for ${st.title}, in percent`}
-                          title="Share of the quest (blank = an equal share)"
-                          className="step-worth h-7 w-[34px] rounded-md bg-transparent px-0.5 text-right text-[14px] font-semibold tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none"
+                        <button
+                          type="button"
+                          onClick={() => setShareStep(shareStep === st.key ? null : st.key)}
+                          aria-expanded={shareStep === st.key}
+                          aria-label={`Share of the quest for ${st.title}: ${Math.round((wOf.get(st.key) ?? 0) * 100)} percent — change`}
+                          title="Share of the quest (tap to change)"
+                          className="step-worth h-7 rounded-md px-1 text-[14px] font-semibold tabular-nums hover:bg-black/[.05]"
                           style={{ color: st.weight ? "var(--t-ink)" : "var(--t-ink-soft)" }}
-                        />
-                        <span>%</span>
+                        >
+                          {Math.round((wOf.get(st.key) ?? 0) * 100)}%
+                        </button>
                         <span className="font-semibold" style={{ color: "var(--t-xp)" }}>
                           {Math.round((wOf.get(st.key) ?? 0) * xp) + (st.xp ?? 0)} XP
                         </span>
@@ -1599,7 +1649,7 @@ export function QuestEditorDialog({
                               [
                                 ["sub", "＋", "Add a sub-task", "var(--t-ink)"],
                                 ...(st.state !== "skipped" ? [["skip", "⏭", "Skip it", "var(--t-ink)"]] : []),
-                                ...(st.state !== "failed" ? [["fail", "✗", "Didn't happen", "#b5321f"]] : []),
+                                ...(st.state !== "failed" ? [["fail", "✗", "Failed", "#b5321f"]] : []),
                                 ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),
                                 ["remove", "🗑", "Remove step", "var(--t-ink-soft)"],
                               ] as [string, string, string, string][]
@@ -1627,6 +1677,27 @@ export function QuestEditorDialog({
                         )}
                       </span>
                     </div>
+                    {/* Its share of the quest, as a slider (blank = an equal share). */}
+                    {shareStep === st.key && !isHolder && (
+                      <div className="reveal ml-[26px] mr-9 flex items-center gap-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                        <span className="shrink-0">Share</span>
+                        <input
+                          type="range"
+                          min={1}
+                          max={100}
+                          value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}
+                          onChange={(e) => updateStep(st.key, { weight: Number(e.target.value) })}
+                          aria-label={`Share of the quest for ${st.title}, in percent`}
+                          className="h-6 min-w-0 flex-1"
+                          style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
+                        />
+                        {st.weight != null && (
+                          <button type="button" onClick={() => updateStep(st.key, { weight: null })} className="shrink-0 underline">
+                            equal
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {/* How far along: a slim slider under each open step. */}
                     {!st.done && !st.state && !isCompleted && !isHolder && (
                       <input
@@ -1770,68 +1841,22 @@ export function QuestEditorDialog({
           {/* Character stats: a share of the XP can build stats instead of your level */}
           {!doingNow && <StatSplitEditor xp={xp} split={statSplit} onChange={changeStatSplit} isAdventure={isAdventure} />}
 
-          {/* Quest progress: partial progress earns its share of the XP */}
+          {/* Quest progress: partial progress earns its share of the XP (same look as the XP row). */}
           {task && !isCompleted && (
-            <div
-              className="flex flex-col gap-1.5 rounded-xl px-3.5 py-2.5"
-              style={{
-                background: isAdventure ? "linear-gradient(180deg, rgba(48,38,18,.9), rgba(30,24,12,.92))" : "var(--t-bg)",
-                border: `1.5px solid ${isAdventure ? "#a88a3f" : "var(--t-card-border)"}`,
-                opacity: progressTracked ? 1 : 0.6,
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[14.5px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
-                  Quest progress
-                </span>
-                <span className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={!progressTracked || progress <= 0}
-                    onClick={() => setProgress((p) => Math.max(0, p - 1))}
-                    aria-label="Less progress"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-[17px] leading-none disabled:opacity-40"
-                    style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}
-                  >
-                    −
-                  </button>
-                  <span className="flex items-center rounded-md px-1" style={{ border: "1px solid rgba(168,138,63,.6)", background: "rgba(0,0,0,.25)" }}>
-                    <NumberInput
-                      min={0}
-                      max={100}
-                      value={progress}
-                      disabled={!progressTracked}
-                      onValueChange={setProgress}
-                      aria-label="Progress percent"
-                      className="bare-input h-7 w-10 bg-transparent text-right text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                      style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}
-                    />
-                    <span className="text-[14px] font-bold" style={{ color: isAdventure ? "#f8e3a0" : "var(--t-accent)" }}>
-                      %
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    disabled={!progressTracked || progress >= 100}
-                    onClick={() => setProgress((p) => Math.min(100, p + 1))}
-                    aria-label="More progress"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-[17px] leading-none disabled:opacity-40"
-                    style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}
-                  >
-                    +
-                  </button>
+            <div className="flex flex-col gap-1" style={{ opacity: progressTracked ? 1 : 0.6 }}>
+              <div className="flex items-center gap-2">
+                <span className={labelCls}>Progress</span>
+                <span className="ml-auto text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                  {!progressTracked
+                    ? "available after the next database update"
+                    : progress >= 100
+                      ? "closing at 100% completes it"
+                      : progress !== initialProgress
+                        ? `+${Math.round((xp * (progress - initialProgress)) / 100)} XP when you close this`
+                        : `${Math.round((xp * progress) / 100)} XP earned · ${xp - Math.round((xp * progress) / 100)} more on completion`}
                 </span>
               </div>
-              <div className="relative h-5">
-                <div
-                  className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full"
-                  style={{ background: "#141a13", border: "1.5px solid #8a6c2c", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}
-                >
-                  <div
-                    className="h-full rounded-full transition-[width] duration-150"
-                    style={{ width: `${progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 8px rgba(242,210,126,.5)" }}
-                  />
-                </div>
+              <div className="flex items-center gap-2">
                 <input
                   type="range"
                   min={0}
@@ -1841,18 +1866,25 @@ export function QuestEditorDialog({
                   disabled={!progressTracked}
                   onChange={(e) => setProgress(Number(e.target.value))}
                   aria-label="Quest progress"
-                  className="progress-range absolute inset-0 w-full cursor-pointer"
+                  className="h-8 min-w-0 flex-1"
+                  style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
                 />
+                <span className="flex h-9 shrink-0 items-center rounded-lg border pr-1.5" style={fieldStyle}>
+                  <NumberInput
+                    min={0}
+                    max={100}
+                    value={progress}
+                    disabled={!progressTracked}
+                    onValueChange={setProgress}
+                    aria-label="Progress percent"
+                    className="bare-input h-full w-11 bg-transparent px-1 text-right text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                    style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
+                  />
+                  <span className="text-[12px] font-bold" style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}>
+                    %
+                  </span>
+                </span>
               </div>
-              <p className="m-0 text-[12.5px]" style={{ color: isAdventure ? "rgba(243,231,203,.78)" : "var(--t-ink-soft)" }}>
-                {!progressTracked
-                  ? "Available after the next database update."
-                  : progress >= 100
-                    ? "Closing at 100% completes the quest."
-                    : progress !== initialProgress
-                      ? `+${Math.round((xp * (progress - initialProgress)) / 100)} XP when you close this · ${xp - Math.round((xp * progress) / 100)} more on completion`
-                      : `${Math.round((xp * progress) / 100)} XP earned so far · ${xp - Math.round((xp * progress) / 100)} more on completion`}
-              </p>
             </div>
           )}
 
@@ -2006,6 +2038,75 @@ export function QuestEditorDialog({
               >
                 Restore to Today
               </button>
+            </div>
+          )}
+
+          {/* Sequence: a fine setting, folded away until wanted. */}
+          {!doingNow && !review && (
+            <div className="flex flex-col gap-1.5">
+              <button type="button" onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))} aria-expanded={task ? undefined : seqOpen} className="flex items-center gap-1 self-start text-[12px] underline-offset-2 hover:underline" style={{ color: "var(--t-ink-soft)" }}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: seqOpen && !task ? "rotate(90deg)" : undefined }}>
+                  <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {task
+                  ? (task.behind?.length ?? 0) > 0
+                    ? `Sequence · ${task.behind!.length} waiting after this…`
+                    : "Sequence: quests before or after this…"
+                  : seqLinks.length
+                    ? `Sequence · ${seqLinks.length} linked`
+                    : "Sequence: quests before or after this"}
+              </button>
+              {!task && seqOpen && (
+                <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
+                  <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                    A quest after another stays stacked out of sight until that one is done.
+                  </p>
+                  {seqLinks.length > 0 && (
+                    <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px]">
+                      {seqLinks.map((l, i) => (
+                        <li key={i} className="flex min-h-8 items-center gap-2">
+                          <span className="shrink-0 text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+                            {l.rel === "after" ? "Comes after" : "Then"}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate">
+                            {l.pick.id ? "" : "＋ "}
+                            {l.pick.title}
+                          </span>
+                          <button type="button" onClick={() => setSeqLinks((ls) => ls.filter((_, j) => j !== i))} aria-label={`Remove ${l.pick.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+                            ×
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {seqAdding ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[12.5px] font-semibold">{seqAdding === "after" ? "This quest comes after…" : "After this quest comes…"}</span>
+                      <QuestPicker
+                        autoFocus
+                        exclude={seqLinks.map((l) => l.pick.id).filter(Boolean) as string[]}
+                        onPick={(p) => {
+                          setSeqLinks((ls) => [...ls, { rel: seqAdding, pick: p }]);
+                          setSeqAdding(null);
+                        }}
+                      />
+                      <button type="button" onClick={() => setSeqAdding(null)} className="self-start text-[12.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      <button type="button" onClick={() => setSeqAdding("after")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
+                        ↑ Comes after a quest
+                      </button>
+                      <button type="button" onClick={() => setSeqAdding("before")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
+                        ↓ Add what comes next
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {task && seqDialog && <SequenceDialog taskId={task.id} title={title} isAdventure={isAdventure} onClose={() => setSeqDialog(false)} />}
             </div>
           )}
 

@@ -239,8 +239,11 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [celebrate, setCelebrate] = useState<{ key: number; kind: WhenKind; xp: number; x: number; y: number; style: FeedbackStyle } | null>(null);
   useEffect(() => {
     if (!celebrate) return;
-    const pace = loadFx().pace ?? 1;
-    const t = setTimeout(() => setCelebrate(null), (celebrate.style === "toucan" ? 2900 : celebrate.style === "quiet" ? 2250 : 2600) * pace);
+    const fx = loadFx();
+    const pace = fx.pace ?? 1;
+    const hold = fx.feedbackHold ?? 2.2;
+    if (celebrate.style === "quiet" && hold === 0) return; // stays until closed
+    const t = setTimeout(() => setCelebrate(null), celebrate.style === "quiet" ? hold * 1000 + 50 : (celebrate.style === "toucan" ? 2900 : 2600) * pace);
     return () => clearTimeout(t);
   }, [celebrate]);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -674,7 +677,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 
         </div>
       )}
-      {celebrate && <SentBurst key={celebrate.key} kind={celebrate.kind} xp={celebrate.xp} x={celebrate.x} y={celebrate.y} isAdventure={isAdventure} style={celebrate.style} />}
+      {celebrate && <SentBurst key={celebrate.key} kind={celebrate.kind} xp={celebrate.xp} x={celebrate.x} y={celebrate.y} isAdventure={isAdventure} style={celebrate.style} onClose={() => setCelebrate(null)} />}
     </>,
     document.body
   );
@@ -686,7 +689,19 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
  */
 const paceNow = () => (typeof window === "undefined" ? 1 : (loadFx().pace ?? 1));
 
-export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet" }: { kind: WhenKind; xp: number; x: number; y: number; isAdventure: boolean; style?: FeedbackStyle }) {
+export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClose }: { kind: WhenKind; xp: number; x: number; y: number; isAdventure: boolean; style?: FeedbackStyle; onClose?: () => void }) {
+  const closeBtn = (dark: boolean) =>
+    onClose && (
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        className="pointer-events-auto absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none hover:bg-black/10"
+        style={{ color: dark ? "#e8fff8" : isAdventure ? "#6b5631" : "var(--t-ink-soft)" }}
+      >
+        ×
+      </button>
+    );
   const where = kind === "future" ? "Saved in your future ideas" : kind === "refill" ? "Saved for when credits refill" : "It goes into the next update";
   const xpTag = xp > 0 && (
     <b className="ml-2 tabular-nums" style={{ color: "#f2d27e" }}>
@@ -694,10 +709,12 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet" }: { ki
     </b>
   );
   // The default: a clear, calm success card in the middle of the screen.
-  if (style === "quiet")
+  if (style === "quiet") {
+    const hold = typeof window === "undefined" ? 2.2 : (loadFx().feedbackHold ?? 2.2);
     return (
-      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center p-6" style={{ ["--fb-pace" as string]: String(paceNow()) }}>
-        <div className="fb-done flex w-[min(300px,100%)] flex-col items-center gap-2 rounded-3xl px-6 pb-5 pt-6 text-center" style={isAdventure ? { background: "linear-gradient(180deg,#f6ecd2,#ead7aa)", border: "2px solid #a88a3f", color: "#2a1c10", boxShadow: "0 18px 40px rgba(0,0,0,.45)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: "var(--t-ink)", boxShadow: "0 18px 40px rgba(0,0,0,.25)" }}>
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center p-6" style={{ ["--fb-pace" as string]: String(paceNow()), ["--fb-hold" as string]: `${hold || 2.2}s` }}>
+        <div className={`${hold === 0 ? "fb-done fb-done-stay" : "fb-done"} relative flex w-[min(300px,100%)] flex-col items-center gap-2 rounded-3xl px-6 pb-5 pt-6 text-center`} style={isAdventure ? { background: "linear-gradient(180deg,#f6ecd2,#ead7aa)", border: "2px solid #a88a3f", color: "#2a1c10", boxShadow: "0 18px 40px rgba(0,0,0,.45)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: "var(--t-ink)", boxShadow: "0 18px 40px rgba(0,0,0,.25)" }}>
+          {closeBtn(false)}
           <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden>
             <circle className="fb-done-ring" cx="38" cy="38" r="33" fill="none" stroke={isAdventure ? "#3f6a2c" : "var(--t-accent)"} strokeWidth="5" strokeLinecap="round" />
             <circle className="fb-done-fill" cx="38" cy="38" r="30" fill={isAdventure ? "#4f7d38" : "var(--t-accent)"} />
@@ -715,6 +732,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet" }: { ki
         </div>
       </div>
     );
+  }
   // Handed to the Great Toucan Spirit: he takes the letter and powers up.
   if (style === "toucan")
     return (
@@ -734,9 +752,14 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet" }: { ki
           {Array.from({ length: 12 }, (_, i) => (
             <span key={i} aria-hidden className="fb-spirit-spark" style={{ ["--a" as string]: `${i * 30}deg`, ["--d" as string]: `${80 + (i % 3) * 22}px` }} />
           ))}
-          <span className={`fb-spirit-words mt-3 max-w-[300px] rounded-2xl px-4 py-1.5 text-center ${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ background: "rgba(8,26,29,.92)", color: "#e8fff8", border: "1px solid rgba(140,240,220,.6)", boxShadow: "0 0 18px rgba(120,230,210,.35)" }}>
+          <span className={`fb-spirit-words relative mt-3 max-w-[300px] rounded-2xl py-1.5 pl-4 pr-9 text-center ${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ background: "rgba(8,26,29,.92)", color: "#e8fff8", border: "1px solid rgba(140,240,220,.6)", boxShadow: "0 0 18px rgba(120,230,210,.35)" }}>
             The Great Toucan Spirit accepts your letter
             {xpTag}
+            {onClose && (
+              <button type="button" onClick={onClose} aria-label="Close" className="pointer-events-auto absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-[17px] leading-none hover:bg-white/10" style={{ color: "#e8fff8" }}>
+                ×
+              </button>
+            )}
           </span>
         </div>
       </div>

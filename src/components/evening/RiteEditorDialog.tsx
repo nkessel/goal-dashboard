@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { createRiteAction, removeRiteAction, updateRiteAction } from "@/app/actions";
+import { createRiteAction, removeRiteAction, setRiteStepsAction, updateRiteAction } from "@/app/actions";
 import type { RiteView } from "./EveningRites";
 import { Moon } from "./BeginEveningButton";
 import { useEscape } from "@/lib/use-escape";
@@ -43,6 +43,17 @@ export function RiteEditorDialog({
   const [icon, setIcon] = useState<{ url: string; source: "library" | "ai" } | null>(rite?.icon_key && rite.icon_source ? { url: rite.icon_key, source: rite.icon_source } : null);
   const [coinValue, setCoinValue] = useState<number | null>(rite?.coin_value ?? null);
   const [minutes, setMinutes] = useState<number | null>(rite?.estimate_minutes ?? null);
+  // Sub-habits: a checklist ticked off each day.
+  const [subs, setSubs] = useState<{ id: string; title: string }[]>(rite?.steps ?? []);
+  const [subText, setSubText] = useState("");
+  const [subsOpen, setSubsOpen] = useState((rite?.steps?.length ?? 0) > 0);
+  const subsChanged = JSON.stringify(subs) !== JSON.stringify(rite?.steps ?? []);
+  function addSub() {
+    const t = subText.replace(/\s+/g, " ").trim();
+    if (!t) return;
+    setSubs((l) => [...l, { id: Math.random().toString(36).slice(2, 10), title: t }]);
+    setSubText("");
+  }
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -60,8 +71,14 @@ export function RiteEditorDialog({
         if (isHabit && days.length === 0) throw new Error("Pick at least one day.");
         const picture = { iconKey: icon?.url ?? null, iconSource: icon?.source ?? null };
         const schedule = isHabit ? { days: days.length === 7 ? null : days, dueTime: dueTime || null, ...picture, coinValue, estimateMinutes: minutes } : picture;
-        if (rite) await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
-        else await createRiteAction({ title, description, isCore: isHabit ? true : isCore, xpValue: xp, slot, ...schedule });
+        const pending = subText.trim() ? [...subs, { id: Math.random().toString(36).slice(2, 10), title: subText.trim() }] : subs;
+        if (rite) {
+          await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
+          if (isHabit && (subsChanged || pending !== subs)) await setRiteStepsAction(rite.id, pending);
+        } else {
+          const id = await createRiteAction({ title, description, isCore: isHabit ? true : isCore, xpValue: xp, slot, ...schedule });
+          if (isHabit && pending.length) await setRiteStepsAction(id, pending);
+        }
         close();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
@@ -151,6 +168,63 @@ export function RiteEditorDialog({
           <p className="relative z-[1] -mt-1.5 m-0 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
             {isHabit ? "It shows as a checkbox. Tap the avatar to give it a portrait instead." : "Its icon follows its name. Tap it to give it a portrait instead."}
           </p>
+        )}
+
+        {isHabit && (
+          <div className="relative z-[1] flex flex-col gap-1.5">
+            <button type="button" onClick={() => setSubsOpen((o) => !o)} aria-expanded={subsOpen} className="flex items-center gap-1 self-start text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: subsOpen ? "rotate(90deg)" : undefined }}>
+                <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {subs.length ? `Sub-habits · ${subs.length}` : "Sub-habits (steps you tick off each day)"}
+            </button>
+            {subsOpen && (
+              <div className="reveal flex flex-col gap-1 pl-3">
+                <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                  {subs.map((st, i) => (
+                    <li key={st.id} className="flex items-center gap-2">
+                      <span aria-hidden className="h-[18px] w-[18px] shrink-0 rounded-full" style={{ border: "2px solid #a58c66", background: "rgba(255,250,238,.6)" }} />
+                      <input
+                        value={st.title}
+                        onChange={(e) => setSubs((l) => l.map((x) => (x.id === st.id ? { ...x, title: e.target.value } : x)))}
+                        aria-label={`Sub-habit ${i + 1}`}
+                        className="h-8 min-w-0 flex-1 rounded-md border-0 bg-transparent px-1 text-[15px]"
+                      />
+                      <button type="button" disabled={i === 0} onClick={() => setSubs((l) => { const n = [...l]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })} aria-label="Move up" className="flex h-7 w-7 items-center justify-center rounded-full text-[14px] hover:bg-black/5 disabled:opacity-25">
+                        ↑
+                      </button>
+                      <button type="button" onClick={() => setSubs((l) => l.filter((x) => x.id !== st.id))} aria-label={`Remove ${st.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[16px] hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex items-center gap-2">
+                  <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed text-[12px]" style={{ borderColor: "#a58c66", color: "var(--t-ink-soft)" }}>
+                    +
+                  </span>
+                  <input
+                    value={subText}
+                    onChange={(e) => setSubText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !(e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        addSub();
+                      }
+                    }}
+                    onBlur={addSub}
+                    placeholder={subs.length ? "Another step" : "e.g. Food and water"}
+                    aria-label="Add a sub-habit"
+                    className="h-8 min-w-0 flex-1 rounded-md border border-dashed bg-transparent px-2 text-[15px]"
+                    style={{ borderColor: "#b39a6a" }}
+                  />
+                </div>
+                <p className="m-0 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+                  Ticking the last one completes the habit for the day.
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="relative z-[1] flex flex-wrap items-center gap-1.5">

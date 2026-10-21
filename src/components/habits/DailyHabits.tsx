@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { completeRiteAction, reorderRitesAction, skipHabitAction, uncompleteRiteAction, unskipHabitAction } from "@/app/actions";
+import { completeRiteAction, reorderRitesAction, skipHabitAction, tickAllRiteStepsAction, tickRiteStepAction, uncompleteRiteAction, unskipHabitAction } from "@/app/actions";
 import { useLocalDay } from "@/components/evening/evening-clock";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
 import type { RiteView } from "@/components/evening/EveningRites";
@@ -22,8 +22,11 @@ export function DailyHabits({
   habits,
   completions,
   skips = [],
+  stepChecks = [],
   theme,
 }: {
+  /** Sub-habit ticks for the last couple of days. */
+  stepChecks?: { rite_id: string; step_id: string; day: string }[];
   habits: RiteView[];
   /** Completions over the last few months (for today's ticks and the streaks). */
   completions: { rite_id: string; day: string }[];
@@ -54,6 +57,9 @@ export function DailyHabits({
     };
   }, [menuFor]);
   const [confirmSkip, setConfirmSkip] = useState<string | null>(null);
+  // Sub-habits: which habits are opened up, and ticks made here ahead of the save.
+  const [openSubs, setOpenSubs] = useState<Set<string>>(() => new Set());
+  const [stepOpt, setStepOpt] = useState<Record<string, boolean>>({});
   const [focusing, setFocusing] = useState<RiteView | null>(null);
   const [skipOverride, setSkipOverride] = useState<Record<string, boolean>>({});
   // Order kept locally while a drag is saving.
@@ -77,6 +83,9 @@ export function DailyHabits({
   const doneSet = new Set(completions.map((c) => `${c.rite_id}|${c.day}`));
   const skipSet = new Set((skips ?? []).map((c) => `${c.rite_id}|${c.day}`));
   const done = (id: string) => optimistic[id] ?? doneSet.has(`${id}|${day}`);
+  const tickSet = new Set(stepChecks.map((c) => `${c.rite_id}|${c.step_id}|${c.day}`));
+  const ticked = (h: RiteView, stepId: string) => stepOpt[`${h.id}|${stepId}`] ?? (tickSet.has(`${h.id}|${stepId}|${day}`) || (done(h.id) && optimistic[h.id] === true));
+  const subsOf = (h: RiteView) => h.steps ?? [];
   const skipped = (id: string) => skipOverride[id] ?? skipSet.has(`${id}|${day}`);
   const dueToday = ordered.filter((h) => dueOn(h, weekday));
   const todays = dueToday.filter((h) => !skipped(h.id));
@@ -153,12 +162,43 @@ export function DailyHabits({
       setPop({ id: h.id, xp: h.xp_value });
       setTimeout(() => setPop((p) => (p?.id === h.id ? null : p)), 1400);
     }
+    const subs = subsOf(h);
+    if (subs.length) setStepOpt((o) => ({ ...o, ...Object.fromEntries(subs.map((st) => [`${h.id}|${st.id}`, next])) }));
     startTransition(async () => {
       try {
+        if (subs.length) await tickAllRiteStepsAction(h.id, day, next);
         if (next) await completeRiteAction(h.id, day);
         else await uncompleteRiteAction(h.id, day);
       } catch (e) {
         setOptimistic((o) => ({ ...o, [h.id]: !next }));
+        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
+
+  /** Tick one sub-habit; the last tick completes the habit. */
+  function tickStep(h: RiteView, stepId: string) {
+    if (!day) return;
+    const on = !ticked(h, stepId);
+    const subs = subsOf(h);
+    const after = new Map(subs.map((st) => [st.id, st.id === stepId ? on : ticked(h, st.id)]));
+    const all = subs.every((st) => after.get(st.id));
+    setError(null);
+    setStepOpt((o) => ({ ...o, ...Object.fromEntries(subs.map((st) => [`${h.id}|${st.id}`, after.get(st.id)!])) }));
+    const wasDone = done(h.id);
+    if (all !== wasDone) {
+      setOptimistic((o) => ({ ...o, [h.id]: all }));
+      if (all && h.xp_value > 0) {
+        setPop({ id: h.id, xp: h.xp_value });
+        setTimeout(() => setPop((p) => (p?.id === h.id ? null : p)), 1400);
+      }
+    }
+    startTransition(async () => {
+      try {
+        await tickRiteStepAction(h.id, stepId, day, on);
+      } catch (e) {
+        setStepOpt((o) => ({ ...o, [`${h.id}|${stepId}`]: !on }));
+        setOptimistic((o) => ({ ...o, [h.id]: wasDone }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
       }
     });
@@ -268,6 +308,23 @@ export function DailyHabits({
                       </span>
                     )}
                   </button>
+                  {subsOf(h).length > 0 && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onClick={() => setOpenSubs((o) => { const n = new Set(o); if (n.has(h.id)) n.delete(h.id); else n.add(h.id); return n; })}
+                      aria-expanded={openSubs.has(h.id)}
+                      aria-label={`${openSubs.has(h.id) ? "Hide" : "Show"} the steps of ${h.title}`}
+                      className="relative z-[1] flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-[12.5px] font-semibold tabular-nums hover:bg-black/[.05]"
+                      style={{ color: "var(--t-ink-soft)", border: "1px solid rgba(139,112,64,.35)" }}
+                    >
+                      {subsOf(h).filter((st) => ticked(h, st.id)).length}/{subsOf(h).length}
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: openSubs.has(h.id) ? "rotate(90deg)" : undefined }}>
+                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  )}
                   <span className="relative z-[1] flex shrink-0 flex-col items-end gap-0.5">
                     <span className="flex items-center gap-1.5 text-[15px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
                       +{h.xp_value} XP
@@ -367,6 +424,41 @@ export function DailyHabits({
                     </span>
                   )}
                 </div>
+                {subsOf(h).length > 0 && openSubs.has(h.id) && (
+                  <ul className="reveal m-0 ml-7 mt-1 flex list-none flex-col gap-0.5 rounded-xl px-2 py-1.5" style={isAdventure ? { background: "rgba(240,226,196,.9)", border: "1.5px solid #b39a6a" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
+                    {subsOf(h).map((st) => {
+                      const t = ticked(h, st.id);
+                      return (
+                        <li key={st.id}>
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={t}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onClick={() => tickStep(h, st.id)}
+                            className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-1.5 text-left hover:bg-black/[.04]"
+                          >
+                            <span
+                              aria-hidden
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
+                              style={{ background: t ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "rgba(255,250,238,.6)", border: `2px solid ${t ? "#2f5a26" : "#a58c66"}` }}
+                            >
+                              {t && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                  <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="text-[15px] leading-snug" style={{ color: "var(--t-ink)", textDecoration: t ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)", opacity: t ? 0.7 : 1 }}>
+                              {st.title}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
                 </SortableHabit>
               );
             })}

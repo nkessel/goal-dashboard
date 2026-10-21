@@ -365,8 +365,22 @@ async function finishTask(ownerId: string, taskId: string, completedAt?: string)
   return finishTaskItself(ownerId, taskId, completedAt);
 }
 
+/** A quest is done: the next one in its sequence steps into the same spot. */
+async function releaseNext(ownerId: string, was: Task) {
+  const { releaseFollowers } = await import("@/lib/data/sequences");
+  const freed = await releaseFollowers(ownerId, was.id);
+  if (!freed.length) return;
+  const patch: Record<string, unknown> = { sort_order: (was as Task & { sort_order?: number }).sort_order ?? 0 };
+  if (was.is_manual_priority) patch.is_manual_priority = true;
+  if (was.queued_for) patch.queued_for = was.queued_for;
+  await supabaseAdmin().from("tasks").update(patch).eq("owner_id", ownerId).eq("id", freed[0]);
+}
+
 async function finishTaskItself(ownerId: string, taskId: string, completedAt?: string) {
+  const was = await tasksData.getTask(taskId, ownerId);
   const completed = await tasksData.completeTask(taskId, ownerId, completedAt);
+  // The next quest in its sequence steps forward (taking its place on Today).
+  if (was) await releaseNext(ownerId, was).catch(() => {});
   // Partial progress may already have paid some of this quest's XP; pay the rest.
   const tracked = typeof completed.xp_awarded === "number";
   const payout = tracked ? completed.xp_value - (completed.xp_awarded ?? 0) : completed.xp_value;
@@ -3077,4 +3091,114 @@ export async function saveMapPrefsAction(boardId: string, prefs: Record<string, 
   const extras = await readExtras(ownerId);
   const all = { ...((extras.mapPrefs as Record<string, unknown>) ?? {}), [boardId.slice(0, 40)]: JSON.parse(JSON.stringify(prefs ?? {})) };
   await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, mapPrefs: all } }).eq("id", ownerId);
+}
+
+/* ── Quest sequences ─────────────────────────────────────────────────── */
+
+/** The sequence a quest belongs to, front to back. */
+export async function sequenceOfAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  const { sequenceOf } = await import("@/lib/data/sequences");
+  return sequenceOf(ownerId, taskId);
+}
+
+/** Open quests to pick from when adding one to a sequence (title search). */
+export async function findQuestsAction(query: string, exclude: string[] = []) {
+  const ownerId = await requireProfileId();
+  let q = supabaseAdmin().from("tasks").select("id, title, board_id, icon_key").eq("owner_id", ownerId).eq("status", "open").is("reward_id", null);
+  const term = query.replace(/[%,()]/g, " ").trim();
+  if (term) q = q.ilike("title", `%${term}%`);
+  const { data } = await q.order("updated_at", { ascending: false }).limit(40);
+  const skip = new Set(exclude);
+  return ((data ?? []) as { id: string; title: string; board_id: string | null; icon_key: string | null }[]).filter((t) => !skip.has(t.id)).slice(0, 12);
+}
+
+/**
+ * Put a quest before or after another in its sequence: an existing quest, or
+ * a new one by title (made on the same board). Returns the updated sequence.
+ */
+export async function sequenceLinkAction(anchorId: string, where: "before" | "after", pick: { id: string } | { title: string }) {
+  const ownerId = await requireProfileId();
+  const seq = await import("@/lib/data/sequences");
+  const anchor = await tasksData.getTask(anchorId, ownerId);
+  if (!anchor) throw new Error("That quest isn't there any more.");
+  let id: string;
+  if ("id" in pick) id = pick.id;
+  else {
+    const title = pick.title.replace(/\s+/g, " ").trim().slice(0, 200);
+    if (!title) throw new Error("Give the new quest a name.");
+    const made = await tasksData.createTask(ownerId, { title, boardId: anchor.board_id ?? null, goalId: anchor.goal_id ?? null });
+    id = made.id;
+  }
+  // A quest already in a sequence just moves here.
+  if (where === "after") await seq.placeAfter(ownerId, id, anchorId);
+  else await seq.placeBefore(ownerId, id, anchorId);
+  revalidatePath("/", "layout");
+  return seq.sequenceOf(ownerId, anchorId);
+}
+
+/** Take a quest out of its sequence (the rest close up). */
+export async function sequenceDetachAction(taskId: string, viewFrom?: string) {
+  const ownerId = await requireProfileId();
+  const seq = await import("@/lib/data/sequences");
+  await seq.detachFromSequence(ownerId, taskId);
+  revalidatePath("/", "layout");
+  return viewFrom ? seq.sequenceOf(ownerId, viewFrom) : [];
+}
+
+/** Move a quest one place earlier or later in its sequence. */
+export async function sequenceMoveAction(taskId: string, dir: -1 | 1, viewFrom?: string) {
+  const ownerId = await requireProfileId();
+  const seq = await import("@/lib/data/sequences");
+  const chain = (await seq.sequenceOf(ownerId, taskId)).filter((t) => t.status === "open");
+  const i = chain.findIndex((t) => t.id === taskId);
+  const other = chain[i + dir];
+  if (i >= 0 && other) {
+    if (dir < 0) await seq.placeBefore(ownerId, taskId, other.id);
+    else await seq.placeAfter(ownerId, taskId, other.id);
+  }
+  revalidatePath("/", "layout");
+  return seq.sequenceOf(ownerId, viewFrom ?? taskId);
+}
+
+/* ── Sub-habits ──────────────────────────────────────────────────────── */
+
+/** Save a habit's sub-habit checklist. */
+export async function setRiteStepsAction(riteId: string, steps: { id: string; title: string }[]) {
+  const ownerId = await requireProfileId();
+  const clean = ritesData.cleanRiteSteps(steps);
+  await ritesData.setRiteSteps(ownerId, riteId, clean);
+  revalidatePath("/");
+  return clean;
+}
+
+/**
+ * Tick (or untick) one sub-habit for `day`. Ticking the last one completes the
+ * habit (XP and all); unticking one of a completed habit undoes that.
+ */
+export async function tickRiteStepAction(riteId: string, stepId: string, day: string, on: boolean) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rite = await ritesData.getRite(riteId, ownerId);
+  if (!rite) throw new Error("That habit isn't here anymore.");
+  await ritesData.setRiteStepCheck(ownerId, riteId, stepId, day, on);
+  const steps = ritesData.cleanRiteSteps(rite.steps);
+  const checks = ((await ritesData.listRiteStepChecks(ownerId, day)) ?? []).filter((c) => c.rite_id === riteId && c.day === day);
+  const ticked = new Set(checks.map((c) => c.step_id));
+  const all = steps.length > 0 && steps.every((st) => ticked.has(st.id));
+  const { data: doneRow } = await supabaseAdmin().from("rite_completions").select("id").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle();
+  let completed: { xp: number; coinsEarned: number } | null = null;
+  if (all && !doneRow) completed = await completeRiteAction(riteId, day);
+  else if (!all && doneRow) await uncompleteRiteAction(riteId, day);
+  revalidatePath("/");
+  return { done: all, xp: completed?.xp ?? 0 };
+}
+
+/** Check (or clear) every sub-habit at once, with the habit itself. */
+export async function tickAllRiteStepsAction(riteId: string, day: string, on: boolean) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rite = await ritesData.getRite(riteId, ownerId);
+  if (!rite) return;
+  for (const st of ritesData.cleanRiteSteps(rite.steps)) await ritesData.setRiteStepCheck(ownerId, riteId, st.id, day, on).catch(() => {});
 }

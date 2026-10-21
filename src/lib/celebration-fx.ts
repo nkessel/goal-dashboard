@@ -16,6 +16,8 @@ export type FxSettings = {
   feedbackStyle?: FeedbackStyle;
   /** Progress and the daily welcome: the full card, or a slim banner at the top. */
   cardStyle?: "card" | "banner";
+  /** Seconds the "Feedback submitted" card stays (0 = until you close it). */
+  feedbackHold?: number;
   /** How quickly the effects play: 0.75 quick, 1 as designed, 1.4 leisurely. */
   pace?: number;
   /** The + button: the dark enamel seal, the gold coin, or a plain one. */
@@ -32,6 +34,14 @@ export const PACES: { v: number; label: string }[] = [
   { v: 0.75, label: "Quick" },
   { v: 1, label: "As designed" },
   { v: 1.4, label: "Leisurely" },
+];
+
+export const FEEDBACK_HOLDS: { v: number; label: string }[] = [
+  { v: 1.2, label: "Brief" },
+  { v: 2.2, label: "A moment" },
+  { v: 4, label: "Longer" },
+  { v: 7, label: "Lingering" },
+  { v: 0, label: "Until I close it" },
 ];
 
 export type FeedbackStyle = "quiet" | "seal" | "crane" | "toucan";

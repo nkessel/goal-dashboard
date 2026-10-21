@@ -14,13 +14,12 @@ import { getProfileById } from "@/lib/data/profiles";
 import { getWeeklyXpEarned, currentWeekStart } from "@/lib/data/xp";
 import { listFriendIds } from "@/lib/data/friendships";
 import { listClaimedSince } from "@/lib/data/rewards";
-import { listRites, listRiteCompletions, listCompletionsFor, listHabitSkips } from "@/lib/data/rites";
+import { listRites, listRiteCompletions, listCompletionsFor, listHabitSkips, listRiteStepChecks, cleanRiteSteps } from "@/lib/data/rites";
 import { listJournalEntries } from "@/lib/data/journal";
 import { DayNightFlip } from "@/components/evening/DayNightFlip";
 import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
-import { PlanNudge, ScheduleNudge } from "@/components/plan/PlanNudge";
-import { listSchedulingList } from "@/lib/data/scheduling";
+import { PlanNudge } from "@/components/plan/PlanNudge";
 import { oneStepPerProject } from "@/lib/next-action";
 import { listBoardsForOwner } from "@/lib/data/boards";
 import { getPlanSession, getWeekChapter, lastPairSession } from "@/lib/data/planning";
@@ -115,11 +114,7 @@ export default async function Home() {
     <PlanNudge kind={pairNudge === "mid" ? "pair-mid" : "pair"} started={!!pairData.walkedAt} partner={pairData.partner || "Mom"} />
   ) : nudgeKind && !nudgeSession?.completed_at ? (
     <PlanNudge kind={nudgeKind} started={!!nudgeSession} />
-  ) : await (async () => {
-    // Otherwise: whatever's on the scheduling list and not on the calendar yet keeps asking for a time.
-    const waiting = (await listSchedulingList(session.user.id).catch(() => [])).filter((t) => !t.is_on_calendar);
-    return waiting.length ? <ScheduleNudge titles={waiting.map((t) => t.title)} /> : null;
-  })();
+  ) : null; // "Waiting for a time" lives on the calendar and with the toucan, not on Today.
   const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
   // Today's latest reading of each extra check-in metric.
   const metricsToday = Object.fromEntries(
@@ -129,14 +124,15 @@ export default async function Home() {
       .map(([k, r]) => [k, r.level])
   ) as Record<string, number>;
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
-  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, kind: r.kind ?? null, icon_key: r.icon_source ? r.icon_key : null, icon_source: r.icon_source ?? null, coin_value: r.coin_value ?? null, estimate_minutes: r.estimate_minutes ?? null });
+  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, kind: r.kind ?? null, icon_key: r.icon_source ? r.icon_key : null, icon_source: r.icon_source ?? null, coin_value: r.coin_value ?? null, estimate_minutes: r.estimate_minutes ?? null, steps: cleanRiteSteps(r.steps) });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
   // Habit streaks look back a few months; skips end a streak. Journal entries join today's victories.
-  const [habitHistory, habitSkips, journal, projectBoards] = await Promise.all([
+  const [habitHistory, habitSkips, journal, projectBoards, stepChecks] = await Promise.all([
     habits?.length ? listCompletionsFor(session.user.id, habits.map((h) => h.id), daysAgoISO(120).slice(0, 10)) : Promise.resolve([]),
     listHabitSkips(session.user.id, daysAgoISO(120).slice(0, 10)),
     listJournalEntries(session.user.id, 150).catch(() => null),
     listBoardsForOwner(session.user.id).catch(() => []),
+    habits?.some((h) => h.steps.length) ? listRiteStepChecks(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => null) : Promise.resolve([]),
   ]);
   const eveningRites = rites?.filter((r) => r.slot !== "day").map(riteView) ?? null;
   // Imports wait for approval before they show here at all; quests taken off
@@ -186,7 +182,7 @@ export default async function Home() {
               theme={theme}
               between={
                 habits && rites?.some((r) => "slot" in r) ? (
-                  <DailyHabits habits={habits} completions={habitHistory} skips={habitSkips} theme={theme} />
+                  <DailyHabits habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} theme={theme} />
                 ) : null
               }
             />

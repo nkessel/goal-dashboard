@@ -55,6 +55,8 @@ export type RiteView = {
   coin_value?: number | null;
   /** Habits: minutes it usually takes. */
   estimate_minutes?: number | null;
+  /** Habits: sub-habits ticked off each day. */
+  steps?: { id: string; title: string }[];
 };
 
 const CORE_ZONE = "zone:core";

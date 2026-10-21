@@ -244,7 +244,7 @@ export function FocusSteps({ taskId }: { taskId: string }) {
               ⏭ Skip
             </button>
             <button type="button" onClick={() => settle(focus.id, "failed")} className="h-10 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(240,140,120,.55)", color: "#f3b39f" }} title="It didn't happen">
-              ✗ Didn&rsquo;t happen
+              ✗ Failed
             </button>
             <label className="flex min-h-9 cursor-pointer items-center gap-1.5 text-[12.5px]" style={{ color: "#f3e7cb" }} title="When a step is done, keep the clock running for the next one">
               <input type="checkbox" checked={carry} onChange={(e) => setCarryPref(e.target.checked)} />

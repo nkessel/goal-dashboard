@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 
-export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "earlier" | "nextstep" | "delete";
+export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "earlier" | "nextstep" | "sequence" | "followup" | "delete";
 
 /**
  * The quest card's action list — opened from the card's icon (the blank
@@ -18,6 +18,7 @@ export function QuestActionMenu({
   onCalendar,
   canSnooze = false,
   onBoard = false,
+  inSequence = false,
   align,
   anchor,
   onPick,
@@ -27,6 +28,8 @@ export function QuestActionMenu({
   canSnooze?: boolean;
   /** On a board: offer making it that project's next step. */
   onBoard?: boolean;
+  /** Already part of a sequence (quests waiting behind it). */
+  inSequence?: boolean;
   isAdventure: boolean;
   inBattle: boolean;
   /** The quest is a reward being claimed: "Complete this reward". */
@@ -53,8 +56,9 @@ export function QuestActionMenu({
       const h = ref.current?.offsetHeight ?? 260;
       let left = align === "right" ? r.right - w : r.left;
       left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
-      let top = r.bottom + 6;
-      if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+      // Just below the card when it fits; otherwise as low as it can sit without being cut off
+      // (it may cover the navigation bar).
+      const top = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - h - 8));
       setPos({ top, left });
     };
     place();
@@ -70,13 +74,18 @@ export function QuestActionMenu({
 
   useEffect(() => {
     function onDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      const el = e.target as Element | null;
+      if (!ref.current || ref.current.contains(el as Node)) return;
+      // Writing feedback about the menu keeps it open.
+      if (el instanceof Element && el.closest("[data-feedback-root]")) return;
+      onClose();
     }
-    // Defer so the click that opened the menu doesn't immediately close it.
-    const t = setTimeout(() => document.addEventListener("pointerdown", onDown), 0);
+    // Defer so the click that opened the menu doesn't immediately close it; capture, so
+    // a card that stops the event (drag handles) still closes it.
+    const t = setTimeout(() => document.addEventListener("pointerdown", onDown, true), 0);
     return () => {
       clearTimeout(t);
-      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("pointerdown", onDown, true);
     };
   }, [onClose]);
 
@@ -100,6 +109,12 @@ export function QuestActionMenu({
     ...(onToday && !inBattle ? [{ key: "offtoday" as const, icon: <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />, label: isAdventure ? "Remove from Additional Quests" : "Remove from More tasks" }] : []),
     { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule on calendar" : "Schedule on calendar" },
     ...(onBoard && !isReward ? [{ key: "nextstep" as const, icon: <Glyph d="M5 12h12M13 7l5 5-5 5" />, label: "Make it the board's next step" }] : []),
+    ...(!isReward
+      ? [
+          { key: "followup" as const, icon: <Glyph d="M5 7h9M5 12h6M14 15l3 3 3-3M17 9v9" />, label: isAdventure ? "Add a follow-up quest" : "Add a follow-up task" },
+          { key: "sequence" as const, icon: <StackGlyph />, label: inSequence ? "Edit the sequence…" : "Join a sequence…" },
+        ]
+      : []),
     ...(!isReward ? [{ key: "earlier" as const, icon: <Glyph d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3h3" />, label: "Already completed…" }] : []),
     { key: "delete", icon: <Glyph d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, label: isReward ? "Delete reward" : isAdventure ? "Delete quest" : "Delete task" },
   ];
@@ -173,6 +188,16 @@ function Glyph({ d }: { d: string }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d={d} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Cards stacked one behind another. */
+export function StackGlyph({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="4" y="9" width="16" height="11" rx="2.2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M6.5 6h11M9 3h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }

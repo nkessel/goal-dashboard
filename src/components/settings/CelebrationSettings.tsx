@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { FAB_STYLES, FEEDBACK_STYLES, FX_DEFAULTS, PACES, loadFx, saveFx, type FeedbackStyle, type FxSettings } from "@/lib/celebration-fx";
+import { FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, loadFx, saveFx, type FeedbackStyle, type FxSettings } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { ProgressCelebration } from "@/components/celebration/ProgressCelebration";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
@@ -27,7 +27,9 @@ export function CelebrationSettings() {
   function playSent(style: FeedbackStyle) {
     const key = ++plays.current;
     setSentPreview({ key, style });
-    setTimeout(() => setSentPreview((p) => (p && p.key === key ? null : p)), 2700);
+    const hold = fx.feedbackHold ?? 2.2;
+    if (style === "quiet" && hold === 0) return; // stays until closed
+    setTimeout(() => setSentPreview((p) => (p && p.key === key ? null : p)), style === "quiet" ? hold * 1000 + 50 : 2700 * (fx.pace ?? 1));
   }
 
   // localStorage is only readable after hydration.
@@ -123,6 +125,23 @@ export function CelebrationSettings() {
             );
           })}
         </ul>
+        <div className="mt-2 flex flex-col gap-1">
+          <span className="text-[13px] font-semibold">How long “Feedback submitted” stays</span>
+          <div role="radiogroup" aria-label="How long the Feedback submitted card stays" className="flex flex-wrap gap-1.5">
+            {FEEDBACK_HOLDS.map((h) => {
+              const on = (fx.feedbackHold ?? 2.2) === h.v;
+              return (
+                <button key={h.v} type="button" role="radio" aria-checked={on} onClick={() => update({ feedbackHold: h.v })} className="min-h-9 rounded-xl px-3 text-[13.5px] font-semibold" style={pick(on)}>
+                  {h.label}
+                  {h.v ? <span className="ml-1 text-[11.5px] font-normal opacity-75">{h.v}s</span> : null}
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+            Tap its × to close it sooner.
+          </span>
+        </div>
       </Fold>
 
       <Fold title="Progress and the daily welcome" hint={(fx.cardStyle ?? "card") === "card" ? "Card" : "Banner"}>
@@ -178,7 +197,7 @@ export function CelebrationSettings() {
       <p className="m-0 min-h-4 text-center text-xs" style={{ color: "var(--t-ink-soft)" }} aria-live="polite">{note}</p>
 
       {sentPreview && (
-        <SentBurst key={sentPreview.key} kind="feedback" xp={2} x={typeof window === "undefined" ? 200 : window.innerWidth / 2} y={typeof window === "undefined" ? 300 : window.innerHeight / 2} isAdventure style={sentPreview.style} />
+        <SentBurst key={sentPreview.key} kind="feedback" xp={2} x={typeof window === "undefined" ? 200 : window.innerWidth / 2} y={typeof window === "undefined" ? 300 : window.innerHeight / 2} isAdventure style={sentPreview.style} onClose={() => setSentPreview(null)} />
       )}
       {cardPreview > 0 && (
         <ProgressCelebration

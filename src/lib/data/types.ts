@@ -97,6 +97,8 @@ export type Task = {
   reward_id?: string | null;
   /** Hidden behind this (prerequisite) quest until it's completed. */
   locked_by_task_id?: string | null;
+  /** Quests waiting behind this one in a sequence (front quest only, when listed). */
+  behind?: { id: string; title: string; estimate_minutes: number | null; icon_key: string | null; board_id: string | null }[];
   /** A quick-win, low-energy quest kept in the Power-ups menu. */
   is_power_up?: boolean;
   /** The quest board this quest belongs to (null = no board). */

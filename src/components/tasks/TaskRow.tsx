@@ -10,6 +10,8 @@ import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
 import { earlyBirdBonus } from "@/lib/next-action";
 import { QuestActionMenu, SnoozeGlyph, type QuestAction } from "./QuestActionMenu";
+import { SequenceDialog, SequenceStack, stackPad } from "./Sequence";
+import { CreateSheet } from "@/components/create/CreateSheet";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { celebrateQuest, updateQuestCelebration } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
@@ -111,6 +113,9 @@ export function TaskRow({
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [doneEarlier, setDoneEarlier] = useState(false);
+  const [sequencing, setSequencing] = useState(false);
+  const [followUp, setFollowUp] = useState(false);
+  const queue = task.behind ?? [];
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -192,6 +197,8 @@ export function TaskRow({
     if (action === "calendar") return setScheduling(true);
     if (action === "focus") return openFocusMode({ ...task, categoryLabel });
     if (action === "earlier") return setDoneEarlier(true);
+    if (action === "sequence") return setSequencing(true);
+    if (action === "followup") return setFollowUp(true);
     if (action === "nextstep") {
       startTransition(async () => {
         try {
@@ -294,6 +301,7 @@ export function TaskRow({
       onCalendar={task.is_on_calendar}
       canSnooze={Boolean(listMoves) && task.status === "open"}
       onBoard={Boolean(task.board_id)}
+      inSequence={queue.length > 0 || Boolean(task.locked_by_task_id && !task.reward_id)}
       align={align}
       anchor={menuAnchor}
       onPick={pick}
@@ -310,7 +318,6 @@ export function TaskRow({
       }}
       {...(sortable ? sortable.attributes : {})}
       {...((sortable?.listeners ?? {}) as React.HTMLAttributes<HTMLLIElement>)}
-      style={sortable ? { ...sortable.style, opacity: sortable.isDragging ? 0.35 : 1, touchAction: "manipulation", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" } : undefined}
       data-task-id={task.id}
       // Explicitly false when this row isn't itself a drag source, so a press
       // inside a goal card on Board Detail doesn't start dragging the goal.
@@ -320,9 +327,15 @@ export function TaskRow({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={behind ? "relative pt-7" : "relative"}
+      style={{
+        ...(sortable ? { ...sortable.style, opacity: sortable.isDragging ? 0.35 : 1, touchAction: "manipulation", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" } : {}),
+        ...(queue.length ? { paddingBottom: stackPad(queue.length) } : {}),
+      }}
     >
       {/* A locked reward peeks out from behind its prerequisite quest. */}
       {behind && <LockedRewardCard reward={behind} />}
+      {/* The quests waiting after this one, stacked underneath. */}
+      {queue.length > 0 && <SequenceStack queue={queue} isAdventure={isAdventure} onEdit={() => setSequencing(true)} />}
       {/* On Today, swipe right to snooze it until tomorrow. */}
       <SwipeReveal
         side="left"
@@ -345,7 +358,7 @@ export function TaskRow({
         setMenu("dots");
       }}
       title="Click to edit · right-click for more"
-      className={`quest-card hover-glow relative flex cursor-pointer flex-col rounded-2xl px-3 pb-3 pt-2.5 ${behind ? "z-[1]" : ""} ${task.reward_id ? "reward-quest" : ""} ${
+      className={`quest-card hover-glow relative flex cursor-pointer flex-col rounded-2xl px-3 pb-3 pt-2.5 ${behind || queue.length ? "z-[1]" : ""} ${task.reward_id ? "reward-quest" : ""} ${
         draggable ? "active:cursor-grabbing" : ""
       } ${isPending ? "opacity-70" : ""}`}
       style={cardStyle}
@@ -614,6 +627,8 @@ export function TaskRow({
           }}
         />
       )}
+      {sequencing && <SequenceDialog taskId={task.id} title={task.title} isAdventure={isAdventure} onClose={() => setSequencing(false)} />}
+      {followUp && <CreateSheet kinds={["quest"]} initial="quest" boardId={task.board_id ?? undefined} followUpOf={{ id: task.id, title: task.title }} theme={theme} onClose={() => setFollowUp(false)} />}
       {doneEarlier && <DoneEarlierDialog title={task.title} isAdventure={isAdventure} onPick={completeEarlier} onClose={() => setDoneEarlier(false)} />}
       </div>
     </div>

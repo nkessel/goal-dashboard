@@ -4,6 +4,12 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { logTaskCompletedActivity } from "./activity";
 import type { Task } from "./types";
 
+/** Stand-ins take their current assignment's dates; quests waiting in a sequence ride behind the front one. */
+async function decorate<T extends Task>(ownerId: string, tasks: T[]) {
+  const [{ applyStandIns }, { attachSequences }] = await Promise.all([import("./standins"), import("./sequences")]);
+  return attachSequences(ownerId, await applyStandIns(ownerId, tasks));
+}
+
 
 export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
   const db = supabaseAdmin();
@@ -19,8 +25,7 @@ export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
-  const { applyStandIns } = await import("./standins");
-  return applyStandIns(ownerId, (data ?? []) as Task[]);
+  return decorate(ownerId, (data ?? []) as Task[]);
 }
 
 export type TaskWithCategory = Task & {
@@ -60,9 +65,8 @@ export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promis
     const { data: boards } = await db.from("boards").select("id, title").in("id", boardIds);
     for (const b of boards ?? []) titles.set(b.id as string, b.title as string);
   }
-  const { applyStandIns } = await import("./standins");
   return attachStepCounts(
-    await applyStandIns(
+    await decorate(
       ownerId,
       tasks.map((task) => ({
         ...task,
@@ -281,8 +285,7 @@ export async function listOpenTasksWithBoardForOwner(
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
-  const { applyStandIns } = await import("./standins");
-  return applyStandIns(ownerId, ((data ?? []) as Task[]).map((t) => ({ ...t, board_id: t.board_id ?? null })));
+  return decorate(ownerId, ((data ?? []) as Task[]).map((t) => ({ ...t, board_id: t.board_id ?? null })));
 }
 
 /** A quest board's own quests (open first, then finished). */
@@ -305,8 +308,7 @@ export async function listTasksForBoard(boardId: string, ownerId: string): Promi
     const title = new Map((hb ?? []).map((b) => [b.id as string, b.title as string]));
     linked = (res.data as Task[]).map((t) => ({ ...t, home_board_title: t.board_id ? (title.get(t.board_id) ?? null) : null }));
   }
-  const { applyStandIns } = await import("./standins");
-  return attachStepCounts(await applyStandIns(ownerId, [...((data ?? []) as Task[]), ...linked]), ownerId);
+  return attachStepCounts(await decorate(ownerId, [...((data ?? []) as Task[]), ...linked]), ownerId);
 }
 
 /** Queue a quest for a background-painted portrait (see PortraitPainter). */
