@@ -2129,7 +2129,9 @@ export async function getStatsAction() {
 export async function setStatsAction(names: string[]) {
   const ownerId = await requireProfileId();
   const next = await statsData.setStats(ownerId, names);
-  revalidatePath("/", "layout");
+  // Not the whole app: refreshing the screen you're on mid-edit closed an open quest editor.
+  revalidatePath("/settings");
+  revalidatePath("/insights");
   return next;
 }
 
