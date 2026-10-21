@@ -70,6 +70,12 @@ export type Task = {
   schedule_folder?: string | null;
   /** Percent of this quest's XP sent to each character stat. */
   stat_split?: Record<string, number> | null;
+  /** Tags for sorting quests across boards (life wheel, insights). */
+  tags?: string[] | null;
+  /** A stand-in quest: it speaks for this board's current assignment. */
+  stands_for?: string | null;
+  /** Filled in for a stand-in: the assignment it points at right now. */
+  stand_in?: { id: string; title: string; due_at: string | null; next_step: string | null; board: string | null } | null;
   /** Hidden from your party, even on screens you share. */
   is_private?: boolean;
   /** A party member who added this quest to a shared board. */

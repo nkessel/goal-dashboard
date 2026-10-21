@@ -16,3 +16,9 @@ export function usePortalTarget(): HTMLElement {
 export function useIsEmbedded(): boolean {
   return useContext(EmbedHostContext) !== null;
 }
+
+/** Where an embedded editor puts its small top-bar buttons (templates, drafts) and asks before closing. */
+export const EditorToolbarContext = createContext<HTMLElement | null>(null);
+export function useEditorToolbar(): HTMLElement | null {
+  return useContext(EditorToolbarContext);
+}

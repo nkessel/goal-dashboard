@@ -146,7 +146,7 @@ export function QuestComplete(props: QuestCompleteProps) {
     timers.current.push(
       setTimeout(() => {
         const start = performance.now();
-        const dur = fx.fill * 1000;
+        const dur = fx.fill * 1000 * (fx.pace ?? 1);
         setPlaying(true);
         const tick = (now: number) => {
           const v = Math.min(1, (now - start) / dur);

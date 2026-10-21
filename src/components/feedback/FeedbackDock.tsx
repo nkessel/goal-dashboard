@@ -36,7 +36,7 @@ type WhenKind = (typeof WHEN)[number][0];
 /** XP you choose to earn for a piece of feedback. */
 const XP_CHOICES = [1, 2, 3] as const;
 
-type Draft = { id: string; body: string; kind: WhenKind; xp?: number; images?: string[]; page?: string; context?: string; shot?: string | null; updatedAt?: number; deleted?: boolean };
+type Draft = { id: string; body: string; kind: WhenKind; xp?: number; xpPicked?: boolean; images?: string[]; page?: string; context?: string; shot?: string | null; updatedAt?: number; deleted?: boolean };
 
 /** Two lists of drafts as one: the newest edit of each wins, and deletions stick. */
 function mergeDrafts(a: Draft[], b: Draft[]): Draft[] {
@@ -97,9 +97,16 @@ function isTyping(el: EventTarget | null) {
 }
 
 /** Unless you choose: 1 XP per paragraph, up to 3. */
-function autoXp(body: string) {
-  return Math.max(1, Math.min(3, body.split(/\n+/).filter((p) => p.trim().length > 0).length));
+function paragraphs(body: string) {
+  return body.split(/\n+/).filter((p) => p.trim().length > 0).length;
 }
+/** 1 XP per paragraph, up to 3, and a secret +4 once a note runs to six paragraphs. */
+function autoXp(body: string) {
+  const n = paragraphs(body);
+  return n >= 6 ? 4 : Math.max(1, Math.min(3, n));
+}
+/** The XP a note earns: your pick if you made one on purpose, otherwise its paragraphs. */
+const xpOf = (d: { body: string; xp?: number; xpPicked?: boolean }) => (d.xpPicked && d.xp ? d.xp : autoXp(d.body));
 
 /** What device the note came from, in a few words. */
 function deviceLabel() {
@@ -232,7 +239,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [celebrate, setCelebrate] = useState<{ key: number; kind: WhenKind; xp: number; x: number; y: number; style: FeedbackStyle } | null>(null);
   useEffect(() => {
     if (!celebrate) return;
-    const t = setTimeout(() => setCelebrate(null), celebrate.style === "toucan" ? 3600 : 2600);
+    const pace = loadFx().pace ?? 1;
+    const t = setTimeout(() => setCelebrate(null), (celebrate.style === "toucan" ? 2900 : celebrate.style === "quiet" ? 2250 : 2600) * pace);
     return () => clearTimeout(t);
   }, [celebrate]);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -364,7 +372,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     if (!d || !d.body.trim() || isSaving) return;
     setError(null);
     // Straight into the celebration; the note is sent behind it.
-    const xp = d.xp ?? autoXp(d.body);
+    const xp = xpOf(d);
     setCelebrate({ key: Date.now(), kind: d.kind, xp, x: shown.x + shown.w / 2, y: shown.y + Math.min(shown.h, 260) / 2, style: loadFx().feedbackStyle ?? "seal" });
     setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, deleted: true, updatedAt: Date.now() } : x)));
     setOpenId(null);
@@ -373,7 +381,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         const r = await fetch("/api/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: d.body, kind: d.kind, xp: d.xp ?? autoXp(d.body), images: [...(d.shot ? [d.shot] : []), ...(d.images ?? [])], page: d.page, context: d.context }),
+          body: JSON.stringify({ body: d.body, kind: d.kind, xp: xpOf(d), images: [...(d.shot ? [d.shot] : []), ...(d.images ?? [])], page: d.page, context: d.context }),
         });
         const res = (await r.json().catch(() => ({ ok: false, error: "Couldn't send it." }))) as { ok: boolean; xpAwarded?: number; error?: string };
         if (!r.ok || !res.ok) throw new Error(r.status === 401 || r.status === 403 ? "You've been signed out — sign in again to send (your note is saved)." : (res.error ?? "Couldn't send it."));
@@ -453,15 +461,15 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const defaultGeom = (): Geom => {
     // Starts at a comfortable size and grows as you write (up to the screen),
     // so it only takes the whole screen when it really needs it.
-    const w = mobile ? vp.innerW - 16 : Math.min(460, vp.innerW - 40);
+    const w = mobile ? vp.innerW - 16 : Math.min(380, vp.innerW - 40);
     // Phones: sized from the whole screen (never from what the keyboard leaves), so it doesn't jump.
-    const h = mobile ? Math.min(Math.round(clamp(vp.innerH * 0.4, 220, 300)) + growBy, Math.round(vp.innerH * 0.62)) : Math.min(380, vp.innerH - 170) + growBy;
+    const h = mobile ? Math.min(Math.round(clamp(vp.innerH * 0.4, 220, 300)) + growBy, Math.round(vp.innerH * 0.62)) : Math.min(Math.min(270, vp.innerH - 170) + growBy, vp.innerH - 120);
     const above = btnPos.y - 12 - h;
     return { w, h, x: mobile ? 8 : clamp(btnPos.x + BTN - w, 20, vp.innerW - w - 20), y: above > 60 ? above : 60 };
   };
   const def = defaultGeom();
   // A size you dragged it to this time stands; otherwise it's as tall as the writing needs.
-  const shown = mobile ? fitPhone(phoneY ?? 64, sized && geom ? geom.h : def.h, vp) : fit(geom ? { ...geom, h: sized ? geom.h : def.h } : def, vp);
+  const shown = mobile ? fitPhone(phoneY ?? 64, sized && geom ? geom.h : def.h, vp) : fit(geom ? { ...geom, w: sized ? geom.w : def.w, h: sized ? geom.h : def.h } : def, vp);
   const isSent = !!open && sent?.id === open.id;
 
   function onPanelDown(e: React.PointerEvent<HTMLElement>, kind: "move" | "resize") {
@@ -604,22 +612,6 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
                   <span className="truncate">Feedback</span>
                 </span>
                 {!isSent && (
-                  <button
-                    type="button"
-                    onClick={submit}
-                    disabled={isSaving || !open.body.trim()}
-                    title="Submit feedback (Ctrl + Enter)"
-                    className="hover-glow h-8 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"
-                    style={{
-                      background: isAdventure ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "var(--t-accent)",
-                      color: isAdventure ? "#2a1c10" : "#fff",
-                      border: isAdventure ? "1.5px solid #6b4a12" : undefined,
-                    }}
-                  >
-                    {isSaving ? "Sending…" : "Submit"}
-                  </button>
-                )}
-                {!isSent && (
                   <button type="button" onClick={leaveOpen} aria-label="Put it away for later" title="Put it away — continue later from the feedback button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5" style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
                       <path d="M6 10l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -632,7 +624,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
                   </svg>
                 </button>
               </div>
-            <div className={`feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${isSent ? "pb-3" : "pb-3"}`}>
+            <div className={`feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${isSent ? "pb-3" : "pb-1"}`}>
 
               {isSent && sent ? (
                 <Sent kind={sent.kind} xp={sent.xp} isAdventure={isAdventure} onAnother={startNew} />
@@ -642,6 +634,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
                   draft={open}
                   isAdventure={isAdventure}
                   compact={mobile}
+                  saving={isSaving}
                   error={error}
                   onChange={update}
                   onSubmit={submit}
@@ -691,6 +684,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
  * Feedback sent, in the style chosen in Settings: a wax-sealed letter, a
  * paper crane, a shooting star, the toucan carrying it off, or just a word.
  */
+const paceNow = () => (typeof window === "undefined" ? 1 : (loadFx().pace ?? 1));
+
 export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet" }: { kind: WhenKind; xp: number; x: number; y: number; isAdventure: boolean; style?: FeedbackStyle }) {
   const where = kind === "future" ? "Saved in your future ideas" : kind === "refill" ? "Saved for when credits refill" : "It goes into the next update";
   const xpTag = xp > 0 && (
@@ -701,7 +696,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet" }: { ki
   // The default: a clear, calm success card in the middle of the screen.
   if (style === "quiet")
     return (
-      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center p-6">
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center p-6" style={{ ["--fb-pace" as string]: String(paceNow()) }}>
         <div className="fb-done flex w-[min(300px,100%)] flex-col items-center gap-2 rounded-3xl px-6 pb-5 pt-6 text-center" style={isAdventure ? { background: "linear-gradient(180deg,#f6ecd2,#ead7aa)", border: "2px solid #a88a3f", color: "#2a1c10", boxShadow: "0 18px 40px rgba(0,0,0,.45)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: "var(--t-ink)", boxShadow: "0 18px 40px rgba(0,0,0,.25)" }}>
           <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden>
             <circle className="fb-done-ring" cx="38" cy="38" r="33" fill="none" stroke={isAdventure ? "#3f6a2c" : "var(--t-accent)"} strokeWidth="5" strokeLinecap="round" />
@@ -723,7 +718,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet" }: { ki
   // Handed to the Great Toucan Spirit: he takes the letter and powers up.
   if (style === "toucan")
     return (
-      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center">
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center" style={{ ["--fb-pace" as string]: String(paceNow()) }}>
         <div className="fb-spirit relative flex flex-col items-center">
           <span aria-hidden className="fb-spirit-rays absolute left-1/2 top-[64px] h-[260px] w-[260px] rounded-full" />
           <span aria-hidden className="fb-spirit-ring absolute left-1/2 top-[64px] h-[120px] w-[120px] rounded-full" />
@@ -875,6 +870,7 @@ function Composer({
   draft,
   isAdventure,
   compact = false,
+  saving = false,
   error,
   onChange,
   onSubmit,
@@ -884,6 +880,7 @@ function Composer({
   isAdventure: boolean;
   /** Phones: the timing row folds into a small chip. */
   compact?: boolean;
+  saving?: boolean;
   error: string | null;
   onChange: (patch: Partial<Draft>) => void;
   onSubmit: () => void;
@@ -891,7 +888,8 @@ function Composer({
   onOverflow?: (px: number) => void;
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null);
-  const xp = draft.xp ?? autoXp(draft.body);
+  const xp = xpOf(draft);
+  const secret = paragraphs(draft.body) >= 6;
   const [uploading, setUploading] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
   // Tap an attachment to see it full size.
@@ -916,7 +914,7 @@ function Composer({
     if (urls.length) onChange({ images: [...(draft.images ?? []), ...urls] });
   }
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 px-3.5 pb-2 pt-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5 px-3.5 pb-1.5 pt-0.5">
       {!compact && <Segmented
         label="Where it goes"
         isAdventure={isAdventure}
@@ -934,11 +932,11 @@ function Composer({
         isAdventure={isAdventure}
         value={xp}
         onChange={(n) => {
-          onChange({ xp: n });
+          onChange({ xp: n, xpPicked: true });
           // Straight on to writing.
           textRef.current?.focus();
         }}
-        options={XP_CHOICES.map((n) => ({ value: n, label: `+${n}`, hint: `Earn ${n} XP for this feedback` }))}
+        options={[...XP_CHOICES, ...(secret ? [4] : [])].map((n) => ({ value: n, label: n === 4 ? "+4 ✦" : `+${n}`, hint: n === 4 ? "A secret bonus for a full six paragraphs" : `Earn ${n} XP for this feedback` }))}
       />
       <div className="relative flex min-h-0 flex-1 flex-col">
       <textarea
@@ -975,7 +973,7 @@ function Composer({
       </div>
       {/* Screenshots: paste one into the box, or pick from your device. */}
       {(
-      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+      <div className="-mt-0.5 flex shrink-0 flex-wrap items-center gap-1">
         {[...(draft.shot ? [{ url: draft.shot, label: "Screen picture", remove: () => onChange({ shot: null }) }] : []), ...(draft.images ?? []).map((u, i) => ({ url: u, label: (draft.images ?? []).length > 1 ? `Image ${i + 1}` : "Image", remove: () => onChange({ images: (draft.images ?? []).filter((x) => x !== u) }) }))].map((a) => (
           <span key={a.url} className="flex h-7 items-center rounded-full pl-1" style={{ border: "1px solid var(--t-panel-border)", background: "rgba(255,255,255,.55)" }}>
             <button type="button" onClick={() => setViewing(a.url)} className="flex h-6 items-center gap-1 rounded-full px-1.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)" }} title="See it full size">
@@ -1040,6 +1038,21 @@ function Composer({
             <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => e.target.files && void attach([...e.target.files])} />
           </label>
         )}
+        {/* Submit sits right under the writing. */}
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={saving || !draft.body.trim()}
+          title="Submit feedback (Ctrl + Enter)"
+          className="hover-glow ml-1 h-8 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"
+          style={{
+            background: isAdventure ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "var(--t-accent)",
+            color: isAdventure ? "#2a1c10" : "#fff",
+            border: isAdventure ? "1.5px solid #6b4a12" : undefined,
+          }}
+        >
+          {saving ? "Sending…" : "Submit"}
+        </button>
         </span>
       </div>
       )}

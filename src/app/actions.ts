@@ -351,7 +351,21 @@ function customCoinAdjustment(task: { coin_value?: number | null; xp_value: numb
  * Complete a quest and pay what it still owes. A reward's own quest also
  * completes the reward and pays its bonus coins.
  */
-async function finishTask(ownerId: string, taskId: string, completedAt?: string) {
+async function finishTask(ownerId: string, taskId: string, completedAt?: string): Promise<Awaited<ReturnType<typeof finishTaskItself>>> {
+  // A stand-in quest stays: checking it off finishes the assignment it speaks for right now.
+  const t = await tasksData.getTask(taskId, ownerId);
+  if (t?.stands_for) {
+    const { currentAssignment } = await import("@/lib/data/standins");
+    const current = await currentAssignment(ownerId, t);
+    if (current) {
+      await supabaseAdmin().from("tasks").update({ needs_review: false }).eq("id", current).eq("owner_id", ownerId);
+      return finishTaskItself(ownerId, current, completedAt);
+    }
+  }
+  return finishTaskItself(ownerId, taskId, completedAt);
+}
+
+async function finishTaskItself(ownerId: string, taskId: string, completedAt?: string) {
   const completed = await tasksData.completeTask(taskId, ownerId, completedAt);
   // Partial progress may already have paid some of this quest's XP; pay the rest.
   const tracked = typeof completed.xp_awarded === "number";
@@ -548,7 +562,7 @@ export async function saveQuestStepsAction(taskId: string, steps: stepsData.Step
   revalidatePath("/");
   revalidatePath("/boards", "layout");
   return {
-    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null })),
+    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null, parent_id: s.parent_id ?? null })),
     xpEarned: delta,
     coinsEarned,
   };
@@ -1595,7 +1609,7 @@ export async function addJournalEntryAction(body: string, mood: number | null, k
   if (!text) throw new Error("Write something first.");
   const k = kind && /^[a-z]{2,20}$/.test(kind) ? kind : null;
   const isFeedback = !!k && (feedbackData.FEEDBACK_KINDS as readonly string[]).includes(k);
-  const xpAwarded = isFeedback ? Math.max(0, Math.min(3, Math.round(feedbackXp))) : 0;
+  const xpAwarded = isFeedback ? Math.max(0, Math.min(4, Math.round(feedbackXp))) : 0;
   const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null, k, xpAwarded);
   const pics = attachments.filter((u) => typeof u === "string" && /^https:\/\/[^\s]+\/feedback\//.test(u)).slice(0, 4);
   if (pics.length) await journalData.setAttachments(ownerId, entry.id, pics).catch(() => {});
@@ -2323,6 +2337,33 @@ export async function editMissionStepAction(taskId: string, patch: { title?: str
   revalidatePath("/settings");
 }
 
+/** Make a quest a stand-in for a board's current assignment (or a plain quest again, with null). */
+export async function setStandsForAction(taskId: string, boardId: string | null) {
+  const ownerId = await requireProfileId();
+  const { error } = await supabaseAdmin().from("tasks").update({ stands_for: boardId }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(/stands_for/.test(error.message) ? "Stand-in quests need a quick database update first." : `Couldn't save that: ${error.message}`);
+  revalidatePath("/");
+}
+
+/** A quest's tags (lower-case words, no #). */
+export async function setTaskTagsAction(taskId: string, tags: string[]) {
+  const ownerId = await requireProfileId();
+  const clean = [...new Set(tags.map((t) => t.replace(/^#/, "").replace(/\s+/g, " ").trim().toLowerCase().slice(0, 30)).filter(Boolean))].slice(0, 12);
+  const { error } = await supabaseAdmin().from("tasks").update({ tags: clean }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(/tags/.test(error.message) ? "Tags need a quick database update first." : `Couldn't save the tags: ${error.message}`);
+  revalidatePath("/");
+  return clean;
+}
+
+/** Every tag you've used, most used first (for suggestions). */
+export async function listTagsAction() {
+  const ownerId = await requireProfileId();
+  const { data } = await supabaseAdmin().from("tasks").select("tags").eq("owner_id", ownerId).not("tags", "eq", "{}").limit(1000);
+  const n = new Map<string, number>();
+  for (const r of (data ?? []) as { tags: string[] | null }[]) for (const t of r.tags ?? []) n.set(t, (n.get(t) ?? 0) + 1);
+  return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+}
+
 /** Put a mission's steps in this order. */
 export async function orderMissionStepsAction(ids: string[]) {
   const ownerId = await requireProfileId();
@@ -2820,7 +2861,7 @@ export async function coachStateAction() {
 }
 
 /** Talk with the Great Toucan Spirit. It sees your quests, recent wins and check-ins, and remembers what you've shared. */
-export async function coachAction(message: string) {
+export async function coachAction(message: string, lite = false, liteHistory: { role: "user" | "assistant"; content: string }[] = []) {
   const ownerId = await requireProfileId();
   const text = String(message ?? "").trim().slice(0, 2000);
   if (!text) throw new Error("Say something first.");
@@ -2841,6 +2882,7 @@ export async function coachAction(message: string) {
   ]);
   const { contextLines } = await import("@/lib/toucan-guide");
   const { coachSystemPrompt, parseReply } = await import("@/lib/coach");
+  const { mentioned } = await import("@/lib/toucan-guide");
   const { catchUpPlan, catchUpOrder } = await import("@/lib/catch-up");
   const fmtWhen = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tz });
   const who = profile?.name?.split(" ")[0] || "friend";
@@ -2863,10 +2905,13 @@ export async function coachAction(message: string) {
     wins: (wins as { kind: string; title: string; at: string }[]).filter((w) => w.kind !== "login" && w.kind !== "feedback").slice(0, 12).map((w) => `- ${w.title} (${fmtWhen(w.at)})`),
     checkIn: Object.entries(checks as Record<string, { level: number; at: string }>).slice(0, 8).map(([k, v]) => `- ${k}: ${v.level}`),
     today,
-    notes: coach.notes.map((n) => `- ${n.text}`),
-    promises: coach.promises.filter((p) => p.status === "open").map((p) => `- ${p.text}${p.due ? ` (for ${fmtWhen(p.due)})` : ""}`),
+    notes: lite ? [] : coach.notes.map((n) => `- ${n.text}`),
+    promises: lite ? [] : coach.promises.filter((p) => p.status === "open").map((p) => `- ${p.text}${p.due ? ` (for ${fmtWhen(p.due)})` : ""}`),
+    lite,
   });
-  const history = [...coach.history.slice(-12), { role: "user" as const, content: text }];
+  // The light guide keeps no memory: it sees only this conversation.
+  const past = lite ? liteHistory.slice(-10).map((m) => ({ role: m.role, content: String(m.content).slice(0, 1200) })) : coach.history.slice(-12);
+  const history = [...past, { role: "user" as const, content: text }];
   const messages = [{ role: "system", content: system }, ...history.map((m) => ({ role: m.role, content: m.content }))];
   let raw = "";
   for (const model of ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct-fast"]) {
@@ -2886,6 +2931,11 @@ export async function coachAction(message: string) {
   }
   if (!raw) throw new Error("The toucan is lost in thought. Try again in a moment.");
   const { text: reply, actions } = parseReply(raw, tasks);
+  if (lite) {
+    // Plan buttons for the quests it names; nothing remembered.
+    const named = mentioned(reply, tasks).map((q) => ({ type: "plan" as const, questId: q.id, quest: q.title }));
+    return { reply, actions: named, remembered: [] as import("@/lib/coach").CoachNote[] };
+  }
   // What it learns about you, it keeps (you can see and remove each note).
   const remembered = actions.filter((a): a is Extract<typeof a, { type: "remember" }> => a.type === "remember").map((a) => ({ id: crypto.randomUUID().slice(0, 8), text: a.note, at: now.toISOString() }));
   const stamp = now.toISOString();
@@ -2992,6 +3042,24 @@ export async function applyCatchUpAction(boardIds: string[], orderedIds: string[
   const extras = await readExtras(ownerId);
   await db.from("profiles").update({ life_wheel: { ...extras, catchUp: { boards: boardIds.slice(0, 20), at: new Date().toISOString() } } }).eq("id", ownerId);
   revalidatePath("/", "layout");
+}
+
+/** How much the toucan does (simple, light guide, full guide) and which of his lines are switched off. */
+export async function saveToucanPrefsAction(patch: { mode?: "simple" | "lite" | "full"; retired?: string[] }) {
+  const ownerId = await requireProfileId();
+  const extras = await readExtras(ownerId);
+  const prev = (extras.toucanPrefs as { mode?: string; retired?: string[] } | undefined) ?? {};
+  const next = {
+    mode: patch.mode && ["simple", "lite", "full"].includes(patch.mode) ? patch.mode : (prev.mode ?? "full"),
+    retired: Array.isArray(patch.retired) ? patch.retired.filter((x) => typeof x === "string").map((x) => x.slice(0, 200)).slice(0, 200) : (prev.retired ?? []),
+  };
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanPrefs: next } }).eq("id", ownerId);
+}
+
+export async function toucanPrefsAction() {
+  const ownerId = await requireProfileId();
+  const p = ((await readExtras(ownerId)).toucanPrefs as { mode?: "simple" | "lite" | "full"; retired?: string[] } | undefined) ?? {};
+  return { mode: p.mode ?? "full", retired: p.retired ?? [] };
 }
 
 /** The colour theme for the Adventure look (forest, moonlit, ember…). */

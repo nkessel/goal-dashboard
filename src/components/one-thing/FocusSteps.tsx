@@ -6,7 +6,8 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { listQuestStepsAction, saveQuestStepsAction } from "@/app/actions";
 
-type Step = { id: string; title: string; done: boolean; xp: number; progress: number; seconds: number; state?: "skipped" | "failed" | null };
+type Step = { id: string; title: string; done: boolean; xp: number; progress: number; seconds: number; state?: "skipped" | "failed" | null; group?: string | null };
+type Holder = { id: string; title: string; done: boolean };
 
 const fmt = (sec: number) => {
   const s = Math.max(0, Math.floor(sec));
@@ -34,13 +35,32 @@ export function FocusSteps({ taskId }: { taskId: string }) {
   const [carry, setCarry] = useState(false);
   // Seconds on the clock already credited to earlier steps (when the timer carries on).
   const credited = useRef(0);
+  const holders = useRef<Holder[]>([]);
   const [party, setParty] = useState<{ title: string; xp: number; n: number } | null>(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
     let alive = true;
     listQuestStepsAction(taskId)
-      .then((rows) => alive && setSteps((rows ?? []).map((r) => ({ id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, progress: r.progress ?? 0, seconds: r.seconds_spent ?? 0, state: r.state ?? null }))))
+      .then((rows) => {
+        if (!alive) return;
+        const list = rows ?? [];
+        // Steps holding sub-tasks stay as they are; focus works through the sub-tasks (each labelled with its step).
+        const parentIds = new Set(list.map((r) => r.parent_id).filter(Boolean) as string[]);
+        const title = new Map(list.map((r) => [r.id, r.title]));
+        holders.current = list.filter((r) => parentIds.has(r.id)).map((r) => ({ id: r.id, title: r.title, done: r.done }));
+        const kids = new Map<string | null, typeof list>();
+        for (const r of list) kids.set(r.parent_id ?? null, [...(kids.get(r.parent_id ?? null) ?? []), r]);
+        const ordered: typeof list = [];
+        const walk = (p: string | null) => {
+          for (const r of kids.get(p) ?? []) {
+            ordered.push(r);
+            walk(r.id);
+          }
+        };
+        walk(null);
+        setSteps(ordered.filter((r) => !parentIds.has(r.id)).map((r) => ({ id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, progress: r.progress ?? 0, seconds: r.seconds_spent ?? 0, state: r.state ?? null, group: r.parent_id ? (title.get(r.parent_id) ?? null) : null })));
+      })
       .catch(() => alive && setSteps([]));
     try {
       setCarry(window.localStorage.getItem("focus-carry-timer") === "1");
@@ -73,7 +93,7 @@ export function FocusSteps({ taskId }: { taskId: string }) {
       try {
         await saveQuestStepsAction(
           taskId,
-          next.map((s) => ({ id: s.id, title: s.title, done: s.done, progress: s.progress, seconds: Math.round(s.seconds), state: s.done ? null : (s.state ?? null) }))
+          [...next.map((s) => ({ id: s.id, title: s.title, done: s.done, progress: s.progress, seconds: Math.round(s.seconds), state: s.done ? null : (s.state ?? null) })), ...holders.current.map((h) => ({ id: h.id, title: h.title, done: h.done }))]
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save that step.");
@@ -178,7 +198,7 @@ export function FocusSteps({ taskId }: { taskId: string }) {
       {focus ? (
         <div key={focus.id} className="reveal relative flex flex-col gap-2 overflow-hidden rounded-2xl px-3.5 py-3" style={{ background: "linear-gradient(180deg, rgba(48,38,18,.94), rgba(30,24,12,.95))", border: "1.5px solid #a88a3f", boxShadow: "0 6px 16px rgba(0,0,0,.3)" }}>
           <span className="text-[11.5px] font-bold uppercase tracking-[.18em]" style={{ color: "#d9b45f" }}>
-            Now
+            Now{focus.group ? ` · ${focus.group}` : ""}
           </span>
           <span className="text-[18px] font-semibold leading-snug" style={{ color: "#f6ecd2" }}>
             {focus.title}

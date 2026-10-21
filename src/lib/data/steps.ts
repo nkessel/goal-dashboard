@@ -16,13 +16,21 @@ export type QuestStep = {
   progress?: number;
   /** Seconds spent on it in focus mode. */
   seconds_spent?: number;
+  /** The step it sits inside (a sub-task's sub-task), or null at the top. */
+  parent_id?: string | null;
   /** XP this step has paid so far. */
   xp_paid?: number;
   /** Skipped (left out) or failed; null when open or done. */
   state?: "skipped" | "failed" | null;
 };
 
-export type StepInput = { id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number; seconds?: number; state?: "skipped" | "failed" | null };
+export type StepInput = {
+  id?: string;
+  /** The editor's own name for a step (its id once saved), so sub-tasks can point at a parent saved in the same go. */
+  key?: string;
+  /** The step this one sits inside (its key or id), or null at the top. */
+  parentKey?: string | null;
+  title: string; done: boolean; xp?: number; weight?: number | null; progress?: number; seconds?: number; state?: "skipped" | "failed" | null };
 
 /** True when the error just means the quest_steps table hasn't been created yet. */
 function missingTable(error: { code?: string; message: string } | null) {
@@ -48,12 +56,14 @@ export async function attachStepCounts<T extends Task>(tasks: T[], ownerId: stri
   if (tasks.length === 0) return tasks;
   const { data, error } = await supabaseAdmin()
     .from("quest_steps")
-    .select("task_id, done, state")
+    .select("id, task_id, done, state, parent_id")
     .eq("owner_id", ownerId)
     .in("task_id", tasks.map((t) => t.id));
   if (error) return tasks;
   const counts = new Map<string, { total: number; done: number }>();
-  for (const s of data ?? []) {
+  // A step with sub-tasks is counted through them.
+  const parents = new Set((data ?? []).map((s) => s.parent_id as string | null).filter(Boolean));
+  for (const s of (data ?? []).filter((x) => !parents.has(x.id as string))) {
     const c = counts.get(s.task_id as string) ?? { total: 0, done: 0 };
     // A skipped step doesn't count against the quest.
     if (s.state !== "skipped") c.total += 1;
@@ -86,10 +96,14 @@ export async function replaceSteps(
   }
   const before = new Map(existing.map((s) => [s.id, s]));
   const now = new Date().toISOString();
+  // Keys (and ids) to saved ids, so a new sub-task can sit inside a step saved a moment earlier.
+  const idOf = new Map<string, string>();
+  for (const s of steps) if (s.id) idOf.set(s.key ?? s.id, s.id);
   for (const [i, s] of steps.entries()) {
     const title = s.title.trim();
     if (!title) continue;
     const prev = s.id ? before.get(s.id) : undefined;
+    const parentId = s.parentKey === undefined ? undefined : s.parentKey === null ? null : (idOf.get(s.parentKey) ?? (before.has(s.parentKey) ? s.parentKey : null));
     const extra = {
       ...(s.xp !== undefined ? { xp: Math.max(0, Math.min(1000, Math.round(s.xp))) } : {}),
       ...(s.weight !== undefined ? { weight: s.weight === null ? null : Math.max(1, Math.min(100, Math.round(s.weight))) } : {}),
@@ -106,19 +120,23 @@ export async function replaceSteps(
         (extra.weight === undefined || extra.weight === (prev.weight ?? null)) &&
         (extra.progress === undefined || extra.progress === (prev.progress ?? 0)) &&
         (extra.seconds_spent === undefined || extra.seconds_spent === (prev.seconds_spent ?? 0)) &&
-        (extra.state === undefined || extra.state === (prev.state ?? null));
+        (extra.state === undefined || extra.state === (prev.state ?? null)) &&
+        (parentId === undefined || parentId === (prev.parent_id ?? null));
       if (same) continue;
       const { error } = await db
         .from("quest_steps")
-        .update({ title, done: s.done, sort_order: i, ...extra, ...(prev.done !== s.done ? { done_at: s.done ? now : null } : {}) })
+        .update({ title, done: s.done, sort_order: i, ...extra, ...(parentId !== undefined ? { parent_id: parentId } : {}), ...(prev.done !== s.done ? { done_at: s.done ? now : null } : {}) })
         .eq("id", prev.id)
         .eq("owner_id", ownerId);
       if (error) throw new Error(`Failed to save a step: ${error.message}`);
     } else {
-      const { error } = await db
+      const { data: row, error } = await db
         .from("quest_steps")
-        .insert({ owner_id: ownerId, task_id: taskId, title, done: s.done, done_at: s.done ? now : null, sort_order: i, ...extra });
+        .insert({ owner_id: ownerId, task_id: taskId, title, done: s.done, done_at: s.done ? now : null, sort_order: i, ...extra, ...(parentId ? { parent_id: parentId } : {}) })
+        .select("id")
+        .single();
       if (error) throw new Error(`Failed to add a step: ${error.message}`);
+      if (s.key && row) idOf.set(s.key, (row as { id: string }).id);
     }
   }
   return (await listStepsForTask(taskId, ownerId)) ?? [];
@@ -129,19 +147,37 @@ export async function attachNextSteps<T extends Task>(tasks: T[], ownerId: strin
   if (tasks.length === 0) return tasks;
   const { data, error } = await supabaseAdmin()
     .from("quest_steps")
-    .select("task_id, title, done, sort_order, created_at")
+    .select("id, task_id, title, done, sort_order, created_at, parent_id, state")
     .eq("owner_id", ownerId)
     .in("task_id", tasks.map((t) => t.id))
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) return tasks;
+  type Row = { id: string; task_id: string; title: string; done: boolean; parent_id: string | null; state: string | null };
+  const rows = (data ?? []) as Row[];
+  const byTask = new Map<string, Row[]>();
+  for (const r of rows) byTask.set(r.task_id, [...(byTask.get(r.task_id) ?? []), r]);
   const info = new Map<string, { total: number; done: number; next: string | null }>();
-  for (const s of data ?? []) {
-    const c = info.get(s.task_id as string) ?? { total: 0, done: 0, next: null };
-    c.total += 1;
-    if (s.done) c.done += 1;
-    else if (!c.next) c.next = s.title as string;
-    info.set(s.task_id as string, c);
+  for (const [taskId, list] of byTask) {
+    // In the order you'd do them: each step, then whatever sits inside it.
+    const kids = new Map<string | null, Row[]>();
+    for (const r of list) kids.set(r.parent_id, [...(kids.get(r.parent_id) ?? []), r]);
+    const ordered: Row[] = [];
+    const walk = (parent: string | null) => {
+      for (const r of kids.get(parent) ?? []) {
+        ordered.push(r);
+        walk(r.id);
+      }
+    };
+    walk(null);
+    const c = { total: 0, done: 0, next: null as string | null };
+    for (const r of ordered) {
+      if (kids.has(r.id) || r.state === "skipped") continue;
+      c.total += 1;
+      if (r.done) c.done += 1;
+      else if (!c.next && !r.state) c.next = r.title;
+    }
+    info.set(taskId, c);
   }
   return tasks.map((t) => {
     const c = info.get(t.id);

@@ -21,7 +21,10 @@ import {
   setQuestEstimateAction,
   snoozeToucanAction,
   toucanWatchAction,
+  toucanPrefsAction,
 } from "@/app/actions";
+import { setRetiredLines } from "@/lib/toucan-lines";
+import { useSyncExternalStore } from "react";
 import { neglected, type GuideTask, type Nudge } from "@/lib/toucan-guide";
 import type { CoachAction, CoachNote, CoachPromise } from "@/lib/coach";
 import { AHEAD_DAYS, catchUpOrder, catchUpPlan, looksLikeCourse, type CourseItem } from "@/lib/catch-up";
@@ -36,6 +39,28 @@ type Mode = "talk" | "catchup";
 const NUDGE_DAY_KEY = "toucan-nudge-day";
 const todayKey = () => new Date().toDateString();
 
+type GuideMode = "simple" | "lite" | "full";
+const readMode = (): GuideMode => {
+  try {
+    const v = window.localStorage.getItem("toucan-mode");
+    return v === "simple" || v === "lite" ? v : "full";
+  } catch {
+    return "full";
+  }
+};
+const subscribeMode = (cb: () => void) => {
+  window.addEventListener("toucan-mode", cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener("toucan-mode", cb);
+    window.removeEventListener("storage", cb);
+  };
+};
+/** How much the toucan does: simple, a light guide, or the full guide (Settings › Toucan Spirit). */
+export function useToucanMode(): GuideMode {
+  return useSyncExternalStore(subscribeMode, readMode, () => "full" as const);
+}
+
 /** Opens the toucan's guide sheet (optionally straight to planning one quest, or to the coursework catch-up). */
 export function talkToToucan(plan?: PlanTarget, mode: Mode = "talk", say?: string) {
   window.dispatchEvent(new CustomEvent("toucan-talk", { detail: { plan, mode, say } }));
@@ -49,6 +74,21 @@ export function talkToToucan(plan?: PlanTarget, mode: Mode = "talk", say?: strin
  */
 export function ToucanGuide() {
   const pathname = usePathname();
+  const mode = useToucanMode();
+  // Your choices (mode, switched-off lines) come along from your account.
+  useEffect(() => {
+    toucanPrefsAction()
+      .then((p) => {
+        try {
+          if (window.localStorage.getItem("toucan-mode") !== p.mode) {
+            window.localStorage.setItem("toucan-mode", p.mode);
+            window.dispatchEvent(new Event("toucan-mode"));
+          }
+        } catch {}
+        setRetiredLines(p.retired);
+      })
+      .catch(() => {});
+  }, []);
   const [open, setOpen] = useState<{ plan: PlanTarget | null; mode: Mode; say?: string } | null>(null);
   const [fallback, setFallback] = useState<{ nudge: Nudge } | null>(null);
 
@@ -63,7 +103,7 @@ export function ToucanGuide() {
 
   // Once a day, on Today, a little while after you arrive.
   useEffect(() => {
-    if (pathname !== "/") return;
+    if (pathname !== "/" || mode === "simple") return;
     try {
       if (window.localStorage.getItem(NUDGE_DAY_KEY) === todayKey()) return;
     } catch {
@@ -109,10 +149,11 @@ export function ToucanGuide() {
       if (window.dispatchEvent(ev)) setFallback({ nudge: top });
     }, 7000);
     return () => clearTimeout(t);
-  }, [pathname]);
+  }, [pathname, mode]);
 
   // Promises with a time: when it comes, the toucan says so.
   useEffect(() => {
+    if (mode !== "full") return;
     let timers: ReturnType<typeof setTimeout>[] = [];
     let live = true;
     const arm = async () => {
@@ -152,7 +193,7 @@ export function ToucanGuide() {
       timers.forEach(clearTimeout);
       window.removeEventListener("toucan-promises", rearm);
     };
-  }, []);
+  }, [mode]);
 
   return (
     <>
@@ -170,7 +211,7 @@ export function ToucanGuide() {
           }}
         />
       )}
-      {open && <GuideSheet initialPlan={open.plan} initialMode={open.mode} initialSay={open.say} onClose={() => setOpen(null)} />}
+      {open && (mode !== "simple" || open.mode === "catchup" || open.plan) && <GuideSheet lite={mode !== "full"} initialPlan={open.plan} initialMode={open.mode} initialSay={open.say} onClose={() => setOpen(null)} />}
     </>
   );
 }
@@ -220,7 +261,7 @@ const PROMPTS: { label: string; say?: string; mode?: Mode }[] = [
 
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 
-function GuideSheet({ initialPlan, initialMode, initialSay, onClose }: { initialPlan: PlanTarget | null; initialMode: Mode; initialSay?: string; onClose: () => void }) {
+function GuideSheet({ initialPlan, initialMode, initialSay, onClose, lite = false }: { initialPlan: PlanTarget | null; initialMode: Mode; initialSay?: string; onClose: () => void; lite?: boolean }) {
   const [plan, setPlan] = useState<PlanTarget | null>(initialPlan);
   const [mode, setMode] = useState<Mode>(initialMode);
   const [nudges, setNudges] = useState<Nudge[] | null>(null);
@@ -240,7 +281,7 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose }: { initial
     toucanWatchAction()
       .then((w) => live && setNudges(neglected(w.tasks as GuideTask[], new Date(), w.snoozed, 3)))
       .catch(() => live && setNudges([]));
-    coachStateAction()
+    if (!lite) coachStateAction()
       .then((c) => {
         if (!live) return;
         setMsgs(c.history.slice(-12).map((m) => ({ role: m.role, content: m.content })));
@@ -272,7 +313,7 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose }: { initial
     setMsgs((m) => [...m, { role: "user", content: question }]);
     setThinking(true);
     try {
-      const r = await coachAction(question);
+      const r = await coachAction(question, lite, lite ? msgs.map(({ role, content }) => ({ role, content })) : []);
       setMsgs((m) => [...m, { role: "assistant", content: r.reply, actions: r.actions, remembered: r.remembered }]);
       if (r.remembered.length) setNotes((n) => [...n, ...r.remembered]);
     } catch (e) {
@@ -305,7 +346,7 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose }: { initial
       {/* Sized to what's visible, so the keyboard never hides the box you type in. */}
       <section
         className="sheet-up absolute left-1/2 flex w-[min(460px,calc(100vw-16px))] -translate-x-1/2 flex-col overflow-hidden rounded-3xl"
-        style={{ top: "calc(var(--vv-top, 0px) + 8px)", height: "min(640px, calc(var(--vvh, 100dvh) - 16px))", background: "linear-gradient(180deg, #10302f, #0a1f22 60%, #081a1d)", border: "1.5px solid rgba(140,240,220,.45)", color: "#e8fff8", boxShadow: "0 18px 40px rgba(0,0,0,.55)" }}
+        style={{ top: "calc(var(--vv-top, 0px) + max(8px, (var(--vvh, 100dvh) - 640px) / 2))", height: "min(640px, calc(var(--vvh, 100dvh) - 28px))", background: "linear-gradient(180deg, #10302f, #0a1f22 60%, #081a1d)", border: "1.5px solid rgba(140,240,220,.45)", color: "#e8fff8", boxShadow: "0 18px 40px rgba(0,0,0,.55)" }}
       >
         <header className="flex shrink-0 items-center gap-2.5 px-4 pb-2 pt-3">
           <ToucanArt size={40} />
@@ -317,9 +358,11 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose }: { initial
               {mode === "catchup" ? "Coming up first, then catching up from the beginning" : "Here for the whole of you, and the next small step"}
             </p>
           </div>
-          <button type="button" onClick={() => setShowNotes((v) => !v)} aria-expanded={showNotes} title="What I remember" className="flex h-9 w-9 items-center justify-center rounded-full text-[16px] hover:bg-white/10">
-            🪶
-          </button>
+          {!lite && (
+            <button type="button" onClick={() => setShowNotes((v) => !v)} aria-expanded={showNotes} title="What I remember" className="flex h-9 w-9 items-center justify-center rounded-full text-[16px] hover:bg-white/10">
+              🪶
+            </button>
+          )}
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
@@ -475,7 +518,7 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose }: { initial
 
         {!plan && mode === "talk" && (
           <form
-            className="flex shrink-0 items-center gap-2 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2"
+            className="flex shrink-0 items-center gap-2 px-3 pb-[max(14px,env(safe-area-inset-bottom))] pt-2.5"
             style={{ borderTop: "1px solid rgba(140,240,220,.2)" }}
             onSubmit={(e) => {
               e.preventDefault();

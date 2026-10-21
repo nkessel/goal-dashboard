@@ -25,7 +25,8 @@ export function StatSplitEditor({
   onChange: (next: StatSplit) => void;
   isAdventure: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  // Folded away by default: sharing XP with stats is an option, not a step.
+  const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<string[]>([...DEFAULT_STATS]);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -74,21 +75,21 @@ export function StatSplitEditor({
   const ink = "var(--t-ink)";
   const soft = "var(--t-ink-soft)";
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl px-3 py-2" style={{ background: "rgba(70,50,20,.06)", border: "1px solid rgba(139,112,64,.25)" }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-h-8 items-center gap-1.5 text-left">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: open ? "rotate(90deg)" : undefined, color: soft }}>
-          <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    <div className="-mt-1 flex flex-col gap-1.5">
+      {/* A quiet link under the XP: share some of it with your character stats. */}
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex items-center gap-1 self-start text-[12px] underline-offset-2 hover:underline" style={{ color: soft }}>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: open ? "rotate(90deg)" : undefined }}>
+          <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="text-[14px] font-semibold" style={{ color: ink }}>
-          Stats
-        </span>
-        <span className="ml-auto text-[12.5px] tabular-nums" style={{ color: soft }}>
-          {total === 0 ? "all XP to your level" : `${toStats} XP to stats · ${xp - toStats} to your level`}
-        </span>
+        {total === 0 ? "Share XP with your stats" : `${toStats} XP to stats · ${xp - toStats} to your level`}
       </button>
 
       {open && (
-        <div className="reveal flex flex-col gap-1.5">
+        <div
+          className="reveal flex flex-col gap-1.5 rounded-xl px-3 py-2.5"
+          // One dark, even panel; the text inside turns light to match.
+          style={{ background: "#2b2214", border: "1.5px solid #8a6c2c", ["--t-ink" as string]: "#f3e7cb", ["--t-ink-soft" as string]: "rgba(243,231,203,.7)", color: "#f3e7cb" }}
+        >
           <DndContext id="dnd-StatSplit" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={stats} strategy={verticalListSortingStrategy}>
               <ul className="m-0 flex list-none flex-col gap-0.5 p-0">

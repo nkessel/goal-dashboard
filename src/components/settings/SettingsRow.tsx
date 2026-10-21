@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useReportOpen } from "./ReorderableSections";
 
 /**
  * One expandable row in the Settings list (matches the mockup's cream
@@ -28,10 +29,16 @@ export function SettingsRow({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const isAdventure = theme === "adventure";
+  // While a section is open, the list of sections can't be dragged around.
+  const report = useReportOpen();
+  useEffect(() => {
+    report?.(label, open);
+    return () => report?.(label, false);
+  }, [report, label, open]);
 
   return (
     <div
-      className={`${disabled ? "" : "hover-glow"} ${isAdventure ? "parchment" : ""}`}
+      className={isAdventure ? "parchment" : ""}
       style={{
         ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }),
         borderRadius: 14,
@@ -42,7 +49,7 @@ export function SettingsRow({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+        className={`${disabled ? "" : "hover-glow"} flex w-full items-center gap-3 rounded-[14px] px-4 py-3.5 text-left`}
         style={{ cursor: disabled ? "default" : "pointer" }}
       >
         <span

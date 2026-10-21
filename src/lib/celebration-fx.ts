@@ -16,7 +16,23 @@ export type FxSettings = {
   feedbackStyle?: FeedbackStyle;
   /** Progress and the daily welcome: the full card, or a slim banner at the top. */
   cardStyle?: "card" | "banner";
+  /** How quickly the effects play: 0.75 quick, 1 as designed, 1.4 leisurely. */
+  pace?: number;
+  /** The + button: the dark enamel seal, the gold coin, or a plain one. */
+  fabStyle?: FabStyle;
 };
+
+export type FabStyle = "seal" | "coin" | "plain";
+export const FAB_STYLES: { key: FabStyle; label: string; hint: string }[] = [
+  { key: "seal", label: "Enamel seal", hint: "A dark seal with a gold plus in a notched gilt ring" },
+  { key: "coin", label: "Gold coin", hint: "The original gold coin" },
+  { key: "plain", label: "Simple", hint: "A quiet parchment button" },
+];
+export const PACES: { v: number; label: string }[] = [
+  { v: 0.75, label: "Quick" },
+  { v: 1, label: "As designed" },
+  { v: 1.4, label: "Leisurely" },
+];
 
 export type FeedbackStyle = "quiet" | "seal" | "crane" | "toucan";
 export const FEEDBACK_STYLES: { key: FeedbackStyle; label: string; hint: string }[] = [
@@ -65,6 +81,7 @@ export function loadFx(): FxSettings {
 export function saveFx(fx: FxSettings): boolean {
   try {
     localStorage.setItem(FX_STORAGE_KEY, JSON.stringify({ ...fx, fbv: 2, savedAt: Date.now() }));
+    window.dispatchEvent(new Event("fx-change"));
     return true;
   } catch {
     return false;
@@ -196,4 +213,23 @@ export function embers(fx: FxSettings): Ember[] {
     t: +(3.4 + it.t0 * 1.2).toFixed(2),
     c: it.c,
   }));
+}
+
+/** The + button's look, kept in step with Settings (the seal until the browser says otherwise). */
+export function readFabStyle(): FabStyle {
+  try {
+    const raw = localStorage.getItem(FX_STORAGE_KEY);
+    const v = raw ? (JSON.parse(raw) as { fabStyle?: FabStyle }).fabStyle : undefined;
+    return v === "coin" || v === "plain" ? v : "seal";
+  } catch {
+    return "seal";
+  }
+}
+export function subscribeFx(cb: () => void) {
+  window.addEventListener("fx-change", cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener("fx-change", cb);
+    window.removeEventListener("storage", cb);
+  };
 }

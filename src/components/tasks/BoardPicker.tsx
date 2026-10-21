@@ -37,7 +37,24 @@ export function BoardPicker({
 
   const current = options?.find((o) => o.id === value);
   const q = query.trim().toLowerCase();
-  const shown = (options ?? []).filter((o) => !q || o.label.toLowerCase().includes(q));
+  const all = options ?? [];
+  // Boards inside boards fold away under their parent until opened (the current board's path starts open).
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const cur = options?.find((o) => o.id === value)?.label;
+    const open = new Set<string>();
+    if (cur) {
+      const p = cur.split(" › ");
+      for (let i = 1; i < p.length; i++) open.add(p.slice(0, i).join(" › "));
+    }
+    return open;
+  });
+  const hasKids = (label: string) => all.some((o) => o.label.startsWith(`${label} › `));
+  const visible = (label: string) => {
+    const p = label.split(" › ");
+    for (let i = 1; i < p.length; i++) if (!expanded.has(p.slice(0, i).join(" › "))) return false;
+    return true;
+  };
+  const shown = all.filter((o) => (q ? o.label.toLowerCase().includes(q) : visible(o.label)));
 
   async function create() {
     const name = (newName ?? "").trim();
@@ -126,7 +143,13 @@ export function BoardPicker({
                 {shown.map((o) => {
                   const p = o.label.split(" › ");
                   return (
-                    <PickRow key={o.id} selected={o.id === value} onPick={() => (onChange(o.id), setOpen(false))} depth={q ? 0 : p.length - 1}>
+                    <PickRow
+                      key={o.id}
+                      selected={o.id === value}
+                      onPick={() => (onChange(o.id), setOpen(false))}
+                      depth={q ? 0 : p.length - 1}
+                      caret={!q && hasKids(o.label) ? { open: expanded.has(o.label), toggle: () => setExpanded((e) => { const n = new Set(e); if (n.has(o.label)) n.delete(o.label); else n.add(o.label); return n; }) } : null}
+                    >
                       {q && p.length > 1 && <span style={{ color: "var(--t-ink-soft)" }}>{p.slice(0, -1).join(" › ")} › </span>}
                       {p[p.length - 1]}
                     </PickRow>
@@ -185,20 +208,24 @@ export function BoardPicker({
   );
 }
 
-function PickRow({ selected, onPick, depth, children }: { selected: boolean; onPick: () => void; depth: number; children: React.ReactNode }) {
+function PickRow({ selected, onPick, depth, children, caret = null }: { selected: boolean; onPick: () => void; depth: number; children: React.ReactNode; caret?: { open: boolean; toggle: () => void } | null }) {
   return (
-    <li>
+    <li className="flex items-center">
+      {caret ? (
+        <button type="button" onClick={caret.toggle} aria-expanded={caret.open} aria-label={caret.open ? "Hide the boards inside" : "Show the boards inside"} className="flex h-11 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-black/[.05]" style={{ marginLeft: depth * 18 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: caret.open ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
+            <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      ) : (
+        <span aria-hidden className="w-8 shrink-0" style={{ marginLeft: depth * 18 }} />
+      )}
       <button
         type="button"
         onClick={onPick}
-        className="hover-glow flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-[15px]"
-        style={{ paddingLeft: 12 + depth * 18, background: selected ? "rgba(217,180,95,.28)" : undefined, fontWeight: selected ? 700 : 500 }}
+        className="hover-glow flex min-h-[44px] min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-[15px]"
+        style={{ background: selected ? "rgba(217,180,95,.28)" : undefined, fontWeight: selected ? 700 : 500 }}
       >
-        {depth > 0 && (
-          <span aria-hidden style={{ color: "var(--t-ink-soft)" }}>
-            ↳
-          </span>
-        )}
         <span className="min-w-0 flex-1">{children}</span>
         {selected && (
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>

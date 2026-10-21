@@ -11,6 +11,8 @@ import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
 import { countImports } from "@/lib/data/rewards";
 import { Avatar } from "@/components/settings/Avatar";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
+import { ToucanSettings } from "@/components/settings/ToucanSettings";
+import { ReorderableSections, SectionItem } from "@/components/settings/ReorderableSections";
 import { PalettePicker } from "@/components/settings/PalettePicker";
 import { isPalette, type PaletteKey } from "@/lib/palettes";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
@@ -220,8 +222,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </Link>
         </div>
 
-        {/* Expandable settings rows */}
-        <div className="flex flex-col gap-2.5">
+        {/* Expandable settings rows (drag to reorder) */}
+        <ReorderableSections>
+          <SectionItem id="account">
           <SettingsRow
             theme={profile.theme}
             label="Account"
@@ -254,8 +257,10 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </button>
             </form>
           </SettingsRow>
+          </SectionItem>
 
 
+          <SectionItem id="notifications-link">
           <Link
             href="/notifications?from=settings"
             className={`hover-glow flex w-full items-center gap-3 px-4 py-3.5 ${isAdventure ? "parchment" : ""}`}
@@ -281,7 +286,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               <path d="M9 5l7 7-7 7" stroke="var(--t-ink-soft)" strokeWidth="2" fill="none" />
             </svg>
           </Link>
+          </SectionItem>
 
+          <SectionItem id="calendar-sync">
           <SettingsRow
             theme={profile.theme}
             label="Calendar Sync"
@@ -302,7 +309,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               <ConnectCalendar isAdventure={isAdventure} returnTo="/settings" compact />
             )}
           </SettingsRow>
+          </SectionItem>
 
+          <SectionItem id="theme">
           <SettingsRow
             theme={profile.theme}
             label="Theme"
@@ -331,10 +340,14 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </ViewTransitionLink>
             </div>
           </SettingsRow>
+          </SectionItem>
 
 
+          <SectionItem id="owl-cage">
           <OwlCage />
+          </SectionItem>
 
+          <SectionItem id="toucan-spirit">
           <SettingsRow
             theme={profile.theme}
             label="Toucan Spirit"
@@ -342,9 +355,15 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             defaultOpen={open === "toucan"}
             icon={<span style={{ fontSize: 14 }}>🦜</span>}
           >
+            <ToucanSettings
+              initialMode={(((profile.life_wheel as { toucanPrefs?: { mode?: string } } | null)?.toucanPrefs?.mode as "simple" | "lite" | "full" | undefined) ?? "full")}
+              initialRetired={(profile.life_wheel as { toucanPrefs?: { retired?: string[] } } | null)?.toucanPrefs?.retired ?? []}
+            />
             <ToucanWorkshop initial={profile.toucan ?? null} coins={profile.coins ?? 0} />
           </SettingsRow>
+          </SectionItem>
 
+          <SectionItem id="secret-missions">
           <SettingsRow
             theme={profile.theme}
             label="Secret Missions"
@@ -357,7 +376,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           >
             <SecretMissions initial={profile.secret_missions ?? []} steps={missionSteps} />
           </SettingsRow>
+          </SectionItem>
 
+          <SectionItem id="visual-effects">
           <SettingsRow
             theme={profile.theme}
             label="Visual Effects"
@@ -381,8 +402,10 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </p>
             </div>
           </SettingsRow>
+          </SectionItem>
 
 
+          <SectionItem id="notifications">
           <SettingsRow
             theme={profile.theme}
             label="Notifications"
@@ -390,7 +413,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           >
             <NotificationPrefs level={profile.notify_level ?? "all"} email={profile.notify_email ?? true} />
           </SettingsRow>
+          </SectionItem>
 
+          <SectionItem id="privacy-security">
           <SettingsRow
             theme={profile.theme}
             label="Privacy & Security"
@@ -408,7 +433,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </div>
             </div>
           </SettingsRow>
+          </SectionItem>
 
+          <SectionItem id="your-data">
           <SettingsRow
             theme={profile.theme}
             label="Your Data"
@@ -425,7 +452,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             </p>
             <ExportDataButton theme={profile.theme} />
           </SettingsRow>
+          </SectionItem>
 
+          <SectionItem id="help-support">
           <SettingsRow
             theme={profile.theme}
             label="Help & Support"
@@ -445,7 +474,8 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               .
             </p>
           </SettingsRow>
-        </div>
+          </SectionItem>
+        </ReorderableSections>
     </>
   );
 }

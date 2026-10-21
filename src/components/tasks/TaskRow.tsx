@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, setNextStepAction } from "@/app/actions";
@@ -104,6 +105,7 @@ export function TaskRow({
     isDragging: boolean;
   };
 }) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState<"icon" | "dots" | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
@@ -254,7 +256,7 @@ export function TaskRow({
           await new Promise((r) => setTimeout(r, 520));
           celebrateQuest({
             taskId: task.id,
-            title: task.title,
+            title: task.stand_in ? task.stand_in.title : task.title,
             description: task.description,
             tag: categoryLabel,
             xp: task.xp_value,
@@ -266,6 +268,11 @@ export function TaskRow({
           try {
             const res = await req;
             updateQuestCelebration({ taskId: task.id, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
+            // A stand-in stays: it moves on to the next assignment.
+            if (task.stand_in) {
+              setDone(false);
+              router.refresh();
+            }
           } catch (e) {
             updateQuestCelebration({ taskId: task.id, failed: true });
             throw e;
@@ -449,6 +456,17 @@ export function TaskRow({
           >
             {task.title}
           </p>
+          {task.stand_in && (
+            <p className="m-0 line-clamp-2 text-[12.5px] leading-snug" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }} title={`This quest stands for ${task.stand_in.board ?? "a board"}: it follows its current assignment`}>
+              <b style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink)" }}>Now:</b> {task.stand_in.title}
+              {task.stand_in.next_step && <span> · next: {task.stand_in.next_step}</span>}
+            </p>
+          )}
+          {task.stands_for && task.stand_in === null && (
+            <p className="m-0 text-[12.5px] italic" style={{ color: "var(--t-ink-soft)" }}>
+              Nothing waiting on its board right now
+            </p>
+          )}
           {task.description && !compact && (
             <p dir="auto" className={`user-text line-clamp-2 break-words text-[12.5px] leading-snug sm:text-[13px]`} style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
               {task.description}

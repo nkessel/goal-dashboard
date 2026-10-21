@@ -1,5 +1,6 @@
 "use client";
 
+import { FOUND, HIDING, SAY_FLYING, SAY_LANDING, WISDOM, retiredLines } from "@/lib/toucan-lines";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
@@ -8,21 +9,6 @@ import { cleanToucan, type ToucanState } from "@/lib/toucan";
 
 /** What it says while you carry it, and when you set it down. */
 // Only the toucan spirit speaks; the owl keeps its silence.
-const SAY_FLYING = ["Wheee!", "To the skies!", "The winds obey me.", "Onward, to wisdom!", "Behold my majestic flight!", "Higher, friend, higher!", "I have soared over many forests."];
-const SAY_LANDING = [
-  "Here I shall dispense wisdom.",
-  "I approve of this spot.",
-  "Ah. The view is excellent.",
-  "This perch will do nicely.",
-  "A fine branch, if I say so myself.",
-  "Settled. Carry on, I'm watching.",
-  "From here I can see everything.",
-  "Mm. Sturdy. Good choice.",
-  "I'll keep an eye on things from here.",
-  "Comfortable. You may proceed.",
-  "A toucan could get used to this.",
-  "Landed with grace, as always.",
-];
 /**
  * A shuffled deck per list: every line comes up once before any repeats, and
  * the deck is remembered across visits so a fresh page doesn't start over.
@@ -36,7 +22,10 @@ function picker() {
       return [];
     }
   };
-  return (name: string, list: string[]) => {
+  return (name: string, all: string[]) => {
+    // Lines switched off in Settings never come up (unless every one is).
+    const off = retiredLines();
+    const list = all.filter((x) => !off.has(x)).length ? all.filter((x) => !off.has(x)) : all;
     let deck = (decks[name] ??= load(name)).filter((x) => list.includes(x));
     if (!deck.length) {
       deck = [...list];
@@ -109,33 +98,12 @@ function hidingSpot(seed: number): { x: number; y: number; tilt: number } {
   ];
   return spots[Math.abs(seed) % spots.length];
 }
-const FOUND = ["You found me!", "Ha! Well spotted.", "A keen eye. I am impressed.", "Hide and seek is a sacred art."];
-const HIDING = ["Find me if you can…", "I shall hide. Seek wisely.", "Now you see me…"];
 
 const OWL_W = 52;
 const OWL_H = 56;
 type Phase = "perched" | "takeoff" | "flying" | "gliding" | "landing";
 
 /** What the great toucan spirit says when tapped. */
-const WISDOM = [
-  "The longest quest begins with one small step. Take it.",
-  "Rest is not retreat. Even spirits perch.",
-  "Finish one thing, and the forest grows quieter.",
-  "The river does not hurry, yet it reaches the sea.",
-  "What you water, grows. Choose wisely.",
-  "Courage is a feather: light, but it lifts you.",
-  "Mistakes are maps. Read them, then fly on.",
-  "The sun rises for those who show up again.",
-  "Ask for help. Even the great toucan has a flock.",
-  "Behold the compound interest of small good things done consistently.",
-  "Make future {name} proud.",
-  "I am the Great Toucan Spirit.",
-  "I bless you with productivity, and flow, and great insight.",
-  "Today's small quest is tomorrow's legend.",
-  "The forest remembers every step you take. Keep walking.",
-  "Your future self is watching — and cheering.",
-  "One quest at a time, {name}. That is the whole secret.",
-];
 
 /** How the spirit addresses you: a first name, or the whole title if it starts with one. */
 function addressOf(name: string | null) {
@@ -483,7 +451,14 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       for (let i = 0; i < 9; i++) setTimeout(() => spark(p.x + facing * (10 + Math.random() * 26), p.y - OWL_H * 0.75 + (Math.random() - 0.5) * 30), 120 + i * 45);
     }
-    speakBrief(pick("wise", WISDOM).replaceAll("{name}", addressOf(name)), 6500, [{ label: "💬 Talk with me", run: () => window.dispatchEvent(new CustomEvent("toucan-talk")) }]);
+    const simple = (() => {
+      try {
+        return window.localStorage.getItem("toucan-mode") === "simple";
+      } catch {
+        return false;
+      }
+    })();
+    speakBrief(pick("wise", WISDOM).replaceAll("{name}", addressOf(name)), simple ? 5000 : 6500, simple ? null : [{ label: "💬 Talk with me", run: () => window.dispatchEvent(new CustomEvent("toucan-talk")) }]);
   }
   // The guide asks it to raise something (a quest slipping): it says so, with buttons.
   const speakRef = useRef(speakBrief);

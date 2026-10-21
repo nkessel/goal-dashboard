@@ -63,7 +63,15 @@ export default async function InsightsPage() {
   const WHEEL = "◎ ";
   // The wheel's areas are your top-level boards.
   const boardAreas = wheelAreasFrom(await listBoardsForOwner(session.user.id).catch(() => []));
-  const wheelTopics = boardAreas.length >= 3 ? boardAreas : profile?.life_wheel?.topics?.length ? profile.life_wheel.topics : DEFAULT_WHEEL;
+  // Tags you use on several quests join the wheel too (as #tag).
+  const tagAreas = await (async () => {
+    const { supabaseAdmin } = await import("@/lib/supabase/server");
+    const { data } = await supabaseAdmin().from("tasks").select("tags").eq("owner_id", session.user.id).not("tags", "eq", "{}").limit(1000);
+    const n = new Map<string, number>();
+    for (const r of (data ?? []) as { tags: string[] | null }[]) for (const t of r.tags ?? []) n.set(t, (n.get(t) ?? 0) + 1);
+    return [...n.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([t]) => `#${t}`);
+  })().catch(() => [] as string[]);
+  const wheelTopics = (boardAreas.length >= 3 ? [...boardAreas, ...tagAreas] : profile?.life_wheel?.topics?.length ? profile.life_wheel.topics : DEFAULT_WHEEL).slice(0, 12);
   const wheelLast: Record<string, { level: number; at: string }> = {};
   for (const c of checks) if (c.metric.startsWith(WHEEL)) wheelLast[c.metric.slice(WHEEL.length)] = { level: c.level, at: c.created_at };
   const chartChecks = checks.filter((c) => !c.metric.startsWith(WHEEL));

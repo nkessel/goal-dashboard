@@ -19,7 +19,8 @@ export async function listOpenTasksForOwner(ownerId: string): Promise<Task[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
-  return data ?? [];
+  const { applyStandIns } = await import("./standins");
+  return applyStandIns(ownerId, (data ?? []) as Task[]);
 }
 
 export type TaskWithCategory = Task & {
@@ -59,11 +60,15 @@ export async function listOpenTasksForOwnerWithCategory(ownerId: string): Promis
     const { data: boards } = await db.from("boards").select("id, title").in("id", boardIds);
     for (const b of boards ?? []) titles.set(b.id as string, b.title as string);
   }
+  const { applyStandIns } = await import("./standins");
   return attachStepCounts(
-    tasks.map((task) => ({
-      ...task,
-      categoryLabel: task.board_id ? titles.get(task.board_id) ?? null : null,
-    })),
+    await applyStandIns(
+      ownerId,
+      tasks.map((task) => ({
+        ...task,
+        categoryLabel: task.board_id ? titles.get(task.board_id) ?? null : null,
+      }))
+    ),
     ownerId
   );
 }
@@ -276,7 +281,8 @@ export async function listOpenTasksWithBoardForOwner(
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Failed to list tasks: ${error.message}`);
-  return ((data ?? []) as Task[]).map((t) => ({ ...t, board_id: t.board_id ?? null }));
+  const { applyStandIns } = await import("./standins");
+  return applyStandIns(ownerId, ((data ?? []) as Task[]).map((t) => ({ ...t, board_id: t.board_id ?? null })));
 }
 
 /** A quest board's own quests (open first, then finished). */

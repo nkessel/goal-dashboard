@@ -2214,31 +2214,31 @@ body[data-palette="grove"] { background-color: #1e3418; }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* Feedback submitted: the check draws itself, then the card fades. */
-.fb-done { animation: fb-done 2.6s cubic-bezier(.2,.8,.2,1) both; }
-@keyframes fb-done { 0% { transform: scale(.88) translateY(10px); opacity: 0; } 10% { transform: none; opacity: 1; } 82% { transform: none; opacity: 1; } 100% { transform: translateY(-8px); opacity: 0; } }
-.fb-done-ring { stroke-dasharray: 208; stroke-dashoffset: 208; transform: rotate(-90deg); transform-origin: 38px 38px; animation: fb-draw .5s .12s ease-out forwards; }
-.fb-done-fill { transform-origin: 38px 38px; transform: scale(0); animation: fb-fill .32s .5s cubic-bezier(.3,1.6,.5,1) forwards; }
-.fb-done-check { stroke-dasharray: 48; stroke-dashoffset: 48; animation: fb-draw .32s .72s ease-out forwards; }
+/* Feedback submitted: the check draws itself, then the card fades. (--fb-pace stretches or quickens it, from Settings.) */
+.fb-done { animation: fb-done calc(2.2s * var(--fb-pace, 1)) cubic-bezier(.2,.8,.2,1) both; }
+@keyframes fb-done { 0% { transform: scale(.88) translateY(10px); opacity: 0; } 8% { transform: none; opacity: 1; } 86% { transform: none; opacity: 1; } 100% { transform: translateY(-8px); opacity: 0; } }
+.fb-done-ring { stroke-dasharray: 208; stroke-dashoffset: 208; transform: rotate(-90deg); transform-origin: 38px 38px; animation: fb-draw calc(.38s * var(--fb-pace, 1)) calc(.09s * var(--fb-pace, 1)) ease-out forwards; }
+.fb-done-fill { transform-origin: 38px 38px; transform: scale(0); animation: fb-fill calc(.24s * var(--fb-pace, 1)) calc(.38s * var(--fb-pace, 1)) cubic-bezier(.3,1.6,.5,1) forwards; }
+.fb-done-check { stroke-dasharray: 48; stroke-dashoffset: 48; animation: fb-draw calc(.24s * var(--fb-pace, 1)) calc(.54s * var(--fb-pace, 1)) ease-out forwards; }
 @keyframes fb-draw { to { stroke-dashoffset: 0; } }
 @keyframes fb-fill { to { transform: scale(1); } }
-.fb-done-words { animation: fb-pop .38s .82s cubic-bezier(.2,1.4,.4,1) both; }
-.fb-done-sub { animation: fb-pop .38s .95s ease-out both; }
+.fb-done-words { animation: fb-pop calc(.3s * var(--fb-pace, 1)) calc(.62s * var(--fb-pace, 1)) cubic-bezier(.2,1.4,.4,1) both; }
+.fb-done-sub { animation: fb-pop calc(.3s * var(--fb-pace, 1)) calc(.71s * var(--fb-pace, 1)) ease-out both; }
 
 /* To the Great Toucan Spirit: the letter rises to him, he takes it, and powers up. */
-.fb-spirit { animation: fb-spirit 3.5s ease both; }
+.fb-spirit { animation: fb-spirit calc(2.8s * var(--fb-pace, 1)) ease both; }
 @keyframes fb-spirit { 0% { opacity: 0; } 8%, 86% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
-.fb-spirit-bird { animation: fb-spirit-bird 3.5s cubic-bezier(.3,1.2,.4,1) both; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
+.fb-spirit-bird { animation: fb-spirit-bird calc(2.8s * var(--fb-pace, 1)) cubic-bezier(.3,1.2,.4,1) both; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
 @keyframes fb-spirit-bird { 0% { transform: scale(.7); } 30% { transform: scale(1); filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); } 42% { transform: scale(.94); } 55% { transform: scale(1.22); filter: drop-shadow(0 0 22px rgba(140,240,220,.95)) drop-shadow(0 0 40px rgba(242,210,126,.7)); } 100% { transform: scale(1.14); filter: drop-shadow(0 0 16px rgba(140,240,220,.8)) drop-shadow(0 0 28px rgba(242,210,126,.5)); } }
-.fb-spirit-letter { margin-left: -26px; animation: fb-spirit-letter 1.5s cubic-bezier(.5,0,.4,1) both; }
+.fb-spirit-letter { margin-left: -26px; animation: fb-spirit-letter calc(1.2s * var(--fb-pace, 1)) cubic-bezier(.5,0,.4,1) both; }
 @keyframes fb-spirit-letter { 0% { transform: translateY(220px) rotate(-10deg); opacity: 0; } 20% { opacity: 1; } 75% { transform: translateY(-58px) rotate(4deg) scale(.8); opacity: 1; } 100% { transform: translateY(-86px) scale(.1); opacity: 0; } }
-.fb-spirit-ring { border: 3px solid rgba(140,240,220,.85); opacity: 0; animation: fb-spirit-ring 1.4s 1.45s ease-out both; }
-.fb-spirit-ring-2 { border-color: rgba(242,210,126,.85); animation-delay: 1.7s; }
+.fb-spirit-ring { border: 3px solid rgba(140,240,220,.85); opacity: 0; animation: fb-spirit-ring calc(1.1s * var(--fb-pace, 1)) calc(1.16s * var(--fb-pace, 1)) ease-out both; }
+.fb-spirit-ring-2 { border-color: rgba(242,210,126,.85); animation-delay: calc(1.36s * var(--fb-pace, 1)); }
 @keyframes fb-spirit-ring { 0% { transform: translate(-50%, -50%) scale(.4); opacity: .95; } 100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; } }
-.fb-spirit-rays { opacity: 0; background: repeating-conic-gradient(from 0deg, rgba(242,210,126,.32) 0deg 6deg, transparent 6deg 22deg); -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 70%); mask-image: radial-gradient(circle, #000 20%, transparent 70%); animation: fb-spirit-rays 2.2s 1.45s ease-out both; }
+.fb-spirit-rays { opacity: 0; background: repeating-conic-gradient(from 0deg, rgba(242,210,126,.32) 0deg 6deg, transparent 6deg 22deg); -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 70%); mask-image: radial-gradient(circle, #000 20%, transparent 70%); animation: fb-spirit-rays calc(1.75s * var(--fb-pace, 1)) calc(1.16s * var(--fb-pace, 1)) ease-out both; }
 @keyframes fb-spirit-rays { 0% { opacity: 0; transform: translate(-50%, -50%) rotate(0) scale(.5); } 30% { opacity: 1; } 100% { opacity: .5; transform: translate(-50%, -50%) rotate(50deg) scale(1.1); } }
-.fb-spirit-spark { position: absolute; left: 50%; top: 64px; width: 8px; height: 8px; margin: -4px; border-radius: 9999px; background: radial-gradient(circle, #f2fffb, #8cf0dc 55%, transparent 70%); animation: fb-spark 1.1s 1.5s ease-out both; }
-.fb-spirit-words { animation: fb-pop .45s 1.8s cubic-bezier(.2,1.4,.4,1) both; }
+.fb-spirit-spark { position: absolute; left: 50%; top: 64px; width: 8px; height: 8px; margin: -4px; border-radius: 9999px; background: radial-gradient(circle, #f2fffb, #8cf0dc 55%, transparent 70%); animation: fb-spark calc(.9s * var(--fb-pace, 1)) calc(1.2s * var(--fb-pace, 1)) ease-out both; }
+.fb-spirit-words { animation: fb-pop calc(.36s * var(--fb-pace, 1)) calc(1.44s * var(--fb-pace, 1)) cubic-bezier(.2,1.4,.4,1) both; }
 @media (prefers-reduced-motion: reduce) { .fb-done, .fb-done-ring, .fb-done-fill, .fb-done-check, .fb-done-words, .fb-done-sub, .fb-spirit-bird, .fb-spirit-letter, .fb-spirit-ring, .fb-spirit-rays, .fb-spirit-spark, .fb-spirit-words { animation-duration: 1ms; animation-delay: 0s; } }
 
 /* The rest of the themed cursor set, so the system cursor never leaks through:
@@ -2289,4 +2289,11 @@ body:has(.cursor-grabbing) {
 }
 .cursor-move button:disabled {
   cursor: url("/design/cursor-no.svg") 3 2, not-allowed;
+}
+
+/* A popup is open: the page behind it doesn't scroll (popups scroll inside themselves). */
+html.scroll-locked,
+html.scroll-locked body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { addJournalEntryAction, createBoardAction } from "@/app/actions";
-import { EmbedHostContext } from "@/components/ui/EmbedHost";
+import { EditorToolbarContext, EmbedHostContext } from "@/components/ui/EmbedHost";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { RewardEditorDialog } from "@/components/rewards/RewardEditorDialog";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
@@ -64,13 +64,20 @@ export function CreateSheet({
   const keyboard = useKeyboardViewport();
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const isAdventure = theme === "adventure";
-  useEscape(() => close());
+  useEscape(() => requestClose());
 
   function close() {
     if (leaving) return;
     setLeaving(true);
     setTimeout(onClose, 190);
   }
+  /** Taps outside, Escape and ×: an editor with unsaved writing asks first. */
+  function requestClose() {
+    if (leaving) return;
+    const ev = new Event("qe-request-close", { cancelable: true });
+    if (window.dispatchEvent(ev)) close();
+  }
+  const [toolbar, setToolbar] = useState<HTMLSpanElement | null>(null);
 
   const shownKind: CreateKind = stage === "journal" ? "journal" : kind;
   const tabKinds = stage === "journal" || stage === "checkin" ? [] : makeKinds;
@@ -111,7 +118,7 @@ export function CreateSheet({
       <div
         className={`fixed inset-0 z-[48] ${leaving ? "overlay-fade-out" : "overlay-fade-in"}`}
         style={{ background: "rgba(8,6,3,.55)", backdropFilter: "blur(1.5px)" }}
-        onClick={close}
+        onClick={requestClose}
         aria-hidden
       />
       <div
@@ -222,12 +229,21 @@ export function CreateSheet({
                 </div>
               )
             )}
+            {/* The editor's own small buttons (templates, drafts) sit here, then × to close. */}
+            <span ref={setToolbar} className="flex shrink-0 items-center gap-1" />
+            <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+              ×
+            </button>
           </div>
         )}
         {stage !== "choose" && (
           <div className="relative z-[1] min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div ref={setHost} className="embed-host" />
-            {host && <EmbedHostContext.Provider value={host}>{editor}</EmbedHostContext.Provider>}
+            {host && (
+              <EmbedHostContext.Provider value={host}>
+                <EditorToolbarContext.Provider value={toolbar}>{editor}</EditorToolbarContext.Provider>
+              </EmbedHostContext.Provider>
+            )}
           </div>
         )}
         </div>
