@@ -305,7 +305,8 @@ export async function listTasksForBoard(boardId: string, ownerId: string): Promi
     const title = new Map((hb ?? []).map((b) => [b.id as string, b.title as string]));
     linked = (res.data as Task[]).map((t) => ({ ...t, home_board_title: t.board_id ? (title.get(t.board_id) ?? null) : null }));
   }
-  return attachStepCounts([...((data ?? []) as Task[]), ...linked], ownerId);
+  const { applyStandIns } = await import("./standins");
+  return attachStepCounts(await applyStandIns(ownerId, [...((data ?? []) as Task[]), ...linked]), ownerId);
 }
 
 /** Queue a quest for a background-painted portrait (see PortraitPainter). */
