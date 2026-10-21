@@ -35,9 +35,44 @@ export function DailyHabits({
   theme: "calm" | "adventure";
 }) {
   const day = useLocalDay();
-  const [open, setOpen] = useState(true);
+  // Closed until opened (the header still shows how the day is going).
+  const [open, setOpen] = useState(false);
+  const [look, setLook] = useState<HeaderLook>("beads");
+  const [lookMenu, setLookMenu] = useState(false);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(LOOK_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the saved choice is only readable after hydration
+      if (v && LOOKS.some((l) => l.key === v)) setLook(v as HeaderLook);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  function chooseLook(v: HeaderLook) {
+    setLook(v);
+    setLookMenu(false);
+    try {
+      localStorage.setItem(LOOK_KEY, v);
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  useEffect(() => {
+    if (!lookMenu) return;
+    const close = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.("[data-habit-look]")) setLookMenu(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setLookMenu(false);
+    document.addEventListener("pointerdown", close, true);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", close, true);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [lookMenu]);
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<RiteView | "new" | null>(null);
+  const [editSub, setEditSub] = useState(false);
   const [pop, setPop] = useState<{ id: string; xp: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -91,7 +126,6 @@ export function DailyHabits({
   const todays = dueToday.filter((h) => !skipped(h.id));
   const skippedToday = dueToday.filter((h) => skipped(h.id));
   const offToday = habits.length - dueToday.length;
-  const doneCount = todays.filter((h) => done(h.id)).length;
 
   /**
    * Days in a row this habit was done, counting only the days it's due.
@@ -206,11 +240,12 @@ export function DailyHabits({
 
   return (
     <section className="flex flex-col">
+      <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="drawer-header relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-4 py-2.5"
+        className="drawer-header relative flex min-h-[58px] w-full flex-col items-center justify-center overflow-hidden rounded-2xl px-12 py-2.5"
         style={
           isAdventure
             ? {
@@ -224,16 +259,58 @@ export function DailyHabits({
         <span className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
           <HabitIcon />
           Daily Habits
-          {todays.length > 0 && (
-            <span className="text-[15px] tabular-nums" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)", fontWeight: 400 }}>
-              ({doneCount}/{todays.length})
-            </span>
-          )}
         </span>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="absolute right-5 transition-transform duration-300" style={{ transform: open ? "rotate(180deg)" : undefined }}>
+        <HeaderAdornment look={look} habits={todays.map((h) => ({ title: h.title, done: done(h.id) }))} isAdventure={isAdventure} />
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="absolute right-5 top-1/2 -translate-y-1/2 transition-transform duration-300" style={{ transform: open ? "translateY(-50%) rotate(180deg)" : "translateY(-50%)" }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
+      {/* How the header shows the day's progress. */}
+      <button
+        type="button"
+        data-habit-look
+        onClick={() => setLookMenu((v) => !v)}
+        aria-label="How the Daily Habits header looks"
+        aria-expanded={lookMenu}
+        title="Header style"
+        className="absolute left-3 top-1/2 z-[2] flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full opacity-70 hover:opacity-100"
+        style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.9" />
+          <path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3L5.5 5.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        </svg>
+      </button>
+      {lookMenu && (
+        <div data-habit-look role="radiogroup" aria-label="Header style" className="card-pop-in parchment absolute left-2 top-full z-40 mt-1.5 flex w-[290px] flex-col gap-1 rounded-xl p-2" style={{ borderRadius: 12, boxShadow: "0 12px 28px rgba(0,0,0,.4)" }}>
+          <p className="relative z-[1] m-0 px-1.5 pb-0.5 text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
+            Header style
+          </p>
+          {LOOKS.map((l) => (
+            <button
+              key={l.key}
+              type="button"
+              role="radio"
+              aria-checked={look === l.key}
+              onClick={() => chooseLook(l.key)}
+              className="relative z-[1] flex flex-col items-stretch gap-1 rounded-lg px-2 py-1.5 text-left hover:bg-black/5"
+              style={look === l.key ? { background: "rgba(217,180,95,.35)", boxShadow: "inset 0 0 0 1.5px #a88a3f" } : undefined}
+            >
+              <span className="text-[14px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                {l.label} <span className="text-[12px] font-normal" style={{ color: "var(--t-ink-soft)" }}>· {l.hint}</span>
+              </span>
+              <span className="relative flex min-h-7 items-center justify-center overflow-hidden rounded-md px-2 py-1" style={{ background: "linear-gradient(180deg,#3a3524,#221f15)" }}>
+                {l.key === "plain" ? (
+                  <span className="font-display text-[14px]" style={{ color: "var(--t-cream)" }}>Daily Habits</span>
+                ) : (
+                  <HeaderAdornment look={l.key} habits={SAMPLE} isAdventure />
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      </div>
 
       <div className="drawer-body" data-open={open ? "true" : "false"}>
         <div className="drawer-inner">
@@ -252,6 +329,13 @@ export function DailyHabits({
               return (
                 <SortableHabit key={h.id} id={h.id} disabled={!open} raised={menuFor === h.id || confirmSkip === h.id}>
                 <div
+                  onContextMenu={(e) => {
+                    if ((e.target as Element).closest("input,textarea,a")) return;
+                    e.preventDefault();
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setMenuUp(window.innerHeight - r.bottom < 200);
+                    setMenuFor(h.id);
+                  }}
                   className={`relative flex items-center gap-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
                   style={isAdventure ? { borderRadius: 16 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
                 >
@@ -373,6 +457,22 @@ export function DailyHabits({
                         className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5"
                       >
                         <span aria-hidden className="w-[18px] text-center">✎</span> Edit habit
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuFor(null);
+                          setEditSub(true);
+                          setEditing(h);
+                        }}
+                        className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5"
+                        style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
+                      >
+                        <span aria-hidden className="flex w-[18px] justify-center">
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full text-[11px] leading-none" style={{ border: "1.5px solid #8a6c2c" }}>+</span>
+                        </span>
+                        Add a sub-habit
                       </button>
                       <button
                         role="menuitem"
@@ -497,7 +597,17 @@ export function DailyHabits({
         </div>
       </div>
 
-      {editing && <RiteEditorDialog rite={editing === "new" ? undefined : editing} slot="day" onClose={() => setEditing(null)} />}
+      {editing && (
+        <RiteEditorDialog
+          rite={editing === "new" ? undefined : editing}
+          slot="day"
+          startWithSub={editSub}
+          onClose={() => {
+            setEditing(null);
+            setEditSub(false);
+          }}
+        />
+      )}
       {focusTask && <FocusMode task={focusTask} theme={theme} onClose={() => setFocusing(null)} />}
     </section>
   );
@@ -558,5 +668,69 @@ function HabitIcon() {
       <path d="M3.2 4.8l.8 4.9 4.8-1.1" stroke="var(--t-gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M8.5 12.4l2.4 2.4 4.6-5" stroke="#8fc46a" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+type HeaderLook = "beads" | "next" | "wins" | "glow" | "plain";
+const LOOK_KEY = "habits-header-look";
+const LOOKS: { key: HeaderLook; label: string; hint: string }[] = [
+  { key: "beads", label: "Beads", hint: "a bead lights up for each habit done" },
+  { key: "next", label: "Next up", hint: "names the habit to do next" },
+  { key: "wins", label: "Wins", hint: "counts only what you've done" },
+  { key: "glow", label: "Rising glow", hint: "a gold line fills along the bottom" },
+  { key: "plain", label: "Just the title", hint: "nothing extra" },
+];
+const SAMPLE = [
+  { title: "Chester care", done: true },
+  { title: "Stretch", done: false },
+  { title: "Water the plants", done: false },
+];
+
+/** What the closed header says about today's habits, in the chosen style (never "0 of 3"). */
+function HeaderAdornment({ look, habits, isAdventure }: { look: HeaderLook; habits: { title: string; done: boolean }[]; isAdventure: boolean }) {
+  if (!habits.length || look === "plain") return null;
+  const n = habits.filter((h) => h.done).length;
+  const all = n === habits.length;
+  const soft = isAdventure ? "rgba(246,236,210,.72)" : "var(--t-ink-soft)";
+  const gold = isAdventure ? "var(--t-gold)" : "var(--t-accent)";
+  if (look === "beads")
+    return (
+      <span aria-label={all ? "All done today" : `${n} done today`} className="mt-1 flex items-center gap-1.5">
+        {habits.map((h, i) => (
+          <span
+            key={i}
+            title={h.title}
+            className="block h-2.5 w-2.5 rounded-full transition-all duration-500"
+            style={
+              h.done
+                ? { background: "radial-gradient(circle at 35% 30%, #fff3c4, #f2d27e 45%, #b08a35)", boxShadow: "0 0 7px rgba(242,210,126,.85)" }
+                : { border: `1.5px solid ${isAdventure ? "rgba(242,210,126,.45)" : "var(--t-card-border)"}` }
+            }
+          />
+        ))}
+      </span>
+    );
+  if (look === "next") {
+    const next = habits.find((h) => !h.done);
+    return (
+      <span className="mt-0.5 max-w-full truncate text-[13px] italic" style={{ color: soft }}>
+        {next ? <>next: {next.title}</> : <span style={{ color: gold, fontStyle: "normal", fontWeight: 600 }}>✦ all done today</span>}
+      </span>
+    );
+  }
+  if (look === "wins")
+    return (
+      <span className="mt-0.5 text-[13px]" style={{ color: n ? gold : soft, fontWeight: n ? 600 : 400 }}>
+        {all ? "✦ all done today" : n ? `✦ ${n} done` : "ready when you are"}
+      </span>
+    );
+  // glow: a line of light along the bottom edge
+  return (
+    <span aria-label={all ? "All done today" : `${n} done today`} className="pointer-events-none absolute inset-x-0 bottom-0 block h-[3px]">
+      <span
+        className="block h-full transition-[width] duration-700"
+        style={{ width: `${(n / habits.length) * 100}%`, background: "linear-gradient(90deg, rgba(242,210,126,.25), #f2d27e)", boxShadow: n ? "0 0 8px rgba(242,210,126,.8)" : undefined }}
+      />
+    </span>
   );
 }

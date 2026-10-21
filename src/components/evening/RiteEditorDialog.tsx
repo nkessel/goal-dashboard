@@ -13,7 +13,7 @@ import { coinsForXp } from "@/lib/coins";
 import { RiteGlyph, glyphFor } from "./RiteGlyph";
 
 const XP_PRESETS = [1, 3, 5, 10, 15];
-const MINUTE_PRESETS = [2, 5, 10, 15, 30];
+const MINUTE_PRESETS = [5, 10, 15, 30, 60];
 
 /**
  * Create or edit an evening rite (name, note, XP, whether it's non-negotiable)
@@ -25,8 +25,11 @@ export function RiteEditorDialog({
   rite,
   defaultCore = true,
   slot = rite?.slot === "day" ? "day" : "evening",
+  startWithSub = false,
   onClose,
 }: {
+  /** Opened from "Add a sub-habit": straight to a new sub-habit. */
+  startWithSub?: boolean;
   rite?: RiteView;
   defaultCore?: boolean;
   slot?: "evening" | "day";
@@ -46,7 +49,10 @@ export function RiteEditorDialog({
   // Sub-habits: a checklist ticked off each day.
   const [subs, setSubs] = useState<{ id: string; title: string }[]>(rite?.steps ?? []);
   const [subText, setSubText] = useState("");
-  const [subsOpen, setSubsOpen] = useState((rite?.steps?.length ?? 0) > 0);
+  const [subsOpen, setSubsOpen] = useState((rite?.steps?.length ?? 0) > 0 || !!startWithSub);
+  const focusSub = !!startWithSub;
+  const [repeatsOpen, setRepeatsOpen] = useState(true);
+  const [dueOpen, setDueOpen] = useState(!!rite?.due_time);
   const subsChanged = JSON.stringify(subs) !== JSON.stringify(rite?.steps ?? []);
   function addSub() {
     const t = subText.replace(/\s+/g, " ").trim();
@@ -116,7 +122,7 @@ export function RiteEditorDialog({
       >
         <div data-embed-hide className="relative z-[1] flex items-center justify-between">
           <h3 className="font-display flex items-center gap-2 text-lg">
-            <Moon size={22} />
+            {isHabit ? <HabitGlyph /> : <Moon size={22} />}
             {isHabit ? (rite ? "Edit habit" : "New habit") : rite ? "Edit rite" : isCore ? "New evening rite" : "New mini-quest"}
           </h3>
           <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
@@ -171,130 +177,39 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div className="relative z-[1] flex flex-col gap-1.5">
-            <button type="button" onClick={() => setSubsOpen((o) => !o)} aria-expanded={subsOpen} className="flex items-center gap-1 self-start text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: subsOpen ? "rotate(90deg)" : undefined }}>
-                <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {subs.length ? `Sub-habits · ${subs.length}` : "Sub-habits (steps you tick off each day)"}
+          <div className="relative z-[1] flex flex-col gap-2">
+            <button type="button" onClick={() => setRepeatsOpen((o) => !o)} aria-expanded={repeatsOpen} className="flex items-center gap-1.5 self-start text-[14.5px] font-semibold">
+              <Caret open={repeatsOpen} />
+              Repeats
+              {!repeatsOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{days.length === 7 ? "every day" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "no days"}</span>}
             </button>
-            {subsOpen && (
-              <div className="reveal flex flex-col gap-1 pl-3">
-                <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                  {subs.map((st, i) => (
-                    <li key={st.id} className="flex items-center gap-2">
-                      <span aria-hidden className="h-[18px] w-[18px] shrink-0 rounded-full" style={{ border: "2px solid #a58c66", background: "rgba(255,250,238,.6)" }} />
-                      <input
-                        value={st.title}
-                        onChange={(e) => setSubs((l) => l.map((x) => (x.id === st.id ? { ...x, title: e.target.value } : x)))}
-                        aria-label={`Sub-habit ${i + 1}`}
-                        className="h-8 min-w-0 flex-1 rounded-md border-0 bg-transparent px-1 text-[15px]"
-                      />
-                      <button type="button" disabled={i === 0} onClick={() => setSubs((l) => { const n = [...l]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })} aria-label="Move up" className="flex h-7 w-7 items-center justify-center rounded-full text-[14px] hover:bg-black/5 disabled:opacity-25">
-                        ↑
-                      </button>
-                      <button type="button" onClick={() => setSubs((l) => l.filter((x) => x.id !== st.id))} aria-label={`Remove ${st.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[16px] hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex items-center gap-2">
-                  <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed text-[12px]" style={{ borderColor: "#a58c66", color: "var(--t-ink-soft)" }}>
-                    +
-                  </span>
-                  <input
-                    value={subText}
-                    onChange={(e) => setSubText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !(e.ctrlKey || e.metaKey)) {
-                        e.preventDefault();
-                        addSub();
-                      }
-                    }}
-                    onBlur={addSub}
-                    placeholder={subs.length ? "Another step" : "e.g. Food and water"}
-                    aria-label="Add a sub-habit"
-                    className="h-8 min-w-0 flex-1 rounded-md border border-dashed bg-transparent px-2 text-[15px]"
-                    style={{ borderColor: "#b39a6a" }}
-                  />
-                </div>
-                <p className="m-0 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-                  Ticking the last one completes the habit for the day.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
-          <span className="mr-0.5 text-[14.5px] font-semibold">XP</span>
-          {XP_PRESETS.map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setXp(v)}
-              className="h-8 min-w-9 rounded-full px-2.5 text-[13.5px] font-semibold tabular-nums"
-              style={
-                xp === v
-                  ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" }
-                  : { border: "1px solid #b39a6a", color: "var(--t-ink)" }
-              }
-            >
-              {v}
-            </button>
-          ))}
-          <input
-            type="number"
-                  onFocus={(e) => e.currentTarget.select()}
-            inputMode="numeric"
-            min={0}
-            max={500}
-            value={XP_PRESETS.includes(xp) ? "" : xp}
-            placeholder="other"
-            onChange={(e) => setXp(Math.max(0, Math.min(500, Math.round(Number(e.target.value) || 0))))}
-            aria-label="XP (any amount)"
-            className="h-8 w-[60px] rounded-full border px-1.5 text-center text-[16px] font-semibold tabular-nums"
-            style={{ borderColor: XP_PRESETS.includes(xp) ? "#b39a6a" : "#5a4520", background: XP_PRESETS.includes(xp) ? undefined : "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" }}
-          />
-        </div>
-
-        {isHabit && (
-          <div className="relative z-[1] flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1.5 text-[14.5px] font-semibold">
-              <CoinIcon size={17} /> Coins
-            </span>
-            <span className="flex h-8 items-center rounded-full border" style={{ borderColor: coinValue === null ? "#b39a6a" : "#5a4520" }}>
+            {repeatsOpen && (
+            <div className="reveal flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setCoinValue(Math.max(0, (coinValue ?? coinsForXp(xp)) - 1))}
-                aria-label="Fewer coins"
-                className="flex h-8 w-8 items-center justify-center text-[17px] leading-none"
-                style={{ color: "var(--t-ink-soft)" }}
+                onClick={() => setDays(days.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
+                className="h-8 rounded-full px-3 text-[13.5px] font-semibold"
+                style={days.length === 7 ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" } : { border: "1px solid #b39a6a", color: "var(--t-ink)" }}
               >
-                −
+                Every day
               </button>
-              <span className="min-w-6 text-center text-[15px] font-bold tabular-nums" style={{ color: coinValue === null ? "var(--t-ink-soft)" : "#8a6116" }} aria-live="polite">
-                {coinValue ?? coinsForXp(xp)}
-              </span>
-              <button
-                type="button"
-                onClick={() => setCoinValue(Math.min(1000, (coinValue ?? coinsForXp(xp)) + 1))}
-                aria-label="More coins"
-                className="flex h-8 w-8 items-center justify-center text-[17px] leading-none"
-                style={{ color: "var(--t-ink-soft)" }}
-              >
-                +
-              </button>
-            </span>
-            {coinValue === null ? (
-              <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-                automatic (1 per 30 XP)
-              </span>
-            ) : (
-              <button type="button" onClick={() => setCoinValue(null)} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
-                back to automatic
-              </button>
+              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => {
+                const on = days.includes(i);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i]}
+                    onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i].sort())}
+                    className="h-8 w-8 rounded-full text-[13.5px] font-bold"
+                    style={on ? { background: "rgba(217,180,95,.55)", border: "1px solid #5a4520", color: "#2a1c10" } : { border: "1px solid #b39a6a", color: "var(--t-ink-soft)" }}
+                  >
+                    {d}
+                  </button>
+                );
+              })}
+            </div>
             )}
           </div>
         )}
@@ -344,36 +259,86 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div className="relative z-[1] flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-0.5 text-[14.5px] font-semibold">Repeats</span>
+          <div className="relative z-[1] flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1.5 text-[14.5px] font-semibold">
+              <CoinIcon size={17} /> Coins
+            </span>
+            <span className="flex h-8 items-center rounded-full border" style={{ borderColor: coinValue === null ? "#b39a6a" : "#5a4520" }}>
               <button
                 type="button"
-                onClick={() => setDays(days.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
-                className="h-8 rounded-full px-3 text-[13.5px] font-semibold"
-                style={days.length === 7 ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" } : { border: "1px solid #b39a6a", color: "var(--t-ink)" }}
+                onClick={() => setCoinValue(Math.max(0, (coinValue ?? coinsForXp(xp)) - 1))}
+                aria-label="Fewer coins"
+                className="flex h-8 w-8 items-center justify-center text-[17px] leading-none"
+                style={{ color: "var(--t-ink-soft)" }}
               >
-                Every day
+                −
               </button>
-              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => {
-                const on = days.includes(i);
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-pressed={on}
-                    aria-label={["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i]}
-                    onClick={() => setDays(on ? days.filter((x) => x !== i) : [...days, i].sort())}
-                    className="h-8 w-8 rounded-full text-[13.5px] font-bold"
-                    style={on ? { background: "rgba(217,180,95,.55)", border: "1px solid #5a4520", color: "#2a1c10" } : { border: "1px solid #b39a6a", color: "var(--t-ink-soft)" }}
-                  >
-                    {d}
-                  </button>
-                );
-              })}
-            </div>
-            <label className="flex items-center gap-2 text-[14.5px] font-semibold">
+              <span className="min-w-6 text-center text-[15px] font-bold tabular-nums" style={{ color: coinValue === null ? "var(--t-ink-soft)" : "#8a6116" }} aria-live="polite">
+                {coinValue ?? coinsForXp(xp)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCoinValue(Math.min(1000, (coinValue ?? coinsForXp(xp)) + 1))}
+                aria-label="More coins"
+                className="flex h-8 w-8 items-center justify-center text-[17px] leading-none"
+                style={{ color: "var(--t-ink-soft)" }}
+              >
+                +
+              </button>
+            </span>
+            {coinValue === null ? (
+              <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+                automatic (1 per 30 XP)
+              </span>
+            ) : (
+              <button type="button" onClick={() => setCoinValue(null)} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                back to automatic
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
+          <span className="mr-0.5 text-[14.5px] font-semibold">XP</span>
+          {XP_PRESETS.map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setXp(v)}
+              className="h-8 min-w-9 rounded-full px-2.5 text-[13.5px] font-semibold tabular-nums"
+              style={
+                xp === v
+                  ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" }
+                  : { border: "1px solid #b39a6a", color: "var(--t-ink)" }
+              }
+            >
+              {v}
+            </button>
+          ))}
+          <input
+            type="number"
+                  onFocus={(e) => e.currentTarget.select()}
+            inputMode="numeric"
+            min={0}
+            max={500}
+            value={XP_PRESETS.includes(xp) ? "" : xp}
+            placeholder="other"
+            onChange={(e) => setXp(Math.max(0, Math.min(500, Math.round(Number(e.target.value) || 0))))}
+            aria-label="XP (any amount)"
+            className="h-8 w-[60px] rounded-full border px-1.5 text-center text-[16px] font-semibold tabular-nums"
+            style={{ borderColor: XP_PRESETS.includes(xp) ? "#b39a6a" : "#5a4520", background: XP_PRESETS.includes(xp) ? undefined : "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" }}
+          />
+        </div>
+
+        {isHabit && (
+          <div className="relative z-[1] flex flex-col gap-2">
+            <button type="button" onClick={() => setDueOpen((o) => !o)} aria-expanded={dueOpen} className="flex items-center gap-1.5 self-start text-[14.5px] font-semibold">
+              <Caret open={dueOpen} />
               Due by
+              {!dueOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{dueTime || "any time"}</span>}
+            </button>
+            {dueOpen && (
+            <label className="reveal flex items-center gap-2 pl-4 text-[14.5px] font-semibold">
               <input
                 type="time"
                 value={dueTime}
@@ -392,6 +357,66 @@ export function RiteEditorDialog({
                 </span>
               )}
             </label>
+            )}
+          </div>
+        )}
+
+        {isHabit && (
+          <div className="relative z-[1] flex flex-col gap-1.5">
+            {subs.length > 0 && <span className="text-[14.5px] font-semibold">Sub-habits</span>}
+            {!subsOpen && subs.length === 0 ? (
+              <button type="button" onClick={() => setSubsOpen(true)} className="flex h-9 items-center gap-2 self-start rounded-full px-3 text-[14px] font-semibold" style={{ border: "1.5px dashed #b39a6a", color: "var(--t-ink)" }}>
+                <span aria-hidden className="text-[16px] leading-none" style={{ color: "#8a6116" }}>+</span>
+                Add a sub-habit
+                <span className="text-[12px] font-normal" style={{ color: "var(--t-ink-soft)" }}>steps you tick off each day</span>
+              </button>
+            ) : (
+              <div className="reveal flex flex-col gap-1 pl-3">
+                <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                  {subs.map((st, i) => (
+                    <li key={st.id} className="flex items-center gap-2">
+                      <span aria-hidden className="h-[18px] w-[18px] shrink-0 rounded-full" style={{ border: "2px solid #a58c66", background: "rgba(255,250,238,.6)" }} />
+                      <input
+                        value={st.title}
+                        onChange={(e) => setSubs((l) => l.map((x) => (x.id === st.id ? { ...x, title: e.target.value } : x)))}
+                        aria-label={`Sub-habit ${i + 1}`}
+                        className="h-8 min-w-0 flex-1 rounded-md border-0 bg-transparent px-1 text-[15px]"
+                      />
+                      <button type="button" disabled={i === 0} onClick={() => setSubs((l) => { const n = [...l]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })} aria-label="Move up" className="flex h-7 w-7 items-center justify-center rounded-full text-[14px] hover:bg-black/5 disabled:opacity-25">
+                        ↑
+                      </button>
+                      <button type="button" onClick={() => setSubs((l) => l.filter((x) => x.id !== st.id))} aria-label={`Remove ${st.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[16px] hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex items-center gap-2">
+                  <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed text-[12px]" style={{ borderColor: "#a58c66", color: "var(--t-ink-soft)" }}>
+                    +
+                  </span>
+                  <input
+                    value={subText}
+                    onChange={(e) => setSubText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !(e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        addSub();
+                      }
+                    }}
+                    onBlur={addSub}
+                    autoFocus={subs.length === 0 || focusSub}
+                    placeholder={subs.length ? "Another step" : "e.g. Food and water"}
+                    aria-label="Add a sub-habit"
+                    className="h-8 min-w-0 flex-1 rounded-md border border-dashed bg-transparent px-2 text-[15px]"
+                    style={{ borderColor: "#b39a6a" }}
+                  />
+                </div>
+                <p className="m-0 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+                  Ticking the last one completes the habit for the day.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -482,5 +507,24 @@ function GlyphAvatar({ title, kind }: { title: string; kind: string | null }) {
     <span className="flex h-full w-full items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, rgba(255,255,255,.7), rgba(214,220,240,.35))", border: "2px solid #8e8aa8" }}>
       {g === "moon" ? <Moon size={30} /> : <RiteGlyph kind={g} size={32} />}
     </span>
+  );
+}
+
+function Caret({ open }: { open: boolean }) {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: open ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
+      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The habits mark: a circling arrow with a check. */
+function HabitGlyph() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 3.5a8.5 8.5 0 1 1-8.1 6" stroke="#a88a3f" strokeWidth="2" strokeLinecap="round" />
+      <path d="M3.2 4.8l.8 4.9 4.8-1.1" stroke="#a88a3f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.5 12.4l2.4 2.4 4.6-5" stroke="#4f7d38" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

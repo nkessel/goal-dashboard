@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Cinzel, EB_Garamond, Manrope, Noto_Naskh_Arabic } fr
 import { ViewTransitionProvider } from "@/components/ui/ViewTransitionProvider";
 import { KeyboardViewport } from "@/components/ui/KeyboardViewport";
 import { ScrollLock } from "@/components/ui/ScrollLock";
+import { ContextMenuBridge } from "@/components/ui/ContextMenuBridge";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -68,6 +69,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <KeyboardViewport />
         <ScrollLock />
+        <ContextMenuBridge />
         <ViewTransitionProvider>
           {children}
           {drawer}
