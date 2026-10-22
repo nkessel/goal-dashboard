@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { FLOURISHES, readFlourish, saveFlourish, type Flourish } from "@/lib/toucan-flourish";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -270,6 +271,8 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose, lite = fals
   const [promises, setPromises] = useState<CoachPromise[]>([]);
   const [due, setDue] = useState<CoachPromise[]>([]);
   const [showNotes, setShowNotes] = useState(false);
+  const [showLook, setShowLook] = useState(false);
+  const [flourish, setFl] = useState<Flourish>(() => (typeof window === "undefined" ? "glow" : readFlourish()));
   const [text, setText] = useState("");
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -363,6 +366,12 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose, lite = fals
               🪶
             </button>
           )}
+          <button type="button" onClick={() => setShowLook((v) => !v)} aria-expanded={showLook} title="How I move" aria-label="How the toucan moves" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10" style={{ color: "rgba(232,255,248,.75)" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.9" />
+              <path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3L5.5 5.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+            </svg>
+          </button>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
@@ -371,6 +380,40 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose, lite = fals
         </header>
 
         <div ref={scroller} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-3">
+          {showLook && (
+            <div className="flex flex-col gap-1.5 rounded-2xl p-3" style={{ background: "rgba(140,240,220,.07)", border: "1px solid rgba(140,240,220,.25)" }}>
+              <span className="text-[12px] font-bold uppercase tracking-[.14em]" style={{ color: "rgba(140,240,220,.8)" }}>
+                When I share wisdom, I…
+              </span>
+              <div role="radiogroup" aria-label="How the toucan moves" className="grid grid-cols-2 gap-1.5">
+                {FLOURISHES.map((f) => {
+                  const on = flourish === f.key;
+                  return (
+                    <button
+                      key={f.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => {
+                        setFl(f.key);
+                        saveFlourish(f.key);
+                      }}
+                      className="flex flex-col items-start rounded-xl px-2.5 py-1.5 text-left"
+                      style={on ? { background: "rgba(140,240,220,.2)", border: "1px solid rgba(140,240,220,.7)" } : { border: "1px solid rgba(140,240,220,.2)" }}
+                    >
+                      <span className="text-[13.5px] font-bold">{f.label}</span>
+                      <span className="text-[11.5px] leading-snug" style={{ color: "rgba(232,255,248,.65)" }}>
+                        {f.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-[12px] italic" style={{ color: "rgba(232,255,248,.6)" }}>
+                Tap me on my perch to see it.
+              </span>
+            </div>
+          )}
           {showNotes && (
             <div className="flex flex-col gap-1.5 rounded-2xl p-3" style={{ background: "rgba(140,240,220,.07)", border: "1px solid rgba(140,240,220,.25)" }}>
               <span className="text-[12px] font-bold uppercase tracking-[.14em]" style={{ color: "rgba(140,240,220,.8)" }}>

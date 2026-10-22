@@ -454,7 +454,7 @@ function ItemSheet({
     <div className="overlay-fade-in fixed inset-0 z-[56] flex items-end justify-center overscroll-contain sm:items-center sm:p-4" style={{ background: "rgba(10,8,4,.3)" }} onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-label={isNew ? "Add an item" : item.name} onClick={(e) => e.stopPropagation()} className="sheet-up parchment parchment-framed flex max-h-[92svh] w-full max-w-md flex-col gap-3 overflow-y-auto overscroll-contain rounded-t-2xl p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:rounded-2xl">
         <div className="relative z-[1] flex items-start gap-3">
-          <span className="inv-slot relative h-20 w-20 shrink-0 overflow-hidden rounded-xl">
+          <span className="inv-slot relative h-20 w-20 shrink-0 overflow-hidden rounded-full">
             {item.icon && !repaint ? (
               // eslint-disable-next-line @next/next/no-img-element -- item portrait
               <img src={item.icon} alt="" className="h-full w-full object-cover" />

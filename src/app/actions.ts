@@ -3202,3 +3202,22 @@ export async function tickAllRiteStepsAction(riteId: string, day: string, on: bo
   if (!rite) return;
   for (const st of ritesData.cleanRiteSteps(rite.steps)) await ritesData.setRiteStepCheck(ownerId, riteId, st.id, day, on).catch(() => {});
 }
+
+/* ── Final Boss battle plans ─────────────────────────────────────────── */
+
+/** Your notes on how to beat a Final Boss (kept with your account). */
+export async function bossPlanAction(bossId: string) {
+  const ownerId = await requireProfileId();
+  const plans = ((await readExtras(ownerId)).bossPlans as Record<string, string> | undefined) ?? {};
+  return typeof plans[bossId] === "string" ? plans[bossId] : "";
+}
+
+export async function saveBossPlanAction(bossId: string, text: string) {
+  const ownerId = await requireProfileId();
+  const extras = await readExtras(ownerId);
+  const plans = { ...((extras.bossPlans as Record<string, string> | undefined) ?? {}) };
+  const t = text.slice(0, 4000);
+  if (t.trim()) plans[bossId] = t;
+  else delete plans[bossId];
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, bossPlans: plans } }).eq("id", ownerId);
+}

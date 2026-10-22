@@ -1,6 +1,7 @@
 "use client";
 
 import { FOUND, HIDING, SAY_FLYING, SAY_LANDING, WISDOM, retiredLines } from "@/lib/toucan-lines";
+import { flourishClass, readFlourish, type Flourish } from "@/lib/toucan-flourish";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
@@ -136,7 +137,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   }, []);
   const [say, setSay] = useState<string | null>(null);
   // Buttons under the words (for the line they belong to).
-  const [sayActions, setSayActions] = useState<{ for: string; list: { label: string; run: () => void }[] } | null>(null);
+  const [sayActions, setSayActions] = useState<{ for: string; list: { label: string; run: () => void; secret?: boolean }[] } | null>(null);
   const sayRef = useRef<HTMLDivElement>(null);
   const sayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -182,6 +183,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   const drag = useRef<{ x0: number; y0: number; offX: number; offY: number; moving: boolean } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [taps, setTaps] = useState(0);
+  const [flourish, setFlourish] = useState<Flourish>("glow");
   const flewWise = useRef(false);
   // Dropped onto the menu button, it goes into its cage (Settings sets it free).
   const [caged, setCaged] = useState(() => {
@@ -289,7 +291,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
       ? `translate3d(${x.toFixed(1)}px, ${above.toFixed(1)}px, 0) translate(-50%, -100%)`
       : `translate3d(${x.toFixed(1)}px, ${(p.y + 10).toFixed(1)}px, 0) translate(-50%, 0)`;
   }
-  function speakBrief(text: string, ms: number | null, actions: { label: string; run: () => void }[] | null = null) {
+  function speakBrief(text: string, ms: number | null, actions: { label: string; run: () => void; secret?: boolean }[] | null = null) {
     if (sayTimer.current) clearTimeout(sayTimer.current);
     setSayActions(actions ? { for: text, list: actions } : null);
     setSay(text);
@@ -446,7 +448,8 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   function speak() {
     const p = pos.current;
     if (!p) return;
-    // A wise flourish: it rises, spreads its glow and lets starlight fall from its bill.
+    // A wise flourish (chosen in the toucan's chat), and starlight falls from its bill.
+    setFlourish(readFlourish());
     setTaps((n) => n + 1);
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       for (let i = 0; i < 9; i++) setTimeout(() => spark(p.x + facing * (10 + Math.random() * 26), p.y - OWL_H * 0.75 + (Math.random() - 0.5) * 30), 120 + i * 45);
@@ -458,7 +461,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         return false;
       }
     })();
-    speakBrief(pick("wise", WISDOM).replaceAll("{name}", addressOf(name)), simple ? 5000 : 6500, simple ? null : [{ label: "💬 Talk with me", run: () => window.dispatchEvent(new CustomEvent("toucan-talk")) }]);
+    speakBrief(pick("wise", WISDOM).replaceAll("{name}", addressOf(name)), simple ? 5000 : 6500, simple ? null : [{ label: "Talk with me", secret: true, run: () => window.dispatchEvent(new CustomEvent("toucan-talk")) }]);
   }
   // The guide asks it to raise something (a quest slipping): it says so, with buttons.
   const speakRef = useRef(speakBrief);
@@ -693,7 +696,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         <div className={charging ? "owl-charging" : undefined}>
           <div ref={body} className={`owl-body owl-${phase}`} style={{ transform: `scaleX(${facing})` }}>
             {spirit ? (
-              <div key={taps} className={taps ? "toucan-tap" : undefined}>
+              <div key={taps} className={taps ? flourishClass(flourish) : undefined}>
                 <div style={{ transform: "scale(1.3)", transformOrigin: "50% 92%" }}>
                   <ToucanArt equipped={wardrobe.equipped} flying={phase === "flying" || phase === "gliding"} />
                 </div>
@@ -706,7 +709,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         <div ref={sayRef} role="status" className={`fixed left-0 top-0 z-[46] ${sayActions?.for === say ? "" : "pointer-events-none"}`}>
           <div
             key={say}
-            className="owl-say w-max max-w-[260px] rounded-2xl px-3 py-1.5 text-center text-[14px] font-semibold leading-snug"
+            className="owl-say relative w-max max-w-[260px] rounded-2xl px-3 py-1.5 text-center text-[14.5px] font-medium italic leading-snug"
             style={
               spirit
                 ? { background: "linear-gradient(180deg, rgba(14,38,40,.94), rgba(8,22,26,.96))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.35), 0 4px 12px rgba(0,0,0,.45)" }
@@ -714,9 +717,30 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             }
           >
             {say}
-            {sayActions?.for === say && (
+            {/* A hidden power: a faint glint in the bubble's corner that wakes on hover. */}
+            {sayActions?.for === say &&
+              sayActions.list
+                .filter((a) => a.secret)
+                .map((a) => (
+                  <button
+                    key={a.label}
+                    type="button"
+                    onClick={() => {
+                      setSay(null);
+                      a.run();
+                    }}
+                    aria-label={a.label}
+                    title={a.label}
+                    className="owl-secret absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M12 1.5l2.2 7.3 7.3 2.2-7.3 2.2L12 20.5l-2.2-7.3L2.5 11l7.3-2.2z" fill="currentColor" />
+                    </svg>
+                  </button>
+                ))}
+            {sayActions?.for === say && sayActions.list.some((a) => !a.secret) && (
               <span className="mt-1.5 flex flex-wrap justify-center gap-1.5">
-                {sayActions.list.map((a) => (
+                {sayActions.list.filter((a) => !a.secret).map((a) => (
                   <button
                     key={a.label}
                     type="button"

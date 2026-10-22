@@ -62,7 +62,7 @@ export function RefillBadge({ inventory }: { inventory: Inventory }) {
           <ul className="relative z-[1] m-0 flex list-none flex-col gap-1 p-0">
             {items.map((i) => (
               <li key={i.id} className="flex items-center gap-2">
-                <span className="h-8 w-8 shrink-0 overflow-hidden rounded-md" style={{ background: "#2a1a10", border: "1px solid #8a6c2c" }}>
+                <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full" style={{ background: "#2a1a10", border: "1px solid #8a6c2c" }}>
                   {i.icon && (
                     // eslint-disable-next-line @next/next/no-img-element -- item portrait
                     <img src={i.icon} alt="" className="h-full w-full object-cover" />
