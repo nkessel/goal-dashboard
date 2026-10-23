@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 
-export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "earlier" | "nextstep" | "sequence" | "followup" | "delete";
+export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "earlier" | "nextstep" | "sequence" | "delete";
 
 /**
  * The quest card's action list — opened from the card's icon (the blank
@@ -111,8 +111,7 @@ export function QuestActionMenu({
     ...(onBoard && !isReward ? [{ key: "nextstep" as const, icon: <Glyph d="M5 12h12M13 7l5 5-5 5" />, label: "Make it the board's next step" }] : []),
     ...(!isReward
       ? [
-          { key: "followup" as const, icon: <Glyph d="M5 7h9M5 12h6M14 15l3 3 3-3M17 9v9" />, label: isAdventure ? "Add a follow-up quest" : "Add a follow-up task" },
-          { key: "sequence" as const, icon: <StackGlyph />, label: inSequence ? "Edit the sequence…" : "Join a sequence…" },
+          { key: "sequence" as const, icon: <StackGlyph />, label: inSequence ? "Edit the sequence…" : "Create a sequence…" },
         ]
       : []),
     ...(!isReward ? [{ key: "earlier" as const, icon: <Glyph d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3h3" />, label: "Already completed…" }] : []),

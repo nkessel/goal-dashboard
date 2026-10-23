@@ -63,7 +63,7 @@ export function CreateSheet({
   const tailRef = useRef<HTMLSpanElement>(null);
   const [kind, setKind] = useState<CreateKind>(initial ?? makeKinds[0] ?? kinds[0]);
   const [leaving, setLeaving] = useState(false);
-  const keyboard = useKeyboardViewport();
+  const keyboard = useKeyboardViewport(sheetRef, leaving);
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const isAdventure = theme === "adventure";
   useEscape(() => requestClose());
@@ -140,8 +140,9 @@ export function CreateSheet({
         className={`create-sheet fixed inset-x-0 z-[49] mx-auto flex w-[calc(100%-16px)] max-w-md flex-col ${leaving ? "create-sheet-out" : "create-sheet-in"}`}
         style={{
           ...(keyboard
-            ? // Keyboard up: use all the room left above it.
-              { top: keyboard.top + 6, height: keyboard.height - 12, bottom: "auto" }
+            ? // Keyboard up: move up to the top of what's visible but keep the sheet's size
+              // (it may run on behind the keyboard; the editor scrolls up to what's hidden).
+              { top: keyboard.top + 6, height: keyboard.sheetHeight, bottom: "auto" }
             : {
                 bottom: "calc(5rem + 66px + env(safe-area-inset-bottom))",
                 maxHeight: "calc(100dvh - 5rem - 66px - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
@@ -198,8 +199,10 @@ export function CreateSheet({
                 <QuillGlyph /> Journal entry
               </span>
             ) : (
-              tabKinds.length > 1 && (
-                <div role="tablist" aria-label="What to make" className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              // The kinds to make, with the editor's own buttons (templates, drafts) at the end of the same scrolling row.
+              <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {tabKinds.length > 1 && (
+                <div role="tablist" aria-label="What to make" className="flex shrink-0 gap-1.5">
                   {tabKinds.map((k) => {
                     const active = k === kind;
                     const special = k === "quest" || k === "board";
@@ -226,17 +229,17 @@ export function CreateSheet({
                     );
                   })}
                 </div>
-              )
+                )}
+                <span ref={setToolbar} className="flex shrink-0 items-center gap-1" />
+              </div>
             )}
-            {/* The editor's own small buttons (templates, drafts) sit here, then × to close. */}
-            <span ref={setToolbar} className="flex shrink-0 items-center gap-1" />
             <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
               ×
             </button>
           </div>
         )}
         {stage !== "choose" && (
-          <div className="relative z-[1] min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="relative z-[1] min-h-0 flex-1 overflow-y-auto overscroll-contain" style={keyboard?.hidden ? { paddingBottom: keyboard.hidden, scrollPaddingBottom: keyboard.hidden } : undefined}>
             <div ref={setHost} className="embed-host" />
             {host && (
               <EmbedHostContext.Provider value={host}>
@@ -541,24 +544,58 @@ function ScrollGlyph() {
   );
 }
 
-/** On phones, the area left above the on-screen keyboard (null while it's down). */
-function useKeyboardViewport(): { top: number; height: number } | null {
-  const [vp, setVp] = useState<{ top: number; height: number } | null>(null);
+/**
+ * On phones, where the on-screen keyboard leaves room (null while it's down):
+ * the top of the visible area, and the sheet's height, which stays what it
+ * was before the keyboard came up (never squeezed into the strip above it),
+ * plus how much of it the keyboard hides. A keyboard that drops for a
+ * moment (moving between fields) doesn't move the sheet, and nothing moves
+ * while the sheet is closing.
+ */
+function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leaving: boolean): { top: number; sheetHeight: number; hidden: number } | null {
+  const [vp, setVp] = useState<{ top: number; sheetHeight: number; hidden: number } | null>(null);
+  const frozen = useRef(leaving);
+  useEffect(() => {
+    frozen.current = leaving;
+  }, [leaving]);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
+    let rest = 0;
+    let closing = 0;
+    let raf = 0;
     const update = () => {
-      const open = vv.height < window.innerHeight - 120;
-      setVp(open ? { top: vv.offsetTop, height: vv.height } : null);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (frozen.current) return;
+        const open = vv.height < window.innerHeight - 120;
+        if (open) {
+          clearTimeout(closing);
+          closing = 0;
+          if (!rest) rest = sheet.current?.offsetHeight ?? 0;
+          const visible = vv.height - 12;
+          const room = window.innerHeight - vv.offsetTop - 12;
+          const sheetHeight = Math.round(Math.min(room, Math.max(visible, rest, 420)));
+          setVp({ top: vv.offsetTop, sheetHeight, hidden: Math.max(0, sheetHeight - visible) });
+        } else if (!closing) {
+          closing = window.setTimeout(() => {
+            closing = 0;
+            rest = 0;
+            setVp(null);
+          }, 220);
+        }
+      });
     };
     update();
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
     return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(closing);
       vv.removeEventListener("resize", update);
       vv.removeEventListener("scroll", update);
     };
-  }, []);
+  }, [sheet]);
   return vp;
 }
 

@@ -15,6 +15,8 @@ import { MONSTER_ICONS } from "@/lib/monster-icons";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
 import { useEscape } from "@/lib/use-escape";
 
+const LIB_KEY = "portrait-library-shown";
+
 export function IconPicker({
   taskId,
   currentIcon,
@@ -30,6 +32,7 @@ export function IconPicker({
   showEditHint = false,
   artStyle = "monster",
   clearLabel = "Clear",
+  onPromptChange,
 }: {
   /** Omit together with `onDraftChange` when the quest doesn't exist yet. */
   taskId?: string;
@@ -58,13 +61,29 @@ export function IconPicker({
   artStyle?: "monster" | "treasure";
   /** Label for taking the picture off (e.g. "Use the checkbox"). */
   clearLabel?: string;
+  /** Draft mode: the description it would be painted from, as you edit it (so a new quest can be painted from it later). */
+  onPromptChange?: (prompt: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   // Shows a new pick right away (the quest prop only updates after a refresh).
   const [override, setOverride] = useState<{ icon: string | null; source: "monster" | "library" | "ai" } | null>(null);
   const router = useRouter();
   const [confirmRemove, setConfirmRemove] = useState<TaskIconLibraryEntry | null>(null);
-  const [tab, setTab] = useState<"library" | "ai">("ai");
+  // The library shows under the paint section unless you've hidden it (remembered on this device).
+  const [libShown, setLibShown] = useState(() => {
+    try {
+      return typeof window === "undefined" || window.localStorage.getItem(LIB_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  function toggleLibrary() {
+    const next = !libShown;
+    setLibShown(next);
+    try {
+      window.localStorage.setItem(LIB_KEY, next ? "1" : "0");
+    } catch {}
+  }
   const [query, setQuery] = useState("");
   const [shelf, setShelf] = useState<"all" | "quest" | "reward" | "character">(artStyle === "treasure" ? "reward" : "all");
   const [library, setLibrary] = useState<TaskIconLibraryEntry[] | null>(null);
@@ -100,7 +119,6 @@ export function IconPicker({
               : prev
           );
         }
-        setTab("library");
       } catch (e) {
         setGenError(e instanceof Error ? e.message : "Couldn't generate an icon.");
         setOpen(true);
@@ -117,10 +135,10 @@ export function IconPicker({
   }
 
   useEffect(() => {
-    if (tab === "library" && !library) {
+    if (open && libShown && !library) {
       listTaskIconLibraryAction().then(setLibrary);
     }
-  }, [tab, library]);
+  }, [open, libShown, library]);
 
   function pickLibraryEntry(imageUrl: string) {
     if (onDraftChange) {
@@ -166,10 +184,6 @@ export function IconPicker({
     (e) => (shelf === "all" || (e.category ?? "quest") === shelf) && (!query.trim() || e.prompt?.toLowerCase().includes(query.trim().toLowerCase()))
   );
 
-  const tabBtnStyle = (active: boolean) => ({
-    background: active ? "var(--t-gold)" : "transparent",
-    color: active ? "#2a1c10" : "var(--t-ink-soft)",
-  });
   const fieldStyle = {
     borderColor: "var(--t-panel-border)",
     background: "var(--t-panel-2)",
@@ -278,13 +292,10 @@ export function IconPicker({
             </span>
           </div>
           <div className="relative z-[1]">
-          <div className="mb-2 flex gap-1 text-xs">
-            <button type="button" onClick={() => setTab("library")} className="rounded-full px-2 py-1" style={tabBtnStyle(tab === "library")}>
-              Library
-            </button>
-            <button type="button" onClick={() => setTab("ai")} className="rounded-full px-2 py-1" style={tabBtnStyle(tab === "ai")}>
+          <div className="mb-2 flex items-center gap-2 text-xs">
+            <span className="text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
               ✨ Paint
-            </button>
+            </span>
             <span className="ml-auto flex items-center gap-2">
               {shownIcon && (
                 <button type="button" onClick={clear} disabled={isPending} style={{ color: "var(--t-ink-soft)" }}>
@@ -303,10 +314,92 @@ export function IconPicker({
             </span>
           </div>
 
-          {tab === "library" ? (
+
             <div className="flex flex-col gap-2">
+              <label className="text-[11.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }} htmlFor="portrait-prompt">
+                Painted from this description — change it or clear it
+              </label>
+              <div className="relative">
+                <textarea
+                  id="portrait-prompt"
+                  rows={3}
+                  value={aiPrompt}
+                  onChange={(e) => {
+                    setAiPrompt(e.target.value);
+                    setPromptEdited(true);
+                    onPromptChange?.(e.target.value);
+                  }}
+                  placeholder="Describe the portrait to paint…"
+                  className="w-full resize-none rounded border py-1 pl-2 pr-8 text-[13px] leading-snug"
+                  style={fieldStyle}
+                />
+                {aiPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiPrompt("");
+                      setPromptEdited(true);
+                      onPromptChange?.("");
+                    }}
+                    aria-label="Clear the description"
+                    title="Clear"
+                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-[15px] leading-none"
+                    style={{ color: "var(--t-ink-soft)" }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={generateIcon}
+                  disabled={isGeneratingIcon || !aiPrompt.trim()}
+                  className="hover-glow h-9 rounded-full px-4 text-[13px] font-semibold disabled:opacity-50"
+                  style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                >
+                  {isGeneratingIcon ? "Painting…" : "Paint portrait"}
+                </button>
+                {suggestedPrompt && aiPrompt !== suggestedPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiPrompt(suggestedPrompt);
+                      setPromptEdited(false);
+                      onPromptChange?.("");
+                    }}
+                    aria-label="Reset to the quest's own description"
+                    title="Reset to the quest's description"
+                    className="hover-glow ml-auto flex h-9 w-9 items-center justify-center rounded-full border"
+                    style={{ borderColor: "var(--t-panel-border)", color: "var(--t-ink-soft)" }}
+                  >
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M4 3.8v4.6h4.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              <p className="m-0 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                Takes a few seconds — you can keep editing while it paints.
+              </p>
+              {genError && (
+                <p className="text-xs" style={{ color: "var(--t-warn)" }}>
+                  {genError}
+                </p>
+              )}
+            </div>
+          {/* The library, under the paint section (shown unless hidden). */}
+          <button type="button" onClick={toggleLibrary} aria-expanded={libShown} className="mb-1 mt-3 flex min-h-8 w-full items-center gap-1.5 text-left text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: libShown ? "rotate(90deg)" : undefined }}>
+              <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Library
+            <span className="ml-auto text-[11.5px] font-normal underline">{libShown ? "Hide" : "Show"}</span>
+          </button>
+          {libShown && (
+            <div className="reveal flex flex-col gap-2">
               <input
-                autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search, e.g. book, dragon, fire…"
@@ -371,82 +464,10 @@ export function IconPicker({
                   ))}
                   {filteredLibrary?.length === 0 && (
                     <p className="col-span-5 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-                      No matches — try Generate instead.
+                      No matches — try painting one instead.
                     </p>
                   )}
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <label className="text-[11.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }} htmlFor="portrait-prompt">
-                Painted from this description — change it or clear it
-              </label>
-              <div className="relative">
-                <textarea
-                  id="portrait-prompt"
-                  rows={3}
-                  value={aiPrompt}
-                  onChange={(e) => {
-                    setAiPrompt(e.target.value);
-                    setPromptEdited(true);
-                  }}
-                  placeholder="Describe the portrait to paint…"
-                  className="w-full resize-none rounded border py-1 pl-2 pr-8 text-[13px] leading-snug"
-                  style={fieldStyle}
-                />
-                {aiPrompt && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAiPrompt("");
-                      setPromptEdited(true);
-                    }}
-                    aria-label="Clear the description"
-                    title="Clear"
-                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-[15px] leading-none"
-                    style={{ color: "var(--t-ink-soft)" }}
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={generateIcon}
-                  disabled={isGeneratingIcon || !aiPrompt.trim()}
-                  className="hover-glow h-9 rounded-full px-4 text-[13px] font-semibold disabled:opacity-50"
-                  style={{ background: "var(--t-gold)", color: "#2a1c10" }}
-                >
-                  {isGeneratingIcon ? "Painting…" : "Paint portrait"}
-                </button>
-                {suggestedPrompt && aiPrompt !== suggestedPrompt && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAiPrompt(suggestedPrompt);
-                      setPromptEdited(false);
-                    }}
-                    aria-label="Reset to the quest's own description"
-                    title="Reset to the quest's description"
-                    className="hover-glow ml-auto flex h-9 w-9 items-center justify-center rounded-full border"
-                    style={{ borderColor: "var(--t-panel-border)", color: "var(--t-ink-soft)" }}
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      <path d="M4 3.8v4.6h4.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              <p className="m-0 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                Takes a few seconds — you can keep editing while it paints.
-              </p>
-              {genError && (
-                <p className="text-xs" style={{ color: "var(--t-warn)" }}>
-                  {genError}
-                </p>
               )}
             </div>
           )}

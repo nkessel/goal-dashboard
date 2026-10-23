@@ -11,7 +11,6 @@ import { EditTaskModal } from "./EditTaskModal";
 import { earlyBirdBonus } from "@/lib/next-action";
 import { QuestActionMenu, SnoozeGlyph, type QuestAction } from "./QuestActionMenu";
 import { SequenceDialog, SequenceStack, stackPad } from "./Sequence";
-import { CreateSheet } from "@/components/create/CreateSheet";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { celebrateQuest, updateQuestCelebration } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
@@ -116,7 +115,6 @@ export function TaskRow({
   const [scheduling, setScheduling] = useState(false);
   const [doneEarlier, setDoneEarlier] = useState(false);
   const [sequencing, setSequencing] = useState(false);
-  const [followUp, setFollowUp] = useState(false);
   const queue = task.behind ?? [];
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -201,7 +199,6 @@ export function TaskRow({
     if (action === "focus") return openFocusMode({ ...task, categoryLabel });
     if (action === "earlier") return setDoneEarlier(true);
     if (action === "sequence") return setSequencing(true);
-    if (action === "followup") return setFollowUp(true);
     if (action === "nextstep") {
       startTransition(async () => {
         try {
@@ -628,7 +625,6 @@ export function TaskRow({
         />
       )}
       {sequencing && <SequenceDialog taskId={task.id} title={task.title} isAdventure={isAdventure} onClose={() => setSequencing(false)} />}
-      {followUp && <CreateSheet kinds={["quest"]} initial="quest" boardId={task.board_id ?? undefined} followUpOf={{ id: task.id, title: task.title }} theme={theme} onClose={() => setFollowUp(false)} />}
       {doneEarlier && (
         <DoneEarlierDialog
           title={task.title}

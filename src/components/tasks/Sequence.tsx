@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { findQuestsAction, sequenceDetachAction, sequenceLinkAction, sequenceMoveAction, sequenceOfAction } from "@/app/actions";
+import { findQuestsAction, listQuestStepsAction, sequenceDetachAction, sequenceLinkAction, sequenceMoveAction, sequenceOfAction, stepsToSequenceAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 import type { SequenceItem } from "@/lib/data/sequences";
 
@@ -251,17 +251,22 @@ export function QuestPicker({ exclude, onPick, autoFocus = false, placeholder = 
 
 /**
  * The whole sequence a quest belongs to, front to back: move quests up and
- * down, take them out, and add quests before or after this one.
+ * down, take them out, add quests before or after this one, or turn the
+ * quest's steps into a sequence of quests (a project).
  */
-export function SequenceDialog({ taskId, title, isAdventure, onClose }: { taskId: string; title: string; isAdventure: boolean; onClose: () => void }) {
+export function SequenceDialog({ taskId, title, isAdventure, onClose, onStepsMoved }: { taskId: string; title: string; isAdventure: boolean; onClose: () => void; onStepsMoved?: () => void }) {
   const router = useRouter();
   const [chain, setChain] = useState<SequenceItem[] | null>(null);
   const [where, setWhere] = useState<"before" | "after">("after");
   const [error, setError] = useState<string | null>(null);
   const [busy, start] = useTransition();
   useEscape(onClose);
+  // Open top-level steps that could each become a quest of their own.
+  const [openSteps, setOpenSteps] = useState(0);
+  const [confirmSteps, setConfirmSteps] = useState(false);
   useEffect(() => {
     sequenceOfAction(taskId).then(setChain, () => setError("Couldn't load the sequence."));
+    listQuestStepsAction(taskId).then((rows) => setOpenSteps((rows ?? []).filter((r) => !r.parent_id && !r.done && !r.state).length), () => {});
   }, [taskId]);
   const run = (fn: () => Promise<SequenceItem[]>) =>
     start(async () => {
@@ -289,7 +294,7 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose }: { taskId
           ×
         </button>
         <div className="relative z-[1] flex flex-col gap-0.5 pr-8">
-          <p className={`m-0 text-[19px] ${isAdventure ? "font-display" : "font-bold"}`}>Sequence</p>
+          <p className={`m-0 text-[19px] ${isAdventure ? "font-display" : "font-bold"}`}>{chain && chain.length > 1 ? "Sequence" : "Create a sequence"}</p>
           <p className="m-0 text-[13.5px]" style={{ color: ink }}>
             One quest at a time: each waits, stacked out of sight, until the one before it is done.
           </p>
@@ -356,6 +361,45 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose }: { taskId
           </div>
           <QuestPicker exclude={(chain ?? []).map((c) => c.id)} onPick={(p) => run(() => sequenceLinkAction(taskId, where, "id" in p ? { id: p.id } : { title: p.title }))} />
         </div>
+        {/* A project: its steps become quests of their own, one after another, with this quest last. */}
+        {openSteps > 0 && (
+          <div className="relative z-[1] flex flex-col gap-1.5 rounded-xl p-3" style={{ border: "1px dashed rgba(140,110,60,.5)" }}>
+            {!confirmSteps ? (
+              <button type="button" disabled={busy} onClick={() => setConfirmSteps(true)} className="flex min-h-9 items-center gap-2 text-left text-[14px] font-semibold disabled:opacity-50">
+                <StackMini />
+                Turn its {openSteps} {openSteps === 1 ? "step" : "steps"} into a sequence of quests
+              </button>
+            ) : (
+              <>
+                <p className="m-0 text-[13.5px]">
+                  Each open step becomes its own quest, in order, ahead of “{title}”. This quest comes last and closes the project out.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      run(async () => {
+                        const next = await stepsToSequenceAction(taskId);
+                        setOpenSteps(0);
+                        setConfirmSteps(false);
+                        onStepsMoved?.();
+                        return next;
+                      })
+                    }
+                    className="h-9 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-50"
+                    style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10" }}
+                  >
+                    Make the sequence
+                  </button>
+                  <button type="button" onClick={() => setConfirmSteps(false)} className="h-9 px-2 text-[13.5px] underline" style={{ color: ink }}>
+                    Not now
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
         {error && (
           <p role="alert" className="relative z-[1] m-0 text-[13.5px]" style={{ color: "var(--t-warn)" }}>
             {error}

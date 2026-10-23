@@ -3194,6 +3194,50 @@ export async function sequenceLinkAction(anchorId: string, where: "before" | "af
   return seq.sequenceOf(ownerId, anchorId);
 }
 
+/**
+ * Turn a quest into a project: each of its open top-level steps becomes its
+ * own quest, in order, ahead of this one (their sub-tasks come along as their
+ * steps). The quest itself comes last and closes the project out.
+ */
+export async function stepsToSequenceAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  const seq = await import("@/lib/data/sequences");
+  const anchor = await tasksData.getTask(taskId, ownerId);
+  if (!anchor) throw new Error("That quest isn't there any more.");
+  const all = (await stepsData.listStepsForTask(taskId, ownerId)) ?? [];
+  const tops = all.filter((s) => !s.parent_id && !s.done && !s.state);
+  if (!tops.length) throw new Error("This quest has no open steps to turn into quests.");
+  const under = (id: string): typeof all => all.filter((s) => s.parent_id === id).flatMap((s) => [s, ...under(s.id)]);
+  const moved = new Set<string>();
+  for (const [i, st] of tops.entries()) {
+    const made = await tasksData.createTask(ownerId, {
+      title: st.title.slice(0, 200),
+      boardId: anchor.board_id ?? null,
+      goalId: anchor.goal_id ?? null,
+      // The first one takes the project's place on Today.
+      isManualPriority: i === 0 && !!anchor.is_manual_priority,
+    });
+    await seq.placeBefore(ownerId, made.id, taskId);
+    const kids = under(st.id);
+    if (kids.length) {
+      await stepsData.replaceSteps(
+        made.id,
+        ownerId,
+        kids.map((k) => ({ key: k.id, parentKey: k.parent_id === st.id ? null : (k.parent_id ?? null), title: k.title, done: k.done, xp: k.xp ?? 0, weight: k.weight ?? null, progress: k.progress ?? 0, state: k.state ?? null }))
+      );
+    }
+    moved.add(st.id);
+    for (const k of kids) moved.add(k.id);
+  }
+  await stepsData.replaceSteps(
+    taskId,
+    ownerId,
+    all.filter((s) => !moved.has(s.id)).map((s) => ({ id: s.id, key: s.id, parentKey: s.parent_id ?? null, title: s.title, done: s.done, xp: s.xp ?? 0, weight: s.weight ?? null, progress: s.progress ?? 0, state: s.state ?? null }))
+  );
+  revalidatePath("/", "layout");
+  return seq.sequenceOf(ownerId, taskId);
+}
+
 /** Take a quest out of its sequence (the rest close up). */
 export async function sequenceDetachAction(taskId: string, viewFrom?: string) {
   const ownerId = await requireProfileId();
