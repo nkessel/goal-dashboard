@@ -10,6 +10,7 @@ import { getProfileById } from "@/lib/data/profiles";
 import { attachNextSteps } from "@/lib/data/steps";
 import { listEnergySince } from "@/lib/data/energy";
 import { xpToNextLevel } from "@/lib/data/xp";
+import { levelCap } from "@/lib/data/bosses";
 import {
   listCompletedTasksForOwner,
   listOpenTasksWithBoardForOwner,
@@ -37,7 +38,7 @@ export default async function MatrixPage({
 
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
-  const level = profile ? xpToNextLevel(profile.total_xp).level : 1;
+  const level = profile ? xpToNextLevel(profile.total_xp, await levelCap(session.user.id).catch(() => 10)).level : 1;
   const victoriesStyle = {
     background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
     border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,

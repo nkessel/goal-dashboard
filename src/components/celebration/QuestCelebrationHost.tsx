@@ -36,7 +36,7 @@ export function celebrateProgress(detail: ProgressCelebrationDetail) {
 }
 
 /** App-wide: shows the Quest Complete scene, then Choose a Reward / Continue. */
-export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { avatarSrc: string; totalXp: number }) {
+export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp, levelCap = 10 }: { avatarSrc: string; totalXp: number; levelCap?: number }) {
   const [current, setCurrent] = useState<QuestCelebration | null>(null);
   const [progress, setProgress] = useState<(ProgressCelebrationDetail & { n: number }) | null>(null);
   const [reward, setReward] = useState<(RewardCelebrationDetail & { n: number }) | null>(null);
@@ -46,7 +46,7 @@ export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { ava
     window.addEventListener("reward-celebrate", on);
     return () => window.removeEventListener("reward-celebrate", on);
   }, []);
-  const rewardScene = reward ? <RewardCelebration key={reward.n} {...reward} onClose={() => setReward(null)} /> : null;
+  const rewardScene = reward ? <RewardCelebration key={reward.n} {...reward} levelCap={levelCap} onClose={() => setReward(null)} /> : null;
 
   useEffect(() => {
     const on = (e: Event) => setCurrent((e as CustomEvent<QuestCelebration>).detail);
@@ -79,7 +79,7 @@ export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp }: { ava
     );
   }
   const total = current.totalXp ?? shellTotalXp + current.xp;
-  const { level, xpIntoLevel, xpForNextLevel } = xpToNextLevel(total);
+  const { level, xpIntoLevel, xpForNextLevel } = xpToNextLevel(total, levelCap);
 
   return (
     <>

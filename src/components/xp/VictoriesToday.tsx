@@ -8,6 +8,7 @@ import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { SectionTitle } from "@/components/ui/Ornaments";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { journalKindMeta, splitKindPrefix } from "@/lib/journal-kinds";
+import { setVisualFx, useVisualFx } from "@/lib/visual-fx";
 
 const noop = () => () => {};
 
@@ -67,6 +68,10 @@ export function VictoriesToday({
   // "Today" runs 5:30am to 5:30am, so a late night still counts.
   const today = useSyncExternalStore(noop, () => eveningDayKey(), () => null);
   const [editing, setEditing] = useState<Task | null>(null);
+  // A tap on a victory shows a small card first; Edit from there opens the editor.
+  const [preview, setPreview] = useState<Task | null>(null);
+  const fx = useVisualFx();
+  const closed = fx.victoriesClosed;
 
   const isToday = (iso: string | null) => !!iso && today !== null && eveningDayKey(new Date(iso)) === today;
   const loginToday = isToday(lastCheckInAt);
@@ -100,6 +105,9 @@ export function VictoriesToday({
   const todaysJournal = todaysAll.filter((j) => !isFeedbackKind(j.kind));
   const totalXp =
     (loginToday ? 5 : 0) + todaysAllQuests.reduce((n, t) => n + t.xp_value, 0) + todaysRites.reduce((n, r) => n + r.xp, 0) + feedbackXp;
+  const victoryCount = (loginToday ? 1 : 0) + todays.length + todaysRites.length + (todaysFeedback.length ? 1 : 0) + todaysJournal.length + todaysRewards.length;
+  const coinsToday = todaysAllQuests.reduce((n, t) => n + questCoins(t), 0) + todaysReceived.reduce((n, r) => n + (r.bonus_coins ?? 0), 0);
+  const latest = [...todays].sort((a, b) => ((b.logged_at ?? b.completed_at ?? "") > (a.logged_at ?? a.completed_at ?? "") ? 1 : -1))[0]?.title ?? null;
   const empty = !loginToday && todays.length === 0 && todaysRewards.length === 0 && todaysRites.length === 0 && todaysJournal.length === 0 && todaysFeedback.length === 0;
 
   const rowCls = "flex min-h-[44px] items-center gap-3 py-2 text-[16.5px]";
@@ -111,6 +119,13 @@ export function VictoriesToday({
       className={`flex flex-col rounded-2xl px-5 pb-3 pt-4 ${isAdventure ? "parchment parchment-framed" : ""}`}
       style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >
+      <button
+        type="button"
+        onClick={() => setVisualFx({ victoriesClosed: !closed })}
+        aria-expanded={!closed}
+        title={closed ? "Open Victories Today" : "Close Victories Today"}
+        className="flex w-full cursor-pointer flex-col items-stretch text-left"
+      >
       {isAdventure ? (
         <SectionTitle
           as="h2"
@@ -122,10 +137,22 @@ export function VictoriesToday({
             </span>
           }
         >
-          Victories Today
+          <span className="inline-flex items-center gap-1.5">
+            Victories Today
+            <Caret open={!closed} />
+          </span>
         </SectionTitle>
       ) : null}
-      {isAdventure ? (
+      {closed ? (
+        <ClosedSummary
+          parts={[
+            fx.victoriesShowXp ? <>Today&apos;s XP: <span className="font-semibold">{totalXp}</span></> : null,
+            fx.victoriesShowCount && victoryCount > 0 ? <>{victoryCount} {victoryCount === 1 ? "victory" : "victories"}</> : null,
+            fx.victoriesShowCoins && coinsToday > 0 ? <span className="inline-flex items-center gap-0.5"><CoinIcon size={13} />+{coinsToday}</span> : null,
+            fx.victoriesShowLatest && latest ? <span className="truncate italic">{latest}</span> : null,
+          ]}
+        />
+      ) : isAdventure ? (
         <p className="m-0 mt-1 text-center text-[14.5px] sm:hidden" style={{ color: "var(--t-ink)" }}>
           Today&apos;s XP: <span className="font-semibold">{totalXp}</span>
         </p>
@@ -139,8 +166,9 @@ export function VictoriesToday({
           </span>
         </div>
       )}
+      </button>
 
-      <ul className="mt-2 flex flex-col">
+      {!closed && <ul className="mt-2 flex flex-col">
         {loginToday && (
           <li className={rowCls} style={{ color: "var(--t-ink)" }}>
             <Seal kind="check" />
@@ -152,8 +180,8 @@ export function VictoriesToday({
           <li key={t.id} style={loginToday || i > 0 ? divider : undefined}>
             <button
               type="button"
-              onClick={() => setEditing(t)}
-              title="Edit this victory"
+              onClick={() => setPreview(t)}
+              title="See this victory"
               className={`${rowCls} w-full rounded-md text-left hover:bg-black/[.04]`}
               style={{ color: "var(--t-ink)" }}
             >
@@ -210,7 +238,7 @@ export function VictoriesToday({
             <Seal kind="gift" />
             <span className="min-w-0 flex-1 break-words leading-snug">
               <span style={{ color: "var(--t-ink-soft)" }}>
-                {receivedIds.has(r.id) ? (isAdventure ? "Treasure received: " : "Reward received: ") : isAdventure ? "Treasure accepted: " : "Reward accepted: "}
+                {receivedIds.has(r.id) ? "Reward received: " : "Reward accepted: "}
               </span>
               {r.title}
             </span>
@@ -227,23 +255,90 @@ export function VictoriesToday({
             Nothing completed yet today — you&apos;ve got this.
           </li>
         )}
-      </ul>
+      </ul>}
 
+      {preview && (
+        <VictoryPreview
+          task={preview}
+          coins={questCoins(preview)}
+          note={doneEarlier(preview)}
+          onEdit={() => {
+            setEditing(preview);
+            setPreview(null);
+          }}
+          onClose={() => setPreview(null)}
+        />
+      )}
       {editing && <EditTaskModal task={editing} theme={theme} onClose={() => setEditing(null)} />}
     </section>
   );
 }
 
-/** "+20 XP · 🪙 1" at the end of a victory line (each part only when there is some). */
+/** "🪙 1 · +20 XP" at the end of a victory line (each part only when there is some). */
 function XpCoins({ xp, coins, xpStyle }: { xp: number; coins: number; xpStyle: React.CSSProperties }) {
   return (
     <span className="flex shrink-0 items-center gap-2 tabular-nums" style={xpStyle}>
-      {xp > 0 && <span>+{xp} XP</span>}
+      {/* Coins first, so the XP always lines up along the right edge. */}
       {coins > 0 && (
         <span className="flex items-center gap-0.5" style={{ color: "#8a6116" }}>
           <CoinIcon size={14} />+{coins}
         </span>
       )}
+      {xp > 0 && <span>+{xp} XP</span>}
     </span>
+  );
+}
+
+function Caret({ open }: { open: boolean }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ transform: open ? "rotate(180deg)" : undefined }}>
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The closed section's one line: whatever Settings chose to show, joined with dots. */
+function ClosedSummary({ parts }: { parts: React.ReactNode[] }) {
+  const shown = parts.filter(Boolean);
+  if (!shown.length) return null;
+  return (
+    <p className="m-0 mt-1.5 flex min-w-0 items-center justify-center gap-2 text-center text-[14.5px]" style={{ color: "var(--t-ink)" }}>
+      {shown.map((p, i) => (
+        <span key={i} className="flex min-w-0 items-center gap-2">
+          {i > 0 && <span aria-hidden style={{ color: "var(--t-ink-soft)" }}>·</span>}
+          {p}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/** A small card for one victory, before the full editor. */
+function VictoryPreview({ task, coins, note, onEdit, onClose }: { task: Task; coins: number; note: string | null; onEdit: () => void; onClose: () => void }) {
+  const when = task.completed_at ? new Date(task.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null;
+  return (
+    <div role="dialog" aria-modal="true" aria-label={task.title} onClick={onClose} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6">
+      <div onClick={(e) => e.stopPropagation()} className="parchment parchment-framed relative flex w-full max-w-sm flex-col gap-3 rounded-2xl p-5" style={{ color: "var(--t-ink)" }}>
+        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-2.5 cursor-pointer text-xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
+          ×
+        </button>
+        <div className="flex items-start gap-3 pr-5">
+          <Seal kind="check" />
+          <div className="min-w-0">
+            <h3 className="font-display m-0 text-[19px] leading-snug">{task.title}</h3>
+            <p className="m-0 mt-0.5 text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
+              {note ? `Done ${note}` : when ? `Done at ${when}` : "Done today"}
+            </p>
+          </div>
+        </div>
+        {task.description && <p className="m-0 line-clamp-4 whitespace-pre-wrap text-[14.5px] leading-snug">{task.description}</p>}
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <XpCoins xp={task.xp_value} coins={coins} xpStyle={{ color: "var(--t-ink)", fontSize: 16 }} />
+          <button type="button" onClick={onEdit} className="hover-glow h-10 cursor-pointer rounded-lg px-4 text-sm font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+            Edit
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import { countUnread, syncImportsNotification } from "@/lib/data/notifications";
 import { getProfileById } from "@/lib/data/profiles";
+import { levelCap } from "@/lib/data/bosses";
 import { WeatherSync } from "@/components/ui/WeatherSync";
 import { TopRightAvatar } from "@/components/layout/TopRightAvatar";
 import { isPalette } from "@/lib/palettes";
@@ -47,12 +48,14 @@ export async function AppShell({
 }) {
   // Everything at once, so opening a screen never waits on one query after another.
   const importsP = profileId ? countImports(profileId) : Promise.resolve({ quests: 0, rewards: 0 });
-  const [profile, , missingPortraits, unreadCount] = await Promise.all([
+  const [profile, , missingPortraits, unreadCount, cap] = await Promise.all([
     profileId ? getProfileById(profileId) : Promise.resolve(null),
     // Imports waiting to be sorted show up as a notification (no popup, no badge on the avatar).
     profileId ? importsP.then((i) => syncImportsNotification(profileId, i.quests + i.rewards)).catch(() => {}) : Promise.resolve(),
     profileId ? countMissingPortraits(profileId).catch(() => 0) : Promise.resolve(0),
     profileId ? countUnread(profileId) : Promise.resolve(0),
+    // An undefeated boss holds the level shown in celebrations, however much XP there is.
+    profileId ? levelCap(profileId).catch(() => 10) : Promise.resolve(10),
   ]);
   const theme = profile?.theme === "adventure" ? "adventure" : "calm";
   const rawPalette = (profile?.life_wheel as { palette?: unknown } | null | undefined)?.palette;
@@ -66,12 +69,13 @@ export async function AppShell({
   return (
     <div data-theme={theme} data-palette={palette} className="flex min-h-screen flex-col items-center">
       <ThemeOnBody theme={theme} palette={palette ?? null} />
-      {profileId && <DailyLogin />}
+      {profileId && <DailyLogin levelCap={cap} />}
       {profileId && missingPortraits > 0 && <PortraitPainter missing={missingPortraits} />}
       {profileId && profile && (
         <QuestCelebrationHost
           avatarSrc={profile.avatar_image_url ?? defaultPortraitFor(profile.id)}
           totalXp={profile.total_xp}
+          levelCap={cap}
         />
       )}
       <div className={`flex w-full flex-1 flex-col ${widthClass}`}>

@@ -30,7 +30,7 @@ type Award = { xp: number; streak: number; coins: number; fromPct: number; toPct
  * counting up. The server ignores repeat check-ins the same day; the
  * per-browser flag just avoids asking again on every screen.
  */
-export function DailyLogin() {
+export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   const router = useRouter();
   const [award, setAward] = useState<Award | null>(null);
   const [line, setLine] = useState<string | null>(null);
@@ -53,8 +53,8 @@ export function DailyLogin() {
         let toPct = 100;
         let caption = `${r.streakCount}-day streak`;
         if (total !== null) {
-          const after = xpToNextLevel(total);
-          const before = xpToNextLevel(Math.max(0, total - r.xpAwarded));
+          const after = xpToNextLevel(total, levelCap);
+          const before = xpToNextLevel(Math.max(0, total - r.xpAwarded), levelCap);
           if (after.xpForNextLevel) {
             toPct = Math.round((after.xpIntoLevel / after.xpForNextLevel) * 100);
             fromPct = before.level === after.level && before.xpForNextLevel ? Math.round((before.xpIntoLevel / before.xpForNextLevel) * 100) : 0;
@@ -66,7 +66,7 @@ export function DailyLogin() {
         router.refresh();
       })
       .catch(() => {});
-  }, [router]);
+  }, [router, levelCap]);
 
   if (!award) return null;
   return (

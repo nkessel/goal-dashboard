@@ -37,7 +37,7 @@ const ease = (t: number) => 1 - Math.pow(1 - t, 3);
  * turn behind the reward's portrait, coins burst out, the XP counts up and
  * the level bar fills. It stays until tapped, so it can be enjoyed.
  */
-export function RewardCelebration({ title, iconSrc, xp, coins, totalXp, onClose }: RewardCelebrationDetail & { onClose: () => void }) {
+export function RewardCelebration({ title, iconSrc, xp, coins, totalXp, levelCap = 10, onClose }: RewardCelebrationDetail & { levelCap?: number; onClose: () => void }) {
   const [t, setT] = useState(0);
   const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   useEffect(() => {
@@ -67,7 +67,7 @@ export function RewardCelebration({ title, iconSrc, xp, coins, totalXp, onClose 
   const xpShown = Math.round(xp * count(0.2, 0.75));
   const coinsShown = Math.round(coins * count(0.3, 0.8));
   const after = totalXp ?? null;
-  const lv = after !== null ? xpToNextLevel(after) : null;
+  const lv = after !== null ? xpToNextLevel(after, levelCap) : null;
   const beforeInto = lv ? Math.max(0, lv.xpIntoLevel - xp) : 0;
   const fill = lv && lv.xpForNextLevel ? (beforeInto + (lv.xpIntoLevel - beforeInto) * count(0.45, 1)) / lv.xpForNextLevel : null;
 

@@ -10,6 +10,7 @@ import { listWinsSince } from "@/lib/data/wins";
 import { getCheckMetrics, listCheckInsSince, listEnergySince } from "@/lib/data/energy";
 import { getStats } from "@/lib/data/stats";
 import { xpToNextLevel } from "@/lib/levels";
+import { levelCap } from "@/lib/data/bosses";
 import { SHARE_SCREENS, shares, type ShareKey } from "@/lib/sharing";
 import { shownLevel } from "@/lib/shown-level";
 import { Avatar } from "@/components/settings/Avatar";
@@ -55,8 +56,8 @@ export default async function FriendProfilePage({ params, searchParams }: { para
   const share = await getShareSettings(id);
   const open = SHARE_SCREENS.filter((s) => shares(share, s.key));
   const tab: ShareKey | null = open.find((s) => s.key === tabParam)?.key ?? open[0]?.key ?? null;
-  const [champion, stats] = await Promise.all([getChampion(), getStats(id)]);
-  const lv = xpToNextLevel(friend.total_xp);
+  const [champion, stats, cap] = await Promise.all([getChampion(), getStats(id), levelCap(id).catch(() => 10)]);
+  const lv = xpToNextLevel(friend.total_xp, cap);
   const first = friend.name?.split(" ")[0] ?? "They";
 
   return (

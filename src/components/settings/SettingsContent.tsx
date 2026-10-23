@@ -23,24 +23,26 @@ import { SettingsRow } from "@/components/settings/SettingsRow";
 import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import { CelebrationSettings } from "@/components/settings/CelebrationSettings";
-import { EveningButtonFxSettings } from "@/components/settings/VisualFxSettings";
+import { EveningButtonFxSettings, VictoriesHeaderSettings } from "@/components/settings/VisualFxSettings";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { isAdmin, countUnreviewed } from "@/lib/data/feedback";
 import { ChatIcon } from "@/components/feedback/FeedbackDock";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
 import { getProfileById } from "@/lib/data/profiles";
 import { xpToNextLevel } from "@/lib/data/xp";
+import { levelCap } from "@/lib/data/bosses";
 
 const ICON_STROKE = { strokeWidth: 1.6, fill: "none" as const };
 
 /** Everything in Settings below its title — shared by the Settings page and the slide-out menu. */
 export async function SettingsContent({ userId, open }: { userId: string; open?: string }) {
-  const [session, profile, imports, admin, missionSteps] = await Promise.all([
+  const [session, profile, imports, admin, missionSteps, cap] = await Promise.all([
     auth(),
     getProfileById(userId),
     countImports(userId).catch(() => ({ quests: 0, rewards: 0 })),
     isAdmin(userId),
     listMissionSteps(userId).catch(() => []),
+    levelCap(userId).catch(() => 10),
   ]);
   const newFeedback = admin ? await countUnreviewed() : 0;
   if (!profile) notFound();
@@ -48,7 +50,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
   const isAdventure = profile.theme === "adventure";
   const refillCount = (profile.life_wheel?.inventory?.items ?? []).filter((i) => i.status === "empty").length;
   const iconColor = isAdventure ? "#7a5f2a" : "var(--t-accent)";
-  const { level, nextLevel, xpIntoLevel, xpForNextLevel } = xpToNextLevel(profile.total_xp);
+  const { level, nextLevel, xpIntoLevel, xpForNextLevel } = xpToNextLevel(profile.total_xp, cap);
   const pct = xpForNextLevel ? Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100)) : 100;
   const themeLabel = isAdventure ? "Adventure" : "Calm (Default)";
 
@@ -382,7 +384,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Visual Effects"
-            rightLabel="Celebrations · Evening"
+            rightLabel="Celebrations · Evening · Victories"
             icon={<span style={{ fontSize: 14 }}>✨</span>}
           >
             <div className="flex flex-col gap-5">
@@ -396,6 +398,13 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
                 <h4 className={`m-0 mb-2 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>Evening Routine button</h4>
                 <EveningButtonFxSettings />
+              </div>
+              <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
+                <h4 className={`m-0 mb-1 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>Victories Today, when closed</h4>
+                <p className="mb-2 text-xs" style={{ color: "var(--t-ink-soft)" }}>
+                  Tap its title to close it. Its header then shows:
+                </p>
+                <VictoriesHeaderSettings />
               </div>
               <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
                 Saved on this device.

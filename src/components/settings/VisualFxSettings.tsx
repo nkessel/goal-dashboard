@@ -23,12 +23,34 @@ export function EveningButtonFxSettings() {
       ))}
       <button
         type="button"
-        onClick={() => setVisualFx({ ...VISUAL_FX_DEFAULTS })}
+        onClick={() => setVisualFx(Object.fromEntries(EVENING.map(({ k }) => [k, VISUAL_FX_DEFAULTS[k]])))}
         className="hover-glow h-10 w-fit rounded-lg px-4 text-sm font-medium"
         style={{ border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}
       >
         Reset
       </button>
+    </div>
+  );
+}
+
+const VICTORIES: { k: keyof VisualFx; label: string }[] = [
+  { k: "victoriesShowXp", label: "Today's XP" },
+  { k: "victoriesShowCount", label: "How many victories" },
+  { k: "victoriesShowCoins", label: "Coins earned today" },
+  { k: "victoriesShowLatest", label: "The latest victory" },
+];
+
+/** What Victories Today shows in its header while it's closed. */
+export function VictoriesHeaderSettings() {
+  const fx = useVisualFx();
+  return (
+    <div className="flex flex-col gap-1.5" style={{ color: "var(--t-ink)" }}>
+      {VICTORIES.map(({ k, label }) => (
+        <label key={k} className="flex min-h-9 items-center gap-2.5 text-sm">
+          <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={!!fx[k]} onChange={() => setVisualFx({ [k]: !fx[k] })} />
+          {label}
+        </label>
+      ))}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { LevelPill } from "@/components/social/LevelPill";
 import { shownLevel } from "@/lib/shown-level";
 import { Avatar } from "@/components/settings/Avatar";
 import { xpToNextLevel } from "@/lib/data/xp";
+import { levelCap } from "@/lib/data/bosses";
 import {
   getFriendshipMap,
   listFriendIds,
@@ -71,7 +72,7 @@ export default async function FeedPage() {
 
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
-  const level = profile ? xpToNextLevel(profile.total_xp).level : 1;
+  const level = profile ? xpToNextLevel(profile.total_xp, await levelCap(session.user.id).catch(() => 10)).level : 1;
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>

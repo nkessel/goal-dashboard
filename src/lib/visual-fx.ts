@@ -13,12 +13,24 @@ export type VisualFx = {
   eveningBorderShimmer: boolean;
   /** Evening Routine button: stars gently fading in and out. */
   eveningStarTwinkle: boolean;
+  /** Victories Today is folded closed. */
+  victoriesClosed: boolean;
+  /** What a closed Victories Today shows in its header. */
+  victoriesShowXp: boolean;
+  victoriesShowCount: boolean;
+  victoriesShowCoins: boolean;
+  victoriesShowLatest: boolean;
 };
 
 export const VISUAL_FX_DEFAULTS: VisualFx = {
   eveningStarShimmer: true,
   eveningBorderShimmer: false,
   eveningStarTwinkle: true,
+  victoriesClosed: false,
+  victoriesShowXp: true,
+  victoriesShowCount: true,
+  victoriesShowCoins: false,
+  victoriesShowLatest: false,
 };
 
 const KEY = "visual-fx";
