@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { RememberView } from "@/components/calendar/RememberView";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
@@ -51,7 +53,12 @@ export default async function CalendarPage({
   searchParams: Promise<{ view?: string; date?: string; n?: string }>;
 }) {
   const session = await requireSession();
-  const { view: viewParam, date: dateParam, n: nParam } = await searchParams;
+  const params = await searchParams;
+  // No view in the link: open on the view used last time.
+  const remembered = params.view ? null : decodeURIComponent((await cookies()).get("cal-view")?.value ?? "").split("|");
+  const viewParam = params.view ?? remembered?.[0];
+  const nParam = params.n ?? remembered?.[1];
+  const dateParam = params.date;
   const view = parseView(viewParam);
   // "Days" shows any number of days from 1 to 7 (the slider in the calendar's settings).
   const nDays = view === "3day" ? 3 : Math.max(1, Math.min(7, Math.round(Number(nParam) || 2)));
@@ -143,6 +150,7 @@ export default async function CalendarPage({
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex gap-4">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <RememberView view={view} n={nDays} />
         <PageHeader isAdventure={isAdventure} title="Quest Calendar" calmTitle="Calendar" />
         {!session.googleAccessToken && <ConnectCalendar isAdventure={isAdventure} />}
 

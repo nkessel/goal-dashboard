@@ -96,14 +96,15 @@ function isTyping(el: EventTarget | null) {
   return t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
 }
 
-/** Unless you choose: 1 XP per paragraph, up to 3. */
+/** Most XP one note can earn, however long it runs. */
+const XP_MAX = 12;
+/** Unless you choose: 1 XP per paragraph. */
 function paragraphs(body: string) {
   return body.split(/\n+/).filter((p) => p.trim().length > 0).length;
 }
-/** 1 XP per paragraph, up to 3, and a secret +4 once a note runs to six paragraphs. */
+/** 1 XP per paragraph, and it keeps growing past 3 (up to XP_MAX). */
 function autoXp(body: string) {
-  const n = paragraphs(body);
-  return n >= 6 ? 4 : Math.max(1, Math.min(3, n));
+  return Math.max(1, Math.min(XP_MAX, paragraphs(body)));
 }
 /** The XP a note earns: your pick if you made one on purpose, otherwise its paragraphs. */
 const xpOf = (d: { body: string; xp?: number; xpPicked?: boolean }) => (d.xpPicked && d.xp ? d.xp : autoXp(d.body));
@@ -912,7 +913,8 @@ function Composer({
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null);
   const xp = xpOf(draft);
-  const secret = paragraphs(draft.body) >= 6;
+  // Past three paragraphs, the note's own count joins the choices.
+  const long = Math.min(XP_MAX, paragraphs(draft.body));
   const [uploading, setUploading] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
   // Tap an attachment to see it full size.
@@ -959,7 +961,7 @@ function Composer({
           // Straight on to writing.
           textRef.current?.focus();
         }}
-        options={[...XP_CHOICES, ...(secret ? [4] : [])].map((n) => ({ value: n, label: n === 4 ? "+4 ✦" : `+${n}`, hint: n === 4 ? "A secret bonus for a full six paragraphs" : `Earn ${n} XP for this feedback` }))}
+        options={[...XP_CHOICES, ...(long > 3 ? [long] : [])].map((n) => ({ value: n, label: n > 3 ? `+${n} ✦` : `+${n}`, hint: n > 3 ? `${n} paragraphs, ${n} XP` : `Earn ${n} XP for this feedback` }))}
       />
       <div className="relative flex min-h-0 flex-1 flex-col">
       <textarea

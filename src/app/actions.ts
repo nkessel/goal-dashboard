@@ -1614,8 +1614,8 @@ export async function listJournalAction() {
 }
 
 /**
- * A journal entry, or a piece of feedback. Feedback earns the 1–3 XP its
- * writer picked (`feedbackXp`); the result says how much was paid.
+ * A journal entry, or a piece of feedback. Feedback earns the XP its writer
+ * picked or its paragraphs earned (`feedbackXp`); the result says how much was paid.
  */
 export async function addJournalEntryAction(body: string, mood: number | null, kind: string | null = null, feedbackXp = 0, attachments: string[] = []) {
   const { id: ownerId, name } = await requireIdentity();
@@ -1623,7 +1623,8 @@ export async function addJournalEntryAction(body: string, mood: number | null, k
   if (!text) throw new Error("Write something first.");
   const k = kind && /^[a-z]{2,20}$/.test(kind) ? kind : null;
   const isFeedback = !!k && (feedbackData.FEEDBACK_KINDS as readonly string[]).includes(k);
-  const xpAwarded = isFeedback ? Math.max(0, Math.min(4, Math.round(feedbackXp))) : 0;
+  // 1 XP per paragraph, growing past three, up to 12.
+  const xpAwarded = isFeedback ? Math.max(0, Math.min(12, Math.round(feedbackXp))) : 0;
   const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null, k, xpAwarded);
   const pics = attachments.filter((u) => typeof u === "string" && /^https:\/\/[^\s]+\/feedback\//.test(u)).slice(0, 4);
   if (pics.length) await journalData.setAttachments(ownerId, entry.id, pics).catch(() => {});

@@ -20,10 +20,13 @@ function StatTile({
   iconSrc,
   value,
   label,
+  long = false,
 }: {
   iconSrc: string;
-  value: number;
+  value: React.ReactNode;
   label: React.ReactNode;
+  /** A long number steps down a size so both columns keep the same weight. */
+  long?: boolean;
 }) {
   // Sized to the Today's Quests reference: large painted icon, big serif number, two-line caption.
   return (
@@ -31,7 +34,7 @@ function StatTile({
       {/* eslint-disable-next-line @next/next/no-img-element -- static /design asset */}
       <img src={iconSrc} alt="" width={42} height={42} className="h-8 w-8 shrink-0 object-contain sm:h-[42px] sm:w-[42px]" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45))" }} />
       <div className="flex flex-col">
-        <span className="font-display text-[21px] leading-none sm:text-[25px]" style={{ color: "var(--t-cream)" }}>
+        <span className={`font-display whitespace-nowrap leading-none ${long ? "text-[18px] sm:text-[22px]" : "text-[21px] sm:text-[25px]"}`} style={{ color: "var(--t-cream)" }}>
           {value}
         </span>
         <span className="mt-1 text-[12.5px] leading-[1.15] sm:text-[14px]" style={{ color: "var(--t-cream)", opacity: 0.9 }}>
@@ -181,7 +184,17 @@ export function XpSummary({
           </div>
 
           <div className="flex flex-col gap-5 justify-self-center sm:gap-6">
-            <StatTile iconSrc="/design/ui-xpshield.png" value={stats?.xpThisWeek ?? 0} label={<>XP this<br />week</>} />
+            <StatTile
+              iconSrc="/design/ui-xpshield.png"
+              value={
+                <>
+                  +{(stats?.xpThisWeek ?? 0).toLocaleString("en-US")}
+                  <span className="ml-0.5 text-[0.62em]">XP</span>
+                </>
+              }
+              long={(stats?.xpThisWeek ?? 0) >= 1000}
+              label={<>this<br />week</>}
+            />
             <StatTile iconSrc="/design/ui-party-simple.svg" value={stats?.partySize ?? 0} label={<>Party<br />Size</>} />
           </div>
         </div>
