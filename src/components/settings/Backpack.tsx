@@ -11,7 +11,6 @@ const STATUS: { v: ItemStatus; label: string; hint: string }[] = [
   { v: "low", label: "Running low", hint: "Refill soon" },
   { v: "empty", label: "Needs refill", hint: "Ran out" },
 ];
-const SUGGESTIONS = ["Electrolyte mix pod", "Water bottle", "Snacks", "Lip balm", "Hand sanitizer", "Tissues", "Phone charger", "Pain reliever", "Sunscreen", "Gum", "Pens", "Bandages"];
 
 /** One slot: an item's portrait, or an empty leather square to fill. */
 function Slot({ item, painting, onTap, moving, at, onGrab, lifted = false }: { item: InventoryItem | null; painting: boolean; onTap: (rect: DOMRect) => void; moving: boolean; at: string; onGrab?: (e: React.PointerEvent) => void; lifted?: boolean }) {
@@ -39,8 +38,8 @@ function Slot({ item, painting, onTap, moving, at, onGrab, lifted = false }: { i
             </span>
           )}
           {empty && (
-            <span className="inv-refill absolute inset-x-0 bottom-0 py-[2px] text-center text-[10px] font-bold uppercase tracking-[.08em]" style={{ background: "rgba(140,40,24,.9)", color: "#ffe9d6" }}>
-              Refill
+            <span className="inv-refill absolute inset-x-0 bottom-0 py-[3px] text-center text-[11px] font-bold uppercase tracking-[.06em]" style={{ background: "rgba(150,36,20,.95)", color: "#fff1e0", boxShadow: "0 -1px 0 rgba(242,210,126,.6)" }}>
+              ↻ Refill
             </span>
           )}
           {item.status === "low" && <span aria-hidden className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full" style={{ background: "#e8a33c", boxShadow: "0 0 0 2px rgba(42,26,16,.8)" }} />}
@@ -67,6 +66,25 @@ export function Backpack({ initial }: { initial: Inventory }) {
   // Tapping an item opens a small menu by it.
   const [menu, setMenu] = useState<{ item: InventoryItem; x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // How many rows each pocket shows (the rest scroll into view); remembered on this device.
+  const [rows, setRows] = useState<Partial<Record<PocketKey, number>>>({});
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+      setRows(JSON.parse(window.localStorage.getItem("inv-rows") ?? "{}") as Partial<Record<PocketKey, number>>);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  function showRows(pocket: PocketKey, n: number) {
+    const next = { ...rows, [pocket]: n };
+    setRows(next);
+    try {
+      window.localStorage.setItem("inv-rows", JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
   // Dragging an item to another slot (press and hold on a phone, then drag).
@@ -241,11 +259,12 @@ export function Backpack({ initial }: { initial: Inventory }) {
               <h3 className="font-display m-0 text-[15px]" style={{ color: "#f2d27e" }}>
                 {p.label}
               </h3>
-              <span className="text-[11.5px]" style={{ color: "rgba(242,210,126,.6)" }}>
+              <span className="flex items-center gap-1 text-[11.5px]" style={{ color: "rgba(242,210,126,.6)" }}>
                 {inv.items.filter((i) => i.pocket === p.key).length}/{inv.slots[p.key]}
+                <RowStepper total={Math.ceil(inv.slots[p.key] / 4)} shown={rows[p.key]} onChange={(n) => showRows(p.key, n)} />
               </span>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <RowWindow rows={rows[p.key]}>
               {Array.from({ length: inv.slots[p.key] }, (_, slot) => {
                 const item = at(p.key, slot);
                 return (
@@ -259,13 +278,14 @@ export function Backpack({ initial }: { initial: Inventory }) {
                       onGrab={(e) => grab(e, item)}
                       onTap={(r) => tapSlot(p.key, slot, r)}
                     />
-                    <span className="block w-full truncate text-center text-[11px] leading-tight" style={{ color: item ? "rgba(246,236,210,.85)" : "transparent" }}>
+                    {/* The whole name, on up to three short lines (tap for the full menu). */}
+                    <span title={item?.name} className="line-clamp-3 block w-full break-words text-center text-[10.5px] leading-[1.15]" style={{ color: item ? "rgba(246,236,210,.85)" : "transparent", hyphens: "auto" }}>
                       {item?.name ?? "·"}
                     </span>
                   </div>
                 );
               })}
-            </div>
+            </RowWindow>
             <button
               type="button"
               onClick={() => persist({ ...inv, slots: { ...inv.slots, [p.key]: Math.min(p.key === "top" ? 16 : 32, inv.slots[p.key] + 4) } })}
@@ -318,6 +338,12 @@ export function Backpack({ initial }: { initial: Inventory }) {
             setStatus(it, it.status === "full" ? "empty" : "full");
           }}
           onQuest={() => (setMenu(null), refillQuest(menu.item))}
+          onGone={() => {
+            const it = menu.item;
+            setMenu(null);
+            remove(it);
+            flash(`${it.name} taken out`);
+          }}
         />
       )}
       {editing && (
@@ -339,11 +365,11 @@ export function Backpack({ initial }: { initial: Inventory }) {
 }
 
 /** The little menu by a tapped item: edit it, mark it refilled or empty, or make it a quest. */
-function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest }: { item: InventoryItem; x: number; y: number; onClose: () => void; onEdit: () => void; onToggle: () => void; onQuest: () => void }) {
+function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest, onGone }: { item: InventoryItem; x: number; y: number; onClose: () => void; onEdit: () => void; onToggle: () => void; onQuest: () => void; onGone: () => void }) {
   useEscape(onClose);
   const W = 196;
   const left = Math.max(8, Math.min(x - W / 2, (typeof window === "undefined" ? 400 : window.innerWidth) - W - 8));
-  const top = Math.min(y, (typeof window === "undefined" ? 800 : window.innerHeight) - 170);
+  const top = Math.min(y, (typeof window === "undefined" ? 800 : window.innerHeight) - 220);
   const empty = item.status !== "full";
   const row = "relative z-[1] flex min-h-11 items-center gap-2.5 px-4 text-left text-[15px] hover:bg-black/5";
   return createPortal(
@@ -363,6 +389,10 @@ function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest }: { item: In
         <button type="button" role="menuitem" onClick={onEdit} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">✎</span>
           Edit
+        </button>
+        <button type="button" role="menuitem" onClick={onGone} className={row} style={{ color: "#9a3b26", borderTop: "1px solid rgba(139,112,64,.2)" }}>
+          <span aria-hidden className="w-5 text-center">✕</span>
+          Gone (take it out)
         </button>
       </div>
     </div>,
@@ -411,6 +441,8 @@ function ItemSheet({
   const [photoError, setPhotoError] = useState<string | null>(null);
   // A new portrait is wanted: none yet, or asked for with "Paint a new one".
   const [repaint, setRepaint] = useState(false);
+  // The picture settings fold away behind the portrait (tap it to open them).
+  const [picturing, setPicturing] = useState(false);
   const field = "h-11 w-full rounded-lg border px-3 text-[16px]";
   const fieldStyle = { borderColor: "#b39a6a", background: "rgba(255,250,238,.75)", color: "var(--t-ink)" };
   const pocket = POCKETS.find((p) => p.key === item.pocket)!;
@@ -454,7 +486,14 @@ function ItemSheet({
     <div className="overlay-fade-in fixed inset-0 z-[56] flex items-end justify-center overscroll-contain sm:items-center sm:p-4" style={{ background: "rgba(10,8,4,.3)" }} onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-label={isNew ? "Add an item" : item.name} onClick={(e) => e.stopPropagation()} className="sheet-up parchment parchment-framed flex max-h-[92svh] w-full max-w-md flex-col gap-3 overflow-y-auto overscroll-contain rounded-t-2xl p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:rounded-2xl">
         <div className="relative z-[1] flex items-start gap-3">
-          <span className="inv-slot relative h-20 w-20 shrink-0 overflow-hidden rounded-full">
+          <button
+            type="button"
+            onClick={() => setPicturing((v) => !v)}
+            aria-expanded={picturing}
+            title="Change the picture"
+            aria-label="Change the picture"
+            className="inv-slot relative h-20 w-20 shrink-0 cursor-pointer overflow-hidden rounded-full"
+          >
             {item.icon && !repaint ? (
               // eslint-disable-next-line @next/next/no-img-element -- item portrait
               <img src={item.icon} alt="" className="h-full w-full object-cover" />
@@ -463,7 +502,11 @@ function ItemSheet({
                 {busy === "illustrate" ? "Painting your photo…" : busy === "photo" ? "Adding…" : "A portrait is painted when you save"}
               </span>
             )}
-          </span>
+            {/* A small brush says the portrait opens its picture settings. */}
+            <span aria-hidden className="absolute bottom-0.5 right-0.5 flex h-6 w-6 items-center justify-center rounded-full text-[12px]" style={{ background: "rgba(20,14,6,.82)", boxShadow: "0 0 0 1.5px #d9b45f" }}>
+              🖌
+            </span>
+          </button>
           <div className="min-w-0 flex-1">
             <span className="block text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
               {pocket.label} · slot {item.slot + 1}
@@ -474,20 +517,11 @@ function ItemSheet({
             ×
           </button>
         </div>
-        {isNew && !item.name && (
-          <div className="relative z-[1] flex flex-wrap gap-1.5">
-            {SUGGESTIONS.map((s) => (
-              <button key={s} type="button" onClick={() => setItem({ ...item, name: s })} className="rounded-full px-2.5 py-1 text-[13px]" style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}>
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
 
-        {/* The picture: a photo as it is, a photo painted as an illustration, or painted from words. */}
-        <div className="relative z-[1] flex flex-col gap-1.5">
-          <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-            Picture
+        {/* The picture (opened by tapping the portrait): a photo as it is, a photo painted as an illustration, or painted from words. */}
+        {picturing && <div className="reveal relative z-[1] flex flex-col gap-1.5 rounded-xl p-2.5" style={{ background: "rgba(120,90,40,.08)", border: "1px solid rgba(139,112,64,.3)" }}>
+          <span className="text-[13px] font-semibold" style={{ color: "var(--t-ink)" }}>
+            The portrait
           </span>
           <div className="flex flex-wrap gap-1.5">
             <label className={chip} style={chipStyle} title="Use your photo as the picture">
@@ -512,7 +546,7 @@ function ItemSheet({
               {photoError}
             </span>
           )}
-        </div>
+        </div>}
 
         <div className="relative z-[1] flex flex-col gap-1">
           <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -557,5 +591,44 @@ function ItemSheet({
       </div>
     </div>,
     document.body
+  );
+}
+
+/** − / + beside a pocket's count: show fewer or more of its rows (all of them by default). */
+function RowStepper({ total, shown, onChange }: { total: number; shown?: number; onChange: (n: number) => void }) {
+  const n = Math.min(total, shown ?? total);
+  const btn = "flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none disabled:opacity-30";
+  const style = { border: "1px solid rgba(242,210,126,.4)", color: "#f2d27e" };
+  if (total <= 1) return null;
+  return (
+    <span className="ml-1 flex items-center gap-0.5" title={`${n} of ${total} rows showing — scroll for the rest`}>
+      <button type="button" className={btn} style={style} disabled={n <= 1} onClick={() => onChange(n - 1)} aria-label="Show one row fewer">
+        −
+      </button>
+      <button type="button" className={btn} style={style} disabled={n >= total} onClick={() => onChange(n + 1)} aria-label="Show one more row">
+        +
+      </button>
+    </span>
+  );
+}
+
+/** The pocket's grid, cut to `rows` rows; the hidden ones scroll into view. */
+function RowWindow({ rows, children }: { rows?: number; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [rowH, setRowH] = useState<number | null>(null);
+  useEffect(() => {
+    const el = ref.current?.firstElementChild as HTMLElement | null;
+    if (!el) return;
+    const measure = () => setRowH(el.offsetHeight + 8);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const cut = rows && rowH ? rows * rowH - 8 : undefined;
+  return (
+    <div ref={ref} className={`grid grid-cols-4 gap-2 ${cut ? "overflow-y-auto overscroll-contain" : ""}`} style={cut ? { maxHeight: cut, scrollSnapType: "y mandatory" } : undefined}>
+      {children}
+    </div>
   );
 }
