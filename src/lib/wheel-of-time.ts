@@ -18,8 +18,9 @@ export const DEFAULT_EFFORT = [
   "No caffeine/cannabis after 12:33pm",
   "Dinner done 2-3 hours before bed",
   "Wind-down routine started before 7:30pm",
+  "No cannabis after 3pm",
 ];
-export const DEFAULT_HINDRANCES = ["Drugs after noon", "Late night movie with partner", "Late night working"];
+export const DEFAULT_HINDRANCES = ["Cannabis after 3pm", "Late night movie with partner", "Late night working"];
 
 const MAX_ITEMS = 12;
 const MAX_NIGHTS = 400;
