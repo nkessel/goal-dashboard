@@ -50,9 +50,9 @@ export const metadata: Metadata = {
   description: "Personal + social goal & task dashboard",
 };
 
-// Android: let the on-screen keyboard shrink the page, so popups and fixed
-// bars sit above it instead of under it. (iPhone ignores this; KeyboardViewport
-// handles it there.)
+// The on-screen keyboard slides over the page on Android too (as it always does
+// on iPhone), so the page never resizes; KeyboardViewport fits only the popup
+// you're typing in.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,

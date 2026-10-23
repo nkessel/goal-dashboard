@@ -1393,16 +1393,16 @@ html {
 }
 
 /* ---------- On-screen keyboard (see KeyboardViewport.tsx) ---------- */
-/* Keyboard up on iPhone: every full-screen overlay shrinks to the visible area
-   above it, so centered popups re-center there and bottom sheets sit on top of
-   the keyboard instead of under it. */
-html[data-kb] .fixed.inset-0 {
+/* Keyboard up: nothing on the page moves. Only the overlay you're typing in
+   is fitted to the visible area above the keyboard, so its buttons stay in
+   sight (the one exception to "no resizing"). */
+html[data-kb] .fixed.inset-0:has(:focus) {
   top: var(--vv-top, 0px);
   bottom: auto;
   height: var(--vvh, 100dvh);
 }
-html[data-kb] .fixed.inset-0 > [role="dialog"],
-html[data-kb] .fixed.inset-0 > .kb-fit {
+html[data-kb] .fixed.inset-0:has(:focus) > [role="dialog"],
+html[data-kb] .fixed.inset-0:has(:focus) > .kb-fit {
   max-height: calc(var(--vvh, 100dvh) - 20px) !important;
   overflow-y: auto;
   overscroll-behavior: contain;

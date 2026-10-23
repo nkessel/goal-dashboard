@@ -5,17 +5,17 @@ import { useEffect } from "react";
 /**
  * Keeps popups clear of the on-screen keyboard, app-wide.
  *
- * iPhone Safari slides the keyboard over the page without resizing it, so a
- * popup centered on the full screen ends up half under the keyboard. This
+ * The keyboard slides over the page without resizing it (iPhone always,
+ * Android through `interactiveWidget` in the root layout), so the page itself
+ * never moves. Only the popup you're typing in is fitted above the keyboard,
+ * so its buttons stay in sight, and only once the keyboard has settled. This
  * publishes the part of the screen that is actually visible:
  *   --vvh     visible height (px)
  *   --vv-top  how far the visible area is scrolled down (px)
- *   html[data-kb]      the keyboard is up (globals.css then fits every
- *                      full-screen overlay into the visible area)
+ *   html[data-kb]      the keyboard is up (globals.css then fits the
+ *                      overlay holding the focused field into the visible area)
  *   html[data-typing]  a text field has focus on a touch screen (bottom bar,
  *                      + button and feedback button step aside)
- * Android Chrome resizes the page itself (see `interactiveWidget` in the root
- * layout), so there the regular layout already fits and data-kb stays off.
  *
  * It also scrolls a focused field back into view once the keyboard settles.
  */
@@ -25,15 +25,27 @@ export function KeyboardViewport() {
     const vv = window.visualViewport;
     const touch = window.matchMedia("(pointer: coarse)").matches;
 
-    const update = () => {
+    // Applied once the keyboard has settled, not on every frame of its slide
+    // (and small scroll nudges while it's up don't move anything).
+    let applied = { kb: false, h: 0, top: 0 };
+    let quiet: number | undefined;
+    const apply = () => {
       if (!vv) return;
       // Pinch-zoom also shrinks the visual viewport; only a keyboard does it at scale 1.
       const hidden = window.innerHeight - vv.height * vv.scale;
-      const keyboard = vv.scale < 1.1 && hidden > 120;
-      root.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
-      root.style.setProperty("--vv-top", `${Math.round(vv.offsetTop)}px`);
-      if (keyboard) root.setAttribute("data-kb", "");
+      const kb = vv.scale < 1.1 && hidden > 120;
+      const h = Math.round(vv.height);
+      const top = Math.round(vv.offsetTop);
+      if (kb === applied.kb && Math.abs(h - applied.h) < 24 && Math.abs(top - applied.top) < 24) return;
+      applied = { kb, h, top };
+      root.style.setProperty("--vvh", `${h}px`);
+      root.style.setProperty("--vv-top", `${top}px`);
+      if (kb) root.setAttribute("data-kb", "");
       else root.removeAttribute("data-kb");
+    };
+    const update = () => {
+      window.clearTimeout(quiet);
+      quiet = window.setTimeout(apply, 120);
     };
 
     const isTextField = (el: Element | null): el is HTMLElement => {
@@ -64,7 +76,7 @@ export function KeyboardViewport() {
       }, 60);
     };
 
-    update();
+    apply();
     vv?.addEventListener("resize", update);
     vv?.addEventListener("scroll", update);
     window.addEventListener("resize", update);
@@ -72,6 +84,7 @@ export function KeyboardViewport() {
     document.addEventListener("focusout", onFocusOut);
     return () => {
       window.clearTimeout(settle);
+      window.clearTimeout(quiet);
       vv?.removeEventListener("resize", update);
       vv?.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
