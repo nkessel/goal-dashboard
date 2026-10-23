@@ -6,6 +6,7 @@ import { SecretMissions } from "./SecretMissions";
 import { listMissionSteps } from "@/lib/data/missions";
 import { EveningRoutineTile } from "./EveningRoutineTile";
 import { StatsTile } from "./StatsTile";
+import { SetAsDefault } from "./SetAsDefault";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
@@ -519,6 +520,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </SettingsRow>
           </SectionItem>
         </ReorderableSections>
+      {admin && <SetAsDefault />}
     </>
   );
 }

@@ -5,6 +5,7 @@ import { WeatherSync } from "@/components/ui/WeatherSync";
 import { TopRightAvatar } from "@/components/layout/TopRightAvatar";
 import { isPalette } from "@/lib/palettes";
 import { ThemeOnBody } from "@/components/layout/ThemeOnBody";
+import { SettingsDefaultsSeed } from "@/components/settings/SettingsDefaultsSeed";
 import { NotificationsButton } from "@/components/layout/NotificationsButton";
 import { DailyLogin } from "@/components/xp/DailyLogin";
 import { QuestCelebrationHost } from "@/components/celebration/QuestCelebrationHost";
@@ -69,6 +70,7 @@ export async function AppShell({
   return (
     <div data-theme={theme} data-palette={palette} className="flex min-h-screen flex-col items-center">
       <ThemeOnBody theme={theme} palette={palette ?? null} />
+      {profileId && <SettingsDefaultsSeed />}
       {profileId && <DailyLogin levelCap={cap} />}
       {profileId && missingPortraits > 0 && <PortraitPainter missing={missingPortraits} />}
       {profileId && profile && (

@@ -3346,3 +3346,21 @@ export async function saveBossPlanAction(bossId: string, text: string) {
   else delete plans[bossId];
   await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, bossPlans: plans } }).eq("id", ownerId);
 }
+
+// ---- App-wide defaults for settings kept on each device.
+
+/** The defaults a new device starts from. */
+export async function appDefaultsAction() {
+  await requireProfileId();
+  const { listAppDefaults } = await import("@/lib/data/app-defaults");
+  return listAppDefaults();
+}
+
+/** The app's owner makes their own settings the default for every account. */
+export async function setAppDefaultsAction(values: Record<string, string | null>) {
+  const profileId = await requireProfileId();
+  if (!(await feedbackData.isAdmin(profileId))) throw new Error("Only the app's owner sets defaults for everyone.");
+  const { saveAppDefaults } = await import("@/lib/data/app-defaults");
+  await saveAppDefaults(profileId, values);
+  return { ok: true };
+}
