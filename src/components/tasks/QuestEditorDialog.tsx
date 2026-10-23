@@ -1890,8 +1890,8 @@ export function QuestEditorDialog({
 
           {!doingNow && (
             <>
-              <IconScale label="Importance" icon="/design/ui-flame-sm.png" value={importance} onChange={setImportance} />
-              <IconScale label="Urgency" icon="/design/ui-hourglass.svg" value={urgency} onChange={setUrgency} />
+              <IconScale label="Importance" icon="/design/ui-trophy.svg" value={importance} onChange={setImportance} />
+              <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
               <IconScale label="Difficulty" icon="/design/ui-muscle.svg" hint="How hard it is — how much it takes out of you" value={effort} onChange={setEffort} />
               <IconScale label="Energy boost" icon="/design/ui-bolt.png" hint="How much energy finishing it gives you" value={energyGain} onChange={setEnergyGain} />
             </>
@@ -1946,7 +1946,7 @@ export function QuestEditorDialog({
                 placeholder={tags.length ? "+ tag" : "Tags (e.g. health, learning)"}
                 aria-label="Add a tag"
                 className="h-7 min-w-[110px] flex-1 rounded-full border px-2.5 text-[13px]"
-                style={{ ...fieldStyle, borderStyle: "dashed" }}
+                style={fieldStyle}
               />
               <datalist id="qe-known-tags">
                 {knownTags.filter((t) => !tags.includes(t)).slice(0, 30).map((t) => (

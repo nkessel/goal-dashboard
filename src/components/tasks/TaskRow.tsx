@@ -150,8 +150,9 @@ export function TaskRow({
   const dividerColor = isAdventure ? "var(--t-divider)" : "var(--t-card-border)";
   const avatarSize = compact ? 48 : 60;
 
-  // Urgency (flames) and importance (bolts), 0–5 each — same icons as the quest editor.
+  // Importance (trophies) and urgency (fire), 0–5 each — same icons as the quest editor.
   const importanceCount = Math.min(5, Math.max(0, Math.round(task.importance)));
+  const urgencyCount = Math.min(5, Math.max(0, Math.round(task.urgency ?? 0)));
 
   const imageUrl = task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null;
   const emoji = task.icon_source === "monster" ? MONSTER_ICONS.find((m) => m.key === task.icon_key)?.emoji : null;
@@ -579,15 +580,8 @@ export function TaskRow({
               &#8635; {task.reschedule_count}
             </span>
           )}
-          {importanceCount > 0 && (
-            // Always one row: the flames shrink a little rather than wrap.
-            <span className={`flex flex-nowrap items-center ${compact ? "gap-px" : "gap-px sm:gap-[3px]"}`} title={`Importance ${task.importance.toFixed(1)}`}>
-              {Array.from({ length: importanceCount }).map((_, i) =>
-                // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                <img key={i} src="/design/ui-flame-sm.png" alt="" width={14} height={14} className={`shrink-0 ${compact ? "h-[11px] w-[11px]" : "h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]"}`} />
-              )}
-            </span>
-          )}
+          {importanceCount > 0 && <IconRun src="/design/ui-trophy.svg" n={importanceCount} compact={compact} title={`Importance ${task.importance.toFixed(1)}`} />}
+          {urgencyCount > 0 && <IconRun src="/design/ui-flame-sm.png" n={urgencyCount} compact={compact} title={`Urgency ${(task.urgency ?? 0).toFixed(1)}`} />}
         </div>
       </div>
 
@@ -811,5 +805,17 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onClose }: { title: str
       </div>
     </div>,
     document.body
+  );
+}
+
+/** A short run of trophies or flames, always on one row (they shrink a little rather than wrap). */
+function IconRun({ src, n, compact, title }: { src: string; n: number; compact: boolean; title: string }) {
+  return (
+    <span className={`flex flex-nowrap items-center ${compact ? "gap-px" : "gap-px sm:gap-[3px]"}`} title={title}>
+      {Array.from({ length: n }).map((_, i) => (
+        // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
+        <img key={i} src={src} alt="" width={14} height={14} className={`shrink-0 ${compact ? "h-[11px] w-[11px]" : "h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]"}`} />
+      ))}
+    </span>
   );
 }

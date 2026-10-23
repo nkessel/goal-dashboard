@@ -12,7 +12,7 @@ import { eveningDayKey } from "@/components/evening/evening-clock";
 
 type Takeoff = Awaited<ReturnType<typeof listTakeoffQuestsAction>>[number];
 
-const LOW = 5;
+const LOW = 3.5;
 /** From 7pm the Power-ups button no longer offers itself. */
 const QUIET_FROM_HOUR = 19;
 
@@ -53,7 +53,7 @@ const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
  * Energy opens the other things being tracked (mood, focus, anything): a
  * list of sliders, then a row of [Edit metrics] · Add new check-in metric ·
  * Submit check-in. Closed, Save stores energy alone. After saving, the caret
- * shows (or hides) what was saved. At 5 or below, a Power-ups button offers
+ * shows (or hides) what was saved. At 3.5 or below, a Power-ups link offers
  * light quests to drop straight onto the top of Today's Quests.
  */
 export function EnergyCheck({
@@ -77,7 +77,13 @@ export function EnergyCheck({
   /** Today's latest reading of each. */
   metricsToday?: Record<string, number>;
 }) {
-  const [value, setValue] = useState(today ?? 6);
+  const [value, setRawValue] = useState(today ?? 5.5);
+  // A new check-in starts with nothing set: Energy sits faded like the others until moved.
+  const [energySet, setEnergySet] = useState(false);
+  const setValue = (n: number) => {
+    setRawValue(n);
+    setEnergySet(true);
+  };
   const sliderStep = useSliderStep();
   const [saved, setSaved] = useState<number | null>(today);
   const [savedAt, setSavedAt] = useState<string | null>(todayAt);
@@ -184,11 +190,13 @@ export function EnergyCheck({
   function save() {
     setError(null);
     const all = expanded ? metrics.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
+    if (!energySet && !all.length) return;
     startSaving(async () => {
       try {
-        const res = await saveCheckInAction(value, all);
-        setSaved(res.energy.level);
-        setSavedAt(res.energy.created_at ?? new Date().toISOString());
+        const res = await saveCheckInAction(energySet ? value : null, all);
+        if (res.energy) setSaved(res.energy.level);
+        setSavedAt(res.energy?.created_at ?? new Date().toISOString());
+        setEnergySet(false);
         setSavedVals(Object.fromEntries(all.map((r) => [r.metric, r.level])));
         setVals({});
         setEditing(false);
@@ -227,7 +235,7 @@ export function EnergyCheck({
   const removeMetric = (m: string) => saveMetrics(metrics.filter((x) => x !== m), metrics);
 
   const shown = editing ? value : (saved ?? value);
-  // Only after a saved check-in at 5 or below — and not once hidden for today, or in the evening.
+  // Only after a saved check-in at 3.5 or below — and not once hidden for today, or in the evening.
   const low = !editing && saved !== null && saved <= LOW && mayOffer;
 
   function hideForToday() {
@@ -368,22 +376,24 @@ export function EnergyCheck({
           <>
             <div className="flex items-center gap-2">
               {caret}
-              <span className={label} style={{ color: "var(--t-cream)" }}>
-                Energy
-              </span>
-              {slider(value, setValue, "Energy level, 1 to 10", `hsl(${hue} 60% 48%)`)}
-              <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>
-                {fmt(value)}
+              <span className="flex min-w-0 flex-1 items-center gap-2 transition-opacity" style={{ opacity: energySet ? 1 : 0.55 }}>
+                <span className={label} style={{ color: "var(--t-cream)" }}>
+                  Energy
+                </span>
+                {slider(value, setValue, "Energy level, 1 to 10", `hsl(${hue} 60% 48%)`)}
+                <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>
+                  {energySet ? fmt(value) : "–"}
+                </span>
               </span>
               {/* Same width open or closed, so the slider never jumps. */}
               <button
                 type="button"
                 onClick={save}
-                disabled={isSaving || expanded}
-                aria-hidden={expanded}
-                tabIndex={expanded ? -1 : 0}
+                disabled={isSaving || expanded || !energySet}
+                aria-hidden={expanded || !energySet}
+                tabIndex={expanded || !energySet ? -1 : 0}
                 className="hover-glow h-8 w-[58px] shrink-0 rounded-full text-[13px] font-bold disabled:opacity-60"
-                style={{ background: "var(--t-gold)", color: "#2a1c10", visibility: expanded ? "hidden" : "visible" }}
+                style={{ background: "var(--t-gold)", color: "#2a1c10", visibility: expanded || !energySet ? "hidden" : "visible" }}
               >
                 {isSaving ? "…" : "Save"}
               </button>
@@ -513,15 +523,18 @@ export function EnergyCheck({
                       Edit check-in
                     </Link>
                   )}
-                  <button
-                    type="button"
-                    onClick={save}
-                    disabled={isSaving}
-                    className="hover-glow h-8 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60"
-                    style={{ background: "var(--t-gold)", color: "#2a1c10" }}
-                  >
-                    {isSaving ? "…" : "Submit check-in"}
-                  </button>
+                  {/* Only once something has been entered. */}
+                  {(energySet || Object.keys(vals).length > 0) && (
+                    <button
+                      type="button"
+                      onClick={save}
+                      disabled={isSaving}
+                      className="fade-in hover-glow h-8 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60"
+                      style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                    >
+                      {isSaving ? "…" : "Submit check-in"}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -580,11 +593,6 @@ export function EnergyCheck({
                   + Event or #tag
                 </button>
               )}
-              {!full && (
-                <Link href="/insights" className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
-                  Insights →
-                </Link>
-              )}
             </div>
           </div>
         )}
@@ -595,16 +603,15 @@ export function EnergyCheck({
         )}
       </div>
       {low && (
-        // One small glowing bolt: light quests to get going.
+        // A quiet text link: light quests to get going.
         <button
           type="button"
           onClick={() => setPicking(true)}
-          aria-label="Power-ups: light quests to get going"
-          title="Power-ups: light quests to get going"
-          className="powerup-orb flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-          style={{ background: "radial-gradient(circle at 32% 28%, #fff1b8, #f2c96a 45%, #d9a83a)", border: "1.5px solid #fff3c4", boxShadow: "0 0 12px rgba(255,214,102,.55), 0 2px 6px rgba(0,0,0,.4)" }}
+          title="Light quests to get going"
+          className="mt-1.5 shrink-0 cursor-pointer whitespace-nowrap text-[13px] underline underline-offset-2"
+          style={{ color: "var(--t-gold)" }}
         >
-          <BoltIcon size={18} />
+          Power-ups
         </button>
       )}
       {picking && (

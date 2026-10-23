@@ -1955,9 +1955,11 @@ export async function listTakeoffQuestsAction() {
  * One check-in: energy, plus any other things being tracked (mood, focus…).
  * `metrics` empty = energy only.
  */
-export async function saveCheckInAction(energy: number, metrics: { metric: string; level: number }[] = []) {
+/** A check-in: energy (when it was given this time) and any other metrics moved. */
+export async function saveCheckInAction(energy: number | null, metrics: { metric: string; level: number }[] = []) {
   const ownerId = await requireProfileId();
-  const entry = await energyData.logEnergy(ownerId, energy);
+  if (energy === null && !metrics.length) throw new Error("Nothing to check in yet.");
+  const entry = energy === null ? null : await energyData.logEnergy(ownerId, energy);
   const extra = metrics.length ? await energyData.logCheckIns(ownerId, metrics) : [];
   revalidatePath("/");
   revalidatePath("/insights");
