@@ -2347,3 +2347,10 @@ html.scroll-locked body {
 /* Popups lock the page's scrolling; keeping the scroll bar's room stops the
    page under them shifting sideways on desktop as they open and close. */
 html { scrollbar-gutter: stable; }
+
+/* Gilded sliders (stat shares): a gold-filled groove and a coin-like thumb. */
+.gilded-range { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+.gilded-range::-webkit-slider-runnable-track { height: 8px; border-radius: 9999px; border: 1px solid #8a6c2c; box-shadow: inset 0 1px 3px rgba(0,0,0,.6); background: linear-gradient(90deg, #a88a3f, #f8e3a0 calc(var(--p, 0%) - 1%), #d9b45f var(--p, 0%), #141a13 var(--p, 0%)); }
+.gilded-range::-moz-range-track { height: 8px; border-radius: 9999px; border: 1px solid #8a6c2c; box-shadow: inset 0 1px 3px rgba(0,0,0,.6); background: linear-gradient(90deg, #a88a3f, #f8e3a0 calc(var(--p, 0%) - 1%), #d9b45f var(--p, 0%), #141a13 var(--p, 0%)); }
+.gilded-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 9999px; border: 1.5px solid #4a3913; background: radial-gradient(circle at 35% 30%, #fff1c4, #e2bf68 50%, #a88a3f); box-shadow: 0 1px 3px rgba(0,0,0,.5), 0 0 6px rgba(242,210,126,.45); }
+.gilded-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 9999px; border: 1.5px solid #4a3913; background: radial-gradient(circle at 35% 30%, #fff1c4, #e2bf68 50%, #a88a3f); box-shadow: 0 1px 3px rgba(0,0,0,.5), 0 0 6px rgba(242,210,126,.45); }

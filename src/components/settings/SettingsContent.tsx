@@ -5,6 +5,7 @@ import { OwlCage } from "./OwlCage";
 import { SecretMissions } from "./SecretMissions";
 import { listMissionSteps } from "@/lib/data/missions";
 import { EveningRoutineTile } from "./EveningRoutineTile";
+import { StatsTile } from "./StatsTile";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
@@ -229,6 +230,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </span>
             </span>
           </Link>
+          <StatsTile isAdventure={isAdventure} />
         </div>
 
         {/* Expandable settings rows (drag to reorder) */}

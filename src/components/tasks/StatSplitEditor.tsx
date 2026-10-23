@@ -1,18 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useEffect, useRef, useState } from "react";
 import { getStatsAction, setStatsAction } from "@/app/actions";
 import { DEFAULT_STATS, cleanStatName, setShare, statAbbr, type StatSplit } from "@/lib/stats";
-
 
 /**
  * "Stats" under a quest's XP reward: slide a share of the XP to each
  * character stat (all 0% by default). XP sent to stats doesn't fill the main
- * level meter. Past 100%, the other stats give up the difference equally.
- * Add your own stats and drag to reorder them (the order is yours everywhere).
+ * level meter. Past 100%, the other stats give up the difference; lowering a
+ * stat again gives back what it took from them. Their order (and removing
+ * one) lives in Settings → Stats.
  */
 export function StatSplitEditor({
   xp,
@@ -30,7 +27,8 @@ export function StatSplitEditor({
   const [stats, setStats] = useState<string[]>([...DEFAULT_STATS]);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const [editing, setEditing] = useState(false);
+  // What each stat took from the others on its way up, to give back on its way down.
+  const borrowed = useRef<Record<string, Record<string, number>>>({});
 
   useEffect(() => {
     let live = true;
@@ -47,32 +45,41 @@ export function StatSplitEditor({
   const total = Object.values(split).reduce((a, b) => a + b, 0);
   const toStats = Math.round((xp * total) / 100);
 
-  function saveStats(next: string[]) {
-    setStats(next);
-    void setStatsAction(next).catch(() => {});
+  function changeShare(stat: string, pct: number) {
+    const prev = split;
+    const next = setShare(prev, stat, pct);
+    const d = (next[stat] ?? 0) - (prev[stat] ?? 0);
+    const lent = { ...(borrowed.current[stat] ?? {}) };
+    if (d > 0) {
+      for (const k of Object.keys(prev)) {
+        const took = (prev[k] ?? 0) - (next[k] ?? 0);
+        if (k !== stat && took > 0) lent[k] = (lent[k] ?? 0) + took;
+      }
+    } else if (d < 0) {
+      let back = -d;
+      for (const k of Object.keys(lent)) {
+        const give = Math.min(lent[k], back);
+        if (give <= 0) continue;
+        next[k] = (next[k] ?? 0) + give;
+        lent[k] -= give;
+        back -= give;
+        if (!lent[k]) delete lent[k];
+      }
+    }
+    borrowed.current[stat] = lent;
+    onChange(next);
   }
+
   function add() {
     const n = cleanStatName(name);
     setName("");
     setAdding(false);
     if (!n || stats.some((s) => s.toLowerCase() === n.toLowerCase())) return;
-    saveStats([...stats, n]);
-  }
-  function drop(stat: string) {
-    saveStats(stats.filter((s) => s !== stat));
-    if (split[stat]) onChange(setShare(split, stat, 0));
+    const next = [...stats, n];
+    setStats(next);
+    void setStatsAction(next).catch(() => {});
   }
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-  function onDragEnd(e: DragEndEvent) {
-    if (!e.over || e.active.id === e.over.id) return;
-    const from = stats.indexOf(String(e.active.id));
-    const to = stats.indexOf(String(e.over.id));
-    if (from < 0 || to < 0) return;
-    saveStats(arrayMove(stats, from, to));
-  }
-
-  const ink = "var(--t-ink)";
   const soft = "var(--t-ink-soft)";
   return (
     <div className="-mt-1 flex flex-col gap-1.5">
@@ -90,29 +97,15 @@ export function StatSplitEditor({
           // One dark, even panel; the text inside turns light to match.
           style={{ background: "#2b2214", border: "1.5px solid #8a6c2c", ["--t-ink" as string]: "#f3e7cb", ["--t-ink-soft" as string]: "rgba(243,231,203,.7)", color: "#f3e7cb" }}
         >
-          <DndContext id="dnd-StatSplit" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext items={stats} strategy={verticalListSortingStrategy}>
-              <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-                {shown.map((stat) => (
-                  <StatRow
-                    key={stat}
-                    stat={stat}
-                    pct={split[stat] ?? 0}
-                    xp={Math.round((xp * (split[stat] ?? 0)) / 100)}
-                    sortable={stats.includes(stat)}
-                    editing={editing}
-                    isAdventure={isAdventure}
-                    onPct={(p) => onChange(setShare(split, stat, p))}
-                    onRemove={() => drop(stat)}
-                  />
-                ))}
-              </ul>
-            </SortableContext>
-          </DndContext>
+          <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+            {shown.map((stat) => (
+              <StatRow key={stat} stat={stat} pct={split[stat] ?? 0} xp={Math.round((xp * (split[stat] ?? 0)) / 100)} isAdventure={isAdventure} onPct={(p) => changeShare(stat, p)} />
+            ))}
+          </ul>
 
-          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             {adding ? (
-              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span className="reveal flex min-w-0 flex-1 items-center gap-1.5">
                 <input
                   autoFocus
                   value={name}
@@ -128,29 +121,32 @@ export function StatSplitEditor({
                     }
                   }}
                   maxLength={24}
-                  placeholder="New stat, e.g. Creativity"
-                  className="h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-[15px]"
-                  style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.6)", color: ink }}
+                  placeholder="Name it, e.g. Creativity"
+                  className="h-9 min-w-0 flex-1 rounded-full border px-3.5 text-[15px] placeholder:italic placeholder:text-[rgba(243,231,203,.45)]"
+                  style={{ borderColor: "#8a6c2c", background: "rgba(0,0,0,.25)", color: "#f3e7cb", boxShadow: "inset 0 1px 3px rgba(0,0,0,.5)" }}
                 />
-                <button type="button" onClick={add} className="h-9 rounded-full px-3 text-[13.5px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+                <button type="button" onClick={add} disabled={!name.trim()} className="h-9 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
                   Add
+                </button>
+                <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="flex h-9 w-7 items-center justify-center text-[17px]" style={{ color: soft }}>
+                  ×
                 </button>
               </span>
             ) : (
-              <button type="button" onClick={() => setAdding(true)} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)", color: ink }}>
-                <span aria-hidden className="text-[15px] leading-none" style={{ color: "#8a6116" }}>
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="hover-glow flex h-8 items-center gap-1.5 rounded-full pl-1 pr-3 text-[13px] font-semibold"
+                style={{ background: "linear-gradient(180deg, rgba(242,213,138,.16), rgba(242,213,138,.06))", border: "1px solid rgba(217,180,95,.55)", color: "#f3e7cb" }}
+              >
+                <span aria-hidden className="flex h-6 w-6 items-center justify-center rounded-full text-[15px] font-bold leading-none" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #4a3913" }}>
                   +
                 </span>
-                Add a stat
-              </button>
-            )}
-            {!adding && (
-              <button type="button" onClick={() => setEditing((v) => !v)} className="text-[13px] underline underline-offset-2" style={{ color: soft }}>
-                {editing ? "Done" : "Edit list"}
+                A new stat
               </button>
             )}
             {total > 0 && !adding && (
-              <button type="button" onClick={() => onChange({})} className="ml-auto text-[13px] underline underline-offset-2" style={{ color: soft }}>
+              <button type="button" onClick={() => ((borrowed.current = {}), onChange({}))} className="ml-auto text-[13px] underline underline-offset-2" style={{ color: soft }}>
                 Reset to 0%
               </button>
             )}
@@ -161,56 +157,20 @@ export function StatSplitEditor({
   );
 }
 
-function StatRow({
-  stat,
-  pct,
-  xp,
-  sortable,
-  editing,
-  isAdventure,
-  onPct,
-  onRemove,
-}: {
-  stat: string;
-  pct: number;
-  xp: number;
-  sortable: boolean;
-  editing: boolean;
-  isAdventure: boolean;
-  onPct: (p: number) => void;
-  onRemove: () => void;
-}) {
-  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: stat, disabled: !sortable });
+function StatRow({ stat, pct, xp, isAdventure, onPct }: { stat: string; pct: number; xp: number; isAdventure: boolean; onPct: (p: number) => void }) {
+  const step = "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] font-bold leading-none disabled:opacity-30";
+  const stepStyle = { border: "1px solid rgba(217,180,95,.5)", color: "#f2d58a", background: "rgba(0,0,0,.2)" };
   return (
-    <li
-      ref={setNodeRef}
-      className="flex items-center gap-2"
-      style={{ transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.5 : 1, position: "relative", zIndex: isDragging ? 5 : undefined }}
-    >
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        aria-label={`Move ${stat}`}
-        title="Drag to reorder"
-        className="flex h-8 w-5 shrink-0 cursor-grab touch-none items-center justify-center"
-        style={{ color: "rgba(110,85,40,.55)" }}
-      >
-        <svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor" aria-hidden>
-          {[2, 7, 12].map((y) => (
-            <g key={y}>
-              <circle cx="2" cy={y} r="1.2" />
-              <circle cx="6" cy={y} r="1.2" />
-            </g>
-          ))}
-        </svg>
-      </button>
-      <span className="font-display w-9 shrink-0 text-center text-[11px] font-bold tracking-wide" style={{ color: "#6b5124" }} title={stat}>
+    <li className="flex items-center gap-1.5">
+      <span className="font-display w-8 shrink-0 text-center text-[11px] font-bold tracking-wide" style={{ color: "#d9b45f" }} title={stat}>
         {statAbbr(stat)}
       </span>
-      <span className="w-[88px] shrink-0 truncate text-[14px]" style={{ color: "var(--t-ink)" }}>
+      <span className="w-[76px] shrink-0 truncate text-[14px]" style={{ color: "var(--t-ink)" }}>
         {stat}
       </span>
+      <button type="button" onClick={() => onPct(pct - 5)} disabled={pct <= 0} aria-label={`Less XP to ${stat}`} className={step} style={stepStyle}>
+        −
+      </button>
       <input
         type="range"
         min={0}
@@ -219,17 +179,15 @@ function StatRow({
         value={pct}
         onChange={(e) => onPct(Number(e.target.value))}
         aria-label={`Share of XP to ${stat}`}
-        className="h-8 min-w-0 flex-1"
-        style={{ accentColor: isAdventure ? "#8a6116" : "var(--t-accent)" }}
+        className={isAdventure ? "gilded-range h-8 min-w-0 flex-1" : "h-8 min-w-0 flex-1"}
+        style={isAdventure ? { ["--p" as string]: `${pct}%` } : { accentColor: "var(--t-accent)" }}
       />
-      <span className="w-[62px] shrink-0 text-right text-[13px] tabular-nums" style={{ color: pct ? "var(--t-ink)" : "var(--t-ink-soft)", fontWeight: pct ? 700 : 400 }}>
+      <button type="button" onClick={() => onPct(pct + 5)} disabled={pct >= 100} aria-label={`More XP to ${stat}`} className={step} style={stepStyle}>
+        +
+      </button>
+      <span className="w-[44px] shrink-0 text-right text-[13px] tabular-nums" style={{ color: pct ? "var(--t-ink)" : "var(--t-ink-soft)", fontWeight: pct ? 700 : 400 }}>
         {pct}%{pct > 0 && <span className="block text-[11px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{xp} XP</span>}
       </span>
-      {editing && (
-        <button type="button" onClick={onRemove} aria-label={`Remove ${stat}`} title={`Remove ${stat} from your stats (its XP is kept)`} className="flex h-8 w-6 shrink-0 items-center justify-center text-[17px] leading-none" style={{ color: "var(--t-warn)" }}>
-          ×
-        </button>
-      )}
     </li>
   );
 }

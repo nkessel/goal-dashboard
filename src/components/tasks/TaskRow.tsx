@@ -11,6 +11,7 @@ import { EditTaskModal } from "./EditTaskModal";
 import { earlyBirdBonus } from "@/lib/next-action";
 import { QuestActionMenu, SnoozeGlyph, type QuestAction } from "./QuestActionMenu";
 import { SequenceDialog, SequenceStack, stackPad } from "./Sequence";
+import { StepsTray } from "./StepsTray";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { celebrateQuest, updateQuestCelebration } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
@@ -108,6 +109,9 @@ export function TaskRow({
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  // A quest with steps: a tap slides out its checklist instead of opening the editor.
+  const [tray, setTray] = useState(false);
+  const hasSteps = (task.steps_total ?? 0) > 0 && task.status === "open";
   // "Edit first" from Already completed: when the editor closes, the day picker comes back.
   const [backToEarlier, setBackToEarlier] = useState(false);
   const [menu, setMenu] = useState<"icon" | "dots" | null>(null);
@@ -347,7 +351,8 @@ export function TaskRow({
         onAction={() => pick("snooze")}
       >
       <div
-      onClick={() => setEditing(true)}
+      onClick={() => (hasSteps && !done ? setTray((t) => !t) : setEditing(true))}
+      aria-expanded={hasSteps ? tray : undefined}
       onContextMenu={(e) => {
         // Right-click opens the same menu as ⋯.
         if ((e.target as Element).closest("input,textarea,a")) return;
@@ -357,7 +362,7 @@ export function TaskRow({
         setMenuAnchor(dots);
         setMenu("dots");
       }}
-      title="Click to edit · right-click for more"
+      title={hasSteps ? "Click for its steps · right-click for more" : "Click to edit · right-click for more"}
       className={`quest-card hover-glow relative flex cursor-pointer flex-col rounded-2xl px-3 pb-3 pt-2.5 ${behind || queue.length ? "z-[1]" : ""} ${task.reward_id ? "reward-quest" : ""} ${
         draggable ? "active:cursor-grabbing" : ""
       } ${isPending ? "opacity-70" : ""}`}
@@ -641,6 +646,20 @@ export function TaskRow({
       </div>
     </div>
       </SwipeReveal>
+      {tray && hasSteps && !done && (
+        <StepsTray
+          task={task}
+          isAdventure={isAdventure}
+          onEdit={() => {
+            setTray(false);
+            setEditing(true);
+          }}
+          onComplete={() => {
+            setTray(false);
+            pick("complete");
+          }}
+        />
+      )}
     </li>
   );
 }
