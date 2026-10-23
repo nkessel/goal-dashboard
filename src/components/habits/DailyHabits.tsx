@@ -1,5 +1,6 @@
 "use client";
 
+import { GearIcon } from "@/components/ui/Icons";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -37,20 +38,32 @@ export function DailyHabits({
   const day = useLocalDay();
   // Closed until opened (the header still shows how the day is going).
   const [open, setOpen] = useState(false);
-  const [look, setLook] = useState<HeaderLook>("beads");
+  const [look, setLook] = useState<HeaderLook>("garden");
+  const [mark, setMark] = useState<HabitMark>("seedling");
   const [lookMenu, setLookMenu] = useState(false);
   useEffect(() => {
     try {
-      const v = localStorage.getItem(LOOK_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the saved choice is only readable after hydration
+      // "beads" became the garden (seeds waiting to grow rather than empty beads).
+      const v = localStorage.getItem(LOOK_KEY)?.replace(/^beads$/, "garden");
+      const m = localStorage.getItem(MARK_KEY);
+      /* eslint-disable react-hooks/set-state-in-effect -- the saved choice is only readable after hydration */
       if (v && LOOKS.some((l) => l.key === v)) setLook(v as HeaderLook);
+      if (m && MARKS.some((x) => x.key === m)) setMark(m as HabitMark);
+      /* eslint-enable react-hooks/set-state-in-effect */
     } catch {
       /* storage unavailable */
     }
   }, []);
+  function chooseMark(v: HabitMark) {
+    setMark(v);
+    try {
+      localStorage.setItem(MARK_KEY, v);
+    } catch {
+      /* storage unavailable */
+    }
+  }
   function chooseLook(v: HeaderLook) {
     setLook(v);
-    setLookMenu(false);
     try {
       localStorage.setItem(LOOK_KEY, v);
     } catch {
@@ -245,19 +258,21 @@ export function DailyHabits({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="drawer-header relative flex min-h-[58px] w-full flex-col items-center justify-center overflow-hidden rounded-2xl px-12 py-2.5"
+        // Open, the header and its tray read as one section: one border around both.
+        className={`drawer-header relative flex min-h-[58px] w-full flex-col items-center justify-center overflow-hidden px-12 py-2.5 transition-[border-radius] duration-200 ${open ? "rounded-t-2xl" : "rounded-2xl"}`}
         style={
           isAdventure
             ? {
                 background: "linear-gradient(180deg, #3a3524 0%, #2b281b 55%, #221f15 100%)",
                 border: "2px solid #8d7642",
+                borderBottomColor: open ? "rgba(141,118,66,.45)" : "#8d7642",
                 boxShadow: "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
               }
             : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }
         }
       >
         <span className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
-          <HabitIcon />
+          <HabitIcon mark={mark} />
           Daily Habits
         </span>
         <HeaderAdornment look={look} habits={todays.map((h) => ({ title: h.title, done: done(h.id) }))} isAdventure={isAdventure} />
@@ -272,17 +287,38 @@ export function DailyHabits({
         onClick={() => setLookMenu((v) => !v)}
         aria-label="How the Daily Habits header looks"
         aria-expanded={lookMenu}
-        title="Header style"
-        className="absolute left-3 top-1/2 z-[2] flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full opacity-70 hover:opacity-100"
-        style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}
+        title="Habit display settings"
+        // The app's one gear, sitting on the header box's bottom-right corner.
+        className="absolute -bottom-2.5 -right-1.5 z-[3] flex h-8 w-8 items-center justify-center rounded-full"
+        style={
+          isAdventure
+            ? { color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }
+            : { color: "var(--t-ink-soft)", background: "var(--t-card)", boxShadow: "0 0 0 1px var(--t-card-border), 0 2px 6px rgba(0,0,0,.15)" }
+        }
       >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.9" />
-          <path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3L5.5 5.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-        </svg>
+        <GearIcon size={17} />
       </button>
       {lookMenu && (
-        <div data-habit-look role="radiogroup" aria-label="Header style" className="card-pop-in parchment absolute left-2 top-full z-40 mt-1.5 flex w-[290px] flex-col gap-1 rounded-xl p-2" style={{ borderRadius: 12, boxShadow: "0 12px 28px rgba(0,0,0,.4)" }}>
+        <div data-habit-look role="radiogroup" aria-label="Header style" className="card-pop-in parchment absolute right-0 top-full z-40 mt-3 flex w-[290px] flex-col gap-1 rounded-xl p-2" style={{ borderRadius: 12, boxShadow: "0 12px 28px rgba(0,0,0,.4)" }}>
+          <p className="relative z-[1] m-0 px-1.5 pb-0.5 text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
+            The mark
+          </p>
+          <div className="relative z-[1] flex gap-1 px-1 pb-1.5">
+            {MARKS.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => chooseMark(m.key)}
+                aria-pressed={mark === m.key}
+                title={m.label}
+                aria-label={m.label}
+                className="flex h-10 flex-1 items-center justify-center rounded-lg"
+                style={{ background: "linear-gradient(180deg,#3a3524,#221f15)", boxShadow: mark === m.key ? "0 0 0 2px #d9b45f" : "inset 0 0 0 1px rgba(139,112,64,.4)" }}
+              >
+                <HabitIcon mark={m.key} />
+              </button>
+            ))}
+          </div>
           <p className="relative z-[1] m-0 px-1.5 pb-0.5 text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
             Header style
           </p>
@@ -314,7 +350,16 @@ export function DailyHabits({
 
       <div className="drawer-body" data-open={open ? "true" : "false"}>
         <div className="drawer-inner">
-          <div className="mt-2.5 rounded-2xl px-2 pb-2.5 pt-2.5" style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}>
+          {/* Joined to the header: the same border runs down its sides and round its bottom. */}
+          <div
+            className="rounded-b-2xl px-2 pb-2.5 pt-3.5"
+            style={{
+              background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)",
+              border: isAdventure ? "2px solid #8d7642" : "1px solid var(--t-card-border)",
+              borderTop: "none",
+              boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)",
+            }}
+          >
           {error && (
             <p className="m-0 px-2 pb-1 text-[13.5px]" style={{ color: "var(--t-warn)" }}>
               {error}
@@ -661,20 +706,55 @@ function FocusGlyph() {
   );
 }
 
-function HabitIcon() {
+type HabitMark = "seedling" | "check" | "sun" | "leaf";
+const MARK_KEY = "habits-header-mark";
+const MARKS: { key: HabitMark; label: string }[] = [
+  { key: "seedling", label: "A seedling" },
+  { key: "check", label: "A turning checkmark" },
+  { key: "sun", label: "A rising sun" },
+  { key: "leaf", label: "A leaf" },
+];
+
+/** The mark beside "Daily Habits": a seedling by default (more in its display settings). */
+function HabitIcon({ mark = "seedling" }: { mark?: HabitMark }) {
+  if (mark === "check")
+    return (
+      // The loop turns clockwise, the way days come round.
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M12 3.5a8.5 8.5 0 1 0 8.1 6" stroke="var(--t-gold)" strokeWidth="2" strokeLinecap="round" />
+        <path d="M20.8 4.8l-.8 4.9-4.8-1.1" stroke="var(--t-gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8.5 12.4l2.4 2.4 4.6-5" stroke="#8fc46a" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  if (mark === "sun")
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M5 17a7 7 0 0 1 14 0" fill="rgba(242,210,126,.25)" stroke="var(--t-gold)" strokeWidth="2" strokeLinecap="round" />
+        <path d="M12 5v2.5M4.6 9.2l1.8 1.5M19.4 9.2l-1.8 1.5M3 17h18" stroke="var(--t-gold)" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  if (mark === "leaf")
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z" fill="rgba(143,196,106,.3)" stroke="#8fc46a" strokeWidth="1.9" strokeLinejoin="round" />
+        <path d="M5 19c3-4 6-7 10-9" stroke="var(--t-gold)" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    );
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 3.5a8.5 8.5 0 1 1-8.1 6" stroke="var(--t-gold)" strokeWidth="2" strokeLinecap="round" />
-      <path d="M3.2 4.8l.8 4.9 4.8-1.1" stroke="var(--t-gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M8.5 12.4l2.4 2.4 4.6-5" stroke="#8fc46a" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 21v-9" stroke="#8fc46a" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 13c0-4-3-6.5-7-6.5 0 4 3 6.5 7 6.5z" fill="rgba(143,196,106,.35)" stroke="#8fc46a" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M12 11c0-4 3-7 7.5-7 0 4.5-3 7-7.5 7z" fill="rgba(143,196,106,.35)" stroke="#8fc46a" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M7 21h10" stroke="var(--t-gold)" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
 
-type HeaderLook = "beads" | "next" | "wins" | "glow" | "plain";
+type HeaderLook = "garden" | "togo" | "next" | "wins" | "glow" | "plain";
 const LOOK_KEY = "habits-header-look";
 const LOOKS: { key: HeaderLook; label: string; hint: string }[] = [
-  { key: "beads", label: "Beads", hint: "a bead lights up for each habit done" },
+  { key: "garden", label: "Garden", hint: "a seed for each habit, blooming as you do it" },
+  { key: "togo", label: "Still to tend", hint: "how many are ready for you, not how many are missing" },
   { key: "next", label: "Next up", hint: "names the habit to do next" },
   { key: "wins", label: "Wins", hint: "counts only what you've done" },
   { key: "glow", label: "Rising glow", hint: "a gold line fills along the bottom" },
@@ -693,23 +773,25 @@ function HeaderAdornment({ look, habits, isAdventure }: { look: HeaderLook; habi
   const all = n === habits.length;
   const soft = isAdventure ? "rgba(246,236,210,.72)" : "var(--t-ink-soft)";
   const gold = isAdventure ? "var(--t-gold)" : "var(--t-accent)";
-  if (look === "beads")
+  if (look === "garden")
+    // Nothing is "missing": each habit not yet done is a seed, ready to grow.
     return (
-      <span aria-label={all ? "All done today" : `${n} done today`} className="mt-1 flex items-center gap-1.5">
+      <span aria-label={all ? "All in bloom today" : `${n} in bloom, ${habits.length - n} ready to grow`} className="mt-1 flex items-end gap-1.5">
         {habits.map((h, i) => (
-          <span
-            key={i}
-            title={h.title}
-            className="block h-2.5 w-2.5 rounded-full transition-all duration-500"
-            style={
-              h.done
-                ? { background: "radial-gradient(circle at 35% 30%, #fff3c4, #f2d27e 45%, #b08a35)", boxShadow: "0 0 7px rgba(242,210,126,.85)" }
-                : { border: `1.5px solid ${isAdventure ? "rgba(242,210,126,.45)" : "var(--t-card-border)"}` }
-            }
-          />
+          <span key={i} title={h.title} className="block text-[13px] leading-none transition-transform duration-500" style={{ transform: h.done ? "scale(1.15)" : undefined, filter: h.done ? "drop-shadow(0 0 4px rgba(242,210,126,.7))" : undefined }}>
+            {h.done ? "🌼" : "🌱"}
+          </span>
         ))}
       </span>
     );
+  if (look === "togo") {
+    const left = habits.length - n;
+    return (
+      <span className="mt-0.5 text-[13px]" style={{ color: all ? gold : soft, fontWeight: all ? 600 : 400 }}>
+        {all ? "✦ all tended today" : n ? `✦ ${n} done · ${left} more to tend` : `${left} ready for you today`}
+      </span>
+    );
+  }
   if (look === "next") {
     const next = habits.find((h) => !h.done);
     return (
