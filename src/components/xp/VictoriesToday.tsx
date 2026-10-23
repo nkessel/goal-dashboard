@@ -306,7 +306,7 @@ function ClosedSummary({ parts }: { parts: React.ReactNode[] }) {
       {shown.map((p, i) => (
         <span key={i} className="flex min-w-0 items-center gap-2">
           {i > 0 && <span aria-hidden style={{ color: "var(--t-ink-soft)" }}>·</span>}
-          {p}
+          <span className="min-w-0 truncate">{p}</span>
         </span>
       ))}
     </p>
