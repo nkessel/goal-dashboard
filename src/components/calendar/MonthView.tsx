@@ -6,6 +6,7 @@ import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { WEEKDAY_LABELS, formatDateParam, getMonthGridWeeks, isSameDay, parseDateParam } from "@/lib/calendar-dates";
 import { getTaskDisplayWindow } from "@/lib/calendar-task-window";
+import { questArt } from "./CalendarTaskChip";
 
 export function MonthView({
   monthKey,
@@ -60,7 +61,7 @@ export function MonthView({
             const isToday = isSameDay(day, today);
             const dayTasks = mounted ? tasks.filter((t) => isSameDay(getTaskDisplayWindow(t).start, day)) : [];
             const dayEvents = mounted ? events.filter((e) => isSameDay(new Date(e.start), day)) : [];
-            const dots = dayTasks.slice(0, 3);
+            const dots = dayTasks.slice(0, isAdventure ? 2 : 3);
             const eventDots = dayEvents.slice(0, Math.max(0, 3 - dots.length));
             const overflow = dayTasks.length + dayEvents.length - dots.length - eventDots.length;
 
@@ -85,7 +86,16 @@ export function MonthView({
                   {day.getDate()}
                 </span>
                 <div className="flex items-center gap-0.5" style={{ minHeight: 6 }}>
-                  {dots.map((t) => (
+                  {isAdventure
+                    ? dots.slice(0, 2).map((t) =>
+                        t.status === "completed" ? (
+                          <span key={t.id} className="quest-seal block h-3.5 w-3.5 rounded-full" title={t.title} />
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL or a static /design/ creature
+                          <img key={t.id} src={questArt(t)} alt="" title={t.title} className="quest-art block h-4 w-4 rounded-full object-cover" />
+                        )
+                      )
+                    : dots.map((t) => (
                     <span
                       key={t.id}
                       className="block h-1.5 w-1.5 rounded-full"

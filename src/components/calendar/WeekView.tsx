@@ -25,6 +25,8 @@ import { GoogleEventChip } from "./GoogleEventChip";
 
 /** Hour height: condensed by default; drag the times on the left to zoom. */
 const DEFAULT_HOUR_PX = 36;
+/** Adventure quests are picture cards, so its hours start roomier. */
+const ADVENTURE_HOUR_PX = 56;
 const MIN_HOUR_PX = 18;
 const MAX_HOUR_PX = 96;
 const ZOOM_KEY = "calendar-hour-px";
@@ -58,7 +60,7 @@ export function WeekView({
 }) {
   const isAdventure = theme === "adventure";
   const days = dayKeys.map((k) => parseDateParam(k));
-  const [hourPx, setHourPx] = useState(DEFAULT_HOUR_PX);
+  const [hourPx, setHourPx] = useState(isAdventure ? ADVENTURE_HOUR_PX : DEFAULT_HOUR_PX);
   const [gripY, setGripY] = useState<number | null>(null);
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
   const HOUR_PX = hourPx;
@@ -499,15 +501,17 @@ export function WeekView({
             <Link
               key={day.toISOString()}
               href={`/calendar?view=day&date=${formatDateParam(day)}`}
-              className="flex flex-col items-center pb-1.5 text-center"
-              style={{ borderBottom: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}` }}
+              className="relative z-[1] flex flex-col items-center pb-1.5 text-center"
+              style={{ borderBottom: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, paddingTop: isAdventure ? 18 : undefined, gridColumn: i + 2, gridRow: 1 }}
             >
+              {isAdventure && isToday && <TodayCrest />}
               <span
-                className={isAdventure ? "font-display" : ""}
+                className={isAdventure ? "font-display uppercase" : ""}
                 style={{
-                  fontSize: 13.5,
+                  fontSize: isAdventure ? (days.length >= 5 ? 12 : 13.5) : 13.5,
+                  letterSpacing: isAdventure ? ".06em" : undefined,
                   fontWeight: isToday ? 700 : 500,
-                  color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : "var(--t-ink-soft)",
+                  color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : isAdventure ? "#4a3a22" : "var(--t-ink-soft)",
                 }}
               >
                 {day.toLocaleDateString(undefined, { weekday: "short" })}
@@ -548,6 +552,9 @@ export function WeekView({
 
         {days.map((day, i) =>
           now && isSameDay(day, now) ? (
+            isAdventure ? (
+              single ? null : <div key={`hl-${i}`} aria-hidden className="quest-today pointer-events-none" style={{ gridColumn: i + 2, gridRow: `1 / ${hourCount + 2}`, margin: "0 -1px" }} />
+            ) : (
             <div
               key={`hl-${i}`}
               style={{
@@ -557,6 +564,7 @@ export function WeekView({
                 opacity: isAdventure ? 1 : 0.4,
               }}
             />
+            )
           ) : null
         )}
 
@@ -728,6 +736,9 @@ export function WeekView({
                 const step = Math.min(8, colWidth / (l.count + 2));
                 const canDrag = it.kind === "task" || (it.event.editable !== false && !it.event.isAllDay);
                 const isMoving = moving?.key === it.key;
+                const cardW = fan ? colWidth - l.lane * step - 1 : colWidth / l.count - 2;
+                // Adventure: a finished quest is a victory, so it keeps its colour; past ones only soften.
+                const fade = !past || isMoving ? undefined : isAdventure && it.kind === "task" ? (it.task.status === "completed" ? undefined : "saturate(.6) brightness(1.03)") : "saturate(.2) contrast(.6) brightness(1.12)";
                 return (
                   <div
                     key={it.key}
@@ -757,7 +768,7 @@ export function WeekView({
                       boxShadow: fan && l.lane > 0 ? "-2px 0 4px rgba(60,40,10,.25)" : undefined,
                       borderRadius: 6,
                       // Faded but still opaque, so past items fanned over each other stay legible.
-                      filter: past && !isMoving ? "saturate(.2) contrast(.6) brightness(1.12)" : undefined,
+                      filter: fade,
                       ...(isMoving ? { zIndex: 40, boxShadow: "0 8px 18px rgba(40,25,5,.35)", outline: "2px solid rgba(217,180,95,.9)", cursor: 'url("/design/cursor-grabbing.svg") 13 12, grabbing' } : {}),
                       touchAction: canDrag ? "pan-y" : undefined,
                     }}
@@ -765,7 +776,7 @@ export function WeekView({
                     {it.kind === "event" ? (
                       <GoogleEventChip event={it.event} theme={theme} compact timeLabel={label} oneLine={oneLine} />
                     ) : (
-                      <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} />
+                      <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} box={colWidth > 0 ? { w: cardW, h: height } : undefined} />
                     )}
                     {canDrag && height >= 18 && (
                       <div data-resize aria-hidden title="Drag to change how long it runs" className="cal-resize absolute inset-x-1 bottom-0 h-[7px] cursor-ns-resize" />
@@ -795,5 +806,22 @@ export function WeekView({
         />
       )}
     </div>
+  );
+}
+
+/** The little gilded shield over today's column. */
+function TodayCrest() {
+  return (
+    <svg aria-hidden width="18" height="21" viewBox="0 0 18 21" className="absolute left-1/2 top-0 -translate-x-1/2">
+      <path d="M9 1l7 2.6v6.1c0 4.6-3 8-7 9.8-4-1.8-7-5.2-7-9.8V3.6z" fill="url(#crest-g)" stroke="#5a4214" strokeWidth="1.1" />
+      <path d="M9 5.2c1.6 1.5 2.4 3 2.4 4.6 0 1.6-1 2.9-2.4 3.6-1.4-.7-2.4-2-2.4-3.6 0-1.6.8-3.1 2.4-4.6z" fill="#fbecc0" opacity=".9" />
+      <defs>
+        <linearGradient id="crest-g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f6dc8e" />
+          <stop offset=".55" stopColor="#d9b45f" />
+          <stop offset="1" stopColor="#a88a3f" />
+        </linearGradient>
+      </defs>
+    </svg>
   );
 }

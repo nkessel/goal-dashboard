@@ -2377,3 +2377,32 @@ input[type="time"], input[type="datetime-local"] { color-scheme: light; accent-c
 input[type="time"]::-webkit-calendar-picker-indicator, input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: sepia(1) saturate(4) hue-rotate(-10deg) brightness(.8); cursor: pointer; }
 input[type="time"]::-webkit-datetime-edit-fields-wrapper, input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper { color: var(--t-ink); }
 input[type="time"]::-webkit-datetime-edit-hour-field:focus, input[type="time"]::-webkit-datetime-edit-minute-field:focus, input[type="time"]::-webkit-datetime-edit-ampm-field:focus { background: rgba(217,180,95,.45); color: #2a1c10; border-radius: 3px; }
+
+/* Quests on the Adventure calendar: storybook cards with their creature. */
+.quest-card {
+  border-radius: 7px;
+  background: linear-gradient(180deg, #fbf3dc, #eedcb3);
+  border: 1px solid #b59457;
+  box-shadow: inset 0 1px 0 rgba(255, 250, 235, 0.8), 0 2px 5px rgba(70, 45, 10, 0.28);
+}
+.quest-card-done {
+  background: linear-gradient(180deg, #e6eacf, #d0d8b0);
+  border-color: #91a36a;
+}
+.quest-art {
+  border: 1px solid rgba(122, 90, 40, 0.55);
+  box-shadow: 0 1px 2px rgba(60, 40, 10, 0.25);
+  background: #fff8e6;
+}
+.quest-seal {
+  background: radial-gradient(circle at 35% 30%, #7d9a5c, #4e6a35 70%);
+  border: 1.5px solid #f3ecd0;
+  box-shadow: 0 1px 2px rgba(40, 50, 20, 0.4);
+}
+/* Today's column on the Adventure calendar: a gilded band, crowned with a crest. */
+.quest-today {
+  border: 1.5px solid rgba(201, 154, 46, 0.85);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(232, 196, 110, 0.22), rgba(232, 196, 110, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 200, 0.5), 0 0 10px rgba(201, 154, 46, 0.25);
+}

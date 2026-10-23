@@ -18,7 +18,10 @@ export function CalendarTaskChip({
   timeLabel,
   oneLine = false,
   portrait = false,
+  box,
 }: {
+  /** The card's size on the grid. With it, Adventure draws a picture-book quest card. */
+  box?: { w: number; h: number };
   /** The quest's portrait large above its title, like a card on a quest map. */
   portrait?: boolean;
   task: Task;
@@ -45,6 +48,25 @@ export function CalendarTaskChip({
     task.icon_key && task.icon_source === "monster" ? MONSTER_ICONS.find((m) => m.key === task.icon_key)?.emoji : null;
 
   const { start, end } = getTaskDisplayWindow(task);
+
+  if (isAdventure && box) {
+    return (
+      <>
+        <QuestCard
+          task={task}
+          box={box}
+          art={monsterImageUrl ?? (monsterEmoji ? null : creatureFor(task.id))}
+          emoji={monsterEmoji ?? null}
+          timeLabel={timeLabel}
+          warned={isWarned}
+          tint={tint}
+          portrait={portrait}
+          onOpen={() => setEditing(true)}
+        />
+        {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
+      </>
+    );
+  }
 
   const cardStyle: React.CSSProperties = {
     // The redness tint is a translucent rgba() — layered directly as the
@@ -166,5 +188,127 @@ export function CalendarTaskChip({
     </button>
     {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
     </>
+  );
+}
+
+/** A quest's picture for the calendar: its portrait, else its creature. */
+export function questArt(task: Task) {
+  if ((task.icon_source === "ai" || task.icon_source === "library") && task.icon_key) return task.icon_key;
+  return creatureFor(task.id);
+}
+
+/** Quests with no portrait yet still get a creature, the same one every time. */
+const CREATURES = ["goblin", "boar", "bat", "golem", "venomroot", "dragon", "sorcerer"];
+function creatureFor(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return `/design/icon-${CREATURES[hash % CREATURES.length]}.jpg`;
+}
+
+/**
+ * A quest on the Adventure calendar, drawn like a card in a storybook: its
+ * creature beside the title (or above it, in a tall narrow slot), and a
+ * green seal once it's done. The layout follows the room the slot has.
+ */
+function QuestCard({
+  task,
+  box,
+  art,
+  emoji,
+  timeLabel,
+  warned,
+  tint,
+  portrait,
+  onOpen,
+}: {
+  task: Task;
+  box: { w: number; h: number };
+  art: string | null;
+  emoji: string | null;
+  timeLabel?: string;
+  warned: boolean;
+  tint?: string;
+  portrait: boolean;
+  onOpen: () => void;
+}) {
+  const done = task.status === "completed";
+  const { w, h } = box;
+  const line = h < 30;
+  // Narrow and tall enough: the creature stands above the title.
+  const stack = !line && (portrait || w < 130) && h >= 54;
+  const artPx = line
+    ? Math.max(0, Math.min(h - 6, 22))
+    : stack
+      ? Math.max(0, Math.min(w - 6, h - 26, 56))
+      : Math.max(0, Math.min(h - 10, h >= 80 ? 64 : 46, w * 0.32));
+  const showArt = artPx >= 16;
+  const titlePx = w < 52 ? 10.5 : w < 110 ? 12 : 13.5;
+  const sealPx = Math.min(artPx, stack ? 22 : 26);
+  const doneNote = done && !line && h >= (stack ? 64 : 44);
+  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? 13 : 0)) / (titlePx * 1.12)));
+
+  return (
+    <button
+      type="button"
+      title={`Edit "${task.title}"`}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      className={`cal-chip quest-card ${done ? "quest-card-done" : ""} flex h-full w-full min-w-0 overflow-hidden ${stack ? "flex-col items-center justify-start text-center" : "items-center text-left"}`}
+      style={{
+        gap: stack ? 3 : line ? 4 : 6,
+        padding: line ? "1px 4px" : stack ? "5px 3px 4px" : "4px 6px 4px 4px",
+        ...(tint && !done ? { backgroundImage: `linear-gradient(${tint}, ${tint}), linear-gradient(180deg, #fbf3dc, #eedcb3)` } : {}),
+        ...(warned ? { borderColor: "var(--t-warn)" } : {}),
+      }}
+    >
+      {done && showArt ? (
+        <span className="quest-seal flex shrink-0 items-center justify-center rounded-full" style={{ width: sealPx, height: sealPx }}>
+          <svg width="62%" height="62%" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      ) : showArt ? (
+        <span className="quest-art flex shrink-0 items-center justify-center overflow-hidden" style={{ width: artPx, height: artPx, borderRadius: artPx > 30 ? 8 : 5 }}>
+          {art ? (
+            // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL or a static /design/ creature
+            <img src={art} alt="" className="h-full w-full object-cover" draggable={false} />
+          ) : (
+            <span style={{ fontSize: artPx * 0.72, lineHeight: 1 }}>{emoji}</span>
+          )}
+        </span>
+      ) : null}
+      <span className={stack ? "w-full min-w-0" : "min-w-0 flex-1"}>
+        <span
+          lang="en" className="font-display [overflow-wrap:break-word] [hyphens:auto]"
+          style={{
+            color: "#3a2a14",
+            fontSize: titlePx,
+            fontWeight: 600,
+            lineHeight: 1.12,
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: line ? 1 : lines,
+            WebkitHyphens: "auto",
+            overflow: "hidden",
+            whiteSpace: line ? "nowrap" : undefined,
+          }}
+        >
+          {task.title}
+        </span>
+        {doneNote && (
+          <span className="block truncate" style={{ color: "#4e6a35", fontSize: 10.5, fontStyle: "italic", lineHeight: 1.2 }}>
+            Completed
+          </span>
+        )}
+        {!done && !stack && !line && timeLabel && h >= 52 && w >= 110 && (
+          <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
+            {timeLabel}
+          </span>
+        )}
+      </span>
+    </button>
   );
 }
