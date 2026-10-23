@@ -1,7 +1,7 @@
 "use client";
 
 import { Children, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -23,8 +23,10 @@ export function SectionItem({ id, children }: { id: string; children: React.Reac
       {...attributes}
       {...(locked ? {} : listeners)}
       tabIndex={-1}
-      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 20 : undefined, position: "relative", opacity: isDragging ? 0.85 : undefined, touchAction: locked ? undefined : "pan-y" }}
-      className={isDragging ? "cursor-grabbing" : undefined}
+      // No text selection or iOS press-and-hold menu while holding to move it.
+      style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 20 : undefined, position: "relative", opacity: isDragging ? 0.85 : undefined, touchAction: locked ? undefined : "pan-y", WebkitTouchCallout: locked ? undefined : "none" }}
+      className={`${locked ? "" : "select-none"} ${isDragging ? "cursor-grabbing" : ""}`}
+      onContextMenu={locked ? undefined : (e) => e.preventDefault()}
     >
       {children}
     </div>
@@ -61,7 +63,8 @@ export function ReorderableSections({ children }: { children: React.ReactNode })
   const sorted = order ? [...order.filter((id) => ids.includes(id)), ...ids.filter((id) => !order.includes(id))] : ids;
   const byId = new Map(items.map((c) => [c.props.id, c]));
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    // Mouse and touch apart: on a phone only a held finger picks a section up, so scrolling never does.
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
@@ -81,7 +84,9 @@ export function ReorderableSections({ children }: { children: React.ReactNode })
       <LockedContext.Provider value={locked}>
         <DndContext id="dnd-settings" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={sorted} strategy={verticalListSortingStrategy}>
-            <div className="flex flex-col gap-2.5">{sorted.map((id) => byId.get(id))}</div>
+            <div data-no-press-scroll className="flex flex-col gap-2.5">
+              {sorted.map((id) => byId.get(id))}
+            </div>
           </SortableContext>
         </DndContext>
       </LockedContext.Provider>

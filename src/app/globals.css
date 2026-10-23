@@ -2330,3 +2330,10 @@ html.scroll-locked body {
 .toucan-tap-rise { animation: toucan-rise 1.6s cubic-bezier(.35,0,.25,1) both; }
 @keyframes toucan-rise { 0%, 100% { transform: none; filter: none; } 45%, 60% { transform: translateY(-6px); filter: drop-shadow(0 6px 10px rgba(126,240,220,.5)); } }
 @media (prefers-reduced-motion: reduce) { .toucan-tap-glow, .toucan-tap-bow, .toucan-tap-flutter, .toucan-tap-rise { animation: none; } }
+
+/* Touch screens: a press only shows once the finger has rested a moment, so
+   scrolling past a button (iOS marks it :active on touchstart) never dents it. */
+@media (hover: none) {
+  .hover-glow:active:not(:disabled) { transition-delay: 0s, 0s, 90ms; }
+  [data-no-press-scroll] :where(a[href], button, [role="button"]):active { transition-delay: 90ms; }
+}
