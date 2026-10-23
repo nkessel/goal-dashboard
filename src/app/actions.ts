@@ -2873,11 +2873,24 @@ async function guideTasks(ownerId: string, opts: { imports?: boolean } = {}) {
 
 /** What the toucan keeps an eye on: your open quests (scored in the browser, in your time zone) and what you've waved off. */
 export async function toucanWatchAction() {
-  const ownerId = await requireProfileId();
+  const { profileId: ownerId, accessToken } = await requireSessionMaybeGoogle();
   const [tasks, extras] = await Promise.all([guideTasks(ownerId), readExtras(ownerId)]);
-  const { cleanCoach, duePromises } = await import("@/lib/coach");
+  const { cleanCoach, duePromises, readyReminders } = await import("@/lib/coach");
   const coach = cleanCoach(extras.coach);
-  return { tasks, snoozed: ((extras.toucanSnooze as Record<string, string> | undefined) ?? {}), promises: coach.promises.filter((p) => p.status === "open"), due: duePromises(coach) };
+  // "Next time" reminders look at your calendar from a little while ago to tomorrow morning.
+  let events: { title: string; start: string; end: string }[] = [];
+  if (accessToken && coach.promises.some((p) => p.status === "open" && p.next)) {
+    try {
+      const { listEventsAllCalendars } = await import("@/lib/google-calendar");
+      const now = Date.now();
+      const all = await listEventsAllCalendars(accessToken, new Date(now - 3 * 3_600_000), new Date(now + 20 * 3_600_000));
+      events = all.events.filter((e) => Date.parse(e.end) > now).map((e) => ({ title: e.title, start: e.start, end: e.end }));
+    } catch {
+      /* no calendar right now: the reminder waits */
+    }
+  }
+  const { nextNear, standing } = readyReminders(coach.promises, events);
+  return { tasks, snoozed: ((extras.toucanSnooze as Record<string, string> | undefined) ?? {}), promises: coach.promises.filter((p) => p.status === "open"), due: duePromises(coach), nextNear, standing };
 }
 
 /** "Not now": the toucan won't raise this quest again for a while. */
@@ -2964,7 +2977,7 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
     checkIn: Object.entries(checks as Record<string, { level: number; at: string }>).slice(0, 8).map(([k, v]) => `- ${k}: ${v.level}`),
     today,
     notes: lite ? [] : coach.notes.map((n) => `- ${n.text}`),
-    promises: lite ? [] : coach.promises.filter((p) => p.status === "open").map((p) => `- ${p.text}${p.due ? ` (for ${fmtWhen(p.due)})` : ""}`),
+    promises: lite ? [] : coach.promises.filter((p) => p.status === "open").map((p) => `- ${p.text}${p.due ? ` (for ${fmtWhen(p.due)})` : p.next ? ` (next time: ${p.next})` : ""}`),
     lite,
   });
   // The light guide keeps no memory: it sees only this conversation.
@@ -3021,13 +3034,13 @@ export async function coachForgetAction(noteId: string) {
 }
 
 /** Make a promise (a "when…, then I will…"), or settle one: kept, missed or let go. */
-export async function coachPromiseAction(input: { add?: { text: string; when: string | null; questId?: string | null }; settle?: { id: string; status: "kept" | "missed" | "released" }; push?: { id: string; minutes: number } }) {
+export async function coachPromiseAction(input: { add?: { text: string; when: string | null; next?: string | null; questId?: string | null }; settle?: { id: string; status: "kept" | "missed" | "released" }; push?: { id: string; minutes: number } }) {
   const ownerId = await requireProfileId();
   const { extras, coach } = await readCoach(ownerId);
   let promises = coach.promises;
   if (input.add) {
     const due = input.add.when ? new Date(input.add.when) : null;
-    promises = [...promises, { id: crypto.randomUUID().slice(0, 8), text: input.add.text.slice(0, 180), due: due && !Number.isNaN(due.getTime()) ? due.toISOString() : null, questId: input.add.questId ?? null, status: "open" as const, at: new Date().toISOString() }];
+    promises = [...promises, { id: crypto.randomUUID().slice(0, 8), text: input.add.text.slice(0, 180), due: due && !Number.isNaN(due.getTime()) ? due.toISOString() : null, next: input.add.next?.trim().slice(0, 40) || null, questId: input.add.questId ?? null, status: "open" as const, at: new Date().toISOString() }];
   }
   if (input.settle) promises = promises.map((p) => (p.id === input.settle!.id ? { ...p, status: input.settle!.status } : p));
   if (input.push) promises = promises.map((p) => (p.id === input.push!.id ? { ...p, due: new Date(Date.now() + input.push!.minutes * 60_000).toISOString() } : p));
