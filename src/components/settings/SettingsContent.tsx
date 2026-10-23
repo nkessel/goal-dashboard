@@ -346,7 +346,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
 
 
           <SectionItem id="owl-cage">
-          <OwlCage />
+          <OwlCage toucan={profile.toucan ?? null} />
           </SectionItem>
 
           <SectionItem id="toucan-spirit">

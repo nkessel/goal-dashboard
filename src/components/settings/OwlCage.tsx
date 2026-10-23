@@ -2,6 +2,8 @@
 
 import { useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { ToucanArt } from "@/components/toucan/ToucanArt";
+import { cleanToucan } from "@/lib/toucan";
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("owl-caged", cb);
@@ -20,14 +22,23 @@ const read = () => {
     return false;
   }
 };
+// Which bird it is right now: the little owl, or the Great Toucan Spirit (held to change).
+const readSpirit = () => {
+  try {
+    return window.localStorage.getItem("owl-spirit") === "1";
+  } catch {
+    return false;
+  }
+};
 
 /**
  * When the bird has been dropped onto the menu button, it waits here in a
  * gilded cage. Tap the cage to set it free: the door swings open in a burst
  * of golden light and it flies out, back to its perch.
  */
-export function OwlCage() {
+export function OwlCage({ toucan = null }: { toucan?: unknown }) {
   const caged = useSyncExternalStore(subscribe, read, () => false);
+  const spirit = useSyncExternalStore(subscribe, readSpirit, () => false);
   const [freeing, setFreeing] = useState(false);
   const cageRef = useRef<HTMLButtonElement>(null);
   if (!caged && !freeing) return null;
@@ -45,7 +56,15 @@ export function OwlCage() {
   return (
     <div className="flex items-center gap-3 rounded-2xl px-3 py-2.5" style={{ background: "rgba(20,14,30,.06)", border: "1px dashed rgba(139,112,64,.5)" }}>
       <button ref={cageRef} type="button" onClick={setFree} aria-label="Open the cage and set the bird free" title="Open the cage" className={`owl-cage relative h-20 w-16 shrink-0 ${freeing ? "is-opening" : ""}`}>
-        <svg viewBox="0 0 64 80" width="64" height="80" aria-hidden style={{ overflow: "visible" }}>
+        {!freeing && spirit && (
+          // The toucan, in whatever it's wearing, sits behind the bars.
+          <span aria-hidden className="pointer-events-none absolute inset-x-0 top-[36px] flex justify-center">
+            <span className="cage-bird block">
+              <ToucanArt equipped={cleanToucan(toucan).equipped} size={30} />
+            </span>
+          </span>
+        )}
+        <svg viewBox="0 0 64 80" width="64" height="80" aria-hidden className="relative" style={{ overflow: "visible" }}>
           <defs>
             <linearGradient id="cage-gold" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="#fff1b8" />
@@ -61,7 +80,7 @@ export function OwlCage() {
           <path d="M8 30V72M56 30V72" stroke="url(#cage-gold)" strokeWidth="2.4" />
           <rect x="4" y="70" width="56" height="6" rx="2" fill="url(#cage-gold)" />
           {/* the little prisoner */}
-          {!freeing && (
+          {!freeing && !spirit && (
             <g className="cage-bird">
               <ellipse cx="32" cy="52" rx="9" ry="11" fill="#f2efe6" />
               <circle cx="29" cy="48" r="1.6" fill="#2a1608" />

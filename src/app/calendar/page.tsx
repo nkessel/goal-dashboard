@@ -55,7 +55,7 @@ export default async function CalendarPage({
   const session = await requireSession();
   const params = await searchParams;
   // No view in the link: open on the view used last time.
-  const remembered = params.view ? null : decodeURIComponent((await cookies()).get("cal-view")?.value ?? "").split("|");
+  const remembered = params.view ? null : decodeURIComponent((await cookies()).get(`cal-view-${session.user.id}`)?.value ?? "").split("|");
   const viewParam = params.view ?? remembered?.[0];
   const nParam = params.n ?? remembered?.[1];
   const dateParam = params.date;
@@ -150,7 +150,7 @@ export default async function CalendarPage({
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex gap-4">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <RememberView view={view} n={nDays} />
+        <RememberView view={view} n={nDays} who={session.user.id} />
         <PageHeader isAdventure={isAdventure} title="Quest Calendar" calmTitle="Calendar" />
         {!session.googleAccessToken && <ConnectCalendar isAdventure={isAdventure} />}
 
