@@ -36,7 +36,7 @@ const readSpirit = () => {
  * gilded cage. Tap the cage to set it free: the door swings open in a burst
  * of golden light and it flies out, back to its perch.
  */
-export function OwlCage({ toucan = null }: { toucan?: unknown }) {
+export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; compact?: boolean }) {
   const caged = useSyncExternalStore(subscribe, read, () => false);
   const spirit = useSyncExternalStore(subscribe, readSpirit, () => false);
   const [freeing, setFreeing] = useState(false);
@@ -54,8 +54,12 @@ export function OwlCage({ toucan = null }: { toucan?: unknown }) {
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl px-3 py-2.5" style={{ background: "rgba(20,14,30,.06)", border: "1px dashed rgba(139,112,64,.5)" }}>
-      <button ref={cageRef} type="button" onClick={setFree} aria-label="Open the cage and set the bird free" title="Open the cage" className={`owl-cage relative h-20 w-16 shrink-0 ${freeing ? "is-opening" : ""}`}>
+    <div
+      className={compact ? "parchment flex min-w-0 flex-1 basis-0 cursor-pointer items-center gap-2 rounded-[14px] px-2.5 py-1.5" : "flex items-center gap-3 rounded-2xl px-3 py-2.5"}
+      style={compact ? undefined : { background: "rgba(20,14,30,.06)", border: "1px dashed rgba(139,112,64,.5)" }}
+      onClick={compact ? setFree : undefined}
+    >
+      <button ref={cageRef} type="button" onClick={compact ? undefined : setFree} aria-label="Open the cage and set the bird free" title="Open the cage" className={`owl-cage relative shrink-0 h-20 w-16 ${freeing ? "is-opening" : ""}`} style={compact ? { zoom: 0.625 } as React.CSSProperties : undefined}>
         {!freeing && spirit && (
           // The toucan, in whatever it's wearing, sits behind the bars.
           <span aria-hidden className="pointer-events-none absolute inset-x-0 top-[36px] flex justify-center">
@@ -96,11 +100,18 @@ export function OwlCage({ toucan = null }: { toucan?: unknown }) {
           </g>
         </svg>
       </button>
-      <span className="text-[14px] leading-snug" style={{ color: "var(--t-ink)" }}>
-        Your bird is resting in its cage.
-        <br />
-        <span className="font-semibold">Tap the cage to set it free.</span>
-      </span>
+      {compact ? (
+        <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }}>
+          <span className="block font-semibold">Resting</span>
+          Tap to set it free
+        </span>
+      ) : (
+        <span className="text-[14px] leading-snug" style={{ color: "var(--t-ink)" }}>
+          Your bird is resting in its cage.
+          <br />
+          <span className="font-semibold">Tap the cage to set it free.</span>
+        </span>
+      )}
       {freeing &&
         createPortal(
           <div className="cage-glory pointer-events-none fixed inset-0 z-[70]" aria-hidden>
