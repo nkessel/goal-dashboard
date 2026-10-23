@@ -285,6 +285,7 @@ export default async function CalendarPage({
           theme={theme}
           dateKey={formatDateParam(date)}
           nDays={view === "day" ? 1 : view === "3day" || view === "days" ? nDays : view === "month" ? 7 : 7}
+          toSchedule={toSchedule.length}
         />
         </CalendarSlide>
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />

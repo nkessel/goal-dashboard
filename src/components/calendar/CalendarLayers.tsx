@@ -42,8 +42,9 @@ function write(next: Layers) {
 /**
  * The calendar with layers you can switch on and off: each Google calendar
  * (in its own colour), the quests the app scheduled, finished quests and
- * all-day events. The gear in the corner holds the switches; choices are
- * remembered on this device.
+ * all-day events. The caret beside "Google calendars" chooses calendars, the
+ * gear holds display settings; choices are remembered on this device. The
+ * calendar button on the left opens the scheduling list.
  */
 export function CalendarLayers({
   view,
@@ -56,7 +57,10 @@ export function CalendarLayers({
   theme,
   dateKey,
   nDays,
+  toSchedule = 0,
 }: {
+  /** Quests waiting on the scheduling list (the badge on its calendar button). */
+  toSchedule?: number;
   dateKey: string;
   /** Days on screen (1–7) for the slider. */
   nDays: number;
@@ -70,7 +74,7 @@ export function CalendarLayers({
   theme: "calm" | "adventure";
 }) {
   const layers = useSyncExternalStore(subscribe, read, () => DEFAULTS);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<"display" | "calendars" | null>(null);
   const router = useRouter();
   const [days, setDays] = useState(nDays);
   const panel = useRef<HTMLDivElement>(null);
@@ -78,9 +82,9 @@ export function CalendarLayers({
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => {
-      if (panel.current && e.target instanceof Node && !panel.current.contains(e.target)) setOpen(false);
+      if (panel.current && e.target instanceof Node && !panel.current.contains(e.target)) setOpen(null);
     };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(null);
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", key);
     return () => {
@@ -94,6 +98,8 @@ export function CalendarLayers({
   const set = (patch: Partial<Layers>) => write({ ...layers, ...patch });
   const toggleCal = (id: string) => set({ hidden: layers.hidden.includes(id) ? layers.hidden.filter((x) => x !== id) : [...layers.hidden, id] });
   const hiddenCount = layers.hidden.length + (layers.quests ? 0 : 1);
+  const chip = { background: isAdventure ? "rgba(14,18,10,.55)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "#f6ecd2" : "var(--t-ink)" };
+  const popup = { background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, boxShadow: "0 12px 30px rgba(0,0,0,.35)" };
 
   const row = (label: string, on: boolean, onClick: () => void, color?: string | null) => (
     <button key={label} type="button" role="switch" aria-checked={on} onClick={onClick} className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[14.5px] hover:bg-black/[.05]">
@@ -116,63 +122,90 @@ export function CalendarLayers({
 
   return (
     <div className="flex flex-col gap-2">
-      <div ref={panel} className="relative z-[25] -mt-1 flex items-center justify-end gap-2">
+      <div ref={panel} className="relative z-[25] -mt-1 flex flex-wrap items-center justify-end gap-2">
+        {/* Top-left: the scheduling list, as a calendar button with its count. */}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("open-scheduling"))}
+          aria-label={`To schedule (${toSchedule})`}
+          title="To schedule"
+          className="hover-glow relative mr-auto flex h-10 w-10 items-center justify-center rounded-full"
+          style={isAdventure ? { background: "radial-gradient(circle at 35% 25%, #f6e3a8, #d9b45f 60%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { ...chip, color: "var(--t-ink)" }}
+        >
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <rect x="3.5" y="5" width="17" height="15.5" rx="2.2" stroke="currentColor" strokeWidth="1.9" />
+            <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+            <path d="M8 13.5h4M8 16.8h7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          </svg>
+          {toSchedule > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10.5px] font-bold tabular-nums" style={{ background: "#2a1c10", color: "#f6dc8e", border: "1px solid #d9b45f" }}>
+              {toSchedule}
+            </span>
+          )}
+        </button>
         {calendars.length > 0 && (() => {
           const othersOn = calendars.some((c) => !layers.hidden.includes(c.id));
           return (
-            <button
-              type="button"
-              role="switch"
-              aria-checked={othersOn}
-              onClick={() => set({ hidden: othersOn ? calendars.map((c) => c.id) : [] })}
-              className="flex h-9 items-center gap-2 rounded-full pl-3 pr-1.5 text-[13.5px] font-semibold"
-              style={{ background: isAdventure ? "rgba(14,18,10,.55)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "#f6ecd2" : "var(--t-ink)" }}
-              title={othersOn ? "Hide your other calendars" : "Show your other calendars"}
-            >
-              Google calendars
-              <span className="relative h-5 w-9 rounded-full transition-colors" style={{ background: othersOn ? "#a88a3f" : "rgba(127,127,127,.35)" }}>
-                <span className="absolute top-0.5 h-4 w-4 rounded-full transition-[left]" style={{ left: othersOn ? 18 : 2, background: othersOn ? "#f6dc8e" : "#e5e0d4" }} />
-              </span>
-            </button>
+            <span className="flex h-9 shrink-0 items-center rounded-full" style={chip}>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={othersOn}
+                onClick={() => set({ hidden: othersOn ? calendars.map((c) => c.id) : [] })}
+                className="flex h-full items-center gap-2 whitespace-nowrap rounded-l-full pl-3 pr-1.5 text-[13.5px] font-semibold"
+                title={othersOn ? "Hide your other calendars" : "Show your other calendars"}
+              >
+                Google calendars
+                <span className="relative h-5 w-9 shrink-0 rounded-full transition-colors" style={{ background: othersOn ? "#a88a3f" : "rgba(127,127,127,.35)" }}>
+                  <span className="absolute top-0.5 h-4 w-4 rounded-full transition-[left]" style={{ left: othersOn ? 18 : 2, background: othersOn ? "#f6dc8e" : "#e5e0d4" }} />
+                </span>
+              </button>
+              {/* The caret: choose which calendars show. */}
+              <button
+                type="button"
+                onClick={() => setOpen((o) => (o === "calendars" ? null : "calendars"))}
+                aria-expanded={open === "calendars"}
+                aria-label="Choose which calendars show"
+                title="Choose which calendars show"
+                className="flex h-full w-8 items-center justify-center rounded-r-full border-l"
+                style={{ borderColor: isAdventure ? "rgba(217,180,95,.4)" : "var(--t-card-border)" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: open === "calendars" ? "rotate(180deg)" : undefined }}>
+                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </span>
           );
         })()}
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          aria-label="Calendars and display settings"
-          title="Calendars and display settings"
-          className="relative flex h-10 w-10 items-center justify-center rounded-full hover-glow"
-          style={{ background: isAdventure ? "rgba(14,18,10,.55)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-gold)" : "var(--t-ink)" }}
+          onClick={() => setOpen((o) => (o === "display" ? null : "display"))}
+          aria-expanded={open === "display"}
+          aria-label="Display settings"
+          title="Display settings"
+          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover-glow"
+          style={{ ...chip, color: isAdventure ? "var(--t-gold)" : "var(--t-ink)" }}
         >
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" stroke="currentColor" strokeWidth="2" />
             <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" stroke="currentColor" strokeWidth="1.6" />
           </svg>
-          {hiddenCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold" style={{ background: "#c4434f", color: "#fff" }}>
-              {hiddenCount}
-            </span>
-          )}
         </button>
-        {open && (
-          <div className="reveal absolute right-0 top-11 w-[270px] rounded-2xl p-2.5" style={{ background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, boxShadow: "0 12px 30px rgba(0,0,0,.35)" }}>
+        {open === "calendars" && (
+          <div className="reveal absolute right-0 top-11 w-[270px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
             <p className="m-0 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
-              Calendars
+              Calendars{hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ""}
             </p>
             {row("Quests you scheduled", layers.quests, () => set({ quests: !layers.quests }))}
             {calendars.map((c) => row(c.name, !layers.hidden.includes(c.id), () => toggleCal(c.id), c.color))}
-            {calendars.length === 0 && (
-              <p className="m-0 px-2 py-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-                Connect Google Calendar to see your other calendars here.
-              </p>
-            )}
-            {calendars.length > 0 && (
-              <button type="button" onClick={() => set({ quests: true, hidden: calendars.map((c) => c.id) })} className="mx-2 mt-1 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
-                Just my quests
-              </button>
-            )}
-            <p className="m-0 mt-2 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
+            <button type="button" onClick={() => set({ quests: true, hidden: calendars.map((c) => c.id) })} className="mx-2 mt-1 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+              Just my quests
+            </button>
+          </div>
+        )}
+        {open === "display" && (
+          <div className="reveal absolute right-0 top-11 w-[270px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
+            <p className="m-0 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
               Display
             </p>
             {view !== "month" && (
@@ -196,6 +229,11 @@ export function CalendarLayers({
             {row("Quests as portrait cards", layers.portraits, () => set({ portraits: !layers.portraits }))}
             {row("Finished quests", layers.done, () => set({ done: !layers.done }))}
             {row("All-day events", layers.allDay, () => set({ allDay: !layers.allDay }))}
+            {calendars.length === 0 && (
+              <p className="m-0 px-2 py-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+                Connect Google Calendar to see your other calendars here.
+              </p>
+            )}
           </div>
         )}
       </div>

@@ -7,11 +7,12 @@ import { createQuestAction, unscheduleTaskAction } from "@/app/actions";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import type { Task } from "@/lib/data/types";
 
-export type MenuTarget = { kind: "task"; task: Task; start: Date; end: Date } | { kind: "event"; title: string; start: Date; end: Date };
+export type MenuTarget = { kind: "task"; task: Task; start: Date; end: Date } | { kind: "event"; id: string; title: string; start: Date; end: Date };
 
 /**
- * Right-click (or long-press) on a calendar item: open or unschedule a quest,
- * and add a follow-up work block straight after any quest, event or meeting.
+ * Right-click (or long-press) on a calendar item: open or unschedule a quest;
+ * edit an event or turn it into a quest; and schedule a follow-up quest
+ * straight after any quest, event or meeting.
  */
 export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: MenuTarget; x: number; y: number; theme: "calm" | "adventure"; onClose: () => void }) {
   const router = useRouter();
@@ -93,10 +94,20 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
               </button>
             </>
           )}
+          {target.kind === "event" && (
+            <>
+              <button type="button" role="menuitem" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "edit" } })), onClose())}>
+                Edit
+              </button>
+              <button type="button" role="menuitem" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "quest" } })), onClose())}>
+                {theme === "adventure" ? "Turn into a quest" : "Turn into a task"}
+              </button>
+            </>
+          )}
           <button type="button" role="menuitem" className={`${item} flex items-center gap-2 border-t`} style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("followup")}>
             {/* eslint-disable-next-line @next/next/no-img-element -- follow-up icon */}
             <img src="/design/icon-followup.svg" alt="" width={20} height={20} />
-            Add a follow-up block after…
+            Schedule a follow-up quest
           </button>
         </>
       ) : (

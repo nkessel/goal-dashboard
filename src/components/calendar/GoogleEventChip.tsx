@@ -1,12 +1,13 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { formatTimeRange } from "@/lib/calendar-dates";
-import { updateGoogleEventAction } from "@/app/actions";
+import { rsvpGoogleEventAction, updateGoogleEventAction } from "@/app/actions";
+import { cleanEventDescription } from "@/lib/event-text";
 import { useEscape } from "@/lib/use-escape";
 
 const HIDDEN_KEY = "hidden-gcal-events-v1";
@@ -68,6 +69,39 @@ export function GoogleEventChip({
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const canEdit = event.editable !== false && !event.isAllDay;
+  const [answer, setAnswer] = useState(event.response ?? null);
+  const [answering, startAnswer] = useTransition();
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
+  const unanswered = answer === "needsAction";
+  const description = cleanEventDescription(event.description);
+
+  // The calendar's right-click menu asks for this event's popup or its quest.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ id: string; action: "edit" | "quest" }>).detail;
+      if (d?.id !== event.id) return;
+      if (d.action === "quest") setCreating(true);
+      else setOpen(true);
+    };
+    window.addEventListener("gcal-item", on);
+    return () => window.removeEventListener("gcal-item", on);
+  }, [event.id]);
+
+  function rsvp(a: "accepted" | "tentative" | "declined") {
+    setRsvpError(null);
+    const before = answer;
+    if (a !== "declined") setAnswer(a);
+    startAnswer(async () => {
+      try {
+        await rsvpGoogleEventAction(event.id, event.calendarId ?? "primary", a);
+        if (a === "declined") setOpen(false);
+        router.refresh();
+      } catch (e) {
+        setAnswer(before);
+        setRsvpError(e instanceof Error ? e.message : "Couldn't send that.");
+      }
+    });
+  }
 
   async function saveEdits() {
     setEditError(null);
@@ -121,12 +155,18 @@ export function GoogleEventChip({
         type="button"
         onClick={() => setOpen(true)}
         className={`cal-chip flex h-full w-full overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
+        title={unanswered ? "Not answered yet" : answer === "tentative" ? "Maybe" : undefined}
         style={{
           // Solid (not see-through) so events fanned over each other stay readable.
-          // Tinted with its calendar's own colour.
-          background: `color-mix(in srgb, ${event.color ?? (isAdventure ? "#46688a" : "#7f95d6")} ${isAdventure ? 18 : 22}%, ${isAdventure ? "#efe2c4" : "#ffffff"})`,
-          border: compact ? "none" : `1px solid color-mix(in srgb, ${event.color ?? "#46688a"} 45%, transparent)`,
-          borderLeft: `3px solid ${event.color ?? (isAdventure ? "#46688a" : "#7f95d6")}`,
+          // Tinted with its calendar's own colour. An unanswered invitation is
+          // only outlined (dotted, no fill), like Google's tentative look.
+          background: unanswered
+            ? isAdventure
+              ? "rgba(239,226,196,.35)"
+              : "rgba(255,255,255,.35)"
+            : `color-mix(in srgb, ${event.color ?? (isAdventure ? "#46688a" : "#7f95d6")} ${isAdventure ? (answer === "tentative" ? 10 : 18) : answer === "tentative" ? 12 : 22}%, ${isAdventure ? "#efe2c4" : "#ffffff"})`,
+          border: unanswered ? `1.5px dotted ${event.color ?? "#46688a"}` : compact ? "none" : `1px ${answer === "tentative" ? "dashed" : "solid"} color-mix(in srgb, ${event.color ?? "#46688a"} 45%, transparent)`,
+          borderLeft: unanswered ? `1.5px dotted ${event.color ?? "#46688a"}` : `3px solid ${event.color ?? (isAdventure ? "#46688a" : "#7f95d6")}`,
           flexDirection: "row",
           gap: compact ? 0 : 8,
           padding: compact ? "3px 4px 3px 5px" : "6px 8px",
@@ -199,6 +239,41 @@ export function GoogleEventChip({
             <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
               Google Calendar appointment · {event.isAllDay ? "All day" : formatTimeRange(start, end)}
             </p>
+            {/* An invitation: answer it here. */}
+            {answer && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[13.5px] font-semibold">Going?</span>
+                {(
+                  [
+                    ["accepted", "Yes"],
+                    ["tentative", "Maybe"],
+                    ["declined", "No"],
+                  ] as const
+                ).map(([a, label]) => (
+                  <button
+                    key={a}
+                    type="button"
+                    disabled={answering}
+                    aria-pressed={answer === a}
+                    onClick={() => rsvp(a)}
+                    className="h-8 rounded-full px-3.5 text-[13.5px] font-semibold disabled:opacity-60"
+                    style={answer === a ? { background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", border: "1.5px solid #8a6116", color: isAdventure ? "#2a1c10" : "#fff" } : { border: "1.5px solid #b39a6a", color: "var(--t-ink)" }}
+                  >
+                    {label}
+                  </button>
+                ))}
+                {unanswered && (
+                  <span className="text-[12px] italic" style={{ color: "var(--t-ink-soft)" }}>
+                    not answered yet
+                  </span>
+                )}
+                {rsvpError && (
+                  <span className="w-full text-[12.5px]" style={{ color: "var(--t-warn)" }}>
+                    {rsvpError}
+                  </span>
+                )}
+              </div>
+            )}
             {canEdit && (
               <div className="flex flex-col gap-2 rounded-xl p-2.5" style={{ background: "rgba(120,90,40,.08)" }}>
                 <input
@@ -234,9 +309,9 @@ export function GoogleEventChip({
                 </button>
               </div>
             )}
-            {event.description && (
-              <p className="text-sm" style={{ color: "var(--t-ink)" }}>
-                {event.description}
+            {description && (
+              <p className="max-h-48 overflow-y-auto whitespace-pre-line break-words text-sm leading-snug" style={{ color: "var(--t-ink)" }}>
+                {description}
               </p>
             )}
             <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -267,7 +342,7 @@ export function GoogleEventChip({
             kind: "create",
             prefill: {
               title: event.title,
-              description: event.description ?? undefined,
+              description: description || undefined,
               estimateMinutes: event.isAllDay ? null : durationMin,
             },
             schedule: { startISO: event.start, endISO: event.end, googleEventId: event.id },

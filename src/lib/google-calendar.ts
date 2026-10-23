@@ -102,7 +102,11 @@ export type GoogleCalendarEvent = {
   color?: string | null;
   /** Can be moved and edited from here. */
   editable?: boolean;
+  /** An invitation from someone else: your answer so far ("needsAction" = not answered yet). */
+  response?: "needsAction" | "tentative" | "accepted" | null;
 };
+
+export type RsvpAnswer = "accepted" | "tentative" | "declined";
 
 export type GoogleCalendarInfo = { id: string; name: string; color: string | null; primary: boolean; writable?: boolean };
 
@@ -141,6 +145,8 @@ export async function listEvents(
 
   return (res.data.items ?? [])
     .filter((e) => e.status !== "cancelled" && e.id)
+    // Invitations you've said no to don't show.
+    .filter((e) => e.attendees?.find((a) => a.self)?.responseStatus !== "declined")
     .map((e): GoogleCalendarEvent | null => {
       const isAllDay = Boolean(e.start?.date && !e.start?.dateTime);
       const start = e.start?.dateTime ?? (e.start?.date ? `${e.start.date}T00:00:00` : undefined);
@@ -157,6 +163,12 @@ export async function listEvents(
         color: source.color ?? null,
         // Only the organiser's copy can be changed; invitations stay as they are.
         editable: Boolean(source.writable) && (e.organizer?.self ?? true) && !e.recurringEventId,
+        response: (() => {
+          const me = e.attendees?.find((a) => a.self);
+          if (!me || e.organizer?.self || me.organizer) return null;
+          const r = me.responseStatus;
+          return r === "accepted" || r === "tentative" ? r : "needsAction";
+        })(),
       };
     })
     .filter((e): e is GoogleCalendarEvent => e !== null);
@@ -182,4 +194,21 @@ export async function listEventsAllCalendars(accessToken: string, timeMin: Date,
     return true;
   });
   return { calendars: calendars.slice(0, 12).map((c) => (c.id === primaryId ? { ...c, id: c.id } : c)), events };
+}
+
+/**
+ * Answer an invitation (Yes / Maybe / No) as yourself: only your own
+ * attendee entry changes, and Google lets the organiser know.
+ */
+export async function rsvpCalendarEvent(accessToken: string, calendarId: string, eventId: string, answer: RsvpAnswer): Promise<void> {
+  const calendar = calendarClient(accessToken);
+  const { data } = await calendar.events.get({ calendarId, eventId });
+  const attendees = data.attendees ?? [];
+  if (!attendees.some((a) => a.self)) throw new Error("You're not on this event's guest list.");
+  await calendar.events.patch({
+    calendarId,
+    eventId,
+    sendUpdates: "all",
+    requestBody: { attendees: attendees.map((a) => (a.self ? { ...a, responseStatus: answer } : a)) },
+  });
 }

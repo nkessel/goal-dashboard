@@ -88,7 +88,8 @@ export function CalendarSlide({ slideKey, children }: { slideKey: string; childr
     if (ghost) ghost.animate([{ transform: "none", opacity: 1 }, { transform: `translateX(${out})`, opacity: 0.2 }], opts).finished.then(() => ghost.remove(), () => ghost.remove());
   }, [slideKey]);
   return (
-    <div ref={boxRef} data-cal-slide className="relative overflow-hidden">
+    // Clipped sideways only, so the toolbar's popups can hang below it.
+    <div ref={boxRef} data-cal-slide className="relative" style={{ overflowX: "clip" }}>
       <div data-cal-page>{children}</div>
     </div>
   );

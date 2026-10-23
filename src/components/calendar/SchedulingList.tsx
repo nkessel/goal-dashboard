@@ -105,6 +105,12 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
       /* storage unavailable */
     }
   }
+  // The calendar button on the calendar's top-left corner opens (or closes) it.
+  useEffect(() => {
+    const on = () => toggle(!open);
+    window.addEventListener("open-scheduling", on);
+    return () => window.removeEventListener("open-scheduling", on);
+  });
   useEffect(() => {
     if (!open || wide) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && !editing && !scheduling && toggle(false);
@@ -230,38 +236,6 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
     if (!wide) toggle(false); // get the slide-out out of the way of the calendar
   }
 
-  // The closed tab: a slim vertical pull on the calendar's right edge.
-  const tab = (
-    <button
-      type="button"
-      onClick={() => toggle(true)}
-      aria-expanded={false}
-      aria-label={`Open the scheduling list (${count})`}
-      title="To schedule"
-      className={`flex flex-col items-center ${wide ? "w-10 gap-2 py-3" : "w-[30px] gap-1.5 py-2.5"}`}
-      style={{
-        background: "radial-gradient(circle at 35% 20%, #f6e3a8, #d9b45f 60%, #a88a3f)",
-        border: "1.5px solid #4a3913",
-        borderRight: wide ? undefined : "none",
-        borderRadius: wide ? 14 : "14px 0 0 14px",
-        color: "#2a1c10",
-        boxShadow: "0 6px 16px rgba(0,0,0,.35)",
-      }}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <span className={`font-display font-semibold ${wide ? "text-[15px]" : "text-[13px]"}`} style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>
-        To schedule
-      </span>
-      {count > 0 && (
-        <span className={`flex items-center justify-center rounded-full px-1 font-bold ${wide ? "h-6 min-w-6 text-[12.5px]" : "h-5 min-w-5 text-[11.5px]"}`} style={{ background: "#2a1c10", color: "#f6dc8e" }}>
-          {count}
-        </span>
-      )}
-    </button>
-  );
-
   const panel = (
     <aside
       aria-label="Scheduling priority list"
@@ -272,46 +246,53 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
         ...(wide ? {} : { height: "100%" }),
       }}
     >
-      <div className="relative z-[1] flex min-h-12 items-center gap-2 px-3">
-        <span className={`flex-1 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
-          To schedule
-          {count > 0 && <span className="ml-1.5 text-[13.5px] font-normal" style={{ color: "var(--t-ink-soft)" }}>({count})</span>}
-        </span>
-        {count > 0 && (
+      <div className="relative z-[1] flex flex-col gap-1.5 px-3 pb-2 pt-2.5">
+        <div className="flex items-center gap-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "var(--t-ink)" }}>
+            <rect x="3.5" y="5" width="17" height="15.5" rx="2.2" stroke="currentColor" strokeWidth="1.9" />
+            <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+          </svg>
+          <span className={`flex-1 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
+            To schedule
+            {count > 0 && <span className="ml-1.5 text-[13.5px] font-normal tabular-nums" style={{ color: "var(--t-ink-soft)" }}>{count}</span>}
+          </span>
           <button
             type="button"
-            onClick={() => setAuto(true)}
-            className="hover-glow h-8 rounded-full px-3 text-[12.5px] font-bold"
-            style={isAdventure ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { background: "var(--t-accent)", color: "#fff" }}
-            title="Place the whole list into your free time, in order"
+            onClick={() => toggle(false)}
+            aria-label="Close the scheduling list"
+            title="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none hover:bg-black/[.06]"
+            style={{ color: "var(--t-ink-soft)" }}
           >
-            ✨ Auto
+            ×
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => talkToToucan(undefined, "catchup")}
-          className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]"
-          style={{ color: "var(--t-ink)", border: "1px solid #b39a6a" }}
-          title="Coursework catch-up: coming up first, then missed ones from the beginning"
-        >
-          📚
-        </button>
-        <button type="button" onClick={() => setAdding(true)} className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)", border: "1px solid #b39a6a" }} title="Add a folder">
-          + Folder
-        </button>
-        <button
-          type="button"
-          onClick={() => toggle(false)}
-          aria-label="Close the scheduling list"
-          title="Slide away"
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]"
-          style={{ color: "var(--t-ink)" }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+        </div>
+        {/* Its tools, quietly on one line. */}
+        <div className="flex items-center gap-1.5">
+          {count > 0 && (
+            <button
+              type="button"
+              onClick={() => setAuto(true)}
+              className="hover-glow h-8 rounded-full px-3 text-[12.5px] font-bold"
+              style={isAdventure ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { background: "var(--t-accent)", color: "#fff" }}
+              title="Place the whole list into your free time, in order"
+            >
+              ✨ Auto-schedule
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => talkToToucan(undefined, "catchup")}
+            className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]"
+            style={{ color: "var(--t-ink)", border: "1px solid rgba(139,112,64,.45)" }}
+            title="Coursework catch-up: coming up first, then missed ones from the beginning"
+          >
+            📚 Catch-up
+          </button>
+          <button type="button" onClick={() => setAdding(true)} className="ml-auto h-8 rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)", border: "1px solid rgba(139,112,64,.45)" }} title="Add a folder">
+            + Folder
+          </button>
+        </div>
       </div>
 
       <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2.5 pb-3">
@@ -469,11 +450,10 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
     <>
       {wide ? (
         <div className="sticky top-4 flex shrink-0 self-start" style={{ maxHeight: "calc(100vh - 140px)" }}>
-          {open ? <div className="flex w-[320px] min-h-0">{panel}</div> : tab}
+          {open && <div className="flex w-[320px] min-h-0">{panel}</div>}
         </div>
       ) : (
         <>
-          {!open && <MovableTab>{tab}</MovableTab>}
           {open &&
             createPortal(
               <div className="fixed inset-0 z-[46]" onClick={() => toggle(false)} style={{ background: "rgba(10,8,4,.35)" }}>
@@ -736,66 +716,5 @@ function MoveMenu({ x, y, current, folders, onClose, onPick, onNew }: { x: numbe
       )}
     </div>,
     document.body
-  );
-}
-
-/**
- * The "To schedule" pull-tab on a phone: drag it up or down the right edge
- * to wherever it's out of the way (remembered on this device). A tap still opens it.
- */
-function MovableTab({ children }: { children: React.ReactNode }) {
-  const [top, setTop] = useState<number | null>(null);
-  const drag = useRef<{ y0: number; t0: number; moved: boolean } | null>(null);
-  const movedRecently = useRef(false);
-  useEffect(() => {
-    try {
-      const v = Number(window.localStorage.getItem("schedule-tab-top"));
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
-      if (v > 0 && v < 1) setTop(v);
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
-  // Out of the way by default: below the controls, over the late-day hours.
-  const frac = top ?? 0.6;
-  return (
-    <div
-      className="cursor-grab fixed right-0 z-[35] touch-none"
-      style={{ top: `${frac * 100}%` }}
-      onPointerDown={(e) => {
-        drag.current = { y0: e.clientY, t0: frac, moved: false };
-      }}
-      onPointerMove={(e) => {
-        const d = drag.current;
-        if (!d) return;
-        if (!d.moved && Math.abs(e.clientY - d.y0) < 6) return;
-        if (!d.moved) (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-        d.moved = true;
-        setTop(Math.max(0.08, Math.min(0.8, d.t0 + (e.clientY - d.y0) / window.innerHeight)));
-      }}
-      onPointerUp={() => {
-        const d = drag.current;
-        drag.current = null;
-        if (d?.moved) {
-          movedRecently.current = true;
-          try {
-            window.localStorage.setItem("schedule-tab-top", String(top ?? frac));
-          } catch {
-            /* storage unavailable */
-          }
-        }
-      }}
-      onClickCapture={(e) => {
-        // A drag isn't a tap.
-        if (movedRecently.current) {
-          e.stopPropagation();
-          e.preventDefault();
-        }
-        movedRecently.current = false;
-      }}
-      title="Drag to move"
-    >
-      {children}
-    </div>
   );
 }

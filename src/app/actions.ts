@@ -2563,6 +2563,21 @@ export async function setNextStepAction(taskId: string) {
 // ---------------------------------------------------------------------------
 
 /** Move, resize, rename or re-describe a Google Calendar event. */
+/** Yes / Maybe / No on a Google Calendar invitation. */
+export async function rsvpGoogleEventAction(eventId: string, calendarId: string, answer: "accepted" | "tentative" | "declined") {
+  const { accessToken } = await requireSessionMaybeGoogle();
+  if (!accessToken) throw new Error("Connect Google Calendar first.");
+  if (!["accepted", "tentative", "declined"].includes(answer)) throw new Error("Pick Yes, Maybe or No.");
+  const { rsvpCalendarEvent } = await import("@/lib/google-calendar");
+  try {
+    await rsvpCalendarEvent(accessToken, calendarId || "primary", eventId, answer);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(/forbidden|insufficient|403/i.test(msg) ? "Google didn't let the answer through from here." : `Couldn't answer the invitation: ${msg}`);
+  }
+  revalidatePath("/calendar");
+}
+
 export async function updateGoogleEventAction(
   eventId: string,
   calendarId: string,

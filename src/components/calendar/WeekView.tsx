@@ -744,7 +744,7 @@ export function WeekView({
                       setItemMenu({
                         x: e.clientX,
                         y: e.clientY,
-                        target: it.kind === "task" ? { kind: "task", task: it.task, start: it.start, end: it.end } : { kind: "event", title: it.event.title, start: it.start, end: it.end },
+                        target: it.kind === "task" ? { kind: "task", task: it.task, start: it.start, end: it.end } : { kind: "event", id: it.event.id, title: it.event.title, start: it.start, end: it.end },
                       });
                     }}
                     className="pointer-events-auto absolute"
