@@ -30,7 +30,34 @@ export type FxSettings = {
   pace?: number;
   /** The + button's look (see FAB_STYLES). */
   fabStyle?: FabStyle;
+  /** How much Quest complete shows: "light", "balanced" (default) or "full". */
+  effects?: EffectsLevel;
 };
+
+export type EffectsLevel = "light" | "balanced" | "full";
+export const EFFECTS_LEVELS: { key: EffectsLevel; label: string; hint: string }[] = [
+  { key: "light", label: "Light", hint: "Comes up at once: the card, the check and the XP bar, no extra sparkle" },
+  { key: "balanced", label: "Balanced", hint: "Comes up fast, the sparkles follow; lighter on slower devices" },
+  { key: "full", label: "Full", hint: "Everything, at the original unhurried pace" },
+];
+
+/** A slower device (few cores, little memory, data saver or reduced motion) gets the lighter scene under "Balanced". */
+export function isSlowDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
+  return (
+    (nav.hardwareConcurrency ?? 8) <= 4 ||
+    (nav.deviceMemory ?? 8) <= 3 ||
+    Boolean(nav.connection?.saveData) ||
+    Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
+  );
+}
+
+/** What Quest complete actually plays on this device. */
+export function effectsTier(fx: FxSettings): EffectsLevel {
+  const level = fx.effects ?? "balanced";
+  return level === "balanced" && isSlowDevice() ? "light" : level;
+}
 
 export type WelcomeHeading = "cheer" | "dawn" | "custom";
 export const WELCOME_HEADINGS: { key: WelcomeHeading; label: string; hint: string }[] = [

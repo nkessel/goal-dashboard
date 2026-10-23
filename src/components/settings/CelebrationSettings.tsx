@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, loadFx, saveFx, type FeedbackStyle, type FxSettings } from "@/lib/celebration-fx";
+import { FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { ProgressCelebration } from "@/components/celebration/ProgressCelebration";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
@@ -200,6 +200,20 @@ export function CelebrationSettings() {
         <button type="button" onClick={() => setCardPreview((n) => n + 1)} className={`${playBtn} self-start`} style={playStyle}>
           <Play /> Preview it
         </button>
+      </Fold>
+
+      <Fold title="Quest complete" hint={EFFECTS_LEVELS.find((l) => l.key === (fx.effects ?? "balanced"))?.label ?? "Balanced"}>
+        <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+          How much plays when you complete a quest.
+        </p>
+        <div role="radiogroup" aria-label="Quest complete effects" className="flex flex-col gap-1.5">
+          {EFFECTS_LEVELS.map((l) => (
+            <button key={l.key} type="button" role="radio" aria-checked={(fx.effects ?? "balanced") === l.key} onClick={() => update({ effects: l.key })} className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick((fx.effects ?? "balanced") === l.key)}>
+              <span className="text-[13.5px] font-bold">{l.label}</span>
+              <span className="text-[12px] font-normal opacity-80">{l.hint}</span>
+            </button>
+          ))}
+        </div>
       </Fold>
 
       <Fold title="Speed of the effects" hint={PACES.find((p) => p.v === (fx.pace ?? 1))?.label ?? "As designed"}>

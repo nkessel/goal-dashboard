@@ -14,6 +14,7 @@ import {
   cardDust,
   embers,
   loadFx,
+  effectsTier,
   puffDust,
   ringDust,
   type FxSettings,
@@ -126,6 +127,9 @@ export function QuestComplete(props: QuestCompleteProps) {
   }
   // Only ever mounted client-side (after a user action), so localStorage is readable up front.
   const [fx] = useState<FxSettings>(() => loadFx());
+  // Light: just the essentials, at once. Balanced: fast, sparkles after. Full: everything, unhurried.
+  const [tier] = useState(() => effectsTier(fx));
+  const lite = tier === "light";
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [reduce] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const [p, setP] = useState(reduce ? 1 : 0);
@@ -157,10 +161,10 @@ export function QuestComplete(props: QuestCompleteProps) {
           else timers.current.push(setTimeout(() => setPlaying(false), 6500));
         };
         raf.current = requestAnimationFrame(tick);
-      }, 1250)
+      }, tier === "full" ? 1250 : tier === "balanced" ? 550 : 300)
     );
     return stop;
-  }, [reduce, fx.fill, stop]);
+  }, [reduce, fx.fill, stop, tier]);
 
   useEscape(() => {
     if (!editTask) onClose();
@@ -176,13 +180,13 @@ export function QuestComplete(props: QuestCompleteProps) {
   const pct = Math.min(100, (cur / max) * 100);
   const spark = playing ? 1 : 0;
 
-  const icon0 = useMemo(() => (fx.fxAvatar ? ringDust(fx, "icon") : []), [fx]);
-  const char0 = useMemo(() => (fx.fxAvatar ? ringDust(fx, "char") : []), [fx]);
-  const card0 = useMemo(() => (fx.fxCard ? cardDust(fx) : []), [fx]);
+  const icon0 = useMemo(() => (fx.fxAvatar && !lite ? ringDust(fx, "icon") : []), [fx, lite]);
+  const char0 = useMemo(() => (fx.fxAvatar && !lite ? ringDust(fx, "char") : []), [fx, lite]);
+  const card0 = useMemo(() => (fx.fxCard && !lite ? cardDust(fx) : []), [fx, lite]);
   const pctBucket = Math.round(pct / 2) * 2;
-  const bar0 = useMemo(() => barDust(fx, pctBucket), [fx, pctBucket]);
-  const puff0 = useMemo(() => puffDust(fx), [fx]);
-  const amb = useMemo(() => embers(fx), [fx]);
+  const bar0 = useMemo(() => (lite ? [] : barDust(fx, pctBucket)), [fx, pctBucket, lite]);
+  const puff0 = useMemo(() => (lite ? [] : puffDust(fx)), [fx, lite]);
+  const amb = useMemo(() => (lite ? [] : embers(fx)), [fx, lite]);
 
 
   // Editing replaces the celebration (it comes back when the editor closes),
@@ -194,7 +198,7 @@ export function QuestComplete(props: QuestCompleteProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Quest complete"
-      className="fixed inset-0 z-50 overflow-hidden"
+      className={`fixed inset-0 z-50 overflow-hidden ${tier === "full" ? "" : "qc-fast"} ${lite ? "qc-lite" : ""}`}
       style={{ fontFamily: "var(--font-eb-garamond), 'EB Garamond', Georgia, serif", backgroundColor: "#232b22", backgroundImage: "url(/design/bg-forest.jpg)", backgroundSize: "cover", backgroundPosition: "top center" }}
     >
       <div className="qc-overlay absolute inset-0" style={{ background: "rgba(9,13,8,.84)" }} />
