@@ -28,7 +28,13 @@ export function BackToSettings({ isAdventure }: { isAdventure: boolean }) {
     {/* Skip the Settings menu: straight back to the page you were on before it. */}
     <button
       type="button"
-      onClick={() => (window.history.length > 2 ? window.history.go(-2) : router.push("/"))}
+      onClick={() => {
+        // Rolls up out of view like closing Settings does, then goes back.
+        const html = document.documentElement;
+        html.setAttribute("data-nav-pending", "settings-close");
+        setTimeout(() => (window.history.length > 2 ? window.history.go(-2) : router.push("/")), 260);
+        setTimeout(() => html.getAttribute("data-nav-pending") === "settings-close" && html.removeAttribute("data-nav-pending"), 3000);
+      }}
       className="hover-glow absolute left-[calc(50%+8px)] top-3 flex h-10 -translate-x-1/2 items-center whitespace-nowrap rounded-full px-3 text-[13.5px] sm:left-1/2 sm:px-3.5 sm:text-[14px]"
       style={{
         background: isAdventure ? "rgba(10,12,32,.6)" : "var(--t-card)",
