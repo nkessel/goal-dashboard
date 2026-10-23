@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addCheckNoteAction, deleteCheckNoteAction, updateCheckNoteAction } from "@/app/actions";
+import { DateField } from "@/components/ui/DateField";
 
 type Note = { id: string; body: string; created_at: string };
 type When = "now" | "morning" | "yesterday" | "pick";
@@ -192,12 +193,11 @@ export function EventLog({ notes }: { notes: Note[] }) {
               </button>
             ))}
             {when === "pick" && (
-              <input
-                type="date"
+              <DateField
                 value={pickDate}
                 max={localInput(new Date()).slice(0, 10)}
-                onChange={(e) => setPickDate(e.target.value)}
-                aria-label="Which day"
+                onChange={(v) => v && setPickDate(v)}
+                ariaLabel="Which day"
                 className="h-8 rounded-lg border px-2 text-[14px]"
                 style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.65)", color: INK }}
               />

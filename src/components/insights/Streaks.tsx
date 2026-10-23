@@ -4,6 +4,7 @@ import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeRiteAction, deleteCheckNoteAction, logSlipAction, saveStreaksAction } from "@/app/actions";
 import { MILESTONES, streakLabel, streakState, type StreakDef, type StreakNote } from "@/lib/streaks";
+import { DateField } from "@/components/ui/DateField";
 
 const INK = "#3b2a14";
 const SOFT = "#6b5631";
@@ -372,7 +373,7 @@ function HabitCard({ habit, now, onLogged }: { habit: HabitStreak; now: number; 
       </div>
       {picking && (
         <div className="fade-in flex items-center gap-2 rounded-lg p-2" style={{ background: "rgba(120,90,40,.1)" }}>
-          <input type="date" value={day} max={todayKey} onChange={(e) => setDay(e.target.value)} aria-label="Which day" className="h-10 min-w-0 flex-1 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.7)", color: INK }} />
+          <DateField value={day} max={todayKey} onChange={setDay} ariaLabel="Which day" className="h-10 min-w-0 flex-1 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.7)", color: INK }} />
           <button type="button" disabled={busy || !day || done.has(day)} onClick={() => log(day)} className="h-10 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
             {done.has(day) ? "Done that day" : "Log it"}
           </button>

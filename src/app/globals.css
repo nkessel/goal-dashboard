@@ -2371,3 +2371,9 @@ html { scrollbar-gutter: stable; }
 .qc-lite .qc-shake,.qc-lite .qc-flash,.qc-lite .qc-ripple,.qc-lite .qc-pulse,.qc-lite .qc-ring2,.qc-lite .qc-ring3{animation:none}
 .qc-lite .qc-flash,.qc-lite .qc-ripple{display:none}
 .qc-lite .qc-card{animation:qc-cardIn .3s cubic-bezier(.2,.9,.3,1.15) 0s both}
+
+/* Native time pickers on theme: parchment field, a gold clock, no blue. */
+input[type="time"], input[type="datetime-local"] { color-scheme: light; accent-color: #a88a3f; }
+input[type="time"]::-webkit-calendar-picker-indicator, input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: sepia(1) saturate(4) hue-rotate(-10deg) brightness(.8); cursor: pointer; }
+input[type="time"]::-webkit-datetime-edit-fields-wrapper, input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper { color: var(--t-ink); }
+input[type="time"]::-webkit-datetime-edit-hour-field:focus, input[type="time"]::-webkit-datetime-edit-minute-field:focus, input[type="time"]::-webkit-datetime-edit-ampm-field:focus { background: rgba(217,180,95,.45); color: #2a1c10; border-radius: 3px; }

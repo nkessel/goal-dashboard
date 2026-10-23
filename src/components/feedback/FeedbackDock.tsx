@@ -383,10 +383,13 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     // Straight into the celebration; the note is sent behind it.
     const xp = xpOf(d);
     setCelebrate({ key: Date.now(), kind: d.kind, xp, x: shown.x + shown.w / 2, y: shown.y + Math.min(shown.h, 260) / 2, style: loadFx().feedbackStyle ?? "seal" });
-    setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, deleted: true, updatedAt: Date.now() } : x)));
     setOpenId(null);
     startSaving(async () => {
       try {
+        // Let the "submitted" card draw in smoothly first: packing up the note and its
+        // pictures (and saving the drafts) is heavy work that made the start stutter on phones.
+        await new Promise((r) => setTimeout(r, 700));
+        setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, deleted: true, updatedAt: Date.now() } : x)));
         const r = await fetch("/api/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

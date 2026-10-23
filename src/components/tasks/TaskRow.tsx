@@ -18,6 +18,7 @@ import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { QuestMonogram } from "./QuestMonogram";
 import { openFocusMode } from "@/lib/focus-timer";
 import { coinsForXp } from "@/lib/coins";
+import { DateField } from "@/components/ui/DateField";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
  * Kept as a plain helper (not inlined in the component) so the impure
@@ -823,7 +824,7 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose }: { ti
           ))}
         </div>
         <div className="relative z-[1] flex flex-wrap items-center gap-2 text-[14px]">
-          <input type="date" value={day} max={keyOf(now)} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Day" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
+          <DateField value={day} max={keyOf(now)} onChange={(v) => v && setDay(v)} ariaLabel="Day" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
           <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Time (optional)" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
           <span style={{ color: "var(--t-ink-soft)" }}>time optional</span>
         </div>

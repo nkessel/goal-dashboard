@@ -48,6 +48,7 @@ import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
 import type { QuestTemplate } from "@/lib/quest-templates";
 import { descendants, parentKeys, stepPayload, stepsShare, stepWeights, treeOrder, type StepDraft } from "@/lib/quest-steps";
 import { readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
+import { DateField } from "@/components/ui/DateField";
 
 export type QuestDraft = {
   title?: string;
@@ -1188,13 +1189,13 @@ export function QuestEditorDialog({
                   {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
                   <img src="/design/ui-calendar.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
                   <span className={`${labelCls} w-[58px] shrink-0`}>Due</span>
-                  <input
-                    type="date"
+                  <DateField
                     value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    aria-label="Due date"
+                    onChange={setDueDate}
+                    ariaLabel="Due date"
+                    placeholder="No due date"
                     className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[15px]"
-                    style={{ ...fieldStyle, color: dueDate ? "var(--t-ink)" : "var(--t-ink-soft)" }}
+                    style={fieldStyle}
                   />
                   {dueDate && (
                     <>
