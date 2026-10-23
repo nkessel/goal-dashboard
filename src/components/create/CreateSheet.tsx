@@ -14,7 +14,6 @@ import { QuestShield } from "@/components/ui/Ornaments";
 import { useEscape } from "@/lib/use-escape";
 import { QuickCheckIn } from "./QuickCheckIn";
 import { EVERYDAY_JOURNAL_KINDS, JOURNAL_KINDS, type JournalKind } from "@/lib/journal-kinds";
-import { ChatIcon, openFeedback } from "@/components/feedback/FeedbackDock";
 
 export type CreateKind = "quest" | "now" | "habit" | "reward" | "rite" | "journal" | "board" | "subboard";
 
@@ -171,16 +170,13 @@ export function CreateSheet({
               isAdventure={isAdventure}
               onClick={() => setStage("make")}
             />
-            <ChoiceButton icon={<ChatIcon size={24} />} title="Feedback" hint="What to change in the next update, or an idea for the future" isAdventure={isAdventure} onClick={() => {
-                openFeedback();
-                close();
-              }} />
             <ChoiceButton icon={<BoltIcon size={24} />} title="Check in" hint="Energy, mood, an event or #tags — all optional" isAdventure={isAdventure} onClick={() => setStage("checkin")} />
             <ChoiceButton icon={<QuillGlyph />} title="Journal entry" hint="Gratitude, reflections, wins, ideas" isAdventure={isAdventure} onClick={() => setStage("journal")} />
           </div>
         ) : (
           <div className="relative z-[1] flex shrink-0 items-center gap-1 px-2 pt-2.5">
-            {offersChoice && (
+            {/* The New quest screen has no Back: its × closes it. */}
+            {offersChoice && stage !== "make" && (
               <button
                 type="button"
                 onClick={() => setStage("choose")}

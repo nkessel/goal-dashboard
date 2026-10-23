@@ -48,11 +48,13 @@ function mergeDrafts(a: Draft[], b: Draft[]): Draft[] {
   }
   return [...byId.values()];
 }
-/** What to keep: drafts with words in them, and recent deletions (so another tab or device doesn't bring them back). */
+/** A draft worth keeping: words, or a picture attached (a screenshot alone still counts). */
+const hasContent = (d: Draft) => !!d.body.trim() || !!d.shot || (d.images ?? []).length > 0;
+/** What to keep: drafts with words or pictures in them, and recent deletions (so another tab or device doesn't bring them back). */
 const keepable = (ds: Draft[]) =>
   ds
     // A draft emptied out counts as deleted, so an older copy elsewhere can't bring it back.
-    .map((d) => (!d.deleted && !d.body.trim() ? { ...d, deleted: true } : d))
+    .map((d) => (!d.deleted && !hasContent(d) ? { ...d, deleted: true } : d))
     .filter((d) => !d.deleted || (d.updatedAt ?? 0) > Date.now() - 86_400_000);
 type Geom = { x: number; y: number; w: number; h: number };
 /** The round button's top-left corner, in px from the window's top-left. */
@@ -256,6 +258,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   // Extra height the writing has asked for (per note).
   const [grow, setGrow] = useState<{ id: string; px: number } | null>(null);
   const [phoneY, setPhoneY] = useState<number | null>(null);
+  // Just minimized: the button waits right where the minimize button was, until it's moved.
+  const [parked, setParked] = useState<Pos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const justDragged = useRef(false);
@@ -314,13 +318,13 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   }, []);
 
   const open = drafts.find((d) => d.id === openId && (!d.deleted || sent?.id === d.id)) ?? null;
-  const waiting = drafts.filter((d) => d.id !== openId && !d.deleted && d.body.trim());
+  const waiting = drafts.filter((d) => d.id !== openId && !d.deleted && hasContent(d));
 
   /** Leave the open draft: empty ones simply go away. */
   const leaveOpen = useCallback(() => {
     setConfirmDiscard(false);
     setError(null);
-    setDrafts((ds) => ds.filter((d) => d.id !== openId || d.body.trim()));
+    setDrafts((ds) => ds.filter((d) => d.id !== openId || hasContent(d)));
     setOpenId(null);
   }, [openId]);
 
@@ -331,7 +335,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     setChoosing(false);
     setSent(null);
     setError(null);
-    setDrafts((ds) => [...ds.filter((x) => x.id !== openId || x.body.trim()), d]);
+    setDrafts((ds) => [...ds.filter((x) => x.id !== openId || hasContent(x)), d]);
     setOpenId(d.id);
   }, [openId]);
 
@@ -341,7 +345,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       document.querySelector<HTMLTextAreaElement>("[data-feedback-text]")?.focus();
       return;
     }
-    const hasWaiting = drafts.some((d) => d.body.trim());
+    // Only drafts still waiting (not sent or thrown away) make it ask.
+    const hasWaiting = drafts.some((d) => !d.deleted && hasContent(d));
     if (hasWaiting) setChoosing((v) => !v);
     else startNew();
   }, [openId, drafts, startNew]);
@@ -351,7 +356,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     setChoosing(false);
     setError(null);
     setSent(null);
-    setDrafts((ds) => ds.filter((d) => d.id !== openId || d.body.trim()));
+    setDrafts((ds) => ds.filter((d) => d.id !== openId || hasContent(d)));
     setOpenId(id);
   }
 
@@ -363,7 +368,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   }
 
   function requestClose() {
-    if (open?.body.trim() && sent?.id !== open.id) setConfirmDiscard(true);
+    if (open && hasContent(open) && sent?.id !== open.id) setConfirmDiscard(true);
     else discard();
   }
 
@@ -437,7 +442,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   // ---- The round button: tap to start (or continue) feedback, drag to put it anywhere.
   const defaultPos: Pos = { x: vp.innerW - BTN - 12, y: vp.innerH - BTN - 92 };
   const placeBtn = (p: Pos): Pos => ({ x: clamp(p.x, 6, vp.innerW - BTN - 6), y: clamp(p.y, 6, vp.innerH - BTN - 6) });
-  const btnPos = placeBtn(dragPos ?? pos ?? defaultPos);
+  const btnPos = placeBtn(dragPos ?? parked ?? pos ?? defaultPos);
 
   function onBtnDown(e: React.PointerEvent<HTMLButtonElement>) {
     const start = btnPos;
@@ -454,6 +459,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         setTimeout(() => (justDragged.current = false), 0);
         setPos(last);
         setDragPos(null);
+        setParked(null);
         writeJson(BUTTON_KEY, last);
       },
     });
@@ -512,7 +518,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 
   return createPortal(
     <>
-      <button
+      {/* On a phone the box has its own minimize, so the button steps aside while it's open. */}
+      {!(mobile && open && !isSent) && <button
         type="button"
         data-feedback-hide
         data-feedback-root
@@ -525,7 +532,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         aria-label={openId ? "Minimize feedback" : "Feedback (F)"}
         title={openId ? "Minimize feedback" : "Feedback (F) — drag to move"}
         aria-expanded={!!openId || choosing}
-        className={`fixed z-[60] flex touch-none select-none items-center justify-center rounded-full ${dragPos ? "cursor-grabbing" : "cursor-pointer transition-transform hover:scale-105 active:scale-95"}`}
+        className={`fixed z-[95] flex touch-none select-none items-center justify-center rounded-full ${dragPos ? "cursor-grabbing" : "cursor-pointer transition-transform hover:scale-105 active:scale-95"}`}
         style={{ left: btnPos.x, top: btnPos.y, width: BTN, height: BTN, ...coin }}
       >
         <ChatIcon size={27} />
@@ -538,7 +545,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             {waiting.length}
           </span>
         )}
-      </button>
+      </button>}
 
       {/* Drafts waiting: keep working on one, or start a new one. */}
       {choosing && !openId && !dragPos && (
@@ -546,7 +553,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           role="menu"
           aria-label="Your unsent feedback"
           data-feedback-root
-          className="card-pop-in parchment fixed z-[61] flex w-[min(300px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl shadow-2xl"
+          className="card-pop-in parchment fixed z-[96] flex w-[min(300px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl shadow-2xl"
           style={{
             ...(chooserRight ? { right: vp.innerW - btnPos.x - BTN } : { left: btnPos.x }),
             ...(chooserAbove ? { bottom: vp.innerH - btnPos.y + 8 } : { top: btnPos.y + BTN + 8 }),
@@ -560,7 +567,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           {waiting.slice(-4).reverse().map((d) => (
             <button key={d.id} type="button" role="menuitem" onClick={() => restore(d.id)} className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[14.5px] hover:bg-black/5">
               <ChatIcon size={16} />
-              <span className="min-w-0 flex-1 truncate">{d.body.trim()}</span>
+              <span className="min-w-0 flex-1 truncate">{d.body.trim() || "📷 A picture, no words yet"}</span>
             </button>
           ))}
           <button
@@ -584,7 +591,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           aria-modal={false}
           aria-label="Feedback"
           data-feedback-root
-          className="fixed z-[61]"
+          className="fixed z-[96]"
           style={{ left: shown.x, top: shown.y, width: shown.w, height: isSent ? "auto" : shown.h }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
@@ -616,9 +623,21 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
                   <span className="truncate">Feedback</span>
                 </span>
                 {!isSent && (
-                  <button type="button" onClick={leaveOpen} aria-label="Put it away for later" title="Put it away — continue later from the feedback button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5" style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M6 10l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      // The feedback button comes back right beside where you tapped.
+                      const r = e.currentTarget.getBoundingClientRect();
+                      setParked({ x: r.left + r.width / 2 - BTN / 2, y: r.top + r.height / 2 - BTN / 2 });
+                      leaveOpen();
+                    }}
+                    aria-label="Minimize"
+                    title="Minimize — continue later from the feedback button"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
+                    style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M5 18h14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
                     </svg>
                   </button>
                 )}
@@ -713,7 +732,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
   if (style === "quiet") {
     const hold = typeof window === "undefined" ? 2.2 : (loadFx().feedbackHold ?? 2.2);
     return (
-      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center p-6" style={{ ["--fb-pace" as string]: String(paceNow()), ["--fb-hold" as string]: `${hold || 2.2}s` }}>
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[97] flex items-center justify-center p-6" style={{ ["--fb-pace" as string]: String(paceNow()), ["--fb-hold" as string]: `${hold || 2.2}s` }}>
         <div className={`${hold === 0 ? "fb-done fb-done-stay" : "fb-done"} relative flex w-[min(300px,100%)] flex-col items-center gap-2 rounded-3xl px-6 pb-5 pt-6 text-center`} style={isAdventure ? { background: "linear-gradient(180deg,#f6ecd2,#ead7aa)", border: "2px solid #a88a3f", color: "#2a1c10", boxShadow: "0 18px 40px rgba(0,0,0,.45)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: "var(--t-ink)", boxShadow: "0 18px 40px rgba(0,0,0,.25)" }}>
           {closeBtn(false)}
           <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden>
@@ -737,7 +756,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
   // Handed to the Great Toucan Spirit: he takes the letter and powers up.
   if (style === "toucan")
     return (
-      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[62] flex items-center justify-center" style={{ ["--fb-pace" as string]: String(paceNow()) }}>
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[97] flex items-center justify-center" style={{ ["--fb-pace" as string]: String(paceNow()) }}>
         <div className="fb-spirit relative flex flex-col items-center">
           <span aria-hidden className="fb-spirit-rays absolute left-1/2 top-[64px] h-[260px] w-[260px] rounded-full" />
           <span aria-hidden className="fb-spirit-ring absolute left-1/2 top-[64px] h-[120px] w-[120px] rounded-full" />
@@ -774,7 +793,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
   );
   if (style === "crane")
     return (
-      <div role="status" aria-live="polite" className="pointer-events-none fixed z-[62]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
+      <div role="status" aria-live="polite" className="pointer-events-none fixed z-[97]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
         <div className="fb-burst relative flex flex-col items-center">
           <svg className="fb-crane" width="96" height="72" viewBox="0 0 96 72" aria-hidden>
             <path d="M4 50l34-8 10-30 8 30 36-26-30 44-18-2z" fill="#f6ecd2" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
@@ -787,7 +806,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
       </div>
     );
   return (
-    <div role="status" aria-live="polite" className="pointer-events-none fixed z-[62]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
+    <div role="status" aria-live="polite" className="pointer-events-none fixed z-[97]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
       <div className="fb-burst relative flex flex-col items-center">
         {Array.from({ length: 10 }, (_, i) => (
           <span key={i} aria-hidden className="fb-spark" style={{ ["--a" as string]: `${i * 36}deg`, ["--d" as string]: `${54 + (i % 3) * 14}px` }} />
@@ -1032,14 +1051,15 @@ function Composer({
             </select>
           </label>
         )}
-        {!draft.shot && (
+        {(draft.shot ? 1 : 0) + (draft.images ?? []).length < 5 && (
           <button
             type="button"
             onClick={async () => {
               setUploading(true);
               const url = await captureScreen();
               setUploading(false);
-              if (url) onChange({ shot: url });
+              // The first picture of the screen is "the" screenshot; more join the images.
+              if (url) onChange(draft.shot ? { images: [...(draft.images ?? []), url] } : { shot: url });
               else setAttachError("Couldn't take a picture of this screen.");
             }}
             title="Add a picture of this screen"
@@ -1088,7 +1108,7 @@ function Composer({
       )}
       {viewing &&
         createPortal(
-          <div role="dialog" aria-label="Attachment" className="fixed inset-0 z-[90] flex items-center justify-center p-4" style={{ background: "rgba(10,8,14,.82)" }} onClick={() => setViewing(null)}>
+          <div role="dialog" aria-label="Attachment" className="fixed inset-0 z-[98] flex items-center justify-center p-4" style={{ background: "rgba(10,8,14,.82)" }} onClick={() => setViewing(null)}>
             {/* eslint-disable-next-line @next/next/no-img-element -- attachment, full size */}
             <img src={viewing} alt="Attachment, full size" className="max-h-full max-w-full rounded-lg object-contain" style={{ boxShadow: "0 12px 40px rgba(0,0,0,.6)" }} />
             <button type="button" onClick={() => setViewing(null)} aria-label="Close" className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-[22px]" style={{ background: "rgba(255,255,255,.15)", color: "#fff" }}>

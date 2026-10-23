@@ -1626,7 +1626,7 @@ export async function addJournalEntryAction(body: string, mood: number | null, k
   // 1 XP per paragraph, growing past three, up to 12.
   const xpAwarded = isFeedback ? Math.max(0, Math.min(12, Math.round(feedbackXp))) : 0;
   const entry = await journalData.addJournalEntry(ownerId, text.slice(0, 20000), mood && mood >= 1 && mood <= 5 ? Math.round(mood) : null, k, xpAwarded);
-  const pics = attachments.filter((u) => typeof u === "string" && /^https:\/\/[^\s]+\/feedback\//.test(u)).slice(0, 4);
+  const pics = attachments.filter((u) => typeof u === "string" && /^https:\/\/[^\s]+\/feedback\//.test(u)).slice(0, 6);
   if (pics.length) await journalData.setAttachments(ownerId, entry.id, pics).catch(() => {});
   // Feedback from someone in the party goes to the owner's review queue.
   if (isFeedback) {
