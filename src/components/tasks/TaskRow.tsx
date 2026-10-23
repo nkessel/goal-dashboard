@@ -109,6 +109,8 @@ export function TaskRow({
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  // "Edit first" from Already completed: when the editor closes, the day picker comes back.
+  const [backToEarlier, setBackToEarlier] = useState(false);
   const [menu, setMenu] = useState<"icon" | "dots" | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [scheduling, setScheduling] = useState(false);
@@ -618,12 +620,28 @@ export function TaskRow({
           onClose={() => {
             setEditing(false);
             onEditorClose?.();
+            if (backToEarlier) {
+              setBackToEarlier(false);
+              setDoneEarlier(true);
+            }
           }}
         />
       )}
       {sequencing && <SequenceDialog taskId={task.id} title={task.title} isAdventure={isAdventure} onClose={() => setSequencing(false)} />}
       {followUp && <CreateSheet kinds={["quest"]} initial="quest" boardId={task.board_id ?? undefined} followUpOf={{ id: task.id, title: task.title }} theme={theme} onClose={() => setFollowUp(false)} />}
-      {doneEarlier && <DoneEarlierDialog title={task.title} isAdventure={isAdventure} onPick={completeEarlier} onClose={() => setDoneEarlier(false)} />}
+      {doneEarlier && (
+        <DoneEarlierDialog
+          title={task.title}
+          isAdventure={isAdventure}
+          onPick={completeEarlier}
+          onEdit={() => {
+            setDoneEarlier(false);
+            setBackToEarlier(true);
+            setEditing(true);
+          }}
+          onClose={() => setDoneEarlier(false)}
+        />
+      )}
       </div>
     </div>
       </SwipeReveal>
@@ -739,7 +757,7 @@ function LockedRewardCard({ reward }: { reward: Task }) {
 }
 
 /** "Already completed": which day (and, if wanted, what time) it was done. */
-function DoneEarlierDialog({ title, isAdventure, onPick, onClose }: { title: string; isAdventure: boolean; onPick: (when: Date) => void; onClose: () => void }) {
+function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose }: { title: string; isAdventure: boolean; onPick: (when: Date) => void; onEdit: () => void; onClose: () => void }) {
   const pad = (n: number) => String(n).padStart(2, "0");
   const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const [now] = useState(() => new Date());
@@ -794,7 +812,11 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onClose }: { title: str
           <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Time (optional)" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
           <span style={{ color: "var(--t-ink-soft)" }}>time optional</span>
         </div>
-        <div className="relative z-[1] flex justify-end gap-2 pt-1">
+        <div className="relative z-[1] flex flex-wrap justify-end gap-2 pt-1">
+          {/* Update it first (steps, XP, notes), then come back here to mark it done. */}
+          <button type="button" onClick={onEdit} className="mr-auto h-10 rounded-full px-3 text-[14.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "var(--t-ink)" }}>
+            ✎ Edit first
+          </button>
           <button type="button" onClick={onClose} className="h-10 rounded-full px-4 text-[15px] font-semibold hover:bg-black/5" style={{ border: "1.5px solid #b39a6a" }}>
             Cancel
           </button>
