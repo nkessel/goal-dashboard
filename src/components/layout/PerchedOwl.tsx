@@ -1,8 +1,8 @@
 "use client";
 
 import { FOUND, HIDING, SAY_FLYING, SAY_LANDING, WISDOM, retiredLines } from "@/lib/toucan-lines";
-import { flourishClass, readFlourish, type Flourish } from "@/lib/toucan-flourish";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { flourishClass, readFlourish, readTalkLook, subscribeTalkLook, type Flourish } from "@/lib/toucan-flourish";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
@@ -136,6 +136,8 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     return () => window.removeEventListener("toucan-change", h);
   }, []);
   const [say, setSay] = useState<string | null>(null);
+  // How "Talk with me" shows on the bubble (Settings → Toucan Spirit → His look).
+  const talkLook = useSyncExternalStore(subscribeTalkLook, readTalkLook, () => "glow" as const);
   // Buttons under the words (for the line they belong to).
   const [sayActions, setSayActions] = useState<{ for: string; list: { label: string; run: () => void; secret?: boolean }[] } | null>(null);
   const sayRef = useRef<HTMLDivElement>(null);
@@ -717,8 +719,9 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             }
           >
             {say}
-            {/* A hidden power: a faint glint in the bubble's corner that wakes on hover. */}
+            {/* "Talk with me": a shining star on the bubble's corner, a few words, or a secret glint. */}
             {sayActions?.for === say &&
+              talkLook !== "words" &&
               sayActions.list
                 .filter((a) => a.secret)
                 .map((a) => (
@@ -731,16 +734,16 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
                     }}
                     aria-label={a.label}
                     title={a.label}
-                    className="owl-secret absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full"
+                    className={`absolute -bottom-2 -right-2 flex items-center justify-center rounded-full ${talkLook === "glint" ? "owl-secret h-6 w-6" : "owl-talk h-8 w-8"}`}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden>
+                    <svg width={talkLook === "glint" ? 12 : 16} height={talkLook === "glint" ? 12 : 16} viewBox="0 0 24 24" aria-hidden>
                       <path d="M12 1.5l2.2 7.3 7.3 2.2-7.3 2.2L12 20.5l-2.2-7.3L2.5 11l7.3-2.2z" fill="currentColor" />
                     </svg>
                   </button>
                 ))}
-            {sayActions?.for === say && sayActions.list.some((a) => !a.secret) && (
+            {sayActions?.for === say && sayActions.list.some((a) => !a.secret || talkLook === "words") && (
               <span className="mt-1.5 flex flex-wrap justify-center gap-1.5">
-                {sayActions.list.filter((a) => !a.secret).map((a) => (
+                {sayActions.list.filter((a) => !a.secret || talkLook === "words").map((a) => (
                   <button
                     key={a.label}
                     type="button"

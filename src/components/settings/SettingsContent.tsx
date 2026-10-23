@@ -11,7 +11,7 @@ import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
 import { countImports } from "@/lib/data/rewards";
 import { Avatar } from "@/components/settings/Avatar";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
-import { ToucanSettings } from "@/components/settings/ToucanSettings";
+import { ToucanLookSettings, ToucanSettings } from "@/components/settings/ToucanSettings";
 import { ReorderableSections, SectionItem } from "@/components/settings/ReorderableSections";
 import { PalettePicker } from "@/components/settings/PalettePicker";
 import { isPalette, type PaletteKey } from "@/lib/palettes";
@@ -364,7 +364,14 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               initialMode={(((profile.life_wheel as { toucanPrefs?: { mode?: string } } | null)?.toucanPrefs?.mode as "simple" | "lite" | "full" | undefined) ?? "full")}
               initialRetired={(profile.life_wheel as { toucanPrefs?: { retired?: string[] } } | null)?.toucanPrefs?.retired ?? []}
             />
-            <ToucanWorkshop initial={profile.toucan ?? null} coins={profile.coins ?? 0} />
+            {/* His look gets its own heading, apart from what he does. */}
+            <div className="mt-4 flex flex-col gap-3 pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
+              <h4 className={`m-0 ${isAdventure ? "font-display text-[16px]" : "text-sm font-bold"}`} style={{ color: "var(--t-ink)" }}>
+                His look
+              </h4>
+              <ToucanLookSettings />
+              <ToucanWorkshop initial={profile.toucan ?? null} coins={profile.coins ?? 0} />
+            </div>
           </SettingsRow>
           </SectionItem>
 

@@ -2337,3 +2337,9 @@ html.scroll-locked body {
   .hover-glow:active:not(:disabled) { transition-delay: 0s, 0s, 90ms; }
   [data-no-press-scroll] :where(a[href], button, [role="button"]):active { transition-delay: 90ms; }
 }
+
+/* The toucan's "Talk with me" star: plain to see, gently shining. */
+.owl-talk { color: #f2d27e; background: radial-gradient(circle at 40% 35%, #3a2a10, #1c1408); box-shadow: 0 0 0 1.5px #d9b45f, 0 0 12px rgba(242,210,126,.55); animation: owl-talk-shine 2.8s ease-in-out infinite; transition: transform 160ms ease; }
+.owl-talk:hover, .owl-talk:focus-visible { transform: scale(1.15); }
+@keyframes owl-talk-shine { 0%, 100% { box-shadow: 0 0 0 1.5px #d9b45f, 0 0 8px rgba(242,210,126,.4); } 50% { box-shadow: 0 0 0 1.5px #f2d27e, 0 0 16px rgba(242,210,126,.8); } }
+@media (prefers-reduced-motion: reduce) { .owl-talk { animation: none; } }

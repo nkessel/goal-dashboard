@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { saveToucanPrefsAction } from "@/app/actions";
+import { FLOURISHES, TALK_LOOKS, readFlourish, readTalkLook, saveFlourish, saveTalkLook, type Flourish, type TalkLook } from "@/lib/toucan-flourish";
 import { LINE_GROUPS, setRetiredLines } from "@/lib/toucan-lines";
 
 export type ToucanMode = "simple" | "lite" | "full";
@@ -90,6 +91,67 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** His look, beyond his add-ons: how he moves when sharing wisdom, and how "Talk with me" shows. */
+export function ToucanLookSettings() {
+  const [flourish, setFlourish] = useState<Flourish>("glow");
+  const [talk, setTalk] = useState<TalkLook>("glow");
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- browser storage is only readable after hydration */
+    setFlourish(readFlourish());
+    setTalk(readTalkLook());
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+  const pick = (on: boolean) => (on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border, rgba(139,112,64,.35))", color: "var(--t-ink)" });
+  return (
+    <div className="flex flex-col gap-2.5" style={{ color: "var(--t-ink)" }}>
+      <span className="text-sm font-semibold">“Talk with me” on his speech bubble</span>
+      <div role="radiogroup" aria-label="How Talk with me shows" className="flex flex-col gap-1.5">
+        {TALK_LOOKS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="radio"
+            aria-checked={talk === t.key}
+            onClick={() => {
+              setTalk(t.key);
+              saveTalkLook(t.key);
+            }}
+            className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left"
+            style={pick(talk === t.key)}
+          >
+            <span className="text-[14px] font-bold">{t.label}</span>
+            <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+              {t.hint}
+            </span>
+          </button>
+        ))}
+      </div>
+      <span className="text-sm font-semibold">When he shares wisdom, he…</span>
+      <div role="radiogroup" aria-label="How the toucan moves" className="grid grid-cols-2 gap-1.5">
+        {FLOURISHES.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            role="radio"
+            aria-checked={flourish === f.key}
+            onClick={() => {
+              setFlourish(f.key);
+              saveFlourish(f.key);
+            }}
+            className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left"
+            style={pick(flourish === f.key)}
+          >
+            <span className="text-[14px] font-bold">{f.label}</span>
+            <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+              {f.hint}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

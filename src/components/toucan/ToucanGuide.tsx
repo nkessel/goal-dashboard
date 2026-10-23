@@ -31,6 +31,7 @@ import type { CoachAction, CoachNote, CoachPromise } from "@/lib/coach";
 import { AHEAD_DAYS, catchUpOrder, catchUpPlan, looksLikeCourse, type CourseItem } from "@/lib/catch-up";
 import { SCHEDULER_DEFAULTS, planSchedule, type Busy, type SchedulerSettings } from "@/lib/auto-schedule";
 import { openFocusMode } from "@/lib/focus-timer";
+import { GearIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "./ToucanArt";
 
 type PlanTarget = { id: string; title: string; estimate: number | null; dueAt: string | null };
@@ -90,13 +91,16 @@ export function ToucanGuide() {
       })
       .catch(() => {});
   }, []);
-  const [open, setOpen] = useState<{ plan: PlanTarget | null; mode: Mode; say?: string } | null>(null);
+  const [open, setOpen] = useState<{ plan: PlanTarget | null; mode: Mode; say?: string; n?: number } | null>(null);
+  const [minimized, setMinimized] = useState(false);
   const [fallback, setFallback] = useState<{ nudge: Nudge } | null>(null);
 
   useEffect(() => {
     const h = (e: Event) => {
       const d = (e as CustomEvent<{ plan?: PlanTarget; mode?: Mode; say?: string } | undefined>).detail;
-      setOpen({ plan: d?.plan ?? null, mode: d?.mode ?? "talk", say: d?.say });
+      setMinimized(false);
+      // A plain "talk" while minimized just brings the same conversation back.
+      setOpen((cur) => (cur && !d?.plan && !d?.say && (d?.mode ?? "talk") === "talk" ? cur : { plan: d?.plan ?? null, mode: d?.mode ?? "talk", say: d?.say, n: Date.now() }));
     };
     window.addEventListener("toucan-talk", h);
     return () => window.removeEventListener("toucan-talk", h);
@@ -268,7 +272,32 @@ export function ToucanGuide() {
           }}
         />
       )}
-      {open && (mode !== "simple" || open.mode === "catchup" || open.plan) && <GuideSheet lite={mode !== "full"} initialPlan={open.plan} initialMode={open.mode} initialSay={open.say} onClose={() => setOpen(null)} />}
+      {open && (mode !== "simple" || open.mode === "catchup" || open.plan) && (
+        <GuideSheet
+          key={open.n}
+          lite={mode !== "full"}
+          initialPlan={open.plan}
+          initialMode={open.mode}
+          initialSay={open.say}
+          hidden={minimized}
+          onMinimize={() => setMinimized(true)}
+          onClose={() => {
+            setOpen(null);
+            setMinimized(false);
+          }}
+        />
+      )}
+      {open && minimized && (
+        <button
+          type="button"
+          onClick={() => setMinimized(false)}
+          className="card-pop-in fixed bottom-[88px] left-3 z-[58] flex h-11 items-center gap-1.5 rounded-full pl-1.5 pr-3.5 text-[13.5px] font-semibold"
+          style={{ background: "linear-gradient(180deg, #10302f, #0a1f22)", border: "1.5px solid rgba(140,240,220,.5)", color: "#bff7ea", boxShadow: "0 6px 16px rgba(0,0,0,.45)" }}
+        >
+          <ToucanArt size={30} />
+          Continue talking
+        </button>
+      )}
     </>
   );
 }
@@ -318,7 +347,24 @@ const PROMPTS: { label: string; say?: string; mode?: Mode }[] = [
 
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 
-function GuideSheet({ initialPlan, initialMode, initialSay, onClose, lite = false }: { initialPlan: PlanTarget | null; initialMode: Mode; initialSay?: string; onClose: () => void; lite?: boolean }) {
+function GuideSheet({
+  initialPlan,
+  initialMode,
+  initialSay,
+  onClose,
+  onMinimize,
+  hidden = false,
+  lite = false,
+}: {
+  initialPlan: PlanTarget | null;
+  initialMode: Mode;
+  initialSay?: string;
+  onClose: () => void;
+  onMinimize: () => void;
+  /** Minimized: kept (with the conversation) but out of sight. */
+  hidden?: boolean;
+  lite?: boolean;
+}) {
   const [plan, setPlan] = useState<PlanTarget | null>(initialPlan);
   const [mode, setMode] = useState<Mode>(initialMode);
   const [nudges, setNudges] = useState<Nudge[] | null>(null);
@@ -354,10 +400,11 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose, lite = fals
     };
   }, []);
   useEffect(() => {
+    if (hidden) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [onClose]);
+  }, [onClose, hidden]);
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
   }, [msgs, thinking, plan]);
@@ -400,7 +447,7 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose, lite = fals
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Talk with the Great Toucan Spirit">
+    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Talk with the Great Toucan Spirit" hidden={hidden}>
       <button type="button" aria-label="Close" className="absolute inset-0 cursor-default" style={{ background: "rgba(6,12,14,.45)" }} onClick={onClose} />
       {/* Sized to what's visible, so the keyboard never hides the box you type in. */}
       <section
@@ -423,9 +470,12 @@ function GuideSheet({ initialPlan, initialMode, initialSay, onClose, lite = fals
             </button>
           )}
           <button type="button" onClick={() => setShowLook((v) => !v)} aria-expanded={showLook} title="How I move" aria-label="How the toucan moves" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10" style={{ color: "rgba(232,255,248,.75)" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.9" />
-              <path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3L5.5 5.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+            <GearIcon size={17} />
+          </button>
+          {/* Minimize keeps the conversation; the small toucan pill brings it back. */}
+          <button type="button" onClick={onMinimize} aria-label="Minimize" title="Minimize" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10" style={{ color: "rgba(232,255,248,.75)" }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M5 18h14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
             </svg>
           </button>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10">

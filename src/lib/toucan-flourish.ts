@@ -27,3 +27,37 @@ export function saveFlourish(f: Flourish) {
   window.dispatchEvent(new CustomEvent("toucan-flourish", { detail: f }));
 }
 export const flourishClass = (f: Flourish) => (f === "still" ? undefined : f === "leap" ? "toucan-tap" : `toucan-tap-${f}`);
+
+/** How the "Talk with me" button on the toucan's speech bubble shows itself. */
+export type TalkLook = "glow" | "words" | "glint";
+export const TALK_LOOKS: { key: TalkLook; label: string; hint: string }[] = [
+  { key: "glow", label: "A glowing star", hint: "a gold star on the bubble's corner, gently shining" },
+  { key: "words", label: "Words", hint: "a small “Talk with me” under what he says" },
+  { key: "glint", label: "A secret glint", hint: "faint, for those who know it's there" },
+];
+const TALK_KEY = "toucan-talk-look";
+export function readTalkLook(): TalkLook {
+  try {
+    const v = localStorage.getItem(TALK_KEY);
+    if (v && TALK_LOOKS.some((t) => t.key === v)) return v as TalkLook;
+  } catch {
+    /* storage unavailable */
+  }
+  return "glow";
+}
+export function saveTalkLook(t: TalkLook) {
+  try {
+    localStorage.setItem(TALK_KEY, t);
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event("toucan-talk-look"));
+}
+export function subscribeTalkLook(cb: () => void) {
+  window.addEventListener("toucan-talk-look", cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener("toucan-talk-look", cb);
+    window.removeEventListener("storage", cb);
+  };
+}
