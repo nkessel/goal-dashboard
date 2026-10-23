@@ -219,10 +219,9 @@ export function BoardGrid({
 
   function card(board: BoardWithStats, dragging = false) {
     const open = questsOn(board);
-    // Fog of war: the card shows the board's next step; the rest waits in the mist.
+    // Fog of war: the card shows the board's next step only (the rest is on the board itself).
     const nextStep = nextActionOf(board, open) ?? open[0];
     const previews = nextStep ? [nextStep] : [];
-    const more = open.length - previews.length;
     const href = `/boards/${board.id}`;
     const rule = isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)";
 
@@ -285,14 +284,6 @@ export function BoardGrid({
             {previews.map((q) => (
               <QuestPreview key={q.id} q={q} disabled={dragging} onOpen={() => setOpenQuest(q)} />
             ))}
-            {more > 0 && (
-              <li>
-                <Link href={href} draggable={false} className="board-quest flex items-center gap-1 rounded-md px-1 py-[3px] text-[12.5px]">
-                  <span aria-hidden>🌫</span>
-                  <span style={{ color: soft }}>{more} more in the mist</span>
-                </Link>
-              </li>
-            )}
           </ul>
         )}
 

@@ -2343,3 +2343,7 @@ html.scroll-locked body {
 .owl-talk:hover, .owl-talk:focus-visible { transform: scale(1.15); }
 @keyframes owl-talk-shine { 0%, 100% { box-shadow: 0 0 0 1.5px #d9b45f, 0 0 8px rgba(242,210,126,.4); } 50% { box-shadow: 0 0 0 1.5px #f2d27e, 0 0 16px rgba(242,210,126,.8); } }
 @media (prefers-reduced-motion: reduce) { .owl-talk { animation: none; } }
+
+/* Popups lock the page's scrolling; keeping the scroll bar's room stops the
+   page under them shifting sideways on desktop as they open and close. */
+html { scrollbar-gutter: stable; }

@@ -74,6 +74,10 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     const pending = pendingRef.current;
     pendingRef.current = null;
     html.removeAttribute("data-nav-pending");
+    // A board opening or closing as a popup over the screen: the screen under it
+    // stays still (it never left), so no entrance plays and nothing jumps.
+    const boardPeek = (p: string | null) => !!p && /^\/boards\/[^/]+/.test(p);
+    if (!pending && (boardPeek(previousPathnameRef.current) || boardPeek(pathname))) return;
     html.setAttribute("data-enter", pending?.direction ?? "fade");
     const t = setTimeout(
       () => {
