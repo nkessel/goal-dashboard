@@ -1957,11 +1957,20 @@ export async function listTakeoffQuestsAction() {
  * `metrics` empty = energy only.
  */
 /** A check-in: energy (when it was given this time) and any other metrics moved. */
-export async function saveCheckInAction(energy: number | null, metrics: { metric: string; level: number }[] = []) {
+export async function saveCheckInAction(energy: number | null, metrics: { metric: string; level: number }[] = [], atISO?: string | null) {
   const ownerId = await requireProfileId();
   if (energy === null && !metrics.length) throw new Error("Nothing to check in yet.");
-  const entry = energy === null ? null : await energyData.logEnergy(ownerId, energy);
-  const extra = metrics.length ? await energyData.logCheckIns(ownerId, metrics) : [];
+  // An entry added on the chart can be back-dated (up to three months), never set in the future.
+  let at: string | null = null;
+  if (atISO) {
+    const t = new Date(atISO).getTime();
+    if (!Number.isFinite(t)) throw new Error("That time doesn't look right.");
+    if (t > Date.now() + 60_000) throw new Error("Pick a time that has already happened.");
+    if (t < Date.now() - 92 * 86_400_000) throw new Error("Entries go back three months at most.");
+    at = new Date(t).toISOString();
+  }
+  const entry = energy === null ? null : await energyData.logEnergy(ownerId, energy, at);
+  const extra = metrics.length ? await energyData.logCheckIns(ownerId, metrics, at) : [];
   revalidatePath("/");
   revalidatePath("/insights");
   return { energy: entry, metrics: extra };

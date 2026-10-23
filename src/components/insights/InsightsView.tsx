@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { TrackingChart } from "./TrackingChart";
 
 type Reading = { metric: string; level: number; at: string };
 type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null };
@@ -29,7 +28,7 @@ const GRID = "rgba(110,85,40,.18)";
 const MARK = "#8a6116";
 const BAR = "#c89a3c";
 
-export function InsightsView({ theme, readings, metrics, wins }: { theme: "calm" | "adventure"; readings: Reading[]; metrics: string[]; wins: WinLite[] }) {
+export function InsightsView({ theme, readings, wins }: { theme: "calm" | "adventure"; readings: Reading[]; wins: WinLite[] }) {
   const mounted = useMounted();
   const isAdventure = theme === "adventure";
   const card = `relative flex flex-col gap-3 rounded-2xl px-4 py-4 ${isAdventure ? "parchment parchment-framed" : ""}`;
@@ -97,14 +96,6 @@ export function InsightsView({ theme, readings, metrics, wins }: { theme: "calm"
             );
           })}
         </div>
-      </section>
-
-      {/* Everything you track, on one chart */}
-      <section className={card} style={cardStyle} aria-label="Tracking">
-        <h2 className={h2} style={{ color: "var(--t-ink)" }}>
-          Tracking
-        </h2>
-        <TrackingChart metrics={metrics} readings={readings} wins={wins} />
       </section>
 
       {/* XP per day */}

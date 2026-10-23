@@ -5,8 +5,9 @@ import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CreateFab } from "@/components/create/CreateFab";
 import { InsightsView } from "@/components/insights/InsightsView";
+import { CheckInHub } from "@/components/insights/CheckInHub";
 import { getProfileById } from "@/lib/data/profiles";
-import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckInsSince, listCheckNotesSince, listEnergySince } from "@/lib/data/energy";
+import { getCheckMetrics, listCheckInsSince, listCheckNotesSince, listEnergySince } from "@/lib/data/energy";
 import { appDayKey } from "@/lib/data/tomorrow";
 import { EnergyCheck } from "@/components/xp/EnergyCheck";
 import { EventLog } from "@/components/insights/EventLog";
@@ -21,23 +22,14 @@ import { cleanWheel } from "@/lib/wheel-of-time";
 export default async function InsightsPage() {
   const session = await requireSession();
   const since = new Date(Date.now() - 92 * 86_400_000).toISOString();
-  const [profile, energy, checks, metrics, wins, lastEnergy, lastReadings, notes] = await Promise.all([
+  const [profile, energy, checks, metrics, wins, notes] = await Promise.all([
     getProfileById(session.user.id),
     listEnergySince(session.user.id, since),
     listCheckInsSince(session.user.id, since),
     getCheckMetrics(session.user.id),
     listWinsSince(session.user.id, since),
-    latestEnergy(session.user.id),
-    latestCheckIns(session.user.id, new Date(Date.now() - 2 * 86_400_000).toISOString()).catch(() => ({})),
     listCheckNotesSince(session.user.id, since),
   ]);
-  const energyToday = lastEnergy && appDayKey(new Date(lastEnergy.created_at)) === appDayKey() ? lastEnergy.level : null;
-  const metricsToday = Object.fromEntries(
-    Object.entries(lastReadings as Record<string, { level: number; at: string }>)
-      // Only what was part of the latest check-in: a metric skipped then isn't shown.
-      .filter(([, r]) => appDayKey(new Date(r.at)) === appDayKey() && !!lastEnergy && Math.abs(new Date(r.at).getTime() - new Date(lastEnergy.created_at).getTime()) < 120_000)
-      .map(([k, r]) => [k, r.level])
-  ) as Record<string, number>;
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
   // Streaks look back a year for slips; their events stay out of the check-in's chips.
@@ -77,6 +69,11 @@ export default async function InsightsPage() {
   const wheelLast: Record<string, { level: number; at: string }> = {};
   for (const c of checks) if (c.metric.startsWith(WHEEL)) wheelLast[c.metric.slice(WHEEL.length)] = { level: c.level, at: c.created_at };
   const chartChecks = checks.filter((c) => !c.metric.startsWith(WHEEL));
+  const readings = [...energy.map((e) => ({ metric: "Energy", level: e.level, at: e.created_at })), ...chartChecks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at }))];
+  const chartWins = [
+    ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null })),
+    ...notes.map((n) => ({ kind: "note", at: n.created_at, xp: 0, title: n.body })),
+  ];
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
@@ -90,7 +87,9 @@ export default async function InsightsPage() {
           <h2 className={`m-0 text-center ${isAdventure ? "font-display text-[20px]" : "text-[16px] font-bold"}`} style={{ color: "#f2d27e" }}>
             Check in
           </h2>
-          <EnergyCheck full today={energyToday} todayAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null} metrics={metrics} metricsToday={metricsToday} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
+          {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
+          <EnergyCheck full today={null} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
+          <CheckInHub readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} />
         </section>
         <section
           id="wheel-of-time"
@@ -135,15 +134,8 @@ export default async function InsightsPage() {
         </section>
         <InsightsView
           theme={theme}
-          readings={[
-            ...energy.map((e) => ({ metric: "Energy", level: e.level, at: e.created_at })),
-            ...chartChecks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at })),
-          ]}
-          metrics={["Energy", ...metrics]}
-          wins={[
-            ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null })),
-            ...notes.map((n) => ({ kind: "note", at: n.created_at, xp: 0, title: n.body })),
-          ]}
+          readings={readings}
+          wins={chartWins}
         />
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>

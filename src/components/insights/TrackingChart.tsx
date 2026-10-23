@@ -144,8 +144,10 @@ function pathFor(pts: [number, number][], smooth: boolean) {
  * optional strips for the weather and for things you did (quests, habits,
  * journal notes, rewards). The gear in the corner switches how it's drawn.
  */
-export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; readings: Reading[]; wins: WinLite[] }) {
+export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: string[]; readings: Reading[]; wins: WinLite[]; onAdd?: () => void }) {
   const [view, setView] = useState<View>(DEFAULT_VIEW);
+  const [more, setMore] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState<Record<string, boolean>>({});
   const [settings, setSettings] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
@@ -168,6 +170,18 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
       window.removeEventListener("keydown", key);
     };
   }, [settings]);
+
+  useEffect(() => {
+    if (!more) return;
+    const down = (e: PointerEvent) => moreRef.current && !moreRef.current.contains(e.target as Node) && setMore(false);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setMore(false);
+    window.addEventListener("pointerdown", down);
+    window.addEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("keydown", key);
+    };
+  }, [more]);
 
   function setV(patch: Partial<View>) {
     const next = { ...view, ...patch };
@@ -192,6 +206,7 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
 
   const showWeather = isOn("weather");
   const activeEvents = EVENTS.filter((e) => isOn(e.key));
+  const extrasOn = activeEvents.length + (showWeather ? 1 : 0);
   const W = 440;
   const L = 28;
   const R = 12;
@@ -247,33 +262,75 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
 
   return (
     <div className="relative z-[1] flex flex-col gap-2">
-      {/* Toggles: each metric (its swatch is its line), then weather and events. */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1.5" role="group" aria-label="What to show">
-        {series.map((s) => (
-          <label key={s.metric} className="flex min-h-9 items-center gap-1.5 text-[14.5px]" style={{ color: INK }}>
-            <input type="checkbox" checked={isOn(s.metric)} onChange={() => flip(s.metric)} />
-            <span aria-hidden className="inline-block h-[3px] w-4 rounded-full" style={{ background: s.color }} />
-            {s.metric}
-          </label>
-        ))}
-        <span aria-hidden className="mx-0.5 self-center" style={{ width: 1, height: 20, background: GRID }} />
-        <label className="flex min-h-9 items-center gap-1.5 text-[14.5px]" style={{ color: INK }}>
-          <input type="checkbox" checked={showWeather} onChange={() => flip("weather")} />
-          <svg aria-hidden width="16" height="16" viewBox="0 0 24 24">
-            <circle cx="9" cy="9" r="4" fill="#e7b43c" />
-            <path d="M8 19h9.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.5A2.8 2.8 0 0 0 8 19z" fill="#f6f1e4" stroke="#7d8aa0" strokeWidth="1.4" />
-          </svg>
-          Weather
-        </label>
-        {EVENTS.map((e) => (
-          <label key={e.key} className="flex min-h-9 items-center gap-1.5 text-[14.5px]" style={{ color: INK }}>
-            <input type="checkbox" checked={isOn(e.key)} onChange={() => flip(e.key)} />
-            <svg aria-hidden width="14" height="14" viewBox="-7 -7 14 14">
-              <EventMark k={e.key} color={e.color} size={12} />
+      {/* Toggles, kept small so the chart leads: each metric as a pill (its swatch is its line), the rest under "More". */}
+      <div className="flex items-center gap-1.5">
+        <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 py-0.5" role="group" aria-label="Lines to show" style={{ scrollbarWidth: "none" }}>
+          {series.map((s) => {
+            const on = isOn(s.metric);
+            return (
+              <button
+                key={s.metric}
+                type="button"
+                aria-pressed={on}
+                onClick={() => flip(s.metric)}
+                className="flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold"
+                style={on ? { background: "rgba(255,250,235,.85)", border: `1.5px solid ${s.color}`, color: INK } : { border: `1px dashed ${GRID}`, color: INK_SOFT, opacity: 0.75 }}
+              >
+                <span aria-hidden className="inline-block h-[3px] w-3.5 rounded-full" style={{ background: on ? s.color : INK_SOFT }} />
+                {s.metric}
+              </button>
+            );
+          })}
+        </div>
+        <div ref={moreRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setMore((o) => !o)}
+            aria-expanded={more}
+            className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
+            style={{ border: `1px solid ${extrasOn ? "#8a6116" : GRID}`, background: extrasOn ? "rgba(217,180,95,.3)" : undefined, color: INK }}
+          >
+            More{extrasOn ? ` · ${extrasOn}` : ""}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M5 9l7 7 7-7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {e.label}
-          </label>
-        ))}
+          </button>
+          {more && (
+            <div role="dialog" aria-label="Weather and events" className="pop parchment absolute right-0 top-full z-[6] mt-1.5 flex w-[220px] flex-col py-1.5" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.3)" }}>
+              <label className="relative z-[1] flex min-h-9 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
+                <input type="checkbox" checked={showWeather} onChange={() => flip("weather")} />
+                <svg aria-hidden width="16" height="16" viewBox="0 0 24 24">
+                  <circle cx="9" cy="9" r="4" fill="#e7b43c" />
+                  <path d="M8 19h9.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.5A2.8 2.8 0 0 0 8 19z" fill="#f6f1e4" stroke="#7d8aa0" strokeWidth="1.4" />
+                </svg>
+                Weather
+              </label>
+              {EVENTS.map((e) => (
+                <label key={e.key} className="relative z-[1] flex min-h-9 items-center gap-2 px-3 text-[14px]" style={{ color: INK }}>
+                  <input type="checkbox" checked={isOn(e.key)} onChange={() => flip(e.key)} />
+                  <svg aria-hidden width="14" height="14" viewBox="-7 -7 14 14">
+                    <EventMark k={e.key} color={e.color} size={12} />
+                  </svg>
+                  {e.label}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        {onAdd && (
+          <button
+            type="button"
+            onClick={onAdd}
+            aria-label="Add an entry to the chart"
+            title="Add an entry"
+            className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+            style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M12 4v16M4 12h16" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
       </div>
       {showWeather && weather === undefined && (
         <p className="m-0 flex flex-wrap items-center gap-1.5 text-[13.5px]" style={{ color: INK_SOFT }}>
@@ -508,7 +565,7 @@ export function TrackingChart({ metrics, readings, wins }: { metrics: string[]; 
       </figure>
       {visible.every((s) => s.pts.length < 3) && (
         <p className="m-0 text-[13px]" style={{ color: INK_SOFT }}>
-          A few more check-ins and the trends will show. Tap the metric names to show or hide each line.
+          A few more check-ins and the trends will show. Tap a name to show or hide its line, or + to add an entry.
         </p>
       )}
     </div>
