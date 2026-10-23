@@ -7,6 +7,7 @@ import { eveningDayKey } from "@/components/evening/evening-clock";
 import { ProgressCelebration } from "@/components/celebration/ProgressCelebration";
 import { xpToNextLevel } from "@/lib/levels";
 import { lineForDay, retireLine } from "@/lib/greetings";
+import { loadFx } from "@/lib/celebration-fx";
 
 /** The day's first greeting: a small cheer for arriving, in the realm's voice (a different one each day). */
 const HEADINGS = {
@@ -15,6 +16,9 @@ const HEADINGS = {
   evening: ["Here you are, even now. Huzzah!", "The lanterns are lit for your arrival!", "You came, and the evening is brighter for it!", "Look who walked through the door tonight!"],
 };
 function dawnHeading(dayKey: string) {
+  const fx = loadFx();
+  if (fx.welcomeHeading === "dawn") return "A new day dawns, adventurer";
+  if (fx.welcomeHeading === "custom" && fx.welcomeText?.trim()) return fx.welcomeText.trim();
   const h = new Date().getHours();
   const list = h < 12 ? HEADINGS.morning : h < 17 ? HEADINGS.day : HEADINGS.evening;
   let n = 0;
@@ -69,17 +73,20 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   }, [router, levelCap]);
 
   if (!award) return null;
+  const fx = loadFx();
   return (
     <ProgressCelebration
+      card
+      noBar={fx.welcomeBar === false}
       heading={dawnHeading(eveningDayKey())}
-      title={award.streak > 1 ? `🔥 ${award.streak}-day streak — keep it going` : "Day one of a new streak"}
+      title={fx.welcomeStreak === false ? "" : award.streak > 1 ? `🔥 ${award.streak}-day streak — keep it going` : "Day one of a new streak"}
       xp={award.xp}
       coinsEarned={award.coins}
       fromPct={award.fromPct}
       toPct={award.toPct}
       barCaption={award.caption}
       extra={
-        line ? (
+        line && fx.welcomeLine !== false ? (
           <div className="mt-1 flex w-full flex-col items-center gap-1.5" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
             <p className={`m-0 text-[16px] leading-snug ${retired ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
               {line}

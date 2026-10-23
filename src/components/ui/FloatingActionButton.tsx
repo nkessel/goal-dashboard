@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
-import { readFabStyle, subscribeFx } from "@/lib/celebration-fx";
+import { readFabStyle, subscribeFx, type FabStyle } from "@/lib/celebration-fx";
 
 /**
  * The round floating "+" action button from the Claude Design mockups
@@ -28,9 +28,7 @@ export function FloatingActionButton({
 }) {
   const isAdventure = theme === "adventure";
   const look = useSyncExternalStore(subscribeFx, readFabStyle, () => "seal" as const);
-  const coin = isAdventure && look === "coin";
-  const plain = isAdventure && look === "plain";
-  const seal = isAdventure && look === "seal";
+  const skin = isAdventure ? FAB_SKINS[look] : null;
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Pinch-zoom: keep the button at the same spot and size on screen instead
@@ -82,20 +80,9 @@ export function FloatingActionButton({
         title={label}
         // An enamelled seal in a gilded, notched bezel: the gold plus is the one bright thing.
         className="fab-ring hover-glow fab-rise pointer-events-auto relative flex h-14 w-14 touch-manipulation select-none items-center justify-center rounded-full p-[4px] transition-transform duration-100 hover:scale-105 active:scale-95"
-        style={
-          seal
-            ? {
-                background: "conic-gradient(from 200deg, #fff1c2, #c9a24e 12%, #7a5c22 26%, #e2bf68 40%, #fff6d6 50%, #a8812e 64%, #f4dc94 78%, #8a6c2c 90%, #fff1c2)",
-                boxShadow: "0 0 0 1.5px #2e2410, 0 0 22px rgba(242,210,126,.35), 0 8px 16px rgba(0,0,0,.55)",
-              }
-            : coin
-              ? { background: "linear-gradient(155deg, #fff1c2 0%, #e2bf68 30%, #8a6c2c 62%, #c9a24e 82%, #f4dc94 100%)", boxShadow: "0 0 0 1.5px #2e2410, 0 0 18px rgba(217,180,95,.28), 0 6px 14px rgba(0,0,0,.5)" }
-              : plain
-                ? { background: "#eedcb8", boxShadow: "0 0 0 1.5px #8a6c2c, 0 6px 14px rgba(0,0,0,.45)" }
-                : { background: "var(--t-card)", boxShadow: "0 0 0 1px var(--t-card-border), 0 6px 16px rgba(0,0,0,.22)" }
-        }
+        style={skin ? skin.ring : { background: "var(--t-card)", boxShadow: "0 0 0 1px var(--t-card-border), 0 6px 16px rgba(0,0,0,.22)" }}
       >
-        {seal && (
+        {skin?.notches && (
           // The bezel's fine notches.
           <svg aria-hidden className="pointer-events-none absolute inset-0" viewBox="0 0 56 56">
             {Array.from({ length: 24 }, (_, i) => {
@@ -108,18 +95,7 @@ export function FloatingActionButton({
         )}
         <span
           className="relative flex h-full w-full items-center justify-center rounded-full"
-          style={
-            seal
-              ? {
-                  background: "radial-gradient(circle at 36% 30%, #5a4020 0%, #2e1f0e 52%, #180f06 100%)",
-                  boxShadow: "0 0 0 1px rgba(255,236,180,.35), inset 0 2px 3px rgba(255,230,170,.18), inset 0 -5px 9px rgba(0,0,0,.55)",
-                }
-              : coin
-                ? { background: "radial-gradient(circle at 34% 28%, #fbe7a6, #e0b75a 48%, #a9802c 100%)", boxShadow: "0 0 0 1px rgba(58,42,14,.6), inset 0 1.5px 0 rgba(255,250,225,.65), inset 0 -4px 7px rgba(90,60,12,.35)" }
-                : plain
-                  ? { background: "linear-gradient(180deg, #f6ecd2, #e6d3a6)" }
-                  : { background: "var(--t-accent)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)" }
-          }
+          style={skin ? skin.face : { background: "var(--t-accent)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)" }}
         >
           <svg
             width="24"
@@ -127,19 +103,19 @@ export function FloatingActionButton({
             viewBox="0 0 24 24"
             fill="none"
             aria-hidden
-            style={{ transform: expanded ? "rotate(45deg)" : undefined, transition: "transform 150ms", filter: seal ? "drop-shadow(0 0 4px rgba(242,210,126,.65))" : coin ? "drop-shadow(0 1px 0 rgba(255,245,210,.6))" : undefined }}
+            style={{ transform: expanded ? "rotate(45deg)" : undefined, transition: "transform 150ms", filter: skin?.glow }}
           >
-            {seal ? (
+            {skin?.plus ? (
               <>
                 <defs>
-                  <linearGradient id="fab-plus" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stopColor="#fff6d6" />
-                    <stop offset=".5" stopColor="#f2d27e" />
-                    <stop offset="1" stopColor="#c9a24e" />
+                  <linearGradient id={`fab-plus-${look}`} x1="0" y1="0" x2="1" y2="1">
+                    {skin.plus.map((c, i) => (
+                      <stop key={i} offset={i / (skin.plus!.length - 1)} stopColor={c} />
+                    ))}
                   </linearGradient>
                 </defs>
-                <path d="M12 4.5v15M4.5 12h15" stroke="url(#fab-plus)" strokeWidth="2.8" strokeLinecap="round" />
-                <path d="M12 2.6l.9 1.4-.9 1.4-.9-1.4zM12 18.6l.9 1.4-.9 1.4-.9-1.4zM2.6 12l1.4-.9 1.4.9-1.4.9zM18.6 12l1.4-.9 1.4.9-1.4.9z" fill="#f6dc8e" />
+                <path d="M12 4.5v15M4.5 12h15" stroke={`url(#fab-plus-${look})`} strokeWidth="2.8" strokeLinecap="round" />
+                <path d="M12 2.6l.9 1.4-.9 1.4-.9-1.4zM12 18.6l.9 1.4-.9 1.4-.9-1.4zM2.6 12l1.4-.9 1.4.9-1.4.9zM18.6 12l1.4-.9 1.4.9-1.4.9z" fill={skin.plus[1]} />
               </>
             ) : (
               <path d="M12 5v14M5 12h14" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="2.6" strokeLinecap="round" />
@@ -150,3 +126,54 @@ export function FloatingActionButton({
     </div>
   );
 }
+
+const GILT_RING = "conic-gradient(from 200deg, #fff1c2, #c9a24e 12%, #7a5c22 26%, #e2bf68 40%, #fff6d6 50%, #a8812e 64%, #f4dc94 78%, #8a6c2c 90%, #fff1c2)";
+const GILT_PLUS = ["#fff6d6", "#f2d27e", "#c9a24e"];
+const ENAMEL_EDGE = "0 0 0 1px rgba(255,236,180,.35), inset 0 2px 3px rgba(255,230,170,.18), inset 0 -5px 9px rgba(0,0,0,.55)";
+
+/**
+ * The adventure theme's + button looks (Settings → Visual Effects → The + button):
+ * the outer ring, the face inside it, an optional gradient plus (otherwise a
+ * plain dark one) and whether the bezel is notched.
+ */
+const FAB_SKINS: Record<FabStyle, { ring: React.CSSProperties; face: React.CSSProperties; plus?: string[]; notches?: boolean; glow?: string }> = {
+  seal: {
+    ring: { background: GILT_RING, boxShadow: "0 0 0 1.5px #2e2410, 0 0 22px rgba(242,210,126,.35), 0 8px 16px rgba(0,0,0,.55)" },
+    face: { background: "radial-gradient(circle at 36% 30%, #5a4020 0%, #2e1f0e 52%, #180f06 100%)", boxShadow: ENAMEL_EDGE },
+    plus: GILT_PLUS,
+    notches: true,
+    glow: "drop-shadow(0 0 4px rgba(242,210,126,.65))",
+  },
+  coin: {
+    ring: { background: "linear-gradient(155deg, #fff1c2 0%, #e2bf68 30%, #8a6c2c 62%, #c9a24e 82%, #f4dc94 100%)", boxShadow: "0 0 0 1.5px #2e2410, 0 0 18px rgba(217,180,95,.28), 0 6px 14px rgba(0,0,0,.5)" },
+    face: { background: "radial-gradient(circle at 34% 28%, #fbe7a6, #e0b75a 48%, #a9802c 100%)", boxShadow: "0 0 0 1px rgba(58,42,14,.6), inset 0 1.5px 0 rgba(255,250,225,.65), inset 0 -4px 7px rgba(90,60,12,.35)" },
+    glow: "drop-shadow(0 1px 0 rgba(255,245,210,.6))",
+  },
+  emerald: {
+    ring: { background: GILT_RING, boxShadow: "0 0 0 1.5px #1c2a14, 0 0 22px rgba(120,190,120,.3), 0 8px 16px rgba(0,0,0,.55)" },
+    face: { background: "radial-gradient(circle at 36% 30%, #3f7a4a 0%, #1f4a2a 52%, #0e2615 100%)", boxShadow: ENAMEL_EDGE },
+    plus: GILT_PLUS,
+    notches: true,
+    glow: "drop-shadow(0 0 4px rgba(242,210,126,.6))",
+  },
+  ruby: {
+    ring: { background: GILT_RING, boxShadow: "0 0 0 1.5px #2e1010, 0 0 22px rgba(220,90,80,.3), 0 8px 16px rgba(0,0,0,.55)" },
+    face: { background: "radial-gradient(circle at 36% 30%, #a5323a 0%, #6a1520 52%, #360810 100%)", boxShadow: ENAMEL_EDGE },
+    plus: GILT_PLUS,
+    notches: true,
+    glow: "drop-shadow(0 0 4px rgba(242,210,126,.6))",
+  },
+  moon: {
+    ring: { background: "conic-gradient(from 200deg, #f4f6fb, #a9b2c2 14%, #5d6677 28%, #d8dde7 42%, #ffffff 50%, #8a93a4 64%, #e4e8f0 78%, #6c7586 90%, #f4f6fb)", boxShadow: "0 0 0 1.5px #1c2130, 0 0 22px rgba(190,205,240,.35), 0 8px 16px rgba(0,0,0,.55)" },
+    face: { background: "radial-gradient(circle at 36% 30%, #3e4f7a 0%, #1d2848 52%, #0b1126 100%)", boxShadow: "0 0 0 1px rgba(225,232,250,.35), inset 0 2px 3px rgba(220,230,255,.18), inset 0 -5px 9px rgba(0,0,0,.55)" },
+    plus: ["#ffffff", "#dfe5f2", "#9aa6bd"],
+    notches: true,
+    glow: "drop-shadow(0 0 4px rgba(210,222,255,.7))",
+  },
+  wax: {
+    ring: { background: "radial-gradient(circle at 40% 32%, #c5463c, #8e1f1a 60%, #5e0f0c)", borderRadius: "47% 53% 50% 50% / 52% 48% 53% 47%", boxShadow: "0 0 0 1px #3a0a08, 0 6px 14px rgba(0,0,0,.5)" },
+    face: { background: "radial-gradient(circle at 38% 30%, #b8382f, #861b16 58%, #5a0e0b)", boxShadow: "inset 0 2px 3px rgba(255,190,170,.25), inset 0 -4px 7px rgba(40,0,0,.45), 0 0 0 1.5px rgba(70,10,8,.6)" },
+    plus: GILT_PLUS,
+    glow: "drop-shadow(0 1px 1px rgba(60,0,0,.6))",
+  },
+};

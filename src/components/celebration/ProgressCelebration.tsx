@@ -43,13 +43,33 @@ const AUTO_DISMISS = false;
  * closed (so it can be looked at and given feedback on); set
  * AUTO_DISMISS to bring back the self-dismissing version.
  */
-export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct, steps, heading = "Progress made!", barCaption, extra, onClose }: ProgressCelebrationDetail & { onClose: () => void; extra?: React.ReactNode }) {
+export function ProgressCelebration({
+  title,
+  xp,
+  coinsEarned = 0,
+  fromPct,
+  toPct,
+  steps,
+  heading = "Progress made!",
+  barCaption,
+  extra,
+  card = false,
+  noBar = false,
+  onClose,
+}: ProgressCelebrationDetail & {
+  onClose: () => void;
+  extra?: React.ReactNode;
+  /** Always the full card, whatever Settings chose for progress (the daily welcome). */
+  card?: boolean;
+  /** Leave out the level bar. */
+  noBar?: boolean;
+}) {
   const [shown, setShown] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [pinned, setPinned] = useState(!AUTO_DISMISS);
   const hasExtra = !!extra;
   // Settings › Visual effects: the full card, or a slim banner across the top.
-  const [banner] = useState(() => (typeof window === "undefined" ? false : loadFx().cardStyle === "banner"));
+  const [banner] = useState(() => (card || typeof window === "undefined" ? false : loadFx().cardStyle === "banner"));
   const dismiss = useEffectEvent(() => onClose());
 
   useEffect(() => {
@@ -115,9 +135,11 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
           <p className={`font-display m-0 leading-none ${banner ? "text-[19px]" : "text-[25px]"}`} style={{ color: "var(--t-ink)" }}>
             {heading}
           </p>
-          <p className="m-0 line-clamp-2 text-[14.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
-            {title}
-          </p>
+          {title && (
+            <p className="m-0 line-clamp-2 text-[14.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
+              {title}
+            </p>
+          )}
           {extra && (
             // Touching it keeps the card open.
             <div className="w-full" onPointerDownCapture={() => (setPinned(true), setLeaving(false))}>
@@ -125,7 +147,7 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
             </div>
           )}
 
-          <div className="mt-1 w-full">
+          {!noBar && <div className="mt-1 w-full">
             <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ background: "rgba(70,50,20,.18)", boxShadow: "inset 0 1px 2px rgba(0,0,0,.2)" }}>
               <div
                 className="pc-fill h-full rounded-full"
@@ -142,7 +164,7 @@ export function ProgressCelebration({ title, xp, coinsEarned = 0, fromPct, toPct
             <p className="m-0 mt-1 text-[12.5px] tabular-nums" style={{ color: "#5a4a30" }}>
               {barCaption ?? (steps ? `${steps.done} of ${steps.total} steps · ${toPct}%` : `${fromPct}% → ${toPct}%`)}
             </p>
-          </div>
+          </div>}
 
           <p className="pc-xp m-0 mt-1 text-[34px] font-bold leading-none tabular-nums" style={{ color: "var(--t-xp)" }}>
             +{shown} XP

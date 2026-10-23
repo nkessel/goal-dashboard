@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, loadFx, saveFx, type FeedbackStyle, type FxSettings } from "@/lib/celebration-fx";
+import { FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, loadFx, saveFx, type FeedbackStyle, type FxSettings } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { ProgressCelebration } from "@/components/celebration/ProgressCelebration";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
@@ -100,7 +100,7 @@ export function CelebrationSettings() {
               </div>
             </div>
           ))}
-          <button type="button" onClick={() => update({ ...FX_DEFAULTS, feedbackStyle: fx.feedbackStyle, cardStyle: fx.cardStyle, pace: fx.pace, fabStyle: fx.fabStyle })} className="hover-glow h-10 self-start rounded-full px-4 text-sm font-medium" style={btnStyle}>
+          <button type="button" onClick={() => update({ ...FX_DEFAULTS, feedbackStyle: fx.feedbackStyle, cardStyle: fx.cardStyle, pace: fx.pace, fabStyle: fx.fabStyle, welcomeHeading: fx.welcomeHeading, welcomeText: fx.welcomeText, welcomeLine: fx.welcomeLine, welcomeStreak: fx.welcomeStreak, welcomeBar: fx.welcomeBar })} className="hover-glow h-10 self-start rounded-full px-4 text-sm font-medium" style={btnStyle}>
             Reset the dust
           </button>
         </Fold>
@@ -144,7 +144,7 @@ export function CelebrationSettings() {
         </div>
       </Fold>
 
-      <Fold title="Progress and the daily welcome" hint={(fx.cardStyle ?? "card") === "card" ? "Card" : "Banner"}>
+      <Fold title="Progress" hint={(fx.cardStyle ?? "card") === "card" ? "Card" : "Banner"}>
         <div role="radiogroup" aria-label="Progress style" className="flex flex-wrap gap-1.5">
           {(
             [
@@ -160,6 +160,43 @@ export function CelebrationSettings() {
             </button>
           ))}
         </div>
+      </Fold>
+
+      <Fold title="The daily welcome" hint={WELCOME_HEADINGS.find((w) => w.key === (fx.welcomeHeading ?? "cheer"))?.label ?? ""}>
+        <span className="text-[13px] font-semibold">The greeting</span>
+        <div role="radiogroup" aria-label="The welcome greeting" className="flex flex-wrap gap-1.5">
+          {WELCOME_HEADINGS.map((w) => (
+            <button key={w.key} type="button" role="radio" aria-checked={(fx.welcomeHeading ?? "cheer") === w.key} title={w.hint} onClick={() => update({ welcomeHeading: w.key })} className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick((fx.welcomeHeading ?? "cheer") === w.key)}>
+              <span className="text-[14px] font-bold">{w.label}</span>
+              <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+                {w.hint}
+              </span>
+            </button>
+          ))}
+        </div>
+        {fx.welcomeHeading === "custom" && (
+          <input
+            value={fx.welcomeText ?? ""}
+            onChange={(e) => update({ welcomeText: e.target.value.slice(0, 80) })}
+            placeholder="e.g. Welcome back, friend"
+            aria-label="Your welcome greeting"
+            className="h-10 rounded-lg border px-3 text-[16px]"
+            style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
+          />
+        )}
+        <span className="mt-1 text-[13px] font-semibold">Also on the card</span>
+        {(
+          [
+            ["welcomeLine", "The day's wise line"],
+            ["welcomeStreak", "Your streak"],
+            ["welcomeBar", "Your level bar"],
+          ] as const
+        ).map(([k, label]) => (
+          <label key={k} className="flex min-h-9 items-center gap-2.5 text-sm">
+            <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx[k] !== false} onChange={() => update({ [k]: fx[k] === false })} />
+            {label}
+          </label>
+        ))}
         <button type="button" onClick={() => setCardPreview((n) => n + 1)} className={`${playBtn} self-start`} style={playStyle}>
           <Play /> Preview it
         </button>
@@ -181,19 +218,6 @@ export function CelebrationSettings() {
         </button>
       </Fold>
 
-      <Fold title="The + button" hint={FAB_STYLES.find((f) => f.key === (fx.fabStyle ?? "seal"))?.label ?? ""}>
-        <div role="radiogroup" aria-label="The + button" className="flex flex-wrap gap-1.5">
-          {FAB_STYLES.map((f) => (
-            <button key={f.key} type="button" role="radio" aria-checked={(fx.fabStyle ?? "seal") === f.key} title={f.hint} onClick={() => update({ fabStyle: f.key })} className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick((fx.fabStyle ?? "seal") === f.key)}>
-              <span className="text-[14px] font-bold">{f.label}</span>
-              <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
-                {f.hint}
-              </span>
-            </button>
-          ))}
-        </div>
-      </Fold>
-
       <p className="m-0 min-h-4 text-center text-xs" style={{ color: "var(--t-ink-soft)" }} aria-live="polite">{note}</p>
 
       {sentPreview && (
@@ -202,8 +226,10 @@ export function CelebrationSettings() {
       {cardPreview > 0 && (
         <ProgressCelebration
           key={cardPreview}
-          heading="A new day dawns, adventurer"
-          title="🔥 8-day streak — keep it going"
+          card
+          noBar={fx.welcomeBar === false}
+          heading={fx.welcomeHeading === "custom" && fx.welcomeText?.trim() ? fx.welcomeText.trim() : fx.welcomeHeading === "dawn" ? "A new day dawns, adventurer" : "Huzzah! Here you are!"}
+          title={fx.welcomeStreak === false ? "" : "🔥 8-day streak — keep it going"}
           xp={10}
           fromPct={40}
           toPct={55}
@@ -253,5 +279,40 @@ function Play() {
     <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
       <path d="M2 1l7 4-7 4z" fill="currentColor" />
     </svg>
+  );
+}
+
+/** The + button's look, in its own part of Visual Effects (not a celebration). */
+export function FabSettings() {
+  const [fx, setFx] = useState<FxSettings>(FX_DEFAULTS);
+  // localStorage is only readable after hydration.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setFx(loadFx()), []);
+  const current = fx.fabStyle && FAB_STYLES.some((f) => f.key === fx.fabStyle) ? fx.fabStyle : "seal";
+  const pick = (on: boolean) => (on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" });
+  return (
+    <div role="radiogroup" aria-label="The + button" className="grid grid-cols-2 gap-1.5" style={{ color: "var(--t-ink)" }}>
+      {FAB_STYLES.map((f) => (
+        <button
+          key={f.key}
+          type="button"
+          role="radio"
+          aria-checked={current === f.key}
+          title={f.hint}
+          onClick={() => {
+            const next = { ...fx, fabStyle: f.key };
+            setFx(next);
+            saveFx(next);
+          }}
+          className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left"
+          style={pick(current === f.key)}
+        >
+          <span className="text-[14px] font-bold">{f.label}</span>
+          <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+            {f.hint}
+          </span>
+        </button>
+      ))}
+    </div>
   );
 }

@@ -90,15 +90,22 @@ export async function AppShell({
           {profileId && (
             <NotificationsButton unreadCount={unreadCount} isAdventure={isAdventure} iconColor={iconColor} />
           )}
-          {profileId && profile && (
-            <div className="relative">
-              <TopRightAvatar profile={profile} isAdventure={isAdventure} label={userLabel} />
-            </div>
-          )}
+          {/* Room for the menu button, which floats (below) so it stays put as the page scrolls. */}
+          {profileId && profile && <span aria-hidden className="h-10 w-10 shrink-0" />}
         </div>
 
         <main className="page-enter flex-1 px-5 pb-36 pt-2">{children}</main>
       </div>
+
+      {profileId && profile && (
+        <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center">
+          <div className={`flex w-full justify-end px-5 ${widthClass}`}>
+            <div className="pointer-events-auto relative">
+              <TopRightAvatar profile={profile} isAdventure={isAdventure} label={userLabel} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {profileId && <FocusTimerPill theme={theme} />}
       {profileId && <WeatherSync place={profile?.life_wheel?.weather ?? null} />}

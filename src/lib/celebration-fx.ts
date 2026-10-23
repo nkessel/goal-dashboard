@@ -14,22 +14,41 @@ export type FxSettings = {
   rewardStyle: "classic" | "ceremony";
   /** What plays when feedback is sent. */
   feedbackStyle?: FeedbackStyle;
-  /** Progress and the daily welcome: the full card, or a slim banner at the top. */
+  /** Progress celebrations: the full card, or a slim banner at the top. (The daily welcome is always a card.) */
   cardStyle?: "card" | "banner";
+  /** The daily welcome card's heading: a cheer that changes daily, the classic dawn line, or your own words. */
+  welcomeHeading?: WelcomeHeading;
+  /** Your own heading, when welcomeHeading is "custom". */
+  welcomeText?: string;
+  /** What else the welcome card shows. */
+  welcomeLine?: boolean;
+  welcomeStreak?: boolean;
+  welcomeBar?: boolean;
   /** Seconds the "Feedback submitted" card stays (0 = until you close it). */
   feedbackHold?: number;
   /** How quickly the effects play: 0.75 quick, 1 as designed, 1.4 leisurely. */
   pace?: number;
-  /** The + button: the dark enamel seal, the gold coin, or a plain one. */
+  /** The + button's look (see FAB_STYLES). */
   fabStyle?: FabStyle;
 };
 
-export type FabStyle = "seal" | "coin" | "plain";
+export type WelcomeHeading = "cheer" | "dawn" | "custom";
+export const WELCOME_HEADINGS: { key: WelcomeHeading; label: string; hint: string }[] = [
+  { key: "cheer", label: "A cheer", hint: "“Huzzah! Here you are!” and others, a different one each day" },
+  { key: "dawn", label: "A new day dawns", hint: "“A new day dawns, adventurer”, every day" },
+  { key: "custom", label: "Your own words", hint: "Write the greeting yourself" },
+];
+
+export type FabStyle = "seal" | "coin" | "emerald" | "ruby" | "moon" | "wax";
 export const FAB_STYLES: { key: FabStyle; label: string; hint: string }[] = [
   { key: "seal", label: "Enamel seal", hint: "A dark seal with a gold plus in a notched gilt ring" },
   { key: "coin", label: "Gold coin", hint: "The original gold coin" },
-  { key: "plain", label: "Simple", hint: "A quiet parchment button" },
+  { key: "emerald", label: "Emerald seal", hint: "Forest-green enamel in a notched gilt ring" },
+  { key: "ruby", label: "Ruby seal", hint: "Deep crimson enamel in a notched gilt ring" },
+  { key: "moon", label: "Moonstone", hint: "Night-blue stone in a silver ring, with a silver plus" },
+  { key: "wax", label: "Wax seal", hint: "A pressed red wax seal with a gold plus" },
 ];
+const FAB_KEYS = new Set<string>(FAB_STYLES.map((f) => f.key));
 export const PACES: { v: number; label: string }[] = [
   { v: 0.75, label: "Quick" },
   { v: 1, label: "As designed" },
@@ -230,7 +249,8 @@ export function readFabStyle(): FabStyle {
   try {
     const raw = localStorage.getItem(FX_STORAGE_KEY);
     const v = raw ? (JSON.parse(raw) as { fabStyle?: FabStyle }).fabStyle : undefined;
-    return v === "coin" || v === "plain" ? v : "seal";
+    // "plain" was retired; it and anything unknown fall back to the seal.
+    return v && FAB_KEYS.has(v) ? v : "seal";
   } catch {
     return "seal";
   }
