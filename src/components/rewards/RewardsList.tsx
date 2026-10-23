@@ -18,6 +18,8 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
   const accepted = rewards.filter((r) => r.status === "claimed");
   const completed = rewards.filter((r) => r.status === "completed");
   const [paid, setPaid] = useState<{ id: string; text: string } | null>(null);
+  // Accepting asks: have it now, or add it to your quests for later.
+  const [asking, setAsking] = useState<string | null>(null);
 
   function complete(r: Reward) {
     setError(null);
@@ -41,12 +43,15 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
     });
   }
 
-  function redeem(r: Reward) {
+  function redeem(r: Reward, now: boolean) {
     setError(null);
+    setAsking(null);
     setBusy(r.id);
     startTransition(async () => {
       try {
-        await claimRewardAction(r.id, null);
+        const res = await claimRewardAction(r.id, null, { now });
+        if (res.received && (res.bonusXp > 0 || res.bonusCoins > 0))
+          celebrateReward({ title: r.title, iconSrc: r.icon_key?.startsWith("/") || r.icon_key?.startsWith("http") ? r.icon_key : null, xp: res.bonusXp, coins: res.bonusCoins, totalXp: res.totalXp ?? null });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't redeem that.");
       } finally {
@@ -151,18 +156,37 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
                   {(r.bonus_coins ?? 0) > 0 ? ` +${r.bonus_coins} coins` : ""}
                 </span>
               )}
+              {asking === r.id ? (
+                <div className="reveal relative z-[1] mt-1 flex w-full flex-col items-center gap-1.5">
+                  <span className="text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                    Have it now, or save it for later?
+                  </span>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <button type="button" onClick={() => redeem(r, true)} className="hover-glow h-9 rounded-full px-4 text-[14.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+                      Receive it now
+                    </button>
+                    <button type="button" onClick={() => redeem(r, false)} className="hover-glow h-9 rounded-full px-4 text-[14.5px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: "var(--t-ink)" }}>
+                      Add to my quests
+                    </button>
+                  </div>
+                  <button type="button" onClick={() => setAsking(null)} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                    Not yet
+                  </button>
+                </div>
+              ) : (
               <div className="relative z-[1] mt-1 flex items-center gap-2">
                 {priceChip(cost)}
                 <button
                   type="button"
                   disabled={short > 0 || busy === r.id}
-                  onClick={() => redeem(r)}
+                  onClick={() => setAsking(r.id)}
                   className="hover-glow h-9 rounded-full px-4 text-[14.5px] disabled:cursor-not-allowed disabled:opacity-60"
                   style={short > 0 ? { border: "1px solid var(--t-card-border)", color: "var(--t-ink-soft)" } : { background: "var(--t-gold)", color: "#2a1c10" }}
                 >
                   {busy === r.id ? "…" : short > 0 ? `Need ${short} more` : "Accept"}
                 </button>
               </div>
+              )}
             </div>
           );
         })}

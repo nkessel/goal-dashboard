@@ -160,7 +160,7 @@ export function RewardCelebration({ title, iconSrc, xp, coins, totalXp, levelCap
           className="relative z-[1] mt-6 h-11 rounded-full px-7 text-[15px] font-bold"
           style={{ opacity: count(0.7, 0.9), background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 4px 14px rgba(0,0,0,.45)" }}
         >
-          Enjoy it!
+          Continue
         </button>
       </div>
     </div>,

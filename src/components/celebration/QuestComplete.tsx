@@ -146,14 +146,15 @@ export function QuestComplete(props: QuestCompleteProps) {
     timers.current.push(
       setTimeout(() => {
         const start = performance.now();
-        const dur = fx.fill * 1000 * (fx.pace ?? 1);
+        // Even a small quest gets a good long fill to watch.
+        const dur = Math.max(2600, fx.fill * 1000 * (fx.pace ?? 1));
         setPlaying(true);
         const tick = (now: number) => {
           const v = Math.min(1, (now - start) / dur);
           setP(v);
           if (v < 1) raf.current = requestAnimationFrame(tick);
           // Let the sparkles linger well after the bar fills.
-          else timers.current.push(setTimeout(() => setPlaying(false), 4200));
+          else timers.current.push(setTimeout(() => setPlaying(false), 6500));
         };
         raf.current = requestAnimationFrame(tick);
       }, 1250)
@@ -260,6 +261,15 @@ export function QuestComplete(props: QuestCompleteProps) {
               onPick={setChoosing}
               onDecide={claim}
               onContinue={onClose}
+              onAnother={() => {
+                setClaimed(null);
+                setReceived(null);
+                setChoosing(null);
+                // Fresh from the chest: what's left and the purse after that one.
+                listAvailableRewardsAction()
+                  .then(setChest)
+                  .catch(() => {});
+              }}
             />
           ) : (
           <>
@@ -409,16 +419,14 @@ export function QuestComplete(props: QuestCompleteProps) {
 
           {/* Actions */}
           <div className="qc-btns mt-1 flex w-full gap-2.5">
-            {!isReward && (
             <button
               type="button"
               onClick={openChest}
-              className="min-h-14 flex-1 cursor-pointer rounded-[14px] px-2 text-[19px] font-bold tracking-[.01em]"
+              className={`min-h-14 flex-1 cursor-pointer rounded-[14px] px-2 font-bold leading-[1.05] tracking-[.01em] ${isReward ? "text-[17px]" : "text-[19px]"}`}
               style={{ border: "3px solid #31301e", background: "radial-gradient(circle at 32% 28%, #f2c96a, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5), inset 0 -3px 5px rgba(0,0,0,.25), 0 6px 14px rgba(0,0,0,.45)" }}
             >
-              Choose a Reward
+              {isReward ? "Receive another reward" : "Choose a Reward"}
             </button>
-            )}
             <button
               type="button"
               onClick={onClose}
@@ -450,6 +458,7 @@ function RewardChest({
   onPick,
   onDecide,
   onContinue,
+  onAnother,
 }: {
   questTitle: string;
   rewards: Reward[] | null;
@@ -462,6 +471,8 @@ function RewardChest({
   onPick: (r: Reward | null) => void;
   onDecide: (r: Reward, now: boolean) => void;
   onContinue: () => void;
+  /** Back to the chest for another one. */
+  onAnother: () => void;
 }) {
   const parchment: React.CSSProperties = {
     border: "2px solid #d9b45f",
@@ -488,7 +499,7 @@ function RewardChest({
         {received ? (
           <>
             <p className="m-0 text-[15px]" style={{ color: "#6b6252" }}>
-              Earned by “{questTitle}”. Enjoy it!
+              Earned by “{questTitle}”.
             </p>
             {(received.bonusXp > 0 || received.bonusCoins > 0) && (
               <p className="m-0 flex items-center gap-2 text-[16px] font-bold tabular-nums" style={{ color: "#4f6d3c" }}>
@@ -506,14 +517,24 @@ function RewardChest({
             Added to your list — earned by “{questTitle}”. It&apos;s waiting in Today&apos;s Quests; complete it once you&apos;ve had it.
           </p>
         )}
-        <button
-          type="button"
-          onClick={onContinue}
-          className="mt-2 min-h-12 w-full max-w-[280px] cursor-pointer rounded-[14px] text-[17px] font-bold"
-          style={{ border: "2px solid #31301e", background: "radial-gradient(circle at 32% 28%, #f2c96a, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5), 0 6px 14px rgba(0,0,0,.35)" }}
-        >
-          Continue Your Journey
-        </button>
+        <div className="mt-2 flex w-full gap-2.5">
+          <button
+            type="button"
+            onClick={onAnother}
+            className="min-h-12 flex-1 cursor-pointer rounded-[14px] px-2 text-[16px] font-bold leading-[1.1]"
+            style={{ border: "2px solid #d9b45f", background: "linear-gradient(180deg,#3b4636,#232c22)", color: "#efe6cc", boxShadow: "inset 0 1px 0 rgba(255,235,180,.2), 0 6px 14px rgba(0,0,0,.35)" }}
+          >
+            Receive another reward
+          </button>
+          <button
+            type="button"
+            onClick={onContinue}
+            className="min-h-12 flex-1 cursor-pointer rounded-[14px] px-2 text-[17px] font-bold leading-[1.1]"
+            style={{ border: "2px solid #31301e", background: "radial-gradient(circle at 32% 28%, #f2c96a, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5), 0 6px 14px rgba(0,0,0,.35)" }}
+          >
+            Continue Your Journey
+          </button>
+        </div>
       </div>
     );
   }

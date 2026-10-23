@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
+import { arrangeMenu, readMenuLayout, serverMenuLayout, subscribeMenuLayout } from "@/lib/quest-menu-layout";
 
 export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "earlier" | "nextstep" | "sequence" | "delete";
 
@@ -47,6 +48,8 @@ export function QuestActionMenu({
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Order and hidden items, as chosen in Settings.
+  const layout = useSyncExternalStore(subscribeMenuLayout, readMenuLayout, serverMenuLayout);
 
   useLayoutEffect(() => {
     if (!anchor) return;
@@ -89,7 +92,7 @@ export function QuestActionMenu({
     };
   }, [onClose]);
 
-  const items: { key: QuestAction; icon: React.ReactNode; label: string }[] = [
+  const allItems: { key: QuestAction; icon: React.ReactNode; label: string }[] = [
     { key: "edit", icon: <Glyph d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />, label: isReward ? "Edit reward" : isAdventure ? "Edit quest" : "Edit task" },
     { key: "complete", icon: "✓", label: isReward ? "Complete this reward" : isAdventure ? "Complete this quest" : "Complete this task" },
     { key: "focus", icon: <Glyph d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 3.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />, label: "Focus mode" },
@@ -117,6 +120,8 @@ export function QuestActionMenu({
     ...(!isReward ? [{ key: "earlier" as const, icon: <Glyph d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3h3" />, label: "Already completed…" }] : []),
     { key: "delete", icon: <Glyph d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, label: isReward ? "Delete reward" : isAdventure ? "Delete quest" : "Delete task" },
   ];
+
+  const items = arrangeMenu(allItems, layout);
 
   return createPortal(
     <div
