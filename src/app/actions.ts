@@ -1967,6 +1967,47 @@ export async function saveCheckInAction(energy: number | null, metrics: { metric
   return { energy: entry, metrics: extra };
 }
 
+// ---- The Wheel of Time: bedtime, wake time, Right Effort and Hindrances.
+
+/** Your Wheel of Time lists and log, and whether this morning's night is logged yet. */
+export async function wheelOfTimeAction() {
+  const ownerId = await requireProfileId();
+  const { cleanWheel } = await import("@/lib/wheel-of-time");
+  const wheel = cleanWheel((await readExtras(ownerId)).wheelOfTime);
+  const today = tomorrowData.appDayKey();
+  return { effort: wheel.effort, hindrances: wheel.hindrances, target: wheel.target, today, loggedToday: !!wheel.log[today] };
+}
+
+/** Log a night (by default last night, for this morning). Logging again replaces it. */
+export async function saveNightAction(input: { bed: string | null; wake: string | null; effort: string[]; hindrances: { name: string; at?: string | null }[]; day?: string | null }) {
+  const ownerId = await requireProfileId();
+  const { cleanWheel, cleanNight } = await import("@/lib/wheel-of-time");
+  const extras = await readExtras(ownerId);
+  const wheel = cleanWheel(extras.wheelOfTime);
+  const day = input.day && /^\d{4}-\d{2}-\d{2}$/.test(input.day) ? input.day : tomorrowData.appDayKey();
+  const night = cleanNight({ ...input, at: new Date().toISOString() });
+  const log = { ...wheel.log };
+  if (night) log[day] = night;
+  else delete log[day];
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, wheelOfTime: { ...wheel, log } } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save last night: ${error.message}`);
+  revalidatePath("/insights");
+  return { day, night };
+}
+
+/** Change the Right Effort / Hindrance lists or the target bedtime. */
+export async function setWheelOfTimeAction(input: { effort?: string[]; hindrances?: string[]; target?: string | null }) {
+  const ownerId = await requireProfileId();
+  const { cleanWheel } = await import("@/lib/wheel-of-time");
+  const extras = await readExtras(ownerId);
+  const wheel = cleanWheel(extras.wheelOfTime);
+  const next = cleanWheel({ ...wheel, ...(input.effort ? { effort: input.effort } : {}), ...(input.hindrances ? { hindrances: input.hindrances } : {}), ...("target" in input ? { target: input.target } : {}) });
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, wheelOfTime: next } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save that: ${error.message}`);
+  revalidatePath("/insights");
+  return { effort: next.effort, hindrances: next.hindrances, target: next.target };
+}
+
 /** The check-in metrics being tracked (beyond Energy), in order. */
 export async function getCheckMetricsAction() {
   const ownerId = await requireProfileId();

@@ -4,7 +4,8 @@ import { snapTo, useSliderStep } from "@/lib/use-slider-step";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { addCheckNoteAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, setCheckMetricsAction } from "@/app/actions";
+import { addCheckNoteAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
+import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft } from "./NightFields";
 import { BoltIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
@@ -163,7 +164,19 @@ export function EnergyCheck({
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
-
+  // The Wheel of Time: the day's first check-in also asks about last night.
+  const [wheel, setWheel] = useState<{ effort: string[]; hindrances: string[] } | null>(null);
+  const [night, setNight] = useState<NightDraft>(EMPTY_NIGHT);
+  useEffect(() => {
+    if (today !== null) return;
+    let live = true;
+    wheelOfTimeAction()
+      .then((w) => live && !w.loggedToday && setWheel({ effort: w.effort, hindrances: w.hindrances }))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [today]);
 
   // Open or closed is remembered on this device.
   useEffect(() => {
@@ -190,12 +203,21 @@ export function EnergyCheck({
   function save() {
     setError(null);
     const all = expanded ? metrics.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
-    if (!energySet && !all.length) return;
+    // Last night's sleep alone is enough to save.
+    if (!energySet && !all.length && !(wheel && !nightIsEmpty(night))) return;
     startSaving(async () => {
       try {
-        const res = await saveCheckInAction(energySet ? value : null, all);
-        if (res.energy) setSaved(res.energy.level);
-        setSavedAt(res.energy?.created_at ?? new Date().toISOString());
+        const nightLogged = !!wheel && !nightIsEmpty(night);
+        if (nightLogged) {
+          await saveNightAction({ bed: night.bed || null, wake: night.wake || null, effort: night.effort, hindrances: night.hindrances });
+          setWheel(null);
+          setNight(EMPTY_NIGHT);
+        }
+        if (energySet || all.length) {
+          const res = await saveCheckInAction(energySet ? value : null, all);
+          if (res.energy) setSaved(res.energy.level);
+          setSavedAt(res.energy?.created_at ?? new Date().toISOString());
+        }
         setEnergySet(false);
         setSavedVals(Object.fromEntries(all.map((r) => [r.metric, r.level])));
         setVals({});
@@ -235,6 +257,8 @@ export function EnergyCheck({
   const removeMetric = (m: string) => saveMetrics(metrics.filter((x) => x !== m), metrics);
 
   const shown = editing ? value : (saved ?? value);
+  // Something to save: energy moved, another metric moved, or last night logged.
+  const canSave = energySet || Object.keys(vals).length > 0 || (!!wheel && !nightIsEmpty(night));
   // Only after a saved check-in at 3.5 or below — and not once hidden for today, or in the evening.
   const low = !editing && saved !== null && saved <= LOW && mayOffer;
 
@@ -374,6 +398,7 @@ export function EnergyCheck({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {editing ? (
           <>
+            {wheel && <NightFields value={night} onChange={setNight} effort={wheel.effort} hindrances={wheel.hindrances} />}
             <div className="flex items-center gap-2">
               {caret}
               <span className="flex min-w-0 flex-1 items-center gap-2 transition-opacity" style={{ opacity: energySet ? 1 : 0.55 }}>
@@ -389,11 +414,11 @@ export function EnergyCheck({
               <button
                 type="button"
                 onClick={save}
-                disabled={isSaving || expanded || !energySet}
-                aria-hidden={expanded || !energySet}
-                tabIndex={expanded || !energySet ? -1 : 0}
+                disabled={isSaving || expanded || !canSave}
+                aria-hidden={expanded || !canSave}
+                tabIndex={expanded || !canSave ? -1 : 0}
                 className="hover-glow h-8 w-[58px] shrink-0 rounded-full text-[13px] font-bold disabled:opacity-60"
-                style={{ background: "var(--t-gold)", color: "#2a1c10", visibility: expanded || !energySet ? "hidden" : "visible" }}
+                style={{ background: "var(--t-gold)", color: "#2a1c10", visibility: expanded || !canSave ? "hidden" : "visible" }}
               >
                 {isSaving ? "…" : "Save"}
               </button>
@@ -524,7 +549,7 @@ export function EnergyCheck({
                     </Link>
                   )}
                   {/* Only once something has been entered. */}
-                  {(energySet || Object.keys(vals).length > 0) && (
+                  {canSave && (
                     <button
                       type="button"
                       onClick={save}

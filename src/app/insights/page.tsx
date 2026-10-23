@@ -15,6 +15,8 @@ import { listWinsSince } from "@/lib/data/wins";
 import { Streaks } from "@/components/insights/Streaks";
 import { slipMatcher } from "@/lib/streaks";
 import { listRites, listCompletionsFor, listHabitSkips } from "@/lib/data/rites";
+import { WheelOfTime } from "@/components/insights/WheelOfTime";
+import { cleanWheel } from "@/lib/wheel-of-time";
 
 export default async function InsightsPage() {
   const session = await requireSession();
@@ -89,6 +91,17 @@ export default async function InsightsPage() {
             Check in
           </h2>
           <EnergyCheck full today={energyToday} todayAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null} metrics={metrics} metricsToday={metricsToday} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
+        </section>
+        <section
+          id="wheel-of-time"
+          aria-label="Wheel of Time"
+          className="flex scroll-mt-4 flex-col gap-2 rounded-2xl px-4 py-3.5"
+          style={{ background: "linear-gradient(180deg, rgba(22,24,38,.94), rgba(14,15,24,.94))", border: "1.5px solid rgba(217,180,95,.45)", boxShadow: "0 6px 18px rgba(0,0,0,.35)" }}
+        >
+          <h2 className={`m-0 ${isAdventure ? "font-display text-[19px]" : "text-[16px] font-bold"}`} style={{ color: "#f2d27e" }}>
+            ☸ Wheel of Time <span className="text-[13px] font-normal" style={{ color: "rgba(239,230,204,.7)" }}>— Right Effort turns it forward, Hindrances turn it back</span>
+          </h2>
+          <WheelOfTime initial={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime)} today={appDayKey()} />
         </section>
         <section
           aria-label="Events and tags"
