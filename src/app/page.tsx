@@ -26,7 +26,7 @@ import { getPlanSession, getWeekChapter, lastPairSession } from "@/lib/data/plan
 import { WeekChapter } from "@/components/plan/WeekChapter";
 import { slipMatcher } from "@/lib/streaks";
 import { DailyHabits } from "@/components/habits/DailyHabits";
-import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
+import { appDayKey, nextDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
 import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckNotesSince } from "@/lib/data/energy";
 import { bossesTableExists, getActiveBoss } from "@/lib/data/bosses";
 
@@ -138,7 +138,17 @@ export default async function Home() {
   // Imports wait for approval before they show here at all; quests taken off
   // the Today screen live only on their boards.
   const onToday = openTasks.filter((t) => !t.needs_review);
-  const topPriorities = onToday.filter((t) => t.is_manual_priority);
+  // Due today or tomorrow (or missed this past week): these go to the very top
+  // of Today on their own, whatever list they're in, soonest first.
+  const tomorrowKey = nextDayKey(dayKey);
+  const dueNow = (t: { due_at?: string | null }) => {
+    if (!t.due_at) return false;
+    const ms = Date.parse(t.due_at);
+    return ms > Date.parse(daysAgoISO(7)) && appDayKey(new Date(ms)) <= tomorrowKey;
+  };
+  const dueTasks = onToday.filter((t) => dueNow(t) && !t.reward_id).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
+  const rest = onToday.filter((t) => !dueTasks.includes(t));
+  const topPriorities = rest.filter((t) => t.is_manual_priority);
   // Deadlines coming up rise to the top of Additional Quests (soonest first);
   // everything else keeps the order you gave it.
   const nowMs = Date.now();
@@ -148,7 +158,7 @@ export default async function Home() {
     return ms < 4 * 86_400_000 && ms > -7 * 86_400_000;
   };
   // A project (a board on your matrix) offers just its next step here.
-  const extras = oneStepPerProject(onToday.filter((t) => !t.is_manual_priority && t.in_additional !== false), projectBoards, openTasks);
+  const extras = oneStepPerProject(rest.filter((t) => !t.is_manual_priority && t.in_additional !== false), projectBoards, openTasks);
   const soon = extras.filter(dueSoon).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
   const otherTasks = [...soon, ...extras.filter((t) => !dueSoon(t))];
   const theme = profile?.theme ?? "adventure";
@@ -177,6 +187,7 @@ export default async function Home() {
             {planNudge}
             {chapter && <WeekChapter chapter={chapter} theme={profile?.theme ?? "adventure"} />}
             <TodayTaskBoard
+              dueTasks={dueTasks}
               priorityTasks={topPriorities}
               otherTasks={otherTasks}
               theme={theme}

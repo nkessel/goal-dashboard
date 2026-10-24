@@ -16,6 +16,7 @@ import {
   coachStateAction,
   courseworkAction,
   addJournalEntryAction,
+  answerDeadlineGuessAction,
   getQuestForEditAction,
   scheduleTaskAction,
   schedulerContextAction,
@@ -26,7 +27,7 @@ import {
 } from "@/app/actions";
 import { setRetiredLines } from "@/lib/toucan-lines";
 import { useSyncExternalStore } from "react";
-import { neglected, type GuideTask, type Nudge } from "@/lib/toucan-guide";
+import { afternoonCheckAt, dueSoonList, dueWhen, neglected, type DeadlineGuess, type GuideTask, type Nudge } from "@/lib/toucan-guide";
 import type { CoachAction, CoachNote, CoachPromise } from "@/lib/coach";
 import { AHEAD_DAYS, catchUpOrder, catchUpPlan, looksLikeCourse, type CourseItem } from "@/lib/catch-up";
 import { SCHEDULER_DEFAULTS, planSchedule, type Busy, type SchedulerSettings } from "@/lib/auto-schedule";
@@ -93,7 +94,8 @@ export function ToucanGuide() {
   }, []);
   const [open, setOpen] = useState<{ plan: PlanTarget | null; mode: Mode; say?: string; n?: number } | null>(null);
   const [minimized, setMinimized] = useState(false);
-  const [fallback, setFallback] = useState<{ nudge: Nudge } | null>(null);
+  const [fallback, setFallback] = useState<{ text: string; actions: NoteAction[] } | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const h = (e: Event) => {
@@ -106,13 +108,25 @@ export function ToucanGuide() {
     return () => window.removeEventListener("toucan-talk", h);
   }, []);
 
+  // Say something with buttons; if the toucan isn't on screen (caged, hiding), a small note instead.
+  const raise = (text: string, actions: NoteAction[], note = true) => {
+    const unseen = window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text, actions } }));
+    if (unseen && note) setFallback({ text, actions });
+    return !unseen;
+  };
+  const raiseRef = useRef(raise);
+  useEffect(() => {
+    raiseRef.current = raise;
+  });
+
   // On Today, a little while after you arrive: a reminder first (each one once a
-  // day), otherwise, once a day, a quest that's been waiting.
+  // day), then a deadline the calendar hints at, then, once a day, what's due
+  // soon (with an offer to plan the day), or else a quest that's been waiting.
   useEffect(() => {
     // Reminders you asked for come up in every mode; the daily nudge stays out of the simple one.
     if (pathname !== "/") return;
     const t = setTimeout(async () => {
-      const watch = await toucanWatchAction().catch(() => null);
+      const watch = await toucanWatchAction({ guesses: mode !== "simple" }).catch(() => null);
       if (!watch) return;
       const day = todayKey();
       const shown = (id: string) => {
@@ -148,6 +162,28 @@ export function ToucanGuide() {
         return;
       }
       if (mode === "simple") return;
+      const planDay = { label: "Plan my day", run: () => talkToToucan(undefined, "talk", PLAN_DAY) };
+      // A quest with no due date whose name matches something coming up on the calendar.
+      const guess = (watch.guesses as DeadlineGuess[]).find((g) => !shown(`due:${g.taskId}`));
+      if (guess) {
+        mark(`due:${guess.taskId}`);
+        const start = new Date(guess.start);
+        const soon = dueSoonList([{ due_at: guess.start }]).length > 0;
+        raiseRef.current(`Is “${guess.title}” due before ${guess.event} (${eventWhen(start)})?`, [
+          {
+            label: "Yes, set it",
+            run: () =>
+              void answerDeadlineGuessAction(guess.taskId, guess.start)
+                .then(() => {
+                  router.refresh();
+                  raiseRef.current(soon ? `Done. It's in Due soon at the top of Today. Shall we plan your day around it?` : `Done. I'll keep it in view and remind you as it gets close.`, soon ? [planDay, later] : [], soon);
+                })
+                .catch(() => {}),
+          },
+          { label: "No", run: () => void answerDeadlineGuessAction(guess.taskId, null).catch(() => {}) },
+        ]);
+        return;
+      }
       try {
         if (window.localStorage.getItem(NUDGE_DAY_KEY) === day) return;
         window.localStorage.setItem(NUDGE_DAY_KEY, day);
@@ -171,24 +207,86 @@ export function ToucanGuide() {
         );
         return;
       }
+      // What's due today and tomorrow, and an offer to plan the day around it.
+      const dueSoon = dueSoonList(watch.tasks as GuideTask[]);
+      if (dueSoon.length) {
+        const named = dueSoon.slice(0, 2).map((d) => `“${d.title}” ${dueWhen(d.due_at!)}`);
+        const more = dueSoon.length - named.length;
+        raiseRef.current(`On today's horizon: ${named.join(" and ")}${more > 0 ? `, and ${more} more` : ""}. Shall we plan your day so nothing slips?`, [planDay, later]);
+        return;
+      }
       const top = neglected(watch.tasks as GuideTask[], new Date(), watch.snoozed, 1)[0];
       if (!top) return;
       const plan = { id: top.id, title: top.title, estimate: top.estimate, dueAt: top.dueAt };
-      const ev = new CustomEvent("toucan-nudge", {
-        cancelable: true,
-        detail: {
-          text: `Psst… “${top.title}” ${top.why}. Shall we give it a time?`,
-          actions: [
-            { label: top.step === "estimate" ? "Estimate & plan" : "Plan it", run: () => talkToToucan(plan) },
-            { label: "Not now", run: () => void snoozeToucanAction(top.id, 1).catch(() => {}) },
-          ],
-        },
-      });
-      // Not on screen (in its cage, or hiding)? Then a small note instead.
-      if (window.dispatchEvent(ev)) setFallback({ nudge: top });
+      raiseRef.current(`Psst… “${top.title}” ${top.why}. Shall we give it a time?`, [
+        { label: top.step === "estimate" ? "Estimate & plan" : "Plan it", run: () => talkToToucan(plan) },
+        { label: "Not now", run: () => void snoozeToucanAction(top.id, 1).catch(() => {}) },
+      ]);
     }, 7000);
     return () => clearTimeout(t);
-  }, [pathname, mode]);
+  }, [pathname, mode, router]);
+
+  // Something due today and still open: about three hours before (or by 3 pm),
+  // once a day, the toucan offers to start on it now.
+  useEffect(() => {
+    if (mode === "simple") return;
+    let timers: ReturnType<typeof setTimeout>[] = [];
+    let live = true;
+    const arm = async () => {
+      const w = await toucanWatchAction().catch(() => null);
+      if (!live || !w) return;
+      timers.forEach(clearTimeout);
+      timers = [];
+      const day = todayKey();
+      const key = (id: string) => `toucan-duecheck:${id}`;
+      let delay = 20_000;
+      for (const t of w.tasks as GuideTask[]) {
+        if (!t.due_at) continue;
+        const until = w.snoozed[t.id];
+        if (until && Date.parse(until) > Date.now()) continue;
+        const at = afternoonCheckAt(t.due_at);
+        if (!at) continue;
+        try {
+          if (window.localStorage.getItem(key(t.id)) === day) continue;
+        } catch {
+          continue;
+        }
+        const ms = at.getTime() - Date.now();
+        if (ms > 12 * 3_600_000) continue;
+        // Already time? Not all at once: one now, the next a little later.
+        const wait = ms > 0 ? ms : delay;
+        if (ms <= 0) delay += 90_000;
+        timers.push(
+          setTimeout(() => {
+            const time = new Date(t.due_at!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+            const seen = raiseRef.current(`“${t.title}” is due today at ${time} and still open. Start 15 minutes on it now?`, [
+              {
+                label: "Begin · 15 min",
+                run: async () => {
+                  const q = await getQuestForEditAction(t.id).catch(() => null);
+                  if (q) openFocusMode({ ...q, estimate_minutes: 15 });
+                },
+              },
+              { label: "Later", run: () => {} },
+            ]);
+            if (seen) {
+              try {
+                window.localStorage.setItem(key(t.id), day);
+              } catch {}
+            }
+          }, wait)
+        );
+      }
+    };
+    void arm();
+    const rearm = () => void arm();
+    window.addEventListener("focus", rearm);
+    return () => {
+      live = false;
+      timers.forEach(clearTimeout);
+      window.removeEventListener("focus", rearm);
+    };
+  }, [mode]);
 
   // Promises with a time: when it comes, the toucan says so.
   useEffect(() => {
@@ -258,20 +356,7 @@ export function ToucanGuide() {
 
   return (
     <>
-      {fallback && (
-        <NudgeNote
-          nudge={fallback.nudge}
-          onPlan={() => {
-            const n = fallback.nudge;
-            setFallback(null);
-            setOpen({ plan: { id: n.id, title: n.title, estimate: n.estimate, dueAt: n.dueAt }, mode: "talk" });
-          }}
-          onLater={() => {
-            void snoozeToucanAction(fallback.nudge.id, 1).catch(() => {});
-            setFallback(null);
-          }}
-        />
-      )}
+      {fallback && <NudgeNote text={fallback.text} actions={fallback.actions} onClose={() => setFallback(null)} />}
       {open && (mode !== "simple" || open.mode === "catchup" || open.plan) && (
         <GuideSheet
           key={open.n}
@@ -302,29 +387,50 @@ export function ToucanGuide() {
   );
 }
 
-function NudgeNote({ nudge, onPlan, onLater }: { nudge: Nudge; onPlan: () => void; onLater: () => void }) {
+type NoteAction = { label: string; run: () => void };
+
+function NudgeNote({ text, actions, onClose }: { text: string; actions: NoteAction[]; onClose: () => void }) {
   return createPortal(
     <div role="status" className="card-pop-in fixed bottom-24 left-1/2 z-[58] flex w-[min(360px,calc(100vw-24px))] -translate-x-1/2 items-start gap-2.5 rounded-2xl p-3" style={{ background: "linear-gradient(180deg, rgba(14,38,40,.96), rgba(8,22,26,.98))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 10px 28px rgba(0,0,0,.5)" }}>
       <span className="shrink-0">
         <ToucanArt size={40} />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <p className="m-0 text-[14px] leading-snug">
-          Psst… “{nudge.title}” {nudge.why}. Shall we give it a time?
-        </p>
-        <span className="flex gap-1.5">
-          <button type="button" onClick={onPlan} className="h-8 rounded-full px-3 text-[12.5px] font-bold" style={{ background: "rgba(140,240,220,.2)", border: "1px solid rgba(140,240,220,.6)" }}>
-            Plan it
-          </button>
-          <button type="button" onClick={onLater} className="h-8 rounded-full px-3 text-[12.5px]" style={{ color: "rgba(232,255,248,.8)" }}>
-            Not now
-          </button>
+        <p className="m-0 text-[14px] leading-snug">{text}</p>
+        <span className="flex flex-wrap gap-1.5">
+          {(actions.length ? actions : [{ label: "OK", run: () => {} }]).map((a, i) => (
+            <button
+              key={a.label}
+              type="button"
+              onClick={() => {
+                onClose();
+                a.run();
+              }}
+              className="h-8 rounded-full px-3 text-[12.5px]"
+              style={i === 0 ? { background: "rgba(140,240,220,.2)", border: "1px solid rgba(140,240,220,.6)", fontWeight: 700 } : { color: "rgba(232,255,248,.8)" }}
+            >
+              {a.label}
+            </button>
+          ))}
         </span>
       </div>
     </div>,
     document.body
   );
 }
+
+/** "today at 6:00 PM", "tomorrow at 9:30 AM" or "Tuesday at 6:00 PM". */
+function eventWhen(d: Date) {
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  if (d.toDateString() === now.toDateString()) return `today at ${time}`;
+  if (d.toDateString() === tomorrow.toDateString()) return `tomorrow at ${time}`;
+  return `${d.toLocaleDateString("en-US", { weekday: "long" })} at ${time}`;
+}
+
+const PLAN_DAY = "Help me plan my day so nothing slips: what's due soonest first, then what matters most. Suggest an order and times that fit around my calendar.";
 
 /** Begin a promise: its quest in focus mode if it has one, otherwise a word with the toucan. */
 async function beginPromise(p: CoachPromise) {
@@ -338,6 +444,7 @@ async function beginPromise(p: CoachPromise) {
 
 const PROMPTS: { label: string; say?: string; mode?: Mode }[] = [
   { label: "📚 Get me up to date on my courses", mode: "catchup" },
+  { label: "🗓 Plan my day", say: PLAN_DAY },
   { label: "What matters most today?" },
   { label: "I'm overwhelmed", say: "I'm feeling overwhelmed. Everything feels like too much." },
   { label: "Help me start something", say: "I want to get started on something but I can't seem to begin." },

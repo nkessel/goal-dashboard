@@ -116,6 +116,37 @@ function SortableQuest({
   );
 }
 
+/**
+ * What's due today or tomorrow, above everything else on Today. It fills
+ * itself from due dates (nothing to drag here) and empties as you finish.
+ */
+function DueSoonBand({ tasks, theme, lockedBehind }: { tasks: TaskWithCategory[]; theme: "calm" | "adventure"; lockedBehind: Map<string, TaskWithCategory> }) {
+  const isAdventure = theme === "adventure";
+  return (
+    <section
+      aria-label="Due soon"
+      className="mb-6 flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-2.5 sm:px-3"
+      style={
+        isAdventure
+          ? { background: "linear-gradient(180deg, rgba(120,52,24,.32), rgba(40,20,10,.3))", border: "1.5px solid rgba(240,150,90,.45)", boxShadow: "inset 0 1px 0 rgba(255,220,180,.08)" }
+          : { background: "var(--t-warn-bg)", border: "1px solid var(--t-card-border)" }
+      }
+    >
+      <h2 className={`m-0 flex items-center justify-center gap-2 ${isAdventure ? "font-display text-[20px]" : "text-base font-extrabold"}`} style={{ color: isAdventure ? "#ffd9b8" : "var(--t-ink)" }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Due soon
+      </h2>
+      <ul className="m-0 flex list-none flex-col gap-3 p-0">
+        {tasks.map((task) => (
+          <TaskRow key={task.id} task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** A drop target with no cards in it (an empty list, or a closed drawer's header). */
 function Zone({ id, children, className, style }: { id: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
   const { setNodeRef, isOver } = useDroppable({ id });
@@ -136,11 +167,14 @@ function Zone({ id, children, className, style }: { id: string; children: React.
  * flight, when a local copy takes over until fresh props catch up.
  */
 export function TodayTaskBoard({
+  dueTasks = [],
   priorityTasks,
   otherTasks,
   theme = "calm",
   between,
 }: {
+  /** Due today or tomorrow (or just missed): shown above everything, soonest first, until done. */
+  dueTasks?: TaskWithCategory[];
   priorityTasks: TaskWithCategory[];
   otherTasks: TaskWithCategory[];
   theme?: "calm" | "adventure";
@@ -170,10 +204,11 @@ export function TodayTaskBoard({
   const isAdventure = theme === "adventure";
 
   // A reward still locked behind an open prerequisite is drawn stacked behind it, not as its own card.
-  const openIds = new Set([...priorityTasks, ...otherTasks].map((t) => t.id));
+  const openIds = new Set([...dueTasks, ...priorityTasks, ...otherTasks].map((t) => t.id));
   const isLocked = (t: TaskWithCategory) => !!t.locked_by_task_id && openIds.has(t.locked_by_task_id);
   const lockedBehind = new Map<string, TaskWithCategory>();
-  for (const t of [...priorityTasks, ...otherTasks]) if (isLocked(t)) lockedBehind.set(t.locked_by_task_id!, t);
+  for (const t of [...dueTasks, ...priorityTasks, ...otherTasks]) if (isLocked(t)) lockedBehind.set(t.locked_by_task_id!, t);
+  const due = dueTasks.filter((t) => !isLocked(t));
   const priority = (localPriority ?? priorityTasks).filter((t) => !isLocked(t));
   const other = (localOther ?? otherTasks).filter((t) => !isLocked(t));
   // Quests just created elsewhere, until the real ones arrive.
@@ -332,6 +367,7 @@ export function TodayTaskBoard({
 
   return (
     <DndContext id="dnd-TodayTaskBoard" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
+      {due.length > 0 && <DueSoonBand tasks={due} theme={theme} lockedBehind={lockedBehind} />}
       {/* Daily Habits, Today's Quests and Additional Quests: drag a closed one to reorder. */}
       <SectionStack
         storageKey="today-section-order"
