@@ -154,8 +154,8 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </Link>
         )}
 
-        {/* Inventory and the bird's cage side by side (the cage only while the bird rests in it). */}
-        <div className="flex gap-2.5">
+        {/* Inventory and the bird's cage side by side, each half wide (the cage only while the bird rests in it). */}
+        <div className="grid grid-cols-2 gap-2.5">
         <ViewTransitionLink
             href="/settings/inventory"
             className={`hover-glow flex min-w-0 flex-1 basis-0 items-center gap-2.5 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}

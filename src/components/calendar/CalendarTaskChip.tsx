@@ -236,14 +236,16 @@ function QuestCard({
   const line = h < 30;
   // Narrow and tall enough: the creature stands above the title.
   const stack = !line && (portrait || w < 130) && h >= 54;
+  const titlePx = w < 52 ? 11 : w < 110 ? 12.5 : 14;
+  // Stacked, the creature takes what's left once the title (up to two lines, by a rough measure) has room.
+  const titleLines = Math.min(2, Math.ceil((task.title.length * titlePx * 0.42) / Math.max(1, w - 8)));
   const artPx = line
     ? Math.max(0, Math.min(h - 6, 22))
     : stack
-      ? Math.max(0, Math.min(w - 6, h - 26, 56))
-      : Math.max(0, Math.min(h - 10, h >= 80 ? 64 : 46, w * 0.32));
+      ? Math.max(0, Math.min(w - 4, h - 12 - Math.ceil(titlePx * 1.12 * titleLines), 64))
+      : Math.max(0, Math.min(h - 6, h >= 80 ? 64 : 52, w * 0.38));
   const showArt = artPx >= 16;
-  const titlePx = w < 52 ? 10.5 : w < 110 ? 12 : 13.5;
-  const sealPx = Math.min(artPx, stack ? 22 : 26);
+  const sealPx = Math.min(artPx, stack ? 24 : 26);
   const doneNote = done && !line && h >= (stack ? 64 : 44);
   const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? 13 : 0)) / (titlePx * 1.12)));
 
@@ -296,7 +298,7 @@ function QuestCard({
           style={{
             color: "#3a2a14",
             fontSize: titlePx,
-            fontWeight: 600,
+            fontWeight: 500,
             lineHeight: 1.12,
             overflow: "hidden",
             ...(line
