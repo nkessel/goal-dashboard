@@ -2906,26 +2906,50 @@ async function guideTasks(ownerId: string, opts: { imports?: boolean } = {}) {
     }));
 }
 
-/** What the toucan keeps an eye on: your open quests (scored in the browser, in your time zone) and what you've waved off. */
-export async function toucanWatchAction() {
+/** What the toucan keeps an eye on: your open quests (scored in the browser, in your time zone) and what you've waved off. With `guesses`, also quests whose deadline looks like an event on your calendar. */
+export async function toucanWatchAction(opts: { guesses?: boolean } = {}) {
   const { profileId: ownerId, accessToken } = await requireSessionMaybeGoogle();
   const [tasks, extras] = await Promise.all([guideTasks(ownerId), readExtras(ownerId)]);
   const { cleanCoach, duePromises, readyReminders } = await import("@/lib/coach");
   const coach = cleanCoach(extras.coach);
-  // "Next time" reminders look at your calendar from a little while ago to tomorrow morning.
+  const asked = (extras.toucanDueAsked as Record<string, string> | undefined) ?? {};
+  const wantNext = coach.promises.some((p) => p.status === "open" && p.next);
+  const wantGuesses = !!opts.guesses && tasks.some((t) => !t.due_at && !asked[t.id]);
+  // "Next time" reminders look at your calendar from a little while ago to tomorrow morning;
+  // deadline guesses look a week ahead.
   let events: { title: string; start: string; end: string }[] = [];
-  if (accessToken && coach.promises.some((p) => p.status === "open" && p.next)) {
+  if (accessToken && (wantNext || wantGuesses)) {
     try {
       const { listEventsAllCalendars } = await import("@/lib/google-calendar");
       const now = Date.now();
-      const all = await listEventsAllCalendars(accessToken, new Date(now - 3 * 3_600_000), new Date(now + 20 * 3_600_000));
+      const all = await listEventsAllCalendars(accessToken, new Date(now - 3 * 3_600_000), new Date(now + (wantGuesses ? 8 * 86_400_000 : 20 * 3_600_000)));
       events = all.events.filter((e) => Date.parse(e.end) > now).map((e) => ({ title: e.title, start: e.start, end: e.end }));
     } catch {
       /* no calendar right now: the reminder waits */
     }
   }
-  const { nextNear, standing } = readyReminders(coach.promises, events);
-  return { tasks, snoozed: ((extras.toucanSnooze as Record<string, string> | undefined) ?? {}), promises: coach.promises.filter((p) => p.status === "open"), due: duePromises(coach), nextNear, standing };
+  const soonEvents = events.filter((e) => Date.parse(e.start) < Date.now() + 20 * 3_600_000);
+  const { nextNear, standing } = readyReminders(coach.promises, soonEvents);
+  const { deadlineGuesses } = await import("@/lib/toucan-guide");
+  const guesses = wantGuesses ? deadlineGuesses(tasks, events, asked) : [];
+  return { tasks, snoozed: ((extras.toucanSnooze as Record<string, string> | undefined) ?? {}), promises: coach.promises.filter((p) => p.status === "open"), due: duePromises(coach), nextNear, standing, guesses };
+}
+
+/** The toucan asked "is this due before <event>?": yes sets the due date; either way it won't ask about this quest again. */
+export async function answerDeadlineGuessAction(taskId: string, dueAt: string | null) {
+  const ownerId = await requireProfileId();
+  if (dueAt) {
+    const when = new Date(dueAt);
+    if (Number.isNaN(when.getTime())) throw new Error("That date didn't look right.");
+    const { error } = await supabaseAdmin().from("tasks").update({ due_at: when.toISOString() }).eq("id", taskId).eq("owner_id", ownerId);
+    if (error) throw new Error(`Couldn't set the due date: ${error.message}`);
+  }
+  const extras = await readExtras(ownerId);
+  const asked = { ...((extras.toucanDueAsked as Record<string, string> | undefined) ?? {}), [taskId.slice(0, 40)]: new Date().toISOString() };
+  // Keep the record small: the most recent 200 answers.
+  const kept = Object.fromEntries(Object.entries(asked).sort((a, b) => b[1].localeCompare(a[1])).slice(0, 200));
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanDueAsked: kept } }).eq("id", ownerId);
+  revalidatePath("/");
 }
 
 /** "Not now": the toucan won't raise this quest again for a while. */

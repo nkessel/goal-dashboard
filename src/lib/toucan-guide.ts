@@ -127,3 +127,80 @@ export function mentioned(reply: string, tasks: { id: string; title: string }[])
     .sort((a, b) => low.indexOf(a.title.toLowerCase()) - low.indexOf(b.title.toLowerCase()))
     .slice(0, 3);
 }
+
+const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+/** Open quests due today or tomorrow (or missed this past week), soonest first. */
+export function dueSoonList<T extends { due_at: string | null }>(tasks: T[], now = new Date()): T[] {
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(23, 59, 59, 999);
+  return tasks
+    .filter((t) => {
+      if (!t.due_at) return false;
+      const ms = Date.parse(t.due_at);
+      return ms > now.getTime() - 7 * DAY && ms <= tomorrow.getTime();
+    })
+    .sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
+}
+
+/** "due today", "due tomorrow" or "was due yesterday", for the morning summary. */
+export function dueWhen(dueAt: string, now = new Date()) {
+  return dayWord(new Date(dueAt), now).replace(/^is /, "");
+}
+
+/**
+ * When to check on a quest due today that's still open: three hours before
+ * it's due, or 3 pm, whichever comes first. Null when it isn't due today or
+ * is already past due.
+ */
+export function afternoonCheckAt(dueAt: string, now = new Date()): Date | null {
+  const due = new Date(dueAt);
+  if (!sameDay(due, now) || due.getTime() <= now.getTime()) return null;
+  const three = new Date(now);
+  three.setHours(15, 0, 0, 0);
+  return new Date(Math.min(due.getTime() - 3 * 3_600_000, three.getTime()));
+}
+
+// Words that say what kind of work it is, not what it's for ("AR class homework" is for "AR class").
+const WORK_WORDS = /\b(homework|hw|assignment|assignments|reading|readings|read|prep|prepare|preparation|study|notes|essay|paper|quiz|worksheet|pset|problem set|lab report|report|slides|presentation|draft|finish|do|submit|for|before|the|my|due|work)\b/g;
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+export type DeadlineGuess = { taskId: string; title: string; event: string; start: string };
+
+/**
+ * Quests with no due date whose name points at something on the calendar
+ * ("AR class homework" and the "AR class" event): the event is probably the
+ * deadline. Only quests that name a kind of work (homework, prep, slides…),
+ * the soonest matching event within the next eight days, never one already asked about.
+ */
+export function deadlineGuesses(
+  tasks: { id: string; title: string; due_at: string | null }[],
+  events: { title: string; start: string }[],
+  asked: Record<string, string> = {},
+  now = new Date(),
+  limit = 2
+): DeadlineGuess[] {
+  const ahead = events
+    .filter((e) => {
+      const ms = Date.parse(e.start);
+      return ms > now.getTime() && ms < now.getTime() + 8 * DAY;
+    })
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  const out: DeadlineGuess[] = [];
+  for (const t of tasks) {
+    if (t.due_at || asked[t.id]) continue;
+    const title = norm(t.title);
+    const core = title.replace(WORK_WORDS, " ").replace(/\s+/g, " ").trim();
+    // It has to name a kind of work, and something besides.
+    if (core === title || core.length < 3 || !/[a-z]/.test(core)) continue;
+    const has = (hay: string, needle: string) => ` ${hay} `.includes(` ${needle} `);
+    const e = ahead.find((ev) => {
+      const name = norm(ev.title);
+      return has(name, core) || (name.length >= 4 && has(title, name));
+    });
+    if (e) out.push({ taskId: t.id, title: t.title, event: e.title, start: e.start });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
