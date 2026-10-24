@@ -130,3 +130,24 @@ export function recentAverages(state: WheelState, days = 7) {
   const onTime = state.target ? nights.filter((n) => n.bed && nightMinutes(n.bed) <= nightMinutes(state.target!)).length : null;
   return { nights: nights.length, bed, slept, onTime, logged: nights.filter((n) => n.bed).length };
 }
+
+/**
+ * How far the wheel has turned: every Right Effort ever logged turns it one
+ * mark forward, every Hindrance one mark back.
+ */
+export function wheelTurns(state: WheelState) {
+  let forward = 0;
+  let back = 0;
+  for (const n of Object.values(state.log)) {
+    forward += n.effort.length;
+    back += n.hindrances.length;
+  }
+  return { forward, back, net: forward - back };
+}
+
+/** The app day after (or before) `key`. */
+export function shiftDay(key: string, days: number) {
+  const d = new Date(`${key}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}

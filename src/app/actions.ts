@@ -1984,7 +1984,10 @@ export async function wheelOfTimeAction() {
   const { cleanWheel } = await import("@/lib/wheel-of-time");
   const wheel = cleanWheel((await readExtras(ownerId)).wheelOfTime);
   const today = tomorrowData.appDayKey();
-  return { effort: wheel.effort, hindrances: wheel.hindrances, target: wheel.target, today, loggedToday: !!wheel.log[today] };
+  // Presses on the stone wheel can log Right Effort before the morning's
+  // check-in; it still asks for sleep and wake, and starts from those presses.
+  const night = wheel.log[today];
+  return { effort: wheel.effort, hindrances: wheel.hindrances, target: wheel.target, today, loggedToday: !!(night?.bed || night?.wake), pressed: { effort: night?.effort ?? [], hindrances: night?.hindrances ?? [] } };
 }
 
 /** Log a night (by default last night, for this morning). Logging again replaces it. */

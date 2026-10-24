@@ -167,11 +167,19 @@ export function EnergyCheck({
   // The Wheel of Time: the day's first check-in also asks about last night.
   const [wheel, setWheel] = useState<{ effort: string[]; hindrances: string[] } | null>(null);
   const [night, setNight] = useState<NightDraft>(EMPTY_NIGHT);
+  // What the stone wheel already logged for last night; only changes to it count as input.
+  const [nightBase, setNightBase] = useState(JSON.stringify(EMPTY_NIGHT));
   useEffect(() => {
     if (today !== null) return;
     let live = true;
     wheelOfTimeAction()
-      .then((w) => live && !w.loggedToday && setWheel({ effort: w.effort, hindrances: w.hindrances }))
+      .then((w) => {
+        if (!live || w.loggedToday) return;
+        setWheel({ effort: w.effort, hindrances: w.hindrances });
+        const base = { ...EMPTY_NIGHT, effort: w.pressed.effort, hindrances: w.pressed.hindrances };
+        setNightBase(JSON.stringify(base));
+        setNight((n) => (nightIsEmpty(n) ? base : n));
+      })
       .catch(() => {});
     return () => {
       live = false;
@@ -200,14 +208,15 @@ export function EnergyCheck({
     }
   }
 
+  const nightTouched = !!wheel && JSON.stringify(night) !== nightBase;
   function save() {
     setError(null);
     const all = expanded ? metrics.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
     // Last night's sleep alone is enough to save.
-    if (!energySet && !all.length && !(wheel && !nightIsEmpty(night))) return;
+    if (!energySet && !all.length && !nightTouched) return;
     startSaving(async () => {
       try {
-        const nightLogged = !!wheel && !nightIsEmpty(night);
+        const nightLogged = nightTouched;
         if (nightLogged) {
           await saveNightAction({ bed: night.bed || null, wake: night.wake || null, effort: night.effort, hindrances: night.hindrances });
           setWheel(null);
@@ -258,7 +267,7 @@ export function EnergyCheck({
 
   const shown = editing ? value : (saved ?? value);
   // Something to save: energy moved, another metric moved, or last night logged.
-  const canSave = energySet || Object.keys(vals).length > 0 || (!!wheel && !nightIsEmpty(night));
+  const canSave = energySet || Object.keys(vals).length > 0 || nightTouched;
   // Only after a saved check-in at 3.5 or below — and not once hidden for today, or in the evening.
   const low = !editing && saved !== null && saved <= LOW && mayOffer;
 

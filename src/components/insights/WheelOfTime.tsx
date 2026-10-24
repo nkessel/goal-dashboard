@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { saveNightAction, setWheelOfTimeAction } from "@/app/actions";
 import { NightFields, EMPTY_NIGHT, nightIsEmpty, type NightDraft } from "@/components/xp/NightFields";
-import { clockFromNight, minutesLabel, nightMinutes, prettyTime, recentAverages, turnings, type NightLog, type WheelState } from "@/lib/wheel-of-time";
+import { StoneWheel, WHEEL_STEP } from "@/components/insights/StoneWheel";
+import { clockFromNight, minutesLabel, nightMinutes, prettyTime, recentAverages, shiftDay, turnings, wheelTurns, type NightLog, type WheelState } from "@/lib/wheel-of-time";
 
 const CREAM = "#efe6cc";
 const SOFT = "rgba(239,230,204,.7)";
@@ -13,6 +14,23 @@ const ROSE = "#f3b39f";
 const TOP = 8 * 60;
 const BOTTOM = 23 * 60;
 const NIGHTS = 14;
+/** Whether the stone wheel is heard, remembered on this device. */
+const SOUND_KEY = "wot-sound";
+function subscribeSound(cb: () => void) {
+  window.addEventListener(SOUND_KEY, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener(SOUND_KEY, cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+function readSound() {
+  try {
+    return localStorage.getItem(SOUND_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
 
 function dayKeys(today: string, n: number) {
   const out: string[] = [];
@@ -40,6 +58,15 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
   const [draft, setDraft] = useState<NightDraft>(EMPTY_NIGHT);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // The stone wheel: press what you did today (or yesterday) to turn it.
+  const [pressDay, setPressDay] = useState<"today" | "yesterday">("today");
+  const sound = useSyncExternalStore(subscribeSound, readSound, () => true);
+  const latest = useRef(state);
+  useEffect(() => {
+    latest.current = state;
+  }, [state]);
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
 
   const keys = dayKeys(today, NIGHTS);
   const avg = recentAverages(state, 7);
@@ -85,6 +112,83 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
     });
   }
 
+  // Today's doings belong to tonight, which is logged on tomorrow's morning;
+  // yesterday's belong to last night (this morning's check-in).
+  const pressKey = pressDay === "today" ? shiftDay(today, 1) : today;
+  const pressNight = state.log[pressKey];
+  const turned = wheelTurns(state);
+
+  function press(kind: "effort" | "hindrance", name: string) {
+    const cur = latest.current.log[pressKey];
+    const base: NightLog = cur ?? { bed: null, wake: null, effort: [], hindrances: [], at: new Date().toISOString() };
+    const now = new Date();
+    const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const next: NightLog =
+      kind === "effort"
+        ? { ...base, effort: base.effort.includes(name) ? base.effort.filter((e) => e !== name) : [...base.effort, name] }
+        : { ...base, hindrances: base.hindrances.some((h) => h.name === name) ? base.hindrances.filter((h) => h.name !== name) : [...base.hindrances, { name, at: pressDay === "today" ? hhmm : null }] };
+    const empty = !next.bed && !next.wake && !next.effort.length && !next.hindrances.length;
+    setState((s) => {
+      const log = { ...s.log };
+      if (empty) delete log[pressKey];
+      else log[pressKey] = next;
+      return { ...s, log };
+    });
+    setError(null);
+    // Quick presses are gathered up, then saved one at a time.
+    const day = pressKey;
+    clearTimeout(saveTimers.current[day]);
+    saveTimers.current[day] = setTimeout(() => {
+      saveChain.current = saveChain.current.then(async () => {
+        const n = latest.current.log[day];
+        try {
+          await saveNightAction({ day, bed: n?.bed ?? null, wake: n?.wake ?? null, effort: n?.effort ?? [], hindrances: n?.hindrances ?? [] });
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Couldn't save that press.");
+        }
+      });
+    }, 700);
+  }
+  function toggleSound() {
+    try {
+      localStorage.setItem(SOUND_KEY, sound ? "off" : "on");
+    } catch {}
+    window.dispatchEvent(new Event(SOUND_KEY));
+  }
+
+  const pressButton = (kind: "effort" | "hindrance", name: string) => {
+    const on = kind === "effort" ? !!pressNight?.effort.includes(name) : !!pressNight?.hindrances.some((h) => h.name === name);
+    const good = kind === "effort";
+    const tint = good ? "242,210,126" : "243,179,159";
+    return (
+      <button
+        key={kind + name}
+        type="button"
+        aria-pressed={on}
+        onClick={() => press(kind, name)}
+        className="flex min-h-10 items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-[13.5px] font-semibold leading-snug transition-[transform,box-shadow] duration-150 active:scale-[.97]"
+        style={{
+          color: on ? (good ? "#2a1c10" : "#2a120c") : CREAM,
+          background: on
+            ? good
+              ? "linear-gradient(180deg, #f2d27e, #c99a45)"
+              : "linear-gradient(180deg, #f3b39f, #c4715c)"
+            : "linear-gradient(180deg, rgba(150,140,120,.32), rgba(70,64,54,.42))",
+          border: `1px solid rgba(${tint},${on ? 0.9 : 0.45})`,
+          boxShadow: on ? `inset 0 2px 5px rgba(0,0,0,.35), 0 0 12px rgba(${tint},.35)` : "0 2px 0 rgba(0,0,0,.45), inset 0 1px 0 rgba(255,246,220,.14)",
+        }}
+      >
+        <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[15px] font-black" style={{ background: on ? "rgba(0,0,0,.18)" : `rgba(${tint},.16)`, color: on ? "inherit" : `rgb(${tint})` }}>
+          {on ? "✓" : good ? "+" : "−"}
+        </span>
+        <span className="min-w-0 flex-1">{name}</span>
+        <span aria-hidden className="text-[14px] opacity-80">
+          {good ? "↻" : "↺"}
+        </span>
+      </button>
+    );
+  };
+
   // Chart geometry.
   const W = 336;
   const H = 168;
@@ -111,6 +215,58 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
 
   return (
     <div className="flex flex-col gap-3" style={{ color: CREAM }}>
+      {/* The stone wheel, and what turns it. */}
+      <div className="flex flex-col gap-2.5">
+        <div className="relative">
+          <StoneWheel angle={turned.net * WHEEL_STEP} sound={sound} />
+          <button
+            type="button"
+            onClick={toggleSound}
+            aria-pressed={sound}
+            aria-label={sound ? "Mute the wheel" : "Let the wheel be heard"}
+            title={sound ? "Mute the wheel" : "Let the wheel be heard"}
+            className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-full text-[16px] hover:bg-white/10"
+            style={{ color: SOFT }}
+          >
+            {sound ? "🔊" : "🔇"}
+          </button>
+        </div>
+        <span className="text-center text-[12.5px]" style={{ color: SOFT }}>
+          Turned forward <b style={{ color: GOLD }}>{turned.forward}</b> · back <b style={{ color: ROSE }}>{turned.back}</b>
+        </span>
+        <div className="mx-auto flex rounded-full p-0.5" role="group" aria-label="Which day" style={{ background: "rgba(0,0,0,.3)", border: "1px solid rgba(217,180,95,.35)" }}>
+          {(["today", "yesterday"] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              aria-pressed={pressDay === d}
+              onClick={() => setPressDay(d)}
+              className="h-8 rounded-full px-4 text-[13px] font-bold"
+              style={pressDay === d ? { background: "var(--t-gold)", color: "#2a1c10" } : { color: SOFT }}
+            >
+              {d === "today" ? "Today" : "Yesterday"}
+            </button>
+          ))}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: GOLD }}>
+              Right Effort · turns it forward
+            </span>
+            {state.effort.map((n) => pressButton("effort", n))}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: ROSE }}>
+              Hindrances · turn it back
+            </span>
+            {state.hindrances.map((n) => pressButton("hindrance", n))}
+          </div>
+        </div>
+        <span className="text-center text-[11.5px]" style={{ color: SOFT }}>
+          Each press is saved to {pressDay === "today" ? "tonight" : "last night"}, so the patterns below learn from it. Press again to take it back.
+        </span>
+      </div>
+
       {/* Averages */}
       <div className="flex flex-wrap gap-2">
         {stat("avg bedtime, last 7", avg.bed !== null ? clockFromNight(avg.bed) : "–")}
