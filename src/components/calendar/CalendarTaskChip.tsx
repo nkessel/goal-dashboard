@@ -199,7 +199,7 @@ export function questArt(task: Task) {
 
 /** Quests with no portrait yet still get a creature, the same one every time. */
 const CREATURES = ["goblin", "boar", "bat", "golem", "venomroot", "dragon", "sorcerer"];
-function creatureFor(id: string) {
+export function creatureFor(id: string) {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return `/design/icon-${CREATURES[hash % CREATURES.length]}.jpg`;
@@ -274,7 +274,17 @@ function QuestCard({
         <span className="quest-art flex shrink-0 items-center justify-center overflow-hidden" style={{ width: artPx, height: artPx, borderRadius: artPx > 30 ? 8 : 5 }}>
           {art ? (
             // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL or a static /design/ creature
-            <img src={art} alt="" className="h-full w-full object-cover" draggable={false} />
+            <img
+              src={art}
+              alt=""
+              className="h-full w-full object-cover"
+              draggable={false}
+              // A portrait that won't load gives way to the quest's creature.
+              onError={(e) => {
+                const fallback = creatureFor(task.id);
+                if (!e.currentTarget.src.endsWith(fallback)) e.currentTarget.src = fallback;
+              }}
+            />
           ) : (
             <span style={{ fontSize: artPx * 0.72, lineHeight: 1 }}>{emoji}</span>
           )}
@@ -288,12 +298,10 @@ function QuestCard({
             fontSize: titlePx,
             fontWeight: 600,
             lineHeight: 1.12,
-            display: "-webkit-box",
-            WebkitBoxOrient: "vertical",
-            WebkitLineClamp: line ? 1 : lines,
-            WebkitHyphens: "auto",
             overflow: "hidden",
-            whiteSpace: line ? "nowrap" : undefined,
+            ...(line
+              ? { display: "block", whiteSpace: "nowrap", textOverflow: "ellipsis" }
+              : { display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: lines, WebkitHyphens: "auto" }),
           }}
         >
           {task.title}
