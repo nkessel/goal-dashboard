@@ -3023,6 +3023,7 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
   const todayKey = now.toLocaleDateString("en-CA", { timeZone: tz });
   const today = tasks.filter((t) => t.scheduled_start && new Date(t.scheduled_start).toLocaleDateString("en-CA", { timeZone: tz }) === todayKey).map((t) => `- ${new Date(t.scheduled_start!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: tz })}: "${t.title}"`);
   const questLines = contextLines(tasks.map((t) => (t.needs_review ? { ...t, title: t.title, board: `${t.board ?? "no board"}, imported, not yet sorted` } : t)), now, 60);
+  const { cleanStyle, styleLines } = await import("@/lib/toucan-style");
   const system = coachSystemPrompt({
     who,
     when: now.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tz }),
@@ -3037,6 +3038,7 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
     today,
     notes: lite ? [] : coach.notes.map((n) => `- ${n.text}`),
     promises: lite ? [] : coach.promises.filter((p) => p.status === "open").map((p) => `- ${p.text}${p.due ? ` (for ${fmtWhen(p.due)})` : p.next ? ` (next time: ${p.next})` : ""}`),
+    style: styleLines(cleanStyle(extras.toucanStyle)),
     lite,
   });
   // The light guide keeps no memory: it sees only this conversation.
@@ -3188,8 +3190,21 @@ export async function saveToucanPrefsAction(patch: { mode?: "simple" | "lite" | 
 
 export async function toucanPrefsAction() {
   const ownerId = await requireProfileId();
-  const p = ((await readExtras(ownerId)).toucanPrefs as { mode?: "simple" | "lite" | "full"; retired?: string[] } | undefined) ?? {};
-  return { mode: p.mode ?? "full", retired: p.retired ?? [] };
+  const extras = await readExtras(ownerId);
+  const p = (extras.toucanPrefs as { mode?: "simple" | "lite" | "full"; retired?: string[] } | undefined) ?? {};
+  const { cleanStyle } = await import("@/lib/toucan-style");
+  return { mode: p.mode ?? "full", retired: p.retired ?? [], style: cleanStyle(extras.toucanStyle) };
+}
+
+/** Save how you like to be checked in (the check-in quiz, or Settings). */
+export async function saveToucanStyleAction(style: unknown) {
+  const ownerId = await requireProfileId();
+  const { cleanStyle } = await import("@/lib/toucan-style");
+  const clean = cleanStyle(style);
+  const extras = await readExtras(ownerId);
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, toucanStyle: clean } }).eq("id", ownerId);
+  revalidatePath("/", "layout");
+  return clean;
 }
 
 /** The colour theme for the Adventure look (forest, moonlit, ember…). */

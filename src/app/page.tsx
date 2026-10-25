@@ -5,6 +5,7 @@ import { TodayTaskBoard } from "@/components/tasks/TodayTaskBoard";
 import { VictoriesToday } from "@/components/xp/VictoriesToday";
 import { AddTaskForm } from "@/components/tasks/AddTaskForm";
 import { XpSummary } from "@/components/xp/XpSummary";
+import { ReturnCheckIn } from "@/components/xp/ReturnCheckIn";
 import {
   listOpenTasksForOwnerWithCategory,
   listCompletedTasksForOwner,
@@ -184,6 +185,11 @@ export default async function Home() {
         day={
           <div className="flex flex-col gap-6">
             {stats}
+            <ReturnCheckIn
+              lastAt={lastEnergy?.created_at ?? null}
+              metrics={checkMetrics}
+              notesToday={recentNotes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))}
+            />
             {planNudge}
             {chapter && <WeekChapter chapter={chapter} theme={profile?.theme ?? "adventure"} />}
             <TodayTaskBoard

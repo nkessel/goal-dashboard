@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { saveToucanPrefsAction } from "@/app/actions";
 import { FLOURISHES, TALK_LOOKS, readFlourish, readTalkLook, saveFlourish, saveTalkLook, type Flourish, type TalkLook } from "@/lib/toucan-flourish";
+import { flourishClass } from "@/lib/toucan-flourish";
 import { LINE_GROUPS, setRetiredLines } from "@/lib/toucan-lines";
+import { ToucanArt } from "@/components/toucan/ToucanArt";
+import { openStyleQuiz, useToucanStyle } from "@/lib/toucan-style-store";
+import { clockWord, voice } from "@/lib/toucan-style";
 
 export type ToucanMode = "simple" | "lite" | "full";
 export const TOUCAN_MODES: { key: ToucanMode; label: string; hint: string }[] = [
@@ -11,6 +15,75 @@ export const TOUCAN_MODES: { key: ToucanMode; label: string; hint: string }[] = 
   { key: "lite", label: "Light guide", hint: "He keeps watch, nudges you about slipping quests and helps plan them" },
   { key: "full", label: "Full guide", hint: "All of that, plus he remembers what you share, keeps your promises and offers next steps" },
 ];
+
+/** What he'd say in each mode, so you can hear the difference before choosing. */
+const MODE_EXAMPLES: Record<ToucanMode, string> = {
+  simple: "Tap me any time for a little wisdom. I won't speak up on my own.",
+  lite: "Good morning! Coming up: “AR class homework” due today. Shall we plan your day so nothing slips?",
+  full: "Good evening! Is there anything you need to prepare for tomorrow? You asked for gym accountability, so I’ll check in before you go.",
+};
+
+/**
+ * A little stage for previews: the toucan, a speech bubble, and (optionally)
+ * the "Talk with me" look and a flourish that replays whenever `play` changes.
+ */
+export function ToucanPreview({ text, talk, flourish, play = 0 }: { text: string; talk?: TalkLook; flourish?: Flourish; play?: number }) {
+  return (
+    <div className="flex items-end gap-2.5 rounded-2xl p-3" style={{ background: "linear-gradient(180deg, #17302c, #0d1f1d)", border: "1px solid rgba(140,240,220,.3)" }} aria-live="polite">
+      <div key={play} className={`shrink-0 ${play && flourish ? (flourishClass(flourish) ?? "") : ""}`}>
+        <ToucanArt size={46} />
+      </div>
+      <div
+        key={text}
+        className="owl-say relative mb-3 rounded-2xl rounded-bl-sm px-3 py-1.5 text-[13.5px] font-medium italic leading-snug"
+        style={{ background: "linear-gradient(180deg, rgba(14,38,40,.94), rgba(8,22,26,.96))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.25)" }}
+      >
+        {text}
+        {talk === "words" && (
+          <span className="mt-1.5 flex">
+            <span className="h-7 rounded-full px-2.5 text-[12px] font-bold not-italic leading-7" style={{ background: "rgba(140,240,220,.18)", border: "1px solid rgba(140,240,220,.6)" }}>
+              Talk with me
+            </span>
+          </span>
+        )}
+        {(talk === "glow" || talk === "glint") && (
+          <span aria-hidden className={`absolute -bottom-2 -right-2 flex items-center justify-center rounded-full ${talk === "glint" ? "owl-secret h-6 w-6" : "owl-talk h-8 w-8"}`}>
+            <svg width={talk === "glint" ? 12 : 16} height={talk === "glint" ? 12 : 16} viewBox="0 0 24 24">
+              <path d="M12 1.5l2.2 7.3 7.3 2.2-7.3 2.2L12 20.5l-2.2-7.3L2.5 11l7.3-2.2z" fill="currentColor" />
+            </svg>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** How you like to be checked in: what the quiz found, a sample, and a way to take it (again). */
+function CheckInStyle() {
+  const st = useToucanStyle();
+  const bits = st.done
+    ? [
+        st.tone === "gentle" ? "Gentle" : st.tone === "direct" ? "Straight to the point" : "Playful",
+        st.often === "rare" ? "once a day at most" : st.often === "some" ? "a few times a day" : "whenever it helps",
+        st.times.length === 3 ? "any time of day" : st.times.join(" and ") || "no set times",
+        ...(st.gym.days.length ? [`gym ${st.gym.days.map((d) => DAY_NAMES[d]).join(", ")}${st.gym.time ? ` at ${clockWord(st.gym.time)}` : ""}`] : []),
+      ]
+    : [];
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-sm font-semibold">How he checks in with you</span>
+      <p className="m-0 -mt-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+        {st.done ? bits.join(" · ") : "A few taps teach him your way: tone, timing, what helps and what doesn't, and the gym."}
+      </p>
+      {st.done && <ToucanPreview text={voice.eveningPrep(st)} />}
+      <button type="button" onClick={openStyleQuiz} className="flex min-h-11 items-center justify-center rounded-xl px-3 text-[14px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+        {st.done ? "Retake the check-in quiz" : "Take the check-in quiz"}
+      </button>
+    </div>
+  );
+}
 
 /**
  * How much the Great Toucan Spirit does, and which of his lines he says:
@@ -20,6 +93,7 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
   const [mode, setMode] = useState<ToucanMode>(initialMode);
   const [off, setOff] = useState<Set<string>>(() => new Set(initialRetired));
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [hover, setHover] = useState<ToucanMode | null>(null);
 
   function chooseMode(m: ToucanMode) {
     setMode(m);
@@ -44,7 +118,7 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
       <span className="text-sm font-semibold">How much he does</span>
       <div role="radiogroup" aria-label="How much the toucan does" className="flex flex-col gap-1.5">
         {TOUCAN_MODES.map((m) => (
-          <button key={m.key} type="button" role="radio" aria-checked={mode === m.key} onClick={() => chooseMode(m.key)} className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick(mode === m.key)}>
+          <button key={m.key} type="button" role="radio" aria-checked={mode === m.key} onClick={() => chooseMode(m.key)} onPointerEnter={() => setHover(m.key)} onPointerLeave={() => setHover(null)} className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick(mode === m.key)}>
             <span className="text-[14px] font-bold">{m.label}</span>
             <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
               {m.hint}
@@ -52,6 +126,13 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
           </button>
         ))}
       </div>
+      <ToucanPreview text={MODE_EXAMPLES[hover ?? mode]} />
+
+      {mode !== "simple" && (
+        <div className="mt-1">
+          <CheckInStyle />
+        </div>
+      )}
 
       <span className="mt-1 text-sm font-semibold">What he says</span>
       <p className="m-0 -mt-1.5 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -99,6 +180,7 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
 export function ToucanLookSettings() {
   const [flourish, setFlourish] = useState<Flourish>("glow");
   const [talk, setTalk] = useState<TalkLook>("glow");
+  const [play, setPlay] = useState(0);
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- browser storage is only readable after hydration */
     setFlourish(readFlourish());
@@ -108,6 +190,7 @@ export function ToucanLookSettings() {
   const pick = (on: boolean) => (on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border, rgba(139,112,64,.35))", color: "var(--t-ink)" });
   return (
     <div className="flex flex-col gap-2.5" style={{ color: "var(--t-ink)" }}>
+      <ToucanPreview text="Rivers carve canyons not by force, but by returning." talk={talk} flourish={flourish} play={play} />
       <span className="text-sm font-semibold">“Talk with me” on his speech bubble</span>
       <div role="radiogroup" aria-label="How Talk with me shows" className="flex flex-col gap-1.5">
         {TALK_LOOKS.map((t) => (
@@ -141,6 +224,7 @@ export function ToucanLookSettings() {
             onClick={() => {
               setFlourish(f.key);
               saveFlourish(f.key);
+              setPlay((n) => n + 1);
             }}
             className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left"
             style={pick(flourish === f.key)}

@@ -34,12 +34,27 @@ import { SCHEDULER_DEFAULTS, planSchedule, type Busy, type SchedulerSettings } f
 import { openFocusMode } from "@/lib/focus-timer";
 import { GearIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "./ToucanArt";
+import { ToucanQuiz } from "./ToucanQuiz";
+import { dailyBudget, polish, voice, windowOf } from "@/lib/toucan-style";
+import { storeStyle, useToucanStyle } from "@/lib/toucan-style-store";
 
 type PlanTarget = { id: string; title: string; estimate: number | null; dueAt: string | null };
 type Msg = { role: "user" | "assistant"; content: string; actions?: CoachAction[]; remembered?: CoachNote[] };
 type Mode = "talk" | "catchup";
 
-const NUDGE_DAY_KEY = "toucan-nudge-day";
+/** The check-ins the toucan started itself today: how many, and which (a part of the day, the gym…). */
+function readCheckins(day: string): { count: number; slots: string[] } {
+  try {
+    const v = JSON.parse(window.localStorage.getItem("toucan-checkins") || "null") as { day?: string; count?: number; slots?: string[] } | null;
+    if (v?.day === day) return { count: v.count ?? 0, slots: v.slots ?? [] };
+  } catch {}
+  return { count: 0, slots: [] };
+}
+function writeCheckins(day: string, v: { count: number; slots: string[] }) {
+  try {
+    window.localStorage.setItem("toucan-checkins", JSON.stringify({ day, ...v }));
+  } catch {}
+}
 const todayKey = () => new Date().toDateString();
 
 type GuideMode = "simple" | "lite" | "full";
@@ -89,6 +104,7 @@ export function ToucanGuide() {
           }
         } catch {}
         setRetiredLines(p.retired);
+        storeStyle(p.style);
       })
       .catch(() => {});
   }, []);
@@ -119,15 +135,28 @@ export function ToucanGuide() {
     raiseRef.current = raise;
   });
 
-  // On Today, a little while after you arrive: a reminder first (each one once a
-  // day), then a deadline the calendar hints at, then, once a day, what's due
-  // soon (with an offer to plan the day), or else a quest that's been waiting.
+  // How you like to be checked in (the check-in quiz): its words, timing and how often.
+  const style = useToucanStyle();
+  const styleRef = useRef(style);
   useEffect(() => {
-    // Reminders you asked for come up in every mode; the daily nudge stays out of the simple one.
+    styleRef.current = style;
+  });
+  const [quiz, setQuiz] = useState(false);
+  useEffect(() => {
+    const h = () => setQuiz(true);
+    window.addEventListener("toucan-quiz", h);
+    return () => window.removeEventListener("toucan-quiz", h);
+  }, []);
+
+  // On Today, a moment after you arrive: a reminder you asked for first (each
+  // once a day), then, as your check-in style allows, one check-in for this
+  // part of the day: the gym, what's due soon, getting ready for tomorrow…
+  useEffect(() => {
     if (pathname !== "/") return;
     const t = setTimeout(async () => {
       const watch = await toucanWatchAction({ guesses: mode !== "simple" }).catch(() => null);
       if (!watch) return;
+      const st = styleRef.current;
       const day = todayKey();
       const shown = (id: string) => {
         try {
@@ -143,7 +172,7 @@ export function ToucanGuide() {
       };
       const done = (p: CoachPromise) => ({ label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: p.id, status: "kept" } }).then(() => window.dispatchEvent(new Event("toucan-promises"))).catch(() => {}) });
       const later = { label: "Later", run: () => {} };
-      const say = (text: string, actions: { label: string; run: () => void }[]) => window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text, actions } }));
+      const say = (text: string, actions: NoteAction[]) => raiseRef.current(polish(st, text), actions);
       // "Next time" reminders whose calendar event is near.
       const near = (watch.nextNear as { promise: CoachPromise; event: { title: string; start: string } }[]).find((n) => !shown(n.promise.id));
       if (near) {
@@ -162,21 +191,46 @@ export function ToucanGuide() {
         return;
       }
       if (mode === "simple") return;
+
+      // Not yet asked how you like to be checked in? Offer the quiz, once a day, a few times at most.
+      if (!st.done && !shown("quiz")) {
+        let offers = 0;
+        try {
+          offers = Number(window.localStorage.getItem("toucan-quiz-offers") || 0);
+        } catch {}
+        if (offers < 3) {
+          mark("quiz");
+          try {
+            window.localStorage.setItem("toucan-quiz-offers", String(offers + 1));
+          } catch {}
+          say("I'd love to learn how you like to be checked in, so I can do it your way. A few taps?", [
+            { label: "Let's do it", run: () => setQuiz(true) },
+            { label: "Not now", run: () => {} },
+          ]);
+          return;
+        }
+      }
+
+      // Each day has a budget of check-ins the toucan starts itself, one per part of the day.
+      const used = readCheckins(day);
+      if (used.count >= dailyBudget(st)) return;
+      const spend = (slot: string) => writeCheckins(day, { count: used.count + 1, slots: [...used.slots, slot] });
       const planDay = { label: "Plan my day", run: () => talkToToucan(undefined, "talk", PLAN_DAY) };
+
       // A quest with no due date whose name matches something coming up on the calendar.
       const guess = (watch.guesses as DeadlineGuess[]).find((g) => !shown(`due:${g.taskId}`));
       if (guess) {
         mark(`due:${guess.taskId}`);
-        const start = new Date(guess.start);
+        spend(`due:${guess.taskId}`);
         const soon = dueSoonList([{ due_at: guess.start }]).length > 0;
-        raiseRef.current(`Is “${guess.title}” due before ${guess.event} (${eventWhen(start)})?`, [
+        say(voice.deadlineGuess(st, guess.title, guess.event, eventWhen(new Date(guess.start))), [
           {
             label: "Yes, set it",
             run: () =>
               void answerDeadlineGuessAction(guess.taskId, guess.start)
                 .then(() => {
                   router.refresh();
-                  raiseRef.current(soon ? `Done. It's in Due soon at the top of Today. Shall we plan your day around it?` : `Done. I'll keep it in view and remind you as it gets close.`, soon ? [planDay, later] : [], soon);
+                  if (soon) say("Done. It's in Due soon at the top of Today. Shall we plan your day around it?", [planDay, later]);
                 })
                 .catch(() => {}),
           },
@@ -184,52 +238,81 @@ export function ToucanGuide() {
         ]);
         return;
       }
-      try {
-        if (window.localStorage.getItem(NUDGE_DAY_KEY) === day) return;
-        window.localStorage.setItem(NUDGE_DAY_KEY, day);
-      } catch {
+
+      // The gym, on the days you chose.
+      const now = new Date();
+      const gym = st.gym;
+      const gymToday = gym.days.includes(now.getDay());
+      const gymTomorrow = gym.days.includes((now.getDay() + 1) % 7);
+      const gymAt = gym.time ? new Date(now) : null;
+      if (gymAt && gym.time) gymAt.setHours(Number(gym.time.slice(0, 2)), Number(gym.time.slice(3, 5)), 0, 0);
+      const mins = gymAt ? (now.getTime() - gymAt.getTime()) / 60_000 : null;
+      if (gymToday && gym.help.includes("before") && mins !== null && mins >= -90 && mins < 0 && !used.slots.includes("gym-before")) {
+        spend("gym-before");
+        say(voice.gymBefore(st, gym.time), [{ label: "On my way ✓", run: () => {} }, { label: "Help me get going", run: () => talkToToucan(undefined, "talk", "I'm supposed to go to the gym soon and I need help getting out the door.") }]);
         return;
       }
+      const afterGym = mins !== null ? mins >= 60 && mins <= 6 * 60 : windowOf(now) === "evening";
+      if (gymToday && gym.help.includes("after") && afterGym && !used.slots.includes("gym-after")) {
+        spend("gym-after");
+        say(voice.gymAfter(st), [
+          { label: "I went ✓", run: () => (gym.help.includes("cheer") ? say(voice.gymCheer(st), []) : undefined) },
+          { label: "Not today", run: () => say(voice.gymMissed(st), [{ label: "Talk it through", run: () => talkToToucan(undefined, "talk", "I didn't make it to the gym today.") }, { label: "Okay", run: () => {} }]) },
+        ]);
+        return;
+      }
+      const w = windowOf(now);
+      if (gymTomorrow && gym.help.includes("pack") && w === "evening" && !used.slots.includes("gym-pack")) {
+        spend("gym-pack");
+        say(voice.gymPack(st, gym.time), [{ label: "Packed ✓", run: () => {} }, { label: "Later", run: () => {} }]);
+        return;
+      }
+
+      // One check-in for this part of the day, if it's one you welcome.
+      if (!w || !st.times.includes(w) || used.slots.includes(w)) return;
+      spend(w);
       // A promise whose time has passed comes first: how did it go?
       const owed = watch.due[0] as CoachPromise | undefined;
       if (owed) {
-        window.dispatchEvent(
-          new CustomEvent("toucan-nudge", {
-            cancelable: true,
-            detail: {
-              text: `Earlier you promised: “${owed.text}”. How did it go?`,
-              actions: [
-                { label: "I did it ✓", run: () => void coachPromiseAction({ settle: { id: owed.id, status: "kept" } }).catch(() => {}) },
-                { label: "Not yet", run: () => talkToToucan(undefined, "talk", `I didn't get to my promise: "${owed.text}".`) },
-              ],
-            },
-          })
-        );
+        say(`Earlier you promised: “${owed.text}”. How did it go?`, [
+          { label: "I did it ✓", run: () => void coachPromiseAction({ settle: { id: owed.id, status: "kept" } }).catch(() => {}) },
+          { label: "Not yet", run: () => talkToToucan(undefined, "talk", `I didn't get to my promise: "${owed.text}".`) },
+        ]);
         return;
       }
-      // What's due today and tomorrow, and an offer to plan the day around it.
+      if (w === "evening") {
+        say(voice.eveningPrep(st), [
+          { label: "Yes, help me", run: () => talkToToucan(undefined, "talk", "Help me prepare for tomorrow: what's coming up, and what I can get ready tonight.") },
+          { label: "All set ✓", run: () => {} },
+        ]);
+        return;
+      }
       const dueSoon = dueSoonList(watch.tasks as GuideTask[]);
       if (dueSoon.length) {
-        const named = dueSoon.slice(0, 2).map((d) => `“${d.title}” ${dueWhen(d.due_at!)}`);
-        const more = dueSoon.length - named.length;
-        raiseRef.current(`On today's horizon: ${named.join(" and ")}${more > 0 ? `, and ${more} more` : ""}. Shall we plan your day so nothing slips?`, [planDay, later]);
+        say(voice.dueSoon(st, w, dueSoon.map((d) => ({ title: d.title, when: dueWhen(d.due_at!) }))), [planDay, later]);
         return;
       }
-      const top = neglected(watch.tasks as GuideTask[], new Date(), watch.snoozed, 1)[0];
+      if (w === "morning") {
+        say(voice.openDay(st, w), [{ label: "Tell the toucan", run: () => talkToToucan(undefined, "talk") }, planDay]);
+        return;
+      }
+      const top = neglected(watch.tasks as GuideTask[], now, watch.snoozed, 1)[0];
       if (!top) return;
       const plan = { id: top.id, title: top.title, estimate: top.estimate, dueAt: top.dueAt };
-      raiseRef.current(`Psst… “${top.title}” ${top.why}. Shall we give it a time?`, [
+      // A date is worth saying; how long it has waited only if you're fine hearing it.
+      const text = top.dueAt ? `“${top.title}” ${dueWhen(top.dueAt)}. ${st.form === "question" ? "Shall we give it a time?" : "Let's give it a time."}` : voice.important(st, top.title);
+      say(text, [
         { label: top.step === "estimate" ? "Estimate & plan" : "Plan it", run: () => talkToToucan(plan) },
         { label: "Not now", run: () => void snoozeToucanAction(top.id, 1).catch(() => {}) },
       ]);
-    }, 7000);
+    }, 1200);
     return () => clearTimeout(t);
   }, [pathname, mode, router]);
 
   // Something due today and still open: about three hours before (or by 3 pm),
-  // once a day, the toucan offers to start on it now.
+  // the toucan offers to start on it now (unless you'd rather it spoke up only once a day).
   useEffect(() => {
-    if (mode === "simple") return;
+    if (mode === "simple" || style.often === "rare") return;
     let timers: ReturnType<typeof setTimeout>[] = [];
     let live = true;
     const arm = async () => {
@@ -258,8 +341,9 @@ export function ToucanGuide() {
         if (ms <= 0) delay += 90_000;
         timers.push(
           setTimeout(() => {
+            const st = styleRef.current;
             const time = new Date(t.due_at!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-            const seen = raiseRef.current(`“${t.title}” is due today at ${time} and still open. Start 15 minutes on it now?`, [
+            const seen = raiseRef.current(voice.dueToday(st, t.title, time), [
               {
                 label: "Begin · 15 min",
                 run: async () => {
@@ -286,7 +370,7 @@ export function ToucanGuide() {
       timers.forEach(clearTimeout);
       window.removeEventListener("focus", rearm);
     };
-  }, [mode]);
+  }, [mode, style.often]);
 
   // Promises with a time: when it comes, the toucan says so.
   useEffect(() => {
@@ -357,6 +441,7 @@ export function ToucanGuide() {
   return (
     <>
       {fallback && <NudgeNote text={fallback.text} actions={fallback.actions} onClose={() => setFallback(null)} />}
+      {quiz && <ToucanQuiz onClose={() => setQuiz(false)} />}
       {open && (mode !== "simple" || open.mode === "catchup" || open.plan) && (
         <GuideSheet
           key={open.n}

@@ -131,6 +131,8 @@ export function coachSystemPrompt(o: {
   today: string[];
   notes: string[];
   promises: string[];
+  /** How they like to be checked in (from the check-in quiz). */
+  style?: string[];
   /** The light guide: kind and practical, no memory and no action cards. */
   lite?: boolean;
 }) {
@@ -151,6 +153,7 @@ export function coachSystemPrompt(o: {
 {"type":"journal","text":"…"}  (save a reflection they wrote, in their words)
 {"type":"remember","note":"…"}  (a lasting fact about them: values, what helps, what's hard. Never for reminders, errands or to-dos)
 Offer actions only when they fit; often none. Omit the ACTIONS line when there are none.`,
+    ...(o.style?.length ? [block("How they like to be checked in (they told you this; follow it closely)", o.style)] : []),
     block("What you remember about them", o.notes),
     block("Their promises and reminders (if they mention being with someone or somewhere marked \"next time\", bring that reminder up)", o.promises),
     block("Their life areas (boards)", o.areas),

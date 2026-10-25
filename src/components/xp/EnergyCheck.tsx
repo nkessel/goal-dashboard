@@ -64,7 +64,10 @@ export function EnergyCheck({
   metricsToday = {},
   full = false,
   notesToday = [],
+  onSaved,
 }: {
+  /** Called once a check-in is saved (the welcome-back popup closes then). */
+  onSaved?: () => void;
   /** Today's write-in events and #tags. */
   notesToday?: { id: string; body: string; at?: string }[];
   /** The Insights screen's full check-in: every metric shown, no link back to Insights. */
@@ -234,6 +237,7 @@ export function EnergyCheck({
         setPeek(false);
         setAdding(false);
         setEditingList(false);
+        onSaved?.();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
       }
