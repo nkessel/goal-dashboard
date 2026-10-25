@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransiti
 import { saveNightAction, setWheelOfTimeAction } from "@/app/actions";
 import { NightFields, EMPTY_NIGHT, nightIsEmpty, type NightDraft } from "@/components/xp/NightFields";
 import { StoneWheel, WHEEL_STEP } from "@/components/insights/StoneWheel";
-import { clockFromNight, minutesLabel, nightMinutes, prettyTime, recentAverages, shiftDay, turnings, wheelTurns, type NightLog, type WheelState } from "@/lib/wheel-of-time";
+import { MAX_WEIGHT, weightOf, clockFromNight, minutesLabel, nightMinutes, prettyTime, recentAverages, shiftDay, turnings, wheelTurns, type NightLog, type WheelState } from "@/lib/wheel-of-time";
 
 const CREAM = "#efe6cc";
 const SOFT = "rgba(239,230,204,.7)";
@@ -74,7 +74,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
   const target = state.target ? nightMinutes(state.target) : null;
   const totalNights = Object.keys(state.log).length;
 
-  function saveSettings(patch: { effort?: string[]; hindrances?: string[]; target?: string | null }) {
+  function saveSettings(patch: { effort?: string[]; hindrances?: string[]; target?: string | null; weights?: Record<string, number> }) {
     const prev = state;
     setState((s) => ({ ...s, ...patch }));
     setError(null);
@@ -182,8 +182,9 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
           {on ? "✓" : good ? "+" : "−"}
         </span>
         <span className="min-w-0 flex-1">{name}</span>
-        <span aria-hidden className="text-[14px] opacity-80">
+        <span aria-hidden className="shrink-0 text-[13px] font-bold tabular-nums opacity-80">
           {good ? "↻" : "↺"}
+          {weightOf(state.weights, name) > 1 ? ` ${weightOf(state.weights, name)}` : ""}
         </span>
       </button>
     );
@@ -262,6 +263,18 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
             {state.hindrances.map((n) => pressButton("hindrance", n))}
           </div>
         </div>
+        <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing} className="mx-auto h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(217,180,95,.6)" }}>
+          {editing ? "Done" : "⚙ Edit what's on the wheel"}
+        </button>
+        {editing && (
+          <div className="reveal grid gap-2 sm:grid-cols-2">
+            <ListEditor title="Right Effort" color={GOLD} items={state.effort} weights={state.weights} onChange={(effort) => saveSettings({ effort })} onWeight={(name, w) => saveSettings({ weights: { ...state.weights, [name]: w } })} />
+            <ListEditor title="Hindrances" color={ROSE} items={state.hindrances} weights={state.weights} onChange={(hindrances) => saveSettings({ hindrances })} onWeight={(name, w) => saveSettings({ weights: { ...state.weights, [name]: w } })} />
+            <span className="text-[12px] sm:col-span-2" style={{ color: SOFT }}>
+              The number beside each is how many marks one press turns the wheel. Changing it re-turns the wheel for every night it was logged. Nights already logged keep what was checked, even if you rename or remove something here.
+            </span>
+          </div>
+        )}
         <span className="text-center text-[11.5px]" style={{ color: SOFT }}>
           Each press is saved to {pressDay === "today" ? "tonight" : "last night"}, so the patterns below learn from it. Press again to take it back.
         </span>
@@ -375,7 +388,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
         </span>
       )}
 
-      {/* Target and lists */}
+      {/* Target bedtime */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-2.5" style={{ borderColor: "rgba(217,180,95,.25)" }}>
         <label className="flex items-center gap-1.5 text-[13.5px] font-semibold">
           Target bedtime
@@ -388,19 +401,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
             style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a", color: "#2a1c10" }}
           />
         </label>
-        <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing} className="ml-auto h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(217,180,95,.6)" }}>
-          {editing ? "Done" : "Edit Right Effort & Hindrances"}
-        </button>
       </div>
-      {editing && (
-        <div className="reveal grid gap-2 sm:grid-cols-2">
-          <ListEditor title="Right Effort" color={GOLD} items={state.effort} onChange={(effort) => saveSettings({ effort })} />
-          <ListEditor title="Hindrances" color={ROSE} items={state.hindrances} onChange={(hindrances) => saveSettings({ hindrances })} />
-          <span className="text-[12px] sm:col-span-2" style={{ color: SOFT }}>
-            Nights already logged keep what was checked, even if you rename or remove something here.
-          </span>
-        </div>
-      )}
       {error && (
         <span className="text-[12.5px] font-semibold" style={{ color: ROSE }}>
           {error}
@@ -410,7 +411,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
   );
 }
 
-function ListEditor({ title, color, items, onChange }: { title: string; color: string; items: string[]; onChange: (next: string[]) => void }) {
+function ListEditor({ title, color, items, weights, onChange, onWeight }: { title: string; color: string; items: string[]; weights: Record<string, number>; onChange: (next: string[]) => void; onWeight: (name: string, weight: number) => void }) {
   const [text, setText] = useState("");
   const add = () => {
     const t = text.replace(/\s+/g, " ").trim().slice(0, 60);
@@ -425,6 +426,17 @@ function ListEditor({ title, color, items, onChange }: { title: string; color: s
       {items.map((i) => (
         <span key={i} className="flex items-center gap-2 text-[13.5px] leading-snug">
           <span className="flex-1">{i}</span>
+          <span className="flex shrink-0 items-center rounded-full" role="group" aria-label={`How far ${i} turns the wheel`} style={{ border: "1px solid rgba(217,180,95,.4)" }}>
+            <button type="button" onClick={() => onWeight(i, Math.max(1, weightOf(weights, i) - 1))} disabled={weightOf(weights, i) <= 1} aria-label={`Turn less for ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-bold hover:bg-white/10 disabled:opacity-30" style={{ color }}>
+              −
+            </button>
+            <span className="min-w-[2.6em] text-center text-[12.5px] font-bold tabular-nums" style={{ color }} title="Marks per press">
+              {weightOf(weights, i)} {weightOf(weights, i) === 1 ? "mark" : "marks"}
+            </span>
+            <button type="button" onClick={() => onWeight(i, Math.min(MAX_WEIGHT, weightOf(weights, i) + 1))} disabled={weightOf(weights, i) >= MAX_WEIGHT} aria-label={`Turn more for ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-bold hover:bg-white/10 disabled:opacity-30" style={{ color }}>
+              +
+            </button>
+          </span>
           <button type="button" onClick={() => onChange(items.filter((x) => x !== i))} aria-label={`Remove ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[16px] hover:bg-white/10" style={{ color: SOFT }}>
             ×
           </button>

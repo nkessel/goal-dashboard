@@ -2008,16 +2008,16 @@ export async function saveNightAction(input: { bed: string | null; wake: string 
 }
 
 /** Change the Right Effort / Hindrance lists or the target bedtime. */
-export async function setWheelOfTimeAction(input: { effort?: string[]; hindrances?: string[]; target?: string | null }) {
+export async function setWheelOfTimeAction(input: { effort?: string[]; hindrances?: string[]; target?: string | null; weights?: Record<string, number> }) {
   const ownerId = await requireProfileId();
   const { cleanWheel } = await import("@/lib/wheel-of-time");
   const extras = await readExtras(ownerId);
   const wheel = cleanWheel(extras.wheelOfTime);
-  const next = cleanWheel({ ...wheel, ...(input.effort ? { effort: input.effort } : {}), ...(input.hindrances ? { hindrances: input.hindrances } : {}), ...("target" in input ? { target: input.target } : {}) });
+  const next = cleanWheel({ ...wheel, ...(input.effort ? { effort: input.effort } : {}), ...(input.hindrances ? { hindrances: input.hindrances } : {}), ...("target" in input ? { target: input.target } : {}), ...(input.weights ? { weights: input.weights } : {}) });
   const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, wheelOfTime: next } }).eq("id", ownerId);
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   revalidatePath("/insights");
-  return { effort: next.effort, hindrances: next.hindrances, target: next.target };
+  return { effort: next.effort, hindrances: next.hindrances, target: next.target, weights: next.weights };
 }
 
 /** The check-in metrics being tracked (beyond Energy), in order. */

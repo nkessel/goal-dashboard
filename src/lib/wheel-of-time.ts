@@ -9,7 +9,9 @@
 export type Hindrance = { name: string; at?: string | null };
 /** One night, keyed by the morning (app day) it was logged for. */
 export type NightLog = { bed: string | null; wake: string | null; effort: string[]; hindrances: Hindrance[]; at: string };
-export type WheelSettings = { effort: string[]; hindrances: string[]; target: string | null };
+/** How many marks each item turns the wheel (1–5), by name; missing means 1. */
+export type WheelWeights = Record<string, number>;
+export type WheelSettings = { effort: string[]; hindrances: string[]; target: string | null; weights: WheelWeights };
 export type WheelState = WheelSettings & { log: Record<string, NightLog> };
 
 export const DEFAULT_EFFORT = [
@@ -53,6 +55,18 @@ export function cleanNight(v: unknown): NightLog | null {
   return { bed, wake, effort, hindrances, at: typeof o.at === "string" ? o.at : new Date().toISOString() };
 }
 
+export const MAX_WEIGHT = 5;
+export const weightOf = (weights: WheelWeights, name: string) => weights[name] ?? 1;
+function cleanWeights(v: unknown): WheelWeights {
+  const out: WheelWeights = {};
+  for (const [k, w] of Object.entries((v ?? {}) as Record<string, unknown>).slice(0, 60)) {
+    const name = label(k);
+    const n = Math.round(Number(w));
+    if (name && n >= 1 && n <= MAX_WEIGHT && n !== 1) out[name] = n;
+  }
+  return out;
+}
+
 export function cleanWheel(raw: unknown): WheelState {
   const r = (raw ?? {}) as Record<string, unknown>;
   const log: Record<string, NightLog> = {};
@@ -64,7 +78,7 @@ export function cleanWheel(raw: unknown): WheelState {
     const n = cleanNight(v);
     if (n) log[k] = n;
   }
-  return { effort: list(r.effort, DEFAULT_EFFORT), hindrances: list(r.hindrances, DEFAULT_HINDRANCES), target: isTime(r.target) ? r.target : null, log };
+  return { effort: list(r.effort, DEFAULT_EFFORT), hindrances: list(r.hindrances, DEFAULT_HINDRANCES), target: isTime(r.target) ? r.target : null, weights: cleanWeights(r.weights), log };
 }
 
 /**
@@ -132,15 +146,15 @@ export function recentAverages(state: WheelState, days = 7) {
 }
 
 /**
- * How far the wheel has turned: every Right Effort ever logged turns it one
- * mark forward, every Hindrance one mark back.
+ * How far the wheel has turned: every Right Effort ever logged turns it
+ * forward by its marks, every Hindrance back by its marks.
  */
 export function wheelTurns(state: WheelState) {
   let forward = 0;
   let back = 0;
   for (const n of Object.values(state.log)) {
-    forward += n.effort.length;
-    back += n.hindrances.length;
+    for (const e of n.effort) forward += weightOf(state.weights, e);
+    for (const h of n.hindrances) back += weightOf(state.weights, h.name);
   }
   return { forward, back, net: forward - back };
 }
