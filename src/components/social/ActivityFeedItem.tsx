@@ -5,6 +5,7 @@ import { shownLevel } from "@/lib/shown-level";
 import { formatRelativeTime } from "@/lib/format-time";
 import { ReactionBar } from "./ReactionBar";
 import { CommentThread, type CommentWithAuthor } from "./CommentThread";
+import { PartyShow } from "./PartyView";
 
 function describe(item: FeedItem, authorName: string): string {
   if (item.kind === "task_completed") return `${authorName} completed "${item.task_title ?? "a task"}"`;
@@ -76,6 +77,14 @@ export function ActivityFeedItem({
 
       <p className="m-0 text-[16.5px] leading-snug" style={{ color: "var(--t-ink)" }}>
         {describe(item, authorName)}
+        {item.kind === "task_completed" && (item.task_xp ?? 0) > 0 && (
+          <PartyShow k="xp">
+            {" "}
+            <span className="ml-1 whitespace-nowrap rounded-full px-2 py-px align-middle text-[13px] font-bold tabular-nums" style={{ background: "rgba(42,28,16,.82)", color: "#f2d27e" }}>
+              +{item.task_xp} XP
+            </span>
+          </PartyShow>
+        )}
       </p>
 
       <div className="flex items-center gap-2.5">

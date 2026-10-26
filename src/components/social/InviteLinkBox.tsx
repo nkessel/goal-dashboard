@@ -5,7 +5,7 @@ import { useState, useSyncExternalStore } from "react";
 const noop = () => () => {};
 
 /** "Invite someone to your party": share sheet on phones, copy everywhere. */
-export function InviteLinkBox({ code, theme = "calm", inviterName }: { code: string; theme?: "calm" | "adventure"; inviterName?: string | null }) {
+export function InviteLinkBox({ code, theme = "calm", inviterName, prominent = false }: { code: string; theme?: "calm" | "adventure"; inviterName?: string | null; /** Top of the Guild Hall: a gilded banner. */ prominent?: boolean }) {
   const [copied, setCopied] = useState(false);
   const isAdventure = theme === "adventure";
   const path = `/invite/${code}`;
@@ -36,6 +36,40 @@ export function InviteLinkBox({ code, theme = "calm", inviterName }: { code: str
   }
 
   const gold = { background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" };
+
+  if (prominent)
+    return (
+      <section
+        className="relative flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3.5"
+        style={{ background: "linear-gradient(180deg, rgba(58,44,16,.95), rgba(30,22,8,.95))", border: "2px solid #d9b45f", boxShadow: "0 0 22px rgba(242,210,126,.25), inset 0 1px 0 rgba(255,235,180,.2)" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- painted party banner */}
+        <img src="/design/ui-party.png" alt="" width={44} height={44} className="h-11 w-11 shrink-0 object-contain" />
+        <span className="min-w-0 flex-1">
+          <span className={`block ${isAdventure ? "font-display text-[20px]" : "text-[17px] font-bold"}`} style={{ color: "#f6dc8e" }}>
+            Invite to your party
+          </span>
+          <span className="block text-[13.5px] leading-snug" style={{ color: "rgba(246,236,210,.85)" }}>
+            Send this link. They sign in with Google and join your party.
+          </span>
+        </span>
+        <span className="flex shrink-0 gap-2">
+          {canShare && (
+            <button type="button" onClick={share} className="hover-glow h-11 rounded-full px-5 text-[15px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1.5px solid #4a3913" }}>
+              Share invite
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={copy}
+            className="hover-glow h-11 rounded-full px-5 text-[15px] font-bold"
+            style={canShare ? { border: "1.5px solid #d9b45f", color: "#f6ecd2" } : { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1.5px solid #4a3913" }}
+          >
+            {copied ? "Copied ✓" : "Copy invite link"}
+          </button>
+        </span>
+      </section>
+    );
 
   return (
     <section

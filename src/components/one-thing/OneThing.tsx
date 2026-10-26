@@ -577,9 +577,9 @@ function EditableFacts({ task, now, onSave }: { task: TaskWithCategory; now: num
         <button type="button" onClick={() => setOpen(open === "ratings" ? null : "ratings")} className={chip} title="Edit importance, urgency and difficulty">
           {task.urgency > 0 || task.importance > 0 ? (
             <>
-              {"🔥".repeat(Math.round(task.importance))}
+              <Glyphs src="/design/ui-trophy.svg" n={Math.round(task.importance)} />
               {task.importance > 0 && task.urgency > 0 ? " " : ""}
-              {"⏳".repeat(Math.round(task.urgency))}
+              <Glyphs src="/design/ui-flame-sm.png" n={Math.round(task.urgency)} />
             </>
           ) : (
             "rate it"
@@ -647,10 +647,10 @@ function Facts({ task, now }: { task: Task; now: number }) {
         +{task.xp_value} XP
       </span>
       {(task.urgency > 0 || task.importance > 0) && (
-        <span className="whitespace-nowrap" title={`Urgency ${task.urgency}, importance ${task.importance}`}>
-          {"🔥".repeat(Math.round(task.urgency))}
+        <span className="inline-flex items-center whitespace-nowrap" title={`Importance ${task.importance}, urgency ${task.urgency}`}>
+          <Glyphs src="/design/ui-trophy.svg" n={Math.round(task.importance)} />
           {task.urgency > 0 && task.importance > 0 ? " " : ""}
-          {"🔥".repeat(Math.round(task.importance))}
+          <Glyphs src="/design/ui-flame-sm.png" n={Math.round(task.urgency)} />
         </span>
       )}
     </div>
@@ -807,5 +807,18 @@ function TargetGlyph() {
       <circle cx="12" cy="12" r="5" stroke="var(--t-gold)" strokeWidth="1.8" />
       <circle cx="12" cy="12" r="1.8" fill="var(--t-gold)" />
     </svg>
+  );
+}
+
+/** Trophies for importance, flames for urgency (the same marks as the quest cards). */
+function Glyphs({ src, n }: { src: string; n: number }) {
+  if (n <= 0) return null;
+  return (
+    <span className="inline-flex items-center gap-px align-[-2px]">
+      {Array.from({ length: n }).map((_, i) => (
+        // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
+        <img key={i} src={src} alt="" width={15} height={15} className="h-[15px] w-[15px] shrink-0" />
+      ))}
+    </span>
   );
 }

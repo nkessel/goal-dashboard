@@ -13,13 +13,16 @@ import { listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { listCheckInsSince } from "@/lib/data/energy";
 import { listEventsAllCalendars, type GoogleCalendarEvent } from "@/lib/google-calendar";
 import { DEFAULT_WHEEL } from "@/components/insights/LifeWheel";
+import { isAdmin } from "@/lib/data/feedback";
 
 /** The weekly and monthly planning rituals. */
 export default async function PlanPage({ searchParams }: { searchParams: Promise<{ mode?: string; mid?: string }> }) {
   const session = await requireSession();
   const { mode, mid } = await searchParams;
-  const kind: PlanKind = mode === "month" ? "month" : mode === "mom" ? "pair" : "week";
   const ownerId = session.user.id;
+  // Planning with Mom is only on the owner's profile.
+  const owner = await isAdmin(ownerId).catch(() => false);
+  const kind: PlanKind = mode === "month" ? "month" : mode === "mom" && owner ? "pair" : "week";
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const end = new Date(start.getTime() + 8 * 86_400_000);
@@ -75,6 +78,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
     <AppShell userLabel={session.user.email ?? ""} profileId={ownerId} wide>
       <PlanRitual
         kind={kind}
+        withMom={owner}
         xp={PLAN_XP[kind]}
         theme={profile?.theme ?? "adventure"}
         draft={(draft?.data as Record<string, unknown>) ?? null}

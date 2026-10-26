@@ -55,7 +55,7 @@ export function StatsTile({ isAdventure }: { isAdventure: boolean }) {
         </span>
         <span className="flex flex-col leading-tight">
           <span className="text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
-            Stats
+            Character stats
           </span>
           <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
             {stats ? `${stats.length} · order and names` : "Order and names"}
@@ -68,7 +68,7 @@ export function StatsTile({ isAdventure }: { isAdventure: boolean }) {
             <div
               role="dialog"
               aria-modal="true"
-              aria-label="Your stats"
+              aria-label="Your character stats"
               onClick={(e) => e.stopPropagation()}
               className="card-pop-in parchment parchment-framed relative flex max-h-[86vh] w-full max-w-sm flex-col gap-3 overflow-y-auto rounded-2xl p-5"
               style={{ color: "var(--t-ink)", background: isAdventure ? undefined : "var(--t-card)" }}
@@ -77,7 +77,7 @@ export function StatsTile({ isAdventure }: { isAdventure: boolean }) {
                 ×
               </button>
               <div className="relative z-[1] pr-8">
-                <p className={`m-0 text-[19px] ${isAdventure ? "font-display" : "font-bold"}`}>Your stats</p>
+                <p className={`m-0 text-[19px] ${isAdventure ? "font-display" : "font-bold"}`}>Character stats</p>
                 <p className="m-0 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
                   The order they show in, everywhere. Taking one off the list keeps the XP it has.
                 </p>

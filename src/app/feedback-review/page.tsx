@@ -17,7 +17,7 @@ export default async function FeedbackReviewPage() {
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <div className="flex flex-col gap-4">
-        <PageHeader isAdventure={isAdventure} title="Party Feedback" calmTitle="Party feedback" subtitle="What your party would change. Decide what happens to each note." />
+        <PageHeader isAdventure={isAdventure} title="App Feedback" calmTitle="App feedback" subtitle="What your party would change. Decide what happens to each note." />
         <FeedbackReview items={items} theme={profile.theme} />
       </div>
     </AppShell>

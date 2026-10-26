@@ -251,6 +251,88 @@ export function WeekView({
     return () => ro.disconnect();
   }, [days.length]);
 
+  // Fluid days: drag the day headers sideways to move through days, or drag
+  // the grip at their right end to make every day wider or narrower (more or
+  // fewer days fit). It follows your finger, then settles on whole days.
+  const [fluid, setFluid] = useState<{ dx: number; w: number | null; n?: number } | null>(null);
+  const dragged = useRef(false);
+  const goTo = (startOffset: number, n: number) => {
+    const first = new Date(days[0]);
+    first.setDate(first.getDate() + startOffset);
+    const key = formatDateParam(first);
+    const k = Math.max(1, Math.min(14, n));
+    router.push(k === 1 ? `/calendar?view=day&date=${key}` : `/calendar?view=days&n=${k}&date=${key}`, { scroll: false });
+  };
+  function startDayScroll(e: React.PointerEvent) {
+    if (e.button !== 0 || colWidth <= 0) return;
+    const x0 = e.clientX;
+    dragged.current = false;
+    const move = (m: PointerEvent) => {
+      const dx = m.clientX - x0;
+      if (!dragged.current && Math.abs(dx) < 8) return;
+      dragged.current = true;
+      setFluid({ dx, w: null });
+    };
+    const up = (u: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      if (!dragged.current) return;
+      const shift = Math.round(-(u.clientX - x0) / (colWidth + 2));
+      setFluid(null);
+      if (shift) goTo(shift, days.length);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+  function startDayResize(e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = boxRef.current;
+    if (!el || colWidth <= 0) return;
+    // The grip sits on the last day's right edge: wherever you pull that edge, the days share the room up to it.
+    const left = el.getBoundingClientRect().left + 10 + 40;
+    const avail = el.clientWidth - 20 - 40;
+    const widthAt = (x: number) => Math.max(36, Math.min(avail, (x - left) / Math.max(1, days.length)));
+    const fit = (w: number) => Math.max(1, Math.min(14, Math.round(avail / w)));
+    const move = (m: PointerEvent) => setFluid({ dx: 0, w: widthAt(m.clientX), n: fit(widthAt(m.clientX)) });
+    const up = (u: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      const n = fit(widthAt(u.clientX));
+      setFluid(null);
+      if (n !== days.length) goTo(0, n);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+  // A sideways trackpad swipe moves through the days too.
+  const swipe = useRef(0);
+  const onSideWheel = useEffectEvent((e: WheelEvent) => {
+    if (e.ctrlKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY) || colWidth <= 0) return;
+    e.preventDefault();
+    swipe.current += e.deltaX;
+    setFluid({ dx: -swipe.current, w: null });
+    clearTimeout(swipeTimer.current);
+    swipeTimer.current = setTimeout(() => {
+      const shift = Math.round(swipe.current / (colWidth + 2));
+      swipe.current = 0;
+      setFluid(null);
+      if (shift) goTo(shift, days.length);
+    }, 180);
+  });
+  const swipeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const h = (e: WheelEvent) => onSideWheel(e);
+    el.addEventListener("wheel", h, { passive: false });
+    return () => el.removeEventListener("wheel", h);
+  }, []);
+
   const gridStart = (d: Date) => {
     const x = new Date(d);
     x.setHours(HOUR_START, 0, 0, 0);
@@ -486,22 +568,54 @@ export function WeekView({
           </>
         )}
       </div>
+      <div className="relative overflow-hidden">
       <div
         className="grid"
         style={{
-          gridTemplateColumns: `40px repeat(${days.length}, minmax(0, 1fr))`,
+          gridTemplateColumns: fluid?.w ? `40px repeat(${days.length}, ${fluid.w}px)` : `40px repeat(${days.length}, minmax(0, 1fr))`,
           gridTemplateRows: `auto repeat(${hourCount}, ${HOUR_PX}px)`,
           columnGap: 2,
+          transform: fluid?.dx ? `translateX(${fluid.dx}px)` : undefined,
+          transition: fluid ? "none" : "transform .25s ease-out",
+          touchAction: "pan-y pinch-zoom",
         }}
       >
         <div />
+        {/* The grip on the last day's edge: pull it in for narrower days (more of them), out for wider ones. */}
+        <div className="pointer-events-none relative z-[3]" style={{ gridColumn: days.length + 1, gridRow: 1 }}>
+          <button
+            type="button"
+            onPointerDown={startDayResize}
+            aria-label="Drag to show more or fewer days"
+            title="Drag sideways: wider or narrower days"
+            className="pointer-events-auto absolute bottom-1.5 right-0.5 flex h-7 w-6 cursor-ew-resize touch-none items-center justify-center rounded-full"
+            style={{ border: `1px solid ${isAdventure ? "rgba(139,112,64,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "#6b5531" : "var(--t-ink-soft)", background: isAdventure ? "rgba(255,248,230,.5)" : "var(--t-card)" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M8 7l-5 5 5 5M16 7l5 5-5 5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {fluid?.w && (
+            <span className="pointer-events-none absolute right-0 top-0 z-[5] whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-bold" style={{ background: "#2a1c10", color: "#f6dc8e" }}>
+              {fluid.n === 1 ? "1 day" : `${fluid.n} days`}
+            </span>
+          )}
+        </div>
         {days.map((day, i) => {
           const isToday = !!now && isSameDay(day, now);
           return (
             <Link
               key={day.toISOString()}
               href={`/calendar?view=day&date=${formatDateParam(day)}`}
-              className="relative z-[1] flex flex-col items-center pb-1.5 text-center"
+              draggable={false}
+              onPointerDown={startDayScroll}
+              onClickCapture={(e) => {
+                if (dragged.current) {
+                  e.preventDefault();
+                  dragged.current = false;
+                }
+              }}
+              className="relative z-[1] flex cursor-grab select-none flex-col items-center pb-1.5 text-center"
               style={{ borderBottom: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, paddingTop: isAdventure ? 18 : undefined, gridColumn: i + 2, gridRow: 1 }}
             >
               {isAdventure && isToday && <TodayCrest />}
@@ -794,6 +908,7 @@ export function WeekView({
             </div>
           );
         })}
+      </div>
       </div>
 
       {itemMenu && <CalendarItemMenu target={itemMenu.target} x={itemMenu.x} y={itemMenu.y} theme={theme} onClose={() => setItemMenu(null)} />}

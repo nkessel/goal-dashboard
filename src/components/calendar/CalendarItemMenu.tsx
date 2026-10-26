@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createQuestAction, unscheduleTaskAction } from "@/app/actions";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import type { Task } from "@/lib/data/types";
+import { fromFeedback } from "@/lib/from-feedback";
 
 export type MenuTarget = { kind: "task"; task: Task; start: Date; end: Date } | { kind: "event"; id: string; title: string; start: Date; end: Date };
 
@@ -25,8 +26,8 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    const down = (e: PointerEvent) => ref.current && !ref.current.contains(e.target as Node) && !editing && onClose();
-    const key = (e: KeyboardEvent) => e.key === "Escape" && !editing && onClose();
+    const down = (e: PointerEvent) => !fromFeedback(e) && ref.current && !ref.current.contains(e.target as Node) && !editing && onClose();
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && !editing && onClose();
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key);
     return () => {
@@ -136,7 +137,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
               {error}
             </p>
           )}
-          <button type="button" onClick={addFollowUp} disabled={pending || !title.trim()} className="h-9 rounded-full text-[14px] font-bold disabled:opacity-60" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+          <button type="button" data-submit onClick={addFollowUp} disabled={pending || !title.trim()} className="h-9 rounded-full text-[14px] font-bold disabled:opacity-60" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
             {pending ? "Adding…" : `Add ${minutes}-minute follow-up`}
           </button>
           <span className="text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>

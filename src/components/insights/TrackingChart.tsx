@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { WEATHER_EVENT, WEATHER_KEY } from "@/lib/use-weather";
 import { WeatherLocation } from "@/components/ui/WeatherLocation";
+import { fromFeedback } from "@/lib/from-feedback";
 
 type Reading = { metric: string; level: number; at: string };
 type WinLite = { kind: string; at: string; xp: number; title?: string };
@@ -161,8 +162,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
   }, []);
   useEffect(() => {
     if (!settings) return;
-    const down = (e: PointerEvent) => gearRef.current && !gearRef.current.contains(e.target as Node) && setSettings(false);
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setSettings(false);
+    const down = (e: PointerEvent) => !fromFeedback(e) && gearRef.current && !gearRef.current.contains(e.target as Node) && setSettings(false);
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && setSettings(false);
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key);
     return () => {
@@ -173,8 +174,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
 
   useEffect(() => {
     if (!more) return;
-    const down = (e: PointerEvent) => moreRef.current && !moreRef.current.contains(e.target as Node) && setMore(false);
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setMore(false);
+    const down = (e: PointerEvent) => !fromFeedback(e) && moreRef.current && !moreRef.current.contains(e.target as Node) && setMore(false);
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && setMore(false);
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key);
     return () => {

@@ -4,6 +4,7 @@ import { ViewTransitionProvider } from "@/components/ui/ViewTransitionProvider";
 import { KeyboardViewport } from "@/components/ui/KeyboardViewport";
 import { ScrollLock } from "@/components/ui/ScrollLock";
 import { ContextMenuBridge } from "@/components/ui/ContextMenuBridge";
+import { SaveKeys } from "@/components/ui/SaveKeys";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -70,6 +71,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
         <KeyboardViewport />
         <ScrollLock />
         <ContextMenuBridge />
+        <SaveKeys />
         <ViewTransitionProvider>
           {children}
           {drawer}

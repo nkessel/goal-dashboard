@@ -11,6 +11,7 @@ export const SHAREABLE_SETTINGS: { key: string; label: string }[] = [
   { key: "settings-order", label: "Settings order" },
   { key: "habits-header-look", label: "Daily Habits header" },
   { key: "habits-header-mark", label: "Daily Habits mark" },
+  { key: "party-view", label: "What the Guild Hall shows" },
   { key: "evening-mode", label: "Evening mode" },
   { key: "evening-low-light", label: "Evening low light" },
   { key: "toucan-flourish", label: "Toucan flourish" },

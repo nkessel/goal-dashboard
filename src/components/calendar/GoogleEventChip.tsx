@@ -61,6 +61,12 @@ export function GoogleEventChip({
   const [hidden, setHidden] = useState(() => (typeof window !== "undefined" ? readHidden().has(event.id) : false));
   const [open, setOpen] = useState(false);
   useEscape(() => setOpen(false), open);
+  // Where the popup has been dragged to (back to the middle each time it opens).
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on each open
+    if (open) setPos({ x: 0, y: 0 });
+  }, [open]);
   const [converted, setConverted] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editTitle, setEditTitle] = useState(event.title);
@@ -216,15 +222,43 @@ export function GoogleEventChip({
           onClick={() => setOpen(false)}
         >
           <div
+            role="dialog"
+            aria-label={event.title}
             onClick={(e) => e.stopPropagation()}
-            className="flex w-full max-w-md flex-col gap-3 rounded-2xl p-4 parchment parchment-framed shadow-2xl"
+            // Drag it by its title bar; resize it from the bottom-right corner.
+            className="relative flex flex-col gap-3 overflow-auto rounded-2xl p-4 parchment parchment-framed shadow-2xl"
             style={{
               background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
               border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
               color: "var(--t-ink)",
+              transform: `translate(${pos.x}px, ${pos.y}px)`,
+              resize: "both",
+              width: "min(28rem, calc(100vw - 32px))",
+              minWidth: 280,
+              minHeight: 180,
+              maxWidth: "calc(100vw - 32px)",
+              maxHeight: "calc(100dvh - 32px)",
             }}
           >
-            <div className="flex items-center justify-between">
+            <div
+              className="-mx-1 -mt-1 flex cursor-move touch-none select-none items-center justify-between rounded-lg px-1 pt-1"
+              title="Drag to move"
+              onPointerDown={(e) => {
+                if ((e.target as Element).closest("button")) return;
+                const from = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+                const el = e.currentTarget;
+                el.setPointerCapture(e.pointerId);
+                const move = (m: PointerEvent) => setPos({ x: m.clientX - from.x, y: m.clientY - from.y });
+                const up = () => {
+                  el.removeEventListener("pointermove", move);
+                  el.removeEventListener("pointerup", up);
+                  el.removeEventListener("pointercancel", up);
+                };
+                el.addEventListener("pointermove", move);
+                el.addEventListener("pointerup", up);
+                el.addEventListener("pointercancel", up);
+              }}
+            >
               <h3 className={isAdventure ? "font-display text-base" : "text-base font-bold"}>{event.title}</h3>
               <button
                 type="button"
@@ -237,8 +271,64 @@ export function GoogleEventChip({
               </button>
             </div>
             <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
-              Google Calendar appointment · {event.isAllDay ? "All day" : formatTimeRange(start, end)}
+              {event.isAllDay ? "All day" : formatTimeRange(start, end)} · {start.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+              {event.recurring ? " · repeats" : ""}
             </p>
+            {/* Where it's from and who's coming. */}
+            <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13.5px]">
+              <dt style={{ color: "var(--t-ink-soft)" }}>Calendar</dt>
+              <dd className="m-0 flex min-w-0 items-center gap-1.5">
+                <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: event.color ?? "#4f6d3c" }} />
+                <span className="truncate">{event.calendarName || (event.calendarId && event.calendarId !== "primary" ? event.calendarId : "My calendar")}</span>
+              </dd>
+              {event.location && (
+                <>
+                  <dt style={{ color: "var(--t-ink-soft)" }}>Where</dt>
+                  <dd className="m-0 min-w-0 break-words">
+                    {/^https?:\/\//.test(event.location) ? (
+                      <a href={event.location} target="_blank" rel="noreferrer" className="underline underline-offset-2">{event.location}</a>
+                    ) : (
+                      <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`} target="_blank" rel="noreferrer" className="underline underline-offset-2">{event.location}</a>
+                    )}
+                  </dd>
+                </>
+              )}
+              {event.meetLink && (
+                <>
+                  <dt style={{ color: "var(--t-ink-soft)" }}>Video</dt>
+                  <dd className="m-0 min-w-0 truncate">
+                    <a href={event.meetLink} target="_blank" rel="noreferrer" className="font-semibold underline underline-offset-2">Join the call</a>
+                  </dd>
+                </>
+              )}
+              {event.organizer && (
+                <>
+                  <dt style={{ color: "var(--t-ink-soft)" }}>Organizer</dt>
+                  <dd className="m-0 min-w-0 truncate">{event.organizer}</dd>
+                </>
+              )}
+              {!!event.guests?.length && (
+                <>
+                  <dt style={{ color: "var(--t-ink-soft)" }}>Guests</dt>
+                  <dd className="m-0 min-w-0">
+                    <details>
+                      <summary className="cursor-pointer">
+                        {event.guests.length} · {event.guests.filter((g) => g.response === "accepted").length} yes
+                        {event.guests.some((g) => g.response === "needsAction") ? `, ${event.guests.filter((g) => g.response === "needsAction").length} waiting` : ""}
+                      </summary>
+                      <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 p-0">
+                        {event.guests.map((g, i) => (
+                          <li key={i} className="flex items-center gap-1.5">
+                            <span aria-hidden className="w-4 text-center">{g.response === "accepted" ? "✓" : g.response === "declined" ? "✕" : g.response === "tentative" ? "?" : "·"}</span>
+                            <span className="truncate">{g.name}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </dd>
+                </>
+              )}
+            </dl>
             {/* An invitation: answer it here. */}
             {answer && (
               <div className="flex flex-wrap items-center gap-1.5">
@@ -314,7 +404,12 @@ export function GoogleEventChip({
                 {description}
               </p>
             )}
-            <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              {event.htmlLink && (
+                <a href={event.htmlLink} target="_blank" rel="noreferrer" className="mr-auto text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+                  Open in Google Calendar
+                </a>
+              )}
               <button
                 type="button"
                 onClick={hideEvent}

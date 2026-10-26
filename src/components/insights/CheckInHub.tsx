@@ -48,13 +48,13 @@ export function CheckInHub({ readings, metrics, wins }: { readings: Reading[]; m
     <div className="flex flex-col gap-3">
       {todays.length > 0 && (
         <div className="mx-auto flex w-full max-w-[640px] flex-col gap-1.5">
-          <h3 className="m-0 text-[12.5px] font-bold uppercase tracking-wide" style={{ color: "rgba(239,230,204,.7)" }}>
+          <h3 className="m-0 text-[12.5px] font-bold uppercase tracking-wide" style={{ color: "var(--ec-soft, rgba(239,230,204,.7))" }}>
             Today&rsquo;s check-ins · {todays.length}
           </h3>
           <ol className="m-0 flex list-none flex-col gap-1 p-0">
             {todays.map((c) => (
-              <li key={c.at} className="flex items-start gap-2.5 rounded-xl px-3 py-1.5" style={{ background: "rgba(0,0,0,.25)", border: "1px solid rgba(217,180,95,.3)" }}>
-                <span className="w-[62px] shrink-0 pt-0.5 text-[13px] font-semibold tabular-nums" style={{ color: "#f2d27e" }}>
+              <li key={c.at} className="flex items-start gap-2.5 rounded-xl px-3 py-1.5" style={{ background: "var(--ec-chip, rgba(0,0,0,.25))", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }}>
+                <span className="w-[62px] shrink-0 pt-0.5 text-[13px] font-semibold tabular-nums" style={{ color: "var(--ec-gold, #f2d27e)" }}>
                   {new Date(c.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-wrap gap-x-3 gap-y-0.5 text-[13.5px]" style={{ color: "var(--t-cream)" }}>

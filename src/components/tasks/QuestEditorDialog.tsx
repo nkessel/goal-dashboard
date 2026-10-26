@@ -81,6 +81,8 @@ export type QuestEditorMode =
       after?: { id: string; title: string };
     };
 
+const noSubscribe = () => () => {};
+
 const XP_MAX = 350;
 const XP_STEP = 10;
 /** Coins follow XP (1 per XP_PER_COIN) unless a quest sets its own. */
@@ -186,6 +188,7 @@ export function QuestEditorDialog({
   /** New quests: leave it without a portrait (just the empty check box). */
   const [noPortrait, setNoPortrait] = useState(Boolean(create?.tiny));
   const layout = useSyncExternalStore(subscribeEditorLayout, readEditorLayout, serverEditorLayout);
+  const coarsePointer = useSyncExternalStore(noSubscribe, () => window.matchMedia("(pointer: coarse)").matches, () => false);
   const [advOpen, setAdvOpen] = useState(false);
   const schedRef = useRef<HTMLDivElement>(null);
   const [stepsReload, setStepsReload] = useState(0);
@@ -1996,6 +1999,7 @@ export function QuestEditorDialog({
       <div
         ref={panelRef}
         role="dialog"
+        data-save-keys
         aria-modal="true"
         aria-label={heading}
         onClick={(e) => {
@@ -2130,7 +2134,9 @@ export function QuestEditorDialog({
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={doingNow ? "What are you doing?" : isAdventure ? "Quest title" : "Task title"}
                   aria-label="Title"
-                  autoFocus={!task}
+                  // Phones: the window opens steady and the keyboard waits for a tap on the title
+                  // (rising mid-animation is what made it jump and resize).
+                  autoFocus={!task && !coarsePointer}
                   enterKeyHint="next"
                   className={`h-10 min-w-0 flex-1 rounded-lg border px-2.5 text-[16px] font-semibold ${autosave ? "pr-8" : ""}`}
                   style={fieldStyle}
@@ -2288,7 +2294,7 @@ export function QuestEditorDialog({
                 }
                 className="shrink-0 text-[12.5px] font-semibold underline disabled:opacity-50"
               >
-                Restore to Today
+                Undo completion
               </button>
             </div>
           )}
@@ -2377,15 +2383,16 @@ export function QuestEditorDialog({
                   </button>
                   {/* Already done it: create it and complete it in one go. */}
                   {create && !doingNow && (
+                    // A quiet outline, so it's never mistaken for Create (it was too easy to complete a new quest by accident).
                     <button
                       type="button"
                       onClick={() => save(true)}
                       disabled={isSaving || !title.trim()}
-                      title={`Create this ${noun} and complete it now`}
-                      className="hover-glow h-10 whitespace-nowrap rounded-full px-3.5 text-[15px] font-semibold disabled:cursor-default disabled:opacity-45"
-                    style={{ background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)" }}
+                      title={`Already done it? Create this ${noun} and complete it now`}
+                      className="h-10 whitespace-nowrap rounded-full px-3 text-[13.5px] font-semibold disabled:cursor-default disabled:opacity-45"
+                      style={{ background: "transparent", color: "var(--t-ink-soft)", border: "1px dashed var(--t-panel-border, rgba(139,112,64,.5))" }}
                     >
-                      {isAdventure ? "Complete quest" : "Complete"}
+                      Already done ✓
                     </button>
                   )}
                 </>

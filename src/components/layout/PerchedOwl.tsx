@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { cleanToucan, type ToucanState } from "@/lib/toucan";
+import { fromFeedback } from "@/lib/from-feedback";
 
 /** What it says while you carry it, and when you set it down. */
 // Only the toucan spirit speaks; the owl keeps its silence.
@@ -304,6 +305,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     if (!say) return;
     // A tap anywhere else puts the words away (not while carrying it).
     const away = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if (drag.current) return;
       if (box.current && e.target instanceof Node && box.current.contains(e.target)) return;
       if (sayRef.current && e.target instanceof Node && sayRef.current.contains(e.target)) return;
@@ -487,6 +489,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     const t = setTimeout(() => setWisdom(null), 5000);
     // A tap anywhere else puts the wisdom away.
     const away = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if (box.current && e.target instanceof Node && box.current.contains(e.target)) return;
       setWisdom(null);
     };

@@ -18,6 +18,7 @@ import {
   type QuickEvent,
 } from "@/app/actions";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
+import { fromFeedback } from "@/lib/from-feedback";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 type Carry =
@@ -187,6 +188,7 @@ export function DayPlanner({
   useEffect(() => {
     if (!mealsOpen && !xpFor) return;
     const onDown = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if ((e.target as HTMLElement | null)?.closest?.("[data-plan-pop]")) return;
       setMealsOpen(false);
       setXpFor(null);

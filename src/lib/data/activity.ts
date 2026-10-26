@@ -94,6 +94,8 @@ export async function logLevelUpActivity(ownerId: string, isPublic: boolean): Pr
 
 export type FeedItem = ActivityEvent & {
   task_title: string | null;
+  /** XP the finished quest earned. */
+  task_xp: number | null;
   goal_title: string | null;
   reactions: ActivityReaction[];
   comments: ActivityComment[];
@@ -110,7 +112,7 @@ export async function listFeed(ownerIds: string[], limit = 30): Promise<FeedItem
 
   const { data: events, error } = await db
     .from("activity_events")
-    .select("*, tasks(title), goals(title)")
+    .select("*, tasks(title, xp_value, xp_awarded), goals(title)")
     .in("owner_id", ownerIds)
     .eq("is_public", true)
     .order("created_at", { ascending: false })
@@ -147,12 +149,13 @@ export async function listFeed(ownerIds: string[], limit = 30): Promise<FeedItem
 
   return rows.map((row) => {
     const { tasks, goals, ...event } = row as ActivityEvent & {
-      tasks: { title: string } | null;
+      tasks: { title: string; xp_value: number | null; xp_awarded: number | null } | null;
       goals: { title: string } | null;
     };
     return {
       ...event,
       task_title: tasks?.title ?? null,
+      task_xp: tasks ? (typeof tasks.xp_awarded === "number" ? tasks.xp_awarded : tasks.xp_value) : null,
       goal_title: goals?.title ?? null,
       reactions: reactionsByActivity.get(event.id) ?? [],
       comments: commentsByActivity.get(event.id) ?? [],
@@ -252,4 +255,33 @@ export async function describeActivity(activityId: string): Promise<string | nul
     if (g?.title) return `completing “${g.title.slice(0, 80)}”`;
   }
   return null;
+}
+
+export type PartyWeekRow = { id: string; xp: number; quests: number; lastQuestAt: string | null };
+
+/**
+ * This week for each party member: XP earned (Monday on), quests finished,
+ * and when they last finished one (for "who's been quiet").
+ */
+export async function partyWeek(memberIds: string[], weekStart: string): Promise<PartyWeekRow[]> {
+  if (!memberIds.length) return [];
+  const db = supabaseAdmin();
+  const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+  const [xpRes, doneRes] = await Promise.all([
+    db.from("xp_events").select("owner_id, amount").in("owner_id", memberIds).eq("week_start", weekStart),
+    db.from("tasks").select("owner_id, completed_at").in("owner_id", memberIds).eq("status", "completed").gte("completed_at", since),
+  ]);
+  if (xpRes.error) throw new Error(`Failed to load party XP: ${xpRes.error.message}`);
+  if (doneRes.error) throw new Error(`Failed to load party quests: ${doneRes.error.message}`);
+  const monday = new Date(`${weekStart}T00:00:00`).getTime();
+  return memberIds.map((id) => {
+    const done = (doneRes.data ?? []).filter((t) => t.owner_id === id && t.completed_at);
+    const last = done.map((t) => t.completed_at as string).sort().pop() ?? null;
+    return {
+      id,
+      xp: (xpRes.data ?? []).filter((r) => r.owner_id === id).reduce((n, r) => n + r.amount, 0),
+      quests: done.filter((t) => new Date(t.completed_at as string).getTime() >= monday).length,
+      lastQuestAt: last,
+    };
+  });
 }

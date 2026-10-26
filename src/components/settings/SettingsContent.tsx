@@ -20,6 +20,7 @@ import { isPalette, type PaletteKey } from "@/lib/palettes";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
 import { SharingSettings } from "@/components/settings/SharingSettings";
+import { PartyViewSettings } from "@/components/social/PartyView";
 import { NotificationPrefs } from "@/components/settings/NotificationPrefs";
 import { SettingsRow } from "@/components/settings/SettingsRow";
 import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
@@ -27,7 +28,7 @@ import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import { CelebrationSettings, FabSettings } from "@/components/settings/CelebrationSettings";
 import { QuestEditorLayoutSettings } from "@/components/settings/QuestEditorLayoutSettings";
 import { QuestMenuSettings } from "@/components/settings/QuestMenuSettings";
-import { EveningButtonFxSettings, VictoriesHeaderSettings } from "@/components/settings/VisualFxSettings";
+import { EveningButtonFxSettings, LoadingSettings, VictoriesHeaderSettings } from "@/components/settings/VisualFxSettings";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { isAdmin, countUnreviewed } from "@/lib/data/feedback";
 import { ChatIcon } from "@/components/feedback/FeedbackDock";
@@ -140,7 +141,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             <ChatIcon size={24} />
             <span className="flex flex-1 flex-col leading-tight">
               <span className="text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                Party feedback
+                App feedback
               </span>
               <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
                 {newFeedback > 0 ? `${newFeedback} new to review` : "Review what your party would change"}
@@ -421,6 +422,10 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
                 </div>
               )}
               <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
+                <h4 className={`m-0 mb-2 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>While a screen loads</h4>
+                <LoadingSettings />
+              </div>
+              <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
                 <h4 className={`m-0 mb-1 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>Victories Today, when closed</h4>
                 <p className="mb-2 text-xs" style={{ color: "var(--t-ink-soft)" }}>
                   Tap its title to close it. Its header then shows:
@@ -456,6 +461,22 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             icon={<span style={{ fontSize: 14 }}>🔔</span>}
           >
             <NotificationPrefs level={profile.notify_level ?? "all"} email={profile.notify_email ?? true} />
+          </SettingsRow>
+          </SectionItem>
+
+          <SectionItem id="party-view">
+          <SettingsRow
+            theme={profile.theme}
+            label="Guild Hall"
+            icon={
+              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
+                <circle cx="8" cy="9" r="3" />
+                <circle cx="16" cy="9" r="3" />
+                <path d="M3 20c0-3 2.2-5 5-5s5 2 5 5M11 20c0-3 2.2-5 5-5s5 2 5 5" strokeLinecap="round" />
+              </svg>
+            }
+          >
+            <PartyViewSettings isAdventure={isAdventure} />
           </SettingsRow>
           </SectionItem>
 

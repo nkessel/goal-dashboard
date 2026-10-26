@@ -20,7 +20,19 @@ export type VisualFx = {
   victoriesShowCount: boolean;
   victoriesShowCoins: boolean;
   victoriesShowLatest: boolean;
+  /** What shows while the next screen loads. */
+  loadingLook: LoadingLook;
+  /** Quietly load the screens you visit most while nothing is happening. */
+  preload: boolean;
 };
+
+export type LoadingLook = "toucan" | "compass" | "quill" | "bar";
+export const LOADING_LOOKS: { key: LoadingLook; label: string; hint: string }[] = [
+  { key: "toucan", label: "Flying toucan", hint: "the Great Toucan Spirit flies across while it loads" },
+  { key: "compass", label: "Compass", hint: "a gilded compass rose turning" },
+  { key: "quill", label: "Quill", hint: "a quill writing the next page" },
+  { key: "bar", label: "Just the gold bar", hint: "a thin line along the top" },
+];
 
 export const VISUAL_FX_DEFAULTS: VisualFx = {
   eveningStarShimmer: true,
@@ -31,6 +43,8 @@ export const VISUAL_FX_DEFAULTS: VisualFx = {
   victoriesShowCount: true,
   victoriesShowCoins: false,
   victoriesShowLatest: false,
+  loadingLook: "toucan",
+  preload: true,
 };
 
 const KEY = "visual-fx";
