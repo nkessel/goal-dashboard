@@ -42,6 +42,29 @@ type PlanTarget = { id: string; title: string; estimate: number | null; dueAt: s
 type Msg = { role: "user" | "assistant"; content: string; actions?: CoachAction[]; remembered?: CoachNote[] };
 type Mode = "talk" | "catchup";
 
+/** An invitation put off with Snooze, and what it offers when it comes back. */
+type SnoozeNote = { text: string; until: number; taskId?: string; plan?: PlanTarget; begin?: string; talk?: string; talkLabel?: string };
+const SNOOZE_KEY = "toucan-snoozed";
+function readSnoozed(): SnoozeNote[] {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(SNOOZE_KEY) || "[]") as SnoozeNote[];
+    // Anything snoozed more than a day ago has had its moment.
+    return Array.isArray(v) ? v.filter((n) => n && typeof n.text === "string" && n.until > Date.now() - 86_400_000) : [];
+  } catch {
+    return [];
+  }
+}
+function writeSnoozed(list: SnoozeNote[]) {
+  try {
+    window.localStorage.setItem(SNOOZE_KEY, JSON.stringify(list.slice(-20)));
+  } catch {}
+}
+/** Open a quest in focus mode for a short first stretch. */
+async function beginQuest(id: string) {
+  const q = await getQuestForEditAction(id).catch(() => null);
+  if (q) openFocusMode({ ...q, estimate_minutes: 15 });
+}
+
 /** The check-ins the toucan started itself today: how many, and which (a part of the day, the gym…). */
 function readCheckins(day: string): { count: number; slots: string[] } {
   try {
@@ -135,6 +158,58 @@ export function ToucanGuide() {
     raiseRef.current = raise;
   });
 
+  // Snooze: an invitation comes back in 1 hour, 2 hours or a time you choose.
+  const actionsFor = (n: SnoozeNote): NoteAction[] => [
+    ...(n.plan ? [{ label: n.plan.estimate ? "Plan it" : "Estimate & plan", run: () => talkToToucan(n.plan!) }] : []),
+    ...(n.begin ? [{ label: "Begin · 15 min", run: () => void beginQuest(n.begin!) }] : []),
+    ...(n.talk ? [{ label: n.talkLabel ?? "Let's go", run: () => talkToToucan(undefined, "talk", n.talk) }] : []),
+    snoozeFor(n),
+    { label: "Not now", run: () => {} },
+  ];
+  const snoozeFor = (n: SnoozeNote): NoteAction => ({
+    label: "Snooze",
+    run: () => {
+      const until = (hours: number) => {
+        const h = Math.max(0.25, Math.min(24, hours));
+        writeSnoozed([...readSnoozed().filter((x) => x.text !== n.text), { ...n, until: Date.now() + h * 3_600_000 }]);
+        if (n.taskId) void snoozeToucanAction(n.taskId, h / 24).catch(() => {});
+      };
+      raiseRef.current("Snooze it for…", [
+        { label: "1 hour", run: () => until(1) },
+        { label: "2 hours", run: () => until(2) },
+        {
+          label: "Custom…",
+          run: () => {
+            const v = window.prompt("Snooze for how many hours?", "3");
+            const h = v ? Number(v.replace(",", ".")) : NaN;
+            if (Number.isFinite(h) && h > 0) until(h);
+          },
+        },
+      ]);
+    },
+  });
+  const actionsRef = useRef(actionsFor);
+  useEffect(() => {
+    actionsRef.current = actionsFor;
+  });
+  useEffect(() => {
+    const check = () => {
+      const all = readSnoozed();
+      const ready = all.find((n) => n.until <= Date.now());
+      if (!ready) return;
+      writeSnoozed(all.filter((n) => n !== ready));
+      raiseRef.current(ready.text, actionsRef.current(ready));
+    };
+    const first = setTimeout(check, 2500);
+    const t = setInterval(check, 60_000);
+    window.addEventListener("focus", check);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+      window.removeEventListener("focus", check);
+    };
+  }, []);
+
   // How you like to be checked in (the check-in quiz): its words, timing and how often.
   const style = useToucanStyle();
   const styleRef = useRef(style);
@@ -216,6 +291,7 @@ export function ToucanGuide() {
       if (used.count >= dailyBudget(st)) return;
       const spend = (slot: string) => writeCheckins(day, { count: used.count + 1, slots: [...used.slots, slot] });
       const planDay = { label: "Plan my day", run: () => talkToToucan(undefined, "talk", PLAN_DAY) };
+      const invite = (text: string, n: Omit<SnoozeNote, "text" | "until">) => say(text, actionsRef.current({ ...n, text: polish(st, text), until: 0 }));
 
       // A quest with no due date whose name matches something coming up on the calendar.
       const guess = (watch.guesses as DeadlineGuess[]).find((g) => !shown(`due:${g.taskId}`));
@@ -249,7 +325,12 @@ export function ToucanGuide() {
       const mins = gymAt ? (now.getTime() - gymAt.getTime()) / 60_000 : null;
       if (gymToday && gym.help.includes("before") && mins !== null && mins >= -90 && mins < 0 && !used.slots.includes("gym-before")) {
         spend("gym-before");
-        say(voice.gymBefore(st, gym.time), [{ label: "On my way ✓", run: () => {} }, { label: "Help me get going", run: () => talkToToucan(undefined, "talk", "I'm supposed to go to the gym soon and I need help getting out the door.") }]);
+        const text = voice.gymBefore(st, gym.time);
+        say(text, [
+          { label: "On my way ✓", run: () => {} },
+          { label: "Help me get going", run: () => talkToToucan(undefined, "talk", "I'm supposed to go to the gym soon and I need help getting out the door.") },
+          snoozeFor({ text, until: 0, talk: "I'm supposed to go to the gym soon and I need help getting out the door.", talkLabel: "Help me get going" }),
+        ]);
         return;
       }
       const afterGym = mins !== null ? mins >= 60 && mins <= 6 * 60 : windowOf(now) === "evening";
@@ -264,7 +345,8 @@ export function ToucanGuide() {
       const w = windowOf(now);
       if (gymTomorrow && gym.help.includes("pack") && w === "evening" && !used.slots.includes("gym-pack")) {
         spend("gym-pack");
-        say(voice.gymPack(st, gym.time), [{ label: "Packed ✓", run: () => {} }, { label: "Later", run: () => {} }]);
+        const text = voice.gymPack(st, gym.time);
+        say(text, [{ label: "Packed ✓", run: () => {} }, snoozeFor({ text, until: 0 })]);
         return;
       }
 
@@ -281,15 +363,14 @@ export function ToucanGuide() {
         return;
       }
       if (w === "evening") {
-        say(voice.eveningPrep(st), [
-          { label: "Yes, help me", run: () => talkToToucan(undefined, "talk", "Help me prepare for tomorrow: what's coming up, and what I can get ready tonight.") },
-          { label: "All set ✓", run: () => {} },
-        ]);
+        const text = voice.eveningPrep(st);
+        const talk = "Help me prepare for tomorrow: what's coming up, and what I can get ready tonight.";
+        say(text, [{ label: "Yes, help me", run: () => talkToToucan(undefined, "talk", talk) }, { label: "All set ✓", run: () => {} }, snoozeFor({ text, until: 0, talk, talkLabel: "Yes, help me" })]);
         return;
       }
       const dueSoon = dueSoonList(watch.tasks as GuideTask[]);
       if (dueSoon.length) {
-        say(voice.dueSoon(st, w, dueSoon.map((d) => ({ title: d.title, when: dueWhen(d.due_at!) }))), [planDay, later]);
+        invite(voice.dueSoon(st, w, dueSoon.map((d) => ({ title: d.title, when: dueWhen(d.due_at!) }))), { talk: PLAN_DAY, talkLabel: "Plan my day" });
         return;
       }
       if (w === "morning") {
@@ -303,6 +384,7 @@ export function ToucanGuide() {
       const text = top.dueAt ? `“${top.title}” ${dueWhen(top.dueAt)}. ${st.form === "question" ? "Shall we give it a time?" : "Let's give it a time."}` : voice.important(st, top.title);
       say(text, [
         { label: top.step === "estimate" ? "Estimate & plan" : "Plan it", run: () => talkToToucan(plan) },
+        snoozeFor({ text: polish(st, text), until: 0, taskId: top.id, plan }),
         { label: "Not now", run: () => void snoozeToucanAction(top.id, 1).catch(() => {}) },
       ]);
     }, 1200);
@@ -343,16 +425,8 @@ export function ToucanGuide() {
           setTimeout(() => {
             const st = styleRef.current;
             const time = new Date(t.due_at!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-            const seen = raiseRef.current(voice.dueToday(st, t.title, time), [
-              {
-                label: "Begin · 15 min",
-                run: async () => {
-                  const q = await getQuestForEditAction(t.id).catch(() => null);
-                  if (q) openFocusMode({ ...q, estimate_minutes: 15 });
-                },
-              },
-              { label: "Later", run: () => {} },
-            ]);
+            const text = voice.dueToday(st, t.title, time);
+            const seen = raiseRef.current(text, actionsRef.current({ text, until: 0, taskId: t.id, begin: t.id }));
             if (seen) {
               try {
                 window.localStorage.setItem(key(t.id), day);
