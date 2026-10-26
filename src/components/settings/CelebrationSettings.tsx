@@ -3,7 +3,10 @@
 import { useEffect, useState, useRef } from "react";
 import { FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
-import { ProgressCelebration } from "@/components/celebration/ProgressCelebration";
+import { WelcomeCard } from "@/components/xp/WelcomeCard";
+import { welcomeContextAction } from "@/app/actions";
+import { lineForDay } from "@/lib/greetings";
+import { BACK_GREETINGS, WELCOME_ELS, backGreeting, backHours, linesOf, moveEl, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
 
 type NumKey = "dens" | "vel" | "reach" | "size" | "embers" | "fill";
@@ -22,7 +25,12 @@ export function CelebrationSettings() {
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState(false);
   const [sentPreview, setSentPreview] = useState<{ key: number; style: FeedbackStyle } | null>(null);
-  const [cardPreview, setCardPreview] = useState(0);
+  const [welcomePreview, setWelcomePreview] = useState<{ mode: "day" | "back"; key: string; ctx: { metrics: string[]; tasks: { id: string; title: string; due_at: string | null }[] } } | null>(null);
+  function openWelcome(mode: "day" | "back") {
+    void welcomeContextAction()
+      .catch(() => ({ metrics: [] as string[], tasks: [] as { id: string; title: string; due_at: string | null }[] }))
+      .then((ctx) => setWelcomePreview({ mode, key: String(Date.now()), ctx }));
+  }
   const plays = useRef(0);
   function playSent(style: FeedbackStyle) {
     const key = ++plays.current;
@@ -162,8 +170,26 @@ export function CelebrationSettings() {
         </div>
       </Fold>
 
-      <Fold title="The daily welcome" hint={WELCOME_HEADINGS.find((w) => w.key === (fx.welcomeHeading ?? "cheer"))?.label ?? ""}>
-        <span className="text-[13px] font-semibold">The greeting</span>
+      <Fold title="The welcome screen" hint={backHours(fx) ? `First visit · then every ${backHours(fx)} h` : "Day's first visit"}>
+        <span className="text-[13px] font-semibold">When it opens</span>
+        <p className="m-0 -mt-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+          On the day&rsquo;s first visit, with last night&rsquo;s sleep times. After that, a check-in (without sleep) once this long has passed since your last one:
+        </p>
+        <div className="flex items-center gap-2">
+          <button type="button" className={btn} style={btnStyle} aria-label="Fewer hours" onClick={() => update({ welcomeBackHours: Math.max(1, backHours(fx) - 1) })} disabled={!backHours(fx)}>
+            −
+          </button>
+          <span className="min-w-[96px] text-center text-[15px] font-bold tabular-nums">{backHours(fx) ? `Every ${backHours(fx)} ${backHours(fx) === 1 ? "hour" : "hours"}` : "Once a day"}</span>
+          <button type="button" className={btn} style={btnStyle} aria-label="More hours" onClick={() => update({ welcomeBackHours: Math.min(12, (backHours(fx) || 0) + 1) })}>
+            +
+          </button>
+          <label className="ml-1 flex items-center gap-1.5 text-sm">
+            <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={backHours(fx) === 0} onChange={(e) => update({ welcomeBackHours: e.target.checked ? 0 : 5 })} />
+            Only the first visit
+          </label>
+        </div>
+
+        <span className="mt-1 text-[13px] font-semibold">The greeting, day&rsquo;s first visit</span>
         <div role="radiogroup" aria-label="The welcome greeting" className="flex flex-wrap gap-1.5">
           {WELCOME_HEADINGS.map((w) => (
             <button key={w.key} type="button" role="radio" aria-checked={(fx.welcomeHeading ?? "cheer") === w.key} title={w.hint} onClick={() => update({ welcomeHeading: w.key })} className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick((fx.welcomeHeading ?? "cheer") === w.key)}>
@@ -175,31 +201,97 @@ export function CelebrationSettings() {
           ))}
         </div>
         {fx.welcomeHeading === "custom" && (
-          <input
+          <textarea
             value={fx.welcomeText ?? ""}
-            onChange={(e) => update({ welcomeText: e.target.value.slice(0, 80) })}
-            placeholder="e.g. Welcome back, friend"
-            aria-label="Your welcome greeting"
-            className="h-10 rounded-lg border px-3 text-[16px]"
+            onChange={(e) => update({ welcomeText: e.target.value.slice(0, 1200) })}
+            rows={3}
+            placeholder={"One per line; they take turns each day.\ne.g. Welcome back, friend"}
+            aria-label="Your welcome greetings"
+            className="rounded-lg border px-3 py-2 text-[16px]"
             style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
           />
         )}
-        <span className="mt-1 text-[13px] font-semibold">Also on the card</span>
-        {(
-          [
-            ["welcomeLine", "The day's wise line"],
-            ["welcomeStreak", "Your streak"],
-            ["welcomeBar", "Your level bar"],
-          ] as const
-        ).map(([k, label]) => (
-          <label key={k} className="flex min-h-9 items-center gap-2.5 text-sm">
-            <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx[k] !== false} onChange={() => update({ [k]: fx[k] === false })} />
-            {label}
-          </label>
-        ))}
-        <button type="button" onClick={() => setCardPreview((n) => n + 1)} className={`${playBtn} self-start`} style={playStyle}>
-          <Play /> Preview it
-        </button>
+
+        <span className="mt-1 text-[13px] font-semibold">The greeting, welcome back</span>
+        <textarea
+          value={fx.welcomeBackText ?? ""}
+          onChange={(e) => update({ welcomeBackText: e.target.value.slice(0, 1200) })}
+          rows={3}
+          placeholder={BACK_GREETINGS.join("\n")}
+          aria-label="Your welcome back greetings"
+          className="rounded-lg border px-3 py-2 text-[16px]"
+          style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
+        />
+        <p className="m-0 -mt-1 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+          One per line; they take turns. Leave empty for the ones shown.
+        </p>
+
+        <span className="mt-1 text-[13px] font-semibold">What&rsquo;s on it, and in what order</span>
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {welcomeOrder(fx).map((el, i, all) => {
+            const meta = WELCOME_ELS.find((e) => e.key === el)!;
+            const on = welcomeShows(fx, el);
+            return (
+              <li key={el} className="flex min-h-11 items-center gap-2 rounded-xl px-2" style={{ border: "1px solid var(--t-card-border)", opacity: on ? 1 : 0.7 }}>
+                <input type="checkbox" className="h-5 w-5 shrink-0 accent-[var(--t-gold-deep)]" checked={on} onChange={() => update(toggleEl(fx, el))} aria-label={`Show ${meta.label}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-semibold">{meta.label}</span>
+                  <span className="block text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+                    {meta.hint}
+                  </span>
+                </span>
+                <button type="button" onClick={() => update(moveEl(fx, el, -1))} disabled={i === 0} aria-label={`Move ${meta.label} up`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[15px] disabled:opacity-30" style={btnStyle}>
+                  ↑
+                </button>
+                <button type="button" onClick={() => update(moveEl(fx, el, 1))} disabled={i === all.length - 1} aria-label={`Move ${meta.label} down`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[15px] disabled:opacity-30" style={btnStyle}>
+                  ↓
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        {welcomeShows(fx, "checkin") && (
+          <>
+            <span className="mt-1 text-[13px] font-semibold">In the check-in</span>
+            {(
+              [
+                ["welcomeSleep", "Last night's sleep times, on the day's first visit (until you've logged them)"],
+                ["welcomeMetrics", "Mood and everything else you track, open"],
+              ] as const
+            ).map(([k, label]) => (
+              <label key={k} className="flex min-h-9 items-center gap-2.5 text-sm">
+                <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx[k] !== false} onChange={() => update({ [k]: fx[k] === false })} />
+                {label}
+              </label>
+            ))}
+          </>
+        )}
+        {welcomeShows(fx, "line") && (
+          <>
+            <span className="mt-1 text-[13px] font-semibold">Your own wise lines</span>
+            <textarea
+              value={fx.welcomeOwnLines ?? ""}
+              onChange={(e) => update({ welcomeOwnLines: e.target.value.slice(0, 2400) })}
+              rows={3}
+              placeholder={"One per line; mixed in with the built-in lines.\ne.g. Breathe. Then the next small thing."}
+              aria-label="Your own wise lines"
+              className="rounded-lg border px-3 py-2 text-[16px]"
+              style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
+            />
+          </>
+        )}
+        <label className="mt-1 flex min-h-9 items-center gap-2.5 text-sm">
+          <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.welcomeConfetti !== false} onChange={() => update({ welcomeConfetti: fx.welcomeConfetti === false })} />
+          Confetti on the day&rsquo;s first visit
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => openWelcome("day")} className={playBtn} style={playStyle}>
+            <Play /> Preview: first visit
+          </button>
+          <button type="button" onClick={() => openWelcome("back")} className={playBtn} style={playStyle}>
+            <Play /> Preview: welcome back
+          </button>
+        </div>
       </Fold>
 
       <Fold title="Quest complete" hint={EFFECTS_LEVELS.find((l) => l.key === (fx.effects ?? "balanced"))?.label ?? "Balanced"}>
@@ -237,18 +329,17 @@ export function CelebrationSettings() {
       {sentPreview && (
         <SentBurst key={sentPreview.key} kind="feedback" xp={2} x={typeof window === "undefined" ? 200 : window.innerWidth / 2} y={typeof window === "undefined" ? 300 : window.innerHeight / 2} isAdventure style={sentPreview.style} onClose={() => setSentPreview(null)} />
       )}
-      {cardPreview > 0 && (
-        <ProgressCelebration
-          key={cardPreview}
-          card
-          noBar={fx.welcomeBar === false}
-          heading={fx.welcomeHeading === "custom" && fx.welcomeText?.trim() ? fx.welcomeText.trim() : fx.welcomeHeading === "dawn" ? "A new day dawns, adventurer" : "Huzzah! Here you are!"}
-          title={fx.welcomeStreak === false ? "" : "🔥 8-day streak — keep it going"}
-          xp={10}
-          fromPct={40}
-          toPct={55}
-          barCaption="Level 4 · 1,960 / 2,500 XP to level 5"
-          onClose={() => setCardPreview(0)}
+      {welcomePreview && (
+        <WelcomeCard
+          mode={welcomePreview.mode}
+          heading={welcomePreview.mode === "day" ? (fx.welcomeHeading === "custom" && linesOf(fx.welcomeText).length ? linesOf(fx.welcomeText)[0] : fx.welcomeHeading === "dawn" ? "A new day dawns, adventurer" : "Huzzah! Here you are!") : backGreeting(fx, welcomePreview.key)}
+          award={welcomePreview.mode === "day" ? { xp: 10, streak: 8, coins: 2, fromPct: 40, toPct: 55, caption: "Level 4 · 1,960 / 2,500 XP to level 5" } : null}
+          line={lineForDay(new Date().toDateString(), linesOf(fx.welcomeOwnLines))}
+          metrics={welcomePreview.ctx.metrics}
+          lastCheckInAt={null}
+          due={welcomePreview.ctx.tasks}
+          fx={fx}
+          onClose={() => setWelcomePreview(null)}
         />
       )}
       {preview && (

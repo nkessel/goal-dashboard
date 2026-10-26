@@ -55,9 +55,9 @@ export function retireLine(line: string, retire = true) {
 }
 
 /** Today's line (the same all day), skipping retired ones. */
-export function lineForDay(dayKey: string): string {
+export function lineForDay(dayKey: string, own: string[] = []): string {
   const retired = retiredLines();
-  const pool = DAILY_LINES.filter((l) => !retired.has(l));
+  const pool = [...DAILY_LINES, ...own].filter((l) => !retired.has(l));
   const list = pool.length ? pool : DAILY_LINES;
   let h = 0;
   for (const c of dayKey) h = (h * 31 + c.charCodeAt(0)) >>> 0;

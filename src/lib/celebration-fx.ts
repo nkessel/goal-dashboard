@@ -24,6 +24,20 @@ export type FxSettings = {
   welcomeLine?: boolean;
   welcomeStreak?: boolean;
   welcomeBar?: boolean;
+  /** The welcome screen's parts, in order, and the ones hidden (see lib/welcome). */
+  welcomeOrder?: string[];
+  welcomeHide?: string[];
+  /** Back after this many hours since your last check-in: a "welcome back" screen (0 = never). */
+  welcomeBackHours?: number;
+  /** Your own "welcome back" greetings, one per line (they take turns). */
+  welcomeBackText?: string;
+  /** Your own wise lines, one per line, mixed in with the built-in ones. */
+  welcomeOwnLines?: string;
+  /** In the check-in on the welcome screen: last night's sleep times, and mood and the rest. */
+  welcomeSleep?: boolean;
+  welcomeMetrics?: boolean;
+  /** Confetti when the welcome screen opens. */
+  welcomeConfetti?: boolean;
   /** Seconds the "Feedback submitted" card stays (0 = until you close it). */
   feedbackHold?: number;
   /** How quickly the effects play: 0.75 quick, 1 as designed, 1.4 leisurely. */

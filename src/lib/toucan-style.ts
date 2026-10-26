@@ -23,7 +23,7 @@ export type ToucanStyle = {
   form: "question" | "suggestion";
   stuck: Stuck[];
   avoid: Avoid[];
-  /** A check-in pops up when you're back after 5+ hours. */
+  /** The check-in comes back every few hours after the day's first visit (how many: Settings › The welcome screen). */
   returnCheckIn: boolean;
   /** Gym days (0 = Sunday) and the usual time ("18:00"), and how to help. */
   gym: { days: number[]; time: string | null; help: GymHelp[] };
@@ -152,7 +152,7 @@ export const QUESTIONS: Question[] = [
   },
   {
     key: "returnCheckIn",
-    ask: "When you come back after 5 hours or more, should a check-in pop up?",
+    ask: "After the day's first visit, should the check-in come back every few hours? (You choose how many in Settings.)",
     choices: [
       { value: "yes", label: "Yes, check in with me", example: "Welcome back. How are you arriving?" },
       { value: "no", label: "No, I'll check in myself", example: "The check-in stays where it is, under your stats." },

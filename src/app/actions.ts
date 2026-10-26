@@ -2029,6 +2029,13 @@ export async function setWheelOfTimeAction(input: { effort?: string[]; hindrance
 }
 
 /** The check-in metrics being tracked (beyond Energy), in order. */
+/** What the welcome screen needs: your check-in metrics, when you last checked in, and what's due soon. */
+export async function welcomeContextAction() {
+  const ownerId = await requireProfileId();
+  const [metrics, last, tasks] = await Promise.all([energyData.getCheckMetrics(ownerId).catch(() => []), energyData.latestEnergy(ownerId), guideTasks(ownerId).catch(() => [])]);
+  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })) };
+}
+
 export async function getCheckMetricsAction() {
   const ownerId = await requireProfileId();
   return energyData.getCheckMetrics(ownerId);

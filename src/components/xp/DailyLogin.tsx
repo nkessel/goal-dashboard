@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { dailyCheckInAction } from "@/app/actions";
+import { dailyCheckInAction, welcomeContextAction } from "@/app/actions";
 import { eveningDayKey } from "@/components/evening/evening-clock";
-import { ProgressCelebration } from "@/components/celebration/ProgressCelebration";
+import { WelcomeCard, type WelcomeAward } from "./WelcomeCard";
 import { xpToNextLevel } from "@/lib/levels";
-import { lineForDay, retireLine } from "@/lib/greetings";
+import { lineForDay } from "@/lib/greetings";
+import { backGreeting, backHours, linesOf, pickFor } from "@/lib/welcome";
+import { voice } from "@/lib/toucan-style";
+import { readStyle } from "@/lib/toucan-style-store";
 import { loadFx } from "@/lib/celebration-fx";
 
 /** The day's first greeting: a small cheer for arriving, in the realm's voice (a different one each day). */
@@ -18,95 +21,115 @@ const HEADINGS = {
 function dawnHeading(dayKey: string) {
   const fx = loadFx();
   if (fx.welcomeHeading === "dawn") return "A new day dawns, adventurer";
-  if (fx.welcomeHeading === "custom" && fx.welcomeText?.trim()) return fx.welcomeText.trim();
+  // Your own words: one per line, taking turns day by day.
+  const own = linesOf(fx.welcomeText);
+  if (fx.welcomeHeading === "custom" && own.length) return pickFor(dayKey, own);
   const h = new Date().getHours();
   const list = h < 12 ? HEADINGS.morning : h < 17 ? HEADINGS.day : HEADINGS.evening;
-  let n = 0;
-  for (const c of dayKey) n = (n * 31 + c.charCodeAt(0)) >>> 0;
-  return list[n % list.length];
+  return pickFor(dayKey, list);
 }
 
-type Award = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
+const BACK_KEY = "welcome-back-at";
+
+type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<ReturnType<typeof welcomeContextAction>> };
 
 /**
- * First visit of the day: records the daily check-in (XP + streak) and plays
- * the same party as other XP gains — confetti, the level bar filling, the XP
- * counting up. The server ignores repeat check-ins the same day; the
- * per-browser flag just avoids asking again on every screen.
+ * The welcome screen. On the day's first visit it records the daily check-in
+ * (XP + streak) and greets you; when you're back after a few hours since your
+ * last check-in, it says welcome back and offers a check-in (sleep times,
+ * mood and the rest). What it shows is chosen in Settings. The server ignores
+ * repeat daily check-ins; the per-browser flags just avoid asking again.
  */
 export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   const router = useRouter();
-  const [award, setAward] = useState<Award | null>(null);
-  const [line, setLine] = useState<string | null>(null);
-  const [retired, setRetired] = useState(false);
+  const [shown, setShown] = useState<Shown | null>(null);
 
   useEffect(() => {
+    let live = true;
     // The app's day turns over at 5:30am local time.
     const today = eveningDayKey();
+    let first = false;
     try {
-      if (window.localStorage.getItem("daily-login") === today) return;
-      window.localStorage.setItem("daily-login", today);
+      first = window.localStorage.getItem("daily-login") !== today;
+      if (first) window.localStorage.setItem("daily-login", today);
     } catch {
       /* storage unavailable — the server still guards against double awards */
     }
-    dailyCheckInAction(new Date().getTimezoneOffset())
-      .then((r) => {
-        if (r.alreadyCheckedInToday || r.xpAwarded <= 0) return;
-        const total = r.award?.totalXp ?? null;
-        let fromPct = 0;
-        let toPct = 100;
-        let caption = `${r.streakCount}-day streak`;
-        if (total !== null) {
-          const after = xpToNextLevel(total, levelCap);
-          const before = xpToNextLevel(Math.max(0, total - r.xpAwarded), levelCap);
-          if (after.xpForNextLevel) {
-            toPct = Math.round((after.xpIntoLevel / after.xpForNextLevel) * 100);
-            fromPct = before.level === after.level && before.xpForNextLevel ? Math.round((before.xpIntoLevel / before.xpForNextLevel) * 100) : 0;
-            caption = `Level ${after.level} · ${after.xpIntoLevel} / ${after.xpForNextLevel} XP to level ${after.nextLevel}`;
-          } else caption = `Level ${after.level} · max level`;
+    const markBack = () => {
+      try {
+        window.localStorage.setItem(BACK_KEY, String(Date.now()));
+      } catch {}
+    };
+    const fx = loadFx();
+    const hours = backHours(fx);
+    const away = hours * 3_600_000;
+    let backDue = false;
+    try {
+      backDue = !!hours && readStyle().returnCheckIn && Date.now() - Number(window.localStorage.getItem(BACK_KEY) || 0) >= away;
+    } catch {}
+    if (!first && !backDue) return;
+    (async () => {
+      const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[] }));
+      if (first) {
+        const r = await dailyCheckInAction(new Date().getTimezoneOffset()).catch(() => null);
+        let award: WelcomeAward | null = null;
+        if (r && !r.alreadyCheckedInToday && r.xpAwarded > 0) {
+          const total = r.award?.totalXp ?? null;
+          let fromPct = 0;
+          let toPct = 100;
+          let caption = `${r.streakCount}-day streak`;
+          if (total !== null) {
+            const after = xpToNextLevel(total, levelCap);
+            const before = xpToNextLevel(Math.max(0, total - r.xpAwarded), levelCap);
+            if (after.xpForNextLevel) {
+              toPct = Math.round((after.xpIntoLevel / after.xpForNextLevel) * 100);
+              fromPct = before.level === after.level && before.xpForNextLevel ? Math.round((before.xpIntoLevel / before.xpForNextLevel) * 100) : 0;
+              caption = `Level ${after.level} · ${after.xpIntoLevel} / ${after.xpForNextLevel} XP to level ${after.nextLevel}`;
+            } else caption = `Level ${after.level} · max level`;
+          }
+          award = { xp: r.xpAwarded, streak: r.streakCount, coins: r.award?.coinsEarned ?? 0, fromPct, toPct, caption };
         }
-        setLine(lineForDay(today));
-        setAward({ xp: r.xpAwarded, streak: r.streakCount, coins: r.award?.coinsEarned ?? 0, fromPct, toPct, caption });
-        router.refresh();
-      })
-      .catch(() => {});
+        // The day's first visit here always greets you (with last night's sleep, if it isn't logged yet).
+        const ctx = await ctxP;
+        if (!live) return;
+        markBack();
+        setShown({ mode: "day", award, ctx });
+        if (award) router.refresh();
+        return;
+      }
+      // Welcome back: a few hours since your last check-in (and since this screen last came up).
+      if (!backDue) return;
+      const ctx = await ctxP;
+      if (!live) return;
+      if (ctx.lastCheckInAt && Date.now() - Date.parse(ctx.lastCheckInAt) < away) return;
+      markBack();
+      const open = () => setShown({ mode: "back", award: null, ctx });
+      // No surprise pop-ups: the toucan asks first, and the screen opens only if you say so.
+      if (readStyle().avoid.includes("popups")) {
+        const unseen = window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text: voice.welcomeBack(readStyle()), actions: [{ label: "Check in", run: open }, { label: "Later", run: () => {} }] } }));
+        if (!unseen) return;
+      }
+      open();
+    })();
+    return () => {
+      live = false;
+    };
   }, [router, levelCap]);
 
-  if (!award) return null;
+  if (!shown) return null;
   const fx = loadFx();
+  const key = shown.mode === "day" ? eveningDayKey() : `${eveningDayKey()}:${new Date().getHours()}`;
   return (
-    <ProgressCelebration
-      card
-      noBar={fx.welcomeBar === false}
-      heading={dawnHeading(eveningDayKey())}
-      title={fx.welcomeStreak === false ? "" : award.streak > 1 ? `🔥 ${award.streak}-day streak — keep it going` : "Day one of a new streak"}
-      xp={award.xp}
-      coinsEarned={award.coins}
-      fromPct={award.fromPct}
-      toPct={award.toPct}
-      barCaption={award.caption}
-      extra={
-        line && fx.welcomeLine !== false ? (
-          <div className="mt-1 flex w-full flex-col items-center gap-1.5" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-            <p className={`m-0 text-[16px] leading-snug ${retired ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
-              {line}
-            </p>
-            <label className="flex cursor-pointer items-center gap-1.5 text-[12px]" style={{ color: "#6b5631" }}>
-              <input
-                type="checkbox"
-                checked={retired}
-                onChange={(e) => {
-                  setRetired(e.target.checked);
-                  retireLine(line, e.target.checked);
-                }}
-                className="h-3.5 w-3.5"
-              />
-              Don&rsquo;t show this line again
-            </label>
-          </div>
-        ) : null
-      }
-      onClose={() => setAward(null)}
+    <WelcomeCard
+      mode={shown.mode}
+      heading={shown.mode === "day" ? dawnHeading(eveningDayKey()) : backGreeting(fx, key)}
+      award={shown.award}
+      line={lineForDay(eveningDayKey(), linesOf(fx.welcomeOwnLines))}
+      metrics={shown.ctx.metrics}
+      lastCheckInAt={shown.ctx.lastCheckInAt}
+      due={shown.ctx.tasks}
+      fx={fx}
+      onClose={() => (setShown(null), router.refresh())}
     />
   );
 }

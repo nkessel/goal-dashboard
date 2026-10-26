@@ -65,7 +65,10 @@ export function EnergyCheck({
   full = false,
   notesToday = [],
   onSaved,
+  noSleep = false,
 }: {
+  /** Leave out last night's sleep times. */
+  noSleep?: boolean;
   /** Called once a check-in is saved (the welcome-back popup closes then). */
   onSaved?: () => void;
   /** Today's write-in events and #tags. */
@@ -211,7 +214,7 @@ export function EnergyCheck({
     }
   }
 
-  const nightTouched = !!wheel && JSON.stringify(night) !== nightBase;
+  const nightTouched = !!wheel && !noSleep && JSON.stringify(night) !== nightBase;
   function save() {
     setError(null);
     const all = expanded ? metrics.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
@@ -411,7 +414,7 @@ export function EnergyCheck({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {editing ? (
           <>
-            {wheel && <NightFields value={night} onChange={setNight} effort={wheel.effort} hindrances={wheel.hindrances} />}
+            {wheel && !noSleep && <NightFields value={night} onChange={setNight} effort={wheel.effort} hindrances={wheel.hindrances} />}
             <div className="flex items-center gap-2">
               {caret}
               <span className="flex min-w-0 flex-1 items-center gap-2 transition-opacity" style={{ opacity: energySet ? 1 : 0.55 }}>
