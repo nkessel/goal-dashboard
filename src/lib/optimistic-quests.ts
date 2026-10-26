@@ -16,6 +16,7 @@ export type OptimisticQuest = {
   estimate: number | null;
   placement: "today" | "additional";
   iconUrl: string | null;
+  tiny?: boolean;
 };
 
 let items: OptimisticQuest[] = [];
