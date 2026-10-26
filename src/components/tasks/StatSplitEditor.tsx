@@ -151,6 +151,12 @@ export function StatSplitEditor({
               </button>
             )}
           </div>
+          {/* A caret at the bottom folds the tray back up. */}
+          <button type="button" onClick={() => setOpen(false)} aria-label="Close the stats tray" title="Close" className="-mb-1 flex h-7 w-full items-center justify-center rounded-full hover:bg-white/[.06]" style={{ color: "#d9b45f" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M6 15l6-6 6 6" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
       )}
     </div>

@@ -31,6 +31,7 @@ import { CreateSheet } from "@/components/create/CreateSheet";
 import { EditBoardModal } from "./EditBoardModal";
 import { BoardSeal } from "./BoardSeal";
 import { nextActionOf } from "@/lib/next-action";
+import { fromFeedback } from "@/lib/from-feedback";
 
 /** Where the Uncategorized card sits among the boards (it has no saved order of its own). */
 const LOOSE_KEY = "boards-loose-index";
@@ -581,9 +582,10 @@ function BoardMenu({
 }) {
   useEffect(() => {
     const down = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if (!(e.target as Element).closest?.("[data-board-menu]")) onClose();
     };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && onClose();
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key);
     window.addEventListener("scroll", onClose, true);
@@ -645,7 +647,7 @@ function NestPicker({ board, isAdventure, onClose, onPick }: { board: BoardWithS
     };
   }, [board.id, board.title]);
   useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && onClose();
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [onClose]);

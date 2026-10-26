@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { WEATHER_EVENT, WEATHER_KEY } from "@/lib/use-weather";
 import { saveWeatherPlaceAction } from "@/app/actions";
+import { fromFeedback } from "@/lib/from-feedback";
 
 type Place = { name: string; region: string; lat: number; lon: number };
 
@@ -54,9 +55,10 @@ export function WeatherLocation({ dark = false, label = "Show weather", up = fal
   useEffect(() => {
     if (!open) return;
     const down = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
     };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && setOpen(false);
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key);
     return () => {

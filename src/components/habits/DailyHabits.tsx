@@ -12,6 +12,7 @@ import type { RiteView } from "@/components/evening/EveningRites";
 import { FocusMode, habitAsTask } from "@/components/one-thing/OneThing";
 import { CoinIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
+import { fromFeedback } from "@/lib/from-feedback";
 
 /**
  * Daily habits: small repeating quests on the day side (stored like evening
@@ -38,13 +39,13 @@ export function DailyHabits({
   const day = useLocalDay();
   // Closed until opened (the header still shows how the day is going).
   const [open, setOpen] = useState(false);
-  const [look, setLook] = useState<HeaderLook>("garden");
+  const [look, setLook] = useState<HeaderLook>("togo");
   const [mark, setMark] = useState<HabitMark>("seedling");
   const [lookMenu, setLookMenu] = useState(false);
   useEffect(() => {
     try {
-      // "beads" became the garden (seeds waiting to grow rather than empty beads).
-      const v = localStorage.getItem(LOOK_KEY)?.replace(/^beads$/, "garden");
+      // "beads" and the garden were retired: they show "Still to tend" now.
+      const v = localStorage.getItem(LOOK_KEY)?.replace(/^(beads|garden)$/, "togo");
       const m = localStorage.getItem(MARK_KEY);
       /* eslint-disable react-hooks/set-state-in-effect -- the saved choice is only readable after hydration */
       if (v && LOOKS.some((l) => l.key === v)) setLook(v as HeaderLook);
@@ -73,9 +74,10 @@ export function DailyHabits({
   useEffect(() => {
     if (!lookMenu) return;
     const close = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if (!(e.target as Element | null)?.closest?.("[data-habit-look]")) setLookMenu(false);
     };
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setLookMenu(false);
+    const esc = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && setLookMenu(false);
     document.addEventListener("pointerdown", close, true);
     document.addEventListener("keydown", esc);
     return () => {
@@ -94,9 +96,10 @@ export function DailyHabits({
   useEffect(() => {
     if (!menuFor) return;
     const close = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if (!(e.target as Element | null)?.closest?.("[data-habit-menu]")) setMenuFor(null);
     };
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenuFor(null);
+    const esc = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && setMenuFor(null);
     document.addEventListener("pointerdown", close, true);
     document.addEventListener("keydown", esc);
     return () => {
@@ -750,10 +753,9 @@ function HabitIcon({ mark = "seedling" }: { mark?: HabitMark }) {
   );
 }
 
-type HeaderLook = "garden" | "togo" | "next" | "wins" | "glow" | "plain";
+type HeaderLook = "togo" | "next" | "wins" | "glow" | "plain";
 const LOOK_KEY = "habits-header-look";
 const LOOKS: { key: HeaderLook; label: string; hint: string }[] = [
-  { key: "garden", label: "Garden", hint: "a seed for each habit, blooming as you do it" },
   { key: "togo", label: "Still to tend", hint: "how many are ready for you, not how many are missing" },
   { key: "next", label: "Next up", hint: "names the habit to do next" },
   { key: "wins", label: "Wins", hint: "counts only what you've done" },
@@ -773,17 +775,6 @@ function HeaderAdornment({ look, habits, isAdventure }: { look: HeaderLook; habi
   const all = n === habits.length;
   const soft = isAdventure ? "rgba(246,236,210,.72)" : "var(--t-ink-soft)";
   const gold = isAdventure ? "var(--t-gold)" : "var(--t-accent)";
-  if (look === "garden")
-    // Nothing is "missing": each habit not yet done is a seed, ready to grow.
-    return (
-      <span aria-label={all ? "All in bloom today" : `${n} in bloom, ${habits.length - n} ready to grow`} className="mt-1 flex items-end gap-1.5">
-        {habits.map((h, i) => (
-          <span key={i} title={h.title} className="block text-[13px] leading-none transition-transform duration-500" style={{ transform: h.done ? "scale(1.15)" : undefined, filter: h.done ? "drop-shadow(0 0 4px rgba(242,210,126,.7))" : undefined }}>
-            {h.done ? "🌼" : "🌱"}
-          </span>
-        ))}
-      </span>
-    );
   if (look === "togo") {
     const left = habits.length - n;
     return (

@@ -32,6 +32,7 @@ import { useLocalDay } from "./evening-clock";
 import { TomorrowQuests } from "./TomorrowQuests";
 import { RiteGlyph, TrophyAvatar, glyphFor } from "./RiteGlyph";
 import type { Task } from "@/lib/data/types";
+import { fromFeedback } from "@/lib/from-feedback";
 
 /** Client-side copy of a rite (the data module is server-only). */
 export type RiteView = {
@@ -312,6 +313,7 @@ export function EveningRites({
   useEffect(() => {
     if (!menuFor) return;
     const onDown = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       const t = e.target as HTMLElement | null;
       if (!t?.closest?.("[data-rite-menu]") && !t?.closest?.("[data-rite-menu-button]")) setMenuFor(null);
     };

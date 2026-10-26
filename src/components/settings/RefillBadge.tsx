@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { saveInventoryAction } from "@/app/actions";
 import type { Inventory } from "@/lib/inventory";
 import { BackpackIcon } from "./BackpackIcon";
+import { fromFeedback } from "@/lib/from-feedback";
 
 /**
  * Beside your portrait on Today when something in the backpack has run out:
@@ -21,8 +22,8 @@ export function RefillBadge({ inventory }: { inventory: Inventory }) {
 
   useEffect(() => {
     if (!open) return;
-    const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const away = (e: PointerEvent) => !fromFeedback(e) && !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && setOpen(false);
     document.addEventListener("pointerdown", away, true);
     document.addEventListener("keydown", esc);
     return () => {

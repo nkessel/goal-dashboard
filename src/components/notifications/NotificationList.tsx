@@ -6,6 +6,7 @@ import { deleteNotificationAction, markNotificationReadAction, markNotificationU
 import { SwipeActions } from "@/components/ui/SwipeActions";
 import type { AppNotification } from "@/lib/data/types";
 import { ImportReview } from "@/components/imports/ImportReview";
+import { fromFeedback } from "@/lib/from-feedback";
 
 type Item = AppNotification & { icon: string };
 
@@ -82,6 +83,7 @@ export function NotificationList({
   useEffect(() => {
     if (!menuFor) return;
     const onDown = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if (!(e.target as HTMLElement | null)?.closest?.("[data-notif-menu]")) setMenuFor(null);
     };
     document.addEventListener("pointerdown", onDown);

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { RememberView } from "@/components/calendar/RememberView";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { requireSession } from "@/lib/session";
+import { isAdmin } from "@/lib/data/feedback";
 import { AppShell } from "@/components/layout/AppShell";
 import { CreateFab } from "@/components/create/CreateFab";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -66,6 +67,8 @@ export default async function CalendarPage({
   const today = parseDateParam(todayKey());
 
   const profile = await getProfileById(session.user.id);
+  // "With Mom" planning is only on the owner's profile.
+  const withMom = await isAdmin(session.user.id).catch(() => false);
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
 
@@ -192,13 +195,15 @@ export default async function CalendarPage({
           >
             Plan the month
           </Link>
-          <Link
-            href="/plan?mode=mom"
-            className="flex h-9 shrink-0 items-center rounded-full px-3 text-[13px] font-semibold"
-            style={{ border: `1px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
-          >
-            🤝 With Mom
-          </Link>
+          {withMom && (
+            <Link
+              href="/plan?mode=mom"
+              className="flex h-9 shrink-0 items-center rounded-full px-3 text-[13px] font-semibold"
+              style={{ border: `1px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
+            >
+              🤝 With Mom
+            </Link>
+          )}
         </div>
         {/* View toggle */}
         <div

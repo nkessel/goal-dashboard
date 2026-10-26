@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
+import { deleteTaskAction, reopenTaskAction } from "@/app/actions";
 import type { Task } from "@/lib/data/types";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
@@ -315,6 +316,8 @@ function ClosedSummary({ parts }: { parts: React.ReactNode[] }) {
 
 /** A small card for one victory, before the full editor. */
 function VictoryPreview({ task, coins, note, onEdit, onClose }: { task: Task; coins: number; note: string | null; onEdit: () => void; onClose: () => void }) {
+  const [pending, start] = useTransition();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const when = task.completed_at ? new Date(task.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null;
   return (
     <div role="dialog" aria-modal="true" aria-label={task.title} onClick={onClose} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6">
@@ -337,6 +340,36 @@ function VictoryPreview({ task, coins, note, onEdit, onClose }: { task: Task; co
           <button type="button" onClick={onEdit} className="hover-glow h-10 cursor-pointer rounded-lg px-4 text-sm font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
             Edit
           </button>
+        </div>
+        {/* Completed by mistake: undo it (back to open, XP and coins taken back), or delete it outright. */}
+        <div className="flex items-center justify-between gap-3 border-t pt-2.5 text-[13.5px]" style={{ borderColor: "rgba(139,112,64,.3)" }}>
+          {confirmDelete ? (
+            <>
+              <span>Delete this quest for good?</span>
+              <span className="flex items-center gap-3">
+                <button type="button" onClick={() => setConfirmDelete(false)} className="cursor-pointer underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+                  Keep it
+                </button>
+                <button type="button" disabled={pending} onClick={() => start(async () => {
+                    // Take back what it paid out first, then delete it.
+                    await reopenTaskAction(task.id).catch(() => {});
+                    await deleteTaskAction(task.id).catch(() => {});
+                    onClose();
+                  })} className="cursor-pointer font-semibold underline underline-offset-2 disabled:opacity-50" style={{ color: "var(--t-warn)" }}>
+                  Delete
+                </button>
+              </span>
+            </>
+          ) : (
+            <>
+              <button type="button" disabled={pending} onClick={() => start(async () => (await reopenTaskAction(task.id).catch(() => {}), onClose()))} className="cursor-pointer font-semibold underline underline-offset-2 disabled:opacity-50" style={{ color: "var(--t-ink)" }}>
+                {pending ? "Undoing…" : "Undo completion"}
+              </button>
+              <button type="button" onClick={() => setConfirmDelete(true)} className="cursor-pointer underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+                Delete
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition 
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
-import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction } from "@/app/actions";
+import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction, reopenTaskAction } from "@/app/actions";
 import { celebrateReward } from "./RewardCelebration";
 import type { Task } from "@/lib/data/types";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
@@ -131,6 +131,7 @@ export function QuestComplete(props: QuestCompleteProps) {
   const [tier] = useState(() => effectsTier(fx));
   const lite = tier === "light";
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [undoing, startUndo] = useTransition();
   const [reduce] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const [p, setP] = useState(reduce ? 1 : 0);
   const [playing, setPlaying] = useState(false);
@@ -440,6 +441,23 @@ export function QuestComplete(props: QuestCompleteProps) {
               Continue Your Journey
             </button>
           </div>
+          {/* Completed by mistake? Take it back: the quest returns open and its XP and coins come back out. */}
+          {taskId && !preview && (
+            <button
+              type="button"
+              disabled={undoing}
+              onClick={() =>
+                startUndo(async () => {
+                  await reopenTaskAction(taskId).catch(() => {});
+                  onClose();
+                })
+              }
+              className="-mt-1 cursor-pointer text-[13.5px] underline underline-offset-2 disabled:opacity-50"
+              style={{ color: "#d9c79a" }}
+            >
+              {undoing ? "Undoing…" : "Not done yet? Undo this completion"}
+            </button>
+          )}
           </>
           )}
         </div>

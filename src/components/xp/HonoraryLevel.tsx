@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDisplayLevelAction } from "@/app/actions";
+import { fromFeedback } from "@/lib/from-feedback";
 
 /**
  * The level badge for someone holding an honorary level: tap it to set your
@@ -17,8 +18,8 @@ export function HonoraryLevel({ level, children }: { level: number; children: Re
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const down = (e: PointerEvent) => box.current && !box.current.contains(e.target as Node) && setOpen(false);
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const down = (e: PointerEvent) => !fromFeedback(e) && box.current && !box.current.contains(e.target as Node) && setOpen(false);
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && setOpen(false);
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key);
     return () => {

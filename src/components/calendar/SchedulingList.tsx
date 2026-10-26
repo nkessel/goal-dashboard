@@ -32,6 +32,7 @@ import { AutoScheduler } from "./AutoScheduler";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { TaskScheduleControl } from "@/components/tasks/TaskScheduleControl";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE } from "@/lib/schedule-carry";
+import { fromFeedback } from "@/lib/from-feedback";
 
 type Folder = { name: string; open: boolean };
 
@@ -113,7 +114,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
   });
   useEffect(() => {
     if (!open || wide) return;
-    const key = (e: KeyboardEvent) => e.key === "Escape" && !editing && !scheduling && toggle(false);
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && !editing && !scheduling && toggle(false);
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   });
@@ -627,9 +628,10 @@ function SmallMenu({ items, onClose }: { items: [string, () => void][]; onClose:
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const down = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if (ref.current && !ref.current.contains(e.target as Node) && !(e.target as Element).closest?.("[data-folder-menu-button]")) onClose();
     };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && onClose();
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key);
     return () => {
@@ -662,8 +664,8 @@ function MoveMenu({ x, y, current, folders, onClose, onPick, onNew }: { x: numbe
   const ref = useRef<HTMLDivElement>(null);
   const [naming, setNaming] = useState(false);
   useEffect(() => {
-    const down = (e: PointerEvent) => ref.current && !ref.current.contains(e.target as Node) && onClose();
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const down = (e: PointerEvent) => !fromFeedback(e) && ref.current && !ref.current.contains(e.target as Node) && onClose();
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && onClose();
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key);
     return () => {

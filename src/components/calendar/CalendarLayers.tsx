@@ -7,6 +7,7 @@ import type { GoogleCalendarEvent, GoogleCalendarInfo } from "@/lib/google-calen
 import { DayView } from "./DayView";
 import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
+import { fromFeedback } from "@/lib/from-feedback";
 
 const KEY = "calendar-layers";
 type Layers = { hidden: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean };
@@ -82,9 +83,10 @@ export function CalendarLayers({
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => {
+      if (fromFeedback(e)) return;
       if (panel.current && e.target instanceof Node && !panel.current.contains(e.target)) setOpen(null);
     };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(null);
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && setOpen(null);
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", key);
     return () => {

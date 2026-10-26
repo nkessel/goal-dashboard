@@ -972,6 +972,7 @@ function Composer({
         }}
         options={WHEN.map(([k, label, hint]) => ({ value: k, label, hint }))}
       />}
+      <div className="flex shrink-0 items-center gap-1.5">
       <Segmented
         label="XP you earn"
         lead="XP"
@@ -983,8 +984,24 @@ function Composer({
           // Straight on to writing.
           textRef.current?.focus();
         }}
-        options={[...XP_CHOICES, ...(long > 3 ? [long] : [])].map((n) => ({ value: n, label: n > 3 ? `+${n} ✦` : `+${n}`, hint: n > 3 ? `${n} paragraphs, ${n} XP` : `Earn ${n} XP for this feedback` }))}
+        // Past three paragraphs, the note's own count takes the +3's place (no extra button).
+        options={[...XP_CHOICES.filter((n) => !(long > 3 && n === 3)), ...(long > 3 ? [long] : [])].map((n) => ({ value: n, label: `+${n}`, hint: n > 3 ? `${n} paragraphs, ${n} XP` : `Earn ${n} XP for this feedback` }))}
       />
+      {compact && (
+        // Phones: when it gets built, as one small chip right of the XP.
+        <label className="relative flex h-8 min-w-0 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" style={{ border: "1px solid var(--t-panel-border)", color: "var(--t-ink)" }} title="When it gets built">
+          <span className="truncate">deploys: {WHEN.find(([k]) => k === draft.kind)?.[1].toLowerCase()}</span>
+          <span aria-hidden className="text-[10px] opacity-60">▾</span>
+          <select aria-label="When it gets built" value={draft.kind} onChange={(e) => onChange({ kind: e.target.value as WhenKind })} className="absolute inset-0 cursor-pointer opacity-0">
+            {WHEN.map(([k, label]) => (
+              <option key={k} value={k}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      </div>
       <div className="relative flex min-h-0 flex-1 flex-col">
       <textarea
         ref={textRef}
@@ -1039,21 +1056,6 @@ function Composer({
         {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>Attaching…</span>}
         {attachError && <span className="text-[12.5px]" style={{ color: "var(--t-warn)" }}>{attachError}</span>}
         <span className="ml-auto flex items-center gap-1">
-        {compact && (
-          // Phones: when it gets built, as one small chip instead of a whole row.
-          <label className="relative flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" style={{ border: "1px solid var(--t-panel-border)", color: "var(--t-ink)" }} title="When it gets built">
-            <span aria-hidden>{draft.kind === "future" ? "✦" : draft.kind === "refill" ? "↻" : "→"}</span>
-            {WHEN.find(([k]) => k === draft.kind)?.[1]}
-            <span aria-hidden className="text-[10px] opacity-60">▾</span>
-            <select aria-label="When it gets built" value={draft.kind} onChange={(e) => onChange({ kind: e.target.value as WhenKind })} className="absolute inset-0 cursor-pointer opacity-0">
-              {WHEN.map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         {(draft.shot ? 1 : 0) + (draft.images ?? []).length < 5 && (
           <button
             type="button"
@@ -1167,7 +1169,7 @@ function Segmented<V extends string | number>({
             aria-checked={on}
             title={o.hint}
             onClick={() => onChange(o.value)}
-            className={`whitespace-nowrap rounded-full font-semibold transition-[background,box-shadow] duration-150 ${small ? "h-[26px] px-3 text-[12.5px]" : "h-[34px] flex-auto px-2.5 text-[13.5px]"}`}
+            className={`whitespace-nowrap rounded-full font-semibold transition-[background,box-shadow] duration-150 ${small ? "h-[26px] px-2 text-[12.5px]" : "h-[34px] flex-auto px-2.5 text-[13.5px]"}`}
             style={{
               background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
               boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
