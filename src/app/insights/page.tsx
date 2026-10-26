@@ -81,15 +81,27 @@ export default async function InsightsPage() {
         <PageHeader isAdventure={isAdventure} title="Insights" calmTitle="Insights" subtitle="What your check-ins and quests are telling you" />
         <section
           aria-label="Check in"
-          className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
-          style={{ background: "linear-gradient(180deg, rgba(28,24,16,.92), rgba(18,16,11,.92))", border: "1.5px solid rgba(217,180,95,.45)", boxShadow: "0 6px 18px rgba(0,0,0,.35)" }}
+          // A parchment card like the rest of the app, its words in ink rather than cream.
+          className={`flex flex-col gap-2 rounded-2xl px-4 py-3.5 ${isAdventure ? "parchment parchment-framed" : ""}`}
+          style={{
+            ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }),
+            ["--t-cream" as string]: "var(--t-ink)",
+            ["--ec-soft" as string]: "var(--t-ink-soft)",
+            ["--ec-chip" as string]: "rgba(120,90,40,.1)",
+            ["--ec-gold" as string]: "#8a6116",
+            ["--ec-line" as string]: "rgba(139,112,64,.45)",
+            ["--ec-value" as string]: "#5a3d12",
+            ["--ec-l" as string]: "30%",
+          }}
         >
-          <h2 className={`m-0 text-center ${isAdventure ? "font-display text-[20px]" : "text-[16px] font-bold"}`} style={{ color: "#f2d27e" }}>
+          <div className="relative z-[1] flex flex-col gap-2">
+          <h2 className={`m-0 text-center ${isAdventure ? "font-display text-[20px]" : "text-[16px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
             Check in
           </h2>
           {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
           <EnergyCheck full today={null} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
           <CheckInHub readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} />
+          </div>
         </section>
         <section
           id="wheel-of-time"

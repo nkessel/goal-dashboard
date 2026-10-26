@@ -301,13 +301,13 @@ export function EnergyCheck({
           style={
             /^#\S+$/.test(n.body)
               ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 }
-              : { background: "rgba(242,210,126,.14)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }
+              : { background: "rgba(242,210,126,.14)", border: "1px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)" }
           }
         >
           <span className="truncate">
             {n.body.split(/(#[\p{L}\p{N}_-]+)/u).map((part, i) =>
               part.startsWith("#") ? (
-                <b key={i} style={{ color: /^#\S+$/.test(n.body) ? "#2a1c10" : "#f2d27e" }}>
+                <b key={i} style={{ color: /^#\S+$/.test(n.body) ? "#2a1c10" : "var(--ec-gold, #f2d27e)" }}>
                   {part}
                 </b>
               ) : (
@@ -315,7 +315,7 @@ export function EnergyCheck({
               )
             )}
           </span>
-          <button type="button" onClick={() => dropNote(n.id)} aria-label={`Remove “${n.body}”`} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[15px] leading-none hover:bg-white/10" style={{ color: "rgba(239,230,204,.7)" }}>
+          <button type="button" onClick={() => dropNote(n.id)} aria-label={`Remove “${n.body}”`} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[15px] leading-none hover:bg-white/10" style={{ color: "var(--ec-soft, rgba(239,230,204,.7))" }}>
             ×
           </button>
         </li>
@@ -327,17 +327,17 @@ export function EnergyCheck({
   const lastSeals = (
     <ul className="m-0 flex list-none flex-wrap justify-center gap-1.5 p-0">
       {saved !== null && (
-        <li className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(0,0,0,.28)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+        <li className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "var(--ec-chip, rgba(0,0,0,.28))", border: "1px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)" }}>
           Energy
-          <b className="font-display text-[17px] tabular-nums" style={{ color: `hsl(${Math.round(((saved - 1) / 9) * 110)} 70% 68%)` }}>
+          <b className="font-display text-[17px] tabular-nums" style={{ color: `hsl(${Math.round(((saved - 1) / 9) * 110)} 70% var(--ec-l, 68%))` }}>
             {fmt(saved)}
           </b>
         </li>
       )}
       {metrics.filter((m) => savedVals[m] !== undefined).map((m) => (
-        <li key={m} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(0,0,0,.28)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+        <li key={m} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "var(--ec-chip, rgba(0,0,0,.28))", border: "1px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)" }}>
           {m}
-          <b className="font-display text-[17px] tabular-nums" style={{ color: "#f2d58a" }}>
+          <b className="font-display text-[17px] tabular-nums" style={{ color: "var(--ec-value, #f2d58a)" }}>
             {fmt(savedVals[m])}
           </b>
         </li>
@@ -374,7 +374,7 @@ export function EnergyCheck({
       <button type="button" onClick={addNote} disabled={!noteText.trim() && !pendingTags.length} className="h-9 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
         Add
       </button>
-      <button type="button" onClick={() => setNoting(false)} aria-label="Cancel" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "rgba(239,230,204,.75)" }}>
+      <button type="button" onClick={() => setNoting(false)} aria-label="Cancel" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
         ×
       </button>
     </div>
@@ -406,7 +406,7 @@ export function EnergyCheck({
                   Energy
                 </span>
                 {slider(value, setValue, "Energy level, 1 to 10", `hsl(${hue} 60% 48%)`)}
-                <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>
+                <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: `hsl(${hue} 70% var(--ec-l, 68%))` }}>
                   {energySet ? fmt(value) : "–"}
                 </span>
               </span>
@@ -437,7 +437,7 @@ export function EnergyCheck({
                         {m}
                       </span>
                       {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), `${m}, 1 to 10`, "#c9a24a")}
-                      <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: "#f2d58a" }}>
+                      <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: "var(--ec-value, #f2d58a)" }}>
                         {set ? fmt(v) : "–"}
                       </span>
                       {editingList ? (
@@ -486,7 +486,7 @@ export function EnergyCheck({
                 )}
 
                 {adding && (
-                  <div className="reveal flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid rgba(217,180,95,.3)" }}>
+                  <div className="reveal flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }}>
                     <div className="flex items-center gap-1.5">
                       <input
                         autoFocus
@@ -511,7 +511,7 @@ export function EnergyCheck({
                       >
                         Add
                       </button>
-                      <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "rgba(239,230,204,.75)" }}>
+                      <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
                         ×
                       </button>
                     </div>
@@ -538,13 +538,13 @@ export function EnergyCheck({
                         onClick={() => setEditingList((v) => !v)}
                         aria-pressed={editingList}
                         className="h-8 rounded-full px-2.5 text-[13.5px] underline-offset-2 hover:underline"
-                        style={{ color: "rgba(239,230,204,.75)" }}
+                        style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}
                       >
                         {editingList ? "Done editing" : "Edit check-in"}
                       </button>
                     )
                   ) : (
-                    <Link href="/insights?edit=checkin" className="flex h-8 items-center rounded-full px-2.5 text-[13.5px] underline-offset-2 hover:underline" style={{ color: "rgba(239,230,204,.75)" }}>
+                    <Link href="/insights?edit=checkin" className="flex h-8 items-center rounded-full px-2.5 text-[13.5px] underline-offset-2 hover:underline" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
                       Edit check-in
                     </Link>
                   )}
@@ -590,16 +590,16 @@ export function EnergyCheck({
           <div className="flex flex-col items-center gap-1.5">
             {/* What you checked in with, as small seals of value. */}
             <ul className="m-0 flex list-none flex-wrap justify-center gap-1.5 p-0">
-              <li className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(0,0,0,.28)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+              <li className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "var(--ec-chip, rgba(0,0,0,.28))", border: "1px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)" }}>
                 Energy
-                <b className="font-display text-[17px] tabular-nums" style={{ color: `hsl(${hue} 70% 68%)` }}>
+                <b className="font-display text-[17px] tabular-nums" style={{ color: `hsl(${hue} 70% var(--ec-l, 68%))` }}>
                   {fmt(saved!)}
                 </b>
               </li>
               {savedExtras.map((m) => (
-                <li key={m} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(0,0,0,.28)", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)" }}>
+                <li key={m} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "var(--ec-chip, rgba(0,0,0,.28))", border: "1px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)" }}>
                   {m}
-                  <b className="font-display text-[17px] tabular-nums" style={{ color: "#f2d58a" }}>
+                  <b className="font-display text-[17px] tabular-nums" style={{ color: "var(--ec-value, #f2d58a)" }}>
                     {fmt(savedVals[m])}
                   </b>
                 </li>
