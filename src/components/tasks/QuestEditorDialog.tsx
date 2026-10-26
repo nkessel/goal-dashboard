@@ -925,13 +925,6 @@ export function QuestEditorDialog({
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, []);
-  /** iOS: keep the field you're typing in above the keyboard. */
-  function keepInView(e: React.FocusEvent<HTMLDivElement>) {
-    const el = e.target as HTMLElement;
-    if (!(el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && !["range", "checkbox", "radio"].includes(el.type)))) return;
-    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 320);
-  }
-
   const enterCls = origin === "fab" ? "qe-rise-in" : "sheet-slide-up-in";
   const exitCls = origin === "fab" ? "qe-sink-out" : "sheet-minimize-out";
   const empty = <CheckMark checked={false} isAdventure={isAdventure} size={72} />;
@@ -2047,7 +2040,7 @@ export function QuestEditorDialog({
             )}
           </div>
         )}
-        <div onFocus={keepInView} className="qe-body relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
+        <div className="qe-body relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
           {/* Stays put while scrolling, small and out of the way. */}
           <div
             data-embed-hide

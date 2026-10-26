@@ -129,6 +129,7 @@ export function CreateSheet({
         ref={sheetRef}
         role="dialog"
         aria-modal
+        data-kb-self
         aria-label="Create something new"
         onKeyDown={(e) => {
           // Ctrl/⌘ + Enter submits whatever form is open.

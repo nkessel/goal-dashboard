@@ -556,6 +556,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           role="menu"
           aria-label="Your unsent feedback"
           data-feedback-root
+          data-kb-self
           className="card-pop-in parchment fixed z-[96] flex w-[min(300px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl shadow-2xl"
           style={{
             ...(chooserRight ? { right: vp.innerW - btnPos.x - BTN } : { left: btnPos.x }),
@@ -594,6 +595,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           aria-modal={false}
           aria-label="Feedback"
           data-feedback-root
+          data-kb-self
           className="fixed z-[96]"
           style={{ left: shown.x, top: shown.y, width: shown.w, height: isSent ? "auto" : shown.h }}
           onKeyDown={(e) => {

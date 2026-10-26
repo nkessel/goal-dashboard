@@ -713,7 +713,7 @@ function GuideSheet({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Talk with the Great Toucan Spirit" hidden={hidden}>
+    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" data-kb-self aria-label="Talk with the Great Toucan Spirit" hidden={hidden}>
       <button type="button" aria-label="Close" className="absolute inset-0 cursor-default" style={{ background: "rgba(6,12,14,.45)" }} onClick={onClose} />
       {/* Sized to what's visible, so the keyboard never hides the box you type in. */}
       <section
