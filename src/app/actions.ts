@@ -458,6 +458,7 @@ export async function updateTaskAction(
     chunkMinutes?: number | null;
     /** Coins paid on completion; null = automatic (see lib/coins). */
     coinValue?: number | null;
+    isTiny?: boolean;
   }
 ) {
   const ownerId = await requireProfileId();
@@ -495,6 +496,7 @@ export async function updateTaskAction(
     dueAt: input.dueAt,
     chunkMinutes: input.chunkMinutes,
     coinValue: input.coinValue,
+    isTiny: input.isTiny,
   });
   revalidatePath("/");
   revalidatePath("/matrix");
@@ -1137,6 +1139,8 @@ export async function createQuestAction(input: {
   coinValue?: number | null;
   /** Where it shows on Today ("none" = just on its board). */
   placement?: "today" | "additional" | "none";
+  /** A tiny task (half height on Today, just a check box). */
+  isTiny?: boolean;
 }): Promise<string> {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
@@ -1157,6 +1161,7 @@ export async function createQuestAction(input: {
     dueAt: input.dueAt ?? null,
     chunkMinutes: input.chunkMinutes ?? null,
     coinValue: input.coinValue ?? null,
+    isTiny: input.isTiny,
   });
   revalidatePath("/power-ups");
   if (input.schedule) {
