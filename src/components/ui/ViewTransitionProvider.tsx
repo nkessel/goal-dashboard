@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { IdlePreload, NavLoader } from "./NavLoader";
 
 type ViewTransitionContextValue = {
   /**
@@ -125,6 +126,8 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     <ViewTransitionContext.Provider value={{ navigate, getPreviousPathname, getLastAppPathname }}>
       {/* Thin top progress bar while the next screen loads (see globals.css). */}
       <div className="nav-progress" aria-hidden />
+      <NavLoader />
+      <IdlePreload />
       {children}
     </ViewTransitionContext.Provider>
   );

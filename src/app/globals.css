@@ -476,6 +476,31 @@ html[data-enter="nav-up"] main { animation: nav-enter-up 320ms cubic-bezier(0.2,
 }
 html[data-nav-pending] .nav-progress { opacity: 1; animation: nav-progress 2.5s cubic-bezier(.1,.7,.3,1) forwards; }
 @keyframes nav-progress { from { width: 0; } to { width: 88%; } }
+/* The loading flourish (Settings > Visual effects): only after a short beat, so quick loads show nothing. */
+.nav-loader {
+  position: fixed; left: 50%; top: 42%; z-index: 69; transform: translate(-50%, -50%);
+  opacity: 0; pointer-events: none; transition: opacity 120ms ease;
+}
+html[data-nav-pending] .nav-loader { animation: nav-loader-in 200ms ease 350ms both; }
+@keyframes nav-loader-in { from { opacity: 0; } to { opacity: 1; } }
+.nav-loader-toucan { display: block; animation: toucan-fly-across 1.6s ease-in-out infinite; filter: drop-shadow(0 6px 10px rgba(0,0,0,.4)); }
+@keyframes toucan-fly-across {
+  0% { transform: translate(-70px, 8px) rotate(-6deg); }
+  25% { transform: translate(-30px, -10px) rotate(4deg); }
+  50% { transform: translate(10px, 6px) rotate(-4deg); }
+  75% { transform: translate(45px, -12px) rotate(5deg); }
+  100% { transform: translate(-70px, 8px) rotate(-6deg); }
+}
+.nav-loader-compass { animation: compass-turn 2.4s cubic-bezier(.45,.05,.55,.95) infinite; filter: drop-shadow(0 6px 12px rgba(0,0,0,.45)); }
+@keyframes compass-turn { 0% { transform: rotate(0); } 40% { transform: rotate(200deg); } 55% { transform: rotate(170deg); } 100% { transform: rotate(360deg); } }
+.nav-loader-quill { filter: drop-shadow(0 6px 12px rgba(0,0,0,.45)); }
+.nav-loader-ink { stroke-dasharray: 90; animation: quill-ink 1.6s linear infinite; }
+.nav-loader-pen { animation: quill-pen 1.6s linear infinite; }
+@keyframes quill-ink { from { stroke-dashoffset: 90; } to { stroke-dashoffset: 0; } }
+@keyframes quill-pen { from { transform: translate(-6px, -2px); } to { transform: translate(70px, -2px); } }
+@media (prefers-reduced-motion: reduce) {
+  .nav-loader-toucan, .nav-loader-compass, .nav-loader-ink, .nav-loader-pen { animation: none; }
+}
 html[data-enter="nav-forward"] main { animation: nav-enter-right 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 html[data-enter="nav-back"] main { animation: nav-enter-left 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 html[data-enter="fade"] main { animation: board-expand-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }

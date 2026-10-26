@@ -1,9 +1,10 @@
 "use client";
 
-import { setVisualFx, useVisualFx, VISUAL_FX_DEFAULTS, type VisualFx } from "@/lib/visual-fx";
+import { LOADING_LOOKS, setVisualFx, useVisualFx, VISUAL_FX_DEFAULTS, type VisualFx } from "@/lib/visual-fx";
+import { LoadingArt } from "@/components/ui/NavLoader";
 import { EveningButtonPreview } from "@/components/evening/BeginEveningButton";
 
-const EVENING: { k: keyof VisualFx; label: string }[] = [
+const EVENING: { k: "eveningStarShimmer" | "eveningStarTwinkle" | "eveningBorderShimmer"; label: string }[] = [
   { k: "eveningStarShimmer", label: "Stars shimmer (a wave of light across them)" },
   { k: "eveningStarTwinkle", label: "Stars twinkle" },
   { k: "eveningBorderShimmer", label: "Border shimmers" },
@@ -51,6 +52,41 @@ export function VictoriesHeaderSettings() {
           {label}
         </label>
       ))}
+    </div>
+  );
+}
+
+/** What shows while the next screen loads, each with a live preview; and quiet preloading. */
+export function LoadingSettings() {
+  const fx = useVisualFx();
+  return (
+    <div className="flex flex-col gap-2">
+      <div role="radiogroup" aria-label="While a screen loads" className="grid grid-cols-2 gap-2">
+        {LOADING_LOOKS.map((l) => {
+          const on = fx.loadingLook === l.key;
+          return (
+            <button
+              key={l.key}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => setVisualFx({ loadingLook: l.key })}
+              title={l.hint}
+              className="flex flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-[13px] font-semibold"
+              style={{ border: `1.5px solid ${on ? "var(--t-gold-deep, #8a6116)" : "var(--t-card-border)"}`, background: on ? "rgba(217,180,95,.18)" : "transparent" }}
+            >
+              <span className="flex h-16 w-full items-center justify-center overflow-hidden">
+                {l.key === "bar" ? <span className="block h-[3px] w-3/4 rounded-full" style={{ background: "linear-gradient(90deg,#a88a3f,#d9b45f)" }} /> : <LoadingArt look={l.key} />}
+              </span>
+              {l.label}
+            </button>
+          );
+        })}
+      </div>
+      <label className="flex min-h-9 items-center gap-2.5 text-sm">
+        <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.preload} onChange={() => setVisualFx({ preload: !fx.preload })} />
+        Quietly load the screens I visit most while I&apos;m idle, so they open faster
+      </label>
     </div>
   );
 }
