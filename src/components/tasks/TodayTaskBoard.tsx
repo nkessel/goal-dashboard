@@ -41,6 +41,7 @@ function asTask(q: OptimisticQuest): TaskWithCategory {
     urgency: 0,
     icon_key: q.iconUrl,
     icon_source: q.iconUrl ? "library" : "monster",
+    is_tiny: Boolean(q.tiny),
     status: "open",
     is_manual_priority: q.placement === "today",
     in_additional: true,
