@@ -72,6 +72,8 @@ export type QuestEditorMode =
       powerUp?: boolean;
       /** "Doing now": log something already under way — created and completed at once. */
       doingNow?: boolean;
+      /** A tiny task: 5 minutes and no portrait to start with; half height on Today. */
+      tiny?: boolean;
       /** Place the new quest on the calendar (e.g. from a Google event). */
       schedule?: { startISO: string; endISO: string; googleEventId?: string };
       prefill?: QuestDraft;
@@ -146,6 +148,7 @@ export function QuestEditorDialog({
   const prefill = create?.prefill;
   const fixedSchedule = create?.schedule;
   const [doingNow, setDoingNow] = useState(Boolean(create?.doingNow));
+  const [tiny, setTiny] = useState(task ? Boolean(task.is_tiny) : Boolean(create?.tiny));
 
   const [title, setTitle] = useState(task?.title ?? prefill?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? prefill?.description ?? "");
@@ -157,7 +160,7 @@ export function QuestEditorDialog({
   const [energyGain, setEnergyGain] = useState(task?.energy_gain ?? 0);
   const [aspiration, setAspiration] = useState(Boolean(task?.is_aspiration));
   const [estimate, setEstimate] = useState<string>(() => {
-    const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (create?.powerUp ? 5 : undefined);
+    const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (create?.powerUp || create?.tiny ? 5 : undefined);
     return v != null ? String(v) : "";
   });
   // Pieces of time are no longer offered; an existing setting is kept as it is.
@@ -181,7 +184,7 @@ export function QuestEditorDialog({
   /** New quests: what to paint instead of the title (blank = paint the title). */
   const [artPrompt, setArtPrompt] = useState("");
   /** New quests: leave it without a portrait (just the empty check box). */
-  const [noPortrait, setNoPortrait] = useState(false);
+  const [noPortrait, setNoPortrait] = useState(Boolean(create?.tiny));
   const layout = useSyncExternalStore(subscribeEditorLayout, readEditorLayout, serverEditorLayout);
   const [advOpen, setAdvOpen] = useState(false);
   const schedRef = useRef<HTMLDivElement>(null);
@@ -495,7 +498,7 @@ export function QuestEditorDialog({
   const autosave = Boolean(task) && !review;
   // Placement isn't saved as you go: moving the quest to another list would
   // take its card (and this dialog) away mid-edit. It's saved on close.
-  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, effort, energyGain, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration]);
+  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, effort, energyGain, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration, tiny]);
   const [savedFields, setSavedFields] = useState(fields);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const dirty = fields !== savedFields || stepsDirty;
@@ -526,6 +529,7 @@ export function QuestEditorDialog({
       dueAt,
       chunkMinutes,
       coinValue,
+      isTiny: tiny,
     };
     const newSlot = !fixedSchedule && slot && slot.start !== savedSlotStart.current ? slot : null;
     const newPlacement = withPlacement && placement !== savedPlacement.current ? placement : null;
@@ -732,6 +736,7 @@ export function QuestEditorDialog({
             dueAt,
             chunkMinutes,
             coinValue,
+            isTiny: tiny,
             confirmImport: Boolean(review),
           });
           if (newSlot) await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
@@ -764,7 +769,7 @@ export function QuestEditorDialog({
         // A quest that waits behind another stays out of sight, so no instant card for it.
         const showNow = !completeNow && !fixedSchedule && placement !== "none" && !seqLinks.some((l) => l.rel === "after");
         const tempId = showNow
-          ? addOptimisticQuest({ title: title.trim(), description: description.trim() || null, xp, estimate: est, placement: placement === "today" ? "today" : "additional", iconUrl: draftIcon?.url ?? null })
+          ? addOptimisticQuest({ title: title.trim(), description: description.trim() || null, xp, estimate: est, placement: placement === "today" ? "today" : "additional", iconUrl: draftIcon?.url ?? null, tiny })
           : null;
         if (tempId) {
           if (embedded) onClose();
@@ -793,6 +798,7 @@ export function QuestEditorDialog({
           dueAt,
           chunkMinutes,
           coinValue,
+          isTiny: tiny,
           });
         } catch (e) {
           if (tempId) resolveOptimisticQuest(tempId, null, e instanceof Error ? e.message : "Couldn't save that quest.");
@@ -2070,17 +2076,26 @@ export function QuestEditorDialog({
           <div className="flex items-start gap-3">
             <div className="flex shrink-0 flex-col items-center gap-1">
               {task ? (
-                <IconPicker
-                  taskId={task.id}
-                  currentIcon={task.icon_key}
-                  currentSource={task.icon_source}
-                  taskTitle={title}
-                  taskDescription={description}
-                  theme={theme}
-                  size={72}
-                  emptyContent={empty}
-                  showEditHint
-                />
+                <>
+                  <IconPicker
+                    taskId={task.id}
+                    currentIcon={task.icon_key}
+                    currentSource={task.icon_source}
+                    taskTitle={title}
+                    taskDescription={description}
+                    theme={theme}
+                    size={72}
+                    emptyContent={empty}
+                    showEditHint
+                  />
+                  {/* Switch between a tiny task (half height on Today) and a standard quest. */}
+                  {!isCompleted && (
+                    <label className="flex cursor-pointer items-center gap-1 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }} title="Tiny tasks show half height on Today, with just a check box unless they have a portrait">
+                      <input type="checkbox" checked={tiny} onChange={(e) => setTiny(e.target.checked)} className="h-3.5 w-3.5" style={{ accentColor: "#7a5f2a" }} />
+                      Tiny task
+                    </label>
+                  )}
+                </>
               ) : (
                 <>
                   <IconPicker

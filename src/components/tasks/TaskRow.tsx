@@ -154,6 +154,8 @@ export function TaskRow({
   const metaColor = "var(--t-ink-soft)";
   const dividerColor = isAdventure ? "var(--t-divider)" : "var(--t-card-border)";
   const avatarSize = compact ? 48 : 60;
+  // Tiny tasks: half height, with just a check box (or a small portrait if one was added).
+  const tiny = Boolean(task.is_tiny) && !compact;
 
   // Importance (trophies) and urgency (fire), 0–5 each — same icons as the quest editor.
   const importanceCount = Math.min(5, Math.max(0, Math.round(task.importance)));
@@ -364,13 +366,13 @@ export function TaskRow({
         setMenu("dots");
       }}
       title={hasSteps ? "Click for its steps · right-click for more" : "Click to edit · right-click for more"}
-      className={`quest-card hover-glow relative flex cursor-pointer flex-col rounded-2xl px-3 pb-3 pt-2.5 ${behind || queue.length ? "z-[1]" : ""} ${task.reward_id ? "reward-quest" : ""} ${
+      className={`quest-card hover-glow relative flex cursor-pointer flex-col ${tiny ? "tiny-quest rounded-xl py-1.5 pl-2.5 pr-10" : "rounded-2xl px-3 pb-3 pt-2.5"} ${behind || queue.length ? "z-[1]" : ""} ${task.reward_id ? "reward-quest" : ""} ${
         draggable ? "active:cursor-grabbing" : ""
       } ${isPending ? "opacity-70" : ""}`}
       style={cardStyle}
     >
-      {/* ⋯ menu, upper right */}
-      <div className="absolute right-1 top-1 z-10" onClick={(e) => e.stopPropagation()}>
+      {/* ⋯ menu, upper right (centred on a tiny task) */}
+      <div className={`absolute right-1 z-10 ${tiny ? "top-1/2 -translate-y-1/2" : "top-1"}`} onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           aria-label="Quest actions"
@@ -392,6 +394,59 @@ export function TaskRow({
         {menu === "dots" && menuEl("right")}
       </div>
 
+      {tiny ? (
+        <div className="flex min-h-[34px] items-center gap-2.5">
+          <div className="relative flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
+            {imageUrl || emoji ? (
+              // A portrait added in the editor: small, and still opens the quest's actions.
+              <button
+                type="button"
+                aria-label={`Actions for ${task.title}`}
+                aria-haspopup="menu"
+                aria-expanded={menu === "icon"}
+                onClick={(e) => {
+                  setMenuAnchor(e.currentTarget);
+                  setMenu((m) => (m === "icon" ? null : "icon"));
+                }}
+                className="hover-glow flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded-full"
+                style={{ border: done ? "none" : `2px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}`, background: isAdventure ? "#f3e6c8" : undefined }}
+              >
+                {done ? (
+                  <CheckMark checked isAdventure={isAdventure} size={34} />
+                ) : imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL or /design asset
+                  <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span style={{ fontSize: 18 }}>{emoji}</span>
+                )}
+              </button>
+            ) : (
+              <TinyCheckBox checked={done} disabled={isPending || done || task.status !== "open"} isAdventure={isAdventure} label={`Complete ${task.title}`} onCheck={() => pick("complete")} />
+            )}
+            {menu === "icon" && menuEl("left")}
+          </div>
+          <p
+            dir="auto"
+            className={`user-text m-0 min-w-0 flex-1 break-words leading-[1.15] ${isAdventure ? "text-[16px] font-semibold" : "text-[15px] font-bold"}`}
+            style={{ color: isOverdue ? "var(--t-warn)" : "var(--t-ink)" }}
+          >
+            {task.title}
+            {(task.steps_total ?? 0) > 0 && (
+              <span className="ml-1.5 whitespace-nowrap text-[12px] font-semibold tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+                {task.steps_done ?? 0}/{task.steps_total}
+              </span>
+            )}
+          </p>
+          <span className="flex shrink-0 items-center gap-2 whitespace-nowrap text-[13px]" style={{ color: isAdventure ? "#3d3628" : metaColor }}>
+            {task.estimate_minutes != null && <span>{isAdventure ? "" : "⏱ "}{formatEstimate(task.estimate_minutes)}</span>}
+            {task.xp_value > 0 && (
+              <span className="font-bold" style={{ color: xpColor }}>
+                {isAdventure ? `${task.xp_value} XP` : `${task.xp_value} pts`}
+              </span>
+            )}
+          </span>
+        </div>
+      ) : (
       <div className="flex items-stretch gap-2 sm:gap-3">
         {/* Left: board tag centered over (and overlapping) the quest portrait.
             Quests without a goal get a quiet "+ Goal" tag in the same spot, so
@@ -590,6 +645,8 @@ export function TaskRow({
         </div>
       </div>
 
+      )}
+
       {error && (
         <p className="mt-1 text-xs" style={{ color: "var(--t-warn)" }}>
           {error}
@@ -695,6 +752,34 @@ function slideOut(el: HTMLElement | null): Promise<void> {
 function resetSlide(el: HTMLElement | null) {
   if (!el) return;
   for (const k of ["height", "overflow", "pointerEvents", "transition", "transform", "opacity", "marginBottom"] as const) el.style[k] = "";
+}
+
+/** A tiny task's check box: one tap completes it. */
+function TinyCheckBox({ checked, disabled, isAdventure, label, onCheck }: { checked: boolean; disabled: boolean; isAdventure: boolean; label: string; onCheck: () => void }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      title="Tick it off"
+      disabled={disabled}
+      onClick={onCheck}
+      className="hover-glow flex h-[30px] w-[30px] items-center justify-center rounded-lg"
+      style={{
+        border: `2px solid ${isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`,
+        background: isAdventure ? "radial-gradient(circle at 35% 30%, rgba(255,255,255,.6), rgba(255,255,255,.2))" : "var(--t-card)",
+        boxShadow: isAdventure ? "inset 0 1px 3px rgba(0,0,0,.18)" : undefined,
+      }}
+    >
+      {checked && (
+        <svg className="qc-card-check" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden style={{ filter: "drop-shadow(0 0 5px rgba(110,230,80,.7))" }}>
+          <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#16300f" strokeWidth="5.2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#3fbf3a" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
+  );
 }
 
 /** The quest's default "icon": a round badge with a greyed-out check. On
