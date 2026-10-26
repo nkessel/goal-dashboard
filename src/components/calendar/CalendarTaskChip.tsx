@@ -199,7 +199,7 @@ export function questArt(task: Task) {
 
 /** Quests with no portrait yet still get a creature, the same one every time. */
 const CREATURES = ["goblin", "boar", "bat", "golem", "venomroot", "dragon", "sorcerer"];
-function creatureFor(id: string) {
+export function creatureFor(id: string) {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return `/design/icon-${CREATURES[hash % CREATURES.length]}.jpg`;
@@ -236,14 +236,16 @@ function QuestCard({
   const line = h < 30;
   // Narrow and tall enough: the creature stands above the title.
   const stack = !line && (portrait || w < 130) && h >= 54;
+  const titlePx = w < 52 ? 11 : w < 110 ? 12.5 : 14;
+  // Stacked, the creature takes what's left once the title (up to two lines, by a rough measure) has room.
+  const titleLines = Math.min(2, Math.ceil((task.title.length * titlePx * 0.42) / Math.max(1, w - 8)));
   const artPx = line
     ? Math.max(0, Math.min(h - 6, 22))
     : stack
-      ? Math.max(0, Math.min(w - 6, h - 26, 56))
-      : Math.max(0, Math.min(h - 10, h >= 80 ? 64 : 46, w * 0.32));
+      ? Math.max(0, Math.min(w - 4, h - 12 - Math.ceil(titlePx * 1.12 * titleLines), 64))
+      : Math.max(0, Math.min(h - 6, h >= 80 ? 64 : 52, w * 0.38));
   const showArt = artPx >= 16;
-  const titlePx = w < 52 ? 10.5 : w < 110 ? 12 : 13.5;
-  const sealPx = Math.min(artPx, stack ? 22 : 26);
+  const sealPx = Math.min(artPx, stack ? 24 : 26);
   const doneNote = done && !line && h >= (stack ? 64 : 44);
   const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? 13 : 0)) / (titlePx * 1.12)));
 
@@ -274,7 +276,17 @@ function QuestCard({
         <span className="quest-art flex shrink-0 items-center justify-center overflow-hidden" style={{ width: artPx, height: artPx, borderRadius: artPx > 30 ? 8 : 5 }}>
           {art ? (
             // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL or a static /design/ creature
-            <img src={art} alt="" className="h-full w-full object-cover" draggable={false} />
+            <img
+              src={art}
+              alt=""
+              className="h-full w-full object-cover"
+              draggable={false}
+              // A portrait that won't load gives way to the quest's creature.
+              onError={(e) => {
+                const fallback = creatureFor(task.id);
+                if (!e.currentTarget.src.endsWith(fallback)) e.currentTarget.src = fallback;
+              }}
+            />
           ) : (
             <span style={{ fontSize: artPx * 0.72, lineHeight: 1 }}>{emoji}</span>
           )}
@@ -286,14 +298,12 @@ function QuestCard({
           style={{
             color: "#3a2a14",
             fontSize: titlePx,
-            fontWeight: 600,
+            fontWeight: 500,
             lineHeight: 1.12,
-            display: "-webkit-box",
-            WebkitBoxOrient: "vertical",
-            WebkitLineClamp: line ? 1 : lines,
-            WebkitHyphens: "auto",
             overflow: "hidden",
-            whiteSpace: line ? "nowrap" : undefined,
+            ...(line
+              ? { display: "block", whiteSpace: "nowrap", textOverflow: "ellipsis" }
+              : { display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: lines, WebkitHyphens: "auto" }),
           }}
         >
           {task.title}

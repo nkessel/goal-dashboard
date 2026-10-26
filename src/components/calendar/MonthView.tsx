@@ -6,7 +6,7 @@ import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { WEEKDAY_LABELS, formatDateParam, getMonthGridWeeks, isSameDay, parseDateParam } from "@/lib/calendar-dates";
 import { getTaskDisplayWindow } from "@/lib/calendar-task-window";
-import { questArt } from "./CalendarTaskChip";
+import { creatureFor, questArt } from "./CalendarTaskChip";
 
 export function MonthView({
   monthKey,
@@ -92,7 +92,17 @@ export function MonthView({
                           <span key={t.id} className="quest-seal block h-3.5 w-3.5 rounded-full" title={t.title} />
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL or a static /design/ creature
-                          <img key={t.id} src={questArt(t)} alt="" title={t.title} className="quest-art block h-4 w-4 rounded-full object-cover" />
+                          <img
+                            key={t.id}
+                            src={questArt(t)}
+                            alt=""
+                            title={t.title}
+                            className="quest-art block h-4 w-4 rounded-full object-cover"
+                            onError={(e) => {
+                              const fallback = creatureFor(t.id);
+                              if (!e.currentTarget.src.endsWith(fallback)) e.currentTarget.src = fallback;
+                            }}
+                          />
                         )
                       )
                     : dots.map((t) => (
