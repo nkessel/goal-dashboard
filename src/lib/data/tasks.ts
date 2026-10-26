@@ -176,14 +176,17 @@ export async function updateTask(
     dueAt?: string | null;
     chunkMinutes?: number | null;
     coinValue?: number | null;
+    /** Undefined leaves it untouched. */
+    isTiny?: boolean;
   }
 ): Promise<Task> {
   const importance = Math.max(0, Math.min(5, Math.round(input.importance * 10) / 10));
   const urgency = Math.max(0, Math.min(5, Math.round(input.urgency * 10) / 10));
   const db = supabaseAdmin();
-  const { data, error } = await db
+  const run = (withTiny: boolean) => db
     .from("tasks")
     .update({
+      ...(withTiny && input.isTiny !== undefined ? { is_tiny: input.isTiny } : {}),
       title: input.title,
       description: input.description,
       importance,
@@ -204,6 +207,9 @@ export async function updateTask(
     .eq("owner_id", ownerId)
     .select("*")
     .single();
+  let { data, error } = await run(true);
+  // Before the tiny-tasks column exists, save everything else.
+  if (error && /is_tiny/.test(error.message)) ({ data, error } = await run(false));
 
   if (error) throw new Error(`Failed to update task: ${error.message}`);
   return data;
@@ -374,12 +380,14 @@ export async function createTask(
     dueAt?: string | null;
     chunkMinutes?: number | null;
     coinValue?: number | null;
+    isTiny?: boolean;
   }
 ): Promise<Task> {
   const db = supabaseAdmin();
-  const { data, error } = await db
+  const run = (withTiny: boolean) => db
     .from("tasks")
     .insert({
+      ...(withTiny && input.isTiny ? { is_tiny: true } : {}),
       ...(input.isManualPriority ? { is_manual_priority: true } : {}),
       ...(input.rewardId ? { reward_id: input.rewardId } : {}),
       ...(input.lockedByTaskId ? { locked_by_task_id: input.lockedByTaskId } : {}),
@@ -406,6 +414,9 @@ export async function createTask(
     })
     .select("*")
     .single();
+  let { data, error } = await run(true);
+  // Before the tiny-tasks column exists, it's made as a standard quest.
+  if (error && /is_tiny/.test(error.message)) ({ data, error } = await run(false));
 
   if (error) throw new Error(`Failed to create task: ${error.message}`);
   return data;

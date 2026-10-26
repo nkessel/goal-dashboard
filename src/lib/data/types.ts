@@ -134,6 +134,8 @@ export type Task = {
   coin_value?: number | null;
   /** Matrix screen placement: 'unplotted' / 'later' lots, or 'hidden' (off the matrix). */
   matrix_state?: "unplotted" | "later" | "hidden" | null;
+  /** A tiny task: quick (5 min by default), drawn half height with just a check box. */
+  is_tiny?: boolean;
   /** Step checklist counts, attached when listed for a card (not a column). */
   steps_total?: number;
   steps_done?: number;

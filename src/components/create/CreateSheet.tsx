@@ -15,9 +15,10 @@ import { useEscape } from "@/lib/use-escape";
 import { QuickCheckIn } from "./QuickCheckIn";
 import { EVERYDAY_JOURNAL_KINDS, JOURNAL_KINDS, type JournalKind } from "@/lib/journal-kinds";
 
-export type CreateKind = "quest" | "now" | "habit" | "reward" | "rite" | "journal" | "board" | "subboard";
+export type CreateKind = "tiny" | "quest" | "now" | "habit" | "reward" | "rite" | "journal" | "board" | "subboard";
 
 const KIND_META: Record<CreateKind, { label: string; icon: React.ReactNode }> = {
+  tiny: { label: "Tiny task", icon: <TinyGlyph /> },
   quest: { label: "Quest", icon: <QuestShield size={18} /> },
   now: { label: "Doing now", icon: <NowGlyph /> },
   habit: { label: "Habit", icon: <HabitGlyph /> },
@@ -56,12 +57,13 @@ export function CreateSheet({
   onClose: () => void;
 }) {
   // With both making-things and the journal on offer, the first screen asks which.
-  const makeKinds = kinds.filter((k) => k !== "journal");
+  // Wherever quests can be made, a tiny task is offered just before them (Quest stays the default).
+  const makeKinds = kinds.filter((k) => k !== "journal").flatMap((k): CreateKind[] => (k === "quest" && !kinds.includes("tiny") ? ["tiny", "quest"] : [k]));
   const offersChoice = initial !== "journal" && makeKinds.length > 0 && kinds.includes("journal");
   const [stage, setStage] = useState<"choose" | "make" | "journal" | "checkin">(offersChoice ? "choose" : initial === "journal" ? "journal" : "make");
   const sheetRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLSpanElement>(null);
-  const [kind, setKind] = useState<CreateKind>(initial ?? makeKinds[0] ?? kinds[0]);
+  const [kind, setKind] = useState<CreateKind>(initial ?? (makeKinds[0] === "tiny" ? "quest" : makeKinds[0]) ?? kinds[0]);
   const [leaving, setLeaving] = useState(false);
   const keyboard = useKeyboardViewport(sheetRef, leaving);
   const [host, setHost] = useState<HTMLDivElement | null>(null);
@@ -103,8 +105,8 @@ export function CreateSheet({
   const editor =
     stage === "checkin" ? (
       <QuickCheckIn key="checkin" isAdventure={isAdventure} onDone={close} />
-    ) : shownKind === "quest" || shownKind === "now" ? (
-      <QuestEditorDialog key={editorKey} mode={{ kind: "create", boardId, todayFull, doingNow: kind === "now", ...(pinToToday ? { pinToBattle: true } : {}), ...(followUpOf ? { after: followUpOf } : {}) }} theme={theme} onClose={close} />
+    ) : shownKind === "quest" || shownKind === "now" || shownKind === "tiny" ? (
+      <QuestEditorDialog key={editorKey} mode={{ kind: "create", boardId, todayFull, doingNow: kind === "now", tiny: kind === "tiny", ...(pinToToday ? { pinToBattle: true } : {}), ...(followUpOf ? { after: followUpOf } : {}) }} theme={theme} onClose={close} />
     ) : shownKind === "reward" ? (
       <RewardEditorDialog key={editorKey} theme={theme} onClose={close} />
     ) : shownKind === "rite" || shownKind === "habit" ? (
@@ -514,6 +516,16 @@ function BoardComposer({ parentBoardId, isAdventure, onDone }: { parentBoardId?:
         </button>
       </div>
     </form>
+  );
+}
+
+/** A small empty check box: a tiny task is just something to tick off. */
+function TinyGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" fill="#fbf3dc" stroke="#7a5f2a" strokeWidth="2.2" />
+      <path d="M8 12.4l2.8 2.8 5.4-6" stroke="rgba(90,80,60,.4)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
