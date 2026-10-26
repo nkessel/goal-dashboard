@@ -104,6 +104,19 @@ export type GoogleCalendarEvent = {
   editable?: boolean;
   /** An invitation from someone else: your answer so far ("needsAction" = not answered yet). */
   response?: "needsAction" | "tentative" | "accepted" | null;
+  /** The calendar's name, for the event popup. */
+  calendarName?: string | null;
+  location?: string | null;
+  /** Who set it up (name, or email). */
+  organizer?: string | null;
+  /** Guests and their answers (first 25). */
+  guests?: { name: string; response: string | null; self?: boolean }[];
+  /** A video call link (Meet, Zoom…), when there is one. */
+  meetLink?: string | null;
+  /** The event in Google Calendar. */
+  htmlLink?: string | null;
+  /** Part of a repeating series. */
+  recurring?: boolean;
 };
 
 export type RsvpAnswer = "accepted" | "tentative" | "declined";
@@ -131,7 +144,7 @@ export async function listEvents(
   accessToken: string,
   timeMin: Date,
   timeMax: Date,
-  source: { id: string; color?: string | null; writable?: boolean } = { id: "primary", writable: true }
+  source: { id: string; name?: string | null; color?: string | null; writable?: boolean } = { id: "primary", writable: true }
 ): Promise<GoogleCalendarEvent[]> {
   const calendar = calendarClient(accessToken);
   const res = await calendar.events.list({
@@ -169,6 +182,13 @@ export async function listEvents(
           const r = me.responseStatus;
           return r === "accepted" || r === "tentative" ? r : "needsAction";
         })(),
+        calendarName: source.name ?? null,
+        location: e.location ?? null,
+        organizer: e.organizer?.self ? "You" : e.organizer?.displayName || e.organizer?.email || null,
+        guests: (e.attendees ?? []).filter((a) => !a.resource).slice(0, 25).map((a) => ({ name: a.self ? "You" : a.displayName || a.email || "Guest", response: a.responseStatus ?? null, ...(a.self ? { self: true } : {}) })),
+        meetLink: e.hangoutLink ?? e.conferenceData?.entryPoints?.find((p) => p.entryPointType === "video")?.uri ?? null,
+        htmlLink: e.htmlLink ?? null,
+        recurring: !!e.recurringEventId,
       };
     })
     .filter((e): e is GoogleCalendarEvent => e !== null);
@@ -183,7 +203,7 @@ export async function listEventsAllCalendars(accessToken: string, timeMin: Date,
     // Older grants may not cover the calendar list: fall back to the main calendar.
     return { calendars: [{ id: "primary", name: "My calendar", color: null, primary: true }], events: await listEvents(accessToken, timeMin, timeMax) };
   }
-  const lists = await Promise.all(calendars.slice(0, 12).map((c) => listEvents(accessToken, timeMin, timeMax, { id: c.id, color: c.color, writable: c.writable }).catch(() => [] as GoogleCalendarEvent[])));
+  const lists = await Promise.all(calendars.slice(0, 12).map((c) => listEvents(accessToken, timeMin, timeMax, { id: c.id, name: c.name, color: c.color, writable: c.writable }).catch(() => [] as GoogleCalendarEvent[])));
   const primaryId = calendars.find((c) => c.primary)?.id;
   // The same meeting can sit on several calendars; show it once.
   const seen = new Set<string>();

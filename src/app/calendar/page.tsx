@@ -62,7 +62,7 @@ export default async function CalendarPage({
   const dateParam = params.date;
   const view = parseView(viewParam);
   // "Days" shows any number of days from 1 to 7 (the slider in the calendar's settings).
-  const nDays = view === "3day" ? 3 : Math.max(1, Math.min(7, Math.round(Number(nParam) || 2)));
+  const nDays = view === "3day" ? 3 : Math.max(1, Math.min(14, Math.round(Number(nParam) || 2)));
   const date = parseDateParam(dateParam ?? todayKey());
   const today = parseDateParam(todayKey());
 

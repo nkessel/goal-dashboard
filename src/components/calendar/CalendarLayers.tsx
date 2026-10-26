@@ -131,16 +131,22 @@ export function CalendarLayers({
           onClick={() => window.dispatchEvent(new Event("open-scheduling"))}
           aria-label={`To schedule (${toSchedule})`}
           title="To schedule"
-          className="hover-glow relative mr-auto flex h-10 w-10 items-center justify-center rounded-full"
-          style={isAdventure ? { background: "radial-gradient(circle at 35% 25%, #f6e3a8, #d9b45f 60%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { ...chip, color: "var(--t-ink)" }}
+          // A labelled pill that sticks out over the calendar's top-left corner.
+          className="hover-glow relative z-[30] mr-auto flex h-11 items-center gap-1.5 rounded-full pl-3 pr-4 text-[14.5px] font-bold"
+          style={{
+            ...(isAdventure ? { background: "radial-gradient(circle at 35% 25%, #f6e3a8, #d9b45f 60%, #a88a3f)", border: "2px solid #4a3913", color: "#2a1c10" } : { ...chip, color: "var(--t-ink)" }),
+            transform: "translate(-12px, 20px)",
+            boxShadow: "0 6px 14px rgba(0,0,0,.4)",
+          }}
         >
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
             <rect x="3.5" y="5" width="17" height="15.5" rx="2.2" stroke="currentColor" strokeWidth="1.9" />
             <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
             <path d="M8 13.5h4M8 16.8h7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           </svg>
+          <span className={isAdventure ? "font-display tracking-wide" : ""}>To schedule</span>
           {toSchedule > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10.5px] font-bold tabular-nums" style={{ background: "#2a1c10", color: "#f6dc8e", border: "1px solid #d9b45f" }}>
+            <span className="absolute -right-1.5 -top-1.5 flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-1 text-[11px] font-bold tabular-nums" style={{ background: "#2a1c10", color: "#f6dc8e", border: "1px solid #d9b45f" }}>
               {toSchedule}
             </span>
           )}
