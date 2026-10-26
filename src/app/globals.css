@@ -2406,21 +2406,39 @@ input[type="time"]::-webkit-datetime-edit-hour-field:focus, input[type="time"]::
 /* Quests on the Adventure calendar: storybook cards with their creature. */
 .quest-card {
   border-radius: 7px;
-  background: linear-gradient(180deg, #fbf3dc, #eedcb3);
-  border: 1px solid #b59457;
-  box-shadow: inset 0 1px 0 rgba(255, 250, 235, 0.8), 0 2px 5px rgba(70, 45, 10, 0.28);
+  background: linear-gradient(180deg, #f8efd6, #ecdcb5);
+  border: 1px solid #b0904f;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 249, 232, 0.55),
+    inset 0 0 0 3px rgba(176, 144, 79, 0.28),
+    0 2px 5px rgba(70, 45, 10, 0.25);
 }
 .quest-card-done {
-  background: linear-gradient(180deg, #e6eacf, #d0d8b0);
-  border-color: #91a36a;
+  background: linear-gradient(180deg, #e2e6c9, #cdd5ae);
+  border-color: #8c9e66;
+  box-shadow:
+    inset 0 0 0 2px rgba(246, 249, 232, 0.5),
+    inset 0 0 0 3px rgba(120, 140, 80, 0.28),
+    0 2px 5px rgba(50, 60, 20, 0.22);
 }
 .quest-art {
   border: 1px solid rgba(122, 90, 40, 0.55);
   box-shadow: 0 1px 2px rgba(60, 40, 10, 0.25);
   background: #fff8e6;
 }
+/* On a card the creature stands free on the parchment: no frame, its
+   backdrop melted into the paper and its edges faded away. */
+.quest-card .quest-art {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  mix-blend-mode: multiply;
+  -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+}
+.quest-card .quest-art img { transform: scale(1.12); }
 .quest-seal {
-  background: radial-gradient(circle at 35% 30%, #7d9a5c, #4e6a35 70%);
+  background: radial-gradient(circle at 35% 30%, #6f8c4f, #3f5a2a 70%);
   border: 1.5px solid #f3ecd0;
   box-shadow: 0 1px 2px rgba(40, 50, 20, 0.4);
 }
