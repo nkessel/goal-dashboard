@@ -6,6 +6,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { FriendDirectory } from "@/components/social/FriendDirectory";
 import { FriendRequests } from "@/components/social/FriendRequests";
 import { InviteLinkBox } from "@/components/social/InviteLinkBox";
+import { PartyWeekBoard } from "@/components/social/PartyView";
+import { partyWeek } from "@/lib/data/activity";
+import { currentWeekStart } from "@/lib/data/xp";
 import { ActivityFeedItem } from "@/components/social/ActivityFeedItem";
 import { listDirectory, getProfilesByIds, getProfileById, getChampion } from "@/lib/data/profiles";
 import { LevelPill } from "@/components/social/LevelPill";
@@ -39,7 +42,10 @@ export default async function FeedPage() {
     getProfileById(profileId),
   ]);
 
-  const [champion, shared] = await Promise.all([getChampion(), listSharedBoards(profileId)]);
+  const [champion, shared, week] = await Promise.all([getChampion(), listSharedBoards(profileId), partyWeek([profileId, ...friendIds], currentWeekStart()).catch(() => [])]);
+  const weekPeople = await getProfilesByIds(friendIds);
+  // eslint-disable-next-line react-hooks/purity -- a server render's "now"
+  const now = Date.now();
   const adders = await getProfilesByIds([...new Set(shared.flatMap((b) => b.quests.map((q) => q.added_by).filter((x): x is string => !!x)))]);
   const sharedViews = shared.map((b) => ({
     id: b.board.id,
@@ -107,7 +113,26 @@ export default async function FeedPage() {
           </Link>
         )}
 
+        {/* Inviting is right at the top, where it's easy to find. */}
+        <InviteLinkBox code={invite.code} theme={theme} inviterName={profile?.name?.split(" ")[0] ?? null} prominent />
+
         <FriendRequests incoming={incomingWithProfiles} theme={theme} />
+
+        <PartyWeekBoard
+          isAdventure={isAdventure}
+          members={week.map((w) => {
+            const p = w.id === profileId ? profile : weekPeople.get(w.id);
+            return {
+              id: w.id,
+              name: p?.name?.split(" ")[0] ?? "A friend",
+              isYou: w.id === profileId,
+              streak: p?.streak_count ?? 0,
+              xp: w.xp,
+              quests: w.quests,
+              quietDays: w.lastQuestAt ? Math.floor((now - new Date(w.lastQuestAt).getTime()) / 86_400_000) : 14,
+            };
+          })}
+        />
 
         <SupportCall partySize={friendIds.length} isAdventure={isAdventure} />
 
@@ -148,13 +173,12 @@ export default async function FeedPage() {
         {/* Inviting and finding people, tucked away (open while the party is empty). */}
         <details open={friendIds.length === 0} className={`rounded-2xl px-4 py-3 ${isAdventure ? "parchment parchment-framed" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
           <summary className={`relative z-[1] flex min-h-9 cursor-pointer list-none items-center gap-2 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
-            <span aria-hidden>➕</span> Grow your party
+            <span aria-hidden>➕</span> Find your party
             <span className="ml-auto text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>
-              invite · find people
+              people already here
             </span>
           </summary>
           <div className="relative z-[1] mt-3 flex flex-col gap-4">
-        <InviteLinkBox code={invite.code} theme={theme} inviterName={profile?.name?.split(" ")[0] ?? null} />
 
         <section className="flex flex-col gap-2 rounded-2xl px-4 py-3.5" style={{
           background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",

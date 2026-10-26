@@ -858,6 +858,9 @@ export async function acceptInviteAction(code: string) {
 // ---------------------------------------------------------------------------
 // Social: activity feed reactions + comments (Priority #7)
 // ---------------------------------------------------------------------------
+/** How each cheer reads in a notification. */
+const CHEER_WORDS: Record<string, string> = { "📣": "cried “Huzzah!” for", "👏": "saluted", "🥂": "raised a goblet to" };
+
 export async function addReactionAction(activityId: string, emoji: string) {
   const { id: profileId, name } = await requireIdentity();
   await activityData.addReaction(activityId, profileId, emoji);
@@ -869,7 +872,7 @@ export async function addReactionAction(activityId: string, emoji: string) {
       profileId: ownerId,
       actorId: profileId,
       kind: "reaction",
-      body: `${name} reacted ${emoji} to ${what ?? "your activity"}.`,
+      body: `${name} ${CHEER_WORDS[emoji] ?? `reacted ${emoji} to`} ${what ?? "your activity"}.`,
       activityId,
     });
   }

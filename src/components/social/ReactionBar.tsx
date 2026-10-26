@@ -4,12 +4,50 @@ import { useState, useTransition } from "react";
 import { addReactionAction, removeReactionAction } from "@/app/actions";
 import type { ActivityReaction } from "@/lib/data/types";
 
-/** Three cheers, calm and in theme: a raised banner, applause, a toast. */
-const CHEERS: { emoji: string; label: string }[] = [
-  { emoji: "📣", label: "Cheer" },
-  { emoji: "👏", label: "Bravo" },
-  { emoji: "🥂", label: "Toast" },
+/**
+ * Three cheers in the guild's own language: a raised banner, a shield struck
+ * in salute, a goblet raised. (The stored keys stay the old emoji, so earlier
+ * cheers still count under their new look.)
+ */
+const CHEERS: { emoji: string; label: string; glyph: React.ReactNode }[] = [
+  { emoji: "📣", label: "Huzzah!", glyph: <BannerGlyph /> },
+  { emoji: "👏", label: "Well fought", glyph: <ShieldGlyph /> },
+  { emoji: "🥂", label: "Raise a goblet", glyph: <GobletGlyph /> },
 ];
+
+function BannerGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M6 2.5v19" stroke="#6b4a1c" strokeWidth="2" strokeLinecap="round" />
+      <path d="M6.8 4h11.5l-2.6 4 2.6 4H6.8z" fill="#b0342a" stroke="#5a1a12" strokeWidth="1.2" strokeLinejoin="round" />
+      <circle cx="6" cy="2.6" r="1.6" fill="#e2bb5c" stroke="#6b4a1c" strokeWidth=".8" />
+      <path d="M10 7.2l.8 1.5 1.6.2-1.2 1.1.3 1.6-1.5-.8-1.4.8.3-1.6-1.2-1.1 1.6-.2z" fill="#f6dc8e" />
+    </svg>
+  );
+}
+function ShieldGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 2l8 3v6.2c0 5-3.4 8.8-8 10.8-4.6-2-8-5.8-8-10.8V5z" fill="url(#rb-sh)" stroke="#4a3913" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M8 8l8 8M16 8l-8 8" stroke="#3a2a0e" strokeWidth="1.6" strokeLinecap="round" />
+      <defs>
+        <linearGradient id="rb-sh" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f6dc8e" />
+          <stop offset="1" stopColor="#a88a3f" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+function GobletGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M6 3h12c0 5-2.4 8.2-6 8.6C8.4 11.2 6 8 6 3z" fill="#d9b45f" stroke="#4a3913" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M7 5.2h10" stroke="#8a2a3a" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 11.6V18M8 21h8M9.5 18h5" stroke="#4a3913" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export function ReactionBar({
   activityId,
@@ -64,7 +102,7 @@ export function ReactionBar({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {CHEERS.map(({ emoji, label }) => {
+      {CHEERS.map(({ emoji, label, glyph }) => {
         const g = grouped.get(emoji);
         return (
           <button
@@ -74,10 +112,10 @@ export function ReactionBar({
             aria-pressed={!!g?.mine}
             className="hover-glow flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px] font-semibold"
             style={chipStyle(!!g?.mine)}
-            title={g?.mine ? `Take back your ${label.toLowerCase()}` : label}
+            title={g?.mine ? `Take back your “${label}”` : label}
           >
-            <span aria-hidden>{emoji}</span>
-            {label}
+            {glyph}
+            <span className={isAdventure ? "font-display tracking-wide" : ""}>{label}</span>
             {g && g.count > 0 && <span className="tabular-nums opacity-75">{g.count}</span>}
           </button>
         );

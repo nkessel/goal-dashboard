@@ -20,6 +20,7 @@ import { isPalette, type PaletteKey } from "@/lib/palettes";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
 import { SharingSettings } from "@/components/settings/SharingSettings";
+import { PartyViewSettings } from "@/components/social/PartyView";
 import { NotificationPrefs } from "@/components/settings/NotificationPrefs";
 import { SettingsRow } from "@/components/settings/SettingsRow";
 import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
@@ -456,6 +457,22 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             icon={<span style={{ fontSize: 14 }}>🔔</span>}
           >
             <NotificationPrefs level={profile.notify_level ?? "all"} email={profile.notify_email ?? true} />
+          </SettingsRow>
+          </SectionItem>
+
+          <SectionItem id="party-view">
+          <SettingsRow
+            theme={profile.theme}
+            label="Guild Hall"
+            icon={
+              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
+                <circle cx="8" cy="9" r="3" />
+                <circle cx="16" cy="9" r="3" />
+                <path d="M3 20c0-3 2.2-5 5-5s5 2 5 5M11 20c0-3 2.2-5 5-5s5 2 5 5" strokeLinecap="round" />
+              </svg>
+            }
+          >
+            <PartyViewSettings isAdventure={isAdventure} />
           </SettingsRow>
           </SectionItem>
 
