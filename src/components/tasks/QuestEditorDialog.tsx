@@ -79,6 +79,8 @@ export type QuestEditorMode =
       after?: { id: string; title: string };
     };
 
+const noSubscribe = () => () => {};
+
 const XP_MAX = 350;
 const XP_STEP = 10;
 /** Coins follow XP (1 per XP_PER_COIN) unless a quest sets its own. */
@@ -183,6 +185,7 @@ export function QuestEditorDialog({
   /** New quests: leave it without a portrait (just the empty check box). */
   const [noPortrait, setNoPortrait] = useState(false);
   const layout = useSyncExternalStore(subscribeEditorLayout, readEditorLayout, serverEditorLayout);
+  const coarsePointer = useSyncExternalStore(noSubscribe, () => window.matchMedia("(pointer: coarse)").matches, () => false);
   const [advOpen, setAdvOpen] = useState(false);
   const schedRef = useRef<HTMLDivElement>(null);
   const [stepsReload, setStepsReload] = useState(0);
@@ -2116,7 +2119,9 @@ export function QuestEditorDialog({
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={doingNow ? "What are you doing?" : isAdventure ? "Quest title" : "Task title"}
                   aria-label="Title"
-                  autoFocus={!task}
+                  // Phones: the window opens steady and the keyboard waits for a tap on the title
+                  // (rising mid-animation is what made it jump and resize).
+                  autoFocus={!task && !coarsePointer}
                   enterKeyHint="next"
                   className={`h-10 min-w-0 flex-1 rounded-lg border px-2.5 text-[16px] font-semibold ${autosave ? "pr-8" : ""}`}
                   style={fieldStyle}

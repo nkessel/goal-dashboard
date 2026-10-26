@@ -562,6 +562,7 @@ function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leav
     const vv = window.visualViewport;
     if (!vv) return;
     let rest = 0;
+    let restTop = 0;
     let closing = 0;
     let raf = 0;
     const update = () => {
@@ -572,11 +573,18 @@ function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leav
         if (open) {
           clearTimeout(closing);
           closing = 0;
-          if (!rest) rest = sheet.current?.offsetHeight ?? 0;
-          const visible = vv.height - 12;
-          const room = window.innerHeight - vv.offsetTop - 12;
+          if (!rest) {
+            rest = sheet.current?.offsetHeight ?? 0;
+            restTop = sheet.current?.offsetTop ?? 0; // (layout position, not mid-animation)
+          }
+          // Stay exactly where it is when its top half is still in sight (nothing jumps);
+          // only move up when the keyboard would cover most of it.
+          const stay = restTop >= vv.offsetTop + 6 && restTop < vv.offsetTop + vv.height * 0.35;
+          const top = stay ? restTop : vv.offsetTop + 6;
+          const visible = vv.offsetTop + vv.height - top - 6;
+          const room = window.innerHeight - top - 12;
           const sheetHeight = Math.round(Math.min(room, Math.max(visible, rest, 420)));
-          setVp({ top: vv.offsetTop, sheetHeight, hidden: Math.max(0, sheetHeight - visible) });
+          setVp({ top: top - 6, sheetHeight, hidden: Math.max(0, sheetHeight - visible) });
         } else if (!closing) {
           closing = window.setTimeout(() => {
             closing = 0;
