@@ -29,6 +29,8 @@ export type ToucanStyle = {
   gym: { days: number[]; time: string | null; help: GymHelp[] };
   /** Anything else, in your words. */
   notes: string;
+  /** Your own words for any quiz question, beside (or instead of) the choices. */
+  writeIns: Record<string, string>;
 };
 
 export const DEFAULT_STYLE: ToucanStyle = {
@@ -43,6 +45,7 @@ export const DEFAULT_STYLE: ToucanStyle = {
   returnCheckIn: true,
   gym: { days: [], time: null, help: ["before", "after", "cheer"] },
   notes: "",
+  writeIns: {},
 };
 
 const oneOf = <T extends string>(v: unknown, list: readonly T[], d: T): T => (list.includes(v as T) ? (v as T) : d);
@@ -68,6 +71,11 @@ export function cleanStyle(raw: unknown): ToucanStyle {
       help: someOf(g.help, ["pack", "before", "after", "cheer"] as const, d.gym.help),
     },
     notes: typeof r.notes === "string" ? r.notes.replace(/\s+/g, " ").trim().slice(0, 600) : "",
+    writeIns: Object.fromEntries(
+      Object.entries(r.writeIns && typeof r.writeIns === "object" ? (r.writeIns as Record<string, unknown>) : {})
+        .filter(([k, v]) => QUESTIONS.some((q) => q.key === k) && typeof v === "string" && v.trim())
+        .map(([k, v]) => [k, (v as string).replace(/\s+/g, " ").trim().slice(0, 300)])
+    ),
   };
 }
 
@@ -286,6 +294,10 @@ export function styleLines(s: ToucanStyle): string[] {
   if (s.avoid.length) out.push(`Avoid: ${s.avoid.map((k) => avoid[k]).join(", ")}.`);
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   if (s.gym.days.length) out.push(`Wants gym accountability: ${s.gym.days.map((d) => days[d]).join(", ")}${s.gym.time ? ` around ${clockWord(s.gym.time)}` : ""}.`);
+  for (const q of QUESTIONS) {
+    const w = s.writeIns[q.key];
+    if (w) out.push(`Asked "${q.ask}", they wrote: ${w}`);
+  }
   if (s.notes) out.push(`In their words: ${s.notes}`);
   return out;
 }

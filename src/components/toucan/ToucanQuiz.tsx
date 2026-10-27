@@ -159,6 +159,18 @@ export function ToucanQuiz({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
+        {/* Your own words, for any question: alongside a choice, or instead of one. */}
+        {q.key !== "notes" && (
+          <input
+            value={draft.writeIns[q.key] ?? ""}
+            onChange={(e) => setDraft({ ...draft, writeIns: { ...draft.writeIns, [q.key]: e.target.value.slice(0, 300) } })}
+            placeholder="Or in your own words…"
+            aria-label={`${q.ask} In your own words`}
+            className="h-11 w-full rounded-2xl px-3.5 text-[15px]"
+            style={{ background: "rgba(0,0,0,.25)", border: "1px solid rgba(140,240,220,.35)", color: "#e8fff8" }}
+          />
+        )}
+
         {q.key === "gym" && draft.gym.days.length > 0 && (
           <label className="flex items-center gap-2 text-[14px]">
             Usual time
