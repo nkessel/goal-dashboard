@@ -1,11 +1,21 @@
 "use client";
 
-import { Children, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { Children, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { DndContext, KeyboardSensor, MouseSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 const KEY = "settings-order";
+
+/** A finger on a section's grip moves it straight away (no hold), so the page never scrolls instead. */
+class GripSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: "onPointerDown" as const,
+      handler: ({ nativeEvent: e }: React.PointerEvent) => e.pointerType !== "mouse" && e.isPrimary && !!(e.target as Element | null)?.closest?.("[data-grip]"),
+    },
+  ];
+}
 /** Settings rows tell the list when they open, so nothing can be dragged while one is open. */
 const OpenContext = createContext<((id: string, open: boolean) => void) | null>(null);
 export function useReportOpen() {
@@ -16,7 +26,7 @@ const LockedContext = createContext(false);
 /** One section in the Settings list (its id keeps your order). */
 export function SectionItem({ id, children }: { id: string; children: React.ReactNode }) {
   const locked = useContext(LockedContext);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: locked });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
     <div
       ref={setNodeRef}
@@ -29,6 +39,23 @@ export function SectionItem({ id, children }: { id: string; children: React.Reac
       onContextMenu={locked ? undefined : (e) => e.preventDefault()}
     >
       {children}
+      {/* The grip: drag it to move the section straight away (no hold needed), even while one is open. */}
+      <span
+        ref={setActivatorNodeRef}
+        {...listeners}
+        aria-hidden
+        data-grip
+        title="Drag to move this section"
+        className="absolute left-0 top-0 z-[2] flex h-[60px] w-4 cursor-grab items-center justify-center"
+        style={{ touchAction: "none", color: "var(--t-ink-soft)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <svg width="6" height="16" viewBox="0 0 6 16" fill="currentColor" opacity=".55">
+          <circle cx="1.5" cy="2" r="1.3" /><circle cx="4.5" cy="2" r="1.3" />
+          <circle cx="1.5" cy="8" r="1.3" /><circle cx="4.5" cy="8" r="1.3" />
+          <circle cx="1.5" cy="14" r="1.3" /><circle cx="4.5" cy="14" r="1.3" />
+        </svg>
+      </span>
     </div>
   );
 }
@@ -66,6 +93,7 @@ export function ReorderableSections({ children }: { children: React.ReactNode })
     // Mouse and touch apart: on a phone only a held finger picks a section up, so scrolling never does.
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 6 } }),
+    useSensor(GripSensor, { activationConstraint: { distance: 3 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   function onDragEnd(e: DragEndEvent) {
@@ -79,10 +107,20 @@ export function ReorderableSections({ children }: { children: React.ReactNode })
     }
   }
   const locked = openSet.size > 0;
+  const dragging = useRef(false);
+  useEffect(() => {
+    // iPhone only lets a drag stop the page scrolling through a non-passive
+    // listener that's already in place when the finger goes down.
+    const hold = (e: TouchEvent) => {
+      if (dragging.current) e.preventDefault();
+    };
+    window.addEventListener("touchmove", hold, { passive: false });
+    return () => window.removeEventListener("touchmove", hold);
+  }, []);
   return (
     <OpenContext.Provider value={report}>
       <LockedContext.Provider value={locked}>
-        <DndContext id="dnd-settings" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext id="dnd-settings" sensors={sensors} collisionDetection={closestCenter} onDragStart={() => (dragging.current = true)} onDragCancel={() => (dragging.current = false)} onDragEnd={(e) => ((dragging.current = false), onDragEnd(e))}>
           <SortableContext items={sorted} strategy={verticalListSortingStrategy}>
             <div data-no-press-scroll className="flex flex-col gap-2.5">
               {sorted.map((id) => byId.get(id))}

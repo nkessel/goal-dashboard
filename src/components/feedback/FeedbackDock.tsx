@@ -940,6 +940,19 @@ function Composer({
   // Past three paragraphs, the note's own count joins the choices.
   const long = Math.min(XP_MAX, paragraphs(draft.body));
   const [uploading, setUploading] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // A picture added: the box grows to fit its thumbnail rather than squeezing the writing.
+  const shots = (draft.shot ? 1 : 0) + (draft.images ?? []).length;
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || !shots) return;
+    const raf = requestAnimationFrame(() => {
+      const over = el.scrollHeight - el.clientHeight;
+      if (over > 2) onOverflow?.(over + 6);
+    });
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shots]);
   const [attachError, setAttachError] = useState<string | null>(null);
   // Tap an attachment to see it full size.
   const [viewing, setViewing] = useState<string | null>(null);
@@ -963,7 +976,7 @@ function Composer({
     if (urls.length) onChange({ images: [...(draft.images ?? []), ...urls] });
   }
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-1.5 px-3.5 pb-1.5 pt-0.5">
+    <div ref={rootRef} className="flex min-h-0 flex-1 flex-col gap-1.5 px-3.5 pb-1.5 pt-0.5">
       {!compact && <Segmented
         label="Where it goes"
         isAdventure={isAdventure}
@@ -1004,7 +1017,7 @@ function Composer({
         </label>
       )}
       </div>
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="relative flex min-h-[72px] flex-1 flex-col">
       <textarea
         ref={textRef}
         onPaste={(e) => {
@@ -1041,16 +1054,12 @@ function Composer({
       {(
       <div className="-mt-0.5 flex shrink-0 flex-wrap items-center gap-1">
         {[...(draft.shot ? [{ url: draft.shot, label: "Screen picture", remove: () => onChange({ shot: null }) }] : []), ...(draft.images ?? []).map((u, i) => ({ url: u, label: (draft.images ?? []).length > 1 ? `Image ${i + 1}` : "Image", remove: () => onChange({ images: (draft.images ?? []).filter((x) => x !== u) }) }))].map((a) => (
-          <span key={a.url} className="flex h-7 items-center rounded-full pl-1" style={{ border: "1px solid var(--t-panel-border)", background: "rgba(255,255,255,.55)" }}>
-            <button type="button" onClick={() => setViewing(a.url)} className="flex h-6 items-center gap-1 rounded-full px-1.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)" }} title="See it full size">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="3.5" y="5" width="17" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
-                <circle cx="9" cy="10" r="1.6" fill="currentColor" />
-                <path d="M5 17l4.5-4.5 3 3 2.5-2.5L19.5 17" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-              </svg>
-              {a.label}
+          <span key={a.url} className="relative">
+            <button type="button" onClick={() => setViewing(a.url)} className="block h-11 w-11 overflow-hidden rounded-md" style={{ border: "1px solid var(--t-panel-border)", boxShadow: "0 1px 3px rgba(60,40,10,.25)" }} title={`${a.label}: see it full size`} aria-label={`${a.label}: see it full size`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={a.url} alt="" className="h-full w-full object-cover" />
             </button>
-            <button type="button" onClick={a.remove} aria-label={`Remove ${a.label.toLowerCase()}`} className="flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none hover:bg-black/10" style={{ color: "var(--t-ink-soft)" }}>
+            <button type="button" onClick={a.remove} aria-label={`Remove ${a.label.toLowerCase()}`} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[13px] leading-none" style={{ background: "rgba(40,28,12,.85)", color: "#f6ecd2" }}>
               ×
             </button>
           </span>
