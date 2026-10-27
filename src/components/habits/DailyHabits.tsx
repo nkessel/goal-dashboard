@@ -494,10 +494,11 @@ export function DailyHabits({
                     </button>
                   )}
                   {menuFor === h.id && (
-                    <div data-habit-menu role="menu" className={`card-pop-in absolute right-2 z-30 flex flex-col overflow-hidden rounded-xl parchment ${menuUp ? "bottom-full mb-1" : "top-full mt-1"}`} style={{ borderRadius: 12, minWidth: 190 }}>
+                    <div data-habit-menu data-menu="habit" role="menu" className={`card-pop-in absolute right-2 z-30 flex flex-col overflow-hidden rounded-xl parchment ${menuUp ? "bottom-full mb-1" : "top-full mt-1"}`} style={{ borderRadius: 12, minWidth: 190 }}>
                       <button
                         type="button"
                         role="menuitem"
+                        data-mi="edit"
                         onClick={() => {
                           setMenuFor(null);
                           setEditing(h);
@@ -509,6 +510,7 @@ export function DailyHabits({
                       <button
                         type="button"
                         role="menuitem"
+                        data-mi="sub"
                         onClick={() => {
                           setMenuFor(null);
                           setEditSub(true);
@@ -524,6 +526,7 @@ export function DailyHabits({
                       </button>
                       <button
                         role="menuitem"
+                        data-mi="focus"
                         style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
                         type="button"
                         onClick={() => {

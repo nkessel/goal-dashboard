@@ -386,9 +386,10 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
                   {folderMenu === g.key && (
                     <SmallMenu
                       onClose={() => setFolderMenu(null)}
+                      menu="folder"
                       items={[
-                        ["Rename", () => setRenaming(g.key)],
-                        ["Remove folder (keeps its quests)", () => dropFolder(g.key)],
+                        ["Rename", () => setRenaming(g.key), "rename"],
+                        ["Remove folder (keeps its quests)", () => dropFolder(g.key), "remove"],
                       ]}
                     />
                   )}
@@ -624,7 +625,7 @@ function IconBtn({ label, children, ...rest }: { label: string; children: React.
   );
 }
 
-function SmallMenu({ items, onClose }: { items: [string, () => void][]; onClose: () => void }) {
+function SmallMenu({ items, menu, onClose }: { items: [string, () => void, string?][]; menu?: string; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const down = (e: PointerEvent) => {
@@ -640,12 +641,13 @@ function SmallMenu({ items, onClose }: { items: [string, () => void][]; onClose:
     };
   }, [onClose]);
   return (
-    <div ref={ref} role="menu" className="parchment absolute right-0 top-full z-[20] mt-1 flex w-56 flex-col overflow-hidden py-1" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
-      {items.map(([label, fn]) => (
+    <div ref={ref} role="menu" data-menu={menu} className="parchment absolute right-0 top-full z-[20] mt-1 flex w-56 flex-col overflow-hidden py-1" style={{ borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
+      {items.map(([label, fn, key]) => (
         <button
           key={label}
           type="button"
           role="menuitem"
+          data-mi={key}
           onClick={() => {
             onClose();
             fn();

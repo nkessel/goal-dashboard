@@ -141,11 +141,11 @@ export function Streaks({ initial, notes: initialNotes, habits = [] }: { initial
                   ⋯
                 </button>
                 {menu === def.id && (
-                  <div role="menu" className="card-pop-in absolute right-2 top-10 z-10 flex min-w-[170px] flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12 }}>
-                    <button type="button" role="menuitem" onClick={() => (setMenu(null), setRenaming(def))} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5">
+                  <div role="menu" data-menu="streak" className="card-pop-in absolute right-2 top-10 z-10 flex min-w-[170px] flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12 }}>
+                    <button type="button" role="menuitem" data-mi="edit" onClick={() => (setMenu(null), setRenaming(def))} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5">
                       ✎ Edit
                     </button>
-                    <button type="button" role="menuitem" onClick={() => (setMenu(null), persist(defs.filter((d) => d.id !== def.id)))} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5" style={{ borderTop: "1px solid rgba(139,112,64,.2)", color: "#9a3b26" }}>
+                    <button type="button" role="menuitem" data-mi="remove" onClick={() => (setMenu(null), persist(defs.filter((d) => d.id !== def.id)))} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5" style={{ borderTop: "1px solid rgba(139,112,64,.2)", color: "#9a3b26" }}>
                       Remove streak
                     </button>
                   </div>

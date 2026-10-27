@@ -374,23 +374,23 @@ function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest, onGone }: { 
   const row = "relative z-[1] flex min-h-11 items-center gap-2.5 px-4 text-left text-[15px] hover:bg-black/5";
   return createPortal(
     <div className="fixed inset-0 z-[57]" onClick={onClose}>
-      <div role="menu" aria-label={item.name} onClick={(e) => e.stopPropagation()} className="card-pop-in parchment fixed flex flex-col overflow-hidden py-1" style={{ left, top, width: W, borderRadius: 14, boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}>
+      <div role="menu" data-menu="inventory" aria-label={item.name} onClick={(e) => e.stopPropagation()} className="card-pop-in parchment fixed flex flex-col overflow-hidden py-1" style={{ left, top, width: W, borderRadius: 14, boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}>
         <span className="relative z-[1] truncate px-4 pb-1 pt-1.5 text-[12px] font-bold uppercase tracking-[.1em]" style={{ color: "#8a6116" }}>
           {item.name}
         </span>
-        <button type="button" role="menuitem" onClick={onToggle} className={row} style={{ color: "var(--t-ink)" }}>
+        <button type="button" role="menuitem" data-mi="refill" onClick={onToggle} className={row} style={{ color: "var(--t-ink)" }}>
           <span aria-hidden className="w-5 text-center">{empty ? "✓" : "⚗"}</span>
           {empty ? "Refilled" : "Needs a refill"}
         </button>
-        <button type="button" role="menuitem" onClick={onQuest} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
+        <button type="button" role="menuitem" data-mi="quest" onClick={onQuest} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">＋</span>
           Make it a quest
         </button>
-        <button type="button" role="menuitem" onClick={onEdit} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
+        <button type="button" role="menuitem" data-mi="edit" onClick={onEdit} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">✎</span>
           Edit
         </button>
-        <button type="button" role="menuitem" onClick={onGone} className={row} style={{ color: "#9a3b26", borderTop: "1px solid rgba(139,112,64,.2)" }}>
+        <button type="button" role="menuitem" data-mi="gone" onClick={onGone} className={row} style={{ color: "#9a3b26", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">✕</span>
           Gone (take it out)
         </button>

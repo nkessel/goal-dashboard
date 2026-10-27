@@ -598,26 +598,28 @@ function BoardMenu({
   const W = 230;
   const left = Math.max(8, Math.min(x, window.innerWidth - W - 8));
   const top = Math.max(8, Math.min(y, window.innerHeight - 230));
-  const items: [string, () => void][] = [
-    ["Open board", onOpen],
-    ["Add a quest or sub-board", onAdd],
-    ["Edit board", onEdit],
-    ["Nest into another board…", onNest],
-    ...(nested ? ([["Move to the top level", onUnnest]] as [string, () => void][]) : []),
+  const items: [string, string, () => void][] = [
+    ["open", "Open board", onOpen],
+    ["add", "Add a quest or sub-board", onAdd],
+    ["edit", "Edit board", onEdit],
+    ["nest", "Nest into another board…", onNest],
+    ...(nested ? ([["unnest", "Move to the top level", onUnnest]] as [string, string, () => void][]) : []),
   ];
   return createPortal(
     <div
       data-board-menu
+      data-menu="board"
       role="menu"
       aria-label={`${title} menu`}
       className="parchment fixed z-[80] flex flex-col overflow-hidden py-1"
       style={{ left, top, width: W, borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,.35)", border: "1px solid #b39a6a" }}
     >
-      {items.map(([label, fn]) => (
+      {items.map(([key, label, fn]) => (
         <button
-          key={label}
+          key={key}
           type="button"
           role="menuitem"
+          data-mi={key}
           onClick={() => {
             onClose();
             fn();

@@ -1,0 +1,183 @@
+/**
+ * Every context menu's item order and hidden items (besides the quest card's,
+ * which keeps its own store in quest-menu-layout). Kept per browser and chosen
+ * in Settings › Menus. Menus mark themselves with data-menu="<id>" and each item
+ * with data-mi="<key>"; <MenuLayoutStyles /> arranges them with CSS, so the
+ * menus' own code doesn't change.
+ */
+export type MenuDef = { id: string; title: string; hint: string; items: { key: string; label: string; keep?: boolean }[] };
+
+export const MENUS: MenuDef[] = [
+  {
+    id: "calendar-item",
+    title: "Calendar items",
+    hint: "Right-click or ⋯ on a quest or event in the calendar.",
+    items: [
+      { key: "open", label: "Open quest" },
+      { key: "unschedule", label: "Take off the calendar" },
+      { key: "edit", label: "Edit (events)" },
+      { key: "quest", label: "Turn into a quest (events)" },
+      { key: "followup", label: "Schedule a follow-up quest" },
+    ],
+  },
+  {
+    id: "habit",
+    title: "Daily Habits",
+    hint: "The ⋯ on a habit.",
+    items: [
+      { key: "edit", label: "Edit habit", keep: true },
+      { key: "sub", label: "Add a sub-habit" },
+      { key: "focus", label: "Focus mode" },
+    ],
+  },
+  {
+    id: "rite",
+    title: "Evening rites",
+    hint: "The ⋯ on an evening rite.",
+    items: [
+      { key: "edit", label: "Edit", keep: true },
+      { key: "skip", label: "Skip tonight" },
+      { key: "delete", label: "Delete" },
+    ],
+  },
+  {
+    id: "board",
+    title: "Quest boards",
+    hint: "Right-click or ⋯ on a board.",
+    items: [
+      { key: "open", label: "Open board", keep: true },
+      { key: "add", label: "Add a quest or sub-board" },
+      { key: "edit", label: "Edit board" },
+      { key: "nest", label: "Nest into another board…" },
+      { key: "unnest", label: "Move to the top level" },
+    ],
+  },
+  {
+    id: "matrix",
+    title: "Priority Matrix",
+    hint: "Tapping a quest or board on the matrix.",
+    items: [
+      { key: "open", label: "Open quest / Edit board", keep: true },
+      { key: "collapse", label: "Collapse a board's quests" },
+      { key: "expand-ask", label: "Show a board's quests" },
+      { key: "expand-here", label: "Plot them all where the board is" },
+      { key: "expand-unplotted", label: "Put them all in Not yet plotted" },
+      { key: "later", label: "Save for later" },
+      { key: "unplotted", label: "Move to Not yet plotted" },
+      { key: "trash", label: "Remove from priority matrix" },
+    ],
+  },
+  {
+    id: "inventory",
+    title: "Inventory",
+    hint: "Tapping an item in your backpack.",
+    items: [
+      { key: "refill", label: "Needs a refill / Refilled" },
+      { key: "quest", label: "Make it a quest" },
+      { key: "edit", label: "Edit", keep: true },
+      { key: "gone", label: "Gone (take it out)" },
+    ],
+  },
+  {
+    id: "notification",
+    title: "Notifications",
+    hint: "The ⋯ on a notification.",
+    items: [
+      { key: "read", label: "Mark as read / unread" },
+      { key: "snooze", label: "Snooze…" },
+      { key: "delete", label: "Delete" },
+    ],
+  },
+  {
+    id: "folder",
+    title: "To schedule folders",
+    hint: "The ⋯ on a folder in To schedule.",
+    items: [
+      { key: "rename", label: "Rename", keep: true },
+      { key: "remove", label: "Remove folder (keeps its quests)" },
+    ],
+  },
+  {
+    id: "streak",
+    title: "Streaks",
+    hint: "The ⋯ on a streak in Insights.",
+    items: [
+      { key: "edit", label: "Edit", keep: true },
+      { key: "remove", label: "Remove streak" },
+    ],
+  },
+];
+
+export type MenuLayout = { order: string[]; hidden: string[] };
+export type MenuLayouts = Record<string, MenuLayout>;
+
+const KEY = "menu-layouts";
+const EVENT = "menu-layouts";
+const EMPTY: MenuLayouts = {};
+
+export const defaultLayout = (m: MenuDef): MenuLayout => ({ order: m.items.map((i) => i.key), hidden: [] });
+
+/** A saved layout made whole: unknown items dropped, new ones added in their default place. */
+export function layoutFor(m: MenuDef, saved: MenuLayout | undefined): MenuLayout {
+  const known = new Set(m.items.map((i) => i.key));
+  const order = (Array.isArray(saved?.order) ? saved.order : []).filter((k) => known.has(k));
+  for (const [i, it] of m.items.entries()) if (!order.includes(it.key)) order.splice(Math.min(i, order.length), 0, it.key);
+  const keep = new Set(m.items.filter((i) => i.keep).map((i) => i.key));
+  const hidden = (Array.isArray(saved?.hidden) ? saved.hidden : []).filter((k) => known.has(k) && !keep.has(k));
+  return { order: [...new Set(order)], hidden: [...new Set(hidden)] };
+}
+
+let cache: { raw: string | null; value: MenuLayouts } | null = null;
+export function readMenuLayouts(): MenuLayouts {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  if (cache && cache.raw === raw) return cache.value;
+  let value = EMPTY;
+  try {
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === "object") value = parsed as MenuLayouts;
+  } catch {
+    /* a broken saved layout falls back to the default */
+  }
+  cache = { raw, value };
+  return value;
+}
+export const serverMenuLayouts = () => EMPTY;
+
+export function saveMenuLayoutFor(id: string, layout: MenuLayout | null) {
+  const all = { ...readMenuLayouts() };
+  if (layout) all[id] = layout;
+  else delete all[id];
+  try {
+    if (Object.keys(all).length) localStorage.setItem(KEY, JSON.stringify(all));
+    else localStorage.removeItem(KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event(EVENT));
+}
+
+export function subscribeMenuLayouts(cb: () => void) {
+  window.addEventListener(EVENT, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener(EVENT, cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+/** The CSS that puts each menu's items in the chosen order and hides the hidden ones. */
+export function menuLayoutCss(all: MenuLayouts): string {
+  const rules: string[] = [];
+  for (const m of MENUS) {
+    if (!all[m.id]) continue;
+    const l = layoutFor(m, all[m.id]);
+    l.order.forEach((k, i) => rules.push(`[data-menu="${m.id}"]>[data-mi="${k}"]{order:${i + 1}}`));
+    for (const k of l.hidden) rules.push(`[data-menu="${m.id}"]>[data-mi="${k}"]{display:none!important}`);
+  }
+  return rules.join("\n");
+}

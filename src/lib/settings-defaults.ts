@@ -8,6 +8,7 @@ export const SHAREABLE_SETTINGS: { key: string; label: string }[] = [
   { key: "visual-fx", label: "Visual effects" },
   { key: "quest-editor-layout", label: "The quest editor" },
   { key: "quest-menu-layout", label: "Quest ⋯ menu" },
+  { key: "menu-layouts", label: "Other menus" },
   { key: "settings-order", label: "Settings order" },
   { key: "habits-header-look", label: "Daily Habits header" },
   { key: "habits-header-mark", label: "Daily Habits mark" },

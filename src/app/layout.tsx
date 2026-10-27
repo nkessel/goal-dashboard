@@ -4,6 +4,7 @@ import { ViewTransitionProvider } from "@/components/ui/ViewTransitionProvider";
 import { KeyboardViewport } from "@/components/ui/KeyboardViewport";
 import { ScrollLock } from "@/components/ui/ScrollLock";
 import { ContextMenuBridge } from "@/components/ui/ContextMenuBridge";
+import { MenuLayoutStyles } from "@/components/settings/MenuLayoutSettings";
 import { SaveKeys } from "@/components/ui/SaveKeys";
 import "./globals.css";
 
@@ -71,6 +72,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
         <KeyboardViewport />
         <ScrollLock />
         <ContextMenuBridge />
+        <MenuLayoutStyles />
         <SaveKeys />
         <ViewTransitionProvider>
           {children}

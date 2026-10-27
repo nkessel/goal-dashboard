@@ -246,13 +246,14 @@ export function NotificationList({
               </svg>
             </button>
             {menuFor === n.id && (
-              <span role="menu" className="card-pop-in parchment absolute right-0 top-full z-30 mt-1 flex w-48 flex-col overflow-hidden rounded-xl shadow-xl" style={{ borderRadius: 12 }}>
-                <button type="button" role="menuitem" onClick={() => setRead(n, !read)} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5">
+              <span role="menu" data-menu="notification" className="card-pop-in parchment absolute right-0 top-full z-30 mt-1 flex w-48 flex-col overflow-hidden rounded-xl shadow-xl" style={{ borderRadius: 12 }}>
+                <button type="button" role="menuitem" data-mi="read" onClick={() => setRead(n, !read)} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5">
                   {read ? "Mark as unread" : "Mark as read"}
                 </button>
                 <button
                   type="button"
                   role="menuitem"
+                  data-mi="snooze"
                   onClick={() => {
                     setMenuFor(null);
                     setSnoozing(n.id);
@@ -265,6 +266,7 @@ export function NotificationList({
                 <button
                   type="button"
                   role="menuitem"
+                  data-mi="delete"
                   onClick={() => remove(n)}
                   className="relative z-[1] min-h-11 border-t px-4 text-left text-[15px] hover:bg-black/5"
                   style={{ borderColor: "rgba(139,112,64,.25)", color: "var(--t-warn)" }}

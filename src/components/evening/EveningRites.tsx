@@ -455,11 +455,12 @@ export function EveningRites({
           )}
         </span>
         {menuFor === r.id && !overlay && (
-          <div data-rite-menu role="menu" className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 190 }}>
+          <div data-rite-menu data-menu="rite" role="menu" className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 190 }}>
             {!special && (
               <button
                 type="button"
                 role="menuitem"
+                data-mi="edit"
                 onClick={() => {
                   setMenuFor(null);
                   setEditing(r);
@@ -472,7 +473,7 @@ export function EveningRites({
                 Edit
               </button>
             )}
-            <button type="button" role="menuitem" onClick={() => setAwayFor(r.id, "skip")} className="relative z-[1] flex min-h-11 items-center gap-2.5 border-t px-4 text-left text-[15px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
+            <button type="button" role="menuitem" data-mi="skip" onClick={() => setAwayFor(r.id, "skip")} className="relative z-[1] flex min-h-11 items-center gap-2.5 border-t px-4 text-left text-[15px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
               <span aria-hidden className="w-4 text-center">⤼</span>
               Skip tonight
             </button>
@@ -480,6 +481,7 @@ export function EveningRites({
               <button
                 type="button"
                 role="menuitem"
+                data-mi="delete"
                 onClick={() => {
                   setMenuFor(null);
                   remove(r);

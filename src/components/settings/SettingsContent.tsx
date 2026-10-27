@@ -27,7 +27,7 @@ import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import { CelebrationSettings, FabSettings } from "@/components/settings/CelebrationSettings";
 import { QuestEditorLayoutSettings } from "@/components/settings/QuestEditorLayoutSettings";
-import { QuestMenuSettings } from "@/components/settings/QuestMenuSettings";
+import { MenusSettings } from "@/components/settings/MenuLayoutSettings";
 import { EveningButtonFxSettings, LoadingSettings, VictoriesHeaderSettings } from "@/components/settings/VisualFxSettings";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { isAdmin, countUnreviewed } from "@/lib/data/feedback";
@@ -439,13 +439,6 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
                 </p>
                 <QuestEditorLayoutSettings />
               </div>
-              <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
-                <h4 className={`m-0 mb-1 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>The quest card&rsquo;s ⋯ menu</h4>
-                <p className="mb-2 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-                  Put the items in your order, and hide the ones you don&rsquo;t use.
-                </p>
-                <QuestMenuSettings />
-              </div>
               <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
                 Saved on this device.
               </p>
@@ -453,6 +446,12 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </SettingsRow>
           </SectionItem>
 
+
+          <SectionItem id="menus">
+          <SettingsRow theme={profile.theme} label="Menus" rightLabel="Order · hide items" icon={<span style={{ fontSize: 14 }}>☰</span>}>
+            <MenusSettings isAdventure={isAdventure} />
+          </SettingsRow>
+          </SectionItem>
 
           <SectionItem id="notifications">
           <SettingsRow

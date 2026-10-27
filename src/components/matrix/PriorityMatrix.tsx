@@ -1173,6 +1173,7 @@ function ContextMenu({
       <div className="fixed inset-0 z-[57]" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
       <div
         role="menu"
+        data-menu="matrix"
         className={`card-pop-in fixed z-[58] flex flex-col overflow-hidden rounded-xl py-1 shadow-2xl ${theme === "adventure" ? "parchment" : ""}`}
         style={{ left, top, width, background: theme === "adventure" ? "var(--t-panel-2)" : "var(--t-card)", border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}
       >
@@ -1184,6 +1185,7 @@ function ContextMenu({
             key={r.a}
             type="button"
             role="menuitem"
+            data-mi={r.a}
             onClick={() => onPick(r.a)}
             className="relative z-[1] flex min-h-11 flex-col justify-center px-3.5 py-1.5 text-left hover:bg-black/5"
             style={{ color: r.a === "trash" ? "var(--t-warn)" : undefined }}

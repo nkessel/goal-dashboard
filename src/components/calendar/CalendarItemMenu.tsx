@@ -69,17 +69,18 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
 
   if (editing) return <EditTaskModal task={editing} theme={theme} onClose={() => (setEditing(null), onClose())} />;
   return createPortal(
-    <div ref={ref} role="menu" className="parchment fixed z-[80] flex flex-col overflow-hidden py-1" style={{ left, top, width: W, borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 30px rgba(0,0,0,.35)" }}>
+    <div ref={ref} role="menu" data-menu="calendar-item" className="parchment fixed z-[80] flex flex-col overflow-hidden py-1" style={{ left, top, width: W, borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 30px rgba(0,0,0,.35)" }}>
       {mode === "menu" ? (
         <>
           {target.kind === "task" && (
             <>
-              <button type="button" role="menuitem" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setEditing(target.task)}>
+              <button type="button" role="menuitem" data-mi="open" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setEditing(target.task)}>
                 Open quest
               </button>
               <button
                 type="button"
                 role="menuitem"
+                data-mi="unschedule"
                 className={item}
                 style={{ color: "var(--t-ink)" }}
                 disabled={pending}
@@ -97,15 +98,15 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
           )}
           {target.kind === "event" && (
             <>
-              <button type="button" role="menuitem" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "edit" } })), onClose())}>
+              <button type="button" role="menuitem" data-mi="edit" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "edit" } })), onClose())}>
                 Edit
               </button>
-              <button type="button" role="menuitem" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "quest" } })), onClose())}>
+              <button type="button" role="menuitem" data-mi="quest" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "quest" } })), onClose())}>
                 {theme === "adventure" ? "Turn into a quest" : "Turn into a task"}
               </button>
             </>
           )}
-          <button type="button" role="menuitem" className={`${item} flex items-center gap-2 border-t`} style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("followup")}>
+          <button type="button" role="menuitem" data-mi="followup" className={`${item} flex items-center gap-2 border-t`} style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("followup")}>
             {/* eslint-disable-next-line @next/next/no-img-element -- follow-up icon */}
             <img src="/design/icon-followup.svg" alt="" width={20} height={20} />
             Schedule a follow-up quest
