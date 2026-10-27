@@ -1659,6 +1659,22 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 .owl-say {
   animation: toucan-wisdom-in 0.25s cubic-bezier(.2,.8,.3,1.2) both;
 }
+/* The speech bubble's tail, pointing back at the bird (below the bubble, or above it when the bubble sits under its feet). */
+.owl-say-tail {
+  position: absolute;
+  left: var(--tail-x, 50%);
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  background: var(--tail-bg);
+  border: inherit;
+  border-color: var(--tail-border);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.owl-say-wrap[data-side="above"] .owl-say-tail,
+.owl-say-wrap:not([data-side]) .owl-say-tail { bottom: -7px; border-top: 0; border-left: 0; }
+.owl-say-wrap[data-side="below"] .owl-say-tail { top: -7px; border-bottom: 0; border-right: 0; }
 .toucan-spirit { animation: none; }
 @keyframes toucan-hover {
   0%, 100% { transform: translateY(0); }

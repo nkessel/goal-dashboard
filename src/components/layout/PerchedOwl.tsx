@@ -293,6 +293,23 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     b.style.transform = fits
       ? `translate3d(${x.toFixed(1)}px, ${above.toFixed(1)}px, 0) translate(-50%, -100%)`
       : `translate3d(${x.toFixed(1)}px, ${(p.y + 10).toFixed(1)}px, 0) translate(-50%, 0)`;
+    // The tail points back at the bird, wherever the bubble had to sit.
+    b.dataset.side = fits ? "above" : "below";
+    b.style.setProperty("--tail-x", `calc(50% + ${(p.x - x).toFixed(1)}px)`);
+  }
+  /** A reminder (words with buttons) is showing: it stays put through a drag. */
+  const reminderUp = () => !!sayActions && sayActions.for === say && !!say;
+  // Carrying the bubble carries the bird (and the bubble with it); the spot is remembered.
+  const bubbleDrag = useRef<{ x0: number; y0: number; offX: number; offY: number; moving: boolean } | null>(null);
+  function rememberSpot() {
+    if (!pos.current) return;
+    at.current = -1;
+    try {
+      window.localStorage.setItem("owl-perch", "-1");
+      window.localStorage.setItem("owl-spot", JSON.stringify({ fx: pos.current.x / window.innerWidth, fy: pos.current.y / window.innerHeight }));
+    } catch {
+      /* storage unavailable */
+    }
   }
   function speakBrief(text: string, ms: number | null, actions: { label: string; run: () => void; secret?: boolean }[] | null = null) {
     if (sayTimer.current) clearTimeout(sayTimer.current);
@@ -312,8 +329,17 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
       if (sayTimer.current) clearTimeout(sayTimer.current);
       setSay(null);
     };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (sayTimer.current) clearTimeout(sayTimer.current);
+      setSay(null);
+    };
     document.addEventListener("pointerdown", away);
-    return () => document.removeEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
   }, [say]);
 
   useEffect(() => {
@@ -604,7 +630,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             setWisdom(null);
             setDragging(true);
             setPhase("flying");
-            if (spirit) {
+            if (spirit && !reminderUp()) {
               flewWise.current = Math.random() < 0.35;
               speakBrief(flewWise.current ? pick("wise", WISDOM).replaceAll("{name}", addressOf(name)) : pick("fly", SAY_FLYING), null);
             }
@@ -655,7 +681,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             put(pos.current);
             setPhase("landing");
             setTimeout(() => setPhase("perched"), 260);
-            if (spirit) {
+            if (spirit && !reminderUp()) {
               // Wisdom shared in flight stays a moment; otherwise a landing line.
               if (flewWise.current && say) speakBrief(say, 4000);
               else speakBrief(pick("land", SAY_LANDING), 2200);
@@ -674,7 +700,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
           markTab(null);
           setDragging(false);
           setPhase("perched");
-          setSay(null);
+          if (!reminderUp()) setSay(null);
           endHold();
         }}
         onContextMenu={(e) => e.preventDefault()}
@@ -711,16 +737,58 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         </div>
       </button>
       {say && (
-        <div ref={sayRef} role="status" className={`fixed left-0 top-0 z-[46] ${sayActions?.for === say ? "" : "pointer-events-none"}`}>
+        <div
+          ref={sayRef}
+          role="status"
+          className={`owl-say-wrap fixed left-0 top-0 z-[46] ${sayActions?.for === say ? "touch-none" : "pointer-events-none"}`}
+          style={{ "--tail-bg": spirit ? "#0c2427" : "#fbf5e6", "--tail-border": spirit ? "rgba(140,240,220,.55)" : "#b39a6a" } as React.CSSProperties}
+          onPointerDown={(e) => {
+            if (!pos.current || e.button > 0 || (e.target as HTMLElement).closest("button")) return;
+            bubbleDrag.current = { x0: e.clientX, y0: e.clientY, offX: e.clientX - pos.current.x, offY: e.clientY - pos.current.y, moving: false };
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            const d = bubbleDrag.current;
+            if (!d) return;
+            if (!d.moving && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
+            d.moving = true;
+            const x = Math.max(OWL_W / 2, Math.min(window.innerWidth - OWL_W / 2, e.clientX - d.offX));
+            const y = Math.max(OWL_H, Math.min(window.innerHeight - 4, e.clientY - d.offY));
+            put({ x, y });
+          }}
+          onPointerUp={(e) => {
+            const d = bubbleDrag.current;
+            bubbleDrag.current = null;
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+            if (d?.moving) rememberSpot();
+          }}
+          onPointerCancel={() => (bubbleDrag.current = null)}
+        >
           <div
             key={say}
-            className="owl-say relative w-max max-w-[260px] rounded-2xl px-3 py-1.5 text-center text-[14.5px] font-medium italic leading-snug"
+            className={`owl-say relative w-max max-w-[260px] rounded-2xl py-1.5 text-center text-[14.5px] font-medium italic leading-snug ${sayActions?.for === say ? "cursor-grab pl-3 pr-7" : "px-3"}`}
             style={
               spirit
                 ? { background: "linear-gradient(180deg, rgba(14,38,40,.94), rgba(8,22,26,.96))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.35), 0 4px 12px rgba(0,0,0,.45)" }
                 : { background: "rgba(251,245,230,.97)", border: "1.5px solid #b39a6a", color: "#2a1c10", boxShadow: "0 4px 12px rgba(0,0,0,.35)" }
             }
           >
+            <span aria-hidden className="owl-say-tail" />
+            {sayActions?.for === say && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (sayTimer.current) clearTimeout(sayTimer.current);
+                  setSay(null);
+                }}
+                aria-label="Close"
+                title="Close"
+                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full not-italic leading-none"
+                style={{ color: spirit ? "rgba(232,255,248,.75)" : "#6b5631", fontSize: 16 }}
+              >
+                ×
+              </button>
+            )}
             {say}
             {/* "Talk with me": a shining star on the bubble's corner, a few words, or a secret glint. */}
             {sayActions?.for === say &&
