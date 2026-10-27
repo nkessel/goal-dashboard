@@ -239,6 +239,8 @@ export function QuestEditorDialog({
   const initialBoard = task ? (task.board_id ?? null) : (create?.boardId ?? null);
   const [boardId, setBoardId] = useState<string | null>(initialBoard);
   const [boardOptions, setBoardOptions] = useState<{ id: string; label: string }[] | null>(null);
+  // The board's own name (the last part of "Parent › Child"), for the avatar's tag.
+  const boardLabel = boardId ? (boardOptions?.find((o) => o.id === boardId)?.label.split(" › ").pop() ?? null) : null;
   const [alsoOn, setAlsoOn] = useState<string[]>(task?.also_on ?? []);
   const [stepMenu, setStepMenu] = useState<string | null>(null);
   const [shareStep, setShareStep] = useState<string | null>(null);
@@ -303,6 +305,8 @@ export function QuestEditorDialog({
   const [stepsDirty, setStepsDirty] = useState(false);
   const [newStep, setNewStep] = useState("");
   const [addingStep, setAddingStep] = useState(false);
+  // The steps list folds away under its header.
+  const [stepsFolded, setStepsFolded] = useState(false);
   const [stepXpPop, setStepXpPop] = useState<number | null>(null);
   const newStepRef = useRef<HTMLInputElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -1058,7 +1062,8 @@ export function QuestEditorDialog({
                       <img src="/design/ui-calendar.png" alt="" width={15} height={15} className="h-[15px] w-[15px]" />
                       {hasSchedule ? "Scheduled" : "Add to calendar"}
                     </button>
-                    {!stepsUnavailable && !isCompleted && steps !== null && (
+                    {/* Once there are steps, their own "Add steps" button does this. */}
+                    {!stepsUnavailable && !isCompleted && steps !== null && steps.length === 0 && !addingStep && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1069,98 +1074,10 @@ export function QuestEditorDialog({
                         style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
                       >
                         <StepsGlyph size={15} />
-                        {steps.length ? "Add more tasks" : "Add tasks"}
+                        Add tasks
                       </button>
                     )}
                   </div>
-                </div>
-              )}
-      </>
-    ),
-    sequence: (
-      <>
-              {/* Sequence: a fine setting, folded away until wanted. */}
-              {!doingNow && !review && (
-                <div className="flex flex-col gap-1.5">
-                  <button type="button" onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))} aria-expanded={task ? undefined : seqOpen} className="flex min-h-8 items-center gap-1.5 self-start text-left" title="Quests before or after this one, or its steps as quests of their own">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: seqOpen && !task ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
-                      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span className="text-[14px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                      {task ? ((task.behind?.length ?? 0) > 0 ? "Sequence" : "Create a sequence") : seqLinks.length ? "Sequence" : "Create a sequence"}
-                    </span>
-                    <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                      {task ? ((task.behind?.length ?? 0) > 0 ? `${task.behind!.length} waiting after this` : "") : seqLinks.length ? `${seqLinks.length} linked` : ""}
-                    </span>
-                  </button>
-                  {!task && seqOpen && (
-                    <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
-                      <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                        A quest after another stays stacked out of sight until that one is done.
-                      </p>
-                      {seqLinks.length > 0 && (
-                        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px]">
-                          {seqLinks.map((l, i) => (
-                            <li key={i} className="flex min-h-8 items-center gap-2">
-                              <span className="shrink-0 text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
-                                {l.rel === "after" ? "Comes after" : "Then"}
-                              </span>
-                              <span className="min-w-0 flex-1 truncate">
-                                {l.pick.id ? "" : "＋ "}
-                                {l.pick.title}
-                              </span>
-                              <button type="button" onClick={() => setSeqLinks((ls) => ls.filter((_, j) => j !== i))} aria-label={`Remove ${l.pick.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-                                ×
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {seqAdding ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[12.5px] font-semibold">{seqAdding === "after" ? "This quest comes after…" : "After this quest comes…"}</span>
-                          <QuestPicker
-                            autoFocus
-                            exclude={seqLinks.map((l) => l.pick.id).filter(Boolean) as string[]}
-                            onPick={(p) => {
-                              setSeqLinks((ls) => [...ls, { rel: seqAdding, pick: p }]);
-                              setSeqAdding(null);
-                            }}
-                          />
-                          <button type="button" onClick={() => setSeqAdding(null)} className="self-start text-[12.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          <button type="button" onClick={() => setSeqAdding("after")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
-                            ↑ Comes after a quest
-                          </button>
-                          <button type="button" onClick={() => setSeqAdding("before")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
-                            ↓ Add what comes next
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {task && seqDialog && (
-                    <SequenceDialog
-                      taskId={task.id}
-                      title={title}
-                      isAdventure={isAdventure}
-                      onClose={() => setSeqDialog(false)}
-                      onStepsMoved={() => {
-                        setStepsDirty(false);
-                        setStepsReload((n) => n + 1);
-                      }}
-                    />
-                  )}
-                </div>
-              )}
-      </>
-    ),
-    scheduling: (
-      <>
               {/* Scheduling: due date, a calendar slot, the scheduling list, the matrix and "not actionable yet" — folded away until wanted */}
               {!doingNow && (schedOpen || hasSchedule) && (
                 <div ref={schedRef} className="flex flex-col gap-2">
@@ -1314,6 +1231,101 @@ export function QuestEditorDialog({
                   )}
                 </div>
               )}
+
+                    </div>
+                  )}
+                </div>
+              )}
+                </div>
+              )}
+      </>
+    ),
+    sequence: (
+      <>
+              {/* Sequence: a fine setting, folded away until wanted. */}
+              {!doingNow && !review && (
+                <div className="flex flex-col gap-1.5">
+                  <button type="button" onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))} aria-expanded={task ? undefined : seqOpen} className="flex min-h-8 items-center gap-1.5 self-start text-left" title="Quests before or after this one, or its steps as quests of their own">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: seqOpen && !task ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
+                      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="text-[14px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                      {task ? ((task.behind?.length ?? 0) > 0 ? "Sequence" : "Create a sequence") : seqLinks.length ? "Sequence" : "Create a sequence"}
+                    </span>
+                    <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                      {task ? ((task.behind?.length ?? 0) > 0 ? `${task.behind!.length} waiting after this` : "") : seqLinks.length ? `${seqLinks.length} linked` : ""}
+                    </span>
+                  </button>
+                  {!task && seqOpen && (
+                    <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
+                      <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                        A quest after another stays stacked out of sight until that one is done.
+                      </p>
+                      {seqLinks.length > 0 && (
+                        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px]">
+                          {seqLinks.map((l, i) => (
+                            <li key={i} className="flex min-h-8 items-center gap-2">
+                              <span className="shrink-0 text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+                                {l.rel === "after" ? "Comes after" : "Then"}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate">
+                                {l.pick.id ? "" : "＋ "}
+                                {l.pick.title}
+                              </span>
+                              <button type="button" onClick={() => setSeqLinks((ls) => ls.filter((_, j) => j !== i))} aria-label={`Remove ${l.pick.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+                                ×
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {seqAdding ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[12.5px] font-semibold">{seqAdding === "after" ? "This quest comes after…" : "After this quest comes…"}</span>
+                          <QuestPicker
+                            autoFocus
+                            exclude={seqLinks.map((l) => l.pick.id).filter(Boolean) as string[]}
+                            onPick={(p) => {
+                              setSeqLinks((ls) => [...ls, { rel: seqAdding, pick: p }]);
+                              setSeqAdding(null);
+                            }}
+                          />
+                          <button type="button" onClick={() => setSeqAdding(null)} className="self-start text-[12.5px] underline" style={{ color: "var(--t-ink-soft)" }}>
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          <button type="button" onClick={() => setSeqAdding("after")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
+                            ↑ Comes after a quest
+                          </button>
+                          <button type="button" onClick={() => setSeqAdding("before")} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px dashed rgba(139,112,64,.6)" }}>
+                            ↓ Add what comes next
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {task && seqDialog && (
+                    <SequenceDialog
+                      taskId={task.id}
+                      title={title}
+                      isAdventure={isAdventure}
+                      onClose={() => setSeqDialog(false)}
+                      onStepsMoved={() => {
+                        setStepsDirty(false);
+                        setStepsReload((n) => n + 1);
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+      </>
+    ),
+    // Shown right under the "Scheduled" button (in Time to complete), not as a part of its own.
+    scheduling: null,
+    matrix: (
+      <>
               {/* Plot on the matrix, with "not actionable yet" beside it */}
               {task && !isCompleted && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -1336,11 +1348,6 @@ export function QuestEditorDialog({
                   </label>
                 </div>
               )}
-
-                    </div>
-                  )}
-                </div>
-              )}
       </>
     ),
     steps: (
@@ -1350,7 +1357,12 @@ export function QuestEditorDialog({
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2.5">
                     <StepsGlyph />
-                    <span className={labelCls}>Steps</span>
+                    <button type="button" onClick={() => setStepsFolded((f) => !f)} aria-expanded={!stepsFolded} className="flex items-center gap-1.5" title={stepsFolded ? "Show the steps" : "Fold the steps away"}>
+                      <span className={labelCls}>Steps</span>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: stepsFolded ? undefined : "rotate(90deg)", color: "var(--t-ink-soft)" }}>
+                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
                     {steps && steps.length > 0 && (
                       <span className="flex min-w-0 flex-1 items-center gap-2 text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
                         {stepsDone}/{stepsLive}
@@ -1368,7 +1380,7 @@ export function QuestEditorDialog({
                     {!isCompleted && steps !== null && !addingStep && (
                       <button
                         type="button"
-                        onClick={() => setAddingStep(true)}
+                        onClick={() => (setAddingStep(true), setStepsFolded(false))}
                         className="hover-glow ml-auto flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-bold"
                         style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", border: isAdventure ? "1px solid #8a6116" : undefined, boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
                       >
@@ -1376,7 +1388,7 @@ export function QuestEditorDialog({
                       </button>
                     )}
                   </div>
-                  {steps === null && (task?.steps_total ?? 0) > 0 ? (
+                  {stepsFolded ? null : steps === null && (task?.steps_total ?? 0) > 0 ? (
                     // Loading: hold the steps' place so the editor doesn't jump when they arrive.
                     <ul className="m-0 flex list-none flex-col p-0 pl-[22px]" aria-busy="true" aria-label="Loading steps">
                       {Array.from({ length: task?.steps_total ?? 0 }).map((_, i) => (
@@ -1943,7 +1955,8 @@ export function QuestEditorDialog({
     showsIn: !doingNow && !isCompleted && !fixedSchedule,
     time: !doingNow,
     sequence: !doingNow && !review,
-    scheduling: !doingNow && (schedOpen || hasSchedule),
+    scheduling: false,
+    matrix: !!task && !isCompleted,
     steps: !doingNow && !stepsUnavailable,
     xp: true,
     stats: !doingNow,
@@ -1960,7 +1973,6 @@ export function QuestEditorDialog({
     template: !!task && !review && !!title.trim(),
   };
   const foldedParts = layout.order.filter((k) => layout.folded.includes(k) && partShown[k]);
-  const firstFolded = layout.order.findIndex((k) => layout.folded.includes(k) && partShown[k]);
   const advancedHeader = foldedParts.length > 0 && (
     <button type="button" onClick={() => setAdvOpen((o) => !o)} aria-expanded={advOpen} className="flex min-h-9 items-center gap-1.5 border-t pt-2 text-left" style={{ borderColor: "rgba(139,112,64,.25)" }}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: advOpen ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
@@ -2072,7 +2084,13 @@ export function QuestEditorDialog({
 
           {/* Portrait left, title + description right — like the quest card */}
           <div className="flex items-start gap-3">
-            <div className="flex shrink-0 flex-col items-center gap-1">
+            <div className="relative flex shrink-0 flex-col items-center gap-1">
+              {/* The board, on the avatar like the quest card's tag. */}
+              {boardLabel && (
+                <span className="pointer-events-none absolute -left-1.5 -top-1.5 z-[2] max-w-[84px] truncate rounded-md px-1.5 py-[1px] text-[11px] font-semibold" style={{ background: "#f6ecd2", border: "1px solid #a58c66", color: "#3b2a14", boxShadow: "0 1px 2px rgba(0,0,0,.25)" }} title={boardLabel}>
+                  {boardLabel}
+                </span>
+              )}
               {task ? (
                 <>
                   <IconPicker
@@ -2245,15 +2263,12 @@ export function QuestEditorDialog({
           )}
           {toolbarHost && toolbarButtons && createPortal(toolbarButtons, toolbarHost)}
 
-          {layout.order.map((k, i) => {
-            const folded = layout.folded.includes(k);
-            return (
-              <Fragment key={k}>
-                {i === firstFolded && advancedHeader}
-                {(!folded || advOpen) && partNodes[k]}
-              </Fragment>
-            );
-          })}
+          {/* Shown parts first (in your order), then the Advanced settings fold with the rest. */}
+          {layout.order.filter((k) => !layout.folded.includes(k)).map((k) => (
+            <Fragment key={k}>{partNodes[k]}</Fragment>
+          ))}
+          {advancedHeader}
+          {advOpen && layout.order.filter((k) => layout.folded.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)}
           {pickingSlot && (
             <SlotPickerDialog
               durationMinutes={Math.max(15, Number(estimate) || 30)}

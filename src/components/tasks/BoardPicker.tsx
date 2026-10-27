@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 
@@ -39,7 +39,7 @@ export function BoardPicker({
   const q = query.trim().toLowerCase();
   const all = options ?? [];
   // Boards inside boards fold away under their parent until opened (the current board's path starts open).
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
+  const pathOpen = () => {
     const cur = options?.find((o) => o.id === value)?.label;
     const open = new Set<string>();
     if (cur) {
@@ -47,7 +47,15 @@ export function BoardPicker({
       for (let i = 1; i < p.length; i++) open.add(p.slice(0, i).join(" › "));
     }
     return open;
-  });
+  };
+  const [expanded, setExpanded] = useState<Set<string>>(pathOpen);
+  // Opening the list jumps to the board the quest is on.
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(() => listRef.current?.querySelector("[data-selected]")?.scrollIntoView({ block: "center" }));
+    return () => cancelAnimationFrame(raf);
+  }, [open]);
   const hasKids = (label: string) => all.some((o) => o.label.startsWith(`${label} › `));
   const visible = (label: string) => {
     const p = label.split(" › ");
@@ -82,6 +90,7 @@ export function BoardPicker({
         onClick={() => {
           setQuery("");
           setNewName(null);
+          setExpanded((x) => new Set([...x, ...pathOpen()]));
           setOpen(true);
         }}
         aria-label={`Quest board: ${label}`}
@@ -129,7 +138,7 @@ export function BoardPicker({
                   />
                 </div>
               )}
-              <ul className="relative z-[1] m-0 flex min-h-0 flex-1 list-none flex-col overflow-y-auto overscroll-contain px-2 pb-2">
+              <ul ref={listRef} className="relative z-[1] m-0 flex min-h-0 flex-1 list-none flex-col overflow-y-auto overscroll-contain px-2 pb-2">
                 {!q && (
                   <PickRow selected={value === null} onPick={() => (onChange(null), setOpen(false))} depth={0}>
                     <span style={{ color: "var(--t-ink-soft)" }}>No board</span>
@@ -210,7 +219,7 @@ export function BoardPicker({
 
 function PickRow({ selected, onPick, depth, children, caret = null }: { selected: boolean; onPick: () => void; depth: number; children: React.ReactNode; caret?: { open: boolean; toggle: () => void } | null }) {
   return (
-    <li className="flex items-center">
+    <li className="flex items-center" data-selected={selected || undefined}>
       {caret ? (
         <button type="button" onClick={caret.toggle} aria-expanded={caret.open} aria-label={caret.open ? "Hide the boards inside" : "Show the boards inside"} className="flex h-11 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-black/[.05]" style={{ marginLeft: depth * 18 }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: caret.open ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>

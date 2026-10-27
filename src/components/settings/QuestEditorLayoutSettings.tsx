@@ -29,7 +29,7 @@ export function QuestEditorLayoutSettings() {
         }}
       />
       <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-        The Advanced settings header sits where the first folded part is. A shown part placed after it stays in view just under the header, like Tags.
+        Shown parts come first, in this order; the Advanced parts wait under their fold below them.
         {!isDefault && (
           <>
             {" "}

@@ -22,34 +22,38 @@ export type EditorPart =
   | "standsFor"
   | "alsoOn"
   | "private"
-  | "template";
+  | "template"
+  /** "Plot on the Priority Matrix", with "Not actionable yet". */
+  | "matrix";
 
+// Scheduling opens right under its "Add to calendar" / "Scheduled" button, so it isn't placed on its own.
 export const EDITOR_PARTS: { key: EditorPart; label: string }[] = [
   { key: "showsIn", label: "Shows in (Today, Additional, Backlog)" },
-  { key: "time", label: "Time to complete" },
+  { key: "time", label: "Time to complete and scheduling" },
   { key: "sequence", label: "Sequence" },
-  { key: "scheduling", label: "Scheduling" },
   { key: "steps", label: "Steps" },
   { key: "xp", label: "XP and coins" },
-  { key: "stats", label: "Character stats" },
   { key: "tags", label: "Tags" },
+  { key: "board", label: "Board" },
+  { key: "stats", label: "Character stats" },
   { key: "progress", label: "Progress" },
   { key: "importance", label: "Importance" },
   { key: "urgency", label: "Urgency" },
   { key: "difficulty", label: "Difficulty" },
   { key: "energy", label: "Energy boost" },
-  { key: "board", label: "Board" },
+  { key: "matrix", label: "Plot on the Priority Matrix" },
   { key: "standsFor", label: "Stands for the board's assignment" },
   { key: "alsoOn", label: "Also on other boards" },
   { key: "private", label: "Private quest" },
   { key: "template", label: "Save as a template" },
 ];
 
-export type EditorLayout = { order: EditorPart[]; folded: EditorPart[] };
+export type EditorLayout = { order: EditorPart[]; folded: EditorPart[]; v?: number };
 
 export const DEFAULT_EDITOR_LAYOUT: EditorLayout = {
   order: EDITOR_PARTS.map((p) => p.key),
-  folded: ["stats", "progress", "importance", "urgency", "difficulty", "energy", "board", "standsFor", "alsoOn", "private", "template"],
+  folded: ["stats", "progress", "importance", "urgency", "difficulty", "energy", "matrix", "standsFor", "alsoOn", "private", "template"],
+  v: 2,
 };
 
 const KEY = "quest-editor-layout";
@@ -61,8 +65,10 @@ function clean(raw: unknown): EditorLayout {
   const order = (Array.isArray(r.order) ? r.order : []).filter((k): k is EditorPart => known.has(k as EditorPart));
   // Parts added since the layout was saved go where they sit by default.
   for (const [i, p] of DEFAULT_EDITOR_LAYOUT.order.entries()) if (!order.includes(p)) order.splice(Math.min(i, order.length), 0, p);
-  const folded = Array.isArray(r.folded) ? r.folded.filter((k): k is EditorPart => known.has(k as EditorPart)) : DEFAULT_EDITOR_LAYOUT.folded;
-  return { order: [...new Set(order)], folded: [...new Set(folded)] };
+  let folded = Array.isArray(r.folded) ? r.folded.filter((k): k is EditorPart => known.has(k as EditorPart)) : DEFAULT_EDITOR_LAYOUT.folded;
+  // Layouts saved before v2: the board comes out of Advanced, and matrix plotting goes in.
+  if ((r.v ?? 1) < 2) folded = [...folded.filter((k) => k !== "board"), "matrix"];
+  return { order: [...new Set(order)], folded: [...new Set(folded)], v: 2 };
 }
 
 let cache: { raw: string | null; value: EditorLayout } | null = null;

@@ -30,6 +30,7 @@ function dawnHeading(dayKey: string) {
 }
 
 const BACK_KEY = "welcome-back-at";
+const OPEN_KEY = "daily-login-open";
 
 type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<ReturnType<typeof welcomeContextAction>> };
 
@@ -49,9 +50,12 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     // The app's day turns over at 5:30am local time.
     const today = eveningDayKey();
     let first = false;
+    // The day's greeting keeps coming back (on later visits too) until you close it yourself.
+    let unclosed = false;
     try {
       first = window.localStorage.getItem("daily-login") !== today;
       if (first) window.localStorage.setItem("daily-login", today);
+      unclosed = !first && window.localStorage.getItem(OPEN_KEY) === today;
     } catch {
       /* storage unavailable — the server still guards against double awards */
     }
@@ -67,9 +71,22 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     try {
       backDue = !!hours && readStyle().returnCheckIn && Date.now() - Number(window.localStorage.getItem(BACK_KEY) || 0) >= away;
     } catch {}
-    if (!first && !backDue) return;
+    if (!first && !backDue && !unclosed) return;
+    const showDay = (award: WelcomeAward | null, ctx: Shown["ctx"]) => {
+      try {
+        window.localStorage.setItem(OPEN_KEY, today);
+      } catch {}
+      setShown({ mode: "day", award, ctx });
+    };
     (async () => {
       const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[] }));
+      if (unclosed) {
+        const ctx = await ctxP;
+        if (!live) return;
+        markBack();
+        showDay(null, ctx);
+        return;
+      }
       if (first) {
         const r = await dailyCheckInAction(new Date().getTimezoneOffset()).catch(() => null);
         let award: WelcomeAward | null = null;
@@ -93,7 +110,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
         const ctx = await ctxP;
         if (!live) return;
         markBack();
-        setShown({ mode: "day", award, ctx });
+        showDay(award, ctx);
         if (award) router.refresh();
         return;
       }
@@ -130,7 +147,13 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       due={shown.ctx.tasks}
       suggestions={shown.ctx.suggestions}
       fx={fx}
-      onClose={() => (setShown(null), router.refresh())}
+      onClose={() => {
+        try {
+          window.localStorage.removeItem(OPEN_KEY);
+        } catch {}
+        setShown(null);
+        router.refresh();
+      }}
     />
   );
 }
