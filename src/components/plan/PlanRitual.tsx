@@ -62,6 +62,7 @@ const FATES: { k: SeedFate; icon: string; label: string; hint: string }[] = [
 const STEPS: Record<Kind, { key: string; title: string; blurb: string }[]> = {
   week: [
     { key: "look", title: "Look back", blurb: "What happened this past week, and what you learned." },
+    { key: "wheel", title: "Wheel of life", blurb: "A quick check-in: how does each part of your life feel this week?" },
     { key: "sweep", title: "Empty your head", blurb: "Write down everything that's on your mind. One thing per line." },
     { key: "sort", title: "Sort the haul", blurb: "Decide what each thing is. Nothing has to be done yet — just put it where it belongs." },
     { key: "review", title: "Get current", blurb: "Quests that are overdue or have sat untouched. Keep, schedule, park or let go." },

@@ -130,6 +130,7 @@ export const PLANS: MenuDef[] = [
     hint: "The steps of Plan the week ahead.",
     items: [
       { key: "look", label: "Look back" },
+      { key: "wheel", label: "Wheel of life" },
       { key: "sweep", label: "Empty your head" },
       { key: "sort", label: "Sort the haul" },
       { key: "review", label: "Get current" },

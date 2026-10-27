@@ -50,7 +50,7 @@ export function PlanNudge({ kind, started, partner = "Mom" }: { kind: Kind; star
       : kind === "pair-mid"
         ? "Ten minutes: one win, what's next, what help you could use"
         : kind === "week"
-          ? "Look back, empty your head, pick 3 big rocks, put them on the calendar · +30 XP"
+          ? "Look back, check your wheel of life, empty your head, pick 3 big rocks · +30 XP"
           : "Life wheel, focus, outcomes and key dates · +60 XP";
   return (
     <Link href={href} className="hover-glow parchment parchment-framed flex items-center gap-3 rounded-2xl px-4 py-3">
