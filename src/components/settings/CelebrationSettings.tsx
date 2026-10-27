@@ -20,7 +20,12 @@ const SLIDERS: { k: NumKey; label: string; min: number; max: number; step: numbe
   { k: "fill", label: "XP fill time", min: 1, max: 6, step: 0.5, fmt: (v) => `${v.toFixed(1)}s` },
 ];
 
-export function CelebrationSettings() {
+/** Settings › Welcome Screen: when it opens, its greetings and lines, and what's on it. */
+export function WelcomeSettings() {
+  return <CelebrationSettings welcomeOnly />;
+}
+
+export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boolean }) {
   const [fx, setFx] = useState<FxSettings>(FX_DEFAULTS);
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState(false);
@@ -61,116 +66,10 @@ export function CelebrationSettings() {
   const pick = (on: boolean) => (on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" });
   const playBtn = "hover-glow flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold";
   const playStyle = { background: "linear-gradient(180deg,#3a2a14,#24190b)", color: "#f6dc8e", border: "1.5px solid #8a6c2c", boxShadow: "0 2px 5px rgba(0,0,0,.3)" };
-  return (
-    <div className="flex flex-col gap-2" style={{ color: "var(--t-ink)" }}>
-      <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-        How the app celebrates: finishing a quest, sending feedback, your progress, and how quickly it all plays. Each part opens on its own.
-      </p>
-
-      <Fold title="Finishing a quest" hint={fx.rewardStyle === "ceremony" ? "Ceremony" : "Classic"}>
-        <div role="radiogroup" aria-label="Reward animation" className="flex flex-wrap gap-1.5">
-          {(
-            [
-              ["classic", "Classic", "A short “Well done!” note"],
-              ["ceremony", "Ceremony", "Golden rays, a coin burst and your level bar filling"],
-            ] as const
-          ).map(([v, label, hint]) => (
-            <button key={v} type="button" role="radio" aria-checked={fx.rewardStyle === v} title={hint} onClick={() => update({ rewardStyle: v })} className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick(fx.rewardStyle === v)}>
-              <span className="text-[14px] font-bold">{label}</span>
-              <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
-                {hint}
-              </span>
-            </button>
-          ))}
-        </div>
-        <button type="button" onClick={() => setPreview(true)} className={`${playBtn} self-start`} style={playStyle}>
-          <Play /> Preview it
-        </button>
-        <Fold title="Magic dust (advanced)" hint="Sparkles around the card and portraits">
-          <label className="flex min-h-9 items-center gap-2.5 text-sm">
-            <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.fxAvatar} onChange={() => update({ fxAvatar: !fx.fxAvatar })} />
-            Dust from the avatars
-          </label>
-          <label className="flex min-h-9 items-center gap-2.5 text-sm">
-            <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.fxCard} onChange={() => update({ fxCard: !fx.fxCard })} />
-            Dust from the quest card border
-          </label>
-          {SLIDERS.map(({ k, label, min, max, step, fmt }) => (
-            <div key={k} className="flex flex-col gap-1">
-              <div className="flex justify-between text-sm">
-                <span>{label}</span>
-                <span className="font-semibold tabular-nums" style={{ color: "var(--t-gold-deep)" }}>{fmt(fx[k])}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button type="button" className={btn} style={btnStyle} aria-label={`Decrease ${label}`} onClick={() => nudge(k, -1, min, max, step)}>−</button>
-                <input type="range" className="min-w-0 flex-1 accent-[var(--t-gold-deep)]" min={min} max={max} step={step} value={fx[k]} aria-label={label} onChange={(e) => update({ [k]: parseFloat(e.target.value) })} />
-                <button type="button" className={btn} style={btnStyle} aria-label={`Increase ${label}`} onClick={() => nudge(k, 1, min, max, step)}>+</button>
-              </div>
-            </div>
-          ))}
-          <button type="button" onClick={() => update({ ...FX_DEFAULTS, feedbackStyle: fx.feedbackStyle, cardStyle: fx.cardStyle, pace: fx.pace, fabStyle: fx.fabStyle, welcomeHeading: fx.welcomeHeading, welcomeText: fx.welcomeText, welcomeLine: fx.welcomeLine, welcomeStreak: fx.welcomeStreak, welcomeBar: fx.welcomeBar })} className="hover-glow h-10 self-start rounded-full px-4 text-sm font-medium" style={btnStyle}>
-            Reset the dust
-          </button>
-        </Fold>
-      </Fold>
-
-      <Fold title="Sending feedback" hint={FEEDBACK_STYLES.find((f) => f.key === (fx.feedbackStyle ?? "quiet"))?.label ?? ""}>
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-          {FEEDBACK_STYLES.map((o) => {
-            const on = (fx.feedbackStyle ?? "quiet") === o.key;
-            return (
-              <li key={o.key} className="flex items-center gap-2">
-                <button type="button" role="radio" aria-checked={on} onClick={() => update({ feedbackStyle: o.key })} className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick(on)}>
-                  <span className="text-[14px] font-bold">{o.label}</span>
-                  <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
-                    {o.hint}
-                  </span>
-                </button>
-                <button type="button" onClick={() => playSent(o.key)} className={playBtn} style={playStyle} aria-label={`Preview ${o.label}`}>
-                  <Play /> Preview
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="mt-2 flex flex-col gap-1">
-          <span className="text-[13px] font-semibold">How long “Feedback submitted” stays</span>
-          <div role="radiogroup" aria-label="How long the Feedback submitted card stays" className="flex flex-wrap gap-1.5">
-            {FEEDBACK_HOLDS.map((h) => {
-              const on = (fx.feedbackHold ?? 2.2) === h.v;
-              return (
-                <button key={h.v} type="button" role="radio" aria-checked={on} onClick={() => update({ feedbackHold: h.v })} className="min-h-9 rounded-xl px-3 text-[13.5px] font-semibold" style={pick(on)}>
-                  {h.label}
-                  {h.v ? <span className="ml-1 text-[11.5px] font-normal opacity-75">{h.v}s</span> : null}
-                </button>
-              );
-            })}
-          </div>
-          <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-            Tap its × to close it sooner.
-          </span>
-        </div>
-      </Fold>
-
-      <Fold title="Progress" hint={(fx.cardStyle ?? "card") === "card" ? "Card" : "Banner"}>
-        <div role="radiogroup" aria-label="Progress style" className="flex flex-wrap gap-1.5">
-          {(
-            [
-              ["card", "Card", "A card in the middle, with confetti"],
-              ["banner", "Banner", "A slim banner slides down from the top"],
-            ] as const
-          ).map(([v, label, hint]) => (
-            <button key={v} type="button" role="radio" aria-checked={(fx.cardStyle ?? "card") === v} title={hint} onClick={() => update({ cardStyle: v })} className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick((fx.cardStyle ?? "card") === v)}>
-              <span className="text-[14px] font-bold">{label}</span>
-              <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
-                {hint}
-              </span>
-            </button>
-          ))}
-        </div>
-      </Fold>
-
-      <Fold title="The welcome screen" hint={backHours(fx) ? `First visit · then every ${backHours(fx)} h` : "Day's first visit"}>
+  // The welcome screen's settings have their own row in Settings.
+  if (welcomeOnly)
+    return (
+      <div className="flex flex-col gap-2" style={{ color: "var(--t-ink)" }}>
         <span className="text-[13px] font-semibold">When it opens</span>
         <p className="m-0 -mt-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
           On the day&rsquo;s first visit, with last night&rsquo;s sleep times. After that, a check-in (without sleep) once this long has passed since your last one:
@@ -291,6 +190,128 @@ export function CelebrationSettings() {
           <button type="button" onClick={() => openWelcome("back")} className={playBtn} style={playStyle}>
             <Play /> Preview: welcome back
           </button>
+        </div>
+      {welcomePreview && (
+        <WelcomeCard
+          mode={welcomePreview.mode}
+          heading={welcomePreview.mode === "day" ? (fx.welcomeHeading === "custom" && linesOf(fx.welcomeText).length ? linesOf(fx.welcomeText)[0] : fx.welcomeHeading === "dawn" ? "A new day dawns, adventurer" : "Huzzah! Here you are!") : backGreeting(fx, welcomePreview.key)}
+          award={welcomePreview.mode === "day" ? { xp: 10, streak: 8, coins: 2, fromPct: 40, toPct: 55, caption: "Level 4 · 1,960 / 2,500 XP to level 5" } : null}
+          line={lineForDay(new Date().toDateString(), linesOf(fx.welcomeOwnLines))}
+          metrics={welcomePreview.ctx.metrics}
+          lastCheckInAt={null}
+          due={welcomePreview.ctx.tasks}
+          fx={fx}
+          onClose={() => setWelcomePreview(null)}
+        />
+      )}
+      </div>
+    );
+  return (
+    <div className="flex flex-col gap-2" style={{ color: "var(--t-ink)" }}>
+      <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+        How the app celebrates: finishing a quest, sending feedback, your progress, and how quickly it all plays. Each part opens on its own.
+      </p>
+
+      <Fold title="Finishing a quest" hint={fx.rewardStyle === "ceremony" ? "Ceremony" : "Classic"}>
+        <div role="radiogroup" aria-label="Reward animation" className="flex flex-wrap gap-1.5">
+          {(
+            [
+              ["classic", "Classic", "A short “Well done!” note"],
+              ["ceremony", "Ceremony", "Golden rays, a coin burst and your level bar filling"],
+            ] as const
+          ).map(([v, label, hint]) => (
+            <button key={v} type="button" role="radio" aria-checked={fx.rewardStyle === v} title={hint} onClick={() => update({ rewardStyle: v })} className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick(fx.rewardStyle === v)}>
+              <span className="text-[14px] font-bold">{label}</span>
+              <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+                {hint}
+              </span>
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={() => setPreview(true)} className={`${playBtn} self-start`} style={playStyle}>
+          <Play /> Preview it
+        </button>
+        <Fold title="Magic dust (advanced)" hint="Sparkles around the card and portraits">
+          <label className="flex min-h-9 items-center gap-2.5 text-sm">
+            <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.fxAvatar} onChange={() => update({ fxAvatar: !fx.fxAvatar })} />
+            Dust from the avatars
+          </label>
+          <label className="flex min-h-9 items-center gap-2.5 text-sm">
+            <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.fxCard} onChange={() => update({ fxCard: !fx.fxCard })} />
+            Dust from the quest card border
+          </label>
+          {SLIDERS.map(({ k, label, min, max, step, fmt }) => (
+            <div key={k} className="flex flex-col gap-1">
+              <div className="flex justify-between text-sm">
+                <span>{label}</span>
+                <span className="font-semibold tabular-nums" style={{ color: "var(--t-gold-deep)" }}>{fmt(fx[k])}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" className={btn} style={btnStyle} aria-label={`Decrease ${label}`} onClick={() => nudge(k, -1, min, max, step)}>−</button>
+                <input type="range" className="min-w-0 flex-1 accent-[var(--t-gold-deep)]" min={min} max={max} step={step} value={fx[k]} aria-label={label} onChange={(e) => update({ [k]: parseFloat(e.target.value) })} />
+                <button type="button" className={btn} style={btnStyle} aria-label={`Increase ${label}`} onClick={() => nudge(k, 1, min, max, step)}>+</button>
+              </div>
+            </div>
+          ))}
+          <button type="button" onClick={() => update({ ...FX_DEFAULTS, feedbackStyle: fx.feedbackStyle, cardStyle: fx.cardStyle, pace: fx.pace, fabStyle: fx.fabStyle, welcomeHeading: fx.welcomeHeading, welcomeText: fx.welcomeText, welcomeLine: fx.welcomeLine, welcomeStreak: fx.welcomeStreak, welcomeBar: fx.welcomeBar })} className="hover-glow h-10 self-start rounded-full px-4 text-sm font-medium" style={btnStyle}>
+            Reset the dust
+          </button>
+        </Fold>
+      </Fold>
+
+      <Fold title="Sending feedback" hint={FEEDBACK_STYLES.find((f) => f.key === (fx.feedbackStyle ?? "quiet"))?.label ?? ""}>
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {FEEDBACK_STYLES.map((o) => {
+            const on = (fx.feedbackStyle ?? "quiet") === o.key;
+            return (
+              <li key={o.key} className="flex items-center gap-2">
+                <button type="button" role="radio" aria-checked={on} onClick={() => update({ feedbackStyle: o.key })} className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick(on)}>
+                  <span className="text-[14px] font-bold">{o.label}</span>
+                  <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+                    {o.hint}
+                  </span>
+                </button>
+                <button type="button" onClick={() => playSent(o.key)} className={playBtn} style={playStyle} aria-label={`Preview ${o.label}`}>
+                  <Play /> Preview
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-2 flex flex-col gap-1">
+          <span className="text-[13px] font-semibold">How long “Feedback submitted” stays</span>
+          <div role="radiogroup" aria-label="How long the Feedback submitted card stays" className="flex flex-wrap gap-1.5">
+            {FEEDBACK_HOLDS.map((h) => {
+              const on = (fx.feedbackHold ?? 2.2) === h.v;
+              return (
+                <button key={h.v} type="button" role="radio" aria-checked={on} onClick={() => update({ feedbackHold: h.v })} className="min-h-9 rounded-xl px-3 text-[13.5px] font-semibold" style={pick(on)}>
+                  {h.label}
+                  {h.v ? <span className="ml-1 text-[11.5px] font-normal opacity-75">{h.v}s</span> : null}
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+            Tap its × to close it sooner.
+          </span>
+        </div>
+      </Fold>
+
+      <Fold title="Progress" hint={(fx.cardStyle ?? "card") === "card" ? "Card" : "Banner"}>
+        <div role="radiogroup" aria-label="Progress style" className="flex flex-wrap gap-1.5">
+          {(
+            [
+              ["card", "Card", "A card in the middle, with confetti"],
+              ["banner", "Banner", "A slim banner slides down from the top"],
+            ] as const
+          ).map(([v, label, hint]) => (
+            <button key={v} type="button" role="radio" aria-checked={(fx.cardStyle ?? "card") === v} title={hint} onClick={() => update({ cardStyle: v })} className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick((fx.cardStyle ?? "card") === v)}>
+              <span className="text-[14px] font-bold">{label}</span>
+              <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+                {hint}
+              </span>
+            </button>
+          ))}
         </div>
       </Fold>
 

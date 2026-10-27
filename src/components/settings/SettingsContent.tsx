@@ -26,7 +26,7 @@ import { NotificationPrefs } from "@/components/settings/NotificationPrefs";
 import { SettingsRow } from "@/components/settings/SettingsRow";
 import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
-import { CelebrationSettings, FabSettings } from "@/components/settings/CelebrationSettings";
+import { CelebrationSettings, FabSettings, WelcomeSettings } from "@/components/settings/CelebrationSettings";
 import { MenusSettings } from "@/components/settings/MenuLayoutSettings";
 import { EveningButtonFxSettings, LoadingSettings, VictoriesHeaderSettings } from "@/components/settings/VisualFxSettings";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
@@ -403,6 +403,12 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             icon={<span style={{ fontSize: 14 }}>🗝️</span>}
           >
             <SecretMissions initial={profile.secret_missions ?? []} steps={missionSteps} />
+          </SettingsRow>
+          </SectionItem>
+
+          <SectionItem id="welcome-screen">
+          <SettingsRow theme={profile.theme} label="Welcome Screen" rightLabel="Check-in · greetings · what's on it" icon={<span style={{ fontSize: 14 }}>🌅</span>}>
+            <WelcomeSettings />
           </SettingsRow>
           </SectionItem>
 

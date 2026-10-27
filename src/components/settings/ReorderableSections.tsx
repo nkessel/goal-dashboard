@@ -74,7 +74,17 @@ export function ReorderableSections({ children }: { children: React.ReactNode })
       return n;
     });
   }, []);
-  const sorted = order ? [...order.filter((id) => ids.includes(id)), ...ids.filter((id) => !order.includes(id))] : ids;
+  // A section added since you set your order slots in after the one it follows by default.
+  const sorted = order
+    ? ids.filter((id) => !order.includes(id)).reduce(
+        (list, id) => {
+          const before = ids[ids.indexOf(id) - 1];
+          const at = before ? list.indexOf(before) : -1;
+          return at === -1 ? (before ? [...list, id] : [id, ...list]) : [...list.slice(0, at + 1), id, ...list.slice(at + 1)];
+        },
+        order.filter((id) => ids.includes(id))
+      )
+    : ids;
   const byId = new Map(items.map((c) => [c.props.id, c]));
   const sensors = useSensors(
     // Mouse and touch apart: on a phone only a held finger picks a section up, so scrolling never does.
@@ -153,7 +163,17 @@ export function ReorderableTiles({ children }: { children: React.ReactNode }) {
       /* storage unavailable */
     }
   }, []);
-  const sorted = order ? [...order.filter((id) => ids.includes(id)), ...ids.filter((id) => !order.includes(id))] : ids;
+  // A section added since you set your order slots in after the one it follows by default.
+  const sorted = order
+    ? ids.filter((id) => !order.includes(id)).reduce(
+        (list, id) => {
+          const before = ids[ids.indexOf(id) - 1];
+          const at = before ? list.indexOf(before) : -1;
+          return at === -1 ? (before ? [...list, id] : [id, ...list]) : [...list.slice(0, at + 1), id, ...list.slice(at + 1)];
+        },
+        order.filter((id) => ids.includes(id))
+      )
+    : ids;
   const byId = new Map(items.map((c) => [c.props.id, c]));
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
