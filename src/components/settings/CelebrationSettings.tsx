@@ -30,10 +30,10 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState(false);
   const [sentPreview, setSentPreview] = useState<{ key: number; style: FeedbackStyle } | null>(null);
-  const [welcomePreview, setWelcomePreview] = useState<{ mode: "day" | "back"; key: string; ctx: { metrics: string[]; tasks: { id: string; title: string; due_at: string | null }[] } } | null>(null);
+  const [welcomePreview, setWelcomePreview] = useState<{ mode: "day" | "back"; key: string; ctx: { metrics: string[]; tasks: { id: string; title: string; due_at: string | null }[]; suggestions: { id: string; title: string; due_at: string | null }[] } } | null>(null);
   function openWelcome(mode: "day" | "back") {
     void welcomeContextAction()
-      .catch(() => ({ metrics: [] as string[], tasks: [] as { id: string; title: string; due_at: string | null }[] }))
+      .catch(() => ({ metrics: [] as string[], tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[] }))
       .then((ctx) => setWelcomePreview({ mode, key: String(Date.now()), ctx }));
   }
   const plays = useRef(0);
@@ -200,6 +200,7 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           metrics={welcomePreview.ctx.metrics}
           lastCheckInAt={null}
           due={welcomePreview.ctx.tasks}
+          suggestions={welcomePreview.ctx.suggestions}
           fx={fx}
           onClose={() => setWelcomePreview(null)}
         />
@@ -359,6 +360,7 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           metrics={welcomePreview.ctx.metrics}
           lastCheckInAt={null}
           due={welcomePreview.ctx.tasks}
+          suggestions={welcomePreview.ctx.suggestions}
           fx={fx}
           onClose={() => setWelcomePreview(null)}
         />

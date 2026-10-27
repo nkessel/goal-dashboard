@@ -69,7 +69,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     } catch {}
     if (!first && !backDue) return;
     (async () => {
-      const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[] }));
+      const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[] }));
       if (first) {
         const r = await dailyCheckInAction(new Date().getTimezoneOffset()).catch(() => null);
         let award: WelcomeAward | null = null;
@@ -128,6 +128,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       metrics={shown.ctx.metrics}
       lastCheckInAt={shown.ctx.lastCheckInAt}
       due={shown.ctx.tasks}
+      suggestions={shown.ctx.suggestions}
       fx={fx}
       onClose={() => (setShown(null), router.refresh())}
     />

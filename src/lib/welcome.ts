@@ -6,11 +6,14 @@
  */
 import type { FxSettings } from "./celebration-fx";
 
-export type WelcomeEl = "toucan" | "checkin" | "streak" | "line" | "bar" | "reward" | "due";
+export type WelcomeEl = "toucan" | "checkin" | "focus" | "intention" | "plan" | "streak" | "line" | "bar" | "reward" | "due";
 
 export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "toucan", label: "The toucan's greeting", hint: "A line from the Great Toucan Spirit, in your check-in style" },
   { key: "checkin", label: "Check-in", hint: "Energy, mood and the rest (sleep times on the day's first visit only)" },
+  { key: "focus", label: "Today's main quest", hint: "Pick the one that matters most (it goes to the top of Today), or write a new one" },
+  { key: "intention", label: "Today's intention", hint: "A line on what you want today to be about, kept in your journal (day's first visit only)" },
+  { key: "plan", label: "Plan my day", hint: "A button to plan the day with the toucan around what's due and your calendar" },
   { key: "streak", label: "Your streak", hint: "How many days in a row (day's first visit only)" },
   { key: "line", label: "The day's wise line", hint: "A different encouragement each day" },
   { key: "bar", label: "Your level bar", hint: "Filling with today's XP (day's first visit only)" },
@@ -18,7 +21,7 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "due", label: "Due soon", hint: "Anything due today or tomorrow" },
 ];
 
-const DEFAULT_ORDER: WelcomeEl[] = ["toucan", "checkin", "streak", "line", "bar", "reward", "due"];
+const DEFAULT_ORDER: WelcomeEl[] = ["toucan", "checkin", "focus", "intention", "plan", "streak", "line", "bar", "reward", "due"];
 const DEFAULT_HIDE: WelcomeEl[] = ["toucan", "due"];
 const KEYS = new Set<string>(DEFAULT_ORDER);
 

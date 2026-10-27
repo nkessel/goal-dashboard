@@ -12,6 +12,8 @@ import { dueSoonList, dueWhen } from "@/lib/toucan-guide";
 import { voice, windowOf } from "@/lib/toucan-style";
 import { useToucanStyle } from "@/lib/toucan-style-store";
 import { useEscape } from "@/lib/use-escape";
+import { addJournalEntryAction, addToTopOfTodayAction, createQuestAction } from "@/app/actions";
+import { PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
 
 export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
 
@@ -36,6 +38,7 @@ export function WelcomeCard({
   metrics,
   lastCheckInAt,
   due,
+  suggestions = [],
   fx,
   onClose,
 }: {
@@ -46,6 +49,8 @@ export function WelcomeCard({
   metrics: string[];
   lastCheckInAt: string | null;
   due: { id: string; title: string; due_at: string | null }[];
+  /** Candidates for today's main quest (due soon, then most important). */
+  suggestions?: { id: string; title: string; due_at: string | null }[];
   fx: FxSettings;
   onClose: () => void;
 }) {
@@ -72,6 +77,21 @@ export function WelcomeCard({
 
   const soon = dueSoonList(due);
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
+    focus: <MainQuest suggestions={suggestions} mode={mode} />,
+    intention: mode === "day" ? <Intention /> : null,
+    plan: (
+      <button
+        type="button"
+        onClick={() => {
+          onClose();
+          talkToToucan(undefined, "talk", PLAN_DAY);
+        }}
+        className="flex h-11 items-center gap-2 rounded-full px-5 text-[14.5px] font-bold"
+        style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
+      >
+        🗓 Plan my day with the toucan
+      </button>
+    ),
     toucan: (
       <div className="flex w-full items-center gap-2.5 text-left">
         <ToucanArt size={40} />
@@ -180,5 +200,109 @@ export function WelcomeCard({
       </div>
     </div>,
     document.body
+  );
+}
+
+const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };
+
+/** Today's main quest: tap one that matters (it goes to the top of Today), or write a new one. */
+function MainQuest({ suggestions, mode }: { suggestions: { id: string; title: string; due_at: string | null }[]; mode: "day" | "back" }) {
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pin = async (run: () => Promise<unknown>, label: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await run();
+      setChosen(label);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save that.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (chosen)
+    return (
+      <p className="m-0 text-[15px]" style={{ color: "#3d5a1e" }}>
+        ✓ “{chosen}” is at the top of Today.
+      </p>
+    );
+  return (
+    <div className="flex w-full flex-col gap-1.5 text-left">
+      <p className="m-0 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
+        {mode === "day" ? "What would make today a success?" : "What matters most for the rest of today?"}
+      </p>
+      {suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {suggestions.map((t) => (
+            <button key={t.id} type="button" disabled={busy} onClick={() => pin(() => addToTopOfTodayAction(t.id), t.title)} className="min-h-9 rounded-full px-3 text-left text-[13.5px] disabled:opacity-60" style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}>
+              {t.title}
+              {t.due_at && <span style={{ color: "#8a5a1e" }}> · {dueWhen(t.due_at)}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      <form
+        className="flex gap-1.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const title = text.trim();
+          if (title) void pin(() => createQuestAction({ title, importance: 4, urgency: 3, xpValue: 20, placement: "today" }), title);
+        }}
+      >
+        <input value={text} onChange={(e) => setText(e.target.value)} maxLength={120} placeholder={suggestions.length ? "Or something else…" : "Your main quest today…"} aria-label="Today's main quest" className="h-10 min-w-0 flex-1 rounded-lg px-2.5 text-[16px]" style={FIELD} />
+        <button type="submit" disabled={busy || !text.trim()} className="h-10 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+          Add
+        </button>
+      </form>
+      {error && (
+        <p className="m-0 text-[12.5px]" style={{ color: "#a33" }}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A line on what today is about, kept in the journal as an intention. */
+function Intention() {
+  const [text, setText] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (saved)
+    return (
+      <p className="m-0 text-[15px] italic" style={{ color: "#3d5a1e" }}>
+        ✓ Today is about: {text}
+      </p>
+    );
+  return (
+    <form
+      className="flex w-full flex-col gap-1.5 text-left"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!text.trim()) return;
+        setBusy(true);
+        try {
+          await addJournalEntryAction(text.trim(), null, "intention");
+          setSaved(true);
+        } catch {
+          /* keep the words so they can try again */
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="text-[15px] font-semibold" style={{ color: "var(--t-ink)" }} htmlFor="welcome-intention">
+        Today is about…
+      </label>
+      <div className="flex gap-1.5">
+        <input id="welcome-intention" value={text} onChange={(e) => setText(e.target.value)} maxLength={200} placeholder="e.g. Steady and kind to myself" className="h-10 min-w-0 flex-1 rounded-lg px-2.5 text-[16px]" style={FIELD} />
+        <button type="submit" disabled={busy || !text.trim()} className="h-10 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+          Save
+        </button>
+      </div>
+    </form>
   );
 }

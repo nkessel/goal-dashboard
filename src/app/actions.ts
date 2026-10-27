@@ -2036,7 +2036,12 @@ export async function setWheelOfTimeAction(input: { effort?: string[]; hindrance
 export async function welcomeContextAction() {
   const ownerId = await requireProfileId();
   const [metrics, last, tasks] = await Promise.all([energyData.getCheckMetrics(ownerId).catch(() => []), energyData.latestEnergy(ownerId), guideTasks(ownerId).catch(() => [])]);
-  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })) };
+  // Candidates for today's main quest: what's due in the next two days, then what matters most.
+  const soon = Date.now() + 2 * 86_400_000;
+  const dueSoon = tasks.filter((t) => t.due_at && Date.parse(t.due_at) <= soon).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
+  const important = tasks.filter((t) => !dueSoon.includes(t) && (t.importance ?? 0) >= 4).sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0));
+  const suggestions = [...dueSoon, ...important].slice(0, 4).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at }));
+  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })), suggestions };
 }
 
 export async function getCheckMetricsAction() {
