@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 /**
  * Small flat pictures for evening rites and mini-quests, chosen from the
  * rite's kind or its title (a heart for checking in with a partner, a shirt
@@ -5,7 +7,7 @@
  * the moon.
  */
 
-type GlyphKey =
+export type GlyphKey =
   | "list123"
   | "calendar"
   | "heart"
@@ -232,6 +234,84 @@ export function TrophyAvatar({ size = 52 }: { size?: number }) {
       <path d="M32 17.6l1.5 3.2 3.4.4-2.5 2.3.7 3.4-3.1-1.7-3.1 1.7.7-3.4-2.5-2.3 3.4-.4z" fill="#fffbe6" stroke="#8a5a10" strokeWidth=".7" />
       <path d="M24 16.5c.3 5 1.6 8.5 4 10.8" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" fill="none" opacity=".7" />
       <circle cx="32" cy="32" r="30" fill="none" stroke="#5a4520" strokeWidth="2" />
+    </svg>
+  );
+}
+
+/** Each picture's colours for its medallion: light, middle, deep. */
+const PALETTE: Record<GlyphKey, [string, string, string]> = {
+  list123: ["#fff6d2", "#f2cf6e", "#a8741c"],
+  calendar: ["#fff2d6", "#f0b860", "#a0581c"],
+  heart: ["#ffe1e6", "#f08aa0", "#9c2e4c"],
+  shirt: ["#e3f1ff", "#86b9ec", "#2f5f9a"],
+  eye: ["#efe4ff", "#b49af0", "#5a3c9e"],
+  book: ["#dff6f0", "#7fcdb8", "#2a7a66"],
+  quill: ["#fff0d8", "#e9b672", "#8e5a1e"],
+  sparkle: ["#e0fbff", "#86dcec", "#2a8296"],
+  stretch: ["#e8f8dc", "#9ad27a", "#42802a"],
+  lotus: ["#f6e6ff", "#d4a2ec", "#7a3c9a"],
+  shoe: ["#ffe9d8", "#f2a36a", "#a3501c"],
+  bed: ["#e3e6ff", "#9aa3ec", "#3a428e"],
+  tooth: ["#e4fff6", "#92e2c6", "#2f8a6c"],
+  glass: ["#e2f4ff", "#7cc4f0", "#226a9c"],
+  phone: ["#eceff4", "#a8b2c4", "#4a5468"],
+  pill: ["#ffe6de", "#f29a86", "#a03c2a"],
+  bag: ["#f8ecd8", "#d8b282", "#86602e"],
+  plant: ["#e6f8de", "#8fcf72", "#3a7a28"],
+  moon: ["#e8e6ff", "#a6a2e0", "#3c3880"],
+};
+
+/**
+ * An illustrated medallion for a main evening rite: a glowing disc in the
+ * picture's colours with soft rays, a gilt rim and the picture large in the
+ * middle — the same family as the wins trophy.
+ */
+export function RiteMedallion({ kind, size = 52 }: { kind: GlyphKey; size?: number }) {
+  const id = useId().replace(/:/g, "");
+  const [light, mid, deep] = PALETTE[kind];
+  const rays = Array.from({ length: 12 }, (_, i) => i * 30);
+  return (
+    <span className="relative block" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden className="absolute inset-0">
+        <defs>
+          <radialGradient id={`${id}-bg`} cx="50%" cy="40%" r="62%">
+            <stop offset="0" stopColor={light} />
+            <stop offset=".5" stopColor={mid} />
+            <stop offset="1" stopColor={deep} />
+          </radialGradient>
+          <linearGradient id={`${id}-rim`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#fff2b8" />
+            <stop offset=".45" stopColor="#d9b45f" />
+            <stop offset="1" stopColor="#7a5414" />
+          </linearGradient>
+          <clipPath id={`${id}-clip`}>
+            <circle cx="32" cy="32" r="29" />
+          </clipPath>
+        </defs>
+        <circle cx="32" cy="32" r="29" fill={`url(#${id}-bg)`} />
+        <g clipPath={`url(#${id}-clip)`} opacity=".4">
+          {rays.map((a) => (
+            <path key={a} d="M32 32 L29.6 0 L34.4 0 Z" fill="#fffbe8" transform={`rotate(${a} 32 32)`} />
+          ))}
+        </g>
+        <circle cx="32" cy="32" r="18" fill="#fffaf0" opacity=".55" />
+        <path d="M14 22a20 20 0 0 1 16-12" stroke="#fff" strokeWidth="2" strokeLinecap="round" fill="none" opacity=".6" />
+        <circle cx="32" cy="32" r="29.5" fill="none" stroke={`url(#${id}-rim)`} strokeWidth="3" />
+        <circle cx="32" cy="32" r="31" fill="none" stroke="#4a3410" strokeWidth=".8" opacity=".6" />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center" style={{ filter: "drop-shadow(0 1px 0 rgba(255,255,255,.8)) drop-shadow(0 2px 3px rgba(0,0,0,.25))" }}>
+        {kind === "moon" ? <MedallionMoon size={Math.round(size * 0.5)} /> : <RiteGlyph kind={kind} size={Math.round(size * 0.52)} />}
+      </span>
+    </span>
+  );
+}
+
+function MedallionMoon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1Z" fill="#f6e7b0" stroke="#3a3148" strokeWidth="1.3" />
+      <circle cx="11" cy="14" r="1.1" fill="#c9ad5a" />
+      <circle cx="14.5" cy="17.5" r=".8" fill="#c9ad5a" />
     </svg>
   );
 }

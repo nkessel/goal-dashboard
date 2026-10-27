@@ -30,7 +30,8 @@ import { Moon } from "./BeginEveningButton";
 import { useFlipToEvening } from "./DayNightFlip";
 import { useLocalDay } from "./evening-clock";
 import { TomorrowQuests } from "./TomorrowQuests";
-import { RiteGlyph, TrophyAvatar, glyphFor } from "./RiteGlyph";
+import { RiteGlyph, RiteMedallion, TrophyAvatar, glyphFor } from "./RiteGlyph";
+import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import type { Task } from "@/lib/data/types";
 import { fromFeedback } from "@/lib/from-feedback";
 
@@ -80,31 +81,32 @@ function RiteSeal({ done, rite }: { done: boolean; rite?: RiteView }) {
           // eslint-disable-next-line @next/next/no-img-element -- rite portrait
           <img src={rite.icon_key!} alt="" className="h-[52px] w-[52px] rounded-full object-cover" style={{ border: "2px solid #8e8aa8" }} />
         )}
-        {done && (
-          <span className="absolute -bottom-0.5 -right-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)", border: "1.5px solid #fff6e0" }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-              <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        )}
+        {done && <DoneCheck />}
       </span>
     );
   }
   const glyph = rite ? glyphFor(rite) : "moon";
+  // The main rites wear an illustrated medallion, like the wins trophy.
+  if (rite?.is_core) {
+    return (
+      <span aria-hidden className="relative block h-[52px] w-[52px] shrink-0">
+        <RiteMedallion kind={glyph} size={52} />
+        {done && <DoneCheck />}
+      </span>
+    );
+  }
   return (
     <span
       aria-hidden
       className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full"
       style={{
-        background: done ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "radial-gradient(circle at 35% 30%, rgba(255,255,255,.6), rgba(214,220,240,.25))",
-        border: `2px solid ${done ? "#5a4520" : "#8e8aa8"}`,
-        boxShadow: done ? "0 0 14px rgba(242,210,126,.65), inset 0 1px 0 rgba(255,255,255,.5)" : "inset 0 1px 3px rgba(0,0,0,.15)",
+        background: "radial-gradient(circle at 35% 30%, rgba(255,255,255,.6), rgba(214,220,240,.25))",
+        border: "2px solid #8e8aa8",
+        boxShadow: "inset 0 1px 3px rgba(0,0,0,.15)",
       }}
     >
       {done ? (
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="qc-card-check">
-          <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#2a1c10" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <DoneCheck inline />
       ) : glyph === "moon" ? (
         <Moon size={24} />
       ) : (
@@ -506,6 +508,12 @@ export function EveningRites({
       </div>
       </div>
     );
+    // Swipe right to snooze it for tonight.
+    const face = overlay ? inner : (
+      <SwipeReveal side="left" label="Skip tonight" icon={<SnoozeIcon />} background="linear-gradient(180deg,#3a3f7a,#232655)" color="#f2d27e" onAction={() => setAwayFor(r.id, "skip")}>
+        {inner}
+      </SwipeReveal>
+    );
     // Special rites slide a tray out from under the card: today's wins on
     // parchment (like Victories Today); tomorrow's quests and the day plan on
     // the night's dark tray.
@@ -541,13 +549,13 @@ export function EveningRites({
       ) : null;
     const withTray = tray ? (
       <div className="flex flex-col">
-        <div className="relative z-[1]">{inner}</div>
+        <div className="relative z-[1]">{face}</div>
         {tray}
       </div>
     ) : (
-      inner
+      face
     );
-    return overlay || special ? withTray : <SwipeToDelete label={r.title} onDelete={() => remove(r)}>{inner}</SwipeToDelete>;
+    return overlay || special ? withTray : <SwipeToDelete label={r.title} onDelete={() => remove(r)}>{face}</SwipeToDelete>;
   }
 
   const active = activeId ? byId.get(activeId) : null;
@@ -746,4 +754,27 @@ function TrashGlyph() {
       <path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5L17.5 7M9.5 7V4.5h5V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
+}
+
+/** Snooze: a crescent with a little "z". */
+function SnoozeIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M17.5 15.2A7.2 7.2 0 0 1 8.3 5.9a7.2 7.2 0 1 0 9.2 9.3Z" fill="#f2d27e" />
+      <path d="M14 3.5h4.5L14 8.5h4.5" stroke="#f2d27e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The big green check every finished item wears (as on quest cards), across the whole avatar. */
+function DoneCheck({ inline = false }: { inline?: boolean }) {
+  const svg = (
+    <svg width="45" height="45" viewBox="0 0 24 24" fill="none" className="qc-card-check" style={{ filter: "drop-shadow(0 0 6px rgba(110,230,80,.7)) drop-shadow(0 2px 3px rgba(0,0,0,.4))" }}>
+      <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#16300f" strokeWidth="5.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.5 12.8 L9.6 17.9 L19.6 6.6" stroke="#3fbf3a" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.6 12.6 L9.6 16.6 L18.4 6.9" stroke="#8ff070" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" opacity=".85" />
+    </svg>
+  );
+  if (inline) return svg;
+  return <span className="absolute inset-0 flex items-center justify-center rounded-full" style={{ background: "rgba(20,24,12,.28)" }}>{svg}</span>;
 }

@@ -162,14 +162,15 @@ export default async function Home() {
   const soon = extras.filter(dueSoon).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
   const otherTasks = [...soon, ...extras.filter((t) => !dueSoon(t))];
   const theme = profile?.theme ?? "adventure";
-  const stats = profile && (
+  // The evening side shows the same summary without the check-in.
+  const statsView = (checkIn: boolean) => profile && (
     <section>
       <XpSummary
         profile={profile}
         stats={{ questsComplete, xpThisWeek, partySize: friendIds.length }}
         boss={boss ? { id: boss.id, level: boss.level, title: boss.title, target: boss.target, progress: boss.progress } : null}
         bossesEnabled={bossesEnabled}
-        energyToday={energyToday}
+        energyToday={checkIn ? energyToday : undefined}
         energyAt={energyToday !== null ? (lastEnergy?.created_at ?? null) : null}
         checkMetrics={checkMetrics}
         metricsToday={metricsToday}
@@ -177,6 +178,8 @@ export default async function Home() {
       />
     </section>
   );
+
+  const stats = statsView(true);
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
@@ -217,7 +220,7 @@ export default async function Home() {
         evening={
           <div className="flex flex-col gap-6">
             <LowLightToggle />
-            {stats}
+            {statsView(false)}
             <EveningRites
               rites={eveningRites}
               completions={riteCompletions.map((c) => ({ rite_id: c.rite_id, day: c.day }))}

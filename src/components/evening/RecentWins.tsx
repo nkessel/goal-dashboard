@@ -72,7 +72,7 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
     const rows: Row[] = list
       .filter((w) => w.kind !== "feedback")
       .map((w) => {
-        const sub = w.kind === "journal" ? journalKindMeta(w.sub) : null;
+        const sub = w.kind === "journal" ? journalKindMeta(w.sub ?? null) : null;
         return {
           id: w.id,
           seal: w.kind === "reward" ? "gift" : w.kind === "journal" ? "star" : "check",
@@ -84,6 +84,7 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
               )}
               {w.kind === "reward" && <span style={{ color: "var(--t-ink-soft)" }}>Treasure accepted: </span>}
               {w.title}
+              {w.kind === "step" && w.sub && <span style={{ color: "var(--t-ink-soft)" }}> · step of {w.sub}</span>}
             </>
           ),
         };
@@ -108,9 +109,6 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col items-center gap-1 text-center">
-        <SectionTitle as="h3" tone="ink" size={21}>
-          {days === 1 ? "Victories Today" : "Recent Victories"}
-        </SectionTitle>
         <span className="text-[14.5px]" style={{ color: "var(--t-ink)" }}>
           {days === 1 ? "Today\u2019s XP" : "XP"}: <span className="font-semibold tabular-nums">{totalXp}</span>
           {wins && wins.length > 0 && (
