@@ -481,7 +481,7 @@ html[data-nav-pending] .nav-progress { opacity: 1; animation: nav-progress 2.5s 
   position: fixed; left: 50%; top: 42%; z-index: 69; transform: translate(-50%, -50%);
   opacity: 0; pointer-events: none; transition: opacity 120ms ease;
 }
-html[data-nav-pending] .nav-loader { animation: nav-loader-in 200ms ease 350ms both; }
+html[data-nav-pending]:not([data-nav-pending="settings-close"]) .nav-loader { animation: nav-loader-in 200ms ease 350ms both; }
 @keyframes nav-loader-in { from { opacity: 0; } to { opacity: 1; } }
 .nav-loader-toucan { display: block; animation: toucan-fly-across 1.6s ease-in-out infinite; filter: drop-shadow(0 6px 10px rgba(0,0,0,.4)); }
 @keyframes toucan-fly-across {
