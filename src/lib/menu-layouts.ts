@@ -1,13 +1,26 @@
 /**
  * Every context menu's item order and hidden items (besides the quest card's,
  * which keeps its own store in quest-menu-layout). Kept per browser and chosen
- * in Settings › Menus. Menus mark themselves with data-menu="<id>" and each item
+ * in Settings › Layout. Menus mark themselves with data-menu="<id>" and each item
  * with data-mi="<key>"; <MenuLayoutStyles /> arranges them with CSS, so the
  * menus' own code doesn't change.
  */
 export type MenuDef = { id: string; title: string; hint: string; items: { key: string; label: string; keep?: boolean }[] };
 
 export const MENUS: MenuDef[] = [
+  {
+    id: "habit-editor",
+    title: "Habit editor",
+    hint: "What shows when you make or edit a habit, and the order.",
+    items: [
+      { key: "repeats", label: "Repeats" },
+      { key: "takes", label: "Takes (minutes)" },
+      { key: "coins", label: "Coins" },
+      { key: "xp", label: "XP" },
+      { key: "due", label: "Due by" },
+      { key: "subs", label: "Sub-habits" },
+    ],
+  },
   {
     id: "calendar-item",
     title: "Calendar items",

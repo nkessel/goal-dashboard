@@ -7,7 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 
 const KEY = "settings-order";
 
-/** A finger on a section's grip moves it straight away (no hold), so the page never scrolls instead. */
+/** A finger on a section's left edge moves it straight away (no hold), so the page never scrolls instead. */
 class GripSensor extends PointerSensor {
   static activators = [
     {
@@ -39,23 +39,8 @@ export function SectionItem({ id, children }: { id: string; children: React.Reac
       onContextMenu={locked ? undefined : (e) => e.preventDefault()}
     >
       {children}
-      {/* The grip: drag it to move the section straight away (no hold needed), even while one is open. */}
-      <span
-        ref={setActivatorNodeRef}
-        {...listeners}
-        aria-hidden
-        data-grip
-        title="Drag to move this section"
-        className="absolute left-0 top-0 z-[2] flex h-[60px] w-4 cursor-grab items-center justify-center"
-        style={{ touchAction: "none", color: "var(--t-ink-soft)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <svg width="6" height="16" viewBox="0 0 6 16" fill="currentColor" opacity=".55">
-          <circle cx="1.5" cy="2" r="1.3" /><circle cx="4.5" cy="2" r="1.3" />
-          <circle cx="1.5" cy="8" r="1.3" /><circle cx="4.5" cy="8" r="1.3" />
-          <circle cx="1.5" cy="14" r="1.3" /><circle cx="4.5" cy="14" r="1.3" />
-        </svg>
-      </span>
+      {/* An unmarked strip along the left edge drags the section straight away (no hold), even while one is open. */}
+      <span ref={setActivatorNodeRef} {...listeners} aria-hidden data-grip className="absolute left-0 top-0 z-[2] h-[60px] w-4 cursor-grab" style={{ touchAction: "none" }} />
     </div>
   );
 }

@@ -118,6 +118,8 @@ export function RiteEditorDialog({
         aria-modal="true"
         aria-label={rite ? "Edit rite" : "New rite"}
         onClick={(e) => e.stopPropagation()}
+        // Its parts take the order and hiding chosen in Settings › Layout.
+        data-menu={isHabit ? "habit-editor" : undefined}
         className={`parchment parchment-framed ${isHabit ? "" : "moonlit"} flex w-full max-w-md flex-col gap-3 rounded-2xl p-5 shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
       >
         <div data-embed-hide className="relative z-[1] flex items-center justify-between">
@@ -177,7 +179,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div className="relative z-[1] flex flex-col gap-2">
+          <div data-mi="repeats" className="relative z-[1] flex flex-col gap-2">
             <button type="button" onClick={() => setRepeatsOpen((o) => !o)} aria-expanded={repeatsOpen} className="flex items-center gap-1.5 self-start text-[14.5px] font-semibold">
               <Caret open={repeatsOpen} />
               Repeats
@@ -215,7 +217,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
+          <div data-mi="takes" className="relative z-[1] flex flex-wrap items-center gap-1.5">
             <span className="mr-0.5 text-[14.5px] font-semibold">Takes</span>
             {MINUTE_PRESETS.map((m) => (
               <button
@@ -259,7 +261,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div className="relative z-[1] flex flex-wrap items-center gap-2">
+          <div data-mi="coins" className="relative z-[1] flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-1.5 text-[14.5px] font-semibold">
               <CoinIcon size={17} /> Coins
             </span>
@@ -298,7 +300,7 @@ export function RiteEditorDialog({
           </div>
         )}
 
-        <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
+        <div data-mi="xp" className="relative z-[1] flex flex-wrap items-center gap-1.5">
           <span className="mr-0.5 text-[14.5px] font-semibold">XP</span>
           {XP_PRESETS.map((v) => (
             <button
@@ -331,7 +333,7 @@ export function RiteEditorDialog({
         </div>
 
         {isHabit && (
-          <div className="relative z-[1] flex flex-col gap-2">
+          <div data-mi="due" className="relative z-[1] flex flex-col gap-2">
             <button type="button" onClick={() => setDueOpen((o) => !o)} aria-expanded={dueOpen} className="flex items-center gap-1.5 self-start text-[14.5px] font-semibold">
               <Caret open={dueOpen} />
               Due by
@@ -362,7 +364,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div className="relative z-[1] flex flex-col gap-1.5">
+          <div data-mi="subs" className="relative z-[1] flex flex-col gap-1.5">
             {subs.length > 0 && <span className="text-[14.5px] font-semibold">Sub-habits</span>}
             {!subsOpen && subs.length === 0 ? (
               <button type="button" onClick={() => setSubsOpen(true)} className="flex h-9 items-center gap-2 self-start rounded-full px-3 text-[14px] font-semibold" style={{ border: "1.5px dashed #b39a6a", color: "var(--t-ink)" }}>
@@ -439,12 +441,12 @@ export function RiteEditorDialog({
         )}
 
         {error && (
-          <p className="relative z-[1] text-sm" style={{ color: "var(--t-warn)" }}>
+          <p className="relative z-[1] text-sm" style={{ color: "var(--t-warn)", order: 98 }}>
             {error}
           </p>
         )}
 
-        <div className="relative z-[1] flex items-center justify-between gap-2 pt-1">
+        <div className="relative z-[1] flex items-center justify-between gap-2 pt-1" style={{ order: 99 }}>
           {rite ? (
             !confirmingDelete ? (
               <button type="button" onClick={() => setConfirmingDelete(true)} className="flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[14px] font-semibold hover:bg-black/5" style={{ color: "var(--t-warn)" }}>

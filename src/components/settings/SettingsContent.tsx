@@ -26,7 +26,6 @@ import { SettingsRow } from "@/components/settings/SettingsRow";
 import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import { CelebrationSettings, FabSettings } from "@/components/settings/CelebrationSettings";
-import { QuestEditorLayoutSettings } from "@/components/settings/QuestEditorLayoutSettings";
 import { MenusSettings } from "@/components/settings/MenuLayoutSettings";
 import { EveningButtonFxSettings, LoadingSettings, VictoriesHeaderSettings } from "@/components/settings/VisualFxSettings";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
@@ -400,7 +399,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Visual Effects"
-            rightLabel="Celebrations · + button · Victories · Quests"
+            rightLabel="Celebrations · + button · Victories"
             icon={<span style={{ fontSize: 14 }}>✨</span>}
           >
             <div className="flex flex-col gap-5">
@@ -432,13 +431,6 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
                 </p>
                 <VictoriesHeaderSettings />
               </div>
-              <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
-                <h4 className={`m-0 mb-1 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>The quest editor</h4>
-                <p className="mb-2 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-                  What shows straight away when you make or edit a quest, what waits under Advanced settings, and the order.
-                </p>
-                <QuestEditorLayoutSettings />
-              </div>
               <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
                 Saved on this device.
               </p>
@@ -448,7 +440,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
 
 
           <SectionItem id="menus">
-          <SettingsRow theme={profile.theme} label="Menus" rightLabel="Order · hide items" icon={<span style={{ fontSize: 14 }}>☰</span>}>
+          <SettingsRow theme={profile.theme} label="Layout" rightLabel="Editors · menus" icon={<span style={{ fontSize: 14 }}>☰</span>}>
             <MenusSettings isAdventure={isAdventure} />
           </SettingsRow>
           </SectionItem>
