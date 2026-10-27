@@ -10,6 +10,7 @@ export const SHAREABLE_SETTINGS: { key: string; label: string }[] = [
   { key: "quest-menu-layout", label: "Quest ⋯ menu" },
   { key: "menu-layouts", label: "Layout: habit editor and menus" },
   { key: "settings-order", label: "Settings order" },
+  { key: "settings-tiles-order", label: "Settings tiles order" },
   { key: "habits-header-look", label: "Daily Habits header" },
   { key: "habits-header-mark", label: "Daily Habits mark" },
   { key: "party-view", label: "What the Guild Hall shows" },

@@ -1090,6 +1090,9 @@ html[data-evening] [data-theme="adventure"] {
   min-height: 0;
   overflow: hidden;
 }
+/* Once open, a drawer stops clipping, so a menu near its bottom shows in full. */
+.drawer-body[data-open="true"] > .drawer-inner { animation: drawer-unclip 0s 330ms forwards; }
+@keyframes drawer-unclip { to { overflow: visible; } }
 .drawer-header:focus { outline: none; }
 .drawer-header:focus-visible { box-shadow: 0 0 0 2px rgba(242, 210, 126, 0.7); }
 .add-slot { transition: border-color 150ms ease, background-color 150ms ease; }

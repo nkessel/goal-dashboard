@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { setAppDefaultsAction } from "@/app/actions";
 import { SHAREABLE_SETTINGS } from "@/lib/settings-defaults";
 
@@ -18,8 +19,8 @@ function readAll(): Record<string, string | null> {
 
 /**
  * For the app's owner: after changing a setting here, a small text button
- * offers to make it the default for every account (devices that haven't
- * chosen that setting themselves start from it).
+ * at the end of that section offers to make it the default for every account
+ * (devices that haven't chosen that setting themselves start from it).
  */
 export function SetAsDefault() {
   const base = useRef<Record<string, string | null> | null>(null);
@@ -27,11 +28,15 @@ export function SetAsDefault() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // The end of the Settings section last touched, where the button shows.
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     base.current = readAll();
     let t: number | undefined;
-    const check = () => {
+    const check = (e?: Event) => {
+      const where = (e?.target as Element | null)?.closest?.("[data-section]")?.querySelector<HTMLElement>(":scope > [data-section-slot]");
+      if (where) setSlot(where);
       window.clearTimeout(t);
       t = window.setTimeout(() => {
         if (!base.current) return;
@@ -43,11 +48,12 @@ export function SetAsDefault() {
     };
     const events = ["click", "change", "input", "pointerup", "keyup"] as const;
     for (const e of events) document.addEventListener(e, check, true);
-    window.addEventListener("storage", check);
+    const onStorage = () => check();
+    window.addEventListener("storage", onStorage);
     return () => {
       window.clearTimeout(t);
       for (const e of events) document.removeEventListener(e, check, true);
-      window.removeEventListener("storage", check);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
@@ -70,10 +76,10 @@ export function SetAsDefault() {
 
   if (!changed.length && !done && !error) return null;
   const labels = SHAREABLE_SETTINGS.filter((s) => changed.includes(s.key)).map((s) => s.label);
-  return (
-    <div className="fade-in pointer-events-none fixed inset-x-0 bottom-24 z-[45] flex justify-center px-4">
+  const bar = (
+    <div className="fade-in mt-2 flex justify-center">
       <div
-        className="pointer-events-auto flex max-w-[460px] items-center gap-2 rounded-full px-4 py-2 text-[13.5px]"
+        className="flex min-w-0 max-w-full items-center gap-2 rounded-full px-4 py-2 text-[13.5px]"
         style={{ background: "rgba(24,20,13,.94)", border: "1px solid rgba(217,180,95,.55)", color: "var(--t-cream, #efe6cc)", boxShadow: "0 8px 22px rgba(0,0,0,.4)" }}
       >
         {done ? (
@@ -93,4 +99,5 @@ export function SetAsDefault() {
       </div>
     </div>
   );
+  return slot?.isConnected ? createPortal(bar, slot) : bar;
 }

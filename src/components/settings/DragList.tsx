@@ -4,12 +4,19 @@ import { useEffect, useRef } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { SwipeReveal } from "@/components/ui/SwipeReveal";
 
 /**
  * A short list whose rows you drag into order: the row itself moves (a held
  * finger on a phone), with no drag symbol taking up room.
  */
-export function DragList({ id, ids, onReorder, row }: { id: string; ids: string[]; onReorder: (next: string[]) => void; row: (key: string) => React.ReactNode }) {
+export type DragRowContent = {
+  label: React.ReactNode;
+  /** Its show/hide (or shown/folded) switch: swipe the row left on a phone, or hover it with a mouse. */
+  toggle?: { hidden: boolean; onToggle: () => void; offLabel?: string } | null;
+};
+
+export function DragList({ id, ids, onReorder, row }: { id: string; ids: string[]; onReorder: (next: string[]) => void; row: (key: string) => DragRowContent }) {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 6 } }),
@@ -34,9 +41,7 @@ export function DragList({ id, ids, onReorder, row }: { id: string; ids: string[
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
         <ol className="m-0 flex list-none flex-col gap-1 p-0">
           {ids.map((k) => (
-            <DragRow key={k} id={k}>
-              {row(k)}
-            </DragRow>
+            <DragRow key={k} id={k} content={row(k)} />
           ))}
         </ol>
       </SortableContext>
@@ -44,35 +49,48 @@ export function DragList({ id, ids, onReorder, row }: { id: string; ids: string[
   );
 }
 
-function DragRow({ id, children }: { id: string; children: React.ReactNode }) {
+function DragRow({ id, content }: { id: string; content: DragRowContent }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const t = content.toggle;
+  // Hidden items are struck out; ones folded under Advanced are only dimmed.
+  const struck = !!t?.hidden && t.offLabel !== "Advanced";
+  const face = (
+    <div className="group flex min-h-10 items-center gap-1 rounded-lg pl-2.5 pr-1" style={{ border: "1px solid rgba(139,112,64,.3)", background: "var(--t-card, #f6ecd2)", opacity: t?.hidden ? 0.6 : 1 }}>
+      <span className={`min-w-0 flex-1 truncate text-[13.5px] ${struck ? "line-through" : ""}`}>{content.label}</span>
+      {t?.hidden && (
+        <span className="shrink-0 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
+          {t.offLabel ?? "Hidden"}
+        </span>
+      )}
+      {t && (
+        <button
+          type="button"
+          onClick={t.onToggle}
+          aria-label={t.hidden ? "Show it" : `Move to ${t.offLabel ?? "Hidden"}`}
+          className="hidden h-7 shrink-0 rounded-full px-2.5 text-[12px] font-semibold opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:hover)]:block"
+          style={{ border: "1px solid rgba(139,112,64,.45)", color: "var(--t-ink)" }}
+        >
+          {t.hidden ? "Show" : t.offLabel === "Advanced" ? "To Advanced" : "Hide"}
+        </button>
+      )}
+    </div>
+  );
   return (
     <li
       ref={setNodeRef}
       {...attributes}
       {...listeners}
       onContextMenu={(e) => e.preventDefault()}
-      className={`flex min-h-10 cursor-grab select-none items-center gap-1 rounded-lg pl-2.5 pr-1 ${isDragging ? "cursor-grabbing shadow-lg" : ""}`}
-      style={{ transform: CSS.Transform.toString(transform), transition, position: "relative", zIndex: isDragging ? 5 : undefined, touchAction: "pan-y", WebkitTouchCallout: "none", border: "1px solid rgba(139,112,64,.3)", background: isDragging ? "var(--t-card, #f6ecd2)" : undefined }}
+      className={`cursor-grab select-none rounded-lg ${isDragging ? "cursor-grabbing shadow-lg" : ""}`}
+      style={{ transform: CSS.Transform.toString(transform), transition, position: "relative", zIndex: isDragging ? 5 : undefined, touchAction: "pan-y", WebkitTouchCallout: "none" }}
     >
-      {children}
+      {t ? (
+        <SwipeReveal side="right" label={t.hidden ? "Show" : t.offLabel === "Advanced" ? "Advanced" : "Hide"} background={t.hidden ? "#4f7d38" : "#8a6116"} onAction={t.onToggle}>
+          {face}
+        </SwipeReveal>
+      ) : (
+        face
+      )}
     </li>
-  );
-}
-
-/** Shown / Hidden for one item. */
-export function ShownSwitch({ hidden, onToggle, offLabel = "Hidden", title }: { hidden: boolean; onToggle: () => void; offLabel?: string; title?: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={!hidden}
-      onClick={onToggle}
-      title={title}
-      className="h-7 shrink-0 rounded-full px-2.5 text-[12px] font-semibold"
-      style={hidden ? { border: "1px solid rgba(139,112,64,.45)", color: "var(--t-ink-soft)" } : { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}
-    >
-      {hidden ? offLabel : "Shown"}
-    </button>
   );
 }

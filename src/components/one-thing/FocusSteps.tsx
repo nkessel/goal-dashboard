@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { listQuestStepsAction, saveQuestStepsAction } from "@/app/actions";
+import { listQuestStepsAction, saveQuestStepsAction, setTaskProgressAction } from "@/app/actions";
+import { stepsShare } from "@/lib/quest-steps";
 import { getFocusTimer, spentSeconds, useFocusTimer } from "@/lib/focus-timer";
 
 type Step = { id: string; title: string; done: boolean; xp: number; progress: number; seconds: number; state?: "skipped" | "failed" | null; group?: string | null };
@@ -27,7 +28,8 @@ const fmt = (sec: number) => {
  * or drag it to change what comes next. Time spent on each step is saved for
  * insights.
  */
-export function FocusSteps({ taskId }: { taskId: string }) {
+export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The quest's own progress, which its steps carry upward. */ progress?: number }) {
+  const questPct = useRef(progress);
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -92,10 +94,16 @@ export function FocusSteps({ taskId }: { taskId: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        await saveQuestStepsAction(
+        const res = await saveQuestStepsAction(
           taskId,
           [...next.map((s) => ({ id: s.id, title: s.title, done: s.done, progress: s.progress, seconds: Math.round(s.seconds), state: s.done ? null : (s.state ?? null) })), ...holders.current.map((h) => ({ id: h.id, title: h.title, done: h.done }))]
         );
+        // As in the steps tray: the quest's progress rises to what its steps add up to (never down here).
+        const share = stepsShare(res.steps.map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp, weight: r.weight, progress: r.progress, state: r.state, parentKey: r.parent_id })));
+        if (share > questPct.current && share < 100) {
+          questPct.current = share;
+          await setTaskProgressAction(taskId, share);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save that step.");
       }
@@ -173,6 +181,10 @@ export function FocusSteps({ taskId }: { taskId: string }) {
           <span className="font-display text-[19px] leading-snug" style={{ color: "var(--t-ink)" }}>
             {focus.title}
           </span>
+          <div className="-mb-1 flex items-center justify-between text-[11.5px]" style={{ color: "#6b5534" }}>
+            <span>How far along this step is (slide to set)</span>
+            <span className="font-semibold tabular-nums">{focus.progress}%</span>
+          </div>
           <div className="relative h-4">
             <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full" style={{ background: "rgba(120,90,40,.15)", border: "1px solid rgba(139,112,64,.4)" }}>
               <div className="h-full rounded-full transition-[width] duration-200" style={{ width: `${focus.progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)" }} />

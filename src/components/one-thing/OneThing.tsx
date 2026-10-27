@@ -357,7 +357,7 @@ function OneThingView({
               </p>
             )}
             <FocusTimer key={`timer-${task.id}`} task={task} minutes={task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25} onPopOut={popOut} />
-            {!task.habit && <FocusStepsPanel key={`steps-${task.id}`} taskId={task.id} />}
+            {!task.habit && <FocusStepsPanel key={`steps-${task.id}`} taskId={task.id} progress={task.progress ?? 0} />}
             {error && (
               <p className="relative z-[1] m-0 text-[14px] font-semibold" style={{ color: "var(--t-warn)" }}>
                 {error}

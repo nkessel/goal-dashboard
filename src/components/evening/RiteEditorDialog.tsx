@@ -172,11 +172,6 @@ export function RiteEditorDialog({
             />
           </div>
         </div>
-        {!icon && (
-          <p className="relative z-[1] -mt-1.5 m-0 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-            {isHabit ? "It shows as a checkbox. Tap the avatar to give it a portrait instead." : "Its icon follows its name. Tap it to give it a portrait instead."}
-          </p>
-        )}
 
         {isHabit && (
           <div data-mi="repeats" className="relative z-[1] flex flex-col gap-2">

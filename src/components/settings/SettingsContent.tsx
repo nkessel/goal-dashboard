@@ -14,7 +14,7 @@ import { countImports } from "@/lib/data/rewards";
 import { Avatar } from "@/components/settings/Avatar";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ToucanLookSettings, ToucanSettings } from "@/components/settings/ToucanSettings";
-import { ReorderableSections, SectionItem } from "@/components/settings/ReorderableSections";
+import { ReorderableSections, ReorderableTiles, SectionItem, TileItem } from "@/components/settings/ReorderableSections";
 import { PalettePicker } from "@/components/settings/PalettePicker";
 import { isPalette, type PaletteKey } from "@/lib/palettes";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
@@ -154,8 +154,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </Link>
         )}
 
-        {/* Inventory and the bird's cage side by side, each half wide (the cage only while the bird rests in it). */}
-        <div className="grid grid-cols-2 gap-2.5">
+        {/* The half-wide tiles: Inventory, the bird's cage (only while the bird rests in it), Power-ups, Rewards and the rest. Drag to reorder. */}
+        <ReorderableTiles>
+          <TileItem id="inventory">
         <ViewTransitionLink
             href="/settings/inventory"
             className={`hover-glow flex min-w-0 flex-1 basis-0 items-center gap-2.5 px-3.5 py-3 ${isAdventure ? "parchment" : ""}`}
@@ -176,11 +177,11 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               <path d="M9 5l7 7-7 7" stroke="var(--t-ink-soft)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </ViewTransitionLink>
-          <OwlCage toucan={profile.toucan ?? null} compact />
-        </div>
-
-        {/* Quick ways in: Power-ups and the Treasure Chest */}
-        <div className="grid grid-cols-2 gap-2.5">
+          </TileItem>
+          <TileItem id="cage">
+            <OwlCage toucan={profile.toucan ?? null} compact />
+          </TileItem>
+          <TileItem id="power-ups">
           <Link
             href="/power-ups?from=settings"
             prefetch
@@ -197,6 +198,8 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </span>
             </span>
           </Link>
+          </TileItem>
+          <TileItem id="rewards">
           <Link
             href="/rewards?from=settings"
             prefetch
@@ -213,7 +216,11 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </span>
             </span>
           </Link>
-          <EveningRoutineTile isAdventure={isAdventure} />
+          </TileItem>
+          <TileItem id="evening">
+            <EveningRoutineTile isAdventure={isAdventure} />
+          </TileItem>
+          <TileItem id="journal">
           <Link
             href="/journal?from=settings"
             prefetch
@@ -232,8 +239,11 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </span>
             </span>
           </Link>
-          <StatsTile isAdventure={isAdventure} />
-        </div>
+          </TileItem>
+          <TileItem id="stats">
+            <StatsTile isAdventure={isAdventure} />
+          </TileItem>
+        </ReorderableTiles>
 
         {/* Expandable settings rows (drag to reorder) */}
         <ReorderableSections>
@@ -402,35 +412,25 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             rightLabel="Celebrations · + button · Victories"
             icon={<span style={{ fontSize: 14 }}>✨</span>}
           >
-            <div className="flex flex-col gap-5">
-              <div>
-                <h4 className={`m-0 mb-1 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>Celebrations</h4>
-                <p className="mb-2 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-                  The dust and sparks that fly when you complete a quest.
-                </p>
+            {/* Folded groups, like Layout: open only the one you're changing. */}
+            <div className="flex flex-col gap-2">
+              <FxGroup title="Celebrations" hint="The dust and sparks that fly when you complete a quest." isAdventure={isAdventure}>
                 <CelebrationSettings />
-              </div>
-              <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
-                <h4 className={`m-0 mb-2 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>Evening Routine button</h4>
+              </FxGroup>
+              <FxGroup title="Evening Routine button" isAdventure={isAdventure}>
                 <EveningButtonFxSettings />
-              </div>
+              </FxGroup>
               {isAdventure && (
-                <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
-                  <h4 className={`m-0 mb-2 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>The + button</h4>
+                <FxGroup title="The + button" isAdventure={isAdventure}>
                   <FabSettings />
-                </div>
+                </FxGroup>
               )}
-              <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
-                <h4 className={`m-0 mb-2 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>While a screen loads</h4>
+              <FxGroup title="While a screen loads" isAdventure={isAdventure}>
                 <LoadingSettings />
-              </div>
-              <div className="pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
-                <h4 className={`m-0 mb-1 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>Victories Today, when closed</h4>
-                <p className="mb-2 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-                  Tap its title to close it. Its header then shows:
-                </p>
+              </FxGroup>
+              <FxGroup title="Victories Today, when closed" hint="Tap its title to close it. Its header then shows:" isAdventure={isAdventure}>
                 <VictoriesHeaderSettings />
-              </div>
+              </FxGroup>
               <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
                 Saved on this device.
               </p>
@@ -534,5 +534,22 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
         </ReorderableSections>
       {admin && <SetAsDefault />}
     </>
+  );
+}
+
+/** One folded group of settings inside a section. */
+function FxGroup({ title, hint, isAdventure, children }: { title: string; hint?: string; isAdventure: boolean; children: React.ReactNode }) {
+  return (
+    <details className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
+      <summary className={`cursor-pointer ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>{title}</summary>
+      <div className="mt-2">
+        {hint && (
+          <p className="mb-2 mt-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
+            {hint}
+          </p>
+        )}
+        {children}
+      </div>
+    </details>
   );
 }

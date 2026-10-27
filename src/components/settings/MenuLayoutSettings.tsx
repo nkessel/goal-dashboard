@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { MENUS, defaultLayout, layoutFor, menuLayoutCss, readMenuLayouts, saveMenuLayoutFor, serverMenuLayouts, subscribeMenuLayouts, type MenuDef } from "@/lib/menu-layouts";
 import { QuestMenuSettings } from "./QuestMenuSettings";
 import { QuestEditorLayoutSettings } from "./QuestEditorLayoutSettings";
-import { DragList, ShownSwitch } from "./DragList";
+import { DragList } from "./DragList";
 
 /** Puts every context menu's items in your order and hides the ones you've hidden (mounted once, app-wide). */
 export function MenuLayoutStyles() {
@@ -19,8 +19,9 @@ export function MenusSettings({ isAdventure }: { isAdventure: boolean }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-        Drag items into your order (hold on a phone), and hide the ones you don&rsquo;t use. Saved on this device.
+        Drag items into your order (hold on a phone). Swipe one left to hide it. Saved on this device.
       </p>
+      <h4 className={`m-0 mt-1 ${head}`}>Editors</h4>
       <details className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
         <summary className={`cursor-pointer ${head}`}>Quest editor</summary>
         <p className="mb-2 mt-1 text-xs" style={{ color: "var(--t-ink-soft)" }}>
@@ -28,6 +29,16 @@ export function MenusSettings({ isAdventure }: { isAdventure: boolean }) {
         </p>
         <QuestEditorLayoutSettings />
       </details>
+      {MENUS.filter((m) => m.id.endsWith("-editor")).map((m) => (
+        <details key={m.id} className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
+          <summary className={`cursor-pointer ${head}`}>{m.title}</summary>
+          <p className="mb-2 mt-1 text-xs" style={{ color: "var(--t-ink-soft)" }}>
+            {m.hint}
+          </p>
+          <OneMenu menu={m} />
+        </details>
+      ))}
+      <h4 className={`m-0 mt-2 ${head}`}>Context menus</h4>
       <details className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
         <summary className={`cursor-pointer ${head}`}>Quest cards</summary>
         <p className="mb-2 mt-1 text-xs" style={{ color: "var(--t-ink-soft)" }}>
@@ -35,7 +46,7 @@ export function MenusSettings({ isAdventure }: { isAdventure: boolean }) {
         </p>
         <QuestMenuSettings />
       </details>
-      {MENUS.map((m) => (
+      {MENUS.filter((m) => !m.id.endsWith("-editor")).map((m) => (
         <details key={m.id} className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
           <summary className={`cursor-pointer ${head}`}>{m.title}</summary>
           <p className="mb-2 mt-1 text-xs" style={{ color: "var(--t-ink-soft)" }}>
@@ -64,19 +75,11 @@ function OneMenu({ menu }: { menu: MenuDef }) {
         id={`menu-${menu.id}`}
         ids={layout.order}
         onReorder={(order) => saveMenuLayoutFor(menu.id, { ...layout, order })}
-        row={(k) => {
-          const hidden = layout.hidden.includes(k);
-          return (
-            <>
-              <span className={`min-w-0 flex-1 truncate text-[13.5px] ${hidden ? "line-through opacity-60" : ""}`}>{labelOf(k)}</span>
-              {!keep(k) && <ShownSwitch hidden={hidden} onToggle={() => toggle(k)} />}
-            </>
-          );
-        }}
+        row={(k) => ({ label: labelOf(k), toggle: keep(k) ? null : { hidden: layout.hidden.includes(k), onToggle: () => toggle(k) } })}
       />
       {!isDefault && (
         <button type="button" onClick={() => saveMenuLayoutFor(menu.id, null)} className="self-start text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
-          Back to the usual menu
+          Back to the usual {menu.id.endsWith("-editor") ? "layout" : "menu"}
         </button>
       )}
     </div>

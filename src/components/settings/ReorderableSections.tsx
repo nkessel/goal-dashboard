@@ -2,7 +2,7 @@
 
 import { Children, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 const KEY = "settings-order";
@@ -30,6 +30,7 @@ export function SectionItem({ id, children }: { id: string; children: React.Reac
   return (
     <div
       ref={setNodeRef}
+      data-section
       {...attributes}
       {...(locked ? {} : listeners)}
       tabIndex={-1}
@@ -39,6 +40,7 @@ export function SectionItem({ id, children }: { id: string; children: React.Reac
       onContextMenu={locked ? undefined : (e) => e.preventDefault()}
     >
       {children}
+      <div data-section-slot />
       {/* An unmarked strip along the left edge drags the section straight away (no hold), even while one is open. */}
       <span ref={setActivatorNodeRef} {...listeners} aria-hidden data-grip className="absolute left-0 top-0 z-[2] h-[60px] w-4 cursor-grab" style={{ touchAction: "none" }} />
     </div>
@@ -114,5 +116,89 @@ export function ReorderableSections({ children }: { children: React.ReactNode })
         </DndContext>
       </LockedContext.Provider>
     </OpenContext.Provider>
+  );
+}
+
+const TILES_KEY = "settings-tiles-order";
+
+/** One half-wide tile in Settings (its id keeps your order). Empty tiles take no room. */
+export function TileItem({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      tabIndex={-1}
+      className="flex min-w-0 select-none empty:hidden [&>*]:min-w-0 [&>*]:flex-1"
+      style={{ transform: CSS.Transform.toString(transform), transition, position: "relative", zIndex: isDragging ? 20 : undefined, opacity: isDragging ? 0.85 : undefined, touchAction: "pan-y", WebkitTouchCallout: "none" }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** The half-wide tiles at the top of Settings, two to a row: drag one (hold it on a phone) to move it. */
+export function ReorderableTiles({ children }: { children: React.ReactNode }) {
+  const items = useMemo(() => Children.toArray(children).filter(isValidElement) as React.ReactElement<{ id: string }>[], [children]);
+  const ids = items.map((c) => c.props.id);
+  const [order, setOrder] = useState<string[] | null>(null);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(TILES_KEY) ?? "null") as string[] | null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+      if (Array.isArray(saved)) setOrder(saved);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const sorted = order ? [...order.filter((id) => ids.includes(id)), ...ids.filter((id) => !order.includes(id))] : ids;
+  const byId = new Map(items.map((c) => [c.props.id, c]));
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const dragging = useRef(false);
+  // A drag that ends over a link isn't a tap on it.
+  const justDragged = useRef(false);
+  useEffect(() => {
+    const hold = (e: TouchEvent) => {
+      if (dragging.current) e.preventDefault();
+    };
+    window.addEventListener("touchmove", hold, { passive: false });
+    return () => window.removeEventListener("touchmove", hold);
+  }, []);
+  function onDragEnd(e: DragEndEvent) {
+    dragging.current = false;
+    justDragged.current = true;
+    setTimeout(() => (justDragged.current = false), 0);
+    if (!e.over || e.active.id === e.over.id) return;
+    const next = arrayMove(sorted, sorted.indexOf(String(e.active.id)), sorted.indexOf(String(e.over.id)));
+    setOrder(next);
+    try {
+      window.localStorage.setItem(TILES_KEY, JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  return (
+    <DndContext id="dnd-settings-tiles" sensors={sensors} collisionDetection={closestCenter} onDragStart={() => (dragging.current = true)} onDragCancel={() => (dragging.current = false)} onDragEnd={onDragEnd}>
+      <SortableContext items={sorted} strategy={rectSortingStrategy}>
+        <div
+          data-no-press-scroll
+          className="grid grid-cols-2 gap-2.5"
+          onClickCapture={(e) => {
+            if (justDragged.current) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+        >
+          {sorted.map((id) => byId.get(id))}
+        </div>
+      </SortableContext>
+    </DndContext>
   );
 }

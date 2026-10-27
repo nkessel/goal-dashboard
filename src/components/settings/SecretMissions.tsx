@@ -299,8 +299,10 @@ function MissionCard({
               const today = onToday(t);
               return (
                 <li key={t.id} className="flex flex-col rounded-lg hover:bg-black/[.04]">
-                <div className="group flex min-h-11 items-center gap-2 px-1.5">
+                <div className="group flex min-h-11 items-start gap-2 px-1.5 [&>input]:mt-2 [&>button:last-child]:mt-0.5">
                   <input type="checkbox" checked={d} onChange={() => toggleDone(t)} aria-label={`Done: ${nameOf(t)}`} />
+                  {/* The name gets the whole width; its XP and Today sit on a line beneath it. */}
+                  <div className="flex min-w-0 flex-1 flex-col gap-1 py-1">
                   {editing?.id === t.id ? (
                     <input
                       autoFocus
@@ -317,10 +319,11 @@ function MissionCard({
                       style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.7)", color: "#2a1c10" }}
                     />
                   ) : (
-                    <button type="button" onClick={() => onOpenCard({ ...t, title: nameOf(t), xp_value: xpOf(t) })} onDoubleClick={() => setEditing({ id: t.id, text: nameOf(t) })} title="Open the quest card (double-tap to rename)" className="min-w-0 flex-1 text-left text-[15px] leading-snug underline-offset-2 hover:underline" style={{ color: "#2a1c10", textDecoration: d ? "line-through" : undefined, opacity: d ? 0.6 : 1 }}>
+                    <button type="button" onClick={() => onOpenCard({ ...t, title: nameOf(t), xp_value: xpOf(t) })} onDoubleClick={() => setEditing({ id: t.id, text: nameOf(t) })} title="Open the quest card (double-tap to rename)" className="min-w-0 text-left text-[15px] leading-snug underline-offset-2 hover:underline" style={{ color: "#2a1c10", textDecoration: d ? "line-through" : undefined, opacity: d ? 0.6 : 1 }}>
                       {nameOf(t)}
                     </button>
                   )}
+                  <div className="flex flex-wrap items-center gap-1.5">
                   <button type="button" onClick={() => setStepXp(t, XP_STEPS[(XP_STEPS.indexOf(xpOf(t)) + 1) % XP_STEPS.length] ?? 20)} title="Tap to change its XP" className="shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-bold tabular-nums" style={{ background: "rgba(217,180,95,.35)", color: "#5a3e12" }}>
                     +{xpOf(t)} XP
                   </button>
@@ -333,7 +336,7 @@ function MissionCard({
                           run(() => sendMissionStepToTodayAction(t.id, false), () => setTodayNow((x) => ({ ...x, [t.id]: true })));
                         }}
                         title="On Today's Quests — tap to take it off"
-                        className="h-8 shrink-0 rounded-full px-2.5 text-[12px] font-semibold"
+                        className="h-6 shrink-0 rounded-full px-2 text-[11.5px] font-semibold"
                         style={{ background: "#2a1c10", color: "#f2d27e" }}
                       >
                         ☀ On Today
@@ -346,12 +349,14 @@ function MissionCard({
                           run(() => sendMissionStepToTodayAction(t.id, true), () => setTodayNow((x) => ({ ...x, [t.id]: false })));
                         }}
                         title="Send to Today's Quests"
-                        className="h-8 shrink-0 rounded-full px-2.5 text-[12px] font-semibold"
+                        className="h-6 shrink-0 rounded-full px-2 text-[11.5px] font-semibold"
                         style={{ border: "1px solid #a58c66", color: "#2a1c10" }}
                       >
                         → Today
                       </button>
                     ))}
+                  </div>
+                  </div>
                   <button type="button" onClick={() => setMenuFor(menuFor === t.id ? null : t.id)} aria-expanded={menuFor === t.id} aria-label={`Edit “${nameOf(t)}”`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px] leading-none hover:bg-black/[.06]" style={{ color: "#6b5631" }}>
                     ⋯
                   </button>
