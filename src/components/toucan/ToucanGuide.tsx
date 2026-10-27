@@ -34,6 +34,7 @@ import { SCHEDULER_DEFAULTS, planSchedule, type Busy, type SchedulerSettings } f
 import { openFocusMode } from "@/lib/focus-timer";
 import { GearIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "./ToucanArt";
+import { useEscape } from "@/lib/use-escape";
 import { ToucanQuiz } from "./ToucanQuiz";
 import { dailyBudget, polish, voice, windowOf } from "@/lib/toucan-style";
 import { storeStyle, useToucanStyle } from "@/lib/toucan-style-store";
@@ -148,10 +149,18 @@ export function ToucanGuide() {
   }, []);
 
   // Say something with buttons; if the toucan isn't on screen (caged, hiding), a small note instead.
+  // The bird may still be settling onto the page: try again for a few seconds before leaving a note.
   const raise = (text: string, actions: NoteAction[], note = true) => {
-    const unseen = window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text, actions } }));
-    if (unseen && note) setFallback({ text, actions });
-    return !unseen;
+    const send = () => !window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text, actions } }));
+    if (send()) return true;
+    let tries = 0;
+    const retry = () => {
+      if (send()) return;
+      if (++tries < 8) setTimeout(retry, 800);
+      else if (note) setFallback({ text, actions });
+    };
+    setTimeout(retry, 800);
+    return false;
   };
   const raiseRef = useRef(raise);
   useEffect(() => {
@@ -549,8 +558,51 @@ export function ToucanGuide() {
 type NoteAction = { label: string; run: () => void };
 
 function NudgeNote({ text, actions, onClose }: { text: string; actions: NoteAction[]; onClose: () => void }) {
+  useEscape(onClose);
+  // Drag it anywhere by its body; it remembers where you put it.
+  const [at, setAt] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const v = JSON.parse(window.localStorage.getItem("toucan-note-at") || "null") as { fx: number; fy: number } | null;
+      return v ? { x: v.fx * window.innerWidth, y: v.fy * window.innerHeight } : null;
+    } catch {
+      return null;
+    }
+  });
+  const drag = useRef<{ dx: number; dy: number; moved: boolean } | null>(null);
+  const place = at
+    ? { left: Math.max(8, Math.min(window.innerWidth - 200, at.x)), top: Math.max(8, Math.min(window.innerHeight - 80, at.y)) }
+    : null;
   return createPortal(
-    <div role="status" className="card-pop-in fixed bottom-24 left-1/2 z-[58] flex w-[min(360px,calc(100vw-24px))] -translate-x-1/2 items-start gap-2.5 rounded-2xl p-3" style={{ background: "linear-gradient(180deg, rgba(14,38,40,.96), rgba(8,22,26,.98))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 10px 28px rgba(0,0,0,.5)" }}>
+    <div
+      role="status"
+      className={`card-pop-in fixed z-[58] flex w-[min(360px,calc(100vw-24px))] cursor-grab touch-none items-start gap-2.5 rounded-2xl p-3 pr-8 ${place ? "" : "bottom-24 left-1/2 -translate-x-1/2"}`}
+      style={{ ...(place ?? {}), background: "linear-gradient(180deg, rgba(14,38,40,.96), rgba(8,22,26,.98))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 10px 28px rgba(0,0,0,.5)" }}
+      onPointerDown={(e) => {
+        if ((e.target as HTMLElement).closest("button")) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d) return;
+        d.moved = true;
+        setAt({ x: e.clientX - d.dx, y: e.clientY - d.dy });
+      }}
+      onPointerUp={(e) => {
+        const d = drag.current;
+        drag.current = null;
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+        if (d?.moved && at) {
+          try {
+            window.localStorage.setItem("toucan-note-at", JSON.stringify({ fx: at.x / window.innerWidth, fy: at.y / window.innerHeight }));
+          } catch {}
+        }
+      }}
+    >
+      <button type="button" onClick={onClose} aria-label="Close" title="Close" className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(232,255,248,.75)" }}>
+        ×
+      </button>
       <span className="shrink-0">
         <ToucanArt size={40} />
       </span>
