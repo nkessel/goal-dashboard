@@ -7,6 +7,7 @@ import { listMissionSteps } from "@/lib/data/missions";
 import { EveningRoutineTile } from "./EveningRoutineTile";
 import { StatsTile } from "./StatsTile";
 import { SetAsDefault } from "./SetAsDefault";
+import { PlanningSettings } from "./PlanningSettings";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
@@ -438,6 +439,12 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </SettingsRow>
           </SectionItem>
 
+
+          <SectionItem id="planning">
+          <SettingsRow theme={profile.theme} label="Planning & evening" rightLabel="Evening routine · planning steps" icon={<span style={{ fontSize: 14 }}>🗺</span>}>
+            <PlanningSettings isAdventure={isAdventure} withPair={admin} />
+          </SettingsRow>
+          </SectionItem>
 
           <SectionItem id="menus">
           <SettingsRow theme={profile.theme} label="Layout" rightLabel="Editors · menus" icon={<span style={{ fontSize: 14 }}>☰</span>}>

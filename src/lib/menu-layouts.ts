@@ -121,6 +121,66 @@ export const MENUS: MenuDef[] = [
   },
 ];
 
+/** The planning walks' steps, ordered and hidden the same way (Settings › Planning & evening). */
+export const PLANS: MenuDef[] = [
+  {
+    id: "plan-week",
+    title: "Weekly planning",
+    hint: "The steps of Plan the week ahead.",
+    items: [
+      { key: "look", label: "Look back" },
+      { key: "sweep", label: "Empty your head" },
+      { key: "sort", label: "Sort the haul" },
+      { key: "review", label: "Get current" },
+      { key: "focus", label: "Lift one area" },
+      { key: "rocks", label: "Big rocks" },
+      { key: "place", label: "Place it on the calendar" },
+      { key: "seal", label: "Seal the week (always last)", keep: true },
+    ],
+  },
+  {
+    id: "plan-month",
+    title: "Monthly planning",
+    hint: "The steps of the new month's plan.",
+    items: [
+      { key: "look", label: "Look back" },
+      { key: "wheel", label: "Life wheel" },
+      { key: "focus", label: "This month's focus" },
+      { key: "sweep", label: "Empty your head" },
+      { key: "sort", label: "Sort the haul" },
+      { key: "someday", label: "Someday / Maybe" },
+      { key: "place", label: "Key dates" },
+      { key: "seal", label: "Seal the month (always last)", keep: true },
+    ],
+  },
+  {
+    id: "plan-pair",
+    title: "Weekly check-in with Mom",
+    hint: "The steps of the check-in together.",
+    items: [
+      { key: "begin", label: "Before we start", keep: true },
+      { key: "good", label: "New and good" },
+      { key: "look", label: "Look back" },
+      { key: "sweep", label: "Mind sweep" },
+      { key: "subtract", label: "Subtract" },
+      { key: "rocks", label: "Big rocks" },
+      { key: "calendar", label: "Calendar" },
+      { key: "swap", label: "Every other week" },
+      { key: "light", label: "Attention out" },
+    ],
+  },
+];
+
+/** A planning walk's steps in your order, without the hidden ones ("seal" always last). */
+export function arrangeSteps<T extends { key: string }>(id: string, steps: readonly T[], all: MenuLayouts): T[] {
+  const def = PLANS.find((p) => p.id === id);
+  if (!def || !all[id]) return [...steps];
+  const l = layoutFor(def, all[id]);
+  const rank = new Map(l.order.map((k, i) => [k, i]));
+  const kept = steps.filter((s) => !l.hidden.includes(s.key));
+  return kept.sort((a, b) => (a.key === "seal" ? 1 : b.key === "seal" ? -1 : (rank.get(a.key) ?? 99) - (rank.get(b.key) ?? 99)));
+}
+
 export type MenuLayout = { order: string[]; hidden: string[] };
 export type MenuLayouts = Record<string, MenuLayout>;
 

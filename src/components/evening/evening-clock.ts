@@ -74,3 +74,66 @@ export function setEveningMode(on: boolean) {
   }
   window.dispatchEvent(new Event(MODE_EVENT));
 }
+
+/** When the evening routine invites itself to the top of Today (minutes after midnight), or "off". Chosen in Settings. */
+export const PROMPT_AT_KEY = "evening-prompt-at";
+const PROMPT_HIDDEN_KEY = "evening-prompt-hidden";
+const PROMPT_EVENT = "evening-prompt-change";
+export const PROMPT_DEFAULT = 17 * 60;
+
+export function readPromptAt(): number | "off" {
+  try {
+    const raw = window.localStorage.getItem(PROMPT_AT_KEY);
+    if (raw === "off") return "off";
+    const n = Number(raw);
+    return raw && Number.isFinite(n) ? n : PROMPT_DEFAULT;
+  } catch {
+    return PROMPT_DEFAULT;
+  }
+}
+export function savePromptAt(v: number | "off") {
+  try {
+    window.localStorage.setItem(PROMPT_AT_KEY, String(v));
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event(PROMPT_EVENT));
+}
+/** Hide the invitation until tomorrow evening. */
+export function hideEveningPrompt() {
+  try {
+    window.localStorage.setItem(PROMPT_HIDDEN_KEY, eveningDayKey());
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event(PROMPT_EVENT));
+}
+const subscribePrompt = (cb: () => void) => {
+  const t = setInterval(cb, 30_000);
+  window.addEventListener(PROMPT_EVENT, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    clearInterval(t);
+    window.removeEventListener(PROMPT_EVENT, cb);
+    window.removeEventListener("storage", cb);
+  };
+};
+/** True while the evening routine sits at the top of Today: from the chosen time until 5:30am, unless hidden tonight. */
+export function useEveningPrompt(): boolean {
+  return useSyncExternalStore(
+    subscribePrompt,
+    () => {
+      const at = readPromptAt();
+      if (at === "off") return false;
+      try {
+        if (window.localStorage.getItem(PROMPT_HIDDEN_KEY) === eveningDayKey()) return false;
+      } catch {
+        /* storage unavailable */
+      }
+      const d = new Date();
+      const m = d.getHours() * 60 + d.getMinutes();
+      return m >= at || m < EVENING_END;
+    },
+    () => false
+  );
+}

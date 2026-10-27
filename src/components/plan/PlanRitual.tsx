@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, useSyncExternalStore } from "react";
+import { arrangeSteps, readMenuLayouts, serverMenuLayouts, subscribeMenuLayouts } from "@/lib/menu-layouts";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { completePlanAction, processSeedsAction, reviewQuestAction, saveLifeWheelAction, savePlanDraftAction, setBigRocksAction, type SeedFate } from "@/app/actions";
@@ -107,7 +108,9 @@ export function PlanRitual(props: {
 }) {
   const { kind, theme } = props;
   const router = useRouter();
-  const steps = STEPS[kind];
+  // In the order chosen in Settings, without the steps you've hidden.
+  const layouts = useSyncExternalStore(subscribeMenuLayouts, readMenuLayouts, serverMenuLayouts);
+  const steps = arrangeSteps(`plan-${kind}`, STEPS[kind], layouts);
   const [d, setD] = useState<Draft>(() => ({
     step: 0,
     wentWell: "",

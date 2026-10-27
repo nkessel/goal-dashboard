@@ -158,6 +158,7 @@ export function EveningRites({
   completions,
   theme,
   tomorrow = null,
+  todayIds = [],
   openQuests = [],
 }: {
   /** Null when the rites tables haven't been created yet. */
@@ -166,6 +167,8 @@ export function EveningRites({
   theme: "calm" | "adventure";
   /** Quests already planned for tomorrow (null before that database update). */
   tomorrow?: (Task & { categoryLabel?: string | null })[] | null;
+  /** What's on Today's Quests now: tomorrow's starting choice when nothing is chosen yet. */
+  todayIds?: string[];
   /** Open quests to plan tomorrow from. */
   openQuests?: (Task & { categoryLabel?: string | null })[];
 }) {
@@ -529,7 +532,7 @@ export function EveningRites({
                 ) : r.kind === "plan" ? (
                   <DayPlanner day={day} chosen={tomorrow ?? []} theme={theme} onHide={() => toggleOpen(r)} />
                 ) : (
-                  <TomorrowQuests heading={false} queued={tomorrow} candidates={openQuests} theme={theme} onCountChange={(n) => syncTomorrow(r, n)} />
+                  <TomorrowQuests heading={false} queued={tomorrow} todayIds={todayIds} candidates={openQuests} theme={theme} onCountChange={(n) => syncTomorrow(r, n)} />
                 )}
               </div>
             </div>
@@ -628,7 +631,7 @@ export function EveningRites({
             </div>
           )}
 
-          {!tomorrowRite && <TomorrowQuests queued={tomorrow} candidates={openQuests} theme={theme} />}
+          {!tomorrowRite && <TomorrowQuests queued={tomorrow} todayIds={todayIds} candidates={openQuests} theme={theme} />}
 
           {removed && (
             <p role="status" className="fade-in -mt-2 text-center text-[14px]" style={{ color: "#d9d2bd" }}>

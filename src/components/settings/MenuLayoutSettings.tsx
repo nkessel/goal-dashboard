@@ -59,7 +59,7 @@ export function MenusSettings({ isAdventure }: { isAdventure: boolean }) {
   );
 }
 
-function OneMenu({ menu }: { menu: MenuDef }) {
+export function OneMenu({ menu }: { menu: MenuDef }) {
   const all = useSyncExternalStore(subscribeMenuLayouts, readMenuLayouts, serverMenuLayouts);
   const layout = layoutFor(menu, all[menu.id]);
   const isDefault = JSON.stringify(layout) === JSON.stringify(defaultLayout(menu));

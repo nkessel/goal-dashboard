@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, useSyncExternalStore } from "react";
+import { arrangeSteps, readMenuLayouts, serverMenuLayouts, subscribeMenuLayouts } from "@/lib/menu-layouts";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { completePlanAction, processSeedsAction, savePlanDraftAction, setBigRocksAction, type SeedFate } from "@/app/actions";
@@ -131,7 +132,10 @@ export function PairRitual(props: {
 
   const set = (patch: Partial<Draft>) => setD((x) => ({ ...x, ...patch }));
   const setSide = <K extends "good" | "look" | "subtract" | "menu" | "bedtime">(k: K, who: Who, v: string) => setD((x) => ({ ...x, [k]: { ...x[k], [who]: v } }));
-  const shown = d.walk ? STEPS.filter((s) => WALKABLE.has(s.key)) : STEPS;
+  // In the order chosen in Settings, without the steps you've hidden.
+  const layouts = useSyncExternalStore(subscribeMenuLayouts, readMenuLayouts, serverMenuLayouts);
+  const arranged = arrangeSteps("plan-pair", STEPS, layouts);
+  const shown = d.walk ? arranged.filter((s) => WALKABLE.has(s.key)) : arranged;
   const go = (n: number) => {
     set({ step: Math.max(0, Math.min(shown.length - 1, n)) });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -139,7 +143,7 @@ export function PairRitual(props: {
   const step = shown[Math.min(d.step, shown.length - 1)];
   const talked = (key: string) => !!d.walkedAt && WALKABLE.has(key) && key !== "begin" && key !== "light";
   function finishWalk() {
-    set({ walk: false, walkedAt: new Date().toISOString(), step: STEPS.findIndex((s) => s.key === "sweep") });
+    set({ walk: false, walkedAt: new Date().toISOString(), step: Math.max(0, arranged.findIndex((s) => s.key === "sweep")) });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 

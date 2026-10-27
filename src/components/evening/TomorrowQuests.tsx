@@ -40,7 +40,10 @@ export function TomorrowQuests({
   embedded = false,
   heading = !embedded,
   onCountChange,
+  todayIds = [],
 }: {
+  /** What's on Today's Quests now, shown as the starting choice until you change it. */
+  todayIds?: string[];
   /** Show its own "Tomorrow's Quests" heading (off inside the evening rite's tray). */
   heading?: boolean;
   /** Null before the database update that adds the queue. In importance order. */
@@ -74,10 +77,12 @@ export function TomorrowQuests({
   if (queued === null) return null;
 
   const byId = new Map([...candidates, ...queued].map((t) => [t.id, t]));
-  const rank = (local?.rank ?? queued.map((t) => t.id)).filter((id) => byId.has(id));
+  // Nothing chosen yet: start from what's on Today now (saved once you change anything).
+  const fromToday = !local && queued.length === 0 ? todayIds.filter((id) => byId.has(id)) : [];
+  const rank = (local?.rank ?? (fromToday.length ? fromToday : queued.map((t) => t.id))).filter((id) => byId.has(id));
   const seq =
     local?.seq ??
-    [...queued].sort((a, b) => (a.queue_seq ?? a.queue_rank ?? 0) - (b.queue_seq ?? b.queue_rank ?? 0)).map((t) => t.id);
+    (fromToday.length ? fromToday : [...queued].sort((a, b) => (a.queue_seq ?? a.queue_rank ?? 0) - (b.queue_seq ?? b.queue_rank ?? 0)).map((t) => t.id));
   const ordered = (mode === "rank" ? rank : seq.filter((id) => rank.includes(id)));
 
   function save(nextRank: string[], nextSeq: string[]) {
@@ -123,6 +128,11 @@ export function TomorrowQuests({
         </div>
       )}
 
+      {fromToday.length > 0 && (
+        <p className="m-0 px-1 text-[12.5px] italic" style={{ color: soft }}>
+          Starting from what&apos;s on Today now. Change anything to make it tomorrow&apos;s plan.
+        </p>
+      )}
       {rank.length > 1 && (
         <div className="flex flex-col gap-1">
           <div role="tablist" aria-label="Order" className="inline-flex w-fit rounded-full p-0.5" style={{ background: embedded ? "rgba(70,50,20,.12)" : "rgba(255,255,255,.08)", border: embedded ? undefined : "1px solid rgba(217,180,95,.25)" }}>

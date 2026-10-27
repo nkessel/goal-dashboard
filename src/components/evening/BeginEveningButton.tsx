@@ -1,6 +1,6 @@
 "use client";
 
-import { useIsAfternoon } from "./evening-clock";
+import { hideEveningPrompt, useEveningPrompt, useIsAfternoon } from "./evening-clock";
 import { useFlipToEvening } from "./DayNightFlip";
 import { useVisualFx, type VisualFx } from "@/lib/visual-fx";
 
@@ -102,17 +102,40 @@ function Face() {
   );
 }
 
-/** Appears after 2:30pm, between Additional Quests and Victories Today. */
+/** Appears after 2:30pm, between Additional Quests and Victories Today (unless it's already at the top). */
 export function BeginEveningButton() {
   const afternoon = useIsAfternoon();
+  const atTop = useEveningPrompt();
   const flip = useFlipToEvening();
   const fx = useVisualFx();
-  if (!afternoon) return null;
+  if (!afternoon || atTop) return null;
   const { className, ...data } = fxProps(fx);
   return (
     <button type="button" onClick={() => flip(true)} className={`hover-glow ${className}`} {...data}>
       <Face />
     </button>
+  );
+}
+
+/**
+ * From 5pm (or the time chosen in Settings) the evening routine sits at the
+ * top of Today, in place of any planning invitation, with a small "hide".
+ */
+export function EveningPromptOr({ children }: { children?: React.ReactNode }) {
+  const showing = useEveningPrompt();
+  const flip = useFlipToEvening();
+  const fx = useVisualFx();
+  if (!showing) return <>{children}</>;
+  const { className, ...data } = fxProps(fx);
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => flip(true)} className={`hover-glow ${className}`} {...data}>
+        <Face />
+      </button>
+      <button type="button" onClick={hideEveningPrompt} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full px-2 py-1 text-[12.5px] underline underline-offset-2" style={{ color: "rgba(246,236,210,.8)" }} title="Hide until tomorrow evening">
+        hide
+      </button>
+    </div>
   );
 }
 

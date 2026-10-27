@@ -17,7 +17,7 @@ import { listClaimedSince } from "@/lib/data/rewards";
 import { listRites, listRiteCompletions, listCompletionsFor, listHabitSkips, listRiteStepChecks, cleanRiteSteps } from "@/lib/data/rites";
 import { listJournalEntries } from "@/lib/data/journal";
 import { DayNightFlip } from "@/components/evening/DayNightFlip";
-import { BeginEveningButton } from "@/components/evening/BeginEveningButton";
+import { BeginEveningButton, EveningPromptOr } from "@/components/evening/BeginEveningButton";
 import { EveningRites } from "@/components/evening/EveningRites";
 import { PlanNudge } from "@/components/plan/PlanNudge";
 import { oneStepPerProject } from "@/lib/next-action";
@@ -184,7 +184,7 @@ export default async function Home() {
         day={
           <div className="flex flex-col gap-6">
             {stats}
-            {planNudge}
+            <EveningPromptOr>{planNudge}</EveningPromptOr>
             {chapter && <WeekChapter chapter={chapter} theme={profile?.theme ?? "adventure"} />}
             <TodayTaskBoard
               dueTasks={dueTasks}
@@ -223,6 +223,7 @@ export default async function Home() {
               completions={riteCompletions.map((c) => ({ rite_id: c.rite_id, day: c.day }))}
               theme={theme}
               tomorrow={tomorrow}
+              todayIds={[...dueTasks, ...topPriorities].map((t) => t.id)}
               openQuests={openTasks.filter((t) => !t.reward_id && !t.needs_review)}
             />
           </div>
