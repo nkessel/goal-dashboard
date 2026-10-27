@@ -1477,22 +1477,25 @@ function assertDay(day: string) {
 }
 
 /** Complete a rite for your local `day` (YYYY-MM-DD); pays its XP once per day. */
-export async function completeRiteAction(riteId: string, day: string) {
+/** Complete a rite for `day`; `pct` below 100 marks it done in part, for that share of its XP. */
+export async function completeRiteAction(riteId: string, day: string, pct = 100) {
   const ownerId = await requireProfileId();
   assertDay(day);
   const rite = await ritesData.getRite(riteId, ownerId);
   if (!rite) throw new Error("That rite isn't here anymore.");
-  // A habit with its own coin value pays exactly that (on top of or instead of the automatic coins).
-  const coinAdjust = rite.coin_value == null ? 0 : Math.max(0, rite.coin_value) - coinsForXp(rite.xp_value);
-  const added = await ritesData.addRiteCompletion(ownerId, riteId, day, rite.xp_value, coinAdjust);
+  const share = Math.max(1, Math.min(100, Math.round(Number(pct) || 100)));
+  const earned = Math.round((rite.xp_value * share) / 100);
+  // A habit with its own coin value pays exactly that (on top of or instead of the automatic coins); done in part, just the automatic coins.
+  const coinAdjust = rite.coin_value == null || share < 100 ? 0 : Math.max(0, rite.coin_value) - coinsForXp(rite.xp_value);
+  const added = await ritesData.addRiteCompletion(ownerId, riteId, day, earned, coinAdjust);
   let coinsEarned = 0;
-  if (added && rite.xp_value > 0) coinsEarned = (await xp.awardXp(ownerId, rite.xp_value, "task_completed")).coinsEarned;
+  if (added && earned > 0) coinsEarned = (await xp.awardXp(ownerId, earned, "task_completed")).coinsEarned;
   if (added && coinAdjust !== 0) {
     await rewardsData.addCoins(ownerId, coinAdjust);
     coinsEarned += coinAdjust;
   }
   revalidatePath("/");
-  return { xp: added ? rite.xp_value : 0, coinsEarned };
+  return { xp: added ? earned : 0, coinsEarned };
 }
 
 /** Undo a rite completion for `day` and take back its XP. */

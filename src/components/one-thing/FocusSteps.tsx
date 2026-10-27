@@ -40,6 +40,8 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
   const [tick, setTick] = useState(0);
   const [mark, setMark] = useState(0);
   const holders = useRef<Holder[]>([]);
+  // Every step's id in the quest's own order (groups included), kept when saving so the editor's order never shifts.
+  const saved = useRef<string[]>([]);
   const [party, setParty] = useState<{ title: string; xp: number; n: number } | null>(null);
 
   useEffect(() => {
@@ -62,6 +64,7 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
           }
         };
         walk(null);
+        saved.current = ordered.map((r) => r.id);
         setSteps(ordered.filter((r) => !parentIds.has(r.id)).map((r) => ({ id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, progress: r.progress ?? 0, seconds: r.seconds_spent ?? 0, state: r.state ?? null, group: r.parent_id ? (title.get(r.parent_id) ?? null) : null })));
         // Time already on the clock belongs to whatever came before.
         const t = getFocusTimer();
@@ -89,15 +92,27 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
   // A reset quest timer starts the step afresh too.
   const onThisStep = Math.max(0, live - Math.min(mark, live));
 
-  function persist(next: Step[]) {
+  /** Save the steps in the quest's own order; `moved` puts the open ones in their new order, in the places open steps held. */
+  function persist(next: Step[], moved = false) {
     setSteps(next);
     setError(null);
+    if (moved) {
+      const openIds = next.filter((s) => !s.done && !s.state).map((s) => s.id);
+      const isOpen = new Set(openIds);
+      let i = 0;
+      saved.current = saved.current.map((id) => (isOpen.has(id) ? openIds[i++] : id));
+    }
+    const byId = new Map(next.map((s) => [s.id, s]));
+    const holderById = new Map(holders.current.map((h) => [h.id, h]));
+    const payload = saved.current.flatMap((id) => {
+      const s = byId.get(id);
+      if (s) return [{ id: s.id, title: s.title, done: s.done, progress: s.progress, seconds: Math.round(s.seconds), state: s.done ? null : (s.state ?? null) }];
+      const h = holderById.get(id);
+      return h ? [{ id: h.id, title: h.title, done: h.done }] : [];
+    });
     startTransition(async () => {
       try {
-        const res = await saveQuestStepsAction(
-          taskId,
-          [...next.map((s) => ({ id: s.id, title: s.title, done: s.done, progress: s.progress, seconds: Math.round(s.seconds), state: s.done ? null : (s.state ?? null) })), ...holders.current.map((h) => ({ id: h.id, title: h.title, done: h.done }))]
-        );
+        const res = await saveQuestStepsAction(taskId, payload);
         // As in the steps tray: the quest's progress rises to what its steps add up to (never down here).
         const share = stepsShare(res.steps.map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp, weight: r.weight, progress: r.progress, state: r.state, parentKey: r.parent_id })));
         if (share > questPct.current && share < 100) {
@@ -109,8 +124,6 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
       }
     });
   }
-  /** The visible order: open steps first (in their order), then the done ones. */
-  const ordered = (list: Step[]) => [...list.filter((s) => !s.done && !s.state), ...list.filter((s) => s.done || !!s.state)];
 
   /** Give the time since the last hand-over to step `id`; the next step starts from now. */
   function pauseInto(list: Step[], id: string | undefined): Step[] {
@@ -122,14 +135,14 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
   /** Skip a step, or mark that it didn't happen: it moves out of the way. */
   function settle(id: string, state: "skipped" | "failed") {
     const list = pauseInto(steps!, focus?.id).map((x) => (x.id === id ? { ...x, state, done: false, progress: 0 } : x));
-    persist(ordered(list));
+    persist(list);
   }
   function bringUp(id: string) {
     // The time so far belongs to the step that was in focus.
     const list = pauseInto(steps!, focus?.id);
     const s = list.find((x) => x.id === id)!;
     const rest = list.filter((x) => x.id !== id);
-    persist(ordered([s, ...rest]));
+    persist([s, ...rest], true);
   }
 
   /** Finish a step: the one in focus, or one ticked off in the list below. */
@@ -141,7 +154,7 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
     const n = stamp();
     setParty({ title: step.title, xp: step.xp, n });
     setTimeout(() => setParty((p) => (p?.n === n ? null : p)), 1600);
-    persist(ordered(list));
+    persist(list);
   }
 
   function setProgress(p: number) {
@@ -158,7 +171,7 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
     const reordered = arrayMove(open, from, to);
     // If the top changes, the time so far stays with the step that had focus.
     const list = reordered[0].id !== focus?.id ? pauseInto([...reordered, ...done], focus?.id) : [...reordered, ...done];
-    persist(list);
+    persist(list, true);
   }
 
   return (
@@ -246,7 +259,7 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
               </span>
               <span className="min-w-0 flex-1 truncate line-through" style={s.state ? { textDecorationColor: "currentColor" } : undefined}>{s.title}</span>
               {s.seconds > 0 && <span className="text-[12px] tabular-nums">{fmt(s.seconds)}</span>}
-              <button type="button" onClick={() => persist(ordered(steps.map((x) => (x.id === s.id ? { ...x, done: false, progress: 0, state: null } : x))))} className="text-[12px] underline" title="Back to open">
+              <button type="button" onClick={() => persist((steps.map((x) => (x.id === s.id ? { ...x, done: false, progress: 0, state: null } : x))))} className="text-[12px] underline" title="Back to open">
                 undo
               </button>
             </li>

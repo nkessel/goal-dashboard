@@ -1078,6 +1078,7 @@ html[data-evening] [data-theme="adventure"] {
 /* ── Drawers that slide open (height animates via grid rows) ─────────── */
 .drawer-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 0fr;
   opacity: 0;
   transition: grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 240ms ease;
@@ -1088,6 +1089,8 @@ html[data-evening] [data-theme="adventure"] {
 }
 .drawer-inner {
   min-height: 0;
+  /* Keeps a wide child from stretching the drawer once it stops clipping. */
+  min-width: 0;
   overflow: hidden;
 }
 /* Once open, a drawer stops clipping, so a menu near its bottom shows in full. */

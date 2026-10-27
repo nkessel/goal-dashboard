@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { completeRiteAction, removeRiteAction, reorderRitesAction, restoreRiteAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
+import { completeRiteAction, setTomorrowQueueAction, removeRiteAction, reorderRitesAction, restoreRiteAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
 import { SwipeToDelete } from "@/components/ui/SwipeToDelete";
 import { RecentWins } from "./RecentWins";
 import { DayPlanner } from "./DayPlanner";
@@ -181,6 +181,8 @@ export function EveningRites({
   const [editing, setEditing] = useState<RiteView | { new: true; core: boolean } | null>(null);
   const [miniOpen, setMiniOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  // "Done in part": the rite and how much of it got done.
+  const [partFor, setPartFor] = useState<{ id: string; pct: number } | null>(null);
   const [pop, setPop] = useState<{ id: string; xp: number } | null>(null);
   const [away, setAway] = useState<Away>({});
   const [error, setError] = useState<string | null>(null);
@@ -227,18 +229,20 @@ export function EveningRites({
   const coreDone = core.filter((r) => doneTonight(r.id)).length;
   const allDone = core.length > 0 && coreDone === core.length;
 
-  function toggle(r: RiteView) {
+  /** Tick a rite off (or undo it); `pct` below 100 completes it in part, for that share of its XP. */
+  function toggle(r: RiteView, pct = 100) {
     if (!day) return;
     const next = !doneTonight(r.id);
     setError(null);
     setOptimistic((o) => ({ ...o, [r.id]: next }));
-    if (next && r.xp_value > 0) {
-      setPop({ id: r.id, xp: r.xp_value });
+    const earned = Math.round((r.xp_value * pct) / 100);
+    if (next && earned > 0) {
+      setPop({ id: r.id, xp: earned });
       setTimeout(() => setPop((p) => (p?.id === r.id ? null : p)), 1500);
     }
     startTransition(async () => {
       try {
-        if (next) await completeRiteAction(r.id, day);
+        if (next) await completeRiteAction(r.id, day, pct);
         else await uncompleteRiteAction(r.id, day);
       } catch (e) {
         setOptimistic((o) => ({ ...o, [r.id]: !next }));
@@ -260,6 +264,15 @@ export function EveningRites({
    */
   const [tomorrowCount, setTomorrowCount] = useState<number | null>(null);
   const chosenTomorrow = tomorrowCount ?? tomorrow?.length ?? 0;
+  // Nothing chosen yet, but Today has quests: those are tomorrow's starting list.
+  const openIds = new Set(openQuests.map((q) => q.id));
+  const prefill = (tomorrow?.length ?? 0) === 0 ? todayIds.filter((id) => openIds.has(id)) : [];
+  /** Tapping the seal with only the starting list: keep it as tomorrow's plan and complete the rite. */
+  function acceptPrefill(r: RiteView) {
+    setTomorrowCount(prefill.length);
+    toggle(r);
+    setTomorrowQueueAction(prefill, prefill).catch((e) => setError(e instanceof Error ? e.message : "Couldn't save tomorrow's plan."));
+  }
   function syncTomorrow(r: RiteView, filled: number) {
     setTomorrowCount(filled);
     const done = doneTonight(r.id);
@@ -412,7 +425,11 @@ export function EveningRites({
         }}
       >
       <div className="flex items-center gap-3">
-        {r.kind === "tomorrow" && chosenTomorrow === 0 && !done ? (
+        {r.kind === "tomorrow" && chosenTomorrow === 0 && !done && prefill.length > 0 ? (
+          <button type="button" onClick={() => acceptPrefill(r)} aria-label={`Complete ${r.title} with today's quests`} className="relative z-[1] rounded-full">
+            <RiteSeal done={done} rite={r} />
+          </button>
+        ) : r.kind === "tomorrow" && chosenTomorrow === 0 && !done ? (
           // Nothing chosen yet: the seal opens the list instead.
           <button type="button" onClick={() => toggleOpen(r)} aria-label={`${r.title}: choose a quest first`} className="relative z-[1] rounded-full">
             <RiteSeal done={done} rite={r} />
@@ -478,6 +495,22 @@ export function EveningRites({
                 Edit
               </button>
             )}
+            {!special && !done && r.xp_value > 0 && (
+              <button
+                type="button"
+                role="menuitem"
+                data-mi="part"
+                onClick={() => {
+                  setMenuFor(null);
+                  setPartFor({ id: r.id, pct: 50 });
+                }}
+                className="relative z-[1] flex min-h-11 items-center gap-2.5 border-t px-4 text-left text-[15px] hover:bg-black/5"
+                style={{ borderColor: "rgba(139,112,64,.3)" }}
+              >
+                <span aria-hidden className="w-4 text-center">◐</span>
+                Done in part…
+              </button>
+            )}
             <button type="button" role="menuitem" data-mi="skip" onClick={() => setAwayFor(r.id, "skip")} className="relative z-[1] flex min-h-11 items-center gap-2.5 border-t px-4 text-left text-[15px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
               <span aria-hidden className="w-4 text-center">⤼</span>
               Skip tonight
@@ -498,6 +531,48 @@ export function EveningRites({
                 Delete
               </button>
             )}
+          </div>
+        )}
+        {partFor?.id === r.id && !done && (
+          <div
+            className="reveal relative z-[1] mt-2 flex flex-wrap items-center gap-2 border-t pt-2"
+            style={{ borderColor: "rgba(139,112,64,.3)" }}
+            // The slider mustn't start dragging the card.
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            <span className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
+              How much got done?
+            </span>
+            <input
+              type="range"
+              min={10}
+              max={90}
+              step={10}
+              value={partFor.pct}
+              onChange={(e) => setPartFor({ id: r.id, pct: Number(e.target.value) })}
+              aria-label="How much got done"
+              className="min-w-[120px] flex-1"
+              style={{ accentColor: "#a88a3f" }}
+            />
+            <span className="w-10 text-right text-[13.5px] font-bold tabular-nums" style={{ color: "var(--t-ink)" }}>
+              {partFor.pct}%
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                toggle(r, partFor.pct);
+                setPartFor(null);
+              }}
+              className="h-9 rounded-full px-3.5 text-[14px] font-bold"
+              style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}
+            >
+              ✓ Complete · +{Math.round((r.xp_value * partFor.pct) / 100)} XP
+            </button>
+            <button type="button" onClick={() => setPartFor(null)} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
+              Cancel
+            </button>
           </div>
         )}
         {pop?.id === r.id && (

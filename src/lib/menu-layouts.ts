@@ -49,6 +49,7 @@ export const MENUS: MenuDef[] = [
     hint: "The ⋯ on an evening rite.",
     items: [
       { key: "edit", label: "Edit", keep: true },
+      { key: "part", label: "Done in part…" },
       { key: "skip", label: "Skip tonight" },
       { key: "delete", label: "Delete" },
     ],

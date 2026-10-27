@@ -319,6 +319,10 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 
   const open = drafts.find((d) => d.id === openId && (!d.deleted || sent?.id === d.id)) ?? null;
   const waiting = drafts.filter((d) => d.id !== openId && !d.deleted && hasContent(d));
+  // The screen height when this note opened: Safari's bars coming and going while you scroll mustn't resize the box.
+  const [baseH, setBaseH] = useState<{ id: string; h: number } | null>(null);
+  if (open && vp && baseH?.id !== open.id) setBaseH({ id: open.id, h: vp.innerH });
+  const screenH = open && baseH?.id === open.id ? baseH.h : (vp?.innerH ?? 0);
 
   /** Leave the open draft: empty ones simply go away. */
   const leaveOpen = useCallback(() => {
@@ -473,11 +477,11 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const mobile = vp.innerW < 640;
   const growBy = grow && open && grow.id === open.id ? grow.px : 0;
   const defaultGeom = (): Geom => {
-    // Starts at a comfortable size and grows as you write (up to the screen),
+    // Starts at a comfortable size and grows only to fit an added picture (up to the screen),
     // so it only takes the whole screen when it really needs it.
     const w = mobile ? vp.innerW - 16 : Math.min(380, vp.innerW - 40);
     // Phones: sized from the whole screen (never from what the keyboard leaves), so it doesn't jump.
-    const h = mobile ? Math.min(Math.round(clamp(vp.innerH * 0.4, 220, 300)) + growBy, Math.round(vp.innerH * 0.62)) : Math.min(Math.min(270, vp.innerH - 170) + growBy, vp.innerH - 120);
+    const h = mobile ? Math.min(Math.round(clamp(screenH * 0.4, 220, 300)) + growBy, Math.round(screenH * 0.62)) : Math.min(Math.min(270, vp.innerH - 170) + growBy, vp.innerH - 120);
     const above = btnPos.y - 12 - h;
     return { w, h, x: mobile ? 8 : clamp(btnPos.x + BTN - w, 20, vp.innerW - w - 20), y: above > 60 ? above : 60 };
   };
@@ -1032,14 +1036,8 @@ function Composer({
         data-feedback-text
         autoFocus
         value={draft.body}
-        onChange={(e) => {
-          onChange({ body: e.target.value });
-          const el = e.currentTarget;
-          requestAnimationFrame(() => {
-            const over = el.scrollHeight - el.clientHeight;
-            if (over > 2) onOverflow?.(over + 8);
-          });
-        }}
+        // The box keeps its size while you write (the text scrolls); only you resize it.
+        onChange={(e) => onChange({ body: e.target.value })}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();

@@ -129,8 +129,11 @@ export function TomorrowQuests({
       )}
 
       {fromToday.length > 0 && (
-        <p className="m-0 px-1 text-[12.5px] italic" style={{ color: soft }}>
-          Starting from what&apos;s on Today now. Change anything to make it tomorrow&apos;s plan.
+        <p className="m-0 flex flex-wrap items-center gap-x-2 px-1 text-[12.5px] italic" style={{ color: soft }}>
+          Starting from what&apos;s on Today now.
+          <button type="button" onClick={() => save(rank, seq)} className="rounded-full px-2.5 py-1 text-[12.5px] font-semibold not-italic" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
+            ✓ Keep these for tomorrow
+          </button>
         </p>
       )}
       {rank.length > 1 && (
