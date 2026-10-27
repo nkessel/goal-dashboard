@@ -843,16 +843,17 @@ function readContext(): string {
     const dl = dialog?.getAttribute("aria-label") || dialog?.querySelector("h1,h2,h3")?.textContent;
     if (dl) bits.push(`open: ${dl.trim().slice(0, 60)}`);
     const H = window.innerHeight;
-    const heads = [...document.querySelectorAll<HTMLElement>("h1, h2, h3")]
+    // Headings, labelled sections and named cards (boards, quests) in view.
+    const heads = [...document.querySelectorAll<HTMLElement>("h1, h2, h3, h4, [role=heading], section[aria-label], [data-fb-name]")]
       .filter((el) => !el.closest("[data-feedback-root]"))
       .filter((el) => {
         const r = el.getBoundingClientRect();
         return r.bottom > 0 && r.top < H && r.width > 0;
       })
-      .map((el) => (el.textContent ?? "").replace(/\s+/g, " ").trim())
+      .map((el) => (el.getAttribute("data-fb-name") || (el.tagName === "SECTION" ? el.getAttribute("aria-label") : el.textContent) || "").replace(/\s+/g, " ").trim().slice(0, 50))
       .filter(Boolean);
-    const uniq = [...new Set(heads)].slice(0, 3);
-    if (uniq.length) bits.push(`showing: ${uniq.join(", ").slice(0, 120)}`);
+    const uniq = [...new Set(heads)].slice(0, 5);
+    if (uniq.length) bits.push(`showing: ${uniq.join(", ").slice(0, 200)}`);
     const max = document.documentElement.scrollHeight - H;
     if (max > 200) bits.push(`scrolled ${Math.round((window.scrollY / max) * 100)}%`);
     return bits.join(" · ");

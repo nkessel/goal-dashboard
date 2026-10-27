@@ -229,7 +229,7 @@ export function BoardGrid({
     const body = (
       <div className="flex h-full flex-col gap-2 px-3 pb-2.5 pt-2.5">
         {/* Header: seal, title and completed count — opens the board */}
-        <Link href={href} draggable={false} className="board-title-pad flex items-start gap-1.5 rounded-md">
+        <Link href={href} draggable={false} data-fb-name={`Board: ${board.title}`} className="board-title-pad flex items-start gap-1.5 rounded-md">
           <span className="mt-[2px]">
             <BoardSeal color={board.color} size={18} />
           </span>
