@@ -69,10 +69,27 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
   const box = isAdventure ? "#8a6c2c" : "var(--t-card-border)";
   return (
     <div
-      className="steps-tray reveal relative -mt-3 mx-2 rounded-b-2xl px-3 pb-2.5 pt-5"
+      className={`steps-tray reveal relative -mt-3 mx-2 rounded-b-2xl px-3.5 pb-3 pt-5 ${isAdventure ? "parchment" : ""}`}
       onClick={(e) => e.stopPropagation()}
-      style={{ background: isAdventure ? "linear-gradient(180deg, #e9d8b0, #dcc697)" : "var(--t-card)", border: `1px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}`, borderTop: 0, boxShadow: "inset 0 6px 8px -6px rgba(60,40,10,.35)" }}
+      // A scroll unrolled from under the card: parchment, a gilded hairline inside the edge.
+      style={
+        isAdventure
+          ? { borderRadius: "0 0 16px 16px", border: "1.5px solid #a88a3f", borderTop: 0, boxShadow: "inset 0 7px 9px -6px rgba(60,40,10,.4), inset 0 0 0 3px rgba(255,248,226,.45), inset 0 0 0 4px rgba(168,138,63,.35)" }
+          : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderTop: 0, boxShadow: "inset 0 6px 8px -6px rgba(60,40,10,.35)" }
+      }
     >
+      <div className="relative z-[1] flex flex-col">
+      {steps && steps.length > 0 && (
+        <div className="mb-1 flex items-center gap-2">
+          <span className={isAdventure ? "font-display text-[15px]" : "text-[12px] font-bold uppercase tracking-wide"} style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}>
+            Steps
+          </span>
+          <span aria-hidden className="h-px flex-1" style={{ background: isAdventure ? "linear-gradient(90deg, rgba(168,138,63,.6), transparent)" : "var(--t-card-border)" }} />
+          <span className="text-[12px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+            {live.filter((x) => x.done).length}/{live.length}
+          </span>
+        </div>
+      )}
       {steps === null && !error && (
         <p className="m-0 text-[13px] italic" style={{ color: "var(--t-ink-soft)" }}>
           Unrolling the steps…
@@ -105,11 +122,15 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
                     <span
                       aria-hidden
                       className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] peer-focus-visible:outline peer-focus-visible:outline-2"
-                      style={{ border: `1.5px solid ${checked ? "var(--t-good)" : box}`, background: checked ? "var(--t-good)" : "rgba(255,250,235,.5)" }}
+                      style={
+                        isAdventure
+                          ? { border: `1.5px solid ${checked ? "#6b4a12" : box}`, background: checked ? "linear-gradient(180deg,#f6dc8e,#d9b45f 55%,#a88a3f)" : "rgba(255,250,235,.6)", boxShadow: checked ? "inset 0 1px 0 rgba(255,250,230,.7)" : "inset 0 1px 2px rgba(60,40,10,.2)" }
+                          : { border: `1.5px solid ${checked ? "var(--t-good)" : box}`, background: checked ? "var(--t-good)" : "rgba(255,250,235,.5)" }
+                      }
                     >
                       {checked && (
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                          <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M5 12.5l4.5 4.5L19 7.5" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       )}
                     </span>
@@ -135,13 +156,14 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
           </span>
         )}
         {allDone && (
-          <button type="button" onClick={onComplete} className="hover-glow h-8 rounded-full px-3 text-[13px] font-semibold" style={{ background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f" }}>
+          <button type="button" onClick={onComplete} className={`hover-glow h-8 rounded-full px-3 text-[13px] font-semibold ${isAdventure ? "one-thing-primary" : ""}`} style={isAdventure ? undefined : { background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f" }}>
             All done · complete it
           </button>
         )}
         <button type="button" onClick={onEdit} className="ml-auto underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
           Edit {isAdventure ? "quest" : "task"}
         </button>
+      </div>
       </div>
     </div>
   );

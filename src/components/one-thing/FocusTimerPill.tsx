@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { closeFocusMode, openFocusMode, resetFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
+import { createPortal } from "react-dom";
+import { FOCUS_POP_OUT, closeFocusMode, focusPipApi, openFocusMode, resetFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
 import { FocusMode } from "./OneThing";
 
 const POS_KEY = "focus-pill-pos";
+
 
 /** A focus timer still going after you left focus mode: a small pill at the top. Tap to go back in; drag to move it. */
 export function FocusTimerPill({ theme }: { theme: "calm" | "adventure" }) {
@@ -29,9 +31,40 @@ export function FocusTimerPill({ theme }: { theme: "calm" | "adventure" }) {
     return () => window.clearInterval(id);
   }, [running]);
 
+  // The popped-out timer window (opened from focus mode's "Pop out").
+  const [pip, setPip] = useState<Window | null>(null);
+  useEffect(() => {
+    const open = () => {
+      const api = focusPipApi();
+      if (!api) return;
+      api
+        .requestWindow({ width: 300, height: 132 })
+        .then((w) => {
+          w.document.title = "Focus timer";
+          w.document.body.style.cssText = "margin:0;background:#1d2617;color:#f1ead2;font-family:Georgia,serif;";
+          w.addEventListener("pagehide", () => setPip(null));
+          setPip(w);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener(FOCUS_POP_OUT, open);
+    return () => window.removeEventListener(FOCUS_POP_OUT, open);
+  }, []);
+  // Done with the timer: the little window goes too.
+  useEffect(() => {
+    if (pip && !t.task) pip.close();
+  }, [pip, t.task]);
+  const popped = pip && t.task ? createPortal(<PipTimer />, pip.document.body) : null;
+
   // App-wide host for focus mode (opened from any quest's menu, or this pill).
-  if (t.showing && t.task) return <FocusMode key={t.task.id} task={t.task} theme={theme} onClose={closeFocusMode} />;
-  if (!t.task || t.open) return null;
+  if (t.showing && t.task)
+    return (
+      <>
+        <FocusMode key={t.task.id} task={t.task} theme={theme} onClose={closeFocusMode} />
+        {popped}
+      </>
+    );
+  if (!t.task || t.open || pip) return popped;
   const spent = spentSeconds(t, running ? tick || t.runStart! : 0);
   if (!running && spent === 0) return null;
   const counting = t.mode === "countdown";
@@ -97,6 +130,44 @@ export function FocusTimerPill({ theme }: { theme: "calm" | "adventure" }) {
       <button type="button" onClick={resetFocusTimer} aria-label="Stop the timer" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(241,234,210,.75)" }}>
         ×
       </button>
+    </div>
+  );
+}
+
+/** The timer in its own window: the quest, the clock, and pause or resume. */
+function PipTimer() {
+  const t = useFocusTimer();
+  const [tick, setTick] = useState(0);
+  const running = t.runStart !== null;
+  useEffect(() => {
+    if (!running) return;
+    const id = window.setInterval(() => setTick(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, [running]);
+  if (!t.task) return null;
+  const spent = spentSeconds(t, running ? tick || t.runStart! : 0);
+  const counting = t.mode === "countdown";
+  const left = t.length * 60 - spent;
+  const secs = Math.abs(Math.round(counting ? left : spent));
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const clock = `${counting && left < 0 ? "+" : ""}${h ? `${h}:${String(m).padStart(2, "0")}` : m}:${String(secs % 60).padStart(2, "0")}`;
+  return (
+    <div style={{ display: "flex", height: "100vh", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", boxSizing: "border-box", background: "radial-gradient(ellipse at 50% 30%, rgba(217,180,95,.18), transparent 70%), linear-gradient(180deg,#232b22,#141a10)" }}>
+      <div style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, opacity: 0.8 }}>{t.task.title}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 34, fontVariantNumeric: "tabular-nums", color: counting && left < 0 ? "#f3a58f" : "#f2d27e" }}>{clock}</span>
+        <button
+          type="button"
+          onClick={() => {
+            setTick(Date.now());
+            toggleFocusTimer();
+          }}
+          style={{ height: 34, padding: "0 14px", borderRadius: 999, border: "1.5px solid #4a3913", background: "linear-gradient(180deg,#f6dc8e,#d9b45f 55%,#a88a3f)", color: "#2a1c10", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+        >
+          {running ? "Pause" : "Resume"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -14,7 +14,7 @@ import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { useEscape } from "@/lib/use-escape";
 import { rankOneThing, whyThisOne } from "@/lib/one-thing";
-import { adoptFocusTask, getFocusTimer, resetFocusTimer, setFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
+import { adoptFocusTask, canPopOutWindow, getFocusTimer, popOutFocusTimer, resetFocusTimer, setFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
 
 /** `habit` marks a daily habit shown as a quest (focus mode for a habit). */
 type TaskWithCategory = Task & { categoryLabel?: string | null; habit?: { riteId: string; day: string } };
@@ -195,6 +195,13 @@ function OneThingView({
     }, 200);
   }
 
+  /** "Pop out": the timer floats in its own window (or as the pill at the top of the app), running. */
+  function popOut() {
+    if (getFocusTimer().runStart === null) toggleFocusTimer();
+    if (canPopOutWindow()) popOutFocusTimer();
+    else exitKeepingTimer();
+  }
+
   function next() {
     setLeaving("skip");
     setTimeout(() => {
@@ -349,7 +356,7 @@ function OneThingView({
                 {whyThisOne(task, now)}
               </p>
             )}
-            <FocusTimer key={`timer-${task.id}`} task={task} minutes={task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25} />
+            <FocusTimer key={`timer-${task.id}`} task={task} minutes={task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25} onPopOut={popOut} />
             {!task.habit && <FocusStepsPanel key={`steps-${task.id}`} taskId={task.id} />}
             {error && (
               <p className="relative z-[1] m-0 text-[14px] font-semibold" style={{ color: "var(--t-warn)" }}>
@@ -408,7 +415,7 @@ function OneThingView({
               disabled={!!leaving}
               className="one-thing-primary min-h-12 flex-[1.4] rounded-full text-[16px] font-bold"
             >
-              {leaving === "done" ? "Completing…" : "Done ✓"}
+              {leaving === "done" ? "Completing…" : "Complete ✓"}
             </button>
           </div>
           {!focus && (
@@ -661,7 +668,7 @@ function Facts({ task, now }: { task: Task; now: number }) {
  * Countdown (5 / 10 / 25 minutes or any length) or a stopwatch that counts
  * up. Either pauses at any time; the countdown keeps going past zero.
  */
-function FocusTimer({ task, minutes }: { task: TaskWithCategory; minutes: number }) {
+function FocusTimer({ task, minutes, onPopOut }: { task: TaskWithCategory; minutes: number; onPopOut: () => void }) {
   const t = useFocusTimer();
   const [custom, setCustom] = useState("");
   const [tick, setTick] = useState(0);
@@ -742,6 +749,12 @@ function FocusTimer({ task, minutes }: { task: TaskWithCategory; minutes: number
         )}
         <button type="button" onClick={toggle} className="one-thing-primary h-10 min-w-[84px] rounded-full px-4 text-[15px] font-bold">
           {running ? "Pause" : spent > 0 ? "Resume" : "Start"}
+        </button>
+        <button type="button" onClick={onPopOut} aria-label="Pop out the timer" title="Pop out the timer, so it stays with you while you do other things" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ border: "1px solid rgba(139,112,64,.45)", color: "#4a3c26" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <rect x="3" y="5" width="14" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M13 3h8v8M21 3l-9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
       {!started && (

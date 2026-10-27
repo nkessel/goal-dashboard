@@ -156,7 +156,8 @@ export function QuestEditorDialog({
   const [description, setDescription] = useState(task?.description ?? prefill?.description ?? "");
   const [importance, setImportance] = useState(task ? Math.round(task.importance) : Math.round(prefill?.importance ?? 0));
   const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : Math.round(prefill?.urgency ?? 0));
-  const [xp, setXp] = useState(task?.xp_value ?? (doingNow ? 30 : 0));
+  // Tiny tasks start at 15 XP.
+  const [xp, setXp] = useState(task?.xp_value ?? (doingNow ? 30 : create?.tiny ? 15 : 0));
   const [coinValue, setCoinValue] = useState<number | null>(task?.coin_value ?? null);
   const [effort, setEffort] = useState(task?.effort ?? Math.round(prefill?.effort ?? 0));
   const [energyGain, setEnergyGain] = useState(task?.energy_gain ?? 0);
@@ -2088,7 +2089,7 @@ export function QuestEditorDialog({
                   {/* Switch between a tiny task (half height on Today) and a standard quest. */}
                   {!isCompleted && (
                     <label className="flex cursor-pointer items-center gap-1 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }} title="Tiny tasks show half height on Today, with just a check box unless they have a portrait">
-                      <input type="checkbox" checked={tiny} onChange={(e) => setTiny(e.target.checked)} className="h-3.5 w-3.5" style={{ accentColor: "#7a5f2a" }} />
+                      <input type="checkbox" checked={tiny} onChange={(e) => (setTiny(e.target.checked), e.target.checked && xp === 0 && setXp(15))} className="h-3.5 w-3.5" style={{ accentColor: "#7a5f2a" }} />
                       Tiny task
                     </label>
                   )}

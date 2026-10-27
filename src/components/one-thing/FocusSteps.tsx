@@ -5,9 +5,12 @@ import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, us
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { listQuestStepsAction, saveQuestStepsAction } from "@/app/actions";
+import { getFocusTimer, spentSeconds, useFocusTimer } from "@/lib/focus-timer";
 
 type Step = { id: string; title: string; done: boolean; xp: number; progress: number; seconds: number; state?: "skipped" | "failed" | null; group?: string | null };
 type Holder = { id: string; title: string; done: boolean };
+
+const stamp = () => Date.now();
 
 const fmt = (sec: number) => {
   const s = Math.max(0, Math.floor(sec));
@@ -18,26 +21,24 @@ const fmt = (sec: number) => {
 };
 
 /**
- * Focus on one step at a time. The step on top is the one in focus: its own
- * timer, partial progress, and a small celebration when it's done (with its
- * XP, if it has any). Drag the cards below to change what comes next, or tap
- * Focus on one to bring it up. When a step is done you can carry the timer
- * on or start fresh. Time spent on each step is saved for insights.
+ * Focus on one step at a time, on the quest's one timer (above): the time it
+ * runs while a step is on top is that step's, and each finished step shows
+ * how long it took. Tick a step below to finish it, tap Focus to bring it up,
+ * or drag it to change what comes next. Time spent on each step is saved for
+ * insights.
  */
 export function FocusSteps({ taskId }: { taskId: string }) {
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-  // The focused step's timer.
-  const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const startedAt = useRef<number | null>(null);
-  const [carry, setCarry] = useState(false);
-  // Seconds on the clock already credited to earlier steps (when the timer carries on).
-  const credited = useRef(0);
+  // The quest's timer; the step on top collects what it runs from `mark` on.
+  const timer = useFocusTimer();
+  const mine = timer.task?.id === taskId;
+  const running = mine && timer.runStart !== null;
+  const [tick, setTick] = useState(0);
+  const [mark, setMark] = useState(0);
   const holders = useRef<Holder[]>([]);
   const [party, setParty] = useState<{ title: string; xp: number; n: number } | null>(null);
-  const [, setTick] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -60,13 +61,11 @@ export function FocusSteps({ taskId }: { taskId: string }) {
         };
         walk(null);
         setSteps(ordered.filter((r) => !parentIds.has(r.id)).map((r) => ({ id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, progress: r.progress ?? 0, seconds: r.seconds_spent ?? 0, state: r.state ?? null, group: r.parent_id ? (title.get(r.parent_id) ?? null) : null })));
+        // Time already on the clock belongs to whatever came before.
+        const t = getFocusTimer();
+        setMark(t.task?.id === taskId ? spentSeconds(t, Date.now()) : 0);
       })
       .catch(() => alive && setSteps([]));
-    try {
-      setCarry(window.localStorage.getItem("focus-carry-timer") === "1");
-    } catch {
-      /* storage unavailable */
-    }
     return () => {
       alive = false;
     };
@@ -74,7 +73,7 @@ export function FocusSteps({ taskId }: { taskId: string }) {
 
   useEffect(() => {
     if (!running) return;
-    const id = setInterval(() => setTick((t) => t + 1), 500);
+    const id = setInterval(() => setTick(Date.now()), 500);
     return () => clearInterval(id);
   }, [running]);
 
@@ -84,7 +83,9 @@ export function FocusSteps({ taskId }: { taskId: string }) {
   const open = steps.filter((s) => !s.done && !s.state);
   const done = steps.filter((s) => s.done || !!s.state);
   const focus = open[0] ?? null;
-  const live = elapsed + (running && startedAt.current ? (Date.now() - startedAt.current) / 1000 : 0);
+  const live = mine ? spentSeconds(timer, running ? tick || timer.runStart! : 0) : 0;
+  // A reset quest timer starts the step afresh too.
+  const onThisStep = Math.max(0, live - Math.min(mark, live));
 
   function persist(next: Step[]) {
     setSteps(next);
@@ -103,53 +104,16 @@ export function FocusSteps({ taskId }: { taskId: string }) {
   /** The visible order: open steps first (in their order), then the done ones. */
   const ordered = (list: Step[]) => [...list.filter((s) => !s.done && !s.state), ...list.filter((s) => s.done || !!s.state)];
 
-  /** Give the time since the last hand-over to step `id`. */
+  /** Give the time since the last hand-over to step `id`; the next step starts from now. */
   function pauseInto(list: Step[], id: string | undefined): Step[] {
+    setMark(live);
     if (!id) return list;
-    const add = Math.max(0, live - credited.current);
-    credited.current = live;
-    return list.map((s) => (s.id === id ? { ...s, seconds: s.seconds + add } : s));
-  }
-  /** After a hand-over: carry the clock on, or start it fresh. */
-  function handOver() {
-    if (carry) return;
-    setElapsed(0);
-    credited.current = 0;
-    startedAt.current = running ? Date.now() : null;
-  }
-  function toggleTimer() {
-    if (running) {
-      setElapsed(live);
-      startedAt.current = null;
-      setRunning(false);
-    } else {
-      startedAt.current = Date.now();
-      setRunning(true);
-    }
-  }
-  function resetTimer() {
-    if (focus) {
-      // Keep what's been spent on this step before clearing the clock.
-      const list = pauseInto(steps!, focus.id);
-      persist(list);
-    }
-    setElapsed(0);
-    credited.current = 0;
-    startedAt.current = running ? Date.now() : null;
-  }
-  function setCarryPref(v: boolean) {
-    setCarry(v);
-    try {
-      window.localStorage.setItem("focus-carry-timer", v ? "1" : "0");
-    } catch {
-      /* storage unavailable */
-    }
+    return list.map((s) => (s.id === id ? { ...s, seconds: s.seconds + onThisStep } : s));
   }
 
   /** Skip a step, or mark that it didn't happen: it moves out of the way. */
   function settle(id: string, state: "skipped" | "failed") {
     const list = pauseInto(steps!, focus?.id).map((x) => (x.id === id ? { ...x, state, done: false, progress: 0 } : x));
-    if (id === focus?.id) handOver();
     persist(ordered(list));
   }
   function bringUp(id: string) {
@@ -157,16 +121,18 @@ export function FocusSteps({ taskId }: { taskId: string }) {
     const list = pauseInto(steps!, focus?.id);
     const s = list.find((x) => x.id === id)!;
     const rest = list.filter((x) => x.id !== id);
-    handOver();
     persist(ordered([s, ...rest]));
   }
 
-  function finish() {
-    if (!focus) return;
-    const list = pauseInto(steps!, focus.id).map((s) => (s.id === focus.id ? { ...s, done: true, progress: 100 } : s));
-    setParty({ title: focus.title, xp: focus.xp, n: Date.now() });
-    setTimeout(() => setParty((p) => (p && Date.now() - p.n >= 1500 ? null : p)), 1600);
-    handOver();
+  /** Finish a step: the one in focus, or one ticked off in the list below. */
+  function finish(id = focus?.id) {
+    const step = steps!.find((x) => x.id === id);
+    if (!step) return;
+    // Only the step in focus collects the clock's time.
+    const list = (id === focus?.id ? pauseInto(steps!, id) : steps!).map((s) => (s.id === id ? { ...s, done: true, progress: 100 } : s));
+    const n = stamp();
+    setParty({ title: step.title, xp: step.xp, n });
+    setTimeout(() => setParty((p) => (p?.n === n ? null : p)), 1600);
     persist(ordered(list));
   }
 
@@ -184,7 +150,6 @@ export function FocusSteps({ taskId }: { taskId: string }) {
     const reordered = arrayMove(open, from, to);
     // If the top changes, the time so far stays with the step that had focus.
     const list = reordered[0].id !== focus?.id ? pauseInto([...reordered, ...done], focus?.id) : [...reordered, ...done];
-    if (reordered[0].id !== focus?.id) handOver();
     persist(list);
   }
 
@@ -194,62 +159,36 @@ export function FocusSteps({ taskId }: { taskId: string }) {
         Steps · {steps.filter((x) => x.done).length}/{steps.filter((x) => x.state !== "skipped").length}
       </span>
 
-      {/* The step in focus */}
+      {/* The step in focus: just its name, its time on the quest's clock, and what to do with it. */}
       {focus ? (
-        <div key={focus.id} className="reveal relative flex flex-col gap-2 overflow-hidden rounded-2xl px-3.5 py-3" style={{ background: "linear-gradient(180deg, rgba(48,38,18,.94), rgba(30,24,12,.95))", border: "1.5px solid #a88a3f", boxShadow: "0 6px 16px rgba(0,0,0,.3)" }}>
-          <span className="text-[11.5px] font-bold uppercase tracking-[.18em]" style={{ color: "#d9b45f" }}>
-            Now{focus.group ? ` · ${focus.group}` : ""}
-          </span>
-          <span className="text-[18px] font-semibold leading-snug" style={{ color: "#f6ecd2" }}>
+        <div key={focus.id} className="reveal relative flex flex-col gap-2 overflow-hidden rounded-2xl px-3.5 py-3" style={{ background: "rgba(255,248,226,.6)", border: "1.5px solid #b39a6a", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5)" }}>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[11.5px] font-bold uppercase tracking-[.18em]" style={{ color: "#8a6116" }}>
+              Now{focus.group ? ` · ${focus.group}` : ""}
+            </span>
+            <span className="ml-auto text-[12.5px] tabular-nums" style={{ color: "#6b5534" }} title="Time on this step (the quest's timer above)">
+              {fmt(focus.seconds + onThisStep)} on this step
+            </span>
+          </div>
+          <span className="font-display text-[19px] leading-snug" style={{ color: "var(--t-ink)" }}>
             {focus.title}
           </span>
-          <div className="flex items-center gap-2">
-            <span className="font-display min-w-[64px] text-[24px] tabular-nums" style={{ color: "#f8e3a0" }} aria-live="off">
-              {fmt(live)}
-            </span>
-            <button type="button" onClick={toggleTimer} className="h-9 rounded-full px-3.5 text-[13.5px] font-bold" style={{ background: running ? "transparent" : "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #d9b45f", color: running ? "#f8e3a0" : "#2a1c10" }}>
-              {running ? "Pause" : live > 0 ? "Resume" : "Start"}
-            </button>
-            <button type="button" onClick={resetTimer} disabled={live === 0} className="h-9 rounded-full px-3 text-[13px] disabled:opacity-40" style={{ border: "1px solid rgba(217,180,95,.5)", color: "#f3e7cb" }}>
-              Reset
-            </button>
-            {focus.seconds > 0 && (
-              <span className="ml-auto text-[12px] tabular-nums" style={{ color: "rgba(243,231,203,.7)" }}>
-                {fmt(focus.seconds)} before
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setProgress(focus.progress - 1)} aria-label="Less progress" className="flex h-8 w-8 items-center justify-center rounded-full text-[17px]" style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}>
-              −
-            </button>
-            <div className="relative h-5 min-w-0 flex-1">
-              <div className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1.5px solid #8a6c2c" }}>
-                <div className="h-full rounded-full transition-[width] duration-200" style={{ width: `${focus.progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)" }} />
-              </div>
-              <input type="range" min={0} max={99} value={focus.progress} onChange={(e) => setProgress(Number(e.target.value))} aria-label="Step progress" className="progress-range absolute inset-0 w-full cursor-pointer" />
+          <div className="relative h-4">
+            <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full" style={{ background: "rgba(120,90,40,.15)", border: "1px solid rgba(139,112,64,.4)" }}>
+              <div className="h-full rounded-full transition-[width] duration-200" style={{ width: `${focus.progress}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)" }} />
             </div>
-            <button type="button" onClick={() => setProgress(focus.progress + 1)} aria-label="More progress" className="flex h-8 w-8 items-center justify-center rounded-full text-[17px]" style={{ border: "1px solid #a88a3f", color: "#f8e3a0" }}>
-              +
-            </button>
-            <span className="w-9 text-right text-[13px] font-bold tabular-nums" style={{ color: "#f8e3a0" }}>
-              {focus.progress}%
-            </span>
+            <input type="range" min={0} max={99} value={focus.progress} onChange={(e) => setProgress(Number(e.target.value))} aria-label="Step progress" title={`${focus.progress}% done`} className="progress-range absolute inset-0 w-full cursor-pointer" />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={finish} className="hover-glow h-10 flex-1 rounded-full text-[15px] font-bold" style={{ background: "linear-gradient(180deg,#7cc06a,#4f9a3f)", border: "1.5px solid #2f5a26", color: "#fff" }}>
-              ✓ Step done{focus.xp ? ` · +${focus.xp} XP` : ""}
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => finish()} className="one-thing-primary h-10 flex-1 rounded-full text-[15px] font-bold">
+              ✓ Complete step{focus.xp ? ` · +${focus.xp} XP` : ""}
             </button>
-            <button type="button" onClick={() => settle(focus.id, "skipped")} className="h-10 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(217,180,95,.5)", color: "#f3e7cb" }} title="Skip this step">
-              ⏭ Skip
+            <button type="button" onClick={() => settle(focus.id, "skipped")} className="h-10 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(139,112,64,.45)", color: "#4a3c26" }} title="Skip this step">
+              Skip
             </button>
-            <button type="button" onClick={() => settle(focus.id, "failed")} className="h-10 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(240,140,120,.55)", color: "#f3b39f" }} title="It didn't happen">
-              ✗ Failed
+            <button type="button" onClick={() => settle(focus.id, "failed")} className="h-10 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(181,70,46,.45)", color: "#9a3b26" }} title="It didn't happen">
+              Didn&rsquo;t happen
             </button>
-            <label className="flex min-h-9 cursor-pointer items-center gap-1.5 text-[12.5px]" style={{ color: "#f3e7cb" }} title="When a step is done, keep the clock running for the next one">
-              <input type="checkbox" checked={carry} onChange={(e) => setCarryPref(e.target.checked)} />
-              Keep timer going
-            </label>
           </div>
           {party && (
             <div key={party.n} className="step-party pointer-events-none absolute inset-0 flex flex-col items-center justify-center" aria-live="polite">
@@ -279,7 +218,7 @@ export function FocusSteps({ taskId }: { taskId: string }) {
           <SortableContext items={open.map((s) => s.id)} strategy={verticalListSortingStrategy}>
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
               {open.slice(1).map((s) => (
-                <UpNext key={s.id} step={s} onFocus={() => bringUp(s.id)} />
+                <UpNext key={s.id} step={s} onFocus={() => bringUp(s.id)} onDone={() => finish(s.id)} />
               ))}
             </ul>
           </SortableContext>
@@ -311,29 +250,23 @@ export function FocusSteps({ taskId }: { taskId: string }) {
   );
 }
 
-function UpNext({ step, onFocus }: { step: Step; onFocus: () => void }) {
+function UpNext({ step, onFocus, onDone }: { step: Step; onFocus: () => void; onDone: () => void }) {
+  // The whole card drags to change the order; the box ticks it off.
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: step.id });
   return (
     <li
       ref={setNodeRef}
-      className="flex min-h-11 items-center gap-2 rounded-xl px-2 py-1.5"
+      {...attributes}
+      {...listeners}
+      className="flex min-h-11 cursor-grab touch-pan-y items-center gap-2.5 rounded-xl px-2.5 py-1.5"
       style={{ transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.5 : 1, background: "rgba(255,250,235,.55)", border: "1px solid rgba(139,112,64,.3)", position: "relative", zIndex: isDragging ? 5 : undefined }}
     >
-      <button type="button" {...attributes} {...listeners} aria-label={`Move ${step.title}`} className="flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center" style={{ color: "rgba(110,85,40,.55)" }}>
-        <svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor" aria-hidden>
-          {[2, 7, 12].map((y) => (
-            <g key={y}>
-              <circle cx="2" cy={y} r="1.2" />
-              <circle cx="6" cy={y} r="1.2" />
-            </g>
-          ))}
-        </svg>
-      </button>
+      <button type="button" onClick={onDone} onPointerDown={(e) => e.stopPropagation()} role="checkbox" aria-checked={false} aria-label={`Complete ${step.title}`} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ border: "2px solid #8a6c2c", background: "rgba(255,255,255,.5)" }} />
       <span className="min-w-0 flex-1 truncate text-[15px]" style={{ color: "var(--t-ink)" }}>
         {step.title}
         {step.progress > 0 && <span className="ml-1.5 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>{step.progress}%</span>}
       </span>
-      <button type="button" onClick={onFocus} className="h-8 shrink-0 rounded-full px-3 text-[12.5px] font-semibold" style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}>
+      <button type="button" onClick={onFocus} onPointerDown={(e) => e.stopPropagation()} className="h-8 shrink-0 rounded-full px-3 text-[12.5px] font-semibold" style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}>
         Focus
       </button>
     </li>

@@ -146,3 +146,13 @@ export function openFocusMode(task: NonNullable<FocusTimerState["task"]>) {
 export function closeFocusMode() {
   setFocusTimer({ showing: false });
 }
+
+export const FOCUS_POP_OUT = "focus-pop-out";
+type PipApi = { requestWindow: (o: { width: number; height: number }) => Promise<Window> };
+export const focusPipApi = () => (typeof window === "undefined" ? undefined : (window as unknown as { documentPictureInPicture?: PipApi }).documentPictureInPicture);
+/** The timer can float in its own little always-on-top window (Chrome and Edge on a computer). */
+export const canPopOutWindow = () => !!focusPipApi();
+/** Float the focus timer in its own window, over every other app (FocusTimerPill opens it). Call it from a click. */
+export function popOutFocusTimer() {
+  window.dispatchEvent(new Event(FOCUS_POP_OUT));
+}

@@ -423,8 +423,9 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     };
   }, [begin]);
 
-  // Escape minimizes the feedback box first, before any dialog under it (like an open quest editor).
-  useEscape(() => leaveOpen(), !!openId);
+  // Escape minimizes the feedback box (or closes its Sent card) first, before any
+  // popup or menu, even one opened after it.
+  useEscape(() => (sentOpen ? requestClose() : leaveOpen()), !!openId, true);
   const sentOpen = !!openId && sent?.id === openId;
   // Once it's sent, a tap anywhere outside closes the little "Sent" card.
   useEffect(() => {

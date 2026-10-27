@@ -152,6 +152,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
   const [shown, setShown] = useState<Record<string, boolean>>({});
   const [settings, setSettings] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
+  const tapType = useRef("mouse");
   const gearRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -342,22 +343,27 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
       <figure className="relative m-0 rounded-xl px-2 pb-1 pt-2" style={{ background: "rgba(255,250,235,.55)", border: `1px solid ${GRID}` }}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          className="w-full touch-none select-none"
+          // A finger dragging up or down scrolls the page; a tap shows that day's numbers.
+          className="w-full touch-pan-y select-none"
           role="img"
           aria-label={`${visible.map((s) => s.metric).join(", ") || "No metrics"} over the last ${n} days, on a 1 to 10 scale`}
           onPointerMove={(e) => {
+            if (e.pointerType !== "mouse") return;
             const r = e.currentTarget.getBoundingClientRect();
             const px = ((e.clientX - r.left) / r.width) * W;
             const i = Math.floor(((px - L) / (W - L - R)) * n);
             setHover(i >= 0 && i < n ? i : null);
           }}
-          onPointerLeave={() => setHover(null)}
+          onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)}
+          onPointerDown={(e) => (tapType.current = e.pointerType)}
           onClick={(e) => {
-            // Tap a day to log an event on it.
             const r = e.currentTarget.getBoundingClientRect();
             const px = ((e.clientX - r.left) / r.width) * W;
             const i = Math.floor(((px - L) / (W - L - R)) * n);
-            if (i >= 0 && i < n) window.dispatchEvent(new CustomEvent("insights-add-event", { detail: { date: dayKey(days[i]) } }));
+            if (i < 0 || i >= n) return setHover(null);
+            // On a touch screen the first tap shows the day; tapping it again logs an event on it.
+            if (tapType.current !== "mouse" && hover !== i) return setHover(i);
+            window.dispatchEvent(new CustomEvent("insights-add-event", { detail: { date: dayKey(days[i]) } }));
           }}
           style={{ cursor: 'url("/design/cursor-hand.svg") 11 3, copy' }}
         >
