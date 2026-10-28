@@ -2507,3 +2507,24 @@ input[type="time"]::-webkit-datetime-edit-hour-field:focus, input[type="time"]::
   background: linear-gradient(180deg, rgba(232, 196, 110, 0.22), rgba(232, 196, 110, 0.1));
   box-shadow: inset 0 0 0 1px rgba(255, 240, 200, 0.5), 0 0 10px rgba(201, 154, 46, 0.25);
 }
+
+/* Sleep and wake times: a smoked-glass pill with a gold rim and the display face, never a white box. */
+input.night-time {
+  color-scheme: dark;
+  height: 2.25rem;
+  padding: 0 0.6em;
+  border-radius: 999px;
+  border: 1px solid rgba(217, 180, 95, 0.55);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.36), rgba(0, 0, 0, 0.18));
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 240, 200, 0.07);
+  color: var(--t-cream, #efe6cc);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input.night-time::-webkit-datetime-edit-fields-wrapper { color: inherit; }
+input.night-time::-webkit-calendar-picker-indicator { filter: invert(0.85) sepia(1) saturate(3) hue-rotate(5deg); opacity: 0.85; }
+input.night-time:focus { outline: none; border-color: rgba(242, 210, 126, 0.95); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(242, 210, 126, 0.22); }
+/* On parchment it takes the parchment's own field. */
+.parchment input.night-time { color-scheme: light; border-radius: 999px; }

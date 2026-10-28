@@ -66,7 +66,13 @@ export function EnergyCheck({
   notesToday = [],
   onSaved,
   noSleep = false,
+  sleepLink = true,
+  onSleepLink,
 }: {
+  /** A link to the sleep and wake log in Insights, for other nights. */
+  sleepLink?: boolean;
+  /** Called as that link is followed (the welcome screen steps aside). */
+  onSleepLink?: () => void;
   /** Leave out last night's sleep times. */
   noSleep?: boolean;
   /** Called once a check-in is saved (the welcome-back popup closes then). */
@@ -545,6 +551,11 @@ export function EnergyCheck({
 
                 {noteChips}
                 {noteInput}
+                {sleepLink && (
+                  <Link href="/insights#sleep-log" onClick={onSleepLink} className="self-center text-[13px] underline decoration-[rgba(217,180,95,.5)] underline-offset-[3px] hover:decoration-current" style={{ color: "var(--ec-soft, rgba(239,230,204,.8))" }}>
+                    <span aria-hidden style={{ color: "var(--t-gold)" }}>☾</span> Log sleep &amp; wake times for other nights
+                  </Link>
+                )}
                 {/* Edit check-in · Submit check-in */}
                 <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 pt-0.5">
                   {full ? (

@@ -42,6 +42,7 @@ export function WelcomeCard({
   fx,
   onClose,
   onCheckedIn,
+  onLeave,
 }: {
   mode: "day" | "back";
   heading: string;
@@ -56,6 +57,8 @@ export function WelcomeCard({
   onClose: () => void;
   /** Called once a check-in is saved here. */
   onCheckedIn?: () => void;
+  /** Steps aside without counting as a skip (it comes back on the next visit). */
+  onLeave?: () => void;
 }) {
   const style = useToucanStyle();
   const [shown, setShown] = useState(0);
@@ -119,7 +122,7 @@ export function WelcomeCard({
         <p className="m-0 mb-1 text-center font-display text-[17px]" style={{ color: "#f2d27e" }}>
           {checkedIn ? "Checked in ✓" : "Check in"}
         </p>
-        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} />
+        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} onSleepLink={onLeave ?? onClose} />
       </div>
     ),
     streak: award && award.streak > 0 ? (

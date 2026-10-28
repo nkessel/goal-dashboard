@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { Hindrance } from "@/lib/wheel-of-time";
 
 export type NightDraft = { bed: string; wake: string; effort: string[]; hindrances: Hindrance[] };
@@ -9,8 +9,7 @@ export const EMPTY_NIGHT: NightDraft = { bed: "", wake: "", effort: [], hindranc
 export const nightIsEmpty = (n: NightDraft) => !n.bed && !n.wake && !n.effort.length && !n.hindrances.length;
 
 const CREAM = "var(--t-cream)";
-const timeBox = "h-8 w-[104px] shrink-0 rounded-lg border px-1.5 text-[15px] tabular-nums";
-const timeStyle = { background: "rgba(255,250,238,.92)", borderColor: "#b39a6a", color: "#2a1c10" } as const;
+const timeBox = "night-time w-[136px] shrink-0";
 
 /**
  * The Wheel of Time in the morning's first check-in: last night's sleep time
@@ -19,6 +18,7 @@ const timeStyle = { background: "rgba(255,250,238,.92)", borderColor: "#b39a6a",
  */
 export function NightFields({ value, onChange, effort, hindrances }: { value: NightDraft; onChange: (n: NightDraft) => void; effort: string[]; hindrances: string[] }) {
   const [open, setOpen] = useState(false);
+  const turningsId = useId();
   const [timing, setTiming] = useState<Set<string>>(new Set());
   const set = (patch: Partial<NightDraft>) => onChange({ ...value, ...patch });
   const toggleEffort = (name: string) => set({ effort: value.effort.includes(name) ? value.effort.filter((e) => e !== name) : [...value.effort, name] });
@@ -45,17 +45,17 @@ export function NightFields({ value, onChange, effort, hindrances }: { value: Ni
         </span>
         <label className="flex items-center gap-1.5 text-[14px] font-semibold" style={{ color: CREAM }}>
           Slept
-          <input type="time" value={value.bed} onChange={(e) => set({ bed: e.target.value })} aria-label="Last night's sleep time" className={timeBox} style={timeStyle} />
+          <input type="time" value={value.bed} onChange={(e) => set({ bed: e.target.value })} aria-label="Last night's sleep time" className={timeBox} />
         </label>
         <label className="flex items-center gap-1.5 text-[14px] font-semibold" style={{ color: CREAM }}>
           Woke
-          <input type="time" value={value.wake} onChange={(e) => set({ wake: e.target.value })} aria-label="This morning's wake time" className={timeBox} style={timeStyle} />
+          <input type="time" value={value.wake} onChange={(e) => set({ wake: e.target.value })} aria-label="This morning's wake time" className={timeBox} />
         </label>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          aria-controls="night-turnings"
+          aria-controls={turningsId}
           aria-label={open ? "Hide Right Effort and Hindrances" : "Right Effort and Hindrances"}
           title="Right Effort and Hindrances"
           className="flex h-8 items-center gap-1 rounded-full px-1.5 hover:bg-white/10"
@@ -72,7 +72,7 @@ export function NightFields({ value, onChange, effort, hindrances }: { value: Ni
       </div>
 
       {open && (
-        <div id="night-turnings" className="reveal ml-7 flex flex-col gap-2 rounded-xl p-2.5" style={{ background: "rgba(0,0,0,.22)", border: "1px solid rgba(217,180,95,.3)" }}>
+        <div id={turningsId} className="reveal ml-7 flex flex-col gap-2 rounded-xl p-2.5" style={{ background: "rgba(0,0,0,.22)", border: "1px solid rgba(217,180,95,.3)" }}>
           <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
             <legend className="mb-1 p-0 text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: "rgba(242,210,126,.9)" }}>
               Right Effort · yesterday
@@ -101,7 +101,7 @@ export function NightFields({ value, onChange, effort, hindrances }: { value: Ni
                     (timing.has(name) || at ? (
                       <label className="flex items-center gap-1 text-[12.5px]" style={{ color: CREAM }}>
                         at
-                        <input type="time" autoFocus={!at} value={at} onChange={(e) => hindranceAt(name, e.target.value)} aria-label={`What time: ${name}`} className="h-7 w-[96px] rounded-md border px-1 text-[14px] tabular-nums" style={timeStyle} />
+                        <input type="time" autoFocus={!at} value={at} onChange={(e) => hindranceAt(name, e.target.value)} aria-label={`What time: ${name}`} className="night-time !h-8 w-[128px]" />
                       </label>
                     ) : (
                       <button type="button" onClick={() => setTiming((s) => new Set(s).add(name))} className="h-7 rounded-full px-2 text-[12.5px] underline underline-offset-2" style={{ color: "var(--t-gold)" }}>

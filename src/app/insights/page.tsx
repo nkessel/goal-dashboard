@@ -99,7 +99,7 @@ export default async function InsightsPage() {
             Check in
           </h2>
           {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
-          <EnergyCheck full today={null} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
+          <EnergyCheck full sleepLink={false} today={null} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
           <CheckInHub readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} />
           </div>
         </section>

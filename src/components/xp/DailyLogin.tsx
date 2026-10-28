@@ -169,6 +169,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       suggestions={shown.ctx.suggestions}
       fx={fx}
       onCheckedIn={() => setPending(null)}
+      onLeave={() => setShown(null)}
       onClose={() => {
         setPending(null);
         setShown(null);
