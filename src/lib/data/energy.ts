@@ -45,7 +45,7 @@ export async function listEnergySince(ownerId: string, sinceISO: string): Promis
 // Other check-in metrics (mood, focus, …), beside energy
 // ---------------------------------------------------------------------------
 
-export type CheckReading = { metric: string; level: number; created_at: string };
+export type CheckReading = { id?: string; metric: string; level: number; created_at: string };
 
 const MAX_METRICS = 6;
 
@@ -81,10 +81,16 @@ export async function logCheckIns(ownerId: string, readings: { metric: string; l
     .map((r) => ({ owner_id: ownerId, metric: cleanLabel(r.metric), level: Math.min(10, Math.max(1, Math.round(r.level * 10) / 10)), ...(atISO ? { created_at: atISO } : {}) }))
     .filter((r) => r.metric);
   if (rows.length === 0) return [];
-  const { data, error } = await supabaseAdmin().from("check_ins").insert(rows).select("metric, level, created_at");
+  const { data, error } = await supabaseAdmin().from("check_ins").insert(rows).select("id, metric, level, created_at");
   if (error && (error.code === "42P01" || error.code === "PGRST205" || /check_ins/.test(error.message))) throw new Error("Tracking more in check-ins needs a quick database update first.");
   if (error) throw new Error(`Couldn't save your check-in: ${error.message}`);
-  return (data ?? []).map((r) => ({ metric: r.metric as string, level: Number(r.level), created_at: r.created_at as string }));
+  return (data ?? []).map((r) => ({ id: r.id as string, metric: r.metric as string, level: Number(r.level), created_at: r.created_at as string }));
+}
+
+/** Remove check-in readings by id (energy and other metrics). */
+export async function deleteReadings(ownerId: string, energyIds: string[], checkInIds: string[]): Promise<void> {
+  if (energyIds.length) await supabaseAdmin().from("energy_log").delete().eq("owner_id", ownerId).in("id", energyIds);
+  if (checkInIds.length) await supabaseAdmin().from("check_ins").delete().eq("owner_id", ownerId).in("id", checkInIds);
 }
 
 /** Each metric's latest reading since a moment (e.g. a day or two back). */

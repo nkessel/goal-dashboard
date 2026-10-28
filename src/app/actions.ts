@@ -3016,7 +3016,7 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
   const tz = process.env.APP_TIMEZONE || "America/New_York";
   const now = new Date();
   const db = supabaseAdmin();
-  const [{ extras, coach }, tasks, profile, wins, checks, boardsRes, aspRes] = await Promise.all([
+  const [{ extras, coach }, tasks, profile, wins, checks, boardsRes, aspRes, metrics] = await Promise.all([
     readCoach(ownerId),
     guideTasks(ownerId, { imports: true }),
     profilesData.getProfileById(ownerId),
@@ -3024,9 +3024,12 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
     energyData.latestCheckIns(ownerId, new Date(now.getTime() - 36 * 3_600_000).toISOString()).catch(() => ({})),
     db.from("boards").select("id, title, parent_board_id").eq("owner_id", ownerId),
     db.from("tasks").select("title").eq("owner_id", ownerId).eq("status", "open").eq("is_aspiration", true).limit(12),
+    energyData.getCheckMetrics(ownerId).catch(() => [] as string[]),
   ]);
   const { contextLines } = await import("@/lib/toucan-guide");
-  const { coachSystemPrompt, parseReply } = await import("@/lib/coach");
+  const { coachSystemPrompt, parseReply, asksToMake, MAKES } = await import("@/lib/coach");
+  const { cleanWheel } = await import("@/lib/wheel-of-time");
+  const wheel = cleanWheel(extras.wheelOfTime);
   const { mentioned } = await import("@/lib/toucan-guide");
   const { catchUpPlan, catchUpOrder } = await import("@/lib/catch-up");
   const fmtWhen = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tz });
@@ -3055,6 +3058,10 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
     promises: lite ? [] : coach.promises.filter((p) => p.status === "open").map((p) => `- ${p.text}${p.due ? ` (for ${fmtWhen(p.due)})` : p.next ? ` (next time: ${p.next})` : ""}`),
     style: styleLines(cleanStyle(extras.toucanStyle)),
     lite,
+    todayKey: `${todayKey} (${now.toLocaleDateString("en-US", { weekday: "long", timeZone: tz })})`,
+    metrics,
+    effort: wheel.effort,
+    hindrances: wheel.hindrances,
   });
   // The light guide keeps no memory: it sees only this conversation.
   const past = lite ? liteHistory.slice(-10).map((m) => ({ role: m.role, content: String(m.content).slice(0, 1200) })) : coach.history.slice(-12);
@@ -3077,7 +3084,10 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
     }
   }
   if (!raw) throw new Error("The toucan is lost in thought. Try again in a moment.");
-  const { text: reply, actions } = parseReply(raw, tasks);
+  const { text: reply, actions: parsed } = parseReply(raw, tasks, { metrics, effort: wheel.effort, hindrances: wheel.hindrances });
+  // Asked to add or log something: the app makes those entries itself (each with an undo).
+  const makeNow = asksToMake(text);
+  const actions = parsed.map((a) => ((MAKES as readonly string[]).includes(a.type) ? { ...a, auto: makeNow } : a));
   if (lite) {
     // Plan buttons for the quests it names; nothing remembered.
     const named = mentioned(reply, tasks).map((q) => ({ type: "plan" as const, questId: q.id, quest: q.title }));
@@ -3139,13 +3149,54 @@ export async function coachAddStepsAction(taskId: string, titles: string[]) {
 }
 
 /** A quest the toucan suggested (something you named that wasn't on your list yet). */
-export async function coachNewQuestAction(title: string, minutes: number | null) {
+export async function coachNewQuestAction(title: string, minutes: number | null, dueISO: string | null = null) {
   const ownerId = await requireProfileId();
   const t = title.replace(/\s+/g, " ").trim().slice(0, 120);
   if (!t) throw new Error("Give it a name.");
-  const task = await tasksData.createTask(ownerId, { title: t, importance: 3, urgency: 3, xpValue: 15, estimateMinutes: minutes ?? null });
+  const due = dueISO && Number.isFinite(Date.parse(dueISO)) ? new Date(dueISO).toISOString() : null;
+  const task = await tasksData.createTask(ownerId, { title: t, importance: 3, urgency: 3, xpValue: 15, estimateMinutes: minutes ?? null, dueAt: due });
   revalidatePath("/");
   return task.id;
+}
+
+/** A check-in the toucan logged; returns what it saved so it can be undone. */
+export async function coachCheckInAction(energy: number | null, metrics: { metric: string; level: number }[]) {
+  const ownerId = await requireProfileId();
+  if (energy === null && !metrics.length) throw new Error("Nothing to check in yet.");
+  const entry = energy === null ? null : await energyData.logEnergy(ownerId, energy);
+  const extra = metrics.length ? await energyData.logCheckIns(ownerId, metrics) : [];
+  revalidatePath("/");
+  revalidatePath("/insights");
+  return { energyId: entry?.id ?? null, checkInIds: extra.map((r) => r.id).filter((id): id is string => !!id) };
+}
+
+/** Take back a check-in the toucan logged. */
+export async function coachUndoCheckInAction(ref: { energyId: string | null; checkInIds: string[] }) {
+  const ownerId = await requireProfileId();
+  await energyData.deleteReadings(ownerId, ref.energyId ? [ref.energyId] : [], ref.checkInIds);
+  revalidatePath("/");
+  revalidatePath("/insights");
+}
+
+/**
+ * A night the toucan logged on the Wheel of Time, added to what's already
+ * there for that morning. Returns the night as it was, for undo.
+ */
+export async function coachLogNightAction(input: { day: string | null; bed: string | null; wake: string | null; effort: string[]; hindrances: string[] }) {
+  const ownerId = await requireProfileId();
+  const { cleanWheel } = await import("@/lib/wheel-of-time");
+  const wheel = cleanWheel((await readExtras(ownerId)).wheelOfTime);
+  const day = input.day && /^\d{4}-\d{2}-\d{2}$/.test(input.day) ? input.day : tomorrowData.appDayKey();
+  const was = wheel.log[day] ?? null;
+  const hindrances = [...(was?.hindrances ?? [])];
+  for (const h of input.hindrances) if (!hindrances.some((x) => x.name === h)) hindrances.push({ name: h });
+  await saveNightAction({ day, bed: input.bed ?? was?.bed ?? null, wake: input.wake ?? was?.wake ?? null, effort: [...new Set([...(was?.effort ?? []), ...input.effort])], hindrances });
+  return { day, was };
+}
+
+/** Put a night back the way it was before the toucan logged it. */
+export async function coachUndoNightAction(day: string, was: import("@/lib/wheel-of-time").NightLog | null) {
+  await saveNightAction({ day, bed: was?.bed ?? null, wake: was?.wake ?? null, effort: was?.effort ?? [], hindrances: was?.hindrances ?? [] });
 }
 
 // ---- Getting up to date on coursework.

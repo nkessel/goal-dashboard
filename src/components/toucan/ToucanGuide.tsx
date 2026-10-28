@@ -12,6 +12,13 @@ import {
   coachClearAction,
   coachForgetAction,
   coachNewQuestAction,
+  coachCheckInAction,
+  coachUndoCheckInAction,
+  coachLogNightAction,
+  coachUndoNightAction,
+  addCheckNoteAction,
+  deleteCheckNoteAction,
+  deleteTaskAction,
   coachPromiseAction,
   coachStateAction,
   courseworkAction,
@@ -40,7 +47,7 @@ import { dailyBudget, polish, voice, windowOf } from "@/lib/toucan-style";
 import { storeStyle, useToucanStyle } from "@/lib/toucan-style-store";
 
 type PlanTarget = { id: string; title: string; estimate: number | null; dueAt: string | null };
-type Msg = { role: "user" | "assistant"; content: string; actions?: CoachAction[]; remembered?: CoachNote[] };
+type Msg = { role: "user" | "assistant"; content: string; actions?: (CoachAction & { auto?: boolean })[]; remembered?: CoachNote[] };
 type Mode = "talk" | "catchup";
 
 /** An invitation put off with Snooze, and what it offers when it comes back. */
@@ -1012,7 +1019,125 @@ function GuideSheet({
 }
 
 /** One thing the toucan offers to do: nothing happens until you tap it. */
-function ActionCard({ action: a, onPlan, onPromise }: { action: CoachAction; onPlan: (p: PlanTarget) => void; onPromise: (p: CoachPromise) => void }) {
+function ActionCard({ action: a, onPlan, onPromise }: { action: CoachAction & { auto?: boolean }; onPlan: (p: PlanTarget) => void; onPromise: (p: CoachPromise) => void }) {
+  if (a.type === "newquest" || a.type === "event" || a.type === "checkin" || a.type === "wheel") return <MadeCard action={a} />;
+  return <OfferCard action={a} onPlan={onPlan} onPromise={onPromise} />;
+}
+
+type Made = Extract<CoachAction, { type: "newquest" | "event" | "checkin" | "wheel" }>;
+/** Local wall time from the toucan ("2026-10-30" = end of that day) as an ISO stamp. */
+const stampISO = (v: string) => new Date(v.length === 10 ? `${v}T23:59` : v).toISOString();
+const clock12 = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")}${h < 12 ? "am" : "pm"}`;
+};
+
+/**
+ * An entry the toucan makes: a quest, an event, a check-in or a night on the
+ * Wheel of Time. Made straight away when you asked for it (with an undo),
+ * otherwise offered with one button.
+ */
+function MadeCard({ action: a }: { action: Made & { auto?: boolean } }) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "busy" | "done" | "error" | "undone">("idle");
+  const [msg, setMsg] = useState<string | null>(null);
+  const undo = useRef<(() => Promise<unknown>) | null>(null);
+  const started = useRef(false);
+  const short = (t: string, n = 40) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+  const when = (v: string) =>
+    new Date(v.length === 10 ? `${v}T12:00` : v).toLocaleString(undefined, v.length === 10 ? { weekday: "short", month: "short", day: "numeric" } : { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const label =
+    a.type === "newquest"
+      ? { icon: "⚔️", kind: "Quest", what: `“${short(a.title)}”${a.due ? ` · due ${when(a.due)}` : ""}${a.minutes ? ` · ${a.minutes} min` : ""}` }
+      : a.type === "event"
+        ? { icon: "🏷", kind: "Event", what: `“${short(a.text, 60)}”${a.at ? ` · ${when(a.at)}` : ""}` }
+        : a.type === "checkin"
+          ? { icon: "💠", kind: "Check-in", what: [...(a.energy !== null ? [`Energy ${a.energy}`] : []), ...a.metrics.map((m) => `${m.metric} ${m.level}`)].join(" · ") }
+          : {
+              icon: "🌀",
+              kind: "Wheel of Time",
+              what: [a.day ? `night before ${when(a.day)}` : "last night", a.bed && `bed ${clock12(a.bed)}`, a.wake && `woke ${clock12(a.wake)}`, ...a.effort.map((e) => `✦ ${e}`), ...a.hindrances.map((h) => `↺ ${h}`)].filter(Boolean).join(" · "),
+            };
+  async function make() {
+    setState("busy");
+    try {
+      if (a.type === "newquest") {
+        const id = await coachNewQuestAction(a.title, a.minutes, a.due ? stampISO(a.due) : null);
+        undo.current = () => deleteTaskAction(id);
+      } else if (a.type === "event") {
+        const note = await addCheckNoteAction(a.text, a.at ? stampISO(a.at) : null);
+        undo.current = () => deleteCheckNoteAction(note.id);
+      } else if (a.type === "checkin") {
+        const ref = await coachCheckInAction(a.energy, a.metrics);
+        undo.current = () => coachUndoCheckInAction(ref);
+      } else {
+        const r = await coachLogNightAction({ day: a.day, bed: a.bed, wake: a.wake, effort: a.effort, hindrances: a.hindrances });
+        undo.current = () => coachUndoNightAction(r.day, r.was);
+      }
+      setState("done");
+      router.refresh();
+    } catch (e) {
+      setState("error");
+      setMsg(e instanceof Error ? e.message : "That didn't work.");
+    }
+  }
+  async function takeBack() {
+    if (!undo.current) return;
+    setState("busy");
+    try {
+      await undo.current();
+      undo.current = null;
+      setState("undone");
+      router.refresh();
+    } catch (e) {
+      setState("error");
+      setMsg(e instanceof Error ? e.message : "Couldn't undo that.");
+    }
+  }
+  useEffect(() => {
+    if (a.auto && !started.current) {
+      started.current = true;
+      void make();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the reply arrives
+  }, []);
+  const verb = a.type === "newquest" ? "Add" : "Log";
+  return (
+    <div className="flex w-[88%] flex-col gap-1.5 rounded-2xl p-3" style={{ background: "rgba(140,240,220,.07)", border: "1px solid rgba(140,240,220,.3)" }}>
+      <span className="text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "rgba(140,240,220,.85)" }}>
+        {label.icon} {label.kind}
+      </span>
+      <span className="text-[14px] leading-snug" style={{ textDecoration: state === "undone" ? "line-through" : undefined, opacity: state === "undone" ? 0.6 : 1 }}>
+        {label.what}
+      </span>
+      {state === "done" ? (
+        <span className="flex items-center gap-2 text-[12.5px]" style={{ color: "#bff7ea" }}>
+          {a.type === "newquest" ? "Added ✓" : "Logged ✓"}
+          <button type="button" className="underline" onClick={() => void takeBack()}>
+            Undo
+          </button>
+        </span>
+      ) : state === "undone" ? (
+        <span className="flex items-center gap-2 text-[12.5px]" style={{ color: "rgba(232,255,248,.6)" }}>
+          Taken back.
+          <button type="button" className="underline" onClick={() => void make()}>
+            {verb} it again
+          </button>
+        </span>
+      ) : state === "error" ? (
+        <span className="text-[12.5px]" style={{ color: "#ffb4a8" }}>
+          {msg}
+        </span>
+      ) : (
+        <Pill strong onClick={() => void make()}>
+          {state === "busy" ? (a.type === "newquest" ? "Adding…" : "Logging…") : a.type === "newquest" ? "＋ Add this quest" : "Log this"}
+        </Pill>
+      )}
+    </div>
+  );
+}
+
+function OfferCard({ action: a, onPlan, onPromise }: { action: CoachAction; onPlan: (p: PlanTarget) => void; onPromise: (p: CoachPromise) => void }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
   const [msg, setMsg] = useState<string | null>(null);
@@ -1097,14 +1222,6 @@ function ActionCard({ action: a, onPlan, onPromise }: { action: CoachAction; onP
           doneLine
         )}
       </div>
-    );
-  if (a.type === "newquest")
-    return state === "done" || state === "error" ? (
-      doneLine
-    ) : (
-      <Pill strong onClick={() => void run(() => coachNewQuestAction(a.title, a.minutes), `Added “${a.title}” to your quests ✓`)}>
-        ＋ Add quest “{a.title.length > 28 ? `${a.title.slice(0, 27)}…` : a.title}”
-      </Pill>
     );
   if (a.type === "journal")
     return state === "done" || state === "error" ? (
