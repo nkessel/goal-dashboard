@@ -3027,7 +3027,7 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
     energyData.getCheckMetrics(ownerId).catch(() => [] as string[]),
   ]);
   const { contextLines } = await import("@/lib/toucan-guide");
-  const { coachSystemPrompt, parseReply, asksToMake, MAKES } = await import("@/lib/coach");
+  const { coachSystemPrompt, parseReply, asksToMake, asksToShip, MAKES } = await import("@/lib/coach");
   const { cleanWheel } = await import("@/lib/wheel-of-time");
   const wheel = cleanWheel(extras.wheelOfTime);
   const { mentioned } = await import("@/lib/toucan-guide");
@@ -3063,10 +3063,16 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
     effort: wheel.effort,
     hindrances: wheel.hindrances,
   });
+  // The app's owner asking to build their feedback: the app starts that build (a card shows it).
+  const ship = !lite && asksToShip(text) && (await feedbackData.isAdmin(ownerId)) ? await (await import("@/lib/data/feedback-run")).pendingFeedback(ownerId) : null;
+  const shipLine =
+    ship === null
+      ? ""
+      : `\n\nThey are asking you to build their app feedback. The app is starting that build right now (${ship} note${ship === 1 ? "" : "s"} waiting) and shows a card for it. Say in a sentence or two that you've sent ${ship ? `their ${ship} note${ship === 1 ? "" : "s"}` : "it"} to the builders and the changes go live on their own when they're done${ship ? "" : " (though nothing new is waiting right now)"}. Offer no ACTIONS line.`;
   // The light guide keeps no memory: it sees only this conversation.
   const past = lite ? liteHistory.slice(-10).map((m) => ({ role: m.role, content: String(m.content).slice(0, 1200) })) : coach.history.slice(-12);
   const history = [...past, { role: "user" as const, content: text }];
-  const messages = [{ role: "system", content: system }, ...history.map((m) => ({ role: m.role, content: m.content }))];
+  const messages = [{ role: "system", content: system + shipLine }, ...history.map((m) => ({ role: m.role, content: m.content }))];
   let raw = "";
   for (const model of ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct-fast"]) {
     try {
@@ -3087,7 +3093,7 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
   const { text: reply, actions: parsed } = parseReply(raw, tasks, { metrics, effort: wheel.effort, hindrances: wheel.hindrances });
   // Asked to add or log something: the app makes those entries itself (each with an undo).
   const makeNow = asksToMake(text);
-  const actions = parsed.map((a) => ((MAKES as readonly string[]).includes(a.type) ? { ...a, auto: makeNow } : a));
+  const actions = ship !== null ? [{ type: "ship" as const, pending: ship, auto: true }] : parsed.map((a) => ((MAKES as readonly string[]).includes(a.type) ? { ...a, auto: makeNow } : a));
   if (lite) {
     // Plan buttons for the quests it names; nothing remembered.
     const named = mentioned(reply, tasks).map((q) => ({ type: "plan" as const, questId: q.id, quest: q.title }));
@@ -3157,6 +3163,25 @@ export async function coachNewQuestAction(title: string, minutes: number | null,
   const task = await tasksData.createTask(ownerId, { title: t, importance: 3, urgency: 3, xpValue: 15, estimateMinutes: minutes ?? null, dueAt: due });
   revalidatePath("/");
   return task.id;
+}
+
+/** Start building the owner's app feedback (the toucan's "ship" card). Only the app's owner can. */
+export async function coachShipFeedbackAction() {
+  const ownerId = await requireProfileId();
+  if (!(await feedbackData.isAdmin(ownerId))) throw new Error("Only the app's owner can start an update.");
+  const run = await import("@/lib/data/feedback-run");
+  const pending = await run.pendingFeedback(ownerId);
+  if (!pending) return { url: null, already: false, pending };
+  const r = await run.startRun(pending);
+  return { url: r.url, already: !!r.already, pending };
+}
+
+/** Save (or remove, with "") the token that lets the app start feedback builds. */
+export async function saveFeedbackRunTokenAction(token: string) {
+  const ownerId = await requireProfileId();
+  if (!(await feedbackData.isAdmin(ownerId))) throw new Error("Only the app's owner can change that.");
+  await (await import("@/lib/data/feedback-run")).saveRunToken(token);
+  revalidatePath("/feedback-review");
 }
 
 /** A check-in the toucan logged; returns what it saved so it can be undone. */

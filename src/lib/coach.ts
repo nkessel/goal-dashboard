@@ -21,7 +21,8 @@ export type CoachAction =
   | { type: "checkin"; energy: number | null; metrics: { metric: string; level: number }[] }
   | { type: "wheel"; day: string | null; bed: string | null; wake: string | null; effort: string[]; hindrances: string[] }
   | { type: "journal"; text: string }
-  | { type: "remember"; note: string };
+  | { type: "remember"; note: string }
+  | { type: "ship"; pending: number };
 
 /** Entries the toucan can make itself when asked: these carry `auto` when the message asked for them. */
 export const MAKES = ["newquest", "event", "checkin", "wheel"] as const;
@@ -29,6 +30,11 @@ export const MAKES = ["newquest", "event", "checkin", "wheel"] as const;
 /** Does the message ask the toucan to make or log something (vs. just talking)? */
 export function asksToMake(message: string) {
   return /\b(add|log|create|make|put|record|track|note|enter|save|set|schedule|mark|new|remind)\b|\b(slept|went to bed|woke|bedtime|check me in|check[- ]in)\b/i.test(message);
+}
+
+/** Does the message ask to build the app feedback ("implement my feedback", "ship the feedback")? Only the app's owner can. */
+export function asksToShip(message: string) {
+  return /\b(implement|build|ship|apply|work on|start on|get to|do (?:the|my|all|any)|handle|deploy)\b[^.?!]{0,40}\bfeedback\b|\bfeedback\b[^.?!]{0,30}\b(implemented|built|shipped|live|going)\b/i.test(message);
 }
 
 /** What the reply can refer to besides quests: tracked check-in metrics and the Wheel of Time lists. */

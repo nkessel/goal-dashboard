@@ -5,19 +5,22 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { getProfileById } from "@/lib/data/profiles";
 import { isAdmin, listFeedbackForReview } from "@/lib/data/feedback";
 import { FeedbackReview } from "@/components/feedback/FeedbackReview";
+import { FeedbackRunSetup } from "@/components/feedback/FeedbackRunSetup";
+import { pendingFeedback, runStatus } from "@/lib/data/feedback-run";
 
 /** The app owner's queue: feedback from people in the party, one decision each. */
 export default async function FeedbackReviewPage() {
   const session = await requireSession();
   const [profile, admin] = await Promise.all([getProfileById(session.user.id), isAdmin(session.user.id)]);
   if (!profile || !admin) notFound();
-  const items = await listFeedbackForReview();
+  const [items, run, pending] = await Promise.all([listFeedbackForReview(), runStatus().catch(() => ({ connected: false, lastAt: null, lastUrl: null })), pendingFeedback(session.user.id)]);
   const isAdventure = profile.theme === "adventure";
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <div className="flex flex-col gap-4">
         <PageHeader isAdventure={isAdventure} title="App Feedback" calmTitle="App feedback" subtitle="What your party would change. Decide what happens to each note." />
+        <FeedbackRunSetup connected={run.connected} pending={pending} lastAt={run.lastAt} lastUrl={run.lastUrl} theme={profile.theme} />
         <FeedbackReview items={items} theme={profile.theme} />
       </div>
     </AppShell>

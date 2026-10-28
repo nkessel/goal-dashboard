@@ -16,6 +16,7 @@ import {
   coachUndoCheckInAction,
   coachLogNightAction,
   coachUndoNightAction,
+  coachShipFeedbackAction,
   addCheckNoteAction,
   deleteCheckNoteAction,
   deleteTaskAction,
@@ -1021,6 +1022,7 @@ function GuideSheet({
 /** One thing the toucan offers to do: nothing happens until you tap it. */
 function ActionCard({ action: a, onPlan, onPromise }: { action: CoachAction & { auto?: boolean }; onPlan: (p: PlanTarget) => void; onPromise: (p: CoachPromise) => void }) {
   if (a.type === "newquest" || a.type === "event" || a.type === "checkin" || a.type === "wheel") return <MadeCard action={a} />;
+  if (a.type === "ship") return <ShipCard action={a} />;
   return <OfferCard action={a} onPlan={onPlan} onPromise={onPromise} />;
 }
 
@@ -1133,6 +1135,69 @@ function MadeCard({ action: a }: { action: Made & { auto?: boolean } }) {
           {state === "busy" ? (a.type === "newquest" ? "Adding…" : "Logging…") : a.type === "newquest" ? "＋ Add this quest" : "Log this"}
         </Pill>
       )}
+    </div>
+  );
+}
+
+/**
+ * The owner asked the toucan to build their app feedback: it starts the
+ * build straight away (or with one button) and links to it.
+ */
+function ShipCard({ action: a }: { action: Extract<CoachAction, { type: "ship" }> & { auto?: boolean } }) {
+  const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const started = useRef(false);
+  async function start() {
+    setState("busy");
+    try {
+      const r = await coachShipFeedbackAction();
+      setUrl(r.url);
+      setMsg(
+        !r.pending
+          ? "Nothing new is waiting: every note you've sent is built."
+          : r.already
+            ? "A build started a few minutes ago and is still at work on your notes."
+            : `Started ✓ Your ${r.pending === 1 ? "note is" : `${r.pending} notes are`} being built. The changes go live on their own when it's done.`,
+      );
+      setState("done");
+    } catch (e) {
+      setState("error");
+      setMsg(e instanceof Error ? e.message : "Couldn't start the build.");
+    }
+  }
+  useEffect(() => {
+    if (a.auto && !started.current) {
+      started.current = true;
+      void start();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the reply arrives
+  }, []);
+  return (
+    <div className="flex w-[88%] flex-col gap-1.5 rounded-2xl p-3" style={{ background: "rgba(140,240,220,.07)", border: "1px solid rgba(242,210,126,.45)" }}>
+      <span className="text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "rgba(140,240,220,.85)" }}>
+        🛠 App update
+      </span>
+      <span className="text-[14px] leading-snug">{a.pending ? `${a.pending} feedback note${a.pending === 1 ? "" : "s"} waiting to be built` : "No new feedback waiting"}</span>
+      {state === "done" || state === "error" ? (
+        <span className="flex flex-wrap items-center gap-2 text-[12.5px]" style={{ color: state === "done" ? "#bff7ea" : "#ffb4a8" }}>
+          {msg}
+          {url && (
+            <a href={url} target="_blank" rel="noreferrer" className="underline">
+              Watch it
+            </a>
+          )}
+          {state === "error" && /feedback page|App feedback/.test(msg ?? "") && (
+            <a href="/feedback-review" className="underline">
+              Open App feedback
+            </a>
+          )}
+        </span>
+      ) : a.pending ? (
+        <Pill strong onClick={() => void start()}>
+          {state === "busy" ? "Starting…" : "Build them now"}
+        </Pill>
+      ) : null}
     </div>
   );
 }
