@@ -113,6 +113,34 @@ export async function nestBoardAction(boardId: string, parentId: string | null) 
   revalidatePath("/boards", "layout");
 }
 
+/** Moves a top-level board into the dreams cloud on the Boards page, or back out to the scrolls. */
+export async function setBoardDreamAction(boardId: string, isDream: boolean) {
+  const ownerId = await requireProfileId();
+  const board = await boardsData.getBoard(boardId, ownerId);
+  if (!board) throw new Error("That board isn't here anymore.");
+  const { dreamBoardIds } = await import("@/lib/dream-boards");
+  const [extras, boards] = await Promise.all([readExtras(ownerId), boardsData.listBoardsForOwner(ownerId)]);
+  const ids = dreamBoardIds(extras, boards);
+  if (isDream) ids.add(boardId);
+  else ids.delete(boardId);
+  const live = new Set(boards.map((b) => b.id));
+  const dreamBoards = [...ids].filter((id) => live.has(id));
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dreamBoards } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't move the board: ${error.message}`);
+  revalidatePath("/boards");
+  revalidatePath(`/boards/${boardId}`);
+}
+
+/** A new board that starts in the dreams cloud. */
+export async function createDreamBoardAction(title: string) {
+  const ownerId = await requireProfileId();
+  const name = title.trim();
+  if (!name) throw new Error("Give your dream a name.");
+  const board = await boardsData.createBoard(ownerId, { title: name });
+  await setBoardDreamAction(board.id, true);
+  return board.id;
+}
+
 export async function reorderBoardsAction(orderedIds: string[], parentBoardId?: string | null) {
   const ownerId = await requireProfileId();
   await boardsData.updateBoardOrder(ownerId, orderedIds);

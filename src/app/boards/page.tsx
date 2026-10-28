@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { QuestsTabs } from "@/components/layout/QuestsTabs";
 import { CreateBoardForm } from "@/components/boards/CreateBoardForm";
 import { BoardGrid } from "@/components/boards/BoardGrid";
+import { DreamCloud } from "@/components/boards/DreamCloud";
+import { dreamBoardIds } from "@/lib/dream-boards";
 import { listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { getProfileById } from "@/lib/data/profiles";
 import { xpToNextLevel } from "@/lib/data/xp";
@@ -17,6 +19,9 @@ export default async function BoardsPage() {
   ]);
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
+  const dreamIds = dreamBoardIds(profile?.life_wheel as Record<string, unknown> | null, boards);
+  const dreams = boards.filter((b) => dreamIds.has(b.id) && !b.isVirtual);
+  const scrolls = boards.filter((b) => !dreams.includes(b));
   const level = profile ? xpToNextLevel(profile.total_xp, await levelCap(session.user.id).catch(() => 10)).level : 1;
 
   return (
@@ -29,7 +34,7 @@ export default async function BoardsPage() {
 
         <CreateBoardForm theme={theme} />
 
-        {boards.length === 0 ? (
+        {scrolls.length === 0 ? (
           <p
             className="rounded-xl border border-dashed p-4 text-sm"
             style={{
@@ -42,8 +47,10 @@ export default async function BoardsPage() {
             &quot;Startup&quot;, &quot;Daily Tasks&quot;.
           </p>
         ) : (
-          <BoardGrid boards={boards} theme={theme} />
+          <BoardGrid boards={scrolls} theme={theme} />
         )}
+
+        <DreamCloud boards={dreams} theme={theme} />
       </div>
     </AppShell>
   );

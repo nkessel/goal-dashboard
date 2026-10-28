@@ -3,7 +3,7 @@
 import { createPortal } from "react-dom";
 import { useState, useTransition } from "react";
 import type { Board } from "@/lib/data/types";
-import { setBoardPrivateAction, setBoardSharedAction, updateBoardAction } from "@/app/actions";
+import { setBoardDreamAction, setBoardPrivateAction, setBoardSharedAction, updateBoardAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 
 const COLORS = [null, "#fde8d0", "#dcefe0", "#e0e7fb", "#fbe0e6", "#fff4c2"];
@@ -11,10 +11,13 @@ const COLORS = [null, "#fde8d0", "#dcefe0", "#e0e7fb", "#fbe0e6", "#fff4c2"];
 export function EditBoardModal({
   board,
   theme = "calm",
+  isDream,
   onClose,
 }: {
   board: Board;
   theme?: "calm" | "adventure";
+  /** Set for top-level boards on the Boards page: offers moving it into (or out of) the dreams cloud. */
+  isDream?: boolean;
   onClose: () => void;
 }) {
   useEscape(() => onClose());
@@ -24,6 +27,7 @@ export function EditBoardModal({
   const [color, setColor] = useState<string | null>(board.color);
   const [isPrivate, setIsPrivate] = useState(!!board.is_private);
   const [shared, setShared] = useState(!!board.shared_with_party);
+  const [dream, setDream] = useState(!!isDream);
   const [isSaving, startSaving] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +44,7 @@ export function EditBoardModal({
         await updateBoardAction(board.id, { title, description, color });
         if (isPrivate !== !!board.is_private) await setBoardPrivateAction(board.id, isPrivate);
         if (!isPrivate && shared !== !!board.shared_with_party) await setBoardSharedAction(board.id, shared);
+        if (isDream !== undefined && dream !== isDream) await setBoardDreamAction(board.id, dream);
         onClose();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save changes.");
@@ -127,6 +132,17 @@ export function EditBoardModal({
             </span>
           </span>
         </label>
+        {isDream !== undefined && (
+          <label className="flex min-h-10 cursor-pointer items-center gap-2.5 text-sm" title="Dream boards float in the cloud below your quest boards">
+            <input type="checkbox" checked={dream} onChange={(e) => setDream(e.target.checked)} />
+            <span>
+              <span className="font-semibold">Dream board ☁</span>
+              <span className="block text-xs" style={{ color: "var(--t-ink-soft)" }}>
+                Keep it in the dreams cloud below your quest boards.
+              </span>
+            </span>
+          </label>
+        )}
         {error && (
           <p className="text-xs" style={{ color: "var(--t-warn)" }}>
             {error}

@@ -24,7 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { BoardWithStats } from "@/lib/data/boards";
 import { UNCATEGORIZED_ID } from "@/lib/board-ids";
 import type { Task } from "@/lib/data/types";
-import { listBoardOptionsAction, moveTaskToBoardAction, nestBoardAction, reorderBoardsAction } from "@/app/actions";
+import { listBoardOptionsAction, moveTaskToBoardAction, nestBoardAction, reorderBoardsAction, setBoardDreamAction } from "@/app/actions";
 import { QuestCardPopup } from "@/components/tasks/QuestCardPopup";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { CreateSheet } from "@/components/create/CreateSheet";
@@ -84,9 +84,12 @@ export function BoardGrid({
   boards: initialBoards,
   theme,
   parentBoardId,
+  dream = false,
 }: {
   boards: BoardWithStats[];
   theme: "calm" | "adventure";
+  /** The dream boards in the cloud on the Boards page: soft cloud cards instead of scrolls. */
+  dream?: boolean;
   /** Set when this grid is a board's sub-boards, so the reorder also revalidates that board's page. */
   parentBoardId?: string;
 }) {
@@ -127,7 +130,8 @@ export function BoardGrid({
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
-  const soft = isAdventure ? "#5a4a30" : "var(--t-ink-soft)";
+  const scroll = isAdventure && !dream;
+  const soft = dream ? "#5d5a7a" : isAdventure ? "#5a4a30" : "var(--t-ink-soft)";
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -224,7 +228,7 @@ export function BoardGrid({
     const nextStep = nextActionOf(board, open) ?? open[0];
     const previews = nextStep ? [nextStep] : [];
     const href = `/boards/${board.id}`;
-    const rule = isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)";
+    const rule = dream ? "rgba(110,100,170,.22)" : isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)";
 
     const body = (
       <div className="flex h-full flex-col gap-2 px-3 pb-2.5 pt-2.5">
@@ -279,7 +283,7 @@ export function BoardGrid({
         {/* Quest previews — tap to open, press and drag onto another board to move */}
         {previews.length > 0 && (
           <ul className="-mx-1 flex flex-col border-t pt-1" style={{ borderColor: rule }}>
-            <li aria-hidden className="px-1 pt-0.5 text-[10.5px] font-bold uppercase tracking-[.12em]" style={{ color: isAdventure ? "#8a6116" : "var(--t-accent)" }}>
+            <li aria-hidden className="px-1 pt-0.5 text-[10.5px] font-bold uppercase tracking-[.12em]" style={{ color: dream ? "#7b6fb8" : isAdventure ? "#8a6116" : "var(--t-accent)" }}>
               Next step
             </li>
             {previews.map((q) => (
@@ -338,7 +342,7 @@ export function BoardGrid({
               onClick={() => setAddingTo(board.id)}
               aria-label={`Add a quest or sub-board to ${board.title}`}
               className="board-quest flex h-9 flex-1 items-center justify-center gap-1 rounded-lg border border-dashed text-[13px] font-semibold"
-              style={{ borderColor: isAdventure ? "rgba(120,90,40,.45)" : "var(--t-card-border)", color: soft }}
+              style={{ borderColor: dream ? "rgba(110,100,170,.4)" : isAdventure ? "rgba(120,90,40,.45)" : "var(--t-card-border)", color: soft }}
             >
               <span className="text-[16px] leading-none" aria-hidden>
                 +
@@ -352,7 +356,7 @@ export function BoardGrid({
               onClick={() => setEditingBoard(board)}
               aria-label={`Edit ${board.title}`}
               className="board-edit-foot board-quest h-9 w-9 shrink-0 items-center justify-center rounded-lg border"
-              style={{ borderColor: isAdventure ? "rgba(120,90,40,.35)" : "var(--t-card-border)", color: soft }}
+              style={{ borderColor: dream ? "rgba(110,100,170,.32)" : isAdventure ? "rgba(120,90,40,.35)" : "var(--t-card-border)", color: soft }}
             >
               <PencilIcon />
             </button>
@@ -368,12 +372,12 @@ export function BoardGrid({
           e.preventDefault();
           setMenu({ board, x: e.clientX, y: e.clientY });
         }}
-        className={`board-card relative h-full ${isAdventure ? `board-scroll ${board.isComplete ? "is-complete" : ""}` : ""}`}>
-        {isAdventure && <span aria-hidden className="scroll-rod top" />}
+        className={`board-card relative h-full ${scroll ? `board-scroll ${board.isComplete ? "is-complete" : ""}` : ""}`}>
+        {scroll && <span aria-hidden className="scroll-rod top" />}
         <div
-          className={isAdventure ? "scroll-sheet" : "h-full rounded-2xl"}
+          className={dream ? "dream-card" : scroll ? "scroll-sheet" : "h-full rounded-2xl"}
           style={
-            isAdventure
+            dream || scroll
               ? undefined
               : {
                   background: board.color ?? "var(--t-card)",
@@ -402,7 +406,7 @@ export function BoardGrid({
             </button>
           )}
         </div>
-        {isAdventure && <span aria-hidden className="scroll-rod bottom" />}
+        {scroll && <span aria-hidden className="scroll-rod bottom" />}
       </div>
     );
   }
@@ -414,7 +418,7 @@ export function BoardGrid({
           {error}
         </p>
       )}
-      <DndContext id="dnd-BoardGrid" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActive(null)}>
+      <DndContext id={dream ? "dnd-DreamGrid" : "dnd-BoardGrid"} sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActive(null)}>
         <SortableContext items={boards.map((b) => BOARD + b.id)} strategy={rectSortingStrategy}>
           <ul className={`grid gap-x-2 gap-y-3 sm:gap-x-3 ${boards.length === 1 ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3"}`}>
             {boards.map((board) => (
@@ -444,11 +448,26 @@ export function BoardGrid({
           y={menu.y}
           title={menu.board.title}
           nested={!!parentBoardId}
+          dream={parentBoardId ? null : dream}
           onClose={() => setMenu(null)}
           onOpen={() => router.push(`/boards/${menu.board.id}`)}
           onEdit={() => setEditingBoard(menu.board)}
           onAdd={() => setAddingTo(menu.board.id)}
           onNest={() => setNesting(menu.board)}
+          onDream={() => {
+            const id = menu.board.id;
+            setError(null);
+            setOrder(boards.map((b) => b.id).filter((x) => x !== id));
+            startTransition(async () => {
+              try {
+                await setBoardDreamAction(id, !dream);
+                router.refresh();
+              } catch (err) {
+                setOrder(null);
+                setError(err instanceof Error ? err.message : "Couldn't move that board.");
+              }
+            });
+          }}
           onUnnest={() => {
             const id = menu.board.id;
             startTransition(async () => {
@@ -484,7 +503,7 @@ export function BoardGrid({
           }}
         />
       )}
-      {editingBoard && <EditBoardModal board={editingBoard} theme={theme} onClose={() => setEditingBoard(null)} />}
+      {editingBoard && <EditBoardModal board={editingBoard} theme={theme} isDream={parentBoardId ? undefined : dream} onClose={() => setEditingBoard(null)} />}
       {openQuest && (
         <QuestCardPopup
           task={openQuest}
@@ -562,17 +581,22 @@ function BoardMenu({
   y,
   title,
   nested,
+  dream,
   onClose,
   onOpen,
   onEdit,
   onAdd,
   onNest,
   onUnnest,
+  onDream,
 }: {
   x: number;
   y: number;
   title: string;
   nested: boolean;
+  /** Top-level boards only: whether this board sits in the dreams cloud (null hides the item). */
+  dream: boolean | null;
+  onDream: () => void;
   onClose: () => void;
   onOpen: () => void;
   onEdit: () => void;
@@ -604,6 +628,7 @@ function BoardMenu({
     ["edit", "Edit board", onEdit],
     ["nest", "Nest into another board…", onNest],
     ...(nested ? ([["unnest", "Move to the top level", onUnnest]] as [string, string, () => void][]) : []),
+    ...(dream === null ? [] : ([["dream", dream ? "Move to quest boards" : "Move to dreams ☁", onDream]] as [string, string, () => void][])),
   ];
   return createPortal(
     <div
