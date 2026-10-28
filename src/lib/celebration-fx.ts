@@ -29,10 +29,18 @@ export type FxSettings = {
   welcomeHide?: string[];
   /** Back after this many hours since your last check-in: a "welcome back" screen (0 = never). */
   welcomeBackHours?: number;
-  /** Your own "welcome back" greetings, one per line (they take turns). */
+  /** Your own "welcome back" greetings, one per line (they take turns with the built-in ones left on). */
   welcomeBackText?: string;
+  /** Whether your own welcome back greetings are used (unset: yes, if you wrote some). */
+  welcomeBackOwn?: boolean;
+  /** Welcome back greetings switched off (built-in or your own). */
+  welcomeBackOff?: string[];
   /** Your own wise lines, one per line, mixed in with the built-in ones. */
   welcomeOwnLines?: string;
+  /** Whether your own wise lines are used (unset: yes, if you wrote some). */
+  welcomeOwnOn?: boolean;
+  /** The look of the welcome screen's Check in button (see CHECKIN_STYLES). */
+  checkinStyle?: CheckinStyle;
   /** In the check-in on the welcome screen: last night's sleep times, and mood and the rest. */
   welcomeSleep?: boolean;
   welcomeMetrics?: boolean;
@@ -79,6 +87,15 @@ export const WELCOME_HEADINGS: { key: WelcomeHeading; label: string; hint: strin
   { key: "dawn", label: "A new day dawns", hint: "“A new day dawns, adventurer”, every day" },
   { key: "custom", label: "Your own words", hint: "Write the greeting yourself" },
 ];
+
+export type CheckinStyle = "gilded" | "enamel" | "parchment" | "wax";
+export const CHECKIN_STYLES: { key: CheckinStyle; label: string; hint: string; style: React.CSSProperties }[] = [
+  { key: "gilded", label: "Gilded", hint: "A polished gold bar with a soft shine", style: { background: "linear-gradient(180deg, #f8e3a0 0%, #e2bf63 45%, #b8913f 100%)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,250,230,.8), inset 0 -2px 0 rgba(90,60,15,.35), 0 2px 6px rgba(74,57,19,.35)" } },
+  { key: "enamel", label: "Night enamel", hint: "Dark enamel in a gilt rim, gold letters", style: { background: "linear-gradient(180deg, #2f2a20, #17140e)", border: "2px solid #c9a24a", color: "#f2d27e", boxShadow: "inset 0 0 0 1px rgba(255,230,170,.18), 0 2px 6px rgba(0,0,0,.35)" } },
+  { key: "parchment", label: "Parchment", hint: "Quiet: parchment with an ink-brown rim", style: { background: "linear-gradient(180deg, #fbf3dc, #ecdcb4)", border: "1.5px solid #8b7040", color: "#3b2a14", boxShadow: "0 1px 3px rgba(80,60,20,.25)" } },
+  { key: "wax", label: "Wax seal", hint: "Deep red wax with cream letters", style: { background: "radial-gradient(circle at 35% 30%, #c0503a, #8e2a1d 70%)", border: "1.5px solid #5a160d", color: "#fbefd4", boxShadow: "inset 0 1px 0 rgba(255,200,180,.35), 0 2px 6px rgba(90,22,13,.35)" } },
+];
+export const checkinStyleOf = (fx: FxSettings) => CHECKIN_STYLES.find((c) => c.key === fx.checkinStyle) ?? CHECKIN_STYLES[0];
 
 export type FabStyle = "seal" | "coin" | "emerald" | "ruby" | "moon" | "wax";
 export const FAB_STYLES: { key: FabStyle; label: string; hint: string }[] = [
@@ -146,6 +163,15 @@ export function loadFx(): FxSettings {
     fx = { ...fx, dens: fx.dens * 0.6, embers: Math.round(fx.embers * 0.5) };
   }
   return fx;
+}
+
+/** Change a few settings from anywhere (not through Settings), on top of what's saved. */
+export function patchFx(patch: Partial<FxSettings>): boolean {
+  let saved: Partial<FxSettings> = {};
+  try {
+    saved = JSON.parse(localStorage.getItem(FX_STORAGE_KEY) ?? "{}");
+  } catch {}
+  return saveFx({ ...FX_DEFAULTS, ...saved, ...patch } as FxSettings);
 }
 
 export function saveFx(fx: FxSettings): boolean {

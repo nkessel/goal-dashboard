@@ -9,16 +9,16 @@ import type { FxSettings } from "./celebration-fx";
 export type WelcomeEl = "toucan" | "checkin" | "focus" | "intention" | "plan" | "streak" | "line" | "bar" | "reward" | "due";
 
 export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
-  { key: "toucan", label: "The toucan's greeting", hint: "A line from the Great Toucan Spirit, in your check-in style" },
-  { key: "checkin", label: "Check-in", hint: "Energy, mood and the rest (sleep times on the day's first visit only)" },
-  { key: "focus", label: "Today's main quest", hint: "Pick the one that matters most (it goes to the top of Today), or write a new one" },
-  { key: "intention", label: "Today's intention", hint: "A line on what you want today to be about, kept in your journal (day's first visit only)" },
-  { key: "plan", label: "Plan my day", hint: "A button to plan the day with the toucan around what's due and your calendar" },
-  { key: "streak", label: "Your streak", hint: "How many days in a row (day's first visit only)" },
-  { key: "line", label: "The day's wise line", hint: "A different encouragement each day" },
-  { key: "bar", label: "Your level bar", hint: "Filling with today's XP (day's first visit only)" },
-  { key: "reward", label: "XP and coins", hint: "What arriving earned you (day's first visit only)" },
-  { key: "due", label: "Due soon", hint: "Anything due today or tomorrow" },
+  { key: "toucan", label: "The toucan's greeting", hint: "The Great Toucan Spirit says hello in the check-in style you chose with him, and asks how you're arriving. Good if you like a warm voice to start with; leave it off for a quieter screen." },
+  { key: "checkin", label: "Check-in", hint: "A gilded Check in button that opens energy, mood and anything else you track, right there (plus last night's sleep and wake times on the day's first visit). Your check-ins feed Insights and tell the toucan how you're doing." },
+  { key: "focus", label: "Your top priority", hint: "Asks “What's your top priority?” with a box to answer in your own words. The app and the toucan keep it in mind, so his check-ins through the day, the week and the month come back to what really matters to you." },
+  { key: "intention", label: "Today's intention", hint: "A line on how you want today to feel or what it's about (e.g. “steady and kind to myself”), kept in your journal. Day's first visit only. Choose it if you like setting a tone as well as a goal." },
+  { key: "plan", label: "Plan my day", hint: "One button that opens the toucan to plan the day with you: what's overdue or due soon first, then what matters most, fitted around your calendar. Nothing goes on the calendar unless you press." },
+  { key: "streak", label: "Your streak", hint: "How many days in a row you've shown up. Day's first visit only. Motivating for some; leave it off if streaks feel like pressure." },
+  { key: "line", label: "The day's wise line", hint: "One short encouragement, a different one each day. You can switch off any line you don't like, or add your own." },
+  { key: "bar", label: "Your level bar", hint: "Your level, filling with the XP that arriving earned you. Day's first visit only." },
+  { key: "reward", label: "XP and coins", hint: "The XP and coins for showing up today, counted up as the screen opens. Day's first visit only." },
+  { key: "due", label: "Due soon", hint: "A short list of anything due today or tomorrow, so nothing sneaks up on you. Off by default to keep the screen calm." },
 ];
 
 const DEFAULT_ORDER: WelcomeEl[] = ["toucan", "checkin", "focus", "intention", "plan", "streak", "line", "bar", "reward", "due"];
@@ -86,8 +86,28 @@ export function pickFor(key: string, list: string[]) {
   return list[n % list.length];
 }
 
-/** The "welcome back" greeting: yours if you wrote some, otherwise one of the built-in ones. */
+/** Whether your own welcome back greetings and wise lines are in use (yes by default if you wrote some). */
+export const backOwnOn = (fx: FxSettings) => fx.welcomeBackOwn ?? !!linesOf(fx.welcomeBackText).length;
+export const ownLinesOn = (fx: FxSettings) => fx.welcomeOwnOn ?? !!linesOf(fx.welcomeOwnLines).length;
+/** Your own wise lines, when they're switched on. */
+export const ownLines = (fx: FxSettings) => (ownLinesOn(fx) ? linesOf(fx.welcomeOwnLines) : []);
+
+/** Every welcome back greeting that can come up: the built-in ones, then yours. */
+export function backPool(fx: FxSettings) {
+  return [...BACK_GREETINGS, ...(backOwnOn(fx) ? linesOf(fx.welcomeBackText) : [])];
+}
+
+/** The "welcome back" greeting: one of those still switched on (the built-in ones if you've switched them all off). */
 export function backGreeting(fx: FxSettings, key: string) {
+  const off = new Set(fx.welcomeBackOff ?? []);
+  const on = backPool(fx).filter((l) => !off.has(l));
+  return pickFor(key, on.length ? on : BACK_GREETINGS);
+}
+
+/** Add a welcome back greeting of your own (it joins the ones that take turns), as a settings patch. */
+export function addBackGreeting(fx: FxSettings, line: string): Partial<FxSettings> {
+  const l = line.replace(/\s+/g, " ").trim().slice(0, 120);
   const own = linesOf(fx.welcomeBackText);
-  return pickFor(key, own.length ? own : BACK_GREETINGS);
+  if (!l || own.includes(l)) return { welcomeBackOwn: true };
+  return { welcomeBackText: [...own, l].join("\n"), welcomeBackOwn: true, welcomeBackOff: (fx.welcomeBackOff ?? []).filter((x) => x !== l) };
 }

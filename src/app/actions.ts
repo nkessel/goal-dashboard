@@ -2070,7 +2070,30 @@ export async function welcomeContextAction() {
   const dueSoon = tasks.filter((t) => t.due_at && Date.parse(t.due_at) <= soon).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
   const important = tasks.filter((t) => !dueSoon.includes(t) && (t.importance ?? 0) >= 4).sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0));
   const suggestions = [...dueSoon, ...important].slice(0, 4).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at }));
-  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })), suggestions };
+  const priority = (cleanPriorities((await readExtras(ownerId).catch(() => ({}) as Record<string, unknown>)).priorities)[0] as Priority | undefined) ?? null;
+  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })), suggestions, priority };
+}
+
+type Priority = { text: string; others?: string[]; day: string; at: string };
+/** Your top priorities, newest first (one per day). */
+function cleanPriorities(raw: unknown): Priority[] {
+  return (Array.isArray(raw) ? raw : [])
+    .filter((p): p is Priority => !!p && typeof p.text === "string" && typeof p.day === "string" && typeof p.at === "string")
+    .sort((a, b) => (a.at < b.at ? 1 : -1));
+}
+
+/** Your top priority for today, from the welcome screen. The toucan keeps it in mind through the day, the week and the month. */
+export async function setTopPriorityAction(text: string, othersIn: string[] = []) {
+  const ownerId = await requireProfileId();
+  const t = String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+  const others = [...new Set((Array.isArray(othersIn) ? othersIn : []).map((o) => String(o ?? "").replace(/\s+/g, " ").trim().slice(0, 160)).filter(Boolean))].slice(0, 8);
+  if (!t) throw new Error("Write your top priority first.");
+  const extras = await readExtras(ownerId);
+  const day = tomorrowData.appDayKey();
+  const priorities = [{ text: t, others, day, at: new Date().toISOString() }, ...cleanPriorities(extras.priorities).filter((p) => p.day !== day)].slice(0, 120);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, priorities } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save that: ${error.message}`);
+  return { text: t, others, day };
 }
 
 export async function getCheckMetricsAction() {
@@ -3098,6 +3121,10 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
     metrics,
     effort: wheel.effort,
     hindrances: wheel.hindrances,
+    priorities: cleanPriorities(extras.priorities)
+      .filter((p) => Date.parse(p.at) > now.getTime() - 35 * 86_400_000)
+      .slice(0, 12)
+      .map((p, i) => `- ${p.day === tomorrowData.appDayKey() ? "Today" : new Date(`${p.day}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}${i === 0 ? " (latest)" : ""}: ${p.text}${p.others?.length ? ` · other priorities: ${p.others.join("; ")}` : ""}`),
   });
   // The app's owner asking to build their feedback: the app starts that build (a card shows it).
   const ship = !lite && asksToShip(text) && (await feedbackData.isAdmin(ownerId)) ? await (await import("@/lib/data/feedback-run")).pendingFeedback(ownerId) : null;

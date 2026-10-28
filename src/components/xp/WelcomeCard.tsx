@@ -6,13 +6,14 @@ import { CoinIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { EnergyCheck } from "./EnergyCheck";
 import { retireLine } from "@/lib/greetings";
-import type { FxSettings } from "@/lib/celebration-fx";
-import { welcomeOrder, welcomeShows, type WelcomeEl } from "@/lib/welcome";
+import { CHECKIN_STYLES, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
+import { addBackGreeting, welcomeOrder, welcomeShows, type WelcomeEl } from "@/lib/welcome";
+import { eveningDayKey } from "@/components/evening/evening-clock";
 import { dueSoonList, dueWhen } from "@/lib/toucan-guide";
 import { voice, windowOf } from "@/lib/toucan-style";
 import { useToucanStyle } from "@/lib/toucan-style-store";
 import { useEscape } from "@/lib/use-escape";
-import { addJournalEntryAction, addToTopOfTodayAction, createQuestAction } from "@/app/actions";
+import { addJournalEntryAction, setTopPriorityAction } from "@/app/actions";
 import { PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 
@@ -39,7 +40,7 @@ export function WelcomeCard({
   metrics,
   lastCheckInAt,
   due,
-  suggestions = [],
+  priority = null,
   fx,
   onClose,
   onCheckedIn,
@@ -51,8 +52,8 @@ export function WelcomeCard({
   metrics: string[];
   lastCheckInAt: string | null;
   due: { id: string; title: string; due_at: string | null }[];
-  /** Candidates for today's main quest (due soon, then most important). */
-  suggestions?: { id: string; title: string; due_at: string | null }[];
+  /** Your latest top priority (and the day it was for). */
+  priority?: { text: string; others?: string[]; day: string } | null;
   fx: FxSettings;
   onClose: () => void;
   /** Called once a check-in is saved here. */
@@ -62,6 +63,9 @@ export function WelcomeCard({
   const [shown, setShown] = useState(0);
   const [retired, setRetired] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
+  const [addingPhrase, setAddingPhrase] = useState(false);
+  const [phrase, setPhrase] = useState("");
+  const [phraseSaved, setPhraseSaved] = useState(false);
   // The check-in starts as a gilded button and opens in its place.
   const [checkinOpen, setCheckinOpen] = useState(false);
   // Checked in within the last hour? Then there's no need to ask again here.
@@ -83,7 +87,7 @@ export function WelcomeCard({
 
   const soon = dueSoonList(due);
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
-    focus: <MainQuest suggestions={suggestions} mode={mode} />,
+    focus: <TopPriority last={priority} />,
     intention: mode === "day" ? <Intention /> : null,
     plan: (
       <button
@@ -111,7 +115,7 @@ export function WelcomeCard({
         type="button"
         onClick={() => setCheckinOpen(true)}
         className="font-display flex h-12 items-center gap-2 rounded-full px-7 text-[18px]"
-        style={{ background: "linear-gradient(180deg, #f8e3a0 0%, #e2bf63 45%, #b8913f 100%)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,250,230,.8), inset 0 -2px 0 rgba(90,60,15,.35), 0 2px 6px rgba(74,57,19,.35)" }}
+        style={checkinStyleOf(fx).style}
       >
         ✦ Check in
       </button>
@@ -204,7 +208,45 @@ export function WelcomeCard({
         <div className="pc-card parchment relative flex max-h-[88vh] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center">
           <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
             {heading}
+            {mode === "back" && !addingPhrase && (
+              <button type="button" onClick={() => setAddingPhrase(true)} aria-label="Add a welcome back greeting of your own" title="Add a welcome back greeting of your own" className="ml-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full align-middle hover:bg-black/[.06]">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
           </p>
+          {addingPhrase && (
+            <form
+              className="reveal flex w-full flex-col gap-1.5 text-left"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!phrase.trim()) return;
+                patchFx(addBackGreeting(loadFx(), phrase));
+                setPhrase("");
+                setAddingPhrase(false);
+                setPhraseSaved(true);
+              }}
+            >
+              <label htmlFor="welcome-phrase" className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                A welcome back greeting for another time
+              </label>
+              <div className="flex gap-1.5">
+                <input id="welcome-phrase" autoFocus value={phrase} onChange={(e) => setPhrase(e.target.value)} maxLength={120} placeholder="e.g. The hearth is warm, come in" className="h-10 min-w-0 flex-1 rounded-full px-3.5 text-[16px]" style={FIELD} />
+                <button type="submit" disabled={!phrase.trim()} className="h-10 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+                  Add
+                </button>
+                <button type="button" onClick={() => setAddingPhrase(false)} aria-label="Cancel" className="h-10 w-8 shrink-0 text-[18px]" style={{ color: "#6b5631" }}>
+                  ×
+                </button>
+              </div>
+            </form>
+          )}
+          {phraseSaved && (
+            <p className="fade-in m-0 -mt-1 text-[12.5px] italic" style={{ color: "#3d5a1e" }}>
+              ✓ Saved. It will greet you on a future visit.
+            </p>
+          )}
           {order.map((el) => (
             <div key={el} className="flex w-full flex-col items-center">
               {parts[el]}
@@ -222,64 +264,123 @@ export function WelcomeCard({
 
 const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };
 
-/** Today's main quest: tap one that matters (it goes to the top of Today), or write a new one. */
-function MainQuest({ suggestions, mode }: { suggestions: { id: string; title: string; due_at: string | null }[]; mode: "day" | "back" }) {
-  const [chosen, setChosen] = useState<string | null>(null);
+/** Your top priority, in your own words: saved for the day, and kept in mind by the app and the toucan. */
+function TopPriority({ last }: { last: { text: string; others?: string[]; day: string } | null }) {
+  const [today] = useState(() => eveningDayKey());
+  const [saved, setSaved] = useState<{ text: string; others: string[] } | null>(last && last.day === today ? { text: last.text, others: last.others ?? [] } : null);
+  const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
+  // Important but not urgent: the other priorities, one small field each.
+  const [others, setOthers] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pin = async (run: () => Promise<unknown>, label: string) => {
+  const earlier = last && last.day !== today ? last : null;
+  const save = async (value: string, more: string[]) => {
+    if (!value.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      await run();
-      setChosen(label);
+      const r = await setTopPriorityAction(value, more.filter((o) => o.trim()));
+      setSaved({ text: r.text, others: r.others });
+      setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that.");
     } finally {
       setBusy(false);
     }
   };
-  if (chosen)
+  if (saved && !editing)
     return (
-      <p className="m-0 text-[15px]" style={{ color: "#3d5a1e" }}>
-        ✓ “{chosen}” is at the top of Today.
-      </p>
+      <div className="flex w-full flex-col items-center gap-0.5">
+        <span className="text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
+          Top priority
+        </span>
+        <p className="m-0 text-[16px] leading-snug" style={{ color: "var(--t-ink)" }}>
+          {saved.text}{" "}
+          <button type="button" onClick={() => (setText(saved.text), setOthers(saved.others), setEditing(true))} className="text-[12.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+            Change
+          </button>
+        </p>
+        {saved.others.length > 0 && (
+          <p className="m-0 text-[13.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
+            Also, when there&rsquo;s space: {saved.others.join(" · ")}
+          </p>
+        )}
+      </div>
     );
   return (
-    <div className="flex w-full flex-col gap-1.5 text-left">
-      <p className="m-0 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
-        {mode === "day" ? "What would make today a success?" : "What matters most for the rest of today?"}
-      </p>
-      {suggestions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {suggestions.map((t) => (
-            <button key={t.id} type="button" disabled={busy} onClick={() => pin(() => addToTopOfTodayAction(t.id), t.title)} className="min-h-9 rounded-full px-3 text-left text-[13.5px] disabled:opacity-60" style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}>
-              {t.title}
-              {t.due_at && <span style={{ color: "#8a5a1e" }}> · {dueWhen(t.due_at)}</span>}
-            </button>
+    <form
+      className="flex w-full flex-col gap-1.5 text-left"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save(text, others);
+      }}
+    >
+      <label htmlFor="welcome-priority" className="text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
+        What&rsquo;s your top priority?
+      </label>
+      <div className="relative pb-4">
+        <textarea
+          id="welcome-priority"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={200}
+          rows={2}
+          placeholder="The one thing that matters most right now"
+          className="block min-h-[72px] w-full resize-none rounded-xl px-3 pb-4 pt-2 text-[16px] leading-snug"
+          style={FIELD}
+        />
+        {/* Sits on the box's lower border. */}
+        <button
+          type="button"
+          onClick={() => setOthers((o) => [...o, ""])}
+          disabled={others.length >= 8}
+          className="font-display absolute bottom-0 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-[13.5px] disabled:opacity-50"
+          style={CHECKIN_STYLES[0].style}
+        >
+          ✦ Add other priorities
+        </button>
+      </div>
+      {others.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[12px]" style={{ color: "#6b5631" }}>
+            Important, not urgent: the toucan brings these up gently, when you have space.
+          </span>
+          {others.map((o, i) => (
+            <div key={i} className="reveal flex items-center gap-1.5">
+              <input
+                autoFocus={!o}
+                value={o}
+                onChange={(e) => setOthers((all) => all.map((x, j) => (j === i ? e.target.value : x)))}
+                maxLength={160}
+                placeholder="Another priority"
+                aria-label={`Other priority ${i + 1}`}
+                className="h-9 min-w-0 flex-1 rounded-full px-3 text-[16px]"
+                style={FIELD}
+              />
+              <button type="button" onClick={() => setOthers((all) => all.filter((_, j) => j !== i))} aria-label="Remove" className="h-9 w-7 shrink-0 text-[17px]" style={{ color: "#6b5631" }}>
+                ×
+              </button>
+            </div>
           ))}
         </div>
       )}
-      <form
-        className="flex gap-1.5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const title = text.trim();
-          if (title) void pin(() => createQuestAction({ title, importance: 4, urgency: 3, xpValue: 20, placement: "today" }), title);
-        }}
-      >
-        <input value={text} onChange={(e) => setText(e.target.value)} maxLength={120} placeholder={suggestions.length ? "Or something else…" : "Your main quest today…"} aria-label="Today's main quest" className="h-10 min-w-0 flex-1 rounded-lg px-2.5 text-[16px]" style={FIELD} />
-        <button type="submit" disabled={busy || !text.trim()} className="h-10 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-          Add
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {earlier && !text && (
+          <button type="button" disabled={busy} onClick={() => void save(earlier.text, [...(earlier.others ?? []), ...others])} className="mr-auto min-h-8 rounded-full px-3 text-left text-[13px] disabled:opacity-60" style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}>
+            Same as before: &ldquo;{earlier.text}&rdquo;
+          </button>
+        )}
+        <button type="submit" disabled={busy || !text.trim()} className="h-9 shrink-0 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+          {busy ? "…" : "Save"}
         </button>
-      </form>
+      </div>
       {error && (
         <p className="m-0 text-[12.5px]" style={{ color: "#a33" }}>
           {error}
         </p>
       )}
-    </div>
+    </form>
   );
 }
 

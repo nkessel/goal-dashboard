@@ -207,6 +207,8 @@ export function coachSystemPrompt(o: {
   /** The Wheel of Time lists. */
   effort?: string[];
   hindrances?: string[];
+  /** Their top priority, day by day (newest first), from the welcome screen. */
+  priorities?: string[];
 }) {
   const block = (title: string, lines: string[], empty = "(none)") => `${title}:\n${lines.length ? lines.join("\n") : empty}`;
   return [
@@ -230,6 +232,7 @@ export function coachSystemPrompt(o: {
 When they tell you to add, log or create a quest, event, check-in or night, do it with that action (one per entry) and say in a few words what you made; the app makes it for them and offers an undo, so don't ask "shall I?". Today is ${o.todayKey ?? "today"}: work out dates like "Friday" from that.
 Offer actions only when they fit; often none. Omit the ACTIONS line when there are none.`,
     ...(o.style?.length ? [block("How they like to be checked in (they told you this; follow it closely)", o.style)] : []),
+    ...(o.priorities?.length ? [block("Their top priority, in their words (they name it on the welcome screen; newest first). It's what really matters to them: let it lead what you suggest, and in your check-ins through the day, the week and the month, come back to it: how it's going, what would move it forward, whether it's still the one. When planning, put quests that serve it first. The “other priorities” are important but not urgent: they matter just as much in the long run, but support for them must be gentle and well timed. Bring one up only when they seem to have space (little overdue, a light calendar, decent energy, or they say they're free), never when they're overloaded; then one small, inviting step is enough. Help them make that space too: notice when the urgent things are handled, and when there's room, say so. You are learning together how to keep both kinds on track: now and then ask what helps, and remember what works (a “remember” action)", o.priorities)] : []),
     block("What you remember about them", o.notes),
     block("Their promises and reminders (if they mention being with someone or somewhere marked \"next time\", bring that reminder up)", o.promises),
     block("Their life areas (boards)", o.areas),

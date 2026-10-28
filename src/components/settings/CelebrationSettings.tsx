@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
+import { CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, checkinStyleOf, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { WelcomeCard } from "@/components/xp/WelcomeCard";
 import { welcomeContextAction } from "@/app/actions";
-import { lineForDay } from "@/lib/greetings";
-import { BACK_GREETINGS, WELCOME_ELS, backGreeting, backHours, linesOf, moveEl, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
+import { DAILY_LINES, lineForDay, retireLine, retiredLines } from "@/lib/greetings";
+import { WELCOME_ELS, backGreeting, backHours, backOwnOn, backPool, linesOf, moveEl, ownLines, ownLinesOn, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
 
 type NumKey = "dens" | "vel" | "reach" | "size" | "embers" | "fill";
@@ -30,10 +30,10 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState(false);
   const [sentPreview, setSentPreview] = useState<{ key: number; style: FeedbackStyle } | null>(null);
-  const [welcomePreview, setWelcomePreview] = useState<{ mode: "day" | "back"; key: string; ctx: { metrics: string[]; tasks: { id: string; title: string; due_at: string | null }[]; suggestions: { id: string; title: string; due_at: string | null }[] } } | null>(null);
+  const [welcomePreview, setWelcomePreview] = useState<{ mode: "day" | "back"; key: string; ctx: { metrics: string[]; tasks: { id: string; title: string; due_at: string | null }[]; suggestions: { id: string; title: string; due_at: string | null }[]; priority: { text: string; others?: string[]; day: string } | null } } | null>(null);
   function openWelcome(mode: "day" | "back") {
     void welcomeContextAction()
-      .catch(() => ({ metrics: [] as string[], tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[] }))
+      .catch(() => ({ metrics: [] as string[], tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[], priority: null }))
       .then((ctx) => setWelcomePreview({ mode, key: String(Date.now()), ctx }));
   }
   const plays = useRef(0);
@@ -112,18 +112,30 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
         )}
 
         <span className="mt-1 text-[13px] font-semibold">The greeting, welcome back</span>
-        <textarea
-          value={fx.welcomeBackText ?? ""}
-          onChange={(e) => update({ welcomeBackText: e.target.value.slice(0, 1200) })}
-          rows={3}
-          placeholder={BACK_GREETINGS.join("\n")}
-          aria-label="Your welcome back greetings"
-          className="rounded-lg border px-3 py-2 text-[16px]"
-          style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
-        />
-        <p className="m-0 -mt-1 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-          One per line; they take turns. Leave empty for the ones shown.
+        <p className="m-0 -mt-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+          A different one each time, from the greetings you leave switched on. You can also add one from the welcome back screen with its ✎ button.
         </p>
+        <label className="flex min-h-9 items-center gap-2.5 text-sm">
+          <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={backOwnOn(fx)} onChange={() => update({ welcomeBackOwn: !backOwnOn(fx) })} />
+          Use my own words too
+        </label>
+        {backOwnOn(fx) && (
+          <textarea
+            value={fx.welcomeBackText ?? ""}
+            onChange={(e) => update({ welcomeBackText: e.target.value.slice(0, 1200) })}
+            rows={3}
+            placeholder={"One per line; they take turns with the others.\ne.g. The hearth is warm, come in"}
+            aria-label="Your welcome back greetings"
+            className="reveal rounded-lg border px-3 py-2 text-[16px]"
+            style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
+          />
+        )}
+        <PhraseList
+          title="Choose which greetings show"
+          lines={backPool(fx)}
+          isOn={(l) => !(fx.welcomeBackOff ?? []).includes(l)}
+          onToggle={(l, on) => update({ welcomeBackOff: on ? (fx.welcomeBackOff ?? []).filter((x) => x !== l) : [...(fx.welcomeBackOff ?? []), l] })}
+        />
 
         <span className="mt-1 text-[13px] font-semibold">What&rsquo;s on it, and in what order</span>
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
@@ -151,6 +163,20 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
         </ul>
         {welcomeShows(fx, "checkin") && (
           <>
+            <span className="mt-1 text-[13px] font-semibold">The Check in button</span>
+            <div role="radiogroup" aria-label="The Check in button's look" className="grid grid-cols-2 gap-1.5">
+              {CHECKIN_STYLES.map((c) => (
+                <button key={c.key} type="button" role="radio" aria-checked={checkinStyleOf(fx).key === c.key} onClick={() => update({ checkinStyle: c.key })} className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-2.5" style={{ border: checkinStyleOf(fx).key === c.key ? "2px solid var(--t-gold-deep)" : "1px solid var(--t-card-border)" }}>
+                  <span aria-hidden className="font-display flex h-9 items-center rounded-full px-4 text-[15px]" style={c.style}>
+                    ✦ Check in
+                  </span>
+                  <span className="text-[13px] font-semibold">{c.label}</span>
+                  <span className="text-center text-[11.5px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+                    {c.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
             <span className="mt-1 text-[13px] font-semibold">In the check-in</span>
             {(
               [
@@ -167,16 +193,23 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
         )}
         {welcomeShows(fx, "line") && (
           <>
-            <span className="mt-1 text-[13px] font-semibold">Your own wise lines</span>
-            <textarea
-              value={fx.welcomeOwnLines ?? ""}
-              onChange={(e) => update({ welcomeOwnLines: e.target.value.slice(0, 2400) })}
-              rows={3}
-              placeholder={"One per line; mixed in with the built-in lines.\ne.g. Breathe. Then the next small thing."}
-              aria-label="Your own wise lines"
-              className="rounded-lg border px-3 py-2 text-[16px]"
-              style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
-            />
+            <span className="mt-1 text-[13px] font-semibold">The day&rsquo;s wise line</span>
+            <label className="flex min-h-9 items-center gap-2.5 text-sm">
+              <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={ownLinesOn(fx)} onChange={() => update({ welcomeOwnOn: !ownLinesOn(fx) })} />
+              Add my own wise lines
+            </label>
+            {ownLinesOn(fx) && (
+              <textarea
+                value={fx.welcomeOwnLines ?? ""}
+                onChange={(e) => update({ welcomeOwnLines: e.target.value.slice(0, 2400) })}
+                rows={3}
+                placeholder={"One per line; mixed in with the built-in lines.\ne.g. Breathe. Then the next small thing."}
+                aria-label="Your own wise lines"
+                className="reveal rounded-lg border px-3 py-2 text-[16px]"
+                style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
+              />
+            )}
+            <PhraseList title="Choose which wise lines show" lines={[...DAILY_LINES, ...ownLines(fx)]} retired />
           </>
         )}
         <label className="mt-1 flex min-h-9 items-center gap-2.5 text-sm">
@@ -196,11 +229,11 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           mode={welcomePreview.mode}
           heading={welcomePreview.mode === "day" ? (fx.welcomeHeading === "custom" && linesOf(fx.welcomeText).length ? linesOf(fx.welcomeText)[0] : fx.welcomeHeading === "dawn" ? "A new day dawns, adventurer" : "Huzzah! Here you are!") : backGreeting(fx, welcomePreview.key)}
           award={welcomePreview.mode === "day" ? { xp: 10, streak: 8, coins: 2, fromPct: 40, toPct: 55, caption: "Level 4 · 1,960 / 2,500 XP to level 5" } : null}
-          line={lineForDay(new Date().toDateString(), linesOf(fx.welcomeOwnLines))}
+          line={lineForDay(new Date().toDateString(), ownLines(fx))}
           metrics={welcomePreview.ctx.metrics}
           lastCheckInAt={null}
           due={welcomePreview.ctx.tasks}
-          suggestions={welcomePreview.ctx.suggestions}
+          priority={welcomePreview.ctx.priority}
           fx={fx}
           onClose={() => setWelcomePreview(null)}
         />
@@ -356,11 +389,11 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           mode={welcomePreview.mode}
           heading={welcomePreview.mode === "day" ? (fx.welcomeHeading === "custom" && linesOf(fx.welcomeText).length ? linesOf(fx.welcomeText)[0] : fx.welcomeHeading === "dawn" ? "A new day dawns, adventurer" : "Huzzah! Here you are!") : backGreeting(fx, welcomePreview.key)}
           award={welcomePreview.mode === "day" ? { xp: 10, streak: 8, coins: 2, fromPct: 40, toPct: 55, caption: "Level 4 · 1,960 / 2,500 XP to level 5" } : null}
-          line={lineForDay(new Date().toDateString(), linesOf(fx.welcomeOwnLines))}
+          line={lineForDay(new Date().toDateString(), ownLines(fx))}
           metrics={welcomePreview.ctx.metrics}
           lastCheckInAt={null}
           due={welcomePreview.ctx.tasks}
-          suggestions={welcomePreview.ctx.suggestions}
+          priority={welcomePreview.ctx.priority}
           fx={fx}
           onClose={() => setWelcomePreview(null)}
         />
@@ -441,6 +474,50 @@ export function FabSettings() {
           </span>
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Every phrase that can come up, each with a checkbox: uncheck one and it
+ * stops showing. Opens from a button. Wise lines keep their "don't show this
+ * line again" list on this device (the same one the welcome screen sets).
+ */
+function PhraseList({ title, lines, isOn, onToggle, retired = false }: { title: string; lines: string[]; isOn?: (line: string) => boolean; onToggle?: (line: string, on: boolean) => void; retired?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [off, setOff] = useState<Set<string>>(() => new Set());
+  const on = (l: string) => (retired ? !off.has(l) : isOn!(l));
+  const toggle = (l: string) => {
+    const next = !on(l);
+    if (retired) {
+      retireLine(l, !next);
+      setOff(retiredLines());
+    } else onToggle!(l, next);
+  };
+  const count = lines.filter(on).length;
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={() => (setOpen((v) => !v), retired && setOff(retiredLines()))}
+        aria-expanded={open}
+        className="hover-glow flex h-9 items-center gap-1.5 self-start rounded-full px-3.5 text-[13px] font-semibold"
+        style={{ border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}
+      >
+        {title} <span style={{ color: "var(--t-ink-soft)" }}>{open ? "▾" : `▸ ${count} of ${lines.length} on`}</span>
+      </button>
+      {open && (
+        <ul className="reveal m-0 flex max-h-[320px] list-none flex-col gap-0.5 overflow-y-auto rounded-xl p-1.5" style={{ border: "1px solid var(--t-card-border)" }}>
+          {lines.map((l) => (
+            <li key={l}>
+              <label className="flex min-h-9 cursor-pointer items-start gap-2.5 rounded-lg px-1.5 py-1 text-[14px] leading-snug hover:bg-black/[.04]" style={{ opacity: on(l) ? 1 : 0.6 }}>
+                <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--t-gold-deep)]" checked={on(l)} onChange={() => toggle(l)} />
+                <span className={on(l) ? "" : "line-through"}>{l}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

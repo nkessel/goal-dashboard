@@ -7,7 +7,7 @@ import { eveningDayKey } from "@/components/evening/evening-clock";
 import { WelcomeCard, type WelcomeAward } from "./WelcomeCard";
 import { xpToNextLevel } from "@/lib/levels";
 import { lineForDay } from "@/lib/greetings";
-import { backGreeting, backHours, linesOf, pickFor } from "@/lib/welcome";
+import { backGreeting, backHours, linesOf, ownLines, pickFor } from "@/lib/welcome";
 import { voice } from "@/lib/toucan-style";
 import { readStyle } from "@/lib/toucan-style-store";
 import { loadFx } from "@/lib/celebration-fx";
@@ -100,7 +100,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       open();
     };
     (async () => {
-      const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[] }));
+      const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[], priority: null }));
       if (pending) {
         const ctx = await ctxP;
         if (!live) return;
@@ -162,11 +162,11 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       mode={shown.mode}
       heading={shown.mode === "day" ? dawnHeading(eveningDayKey()) : backGreeting(fx, key)}
       award={shown.award}
-      line={lineForDay(eveningDayKey(), linesOf(fx.welcomeOwnLines))}
+      line={lineForDay(eveningDayKey(), ownLines(fx))}
       metrics={shown.ctx.metrics}
       lastCheckInAt={shown.ctx.lastCheckInAt}
       due={shown.ctx.tasks}
-      suggestions={shown.ctx.suggestions}
+      priority={shown.ctx.priority}
       fx={fx}
       onCheckedIn={() => setPending(null)}
       onClose={() => {
