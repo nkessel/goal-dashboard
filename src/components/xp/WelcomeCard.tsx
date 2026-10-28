@@ -41,6 +41,7 @@ export function WelcomeCard({
   suggestions = [],
   fx,
   onClose,
+  onCheckedIn,
 }: {
   mode: "day" | "back";
   heading: string;
@@ -53,11 +54,15 @@ export function WelcomeCard({
   suggestions?: { id: string; title: string; due_at: string | null }[];
   fx: FxSettings;
   onClose: () => void;
+  /** Called once a check-in is saved here. */
+  onCheckedIn?: () => void;
 }) {
   const style = useToucanStyle();
   const [shown, setShown] = useState(0);
   const [retired, setRetired] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
+  // Welcome back starts with just a gilded button; the check-in opens in its place.
+  const [checkinOpen, setCheckinOpen] = useState(mode === "day");
   // Checked in within the last hour? Then there's no need to ask again here.
   const [recent] = useState(() => !!lastCheckInAt && Date.now() - Date.parse(lastCheckInAt) < 3_600_000);
   useEscape(onClose);
@@ -100,12 +105,21 @@ export function WelcomeCard({
         </p>
       </div>
     ),
-    checkin: recent ? null : (
+    checkin: recent ? null : !checkinOpen ? (
+      <button
+        type="button"
+        onClick={() => setCheckinOpen(true)}
+        className="font-display flex h-12 items-center gap-2 rounded-full px-7 text-[18px]"
+        style={{ background: "linear-gradient(180deg, #f8e3a0 0%, #e2bf63 45%, #b8913f 100%)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,250,230,.8), inset 0 -2px 0 rgba(90,60,15,.35), 0 2px 6px rgba(74,57,19,.35)" }}
+      >
+        ✦ Check in
+      </button>
+    ) : (
       <div className="w-full rounded-2xl px-2 py-2.5 text-left" style={{ background: "linear-gradient(180deg, rgba(28,24,16,.94), rgba(18,16,11,.94))", border: "1.5px solid rgba(217,180,95,.45)" }}>
         <p className="m-0 mb-1 text-center font-display text-[17px]" style={{ color: "#f2d27e" }}>
           {checkedIn ? "Checked in ✓" : "Check in"}
         </p>
-        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => setCheckedIn(true)} />
+        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} />
       </div>
     ),
     streak: award && award.streak > 0 ? (

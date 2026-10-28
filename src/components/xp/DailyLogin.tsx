@@ -30,7 +30,25 @@ function dawnHeading(dayKey: string) {
 }
 
 const BACK_KEY = "welcome-back-at";
-const OPEN_KEY = "daily-login-open";
+/** The day's open check-in screen: it comes back on each visit until you check in or close it. */
+const PENDING_KEY = "welcome-pending";
+type Pending = { day: string; mode: "day" | "back"; at: number };
+function readPending(today: string): Pending | null {
+  try {
+    const p = JSON.parse(window.localStorage.getItem(PENDING_KEY) || "null") as Pending | null;
+    if (p && p.day === today && (p.mode === "day" || p.mode === "back")) return p;
+    // Older flag for the day's greeting.
+    if (window.localStorage.getItem("daily-login-open") === today) return { day: today, mode: "day", at: Date.now() };
+  } catch {}
+  return null;
+}
+function setPending(p: Pending | null) {
+  try {
+    window.localStorage.removeItem("daily-login-open");
+    if (p) window.localStorage.setItem(PENDING_KEY, JSON.stringify(p));
+    else window.localStorage.removeItem(PENDING_KEY);
+  } catch {}
+}
 
 type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<ReturnType<typeof welcomeContextAction>> };
 
@@ -38,8 +56,9 @@ type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<Re
  * The welcome screen. On the day's first visit it records the daily check-in
  * (XP + streak) and greets you; when you're back after a few hours since your
  * last check-in, it says welcome back and offers a check-in (sleep times,
- * mood and the rest). What it shows is chosen in Settings. The server ignores
- * repeat daily check-ins; the per-browser flags just avoid asking again.
+ * mood and the rest). Either one comes back on later visits that day until
+ * you check in or close it. What it shows is chosen in Settings. The server
+ * ignores repeat daily check-ins; the per-browser flags just avoid asking again.
  */
 export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   const router = useRouter();
@@ -50,15 +69,15 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     // The app's day turns over at 5:30am local time.
     const today = eveningDayKey();
     let first = false;
-    // The day's greeting keeps coming back (on later visits too) until you close it yourself.
-    let unclosed = false;
     try {
       first = window.localStorage.getItem("daily-login") !== today;
       if (first) window.localStorage.setItem("daily-login", today);
-      unclosed = !first && window.localStorage.getItem(OPEN_KEY) === today;
     } catch {
       /* storage unavailable — the server still guards against double awards */
     }
+    // Marked before anything loads, so closing the app early still brings it back.
+    if (first) setPending({ day: today, mode: "day", at: Date.now() });
+    const pending = first ? null : readPending(today);
     const markBack = () => {
       try {
         window.localStorage.setItem(BACK_KEY, String(Date.now()));
@@ -71,20 +90,25 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     try {
       backDue = !!hours && readStyle().returnCheckIn && Date.now() - Number(window.localStorage.getItem(BACK_KEY) || 0) >= away;
     } catch {}
-    if (!first && !backDue && !unclosed) return;
-    const showDay = (award: WelcomeAward | null, ctx: Shown["ctx"]) => {
-      try {
-        window.localStorage.setItem(OPEN_KEY, today);
-      } catch {}
-      setShown({ mode: "day", award, ctx });
+    if (!first && !backDue && !pending) return;
+    // No surprise pop-ups: the toucan asks first, and the screen opens only if you say so ("Later" skips it).
+    const present = (open: () => void) => {
+      if (readStyle().avoid.includes("popups")) {
+        const unseen = window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text: voice.welcomeBack(readStyle()), actions: [{ label: "Check in", run: open }, { label: "Later", run: () => setPending(null) }] } }));
+        if (!unseen) return;
+      }
+      open();
     };
     (async () => {
       const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[] }));
-      if (unclosed) {
+      if (pending) {
         const ctx = await ctxP;
         if (!live) return;
+        // Checked in somewhere else since it opened? Then it's done.
+        if (ctx.lastCheckInAt && Date.parse(ctx.lastCheckInAt) >= pending.at) return setPending(null);
         markBack();
-        showDay(null, ctx);
+        if (pending.mode === "day") setShown({ mode: "day", award: null, ctx });
+        else present(() => setShown({ mode: "back", award: null, ctx }));
         return;
       }
       if (first) {
@@ -110,7 +134,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
         const ctx = await ctxP;
         if (!live) return;
         markBack();
-        showDay(award, ctx);
+        setShown({ mode: "day", award, ctx });
         if (award) router.refresh();
         return;
       }
@@ -120,13 +144,10 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       if (!live) return;
       if (ctx.lastCheckInAt && Date.now() - Date.parse(ctx.lastCheckInAt) < away) return;
       markBack();
-      const open = () => setShown({ mode: "back", award: null, ctx });
-      // No surprise pop-ups: the toucan asks first, and the screen opens only if you say so.
-      if (readStyle().avoid.includes("popups")) {
-        const unseen = window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text: voice.welcomeBack(readStyle()), actions: [{ label: "Check in", run: open }, { label: "Later", run: () => {} }] } }));
-        if (!unseen) return;
-      }
-      open();
+      present(() => {
+        setPending({ day: today, mode: "back", at: Date.now() });
+        setShown({ mode: "back", award: null, ctx });
+      });
     })();
     return () => {
       live = false;
@@ -147,10 +168,9 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       due={shown.ctx.tasks}
       suggestions={shown.ctx.suggestions}
       fx={fx}
+      onCheckedIn={() => setPending(null)}
       onClose={() => {
-        try {
-          window.localStorage.removeItem(OPEN_KEY);
-        } catch {}
+        setPending(null);
         setShown(null);
         router.refresh();
       }}
