@@ -44,6 +44,7 @@ export function WelcomeCard({
   fx,
   onClose,
   onCheckedIn,
+  onSnooze,
 }: {
   mode: "day" | "back";
   heading: string;
@@ -58,6 +59,8 @@ export function WelcomeCard({
   onClose: () => void;
   /** Called once a check-in is saved here. */
   onCheckedIn?: () => void;
+  /** Bring it back after this many milliseconds instead of skipping it for today. */
+  onSnooze?: (ms: number) => void;
 }) {
   const style = useToucanStyle();
   const [shown, setShown] = useState(0);
@@ -66,6 +69,7 @@ export function WelcomeCard({
   const [addingPhrase, setAddingPhrase] = useState(false);
   const [phrase, setPhrase] = useState("");
   const [phraseSaved, setPhraseSaved] = useState(false);
+  const [snoozing, setSnoozing] = useState(false);
   // The check-in starts as a gilded button and opens in its place.
   const [checkinOpen, setCheckinOpen] = useState(false);
   // Checked in within the last hour? Then there's no need to ask again here.
@@ -187,6 +191,8 @@ export function WelcomeCard({
     ),
   };
   const order = welcomeOrder(fx).filter((el) => welcomeShows(fx, el) && parts[el]);
+  // Not checked in yet? "Not now" offers to ask again later, or to skip it for today.
+  const snoozable = !!onSnooze && !checkedIn && order.includes("checkin");
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
@@ -252,14 +258,50 @@ export function WelcomeCard({
               {parts[el]}
             </div>
           ))}
-          <button type="button" onClick={onClose} className="mt-1 h-10 rounded-full border px-5 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>
-            {checkedIn || mode === "day" ? "Continue" : "Not now"}
-          </button>
+          {snoozing ? (
+            <div className="reveal mt-1 flex w-full flex-col items-center gap-1.5">
+              <span className="text-[13px] font-semibold" style={{ color: "#5a4a30" }}>
+                Ask me again…
+              </span>
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {snoozeChoices().map((c) => (
+                  <button key={c.label} type="button" onClick={() => onSnooze!(c.ms)} className="h-9 rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={onClose} className="h-9 px-1 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                  Skip for today
+                </button>
+                <button type="button" onClick={() => setSnoozing(false)} className="h-9 px-1 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                  Back
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => (snoozable ? setSnoozing(true) : onClose())} className="mt-1 h-10 rounded-full border px-5 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>
+              {snoozable ? "Not now" : "Continue"}
+            </button>
+          )}
         </div>
       </div>
     </div>,
     document.body
   );
+}
+
+/** When "Not now" can ask again: soon, in a while, this evening (before then), or at bedtime. */
+function snoozeChoices() {
+  const now = new Date();
+  const at = (h: number, m = 0) => new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime() - now.getTime();
+  const out = [
+    { label: "In 30 min", ms: 30 * 60_000 },
+    { label: "In 1 hour", ms: 3_600_000 },
+    { label: "In 3 hours", ms: 3 * 3_600_000 },
+  ];
+  if (at(18) > 3.5 * 3_600_000) out.push({ label: "This evening", ms: at(18) });
+  return out;
 }
 
 const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };

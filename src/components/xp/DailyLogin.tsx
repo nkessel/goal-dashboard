@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { dailyCheckInAction, welcomeContextAction } from "@/app/actions";
 import { eveningDayKey } from "@/components/evening/evening-clock";
@@ -32,7 +32,8 @@ function dawnHeading(dayKey: string) {
 const BACK_KEY = "welcome-back-at";
 /** The day's open check-in screen: it comes back on each visit until you check in or close it. */
 const PENDING_KEY = "welcome-pending";
-type Pending = { day: string; mode: "day" | "back"; at: number };
+/** `until`: snoozed, so it waits until then. */
+type Pending = { day: string; mode: "day" | "back"; at: number; until?: number };
 function readPending(today: string): Pending | null {
   try {
     const p = JSON.parse(window.localStorage.getItem(PENDING_KEY) || "null") as Pending | null;
@@ -63,6 +64,9 @@ type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<Re
 export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   const router = useRouter();
   const [shown, setShown] = useState<Shown | null>(null);
+  // A snooze that ends while the app is still open brings it back then.
+  const snoozeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(snoozeTimer.current), []);
 
   useEffect(() => {
     let live = true;
@@ -90,6 +94,20 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     try {
       backDue = !!hours && readStyle().returnCheckIn && Date.now() - Number(window.localStorage.getItem(BACK_KEY) || 0) >= away;
     } catch {}
+    // Snoozed: nothing until the snooze is over (on a later visit, or right then if the app's still open).
+    if (pending?.until && Date.now() < pending.until) {
+      const wait = pending.until - Date.now();
+      if (wait > 6 * 3_600_000) return;
+      const t = setTimeout(() => {
+        welcomeContextAction()
+          .then((ctx) => setShown({ mode: pending.mode, award: null, ctx }))
+          .catch(() => {});
+      }, wait);
+      return () => {
+        live = false;
+        clearTimeout(t);
+      };
+    }
     if (!first && !backDue && !pending) return;
     // No surprise pop-ups: the toucan asks first, and the screen opens only if you say so ("Later" skips it).
     const present = (open: () => void) => {
@@ -169,6 +187,14 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       priority={shown.ctx.priority}
       fx={fx}
       onCheckedIn={() => setPending(null)}
+      onSnooze={(ms) => {
+        const today = eveningDayKey();
+        setPending({ ...(readPending(today) ?? { day: today, mode: shown.mode, at: Date.now() }), until: Date.now() + ms });
+        const again = shown;
+        setShown(null);
+        clearTimeout(snoozeTimer.current);
+        if (ms <= 6 * 3_600_000) snoozeTimer.current = setTimeout(() => setShown(again), ms);
+      }}
       onClose={() => {
         setPending(null);
         setShown(null);
