@@ -6,6 +6,8 @@ import { useEffect, useState, useSyncExternalStore, useTransition } from "react"
 import { createPortal } from "react-dom";
 import { addCheckNoteAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
 import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft } from "./NightFields";
+import { DateField } from "@/components/ui/DateField";
+import { shiftDay } from "@/lib/wheel-of-time";
 import { BoltIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
@@ -67,12 +69,12 @@ export function EnergyCheck({
   onSaved,
   noSleep = false,
   sleepLink = true,
-  onSleepLink,
+  addNights = false,
 }: {
   /** A link to the sleep and wake log in Insights, for other nights. */
   sleepLink?: boolean;
-  /** Called as that link is followed (the welcome screen steps aside). */
-  onSleepLink?: () => void;
+  /** Instead of the link, a button that adds rows for other nights' sleep and wake times right here. */
+  addNights?: boolean;
   /** Leave out last night's sleep times. */
   noSleep?: boolean;
   /** Called once a check-in is saved (the welcome-back popup closes then). */
@@ -105,6 +107,9 @@ export function EnergyCheck({
   const [vals, setVals] = useState<Record<string, number>>({});
   const [savedVals, setSavedVals] = useState<Record<string, number>>(metricsToday);
   const [expanded, setExpanded] = useState(full);
+  // Other nights' sleep and wake, added a row at a time (keyed by the morning after).
+  const [otherNights, setOtherNights] = useState<{ id: number; day: string; bed: string; wake: string }[]>([]);
+  const setNight2 = (i: number, patch: Partial<{ day: string; bed: string; wake: string }>) => setOtherNights((o) => o.map((n, j) => (j === i ? { ...n, ...patch } : n)));
   const [notes, setNotes] = useState(notesToday);
   // Events and #tags written since the screen opened — the only ones the open bar shows.
   const [sessionIds, setSessionIds] = useState<Set<string>>(new Set());
@@ -225,9 +230,12 @@ export function EnergyCheck({
     setError(null);
     const all = expanded ? metrics.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
     // Last night's sleep alone is enough to save.
-    if (!energySet && !all.length && !nightTouched) return;
+    if (!energySet && !all.length && !nightTouched && !nightsFilled.length) return;
     startSaving(async () => {
       try {
+        // Other nights only change their times; anything else logged for them stays.
+        for (const n of nightsFilled) await saveNightAction({ day: n.day, bed: n.bed || null, wake: n.wake || null, effort: [], hindrances: [], keep: true });
+        if (nightsFilled.length) setOtherNights([]);
         const nightLogged = nightTouched;
         if (nightLogged) {
           await saveNightAction({ bed: night.bed || null, wake: night.wake || null, effort: night.effort, hindrances: night.hindrances });
@@ -280,7 +288,14 @@ export function EnergyCheck({
 
   const shown = editing ? value : (saved ?? value);
   // Something to save: energy moved, another metric moved, or last night logged.
-  const canSave = energySet || Object.keys(vals).length > 0 || nightTouched;
+  function addNight() {
+    // Each new row starts a night earlier than the earliest one so far.
+    const today = eveningDayKey();
+    const earliest = otherNights.reduce((m, n) => (n.day < m ? n.day : m), wheel && !noSleep ? today : shiftDay(today, 1));
+    setOtherNights((o) => [...o, { id: (o.at(-1)?.id ?? 0) + 1, day: shiftDay(earliest, -1), bed: "", wake: "" }]);
+  }
+  const nightsFilled = otherNights.filter((n) => n.day && (n.bed || n.wake));
+  const canSave = energySet || Object.keys(vals).length > 0 || nightTouched || nightsFilled.length > 0;
   // Only after a saved check-in at 3.5 or below — and not once hidden for today, or in the evening.
   const low = !editing && saved !== null && saved <= LOW && mayOffer;
 
@@ -551,8 +566,34 @@ export function EnergyCheck({
 
                 {noteChips}
                 {noteInput}
-                {sleepLink && (
-                  <Link href="/insights#sleep-log" onClick={onSleepLink} className="self-center text-[13px] underline decoration-[rgba(217,180,95,.5)] underline-offset-[3px] hover:decoration-current" style={{ color: "var(--ec-soft, rgba(239,230,204,.8))" }}>
+                {addNights && (
+                  <>
+                    {otherNights.map((n, i) => (
+                      <div key={n.id} className="reveal flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl px-2 py-1.5" style={{ background: "rgba(0,0,0,.18)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }}>
+                        <span className="flex items-center gap-1.5 text-[14px] font-semibold" style={{ color: "var(--t-cream)" }}>
+                          Morning of
+                          <DateField value={n.day} onChange={(v) => v && setNight2(i, { day: v })} max={eveningDayKey()} ariaLabel="The morning after the night" className="night-time font-display" />
+                        </span>
+                        <label className="flex items-center gap-1.5 text-[14px] font-semibold" style={{ color: "var(--t-cream)" }}>
+                          Slept
+                          <input type="time" value={n.bed} onChange={(e) => setNight2(i, { bed: e.target.value })} aria-label="Sleep time" className="night-time w-[136px] shrink-0" />
+                        </label>
+                        <label className="flex items-center gap-1.5 text-[14px] font-semibold" style={{ color: "var(--t-cream)" }}>
+                          Woke
+                          <input type="time" value={n.wake} onChange={(e) => setNight2(i, { wake: e.target.value })} aria-label="Wake time" className="night-time w-[136px] shrink-0" />
+                        </label>
+                        <button type="button" onClick={() => setOtherNights((o) => o.filter((x) => x.id !== n.id))} aria-label="Remove this night" className="ml-auto flex h-8 w-8 items-center justify-center text-[18px] leading-none" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={addNight} className="flex h-8 items-center gap-1 self-center rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}>
+                      <span aria-hidden style={{ color: "var(--t-gold)" }}>+</span> Add sleep &amp; wake times
+                    </button>
+                  </>
+                )}
+                {sleepLink && !addNights && (
+                  <Link href="/insights#sleep-log" className="self-center text-[13px] underline decoration-[rgba(217,180,95,.5)] underline-offset-[3px] hover:decoration-current" style={{ color: "var(--ec-soft, rgba(239,230,204,.8))" }}>
                     <span aria-hidden style={{ color: "var(--t-gold)" }}>☾</span> Log sleep &amp; wake times for other nights
                   </Link>
                 )}

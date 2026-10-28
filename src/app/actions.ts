@@ -2029,14 +2029,15 @@ export async function wheelOfTimeAction() {
   return { effort: wheel.effort, hindrances: wheel.hindrances, target: wheel.target, today, loggedToday: !!(night?.bed || night?.wake), pressed: { effort: night?.effort ?? [], hindrances: night?.hindrances ?? [] } };
 }
 
-/** Log a night (by default last night, for this morning). Logging again replaces it. */
-export async function saveNightAction(input: { bed: string | null; wake: string | null; effort: string[]; hindrances: { name: string; at?: string | null }[]; day?: string | null }) {
+/** Log a night (by default last night, for this morning). Logging again replaces it, unless `keep` (then only the times given change). */
+export async function saveNightAction(input: { bed: string | null; wake: string | null; effort: string[]; hindrances: { name: string; at?: string | null }[]; day?: string | null; keep?: boolean }) {
   const ownerId = await requireProfileId();
   const { cleanWheel, cleanNight } = await import("@/lib/wheel-of-time");
   const extras = await readExtras(ownerId);
   const wheel = cleanWheel(extras.wheelOfTime);
   const day = input.day && /^\d{4}-\d{2}-\d{2}$/.test(input.day) ? input.day : tomorrowData.appDayKey();
-  const night = cleanNight({ ...input, at: new Date().toISOString() });
+  const was = input.keep ? wheel.log[day] : undefined;
+  const night = cleanNight(was ? { ...was, bed: input.bed ?? was.bed, wake: input.wake ?? was.wake, at: new Date().toISOString() } : { ...input, at: new Date().toISOString() });
   const log = { ...wheel.log };
   if (night) log[day] = night;
   else delete log[day];

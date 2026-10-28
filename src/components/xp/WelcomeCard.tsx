@@ -43,7 +43,6 @@ export function WelcomeCard({
   fx,
   onClose,
   onCheckedIn,
-  onLeave,
 }: {
   mode: "day" | "back";
   heading: string;
@@ -58,15 +57,13 @@ export function WelcomeCard({
   onClose: () => void;
   /** Called once a check-in is saved here. */
   onCheckedIn?: () => void;
-  /** Steps aside without counting as a skip (it comes back on the next visit). */
-  onLeave?: () => void;
 }) {
   const style = useToucanStyle();
   const [shown, setShown] = useState(0);
   const [retired, setRetired] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
-  // Welcome back starts with just a gilded button; the check-in opens in its place.
-  const [checkinOpen, setCheckinOpen] = useState(mode === "day");
+  // The check-in starts as a gilded button and opens in its place.
+  const [checkinOpen, setCheckinOpen] = useState(false);
   // Checked in within the last hour? Then there's no need to ask again here.
   const [recent] = useState(() => !!lastCheckInAt && Date.now() - Date.parse(lastCheckInAt) < 3_600_000);
   useEscape(onClose);
@@ -123,7 +120,7 @@ export function WelcomeCard({
         <p className="m-0 mb-1 text-center font-display text-[17px]" style={{ color: "#f2d27e" }}>
           {checkedIn ? "Checked in ✓" : "Check in"}
         </p>
-        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} onSleepLink={onLeave ?? onClose} />
+        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} addNights />
       </div>
     ),
     streak: award && award.streak > 0 ? (

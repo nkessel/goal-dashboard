@@ -238,8 +238,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
               onChange={(v) => v && openLog(v > today ? today : v)}
               max={today}
               ariaLabel="The morning after the night"
-              className="font-display h-9 rounded-full border px-3 text-[15px]"
-              style={{ background: "linear-gradient(180deg, rgba(0,0,0,.36), rgba(0,0,0,.18))", borderColor: "rgba(217,180,95,.55)", color: "#f6e6bb" }}
+              className="night-time px-3"
             />
             <button type="button" onClick={() => openLog(shiftDay(logDay, 1))} disabled={logDay >= today} aria-label="The night after" className="flex h-9 w-9 items-center justify-center rounded-full text-[18px] hover:bg-white/10 disabled:opacity-30" style={{ color: GOLD }}>
               ›
