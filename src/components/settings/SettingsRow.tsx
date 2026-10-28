@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useReportOpen } from "./ReorderableSections";
 
 /**
@@ -28,6 +28,25 @@ export function SettingsRow({
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  // A gear elsewhere in the app can send you here while Settings is already
+  // showing: open again, and bring the row into view with a short glow.
+  const [wasDefault, setWasDefault] = useState(defaultOpen);
+  if (defaultOpen !== wasDefault) {
+    setWasDefault(defaultOpen);
+    if (defaultOpen) setOpen(true);
+  }
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    if (!defaultOpen || !el) return;
+    const t = window.setTimeout(() => {
+      el.scrollIntoView({ block: "start", behavior: "smooth" });
+      el.classList.remove("settings-spotlight");
+      void el.offsetWidth;
+      el.classList.add("settings-spotlight");
+    }, 280);
+    return () => window.clearTimeout(t);
+  }, [defaultOpen]);
   const isAdventure = theme === "adventure";
   // While a section is open, the list of sections can't be dragged around.
   const report = useReportOpen();
@@ -38,8 +57,10 @@ export function SettingsRow({
 
   return (
     <div
+      ref={box}
       className={isAdventure ? "parchment" : ""}
       style={{
+        scrollMarginTop: 12,
         ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }),
         borderRadius: 14,
         opacity: disabled ? 0.55 : 1,

@@ -9,6 +9,7 @@ import { celebrateReward } from "./RewardCelebration";
 import type { Task } from "@/lib/data/types";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
+import { SettingsGear } from "@/components/ui/SettingsGear";
 import {
   barDust,
   cardDust,
@@ -213,6 +214,17 @@ export function QuestComplete(props: QuestCompleteProps) {
       >
         ×
       </button>
+      {/* Its mirror on the right: how big the celebration is, in Settings. */}
+      {!preview && (
+        <SettingsGear
+          to="visual-effects.celebrations"
+          label="Celebration settings"
+          tone="night"
+          size={44}
+          beforeOpen={onClose}
+          className="absolute right-[max(10px,env(safe-area-inset-right))] top-[max(10px,env(safe-area-inset-top))] z-20"
+        />
+      )}
 
       {/* ambient embers keep drifting after the main animation */}
       <div className="pointer-events-none absolute inset-0">

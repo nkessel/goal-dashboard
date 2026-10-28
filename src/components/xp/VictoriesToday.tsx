@@ -7,6 +7,7 @@ import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { SectionTitle } from "@/components/ui/Ornaments";
+import { SettingsGear } from "@/components/ui/SettingsGear";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { journalKindMeta, splitKindPrefix } from "@/lib/journal-kinds";
 import { setVisualFx, useVisualFx } from "@/lib/visual-fx";
@@ -117,9 +118,11 @@ export function VictoriesToday({
 
   return (
     <section
-      className={`flex flex-col rounded-2xl px-5 pb-3 pt-4 ${isAdventure ? "parchment parchment-framed" : ""}`}
+      className={`relative flex flex-col rounded-2xl px-5 pb-3 pt-4 ${isAdventure ? "parchment parchment-framed" : ""}`}
       style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >
+      {/* Like the habit gear, on the box's corner: what the closed header shows. */}
+      <SettingsGear to="visual-effects.victories" label="Victories Today settings" tone={isAdventure ? "adventure" : "calm"} size={28} className="absolute -right-1.5 -top-2.5 z-[3]" />
       <button
         type="button"
         onClick={() => setVisualFx({ victoriesClosed: !closed })}

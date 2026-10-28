@@ -14,6 +14,7 @@ import { useToucanStyle } from "@/lib/toucan-style-store";
 import { useEscape } from "@/lib/use-escape";
 import { addJournalEntryAction, addToTopOfTodayAction, createQuestAction } from "@/app/actions";
 import { PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
+import { SettingsGear } from "@/components/ui/SettingsGear";
 
 export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
 
@@ -201,6 +202,8 @@ export function WelcomeCard({
             ))}
           </div>
         )}
+        {/* What shows here, and in what order, is chosen in Settings. */}
+        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeOpen={onClose} className="pc-card absolute -right-2 -top-2 z-[2]" />
         <div className="pc-card parchment relative flex max-h-[88vh] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center">
           <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
             {heading}

@@ -1,6 +1,7 @@
 "use client";
 
 import { NumberInput } from "@/components/ui/NumberInput";
+import { SettingsGear } from "@/components/ui/SettingsGear";
 import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -2065,6 +2066,15 @@ export function QuestEditorDialog({
               {title.trim() || heading}
             </h3>
             {!toolbarHost && toolbarButtons}
+            {/* Which fields show, and in what order, is in Settings. A started quest waits in Drafts. */}
+            <SettingsGear
+              to="menus.quest-editor"
+              label="Quest editor settings"
+              tone="plain"
+              size={32}
+              beforeOpen={() => (hasWriting && !finished.current ? leaveWithDraft() : close())}
+              className="ml-0.5"
+            />
             <button type="button" onClick={requestClose} aria-label="Close" className="-mr-1.5 flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
               ×
             </button>

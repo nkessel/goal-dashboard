@@ -14,7 +14,7 @@ export function MenuLayoutStyles() {
 }
 
 /** Settings › Layout: the quest and habit editors and each context menu, folded, with their parts to drag into order and hide. */
-export function MenusSettings({ isAdventure }: { isAdventure: boolean }) {
+export function MenusSettings({ isAdventure, openGroup }: { isAdventure: boolean; /** "quest-editor" when the editor's gear sent you here. */ openGroup?: string }) {
   const head = isAdventure ? "font-display text-[15px]" : "text-sm font-bold";
   return (
     <div className="flex flex-col gap-2">
@@ -22,7 +22,7 @@ export function MenusSettings({ isAdventure }: { isAdventure: boolean }) {
         Drag items into your order (hold on a phone). Swipe one left to hide it. Saved on this device.
       </p>
       <h4 className={`m-0 mt-1 ${head}`}>Editors</h4>
-      <details className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
+      <details open={openGroup === "quest-editor" || undefined} className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
         <summary className={`cursor-pointer ${head}`}>Quest editor</summary>
         <p className="mb-2 mt-1 text-xs" style={{ color: "var(--t-ink-soft)" }}>
           What shows straight away when you make or edit a quest, and what waits under Advanced settings.

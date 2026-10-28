@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { SettingsGear } from "@/components/ui/SettingsGear";
 import {
   DndContext,
   DragOverlay,
@@ -638,8 +639,10 @@ export function EveningRites({
   return (
     <div className="flex flex-col gap-5">
       {/* Header, where Today's Quests sit by day */}
-      <div className="flex flex-col items-center gap-1.5 pt-1 text-center">
-        <div className="flex w-full items-center gap-2">
+      <div className="relative flex flex-col items-center gap-1.5 pt-1 text-center">
+        {/* When the routine starts, and the planning steps, are in Settings. */}
+        <SettingsGear to="planning" label="Evening routine settings" size={28} className="absolute -top-1 right-0 z-[2]" />
+        <div className="flex w-full items-center gap-2 px-8 sm:px-9">
           <span className="hidden flex-1 sm:flex">
             <GoldRule dir="left" />
           </span>

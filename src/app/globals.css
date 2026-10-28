@@ -153,6 +153,30 @@ body {
   transform: scale(0.98);
 }
 
+/* The settings gear turns a little when you reach for it. */
+.settings-gear svg {
+  transition: transform 300ms ease;
+}
+.settings-gear:hover svg,
+.settings-gear:focus-visible svg {
+  transform: rotate(60deg);
+}
+.settings-gear:active {
+  transform: scale(0.94);
+}
+/* The section a gear opened glows gold for a moment, so you see where you landed. */
+@keyframes settings-spotlight {
+  0%, 30% { box-shadow: 0 0 0 2px rgba(217, 180, 95, 0.95), 0 0 22px rgba(217, 180, 95, 0.55); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 180, 95, 0), 0 0 0 rgba(217, 180, 95, 0); }
+}
+.settings-spotlight {
+  animation: settings-spotlight 1.8s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-gear svg { transition: none; }
+  .settings-spotlight { animation: none; }
+}
+
 /* FAB entrance: rises up from the bottom instead of just popping in. */
 @keyframes fab-rise {
   from {

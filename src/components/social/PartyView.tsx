@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SettingsGear } from "@/components/ui/SettingsGear";
 import { setPartyView, usePartyView, PARTY_VIEW_OPTIONS, type PartyView } from "@/lib/party-view";
 
 /** Shows its children only while that part of the Guild Hall is switched on in Settings. */
@@ -19,7 +20,8 @@ export function PartyWeekBoard({ members, isAdventure }: { members: Member[]; is
   const top = Math.max(1, ...ranked.map((m) => m.xp));
   const quiet = members.filter((m) => !m.isYou && m.quietDays !== null && m.quietDays >= 3);
   return (
-    <section className={`flex flex-col gap-2.5 rounded-2xl px-4 py-3.5 ${isAdventure ? "parchment parchment-framed" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
+    <section className={`relative flex flex-col gap-2.5 rounded-2xl px-4 py-3.5 ${isAdventure ? "parchment parchment-framed" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
+      <SettingsGear to="party-view" label="What the Guild Hall shows" tone={isAdventure ? "adventure" : "calm"} size={28} className="absolute -right-1.5 -top-2.5 z-[3]" />
       {view.week && members.length > 1 && (
         <>
           <h2 className={`relative z-[1] m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "var(--t-ink)" }}>

@@ -51,7 +51,10 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
   ]);
   const newFeedback = admin ? await countUnreviewed() : 0;
   if (!profile) notFound();
-  const openAppearance = open === "appearance";
+  // ?open= names a section (and maybe one of its groups: "visual-effects.celebrations"); the gears around the app link here.
+  const [openSection, openGroup] = (open ?? "").split(".");
+  const opens = (id: string) => openSection === id;
+  const openAppearance = open === "appearance" || opens("theme");
   const isAdventure = profile.theme === "adventure";
   const refillCount = (profile.life_wheel?.inventory?.items ?? []).filter((i) => i.status === "empty").length;
   const iconColor = isAdventure ? "#7a5f2a" : "var(--t-accent)";
@@ -252,6 +255,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Account"
+            defaultOpen={opens("account")}
             rightLabel={session?.user?.email ?? undefined}
             icon={
               <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
@@ -316,6 +320,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Calendar Sync"
+            defaultOpen={opens("calendar-sync")}
             rightLabel={session?.googleAccessToken ? "Google Calendar ✓" : "Not connected"}
             icon={
               <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
@@ -373,7 +378,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             theme={profile.theme}
             label="Toucan Spirit"
             rightLabel={`${(profile.toucan?.owned ?? []).length} add-on${(profile.toucan?.owned ?? []).length === 1 ? "" : "s"}`}
-            defaultOpen={open === "toucan"}
+            defaultOpen={open === "toucan" || opens("toucan-spirit")}
             icon={<span style={{ fontSize: 14 }}>🦜</span>}
           >
             <ToucanSettings
@@ -399,7 +404,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               const n = Array.isArray(profile.secret_missions) ? profile.secret_missions.length : 0;
               return n ? `${n} sealed` : "None yet";
             })()}
-            defaultOpen={open === "missions"}
+            defaultOpen={open === "missions" || opens("secret-missions")}
             icon={<span style={{ fontSize: 14 }}>🗝️</span>}
           >
             <SecretMissions initial={profile.secret_missions ?? []} steps={missionSteps} />
@@ -407,7 +412,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </SectionItem>
 
           <SectionItem id="welcome-screen">
-          <SettingsRow theme={profile.theme} label="Welcome Screen" rightLabel="Check-in · greetings · what's on it" icon={<span style={{ fontSize: 14 }}>🌅</span>}>
+          <SettingsRow theme={profile.theme} defaultOpen={opens("welcome-screen")} label="Welcome Screen" rightLabel="Check-in · greetings · what's on it" icon={<span style={{ fontSize: 14 }}>🌅</span>}>
             <WelcomeSettings />
           </SettingsRow>
           </SectionItem>
@@ -416,26 +421,27 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Visual Effects"
+            defaultOpen={opens("visual-effects")}
             rightLabel="Celebrations · + button · Victories"
             icon={<span style={{ fontSize: 14 }}>✨</span>}
           >
             {/* Folded groups, like Layout: open only the one you're changing. */}
             <div className="flex flex-col gap-2">
-              <FxGroup title="Celebrations" hint="The dust and sparks that fly when you complete a quest." isAdventure={isAdventure}>
+              <FxGroup open={opens("visual-effects") && openGroup === "celebrations"} title="Celebrations" hint="The dust and sparks that fly when you complete a quest." isAdventure={isAdventure}>
                 <CelebrationSettings />
               </FxGroup>
-              <FxGroup title="Evening Routine button" isAdventure={isAdventure}>
+              <FxGroup open={opens("visual-effects") && openGroup === "evening-button"} title="Evening Routine button" isAdventure={isAdventure}>
                 <EveningButtonFxSettings />
               </FxGroup>
               {isAdventure && (
-                <FxGroup title="The + button" isAdventure={isAdventure}>
+                <FxGroup open={opens("visual-effects") && openGroup === "fab"} title="The + button" isAdventure={isAdventure}>
                   <FabSettings />
                 </FxGroup>
               )}
-              <FxGroup title="While a screen loads" isAdventure={isAdventure}>
+              <FxGroup open={opens("visual-effects") && openGroup === "loading"} title="While a screen loads" isAdventure={isAdventure}>
                 <LoadingSettings />
               </FxGroup>
-              <FxGroup title="Victories Today, when closed" hint="Tap its title to close it. Its header then shows:" isAdventure={isAdventure}>
+              <FxGroup open={opens("visual-effects") && openGroup === "victories"} title="Victories Today, when closed" hint="Tap its title to close it. Its header then shows:" isAdventure={isAdventure}>
                 <VictoriesHeaderSettings />
               </FxGroup>
               <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
@@ -447,14 +453,14 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
 
 
           <SectionItem id="planning">
-          <SettingsRow theme={profile.theme} label="Planning & evening" rightLabel="Evening routine · planning steps" icon={<span style={{ fontSize: 14 }}>🗺</span>}>
+          <SettingsRow theme={profile.theme} defaultOpen={opens("planning")} label="Planning & evening" rightLabel="Evening routine · planning steps" icon={<span style={{ fontSize: 14 }}>🗺</span>}>
             <PlanningSettings isAdventure={isAdventure} withPair={admin} />
           </SettingsRow>
           </SectionItem>
 
           <SectionItem id="menus">
-          <SettingsRow theme={profile.theme} label="Layout" rightLabel="Editors · menus" icon={<span style={{ fontSize: 14 }}>☰</span>}>
-            <MenusSettings isAdventure={isAdventure} />
+          <SettingsRow theme={profile.theme} defaultOpen={opens("menus")} label="Layout" rightLabel="Editors · menus" icon={<span style={{ fontSize: 14 }}>☰</span>}>
+            <MenusSettings isAdventure={isAdventure} openGroup={opens("menus") ? openGroup : undefined} />
           </SettingsRow>
           </SectionItem>
 
@@ -462,6 +468,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Notifications"
+            defaultOpen={opens("notifications")}
             icon={<span style={{ fontSize: 14 }}>🔔</span>}
           >
             <NotificationPrefs level={profile.notify_level ?? "all"} email={profile.notify_email ?? true} />
@@ -472,6 +479,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Guild Hall"
+            defaultOpen={opens("party-view")}
             icon={
               <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
                 <circle cx="8" cy="9" r="3" />
@@ -488,6 +496,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Privacy & Security"
+            defaultOpen={opens("privacy-security")}
             icon={
               <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
                 <rect x="5" y="11" width="14" height="9" rx="2" />
@@ -508,6 +517,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Your Data"
+            defaultOpen={opens("your-data")}
             icon={
               <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
                 <path d="M12 3v13m0 0-4-4m4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
@@ -527,6 +537,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           <SettingsRow
             theme={profile.theme}
             label="Help & Support"
+            defaultOpen={opens("help-support")}
             icon={
               <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
                 <circle cx="12" cy="12" r="9" />
@@ -551,9 +562,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
 }
 
 /** One folded group of settings inside a section. */
-function FxGroup({ title, hint, isAdventure, children }: { title: string; hint?: string; isAdventure: boolean; children: React.ReactNode }) {
+function FxGroup({ title, hint, isAdventure, open, children }: { title: string; hint?: string; isAdventure: boolean; open?: boolean; children: React.ReactNode }) {
   return (
-    <details className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
+    <details open={open || undefined} className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
       <summary className={`cursor-pointer ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>{title}</summary>
       <div className="mt-2">
         {hint && (
