@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { InviteComposer } from "./InviteComposer";
 
 const noop = () => () => {};
 
-/** "Invite someone to your party": share sheet on phones, copy everywhere. */
+/** "Invite someone to your party": write a custom invite (share sheet, text, email, copy), or just copy the link. */
 export function InviteLinkBox({ code, theme = "calm", inviterName, prominent = false }: { code: string; theme?: "calm" | "adventure"; inviterName?: string | null; /** Top of the Guild Hall: a gilded banner. */ prominent?: boolean }) {
   const [copied, setCopied] = useState(false);
+  const [composing, setComposing] = useState(false);
   const isAdventure = theme === "adventure";
   const path = `/invite/${code}`;
   const origin = useSyncExternalStore(noop, () => window.location.origin, () => "");
@@ -23,19 +25,8 @@ export function InviteLinkBox({ code, theme = "calm", inviterName, prominent = f
     }
   }
 
-  async function share() {
-    try {
-      await navigator.share({
-        title: "Join my party on Goal Dashboard",
-        text: `${inviterName ? `${inviterName} invited you` : "You're invited"} to join their party on Goal Dashboard — cheer each other on and take on goals together.`,
-        url,
-      });
-    } catch {
-      /* closed the share sheet */
-    }
-  }
-
   const gold = { background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" };
+  const composer = composing && <InviteComposer url={url} inviterName={inviterName ?? null} canShare={canShare} theme={theme} onClose={() => setComposing(false)} />;
 
   if (prominent)
     return (
@@ -45,29 +36,23 @@ export function InviteLinkBox({ code, theme = "calm", inviterName, prominent = f
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- painted party banner */}
         <img src="/design/ui-party.png" alt="" width={44} height={44} className="h-11 w-11 shrink-0 object-contain" />
-        <span className="min-w-0 flex-1">
+        <span className="min-w-[11rem] flex-1">
           <span className={`block ${isAdventure ? "font-display text-[20px]" : "text-[17px] font-bold"}`} style={{ color: "#f6dc8e" }}>
             Invite to your party
           </span>
           <span className="block text-[13.5px] leading-snug" style={{ color: "rgba(246,236,210,.85)" }}>
-            Send this link. They sign in with Google and join your party.
+            Write a note with your link. They sign in with Google and join your party.
           </span>
         </span>
-        <span className="flex shrink-0 gap-2">
-          {canShare && (
-            <button type="button" onClick={share} className="hover-glow h-11 rounded-full px-5 text-[15px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1.5px solid #4a3913" }}>
-              Share invite
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={copy}
-            className="hover-glow h-11 rounded-full px-5 text-[15px] font-bold"
-            style={canShare ? { border: "1.5px solid #d9b45f", color: "#f6ecd2" } : { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1.5px solid #4a3913" }}
-          >
-            {copied ? "Copied ✓" : "Copy invite link"}
+        <span className="flex shrink-0 flex-wrap gap-2">
+          <button type="button" onClick={() => setComposing(true)} className="hover-glow h-11 rounded-full px-5 text-[15px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1.5px solid #4a3913" }}>
+            Write an invite
+          </button>
+          <button type="button" onClick={copy} className="hover-glow h-11 rounded-full px-5 text-[15px] font-bold" style={{ border: "1.5px solid #d9b45f", color: "#f6ecd2" }}>
+            {copied ? "Copied ✓" : "Copy link"}
           </button>
         </span>
+        {composer}
       </section>
     );
 
@@ -83,16 +68,14 @@ export function InviteLinkBox({ code, theme = "calm", inviterName, prominent = f
         Send them this link. Once they open it and sign in with Google, you&apos;re in each other&apos;s party.
       </p>
       <div className="relative z-[1] flex flex-wrap items-center gap-2">
-        {canShare && (
-          <button type="button" onClick={share} className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold" style={gold}>
-            Share invite
-          </button>
-        )}
+        <button type="button" onClick={() => setComposing(true)} className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold" style={gold}>
+          Write an invite
+        </button>
         <button
           type="button"
           onClick={copy}
           className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold"
-          style={canShare ? { border: `1.5px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}`, color: "var(--t-ink)" } : gold}
+          style={{ border: `1.5px solid ${isAdventure ? "#a58c66" : "var(--t-card-border)"}`, color: "var(--t-ink)" }}
         >
           {copied ? "Copied" : "Copy link"}
         </button>
@@ -100,6 +83,7 @@ export function InviteLinkBox({ code, theme = "calm", inviterName, prominent = f
           {url.replace(/^https?:\/\//, "")}
         </code>
       </div>
+      {composer}
     </section>
   );
 }
