@@ -41,6 +41,7 @@ import { AHEAD_DAYS, catchUpOrder, catchUpPlan, looksLikeCourse, type CourseItem
 import { SCHEDULER_DEFAULTS, planSchedule, type Busy, type SchedulerSettings } from "@/lib/auto-schedule";
 import { openFocusMode } from "@/lib/focus-timer";
 import { GearIcon } from "@/components/ui/Icons";
+import { SettingsGear } from "@/components/ui/SettingsGear";
 import { ToucanArt } from "./ToucanArt";
 import { useEscape } from "@/lib/use-escape";
 import { ToucanQuiz } from "./ToucanQuiz";
@@ -700,7 +701,6 @@ function GuideSheet({
   const [due, setDue] = useState<CoachPromise[]>([]);
   const [showNotes, setShowNotes] = useState(false);
   const [showLook, setShowLook] = useState(false);
-  const router = useRouter();
   const [flourish, setFl] = useState<Flourish>(() => (typeof window === "undefined" ? "glow" : readFlourish()));
   const [text, setText] = useState("");
   const [thinking, setThinking] = useState(false);
@@ -845,19 +845,15 @@ function GuideSheet({
               <span className="text-[12px] italic" style={{ color: "rgba(232,255,248,.6)" }}>
                 Tap me on my perch to see it.
               </span>
-              {/* The rest of how he talks and looks lives in Settings; the chat waits, minimized. */}
-              <button
-                type="button"
-                onClick={() => {
-                  onMinimize();
-                  router.push("/settings?open=toucan-spirit");
-                }}
-                className="settings-gear mt-0.5 flex items-center gap-1.5 self-start rounded-full px-2.5 py-1 text-[12.5px] font-semibold hover:bg-white/10"
+              {/* The rest of how he talks and looks, over the chat; going on to full Settings minimizes it. */}
+              <SettingsGear
+                to="toucan-spirit"
+                text="All my settings"
+                label="All the toucan's settings"
+                beforeLeave={onMinimize}
+                className="mt-0.5 self-start px-2.5 py-1 text-[12.5px] font-semibold hover:bg-white/10"
                 style={{ color: "rgba(140,240,220,.9)", border: "1px solid rgba(140,240,220,.3)" }}
-              >
-                <GearIcon size={14} />
-                All my settings
-              </button>
+              />
             </div>
           )}
           {showNotes && (

@@ -221,7 +221,7 @@ export function QuestComplete(props: QuestCompleteProps) {
           label="Celebration settings"
           tone="night"
           size={44}
-          beforeOpen={onClose}
+          beforeLeave={onClose}
           className="absolute right-[max(10px,env(safe-area-inset-right))] top-[max(10px,env(safe-area-inset-top))] z-20"
         />
       )}

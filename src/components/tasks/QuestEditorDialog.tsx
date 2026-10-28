@@ -2072,7 +2072,7 @@ export function QuestEditorDialog({
               label="Quest editor settings"
               tone="plain"
               size={32}
-              beforeOpen={() => (hasWriting && !finished.current ? leaveWithDraft() : close())}
+              beforeLeave={() => (hasWriting && !finished.current ? leaveWithDraft() : close())}
               className="ml-0.5"
             />
             <button type="button" onClick={requestClose} aria-label="Close" className="-mr-1.5 flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>

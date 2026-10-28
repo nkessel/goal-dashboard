@@ -2329,6 +2329,13 @@ export async function callForSupportAction(kind: partyData.SupportKind, message:
   return threadId;
 }
 
+/** What a settings popup opened from a gear needs that only the server knows. */
+export async function settingsPopupContextAction() {
+  const ownerId = await requireProfileId();
+  const [profile, admin] = await Promise.all([profilesData.getProfileById(ownerId), feedbackData.isAdmin(ownerId)]);
+  return { notifyLevel: profile?.notify_level ?? "all", notifyEmail: profile?.notify_email ?? true, admin };
+}
+
 export async function setNotifyPrefsAction(prefs: { level?: string; email?: boolean }) {
   const ownerId = await requireProfileId();
   await partyData.setNotifyPrefs(ownerId, prefs);

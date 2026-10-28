@@ -1,7 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { GearIcon } from "./Icons";
+import { SettingsPopup } from "./SettingsPopup";
 
 /**
  * Where a gear can take you in Settings: a section's id, or a section and
@@ -29,8 +30,10 @@ const TONES = {
 
 /**
  * The app's one gear, on anything whose look or behaviour can be changed in
- * Settings. Tapping it opens Settings at that section. `beforeOpen` lets a
- * popup close itself first.
+ * Settings. Tapping it opens that section's settings in a popup on the same
+ * screen. `beforeLeave` runs only if you go on to the full Settings page, so
+ * a popup underneath can close itself first. With `text`, it's a small
+ * labelled button instead of a round gear.
  */
 export function SettingsGear({
   to,
@@ -38,30 +41,43 @@ export function SettingsGear({
   tone = "adventure",
   size = 30,
   className = "",
-  beforeOpen,
+  text,
+  style,
+  beforeLeave,
 }: {
   to: SettingsSpot;
   label?: string;
   tone?: keyof typeof TONES;
   size?: number;
   className?: string;
-  beforeOpen?: () => void;
+  text?: string;
+  style?: React.CSSProperties;
+  beforeLeave?: () => void;
 }) {
-  const router = useRouter();
+  const [open, setOpen] = useState(false);
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={(e) => {
-        e.stopPropagation();
-        beforeOpen?.();
-        router.push(`/settings?open=${to}`);
-      }}
-      className={`settings-gear flex shrink-0 items-center justify-center rounded-full ${tone === "plain" ? "hover:bg-black/5" : ""} ${className}`}
-      style={{ width: size, height: size, ...TONES[tone] }}
-    >
-      <GearIcon size={Math.round(size * 0.56)} />
-    </button>
+    <>
+      <button
+        type="button"
+        aria-label={text ? undefined : label}
+        title={label}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className={
+          text
+            ? `settings-gear flex items-center gap-1.5 rounded-full ${className}`
+            : `settings-gear flex shrink-0 items-center justify-center rounded-full ${tone === "plain" ? "hover:bg-black/5" : ""} ${className}`
+        }
+        style={text ? style : { width: size, height: size, ...TONES[tone], ...style }}
+      >
+        <GearIcon size={text ? 14 : Math.round(size * 0.56)} />
+        {text}
+      </button>
+      {open && <SettingsPopup spot={to} onClose={() => setOpen(false)} beforeLeave={beforeLeave} />}
+    </>
   );
 }
