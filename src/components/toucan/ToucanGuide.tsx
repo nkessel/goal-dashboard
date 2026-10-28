@@ -53,7 +53,7 @@ type Msg = { role: "user" | "assistant"; content: string; actions?: (CoachAction
 type Mode = "talk" | "catchup";
 
 /** An invitation put off with Snooze, and what it offers when it comes back. */
-type SnoozeNote = { text: string; until: number; taskId?: string; plan?: PlanTarget; begin?: string; talk?: string; talkLabel?: string };
+type SnoozeNote = { text: string; until: number; taskId?: string; plan?: PlanTarget; begin?: string; talk?: string; talkLabel?: string; promiseId?: string; quiz?: boolean };
 const SNOOZE_KEY = "toucan-snoozed";
 function readSnoozed(): SnoozeNote[] {
   try {
@@ -68,6 +68,13 @@ function writeSnoozed(list: SnoozeNote[]) {
   try {
     window.localStorage.setItem(SNOOZE_KEY, JSON.stringify(list.slice(-20)));
   } catch {}
+}
+/** 9am tomorrow: when a "tomorrow" snooze comes back. */
+function tomorrowMorning() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(9, 0, 0, 0);
+  return d.getTime();
 }
 /** Open a quest in focus mode for a short first stretch. */
 async function beginQuest(id: string) {
@@ -144,6 +151,7 @@ export function ToucanGuide() {
   const [open, setOpen] = useState<{ plan: PlanTarget | null; mode: Mode; say?: string; n?: number } | null>(null);
   const [minimized, setMinimized] = useState(false);
   const [fallback, setFallback] = useState<{ text: string; actions: NoteAction[] } | null>(null);
+  const [pickTime, setPickTime] = useState<((when: number) => void) | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -176,39 +184,38 @@ export function ToucanGuide() {
     raiseRef.current = raise;
   });
 
-  // Snooze: an invitation comes back in 1 hour, 2 hours or a time you choose.
+  // Not now: an invitation comes back when you say (30 minutes, 1 or 2 hours, tomorrow or a time you pick), or not at all.
   const actionsFor = (n: SnoozeNote): NoteAction[] => [
+    ...(n.promiseId ? [{ label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: n.promiseId!, status: "kept" } }).then(() => window.dispatchEvent(new Event("toucan-promises"))).catch(() => {}) }] : []),
+    ...(n.quiz ? [{ label: "Let's do it", run: () => window.dispatchEvent(new Event("toucan-quiz")) }] : []),
     ...(n.plan ? [{ label: n.plan.estimate ? "Plan it" : "Estimate & plan", run: () => talkToToucan(n.plan!) }] : []),
     ...(n.begin ? [{ label: "Begin · 15 min", run: () => void beginQuest(n.begin!) }] : []),
     ...(n.talk ? [{ label: n.talkLabel ?? "Let's go", run: () => talkToToucan(undefined, "talk", n.talk) }] : []),
     snoozeFor(n),
-    { label: "Not now", run: () => {} },
   ];
   const snoozeFor = (n: SnoozeNote): NoteAction => ({
-    label: "Snooze",
+    label: "Not now…",
     run: () => {
-      const until = (hours: number) => {
-        const h = Math.max(0.25, Math.min(24, hours));
-        writeSnoozed([...readSnoozed().filter((x) => x.text !== n.text), { ...n, until: Date.now() + h * 3_600_000 }]);
-        if (n.taskId) void snoozeToucanAction(n.taskId, h / 24).catch(() => {});
+      const at = (when: number) => {
+        writeSnoozed([...readSnoozed().filter((x) => x.text !== n.text), { ...n, until: when }]);
+        if (n.taskId) void snoozeToucanAction(n.taskId, Math.max(0.01, (when - Date.now()) / 86_400_000)).catch(() => {});
       };
-      raiseRef.current("Snooze it for…", [
-        { label: "1 hour", run: () => until(1) },
-        { label: "2 hours", run: () => until(2) },
-        {
-          label: "Custom…",
-          run: () => {
-            const v = window.prompt("Snooze for how many hours?", "3");
-            const h = v ? Number(v.replace(",", ".")) : NaN;
-            if (Number.isFinite(h) && h > 0) until(h);
-          },
-        },
+      const inHours = (h: number) => at(Date.now() + h * 3_600_000);
+      raiseRef.current("When should I bring it back?", [
+        { label: "30 min", run: () => inHours(0.5) },
+        { label: "1 hour", run: () => inHours(1) },
+        { label: "2 hours", run: () => inHours(2) },
+        { label: "Tomorrow", run: () => at(tomorrowMorning()) },
+        { label: "Pick a time…", run: () => setPickTime(() => at) },
+        { label: "Skip it", run: () => void (n.taskId && snoozeToucanAction(n.taskId, 1).catch(() => {})) },
       ]);
     },
   });
   const actionsRef = useRef(actionsFor);
+  const snoozeForRef = useRef(snoozeFor);
   useEffect(() => {
     actionsRef.current = actionsFor;
+    snoozeForRef.current = snoozeFor;
   });
   useEffect(() => {
     const check = () => {
@@ -264,7 +271,7 @@ export function ToucanGuide() {
         } catch {}
       };
       const done = (p: CoachPromise) => ({ label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: p.id, status: "kept" } }).then(() => window.dispatchEvent(new Event("toucan-promises"))).catch(() => {}) });
-      const later = { label: "Later", run: () => {} };
+      const later = (p: CoachPromise, text: string) => snoozeFor({ text, until: 0, promiseId: p.id });
       const say = (text: string, actions: NoteAction[]) => raiseRef.current(polish(st, text), actions);
       // "Next time" reminders whose calendar event is near.
       const near = (watch.nextNear as { promise: CoachPromise; event: { title: string; start: string } }[]).find((n) => !shown(n.promise.id));
@@ -272,7 +279,8 @@ export function ToucanGuide() {
         mark(near.promise.id);
         const start = Date.parse(near.event.start);
         const whenText = start <= Date.now() ? "now" : `at ${new Date(start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${new Date(start).toDateString() === new Date().toDateString() ? "" : " tomorrow"}`;
-        say(`“${near.event.title}” is ${whenText}. Remember: ${near.promise.text}`, [done(near.promise), later]);
+        const text = `“${near.event.title}” is ${whenText}. Remember: ${near.promise.text}`;
+        say(text, [done(near.promise), later(near.promise, polish(st, text))]);
         return;
       }
       // Reminders with no time: kept in mind, brought up once a day.
@@ -280,7 +288,8 @@ export function ToucanGuide() {
       if (standing.length) {
         standing.forEach((p) => mark(p.id));
         const [first, ...rest] = standing;
-        say(`Don't forget: ${first.text}${rest.length ? ` (and ${rest.length} more: ${rest.map((p) => p.text).join("; ")})` : ""}`, [done(first), later]);
+        const text = `Don't forget: ${first.text}${rest.length ? ` (and ${rest.length} more: ${rest.map((p) => p.text).join("; ")})` : ""}`;
+        say(text, [done(first), later(first, polish(st, text))]);
         return;
       }
       if (mode === "simple") return;
@@ -296,10 +305,8 @@ export function ToucanGuide() {
           try {
             window.localStorage.setItem("toucan-quiz-offers", String(offers + 1));
           } catch {}
-          say("I'd love to learn how you like to be checked in, so I can do it your way. A few taps?", [
-            { label: "Let's do it", run: () => setQuiz(true) },
-            { label: "Not now", run: () => {} },
-          ]);
+          const text = "I'd love to learn how you like to be checked in, so I can do it your way. A few taps?";
+          say(text, [{ label: "Let's do it", run: () => setQuiz(true) }, snoozeFor({ text: polish(st, text), until: 0, quiz: true })]);
           return;
         }
       }
@@ -324,7 +331,7 @@ export function ToucanGuide() {
               void answerDeadlineGuessAction(guess.taskId, guess.start)
                 .then(() => {
                   router.refresh();
-                  if (soon) say("Done. It's in Due soon at the top of Today. Shall we plan your day around it?", [planDay, later]);
+                  if (soon) say("Done. It's in Due soon at the top of Today. Shall we plan your day around it?", [planDay, { label: "Not now", run: () => {} }]);
                 })
                 .catch(() => {}),
           },
@@ -403,7 +410,6 @@ export function ToucanGuide() {
       say(text, [
         { label: top.step === "estimate" ? "Estimate & plan" : "Plan it", run: () => talkToToucan(plan) },
         snoozeFor({ text: polish(st, text), until: 0, taskId: top.id, plan }),
-        { label: "Not now", run: () => void snoozeToucanAction(top.id, 1).catch(() => {}) },
       ]);
     }, 1200);
     return () => clearTimeout(t);
@@ -487,7 +493,19 @@ export function ToucanGuide() {
                   text: `It's time: “${p.text}”. Shall we begin together?`,
                   actions: [
                     { label: "Begin", run: () => void beginPromise(p) },
-                    { label: "In 15 min", run: () => void coachPromiseAction({ push: { id: p.id, minutes: 15 } }).then(arm).catch(() => {}) },
+                    {
+                      label: "Not now…",
+                      run: () => {
+                        const push = (minutes: number) => void coachPromiseAction({ push: { id: p.id, minutes } }).then(arm).catch(() => {});
+                        raiseRef.current("When should I bring it back?", [
+                          { label: "15 min", run: () => push(15) },
+                          { label: "30 min", run: () => push(30) },
+                          { label: "1 hour", run: () => push(60) },
+                          { label: "2 hours", run: () => push(120) },
+                          { label: "Pick a time…", run: () => setPickTime(() => (when: number) => push(Math.max(1, Math.round((when - Date.now()) / 60_000)))) },
+                        ]);
+                      },
+                    },
                     { label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: p.id, status: "kept" } }).catch(() => {}) },
                   ],
                 },
@@ -510,7 +528,7 @@ export function ToucanGuide() {
                   text: `“${n.event.title}” is starting. Remember: ${n.promise.text}`,
                   actions: [
                     { label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: n.promise.id, status: "kept" } }).then(arm).catch(() => {}) },
-                    { label: "Later", run: () => {} },
+                    snoozeForRef.current({ text: `“${n.event.title}” is starting. Remember: ${n.promise.text}`, until: 0, promiseId: n.promise.id }),
                   ],
                 },
               })
@@ -532,6 +550,15 @@ export function ToucanGuide() {
 
   return (
     <>
+      {pickTime && (
+        <PickTime
+          onPick={(when) => {
+            pickTime(when);
+            setPickTime(null);
+          }}
+          onClose={() => setPickTime(null)}
+        />
+      )}
       {fallback && <NudgeNote text={fallback.text} actions={fallback.actions} onClose={() => setFallback(null)} />}
       {quiz && <ToucanQuiz onClose={() => setQuiz(false)} />}
       {open && (mode !== "simple" || open.mode === "catchup" || open.plan) && (
@@ -565,6 +592,48 @@ export function ToucanGuide() {
 }
 
 type NoteAction = { label: string; run: () => void };
+
+/** Choose when a reminder comes back: a time today, or tomorrow if that time has passed. */
+function PickTime({ onPick, onClose }: { onPick: (when: number) => void; onClose: () => void }) {
+  useEscape(onClose);
+  const nextAt = (value: string) => {
+    const [h, m] = value.split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+    return d;
+  };
+  const [{ value, when, today }, setPick] = useState(() => {
+    const d = new Date(Date.now() + 3 * 3_600_000);
+    const value = `${String(d.getHours()).padStart(2, "0")}:00`;
+    const when = nextAt(value);
+    return { value, when, today: when?.toDateString() === new Date().toDateString() };
+  });
+  return createPortal(
+    <div className="fixed inset-0 z-[72] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="Bring it back at" onClick={(e) => e.stopPropagation()} className="card-pop-in relative flex w-[min(320px,calc(100vw-32px))] flex-col gap-3 rounded-2xl p-4" style={{ background: "linear-gradient(180deg, rgba(14,38,40,.98), rgba(8,22,26,.99))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 10px 28px rgba(0,0,0,.5)" }}>
+        <button type="button" onClick={onClose} aria-label="Close" title="Close" className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(232,255,248,.75)" }}>
+          ×
+        </button>
+        <p className="m-0 text-[15px] font-semibold">Bring it back at…</p>
+        <input type="time" value={value} onChange={(e) => {
+            const when = nextAt(e.target.value);
+            setPick({ value: e.target.value, when, today: when?.toDateString() === new Date().toDateString() });
+          }} aria-label="Time" className="h-11 rounded-xl px-3 text-[16px]" style={{ background: "rgba(0,0,0,.25)", border: "1px solid rgba(140,240,220,.35)", color: "#e8fff8", colorScheme: "dark" }} />
+        {when && (
+          <p className="m-0 text-[13px]" style={{ color: "rgba(232,255,248,.7)" }}>
+            {today ? "Today" : "Tomorrow"} at {when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+          </p>
+        )}
+        <button type="button" disabled={!when} onClick={() => when && onPick(when.getTime())} className="h-11 rounded-full text-[14.5px] font-bold disabled:opacity-60" style={{ background: "linear-gradient(180deg, #8cf0dc, #4fbfa9)", color: "#0a2a26" }}>
+          Remind me then
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 function NudgeNote({ text, actions, onClose }: { text: string; actions: NoteAction[]; onClose: () => void }) {
   useEscape(onClose);
