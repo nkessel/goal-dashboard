@@ -70,7 +70,10 @@ export function EnergyCheck({
   noSleep = false,
   sleepLink = true,
   addNights = false,
+  simple = false,
 }: {
+  /** The welcome screen's check-in: always open (no caret) and no Edit check-in. */
+  simple?: boolean;
   /** A link to the sleep and wake log in Insights, for other nights. */
   sleepLink?: boolean;
   /** Instead of the link, a button that adds rows for other nights' sleep and wake times right here. */
@@ -437,13 +440,14 @@ export function EnergyCheck({
           <>
             {wheel && !noSleep && <NightFields value={night} onChange={setNight} effort={wheel.effort} hindrances={wheel.hindrances} />}
             <div className="flex items-center gap-2">
-              {caret}
-              <span className="flex min-w-0 flex-1 items-center gap-2 transition-opacity" style={{ opacity: energySet ? 1 : 0.55 }}>
-                <span className={label} style={{ color: "var(--t-cream)" }}>
+              {/* The welcome screen's check-in is always open, so no caret there. */}
+              {!simple && caret}
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: energySet ? 1 : 0.6 }}>
                   Energy
                 </span>
                 {slider(value, setValue, "Energy level, 1 to 10", `hsl(${hue} 60% 48%)`)}
-                <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: `hsl(${hue} 70% var(--ec-l, 68%))` }}>
+                <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums transition-opacity" style={{ color: `hsl(${hue} 70% var(--ec-l, 68%))`, opacity: energySet ? 1 : 0.6 }}>
                   {energySet ? fmt(value) : "–"}
                 </span>
               </span>
@@ -467,14 +471,14 @@ export function EnergyCheck({
                   const set = vals[m] !== undefined;
                   const v = vals[m] ?? 5.5;
                   return (
-                    // Untouched metrics sit faded and aren't saved; moving one counts it.
-                    <div key={m} className="flex items-center gap-2 transition-opacity" style={{ opacity: set ? 1 : 0.55 }}>
-                      <span aria-hidden className="w-5 shrink-0" />
-                      <span className={label} style={{ color: "var(--t-cream)" }} title={m}>
+                    // Untouched metrics aren't saved (their name and value sit faded, the slider stays bright); moving one counts it.
+                    <div key={m} className="flex items-center gap-2">
+                      {!simple && <span aria-hidden className="w-5 shrink-0" />}
+                      <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: set ? 1 : 0.6 }} title={m}>
                         {m}
                       </span>
                       {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), `${m}, 1 to 10`, "#c9a24a")}
-                      <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums" style={{ color: "var(--ec-value, #f2d58a)" }}>
+                      <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums transition-opacity" style={{ color: "var(--ec-value, #f2d58a)", opacity: set ? 1 : 0.6 }}>
                         {set ? fmt(v) : "–"}
                       </span>
                       {editingList ? (
@@ -498,16 +502,17 @@ export function EnergyCheck({
                 {/* Beneath the metrics: add another, or log an event / #tag. */}
                 {!adding && !noting && (
                   <div className="flex items-center gap-2">
-                    <span aria-hidden className="w-5 shrink-0" />
+                    {!simple && <span aria-hidden className="w-5 shrink-0" />}
                     {metrics.length < MAX_METRICS && (
                       <button
                         type="button"
                         onClick={() => setAdding(true)}
-                        className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
-                        style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
+                        className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[19px] leading-none"
+                        style={{ border: "1.5px solid rgba(217,180,95,.75)", color: "var(--t-gold)", background: "rgba(242,210,126,.08)" }}
                         title="Add a new check-in metric"
+                        aria-label="Add a new check-in metric"
                       >
-                        <span aria-hidden style={{ color: "var(--t-gold)" }}>+</span> New
+                        +
                       </button>
                     )}
                     <button
@@ -599,7 +604,8 @@ export function EnergyCheck({
                 )}
                 {/* Edit check-in · Submit check-in */}
                 <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 pt-0.5">
-                  {full ? (
+                  {/* The welcome screen keeps to the essentials: metrics are edited in Insights. */}
+                  {simple ? null : full ? (
                     metrics.length > 0 && (
                       <button
                         type="button"

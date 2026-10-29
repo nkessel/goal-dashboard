@@ -259,9 +259,9 @@ export function EveningRites({
   };
 
   /**
-   * Choosing tomorrow's quests is one rite: it completes itself once three or
-   * more are chosen (or with a tap, for a lighter day), and undoes itself if
-   * every quest is taken back out.
+   * Choosing tomorrow's quests is one rite: it completes only when you tap
+   * its seal (never by itself while you're still choosing), and undoes itself
+   * if every quest is taken back out.
    */
   const [tomorrowCount, setTomorrowCount] = useState<number | null>(null);
   const chosenTomorrow = tomorrowCount ?? tomorrow?.length ?? 0;
@@ -277,7 +277,7 @@ export function EveningRites({
   function syncTomorrow(r: RiteView, filled: number) {
     setTomorrowCount(filled);
     const done = doneTonight(r.id);
-    if ((filled >= 3 && !done) || (filled === 0 && done)) toggle(r);
+    if (filled === 0 && done) toggle(r);
   }
 
   function remove(r: RiteView) {

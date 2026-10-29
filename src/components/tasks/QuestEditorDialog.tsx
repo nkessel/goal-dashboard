@@ -187,8 +187,8 @@ export function QuestEditorDialog({
   const [draftIcon, setDraftIcon] = useState<{ url: string; source: "library" | "ai" } | null>(null);
   /** New quests: what to paint instead of the title (blank = paint the title). */
   const [artPrompt, setArtPrompt] = useState("");
-  /** New quests: leave it without a portrait (just the empty check box). */
-  const [noPortrait, setNoPortrait] = useState(Boolean(create?.tiny));
+  /** New quests: no portrait (just the empty check box) unless you tick "Paint a portrait". */
+  const [noPortrait, setNoPortrait] = useState(true);
   const layout = useSyncExternalStore(subscribeEditorLayout, readEditorLayout, serverEditorLayout);
   const coarsePointer = useSyncExternalStore(noSubscribe, () => window.matchMedia("(pointer: coarse)").matches, () => false);
   const [advOpen, setAdvOpen] = useState(false);
@@ -210,6 +210,10 @@ export function QuestEditorDialog({
   // Share of this quest's XP sent to character stats (saved as you slide, for existing quests).
   const [statSplit, setStatSplit] = useState<Record<string, number>>(task?.stat_split ?? {});
   const statTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [statsOpen, setStatsOpen] = useState(false);
+  // XP you set yourself (an existing quest whose XP isn't its minutes counts): time to complete no longer sets it.
+  const [xpOwn, setXpOwn] = useState(() => !!task && task.xp_value > 0 && task.xp_value !== task.estimate_minutes);
+  const statTotal = Object.values(statSplit).reduce((a, b) => a + b, 0);
   function changeStatSplit(next: Record<string, number>) {
     setStatSplit(next);
     if (!task) return;
@@ -957,6 +961,22 @@ export function QuestEditorDialog({
   const toolbarButtons =
     create && !doingNow ? (
       <span className="flex items-center gap-1">
+        {/* A tiny task: half height on Today, 5 minutes and 15 XP to start with. */}
+        <button
+          type="button"
+          onClick={() => {
+            const on = !tiny;
+            setTiny(on);
+            if (on && xp === 0) setXp(15);
+            if (on && !estimate.trim()) setEstimate("5");
+          }}
+          aria-pressed={tiny}
+          title="A tiny task: half height on Today, with just a check box"
+          className={smallBtn}
+          style={smallBtnStyle(tiny)}
+        >
+          <span aria-hidden>🌱</span> Tiny task
+        </button>
         <button type="button" onClick={() => (setShowTemplates((v) => !v), setShowDrafts(false))} aria-expanded={showTemplates} title="Start from a template or a quick set" className={smallBtn} style={smallBtnStyle(showTemplates)}>
           <span aria-hidden>📜</span> Templates
         </button>
@@ -1037,7 +1057,12 @@ export function QuestEditorDialog({
                       min={0}
                       step={5}
                       value={estimate}
-                      onChange={(e) => setEstimate(e.target.value)}
+                      onChange={(e) => {
+                        setEstimate(e.target.value);
+                        // XP follows the minutes (1 XP a minute) until you set the XP yourself.
+                        const m = Math.round(Number(e.target.value));
+                        if (!xpOwn && Number.isFinite(m) && m > 0) setXp(Math.min(1000, m));
+                      }}
                       placeholder="—"
                       aria-label="Minutes to complete"
                       className="h-9 w-16 rounded-lg border px-2 text-right text-[16px] tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1657,7 +1682,18 @@ export function QuestEditorDialog({
               {/* XP and coins */}
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <span className={labelCls}>{isAdventure ? "XP reward" : "Points"}</span>
+                  <span className="flex flex-col items-start gap-0.5">
+                    <span className={labelCls}>{isAdventure ? "XP reward" : "Points"}</span>
+                    {/* Under the title: send some of the XP to character stats (the tray opens below the XP bar). */}
+                    {!doingNow && (!layout.folded.includes("stats") || advOpen) && (
+                      <button type="button" onClick={() => setStatsOpen((o) => !o)} aria-expanded={statsOpen} className="flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: statsOpen ? "rgba(217,180,95,.3)" : "rgba(255,250,235,.35)" }}>
+                        {statTotal > 0 ? `${Math.round((xp * statTotal) / 100)} XP to stats` : "＋ Add to stats"}
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: statsOpen ? "rotate(90deg)" : undefined }}>
+                          <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
+                  </span>
                   <span className="ml-auto text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
                     {coinValue === null ? `coins follow XP (1 per ${XP_PER_COIN})` : (
                       <button type="button" onClick={() => setCoinValue(null)} className="underline">
@@ -1673,7 +1709,7 @@ export function QuestEditorDialog({
                     max={XP_MAX}
                     step={XP_STEP}
                     value={Math.min(XP_MAX, xp)}
-                    onChange={(e) => setXp(Number(e.target.value))}
+                    onChange={(e) => (setXp(Number(e.target.value)), setXpOwn(true))}
                     aria-label="XP reward"
                     className="h-8 min-w-0 flex-1"
                     style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
@@ -1683,7 +1719,7 @@ export function QuestEditorDialog({
                       min={0}
                       max={1000}
                       value={xp}
-                      onValueChange={setXp}
+                      onValueChange={(v) => (setXp(v), setXpOwn(true))}
                       blankZero
                       aria-label="XP amount"
                       className="bare-input h-full w-11 bg-transparent px-1 text-right text-[16px] font-bold tabular-nums placeholder:opacity-60 placeholder:text-[var(--t-xp)] focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
@@ -1731,7 +1767,7 @@ export function QuestEditorDialog({
     stats: (
       <>
               {/* Character stats: a share of the XP can build stats instead of your level */}
-              {!doingNow && <StatSplitEditor xp={xp} split={statSplit} onChange={changeStatSplit} isAdventure={isAdventure} />}
+              {!doingNow && <StatSplitEditor xp={xp} split={statSplit} onChange={changeStatSplit} isAdventure={isAdventure} open={statsOpen} onOpenChange={setStatsOpen} />}
       </>
     ),
     tags: (
@@ -2139,11 +2175,11 @@ export function QuestEditorDialog({
                     }}
                     onPromptChange={setArtPrompt}
                   />
-                  {/* No portrait: it stays the empty check box, ready to tick. */}
+                  {/* Opt in: paint a portrait once it's saved. Otherwise it stays the empty check box, ready to tick. */}
                   {!draftIcon && !doingNow && (
-                    <label className="flex cursor-pointer items-center gap-1 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }} title="Don't paint a portrait for this quest">
-                      <input type="checkbox" checked={noPortrait} onChange={(e) => setNoPortrait(e.target.checked)} className="h-3.5 w-3.5" style={{ accentColor: "#7a5f2a" }} />
-                      No portrait
+                    <label className="flex cursor-pointer items-center gap-1 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }} title="Paint a portrait for this quest from its title once it's saved">
+                      <input type="checkbox" checked={!noPortrait} onChange={(e) => setNoPortrait(!e.target.checked)} className="h-3.5 w-3.5" style={{ accentColor: "#7a5f2a" }} />
+                      Paint a portrait
                     </label>
                   )}
                 </>
@@ -2355,14 +2391,7 @@ export function QuestEditorDialog({
                   <span className="text-[12.5px]" style={{ color: saveState === "error" ? "var(--t-warn)" : "var(--t-ink-soft)" }} aria-live="polite">
                     {saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : dirty ? "Editing…" : savedTick ? "" : "✓ Saved"}
                   </span>
-                  <button
-                    type="button"
-                    onClick={close}
-                    className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold"
-                    style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
-                  >
-                    Done
-                  </button>
+                  {/* Complete in gold, then Done in green at the bottom right. */}
                   {!isCompleted && (
                     <button
                       type="button"
@@ -2370,11 +2399,19 @@ export function QuestEditorDialog({
                       disabled={isSaving || !title.trim()}
                       title={`Complete this ${noun} now`}
                       className="hover-glow h-10 whitespace-nowrap rounded-full px-3.5 text-[15px] font-semibold disabled:cursor-default disabled:opacity-45"
-                    style={{ background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)" }}
+                      style={{ background: isAdventure ? "linear-gradient(180deg, #f8e3a0 0%, #e2bf63 45%, #b8913f 100%)" : "var(--t-gold, #d9b45f)", color: "#2a1c10", border: "1px solid #4a3913", boxShadow: "inset 0 1px 0 rgba(255,250,230,.7)" }}
                     >
                       {isAdventure ? "Complete quest" : "Complete"}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold"
+                    style={{ background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)" }}
+                  >
+                    Done
+                  </button>
                 </>
               ) : (
                 <>

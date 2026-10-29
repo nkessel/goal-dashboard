@@ -1,6 +1,7 @@
 "use client";
 
 import { PerchedOwl } from "./PerchedOwl";
+import { useEveningMode } from "@/components/evening/evening-clock";
 import { ToucanGuide } from "@/components/toucan/ToucanGuide";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -96,6 +97,7 @@ function onTab(item: { href: string; also?: string[] }, pathname: string) {
 export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme; name?: string | null; toucan?: unknown }) {
   const pathname = usePathname();
   const navigateWithTransition = useViewTransitionNavigate();
+  const evening = useEveningMode();
   const isAdventure = theme === "adventure";
 
   const rowRef = useRef<HTMLDivElement>(null);
@@ -171,6 +173,8 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
       // page for no visible benefit and looked like a stray "blip" on
       // repeated taps of the current tab.
       e.preventDefault();
+      // Today's Quest tab, tapped while on Today: turn the screen over between day and evening.
+      if (href === "/") window.dispatchEvent(new CustomEvent("day-night-flip", { detail: { toEvening: !evening } }));
       return;
     }
     e.preventDefault();

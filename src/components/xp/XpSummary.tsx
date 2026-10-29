@@ -8,8 +8,8 @@ import { xpToNextLevel } from "@/lib/data/xp";
 import { Avatar, defaultPortraitFor } from "@/components/settings/Avatar";
 import { RefillBadge } from "@/components/settings/RefillBadge";
 import { normalizeInventory } from "@/lib/inventory";
-import { BossBadge, type BossView } from "./BossLine";
-import { EnergyCheck } from "./EnergyCheck";
+import { BossBadge, FaceBossButton, type BossView } from "./BossLine";
+import { TodayCheckIn } from "./TodayCheckIn";
 
 /** One flanking stat tile in the Adventure-theme header (Quests Complete,
  * Quest Streak, XP this week, Party Size) — icon + big number + caption,
@@ -164,21 +164,14 @@ export function XpSummary({
                   }}
                 />
               </div>
-              <div className="text-center text-[13.5px] tabular-nums tracking-wide sm:text-[15px]" style={{ color: "var(--t-gold)" }}>
-                {nextLevel ? (
-                  heldByBoss || xpIntoLevel > xpForNextLevel! ? (
-                    // XP keeps counting while the level boss holds the door.
-                    <>
-                      {xpIntoLevel.toLocaleString("en-US")} / {xpForNextLevel!.toLocaleString("en-US")} XP
-                      <span className="block text-[11.5px] leading-tight opacity-80">+{(xpIntoLevel - xpForNextLevel!).toLocaleString("en-US")} banked for the next level</span>
-                    </>
-                  ) : (
-                    `${xpIntoLevel.toLocaleString("en-US")} / ${xpForNextLevel!.toLocaleString("en-US")} XP`
-                  )
-                ) : (
-                  `${profile.total_xp.toLocaleString("en-US")} XP · Max level`
-                )}
-              </div>
+              {/* No XP count here; once the level is full, the way to its Final Boss. */}
+              {!nextLevel ? (
+                <div className="text-center text-[13.5px] tabular-nums tracking-wide sm:text-[15px]" style={{ color: "var(--t-gold)" }}>
+                  Max level
+                </div>
+              ) : (heldByBoss || xpIntoLevel >= xpForNextLevel!) && (boss || bossesEnabled) && profile.display_level == null ? (
+                <FaceBossButton boss={boss && boss.level === level ? boss : null} level={level} />
+              ) : null}
               <CharacterStats order={Array.isArray(profile.stats) ? profile.stats : [...DEFAULT_STATS]} xp={profile.stat_xp ?? {}} />
             </div>
           </div>
@@ -199,7 +192,7 @@ export function XpSummary({
           </div>
         </div>
 
-        {energyToday !== undefined && <EnergyCheck today={energyToday} todayAt={energyAt ?? null} metrics={checkMetrics} metricsToday={metricsToday} notesToday={notesToday} />}
+        {energyToday !== undefined && <TodayCheckIn today={energyToday} todayAt={energyAt ?? null} metrics={checkMetrics} metricsToday={metricsToday} notesToday={notesToday} />}
 
         {profile.streak_protection_tokens > 0 && (
           <div className="text-center text-xs" style={{ color: "var(--t-cream)", opacity: 0.75 }}>

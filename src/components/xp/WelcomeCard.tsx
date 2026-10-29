@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 import { CoinIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { EnergyCheck } from "./EnergyCheck";
-import { retireLine } from "@/lib/greetings";
-import { CHECKIN_STYLES, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
+import { likeLine, likedLines, retireLine } from "@/lib/greetings";
+import { CHECKIN_STYLES, checkinLabelOf, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
 import { addBackGreeting, welcomeOrder, welcomeShows, type WelcomeEl } from "@/lib/welcome";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { dueSoonList, dueWhen } from "@/lib/toucan-guide";
@@ -45,6 +45,7 @@ export function WelcomeCard({
   onClose,
   onCheckedIn,
   onSnooze,
+  preview = false,
 }: {
   mode: "day" | "back";
   heading: string;
@@ -61,10 +62,13 @@ export function WelcomeCard({
   onCheckedIn?: () => void;
   /** Bring it back after this many milliseconds instead of skipping it for today. */
   onSnooze?: (ms: number) => void;
+  /** Opened from Settings to try it out: shows above the settings popup. */
+  preview?: boolean;
 }) {
   const style = useToucanStyle();
   const [shown, setShown] = useState(0);
-  const [retired, setRetired] = useState(false);
+  // Your verdict on the day's wise line: liked lines come back often, disliked ones never.
+  const [verdict, setVerdict] = useState<"like" | "dislike" | null>(() => (line && typeof window !== "undefined" && likedLines().has(line) ? "like" : null));
   const [checkedIn, setCheckedIn] = useState(false);
   const [addingPhrase, setAddingPhrase] = useState(false);
   const [phrase, setPhrase] = useState("");
@@ -118,17 +122,17 @@ export function WelcomeCard({
       <button
         type="button"
         onClick={() => setCheckinOpen(true)}
-        className="font-display flex h-12 items-center gap-2 rounded-full px-7 text-[18px]"
+        className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]"
         style={checkinStyleOf(fx).style}
       >
-        ✦ Check in
+        <span aria-hidden>{checkinLabelOf(fx).icon}</span> {checkinLabelOf(fx).text}
       </button>
     ) : (
       <div className="w-full rounded-2xl px-2 py-2.5 text-left" style={{ background: "linear-gradient(180deg, rgba(28,24,16,.94), rgba(18,16,11,.94))", border: "1.5px solid rgba(217,180,95,.45)" }}>
         <p className="m-0 mb-1 text-center font-display text-[17px]" style={{ color: "#f2d27e" }}>
           {checkedIn ? "Checked in ✓" : "Check in"}
         </p>
-        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} addNights />
+        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} addNights simple={fx.welcomeMetrics !== false} />
       </div>
     ),
     streak: award && award.streak > 0 ? (
@@ -138,13 +142,18 @@ export function WelcomeCard({
     ) : null,
     line: line ? (
       <div className="flex w-full flex-col items-center gap-1.5">
-        <p className={`m-0 text-[16px] leading-snug ${retired ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
+        <p className={`m-0 text-[16px] leading-snug ${verdict === "dislike" ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
           {line}
         </p>
-        <label className="flex cursor-pointer items-center gap-1.5 text-[12px]" style={{ color: "#6b5631" }}>
-          <input type="checkbox" checked={retired} onChange={(e) => (setRetired(e.target.checked), retireLine(line, e.target.checked))} className="h-3.5 w-3.5" />
-          Don&rsquo;t show this line again
-        </label>
+        <div className="flex items-center gap-1.5">
+          <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"))} />
+          <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"))} />
+          {verdict && (
+            <span className="fade-in text-[12px] italic" style={{ color: "#6b5631" }}>
+              {verdict === "like" ? "It'll come back often." : "You won't see it again."}
+            </span>
+          )}
+        </div>
       </div>
     ) : null,
     bar: award ? (
@@ -196,7 +205,7 @@ export function WelcomeCard({
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-3" onClick={onClose} role="dialog" aria-modal="true" aria-label={heading}>
+    <div className={`fixed inset-0 ${preview ? "z-[95]" : "z-[60]"} flex items-center justify-center bg-black/40 p-3`} onClick={onClose} role="dialog" aria-modal="true" aria-label={heading}>
       <div className="relative" onClick={(e) => e.stopPropagation()}>
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
@@ -304,6 +313,26 @@ function snoozeChoices() {
   return out;
 }
 
+/** A small round thumbs up or down for the day's wise line. */
+function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean; onClick: () => void }) {
+  const like = kind === "like";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={like ? "I like this line: show it more" : "I don't like this line: don't show it again"}
+      title={like ? "Like: show it more often" : "Dislike: never show it again"}
+      className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+      style={{ border: `1.5px solid ${on ? (like ? "#5b8a3a" : "#a0503a") : "#b39a6a"}`, background: on ? (like ? "rgba(120,170,80,.22)" : "rgba(192,80,58,.16)") : "rgba(255,250,238,.6)" }}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden style={like ? undefined : { transform: "rotate(180deg)" }}>
+        <path d="M7 10v10H4V10h3zm2 10h8.2a2 2 0 0 0 2-1.6l1.3-6.5A2 2 0 0 0 18.5 9.5H14l.8-4a1.6 1.6 0 0 0-2.9-1.2L9 9v11z" fill={on ? (like ? "#4f7a30" : "#93402c") : "none"} stroke={on ? (like ? "#4f7a30" : "#93402c") : "#8a6116"} strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
 const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };
 
 /** Your top priority, in your own words: saved for the day, and kept in mind by the app and the toucan. */
@@ -359,7 +388,7 @@ function TopPriority({ last }: { last: { text: string; others?: string[]; day: s
       }}
     >
       <label htmlFor="welcome-priority" className="text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
-        What&rsquo;s your top priority?
+        What are your top priorities?
       </label>
       <div className="relative pb-4">
         <textarea
@@ -368,7 +397,7 @@ function TopPriority({ last }: { last: { text: string; others?: string[]; day: s
           onChange={(e) => setText(e.target.value)}
           maxLength={200}
           rows={2}
-          placeholder="The one thing that matters most right now"
+          placeholder="What is most important now?"
           className="block min-h-[72px] w-full resize-none rounded-xl px-3 pb-4 pt-2 text-[16px] leading-snug"
           style={FIELD}
         />

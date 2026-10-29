@@ -69,7 +69,24 @@ export const backHours = (fx: FxSettings) => {
   return typeof h === "number" && Number.isInteger(h) && h >= 0 && h <= 12 ? h : 5;
 };
 
-export const BACK_GREETINGS = ["Welcome back, adventurer", "The realm missed you", "Back on the path, I see", "There you are again!"];
+export const BACK_GREETINGS = [
+  "Welcome back, adventurer",
+  "The realm missed you",
+  "Back on the path, I see",
+  "There you are again!",
+  "The hearth kept warm for you",
+  "Ah, the wanderer returns",
+  "Good to see you, traveller",
+  "The quest board awaits your return",
+  "Back at the inn, I see",
+  "The map lit up when you arrived",
+  "Hail, returning hero",
+  "The lanterns brighten: you're back",
+  "Pull up a chair by the fire",
+  "The road brought you home again",
+  "Your party is glad you're here",
+  "Welcome back to the adventure",
+];
 
 /** Lines from a box of text, one per line. */
 export const linesOf = (text: string | undefined) =>

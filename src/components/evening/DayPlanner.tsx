@@ -133,6 +133,8 @@ export function DayPlanner({
   const [mealsOpen, setMealsOpen] = useState(false);
   const [xpFor, setXpFor] = useState<string | null>(null);
   const [height, setHeight] = useState(DEFAULT_HEIGHT);
+  // Shows the "drag to make it taller" hint until the day has been resized once.
+  const [resized, setResized] = useState(true);
   // How tall an hour is: drag the times on the left to squeeze or stretch the day.
   const [hourPx, setHourPx] = useState(DEFAULT_HOUR_PX);
   const HOUR_PX = hourPx;
@@ -171,6 +173,7 @@ export function DayPlanner({
       const h = Number(window.localStorage.getItem(HEIGHT_KEY));
       // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
       if (h >= 120) setHeight(h);
+      setResized(h >= 120);
       const z = Number(window.localStorage.getItem(ZOOM_KEY));
       if (z >= MIN_HOUR_PX && z <= MAX_HOUR_PX) setHourPx(z);
       if (window.localStorage.getItem(PLANNING_KEY) === "0") setPlanning(false);
@@ -390,8 +393,9 @@ export function DayPlanner({
   const timeline = (
     <div
       ref={scrollRef}
-      className="relative min-h-0 overflow-y-auto rounded-xl"
-      style={{ background: N.grid, border: `1px solid ${N.border}`, height: full ? undefined : height, flex: full ? "1 1 auto" : undefined, boxShadow: "inset 0 4px 12px rgba(0,0,0,.4)" }}
+      className="relative min-h-0 overflow-y-auto overscroll-contain rounded-xl"
+      // Its own scroll, by finger too (the page doesn't take the swipe).
+      style={{ background: N.grid, border: `1px solid ${N.border}`, height: full ? undefined : height, flex: full ? "1 1 auto" : undefined, boxShadow: "inset 0 4px 12px rgba(0,0,0,.4)", touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
     >
       {/* All-day events stay in view at the top of the day. */}
       {allDay.length > 0 && (
@@ -558,6 +562,7 @@ export function DayPlanner({
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointercancel", up);
+      if (last !== h0) setResized(true);
       try {
         window.localStorage.setItem(HEIGHT_KEY, String(Math.round(last)));
       } catch {
@@ -641,8 +646,18 @@ export function DayPlanner({
   const body = (
     <div className={`flex flex-col gap-3 ${full ? "h-full" : ""}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className={`font-semibold ${full ? "font-display text-[22px]" : "text-[15px]"}`} style={{ color: N.ink }}>
-          {tomorrowName}
+        <span className="flex min-w-0 items-center gap-1.5">
+          {full && (
+            <button type="button" onClick={() => setFull(false)} aria-label="Back" className="hover-glow -ml-1 flex h-9 shrink-0 items-center gap-0.5 rounded-full pl-1 pr-3 text-[14px] font-semibold" style={{ border: `1px solid ${N.border}`, color: N.gold }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M14.5 5.5 8 12l6.5 6.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back
+            </button>
+          )}
+          <span className={`truncate font-semibold ${full ? "font-display text-[22px]" : "text-[15px]"}`} style={{ color: N.ink }}>
+            {tomorrowName}
+          </span>
         </span>
         {full && tools}
       </div>
@@ -671,28 +686,39 @@ export function DayPlanner({
       {planning && (
         <div className="flex flex-col gap-2" onClick={() => setXpFor(null)}>
           {toPlace.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+              <li className="text-[12px] font-semibold uppercase tracking-[.12em]" style={{ color: N.faint }}>
+                Tomorrow&rsquo;s quests · tap one, then a time
+              </li>
               {toPlace.map((t) => {
                 const on = carry?.kind === "quest" && carry.id === t.id;
+                const mins = t.estimate_minutes && t.estimate_minutes <= 480 ? t.estimate_minutes : 30;
                 return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCarry(on ? null : { kind: "quest", id: t.id, title: t.title, minutes: t.estimate_minutes && t.estimate_minutes <= 480 ? t.estimate_minutes : 30 });
-                    }}
-                    className={chip}
-                    style={chipStyle(on)}
-                    title="Then tap a time below"
-                  >
-                    <QuestMonogram id={t.id} title={t.title} size={24} />
-                    <span className="max-w-[160px] truncate pr-1">{t.title}</span>
-                  </button>
+                  <li key={t.id}>
+                    {/* A full-width row: the whole title shows (up to two lines), with its time on the right. */}
+                    <button
+                      type="button"
+                      aria-pressed={on}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCarry(on ? null : { kind: "quest", id: t.id, title: t.title, minutes: mins });
+                      }}
+                      className="hover-glow flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-[14px] font-semibold leading-snug"
+                      style={chipStyle(on)}
+                      title="Then tap a time below"
+                    >
+                      <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full">
+                        <QuestMonogram id={t.id} title={t.title} size={28} />
+                      </span>
+                      <span className="line-clamp-2 min-w-0 flex-1">{t.title}</span>
+                      <span className="shrink-0 text-[12px] font-normal tabular-nums" style={{ color: on ? "#2a1c10" : N.soft }}>
+                        {mins}m
+                      </span>
+                    </button>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
           <div className="flex flex-wrap gap-1.5">
             {meals.length > 0 && (
@@ -822,7 +848,7 @@ export function DayPlanner({
               /* storage unavailable */
             }
           }}
-          className="-mt-2 flex h-5 cursor-ns-resize touch-none items-center justify-center"
+          className="-mt-2 flex min-h-7 cursor-ns-resize touch-none flex-col items-center justify-center gap-0.5"
           title="Drag to resize"
         >
           <span aria-hidden className="flex items-center gap-1.5">
@@ -830,6 +856,12 @@ export function DayPlanner({
             <span className="h-[3px] w-12 rounded-full" style={{ background: "linear-gradient(90deg, rgba(217,180,95,.35), #f2d27e, rgba(217,180,95,.35))" }} />
             <span className="h-[5px] w-[5px] rotate-45" style={{ background: "#d9b45f" }} />
           </span>
+          {/* Until it's been resized once: what the handle does. */}
+          {!resized && (
+            <span className="text-[11.5px]" style={{ color: N.faint }}>
+              ↕ Drag to make the day taller
+            </span>
+          )}
         </div>
       )}
 

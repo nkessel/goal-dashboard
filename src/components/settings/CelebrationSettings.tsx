@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, checkinStyleOf, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
+import { CHECKIN_LABELS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, checkinLabelOf, checkinStyleOf, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { WelcomeCard } from "@/components/xp/WelcomeCard";
 import { welcomeContextAction } from "@/app/actions";
-import { DAILY_LINES, lineForDay, retireLine, retiredLines } from "@/lib/greetings";
+import { ROTATION, likeLine, likedLines, lineForDay, retireLine, retiredLines, rotationFor } from "@/lib/greetings";
 import { WELCOME_ELS, backGreeting, backHours, backOwnOn, backPool, linesOf, moveEl, ownLines, ownLinesOn, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
 
@@ -167,13 +167,21 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
             <div role="radiogroup" aria-label="The Check in button's look" className="grid grid-cols-2 gap-1.5">
               {CHECKIN_STYLES.map((c) => (
                 <button key={c.key} type="button" role="radio" aria-checked={checkinStyleOf(fx).key === c.key} onClick={() => update({ checkinStyle: c.key })} className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-2.5" style={{ border: checkinStyleOf(fx).key === c.key ? "2px solid var(--t-gold-deep)" : "1px solid var(--t-card-border)" }}>
-                  <span aria-hidden className="font-display flex h-9 items-center rounded-full px-4 text-[15px]" style={c.style}>
-                    ✦ Check in
+                  <span aria-hidden className="font-display flex h-9 items-center gap-1 rounded-full px-4 text-[15px]" style={c.style}>
+                    {checkinLabelOf(fx).icon} {checkinLabelOf(fx).text}
                   </span>
                   <span className="text-[13px] font-semibold">{c.label}</span>
                   <span className="text-center text-[11.5px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
                     {c.hint}
                   </span>
+                </button>
+              ))}
+            </div>
+            <span className="mt-1 text-[13px] font-semibold">What it says</span>
+            <div role="radiogroup" aria-label="What the Check in button says" className="flex flex-wrap gap-1.5">
+              {CHECKIN_LABELS.map((c) => (
+                <button key={c.key} type="button" role="radio" aria-checked={checkinLabelOf(fx).key === c.key} onClick={() => update({ checkinLabel: c.key })} className="font-display flex h-9 items-center gap-1 rounded-full px-3 text-[14px]" style={checkinLabelOf(fx).key === c.key ? checkinStyleOf(fx).style : { border: "1px solid var(--t-card-border)" }}>
+                  <span aria-hidden>{c.icon}</span> {c.text}
                 </button>
               ))}
             </div>
@@ -209,7 +217,7 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
                 style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
               />
             )}
-            <PhraseList title="Choose which wise lines show" lines={[...DAILY_LINES, ...ownLines(fx)]} retired />
+            <WiseLines own={ownLines(fx)} />
           </>
         )}
         <label className="mt-1 flex min-h-9 items-center gap-2.5 text-sm">
@@ -235,6 +243,7 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           due={welcomePreview.ctx.tasks}
           priority={welcomePreview.ctx.priority}
           fx={fx}
+          preview
           onClose={() => setWelcomePreview(null)}
         />
       )}
@@ -395,6 +404,7 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           due={welcomePreview.ctx.tasks}
           priority={welcomePreview.ctx.priority}
           fx={fx}
+          preview
           onClose={() => setWelcomePreview(null)}
         />
       )}
@@ -483,6 +493,67 @@ export function FabSettings() {
  * stops showing. Opens from a button. Wise lines keep their "don't show this
  * line again" list on this device (the same one the welcome screen sets).
  */
+/**
+ * The wise lines in rotation: like one to see it more, × to delete it (the
+ * next line waiting takes its place). Deleted lines can be brought back.
+ */
+function WiseLines({ own }: { own: string[] }) {
+  const [open, setOpen] = useState(false);
+  // Re-read after each change (the lists live in this browser).
+  const [, setTick] = useState(0);
+  const today = new Date().toISOString().slice(0, 10);
+  const { liked, fresh } = open ? rotationFor(today, own) : { liked: [], fresh: [] };
+  const gone = open ? [...retiredLines()] : [];
+  const likedSet = open ? likedLines() : new Set<string>();
+  const bump = () => setTick((t) => t + 1);
+  const row = (l: string) => (
+    <li key={l} className="flex min-h-9 items-start gap-1.5 rounded-lg px-1.5 py-1 text-[14px] leading-snug hover:bg-black/[.04]">
+      <span className="min-w-0 flex-1 pt-1">{l}</span>
+      <button type="button" onClick={() => (likeLine(l, !likedSet.has(l)), bump())} aria-pressed={likedSet.has(l)} aria-label={likedSet.has(l) ? `Unlike “${l}”` : `Like “${l}”: show it more`} title={likedSet.has(l) ? "Liked: shows often" : "Like: show it more"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[15px]" style={{ color: likedSet.has(l) ? "#b0402c" : "var(--t-ink-soft)" }}>
+        {likedSet.has(l) ? "♥" : "♡"}
+      </button>
+      <button type="button" onClick={() => (retireLine(l, true), bump())} aria-label={`Delete “${l}”`} title="Delete: another line takes its place" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px]" style={{ color: "var(--t-ink-soft)" }}>
+        ×
+      </button>
+    </li>
+  );
+  return (
+    <div className="flex flex-col gap-1">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="hover-glow flex h-9 items-center gap-1.5 self-start rounded-full px-3.5 text-[13px] font-semibold" style={{ border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}>
+        The wise lines in rotation <span style={{ color: "var(--t-ink-soft)" }}>{open ? "▾" : "▸"}</span>
+      </button>
+      {open && (
+        <div className="reveal flex flex-col gap-1 rounded-xl p-1.5" style={{ border: "1px solid var(--t-card-border)" }}>
+          <p className="m-0 px-1.5 text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+            {ROTATION} lines take turns, and a few new ones join each week. ♡ brings one back often; × deletes it and the next one waiting takes its place.
+          </p>
+          <ul className="m-0 flex max-h-[320px] list-none flex-col gap-0.5 overflow-y-auto p-0">
+            {liked.map(row)}
+            {fresh.filter((l) => !liked.includes(l)).map(row)}
+          </ul>
+          {gone.length > 0 && (
+            <details className="px-1.5 text-[13px]">
+              <summary className="cursor-pointer py-1" style={{ color: "var(--t-ink-soft)" }}>
+                Deleted ({gone.length})
+              </summary>
+              <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                {gone.map((l) => (
+                  <li key={l} className="flex min-h-9 items-center gap-2">
+                    <span className="min-w-0 flex-1 line-through opacity-60">{l}</span>
+                    <button type="button" onClick={() => (retireLine(l, false), bump())} className="h-8 shrink-0 rounded-full px-2.5 text-[12.5px] underline underline-offset-2">
+                      Bring back
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PhraseList({ title, lines, isOn, onToggle, retired = false }: { title: string; lines: string[]; isOn?: (line: string) => boolean; onToggle?: (line: string, on: boolean) => void; retired?: boolean }) {
   const [open, setOpen] = useState(false);
   const [off, setOff] = useState<Set<string>>(() => new Set());

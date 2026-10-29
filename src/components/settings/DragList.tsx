@@ -12,7 +12,7 @@ import { SwipeReveal } from "@/components/ui/SwipeReveal";
  */
 export type DragRowContent = {
   label: React.ReactNode;
-  /** Its show/hide (or shown/folded) switch: swipe the row left on a phone, or hover it with a mouse. */
+  /** Its show/hide switch (a check on the right), or shown/folded (swipe the row left on a phone, or hover it with a mouse). */
   toggle?: { hidden: boolean; onToggle: () => void; offLabel?: string } | null;
 };
 
@@ -57,12 +57,18 @@ function DragRow({ id, content }: { id: string; content: DragRowContent }) {
   const face = (
     <div className="group flex min-h-10 items-center gap-1 rounded-lg pl-2.5 pr-1" style={{ border: "1px solid rgba(139,112,64,.3)", background: "var(--t-card, #f6ecd2)", opacity: t?.hidden ? 0.6 : 1 }}>
       <span className={`min-w-0 flex-1 truncate text-[13.5px] ${struck ? "line-through" : ""}`}>{content.label}</span>
-      {t?.hidden && (
+      {t?.hidden && t.offLabel && (
         <span className="shrink-0 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
-          {t.offLabel ?? "Hidden"}
+          {t.offLabel}
         </span>
       )}
-      {t && (
+      {/* Show or hide: a check on the right (it doesn't start a drag). */}
+      {t && !t.offLabel && (
+        <label className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <input type="checkbox" checked={!t.hidden} onChange={t.onToggle} aria-label={t.hidden ? "Hidden: tick to show it" : "Shown: untick to hide it"} className="h-5 w-5 accent-[var(--t-gold-deep)]" />
+        </label>
+      )}
+      {t && t.offLabel && (
         <button
           type="button"
           onClick={t.onToggle}

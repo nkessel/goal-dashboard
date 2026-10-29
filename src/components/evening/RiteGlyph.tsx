@@ -29,6 +29,7 @@ export type GlyphKey =
   | "moon";
 
 const RULES: [RegExp, GlyphKey][] = [
+  [/calendar/i, "calendar"],
   [/tiffany|partner|spouse|wife|husband|couple|check.?in with|love/i, "heart"],
   [/cloth|outfit|shirt|wear|dress/i, "shirt"],
   [/envision|imagine|visuali[sz]e|picture tomorrow|dream/i, "eye"],
@@ -50,7 +51,8 @@ const RULES: [RegExp, GlyphKey][] = [
 
 export function glyphFor(r: { kind?: string | null; title: string }): GlyphKey {
   if (r.kind === "tomorrow") return "list123";
-  if (r.kind === "plan") return "calendar";
+  // Swapped at the owner's request: preparing tomorrow wears the heart, a calendar check-in the calendar.
+  if (r.kind === "plan") return "heart";
   for (const [re, key] of RULES) if (re.test(r.title)) return key;
   return "moon";
 }

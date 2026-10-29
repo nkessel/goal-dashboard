@@ -32,26 +32,26 @@ export function normalizeSplit(split: StatSplit): StatSplit {
 }
 
 /**
- * Set one stat's share; if the total would pass 100%, the other stats give
- * up the difference equally (none goes below zero).
+ * Set one stat's share; if the total would pass 100%, the stat chosen most
+ * recently gives up the difference, then the one before it (none goes below
+ * zero). `picked` lists the stats in the order they were chosen.
  */
-export function setShare(split: StatSplit, stat: string, pct: number): StatSplit {
+export function setShare(split: StatSplit, stat: string, pct: number, picked: string[] = []): StatSplit {
   const next: StatSplit = { ...split, [stat]: Math.max(0, Math.min(100, Math.round(pct))) };
   let over = Object.values(next).reduce((a, b) => a + b, 0) - 100;
-  while (over > 0) {
-    const others = Object.keys(next).filter((k) => k !== stat && next[k] > 0);
-    if (!others.length) {
-      next[stat] -= over;
-      break;
-    }
-    const each = Math.ceil(over / others.length);
-    for (const k of others) {
-      if (over <= 0) break;
-      const cut = Math.min(next[k], each, over);
-      next[k] -= cut;
-      over -= cut;
-    }
+  // Past 100%: take from the stat chosen most recently, then the one before it once that's drained.
+  const at = (k: string) => picked.lastIndexOf(k);
+  const others = Object.keys(next)
+    .filter((k) => k !== stat)
+    .reverse()
+    .sort((a, b) => at(b) - at(a));
+  for (const k of others) {
+    if (over <= 0) break;
+    const cut = Math.min(next[k], over);
+    next[k] -= cut;
+    over -= cut;
   }
+  if (over > 0) next[stat] -= over;
   for (const k of Object.keys(next)) if (next[k] <= 0) delete next[k];
   return next;
 }

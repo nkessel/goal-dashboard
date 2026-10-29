@@ -34,7 +34,7 @@ export type QuestCompleteProps = {
   /** Character XP inside the current level, and the size of the level. */
   xpIntoLevel: number;
   xpForNextLevel: number | null;
-  /** Quest portrait; defaults to the dragon. */
+  /** Quest portrait; none leaves the circle blank. */
   iconSrc?: string;
   /** The player's avatar image. */
   avatarSrc?: string;
@@ -85,7 +85,7 @@ const Dust = memo(function Dust({ items, mode }: { items: Speck[]; mode: "center
 });
 
 export function QuestComplete(props: QuestCompleteProps) {
-  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc = "/design/icon-dragon.jpg", avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, coinsEarned = 0, isReward = false, onClose } = props;
+  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc, avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, coinsEarned = 0, isReward = false, onClose } = props;
   const [phase, setPhase] = useState<"celebrate" | "rewards">("celebrate");
   const [chest, setChest] = useState<{ rewards: Reward[]; coins: number } | null>(null);
   const [claimed, setClaimed] = useState<Reward | null>(null);
@@ -250,8 +250,9 @@ export function QuestComplete(props: QuestCompleteProps) {
         style={{ background: "radial-gradient(circle at 50% 42%, rgba(255,244,190,.95), rgba(242,201,106,.35) 30%, rgba(242,201,106,0) 62%)" }}
       />
 
-      <div className="absolute inset-0 overflow-y-auto">
-        <div className="qc-shake mx-auto flex min-h-full w-full max-w-[420px] flex-col items-center justify-center gap-[22px] px-4 py-6">
+      {/* Phones start it from the top (centering moved it as the browser bar came and went, so it jumped while scrolling). */}
+      <div className="absolute inset-0 overflow-y-auto overflow-x-hidden overscroll-contain">
+        <div className="qc-shake mx-auto flex min-h-full w-full max-w-[420px] flex-col items-center justify-start gap-[22px] px-4 pb-6 pt-16 sm:justify-center sm:py-6">
           {/* Title */}
           <div className="qc-title flex w-full items-center justify-center gap-2.5">
             <div className="h-px flex-1" style={{ background: "linear-gradient(90deg, rgba(217,180,95,0), rgba(217,180,95,.6))" }} />
@@ -278,6 +279,7 @@ export function QuestComplete(props: QuestCompleteProps) {
               onPick={setChoosing}
               onDecide={claim}
               onContinue={onClose}
+              onBack={() => (setChoosing(null), setClaimError(null), setPhase("celebrate"))}
               onAnother={() => {
                 setClaimed(null);
                 setReceived(null);
@@ -332,8 +334,13 @@ export function QuestComplete(props: QuestCompleteProps) {
                     className="qc-icon absolute inset-0 flex items-center justify-center overflow-hidden rounded-full"
                     style={{ border: "2px solid #a58c66", boxShadow: "0 0 0 3px rgba(217,180,95,.55), 0 4px 10px rgba(0,0,0,.35)" }}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={iconSrc} alt="" className="h-full w-full object-cover" />
+                    {iconSrc ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={iconSrc} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      // No portrait: a blank circle, like the quest's empty check box.
+                      <span aria-hidden className="block h-full w-full" style={{ background: "radial-gradient(circle at 40% 35%, #fbf3dc, #ecdcb4)" }} />
+                    )}
                   </div>
                   <div className="pointer-events-none absolute inset-0">
                     <div className="qc-ripple" />
@@ -493,7 +500,10 @@ function RewardChest({
   onDecide,
   onContinue,
   onAnother,
+  onBack,
 }: {
+  /** Back to the Quest complete screen. */
+  onBack: () => void;
   questTitle: string;
   rewards: Reward[] | null;
   coins: number;
@@ -623,8 +633,14 @@ function RewardChest({
   }
 
   return (
-    <div className="qc-card flex w-full flex-col gap-4 rounded-2xl px-4 pb-4 pt-5" style={parchment}>
-      <div className="flex flex-col items-center gap-1 text-center">
+    <div className="qc-card relative flex w-full flex-col gap-4 rounded-2xl px-4 pb-4 pt-5" style={parchment}>
+      <button type="button" onClick={onBack} aria-label="Back to Quest complete" className="absolute left-2.5 top-2.5 flex h-9 items-center gap-0.5 rounded-full pl-1 pr-2.5 text-[14px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: "#2f2a1f", background: "rgba(255,248,232,.55)" }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M14.5 5.5 8 12l6.5 6.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Back
+      </button>
+      <div className="flex flex-col items-center gap-1 pt-7 text-center">
         <p className="m-0 text-[24px] font-bold leading-tight" style={{ color: "#2f2a1f" }}>
           Choose Your Reward
         </p>

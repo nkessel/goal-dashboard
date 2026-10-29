@@ -16,7 +16,9 @@ export type SettingsSpot =
   | "party-view"
   | "notifications"
   | "planning"
-  | "menus.quest-editor";
+  | "menus.quest-editor"
+  | "menus.quest-card"
+  | "menus";
 
 const TONES = {
   // The habit gear's look: a dark medallion ringed in gold.

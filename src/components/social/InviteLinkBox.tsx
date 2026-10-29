@@ -34,8 +34,7 @@ export function InviteLinkBox({ code, theme = "calm", inviterName, prominent = f
         className="relative flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3.5"
         style={{ background: "linear-gradient(180deg, rgba(58,44,16,.95), rgba(30,22,8,.95))", border: "2px solid #d9b45f", boxShadow: "0 0 22px rgba(242,210,126,.25), inset 0 1px 0 rgba(255,235,180,.2)" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- painted party banner */}
-        <img src="/design/ui-party.png" alt="" width={44} height={44} className="h-11 w-11 shrink-0 object-contain" />
+        <InviteSeal />
         <span className="min-w-[11rem] flex-1">
           <span className={`block ${isAdventure ? "font-display text-[20px]" : "text-[17px] font-bold"}`} style={{ color: "#f6dc8e" }}>
             Invite to your party
@@ -85,5 +84,44 @@ export function InviteLinkBox({ code, theme = "calm", inviterName, prominent = f
       </div>
       {composer}
     </section>
+  );
+}
+
+/** A gilded medallion holding a sealed invitation, with a soft glow and a few sparkles. */
+function InviteSeal() {
+  return (
+    <span aria-hidden className="relative flex h-14 w-14 shrink-0 items-center justify-center" style={{ filter: "drop-shadow(0 0 8px rgba(242,210,126,.45)) drop-shadow(0 3px 5px rgba(0,0,0,.45))" }}>
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+        <defs>
+          <radialGradient id="inv-gold" cx="38%" cy="30%" r="75%">
+            <stop offset="0" stopColor="#fff2c2" />
+            <stop offset=".45" stopColor="#e2bf63" />
+            <stop offset="1" stopColor="#8a6116" />
+          </radialGradient>
+          <radialGradient id="inv-wax" cx="38%" cy="32%" r="70%">
+            <stop offset="0" stopColor="#e0654a" />
+            <stop offset=".6" stopColor="#a8301f" />
+            <stop offset="1" stopColor="#6e1a10" />
+          </radialGradient>
+          <linearGradient id="inv-paper" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#fbf3dc" />
+            <stop offset="1" stopColor="#e6d2a4" />
+          </linearGradient>
+        </defs>
+        {/* Medallion */}
+        <circle cx="28" cy="28" r="25" fill="url(#inv-gold)" stroke="#4a3913" strokeWidth="1.6" />
+        <circle cx="28" cy="28" r="21" fill="#2a2010" stroke="#f6dc8e" strokeOpacity=".55" strokeWidth="1" />
+        {/* Envelope */}
+        <rect x="14.5" y="19" width="27" height="19" rx="2.2" fill="url(#inv-paper)" stroke="#8a6c2c" strokeWidth="1.1" />
+        <path d="M15 20l13 10 13-10" stroke="#8a6c2c" strokeWidth="1.1" strokeLinejoin="round" fill="none" />
+        <path d="M15 37.3l9.5-8M41 37.3l-9.5-8" stroke="#b39a6a" strokeWidth=".9" />
+        {/* Wax seal */}
+        <circle cx="28" cy="30.5" r="5" fill="url(#inv-wax)" stroke="#5a160d" strokeWidth=".8" />
+        <path d="M28 27.8l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" fill="#f6dc8e" />
+        {/* Sparkles */}
+        <path d="M44 10.5c.3 2.2 1.3 3.2 3.5 3.5-2.2.3-3.2 1.3-3.5 3.5-.3-2.2-1.3-3.2-3.5-3.5 2.2-.3 3.2-1.3 3.5-3.5z" fill="#fff6d8" />
+        <path d="M11 40c.2 1.4.8 2 2.2 2.2-1.4.2-2 .8-2.2 2.2-.2-1.4-.8-2-2.2-2.2 1.4-.2 2-.8 2.2-2.2z" fill="#fff6d8" opacity=".85" />
+      </svg>
+    </span>
   );
 }

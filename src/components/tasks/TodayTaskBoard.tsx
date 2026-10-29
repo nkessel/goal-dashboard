@@ -117,33 +117,108 @@ function SortableQuest({
   );
 }
 
+const DUE_FOLD_KEY = "due-soon-folded";
+const DUE_HIDDEN_KEY = "due-soon-hidden";
+function readHidden(): string[] {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(DUE_HIDDEN_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * What's due today or tomorrow, above everything else on Today. It fills
  * itself from due dates (nothing to drag here) and empties as you finish.
+ * Tap its title to fold it away; Edit lets you × a quest out of it for good.
  */
 function DueSoonBand({ tasks, theme, lockedBehind }: { tasks: TaskWithCategory[]; theme: "calm" | "adventure"; lockedBehind: Map<string, TaskWithCategory> }) {
   const isAdventure = theme === "adventure";
+  const [folded, setFolded] = useState(false);
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [editing, setEditing] = useState(false);
+  // Both live in this browser, so read them after hydration.
+  useEffect(() => {
+    let f = false;
+    try {
+      f = window.localStorage.getItem(DUE_FOLD_KEY) === "1";
+    } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFolded(f);
+    setHidden(readHidden());
+  }, []);
+  const fold = (v: boolean) => {
+    setFolded(v);
+    if (v) setEditing(false);
+    try {
+      window.localStorage.setItem(DUE_FOLD_KEY, v ? "1" : "0");
+    } catch {}
+  };
+  const snooze = (id: string) => {
+    const next = [...new Set([...readHidden(), id])].slice(-300);
+    setHidden(next);
+    try {
+      window.localStorage.setItem(DUE_HIDDEN_KEY, JSON.stringify(next));
+    } catch {}
+  };
+  const shown = tasks.filter((t) => !hidden.includes(t.id));
+  if (!shown.length) return null;
+  const ink = isAdventure ? "#ffd9b8" : "var(--t-ink)";
   return (
     <section
       aria-label="Due soon"
-      className="mb-6 flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-2.5 sm:px-3"
+      className={`${folded ? "mb-4" : "mb-6"} flex flex-col gap-3 rounded-3xl px-2.5 sm:px-3 ${folded ? "py-1.5" : "pb-3 pt-2.5"}`}
       style={
         isAdventure
           ? { background: "linear-gradient(180deg, rgba(120,52,24,.32), rgba(40,20,10,.3))", border: "1.5px solid rgba(240,150,90,.45)", boxShadow: "inset 0 1px 0 rgba(255,220,180,.08)" }
           : { background: "var(--t-warn-bg)", border: "1px solid var(--t-card-border)" }
       }
     >
-      <h2 className={`m-0 flex items-center justify-center gap-2 ${isAdventure ? "font-display text-[20px]" : "text-base font-extrabold"}`} style={{ color: isAdventure ? "#ffd9b8" : "var(--t-ink)" }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Due soon
-      </h2>
-      <ul className="m-0 flex list-none flex-col gap-3 p-0">
-        {tasks.map((task) => (
-          <TaskRow key={task.id} task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
-        ))}
-      </ul>
+      <div className="relative flex items-center justify-center">
+        <h2 className="m-0">
+          <button type="button" onClick={() => fold(!folded)} aria-expanded={!folded} className={`flex min-h-9 items-center gap-2 ${isAdventure ? "font-display text-[20px]" : "text-base font-extrabold"}`} style={{ color: ink }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Due soon
+            {folded && <span className="text-[14px] opacity-80">({shown.length})</span>}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: folded ? undefined : "rotate(90deg)", opacity: 0.8 }}>
+              <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </h2>
+        {!folded && (
+          <button type="button" onClick={() => setEditing((v) => !v)} aria-pressed={editing} className="absolute right-0 h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${isAdventure ? "rgba(240,150,90,.55)" : "var(--t-card-border)"}`, color: ink }}>
+            {editing ? "Done" : "Edit"}
+          </button>
+        )}
+      </div>
+      {!folded && (
+        <>
+          {editing && (
+            <p className="m-0 -mt-1 text-center text-[12.5px]" style={{ color: ink, opacity: 0.85 }}>
+              × takes a quest out of Due soon for good (it stays on its board).
+            </p>
+          )}
+          <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            {shown.map((task) =>
+              editing ? (
+                <li key={task.id} className="fade-in flex items-center gap-2">
+                  <ul className="m-0 min-w-0 flex-1 list-none p-0">
+                    <TaskRow task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
+                  </ul>
+                  <button type="button" onClick={() => snooze(task.id)} aria-label={`Take “${task.title}” out of Due soon for good`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] leading-none" style={{ border: "1.5px solid rgba(240,150,90,.6)", color: ink, background: "rgba(0,0,0,.18)" }}>
+                    ×
+                  </button>
+                </li>
+              ) : (
+                <TaskRow key={task.id} task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
+              )
+            )}
+          </ul>
+        </>
+      )}
     </section>
   );
 }

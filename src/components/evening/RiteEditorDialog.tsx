@@ -9,6 +9,7 @@ import { useEscape } from "@/lib/use-escape";
 import { usePortalTarget } from "@/components/ui/EmbedHost";
 import { IconPicker } from "@/components/tasks/IconPicker";
 import { CoinIcon } from "@/components/ui/Icons";
+import { SettingsGear } from "@/components/ui/SettingsGear";
 import { coinsForXp } from "@/lib/coins";
 import { RiteGlyph, glyphFor } from "./RiteGlyph";
 
@@ -127,9 +128,13 @@ export function RiteEditorDialog({
             {isHabit ? <HabitGlyph /> : <Moon size={22} />}
             {isHabit ? (rite ? "Edit habit" : "New habit") : rite ? "Edit rite" : isCore ? "New evening rite" : "New mini-quest"}
           </h3>
-          <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
-            ×
-          </button>
+          <span className="flex items-center gap-1">
+            {/* What this editor shows, and in what order: Settings › Layout. */}
+            <SettingsGear to="menus" label="Layout settings" tone="plain" size={32} />
+            <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
+              ×
+            </button>
+          </span>
         </div>
 
         <div className="relative z-[1] flex items-start gap-3">

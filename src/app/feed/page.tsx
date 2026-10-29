@@ -118,6 +118,28 @@ export default async function FeedPage() {
 
         <FriendRequests incoming={incomingWithProfiles} theme={theme} />
 
+        {/* Finding people already here: near the top, open while the party is small. */}
+        <details open={friendIds.length < 3} className={`rounded-2xl px-4 py-3 ${isAdventure ? "parchment parchment-framed" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
+          <summary className={`relative z-[1] flex min-h-10 cursor-pointer list-none items-center gap-2.5 ${isAdventure ? "font-display text-[19px]" : "text-[15px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
+            <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913" }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                <circle cx="9" cy="8" r="3.2" stroke="#2a1c10" strokeWidth="2" />
+                <path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" stroke="#2a1c10" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="16.8" cy="9" r="2.4" stroke="#2a1c10" strokeWidth="1.8" />
+                <path d="M16 13.6c2.4 0 4 1.5 4.5 4" stroke="#2a1c10" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </span>
+            Find your party
+            <span className="ml-auto text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>
+              people already here ▾
+            </span>
+          </summary>
+          <div className="relative z-[1] mt-3">
+            <FriendDirectory profileId={profileId} rows={directoryRows} theme={theme} championId={champion?.id ?? null} />
+          </div>
+        </details>
+
+
         <PartyWeekBoard
           isAdventure={isAdventure}
           members={week.map((w) => {
@@ -169,29 +191,6 @@ export default async function FeedPage() {
             )}
           </ul>
         </section>
-
-        {/* Inviting and finding people, tucked away (open while the party is empty). */}
-        <details open={friendIds.length === 0} className={`rounded-2xl px-4 py-3 ${isAdventure ? "parchment parchment-framed" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
-          <summary className={`relative z-[1] flex min-h-9 cursor-pointer list-none items-center gap-2 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
-            <span aria-hidden>➕</span> Find your party
-            <span className="ml-auto text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>
-              people already here
-            </span>
-          </summary>
-          <div className="relative z-[1] mt-3 flex flex-col gap-4">
-
-        <section className="flex flex-col gap-2 rounded-2xl px-4 py-3.5" style={{
-          background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
-          border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
-        }}>
-          <h2 className="text-sm font-semibold" style={{ color: "var(--t-ink)" }}>
-            Find your party
-          </h2>
-          <FriendDirectory profileId={profileId} rows={directoryRows} theme={theme} championId={champion?.id ?? null} />
-        </section>
-
-          </div>
-        </details>
 
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>

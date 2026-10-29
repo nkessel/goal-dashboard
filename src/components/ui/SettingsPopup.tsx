@@ -18,6 +18,8 @@ const ToucanLookSettings = dynamic(() => import("@/components/settings/ToucanSet
 const PartyViewSettings = dynamic(() => import("@/components/social/PartyView").then((m) => m.PartyViewSettings));
 const NotificationPrefs = dynamic(() => import("@/components/settings/NotificationPrefs").then((m) => m.NotificationPrefs));
 const PlanningSettings = dynamic(() => import("@/components/settings/PlanningSettings").then((m) => m.PlanningSettings));
+const QuestMenuSettings = dynamic(() => import("@/components/settings/QuestMenuSettings").then((m) => m.QuestMenuSettings));
+const MenusSettings = dynamic(() => import("@/components/settings/MenuLayoutSettings").then((m) => m.MenusSettings));
 const QuestEditorLayoutSettings = dynamic(() => import("@/components/settings/QuestEditorLayoutSettings").then((m) => m.QuestEditorLayoutSettings));
 
 const TITLES: Record<SettingsSpot, string> = {
@@ -29,6 +31,8 @@ const TITLES: Record<SettingsSpot, string> = {
   notifications: "Notifications",
   planning: "Planning & evening",
   "menus.quest-editor": "Quest editor",
+  "menus.quest-card": "Quest card menu",
+  menus: "Layout",
 };
 
 type Ctx = { notifyLevel: string; notifyEmail: boolean; admin: boolean; toucan: { mode: "simple" | "lite" | "full"; retired: string[] } };
@@ -98,6 +102,15 @@ export function SettingsPopup({ spot, onClose, beforeLeave }: { spot: SettingsSp
         <QuestEditorLayoutSettings />
       </>
     ),
+    "menus.quest-card": () => (
+      <>
+        <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
+          The ⋯ on a quest, or right-click it. Drag items into your order (hold on a phone); the check on the right shows or hides each one.
+        </p>
+        <QuestMenuSettings />
+      </>
+    ),
+    menus: () => <MenusSettings isAdventure={isAdventure} />,
   };
 
   return createPortal(

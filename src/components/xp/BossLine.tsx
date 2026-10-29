@@ -72,6 +72,25 @@ export function BossBadge({
   );
 }
 
+/** Once the level's XP is full: a button straight to the Final Boss, through the same portal. */
+export function FaceBossButton({ boss, level }: { boss: BossView | null; level: number }) {
+  const [stage, setStage] = useState<null | "portal" | "level">(null);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setStage("portal")}
+        className="font-display hover-glow mx-auto flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[14px]"
+        style={{ background: "linear-gradient(180deg, #4b2a6e, #2a1640)", border: "1.5px solid #d9b45f", color: "#f2d27e", boxShadow: "0 0 12px rgba(160,110,220,.45), 0 2px 6px rgba(0,0,0,.45)" }}
+      >
+        <span aria-hidden>⚔</span> Face the Final Boss
+      </button>
+      {stage === "portal" && <FinalBossPortal boss={boss} level={boss?.level ?? level} onEnter={() => setStage("level")} onClose={() => setStage(null)} />}
+      {stage === "level" && <BossDialog boss={boss} level={boss?.level ?? level} onClose={() => setStage(null)} />}
+    </>
+  );
+}
+
 /**
  * The entryway: a gold-framed portal in royal purple, about a third of the
  * screen, saying you're about to step into the Final Boss level.

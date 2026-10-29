@@ -31,7 +31,7 @@ export function IconPicker({
   centered = false,
   showEditHint = false,
   artStyle = "monster",
-  clearLabel = "Clear",
+  clearLabel = "Remove portrait",
   onPromptChange,
 }: {
   /** Omit together with `onDraftChange` when the quest doesn't exist yet. */
@@ -298,7 +298,10 @@ export function IconPicker({
             </span>
             <span className="ml-auto flex items-center gap-2">
               {shownIcon && (
-                <button type="button" onClick={clear} disabled={isPending} style={{ color: "var(--t-ink-soft)" }}>
+                <button type="button" onClick={clear} disabled={isPending} title="Take the portrait off: the quest shows just its check box" className="flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold disabled:opacity-60" style={{ border: "1px solid var(--t-panel-border, rgba(139,112,64,.45))", color: "var(--t-ink)" }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M5 7h14M10 4h4M7 7l1 13h8l1-13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                   {clearLabel}
                 </button>
               )}

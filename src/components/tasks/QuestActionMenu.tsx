@@ -3,9 +3,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
+import { GearIcon } from "@/components/ui/Icons";
+import { SettingsPopup } from "@/components/ui/SettingsPopup";
 import { arrangeMenu, readMenuLayout, serverMenuLayout, subscribeMenuLayout } from "@/lib/quest-menu-layout";
 
-export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "earlier" | "nextstep" | "sequence" | "delete";
+export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "board" | "earlier" | "nextstep" | "sequence" | "delete";
 
 /**
  * The quest card's action list — opened from the card's icon (the blank
@@ -48,6 +50,8 @@ export function QuestActionMenu({
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // The menu's own gear: its order and which items show, in a popup over it.
+  const [layoutOpen, setLayoutOpen] = useState(false);
   // Order and hidden items, as chosen in Settings.
   const layout = useSyncExternalStore(subscribeMenuLayout, readMenuLayout, serverMenuLayout);
 
@@ -73,12 +77,14 @@ export function QuestActionMenu({
     };
   }, [anchor, align, confirmDelete]);
 
-  useEscape(onClose);
+  useEscape(() => !layoutOpen && onClose());
 
   useEffect(() => {
     function onDown(e: PointerEvent) {
       const el = e.target as Element | null;
       if (!ref.current || ref.current.contains(el as Node)) return;
+      // Its settings popup is open over it: leave the menu be.
+      if (layoutOpen) return;
       // Writing feedback about the menu keeps it open.
       if (el instanceof Element && el.closest("[data-feedback-root]")) return;
       onClose();
@@ -90,7 +96,7 @@ export function QuestActionMenu({
       clearTimeout(t);
       document.removeEventListener("pointerdown", onDown, true);
     };
-  }, [onClose]);
+  }, [onClose, layoutOpen]);
 
   const allItems: { key: QuestAction; icon: React.ReactNode; label: string }[] = [
     { key: "edit", icon: <Glyph d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />, label: isReward ? "Edit reward" : isAdventure ? "Edit quest" : "Edit task" },
@@ -111,12 +117,13 @@ export function QuestActionMenu({
     // In Additional Quests, taking it out of that list takes it off the Today screen.
     ...(onToday && !inBattle ? [{ key: "offtoday" as const, icon: <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />, label: isAdventure ? "Remove from Additional Quests" : "Remove from More tasks" }] : []),
     { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule on calendar" : "Schedule on calendar" },
-    ...(onBoard && !isReward ? [{ key: "nextstep" as const, icon: <Glyph d="M5 12h12M13 7l5 5-5 5" />, label: "Make it the board's next step" }] : []),
+    ...(onBoard && !isReward ? [{ key: "board" as const, icon: <Glyph d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z" />, label: "See quest in its board" }] : []),
     ...(!isReward
       ? [
           { key: "sequence" as const, icon: <StackGlyph />, label: inSequence ? "Edit the sequence…" : "Create a sequence…" },
         ]
       : []),
+    ...(onBoard && !isReward ? [{ key: "nextstep" as const, icon: <Glyph d="M5 12h12M13 7l5 5-5 5" />, label: "Make it the board's next step" }] : []),
     ...(!isReward ? [{ key: "earlier" as const, icon: <Glyph d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3h3" />, label: "Already completed…" }] : []),
     { key: "delete", icon: <Glyph d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, label: isReward ? "Delete reward" : isAdventure ? "Delete quest" : "Delete task" },
   ];
@@ -156,7 +163,18 @@ export function QuestActionMenu({
           </div>
         </div>
       ) : (
-        items.map((it) => (
+        <>
+        <button
+          type="button"
+          onClick={() => setLayoutOpen(true)}
+          aria-label="Arrange this menu: order and which items show"
+          title="Arrange this menu"
+          className="absolute right-1.5 top-1.5 z-[1] flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5"
+          style={{ color: "var(--t-ink-soft)" }}
+        >
+          <GearIcon size={15} />
+        </button>
+        {items.map((it, i) => (
           <button
             key={it.key}
             type="button"
@@ -178,10 +196,12 @@ export function QuestActionMenu({
             >
               {it.icon}
             </span>
-            {it.label}
+            <span className={i === 0 ? "pr-7" : undefined}>{it.label}</span>
           </button>
-        ))
+        ))}
+        </>
       )}
+      {layoutOpen && <SettingsPopup spot="menus.quest-card" onClose={() => setLayoutOpen(false)} />}
     </div>,
     document.body
   );

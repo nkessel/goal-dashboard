@@ -12,8 +12,9 @@ export const MENU_ITEMS: { key: QuestAction; label: string }[] = [
   { key: "snooze", label: "Snooze until tomorrow" },
   { key: "offtoday", label: "Remove from Additional Quests" },
   { key: "calendar", label: "Schedule on calendar" },
-  { key: "nextstep", label: "Make it the board's next step" },
+  { key: "board", label: "See quest in its board" },
   { key: "sequence", label: "Create a sequence" },
+  { key: "nextstep", label: "Make it the board's next step" },
   { key: "earlier", label: "Already completed…" },
   { key: "delete", label: "Delete quest" },
 ];

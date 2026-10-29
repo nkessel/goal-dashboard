@@ -30,7 +30,7 @@ export function SideDrawer({ theme, title, children }: { theme: "calm" | "advent
   }, []);
 
   return (
-    <div data-theme={theme} className="fixed inset-0 z-[45]" style={{ background: "transparent", minHeight: 0 }}>
+    <div data-theme={theme} className="fixed inset-0 z-[47]" style={{ background: "transparent", minHeight: 0 }}>
       <div className={`absolute inset-0 ${closing ? "drawer-fade-out" : "drawer-fade-in"}`} style={{ background: "rgba(6,9,5,.55)" }} onClick={close} />
       <aside
         role="dialog"

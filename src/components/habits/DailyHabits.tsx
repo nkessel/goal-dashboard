@@ -291,8 +291,8 @@ export function DailyHabits({
         aria-label="How the Daily Habits header looks"
         aria-expanded={lookMenu}
         title="Habit display settings"
-        // The app's one gear, sitting on the header box's bottom-right corner.
-        className="absolute -bottom-2.5 -right-1.5 z-[3] flex h-8 w-8 items-center justify-center rounded-full"
+        // The app's one gear, on the header box's bottom-right corner (top-right while open, so the tray never covers it).
+        className={`absolute -right-1.5 z-[5] flex h-8 w-8 items-center justify-center rounded-full ${open ? "-top-2.5" : "-bottom-2.5"}`}
         style={
           isAdventure
             ? { color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }

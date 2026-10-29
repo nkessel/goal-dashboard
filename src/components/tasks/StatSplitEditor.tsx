@@ -7,8 +7,8 @@ import { DEFAULT_STATS, cleanStatName, setShare, statAbbr, type StatSplit } from
 /**
  * "Stats" under a quest's XP reward: slide a share of the XP to each
  * character stat (all 0% by default). XP sent to stats doesn't fill the main
- * level meter. Past 100%, the other stats give up the difference; lowering a
- * stat again gives back what it took from them. Their order (and removing
+ * level meter. Past 100%, the stat chosen last gives up the difference (then
+ * the one before it); lowering a stat again gives back what it took. Their order (and removing
  * one) lives in Settings → Stats.
  */
 export function StatSplitEditor({
@@ -16,19 +16,33 @@ export function StatSplitEditor({
   split,
   onChange,
   isAdventure,
+  open: openProp,
+  onOpenChange,
 }: {
+  /** Opened from outside (the "Add to stats" button under the XP reward's title); the tray's own link is then left out. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   xp: number;
   split: StatSplit;
   onChange: (next: StatSplit) => void;
   isAdventure: boolean;
 }) {
   // Folded away by default: sharing XP with stats is an option, not a step.
-  const [open, setOpen] = useState(false);
+  const [openOwn, setOpenOwn] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openOwn;
+  const setOpen = (v: boolean | ((o: boolean) => boolean)) => {
+    const next = typeof v === "function" ? v(open) : v;
+    if (controlled) onOpenChange?.(next);
+    else setOpenOwn(next);
+  };
   const [stats, setStats] = useState<string[]>([...DEFAULT_STATS]);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   // What each stat took from the others on its way up, to give back on its way down.
   const borrowed = useRef<Record<string, Record<string, number>>>({});
+  // The order stats were chosen in (the last one gives way first).
+  const picked = useRef<string[]>(Object.keys(split));
 
   useEffect(() => {
     let live = true;
@@ -47,7 +61,8 @@ export function StatSplitEditor({
 
   function changeShare(stat: string, pct: number) {
     const prev = split;
-    const next = setShare(prev, stat, pct);
+    if (!(prev[stat] > 0) && pct > 0) picked.current = [...picked.current.filter((k) => k !== stat), stat];
+    const next = setShare(prev, stat, pct, picked.current);
     const d = (next[stat] ?? 0) - (prev[stat] ?? 0);
     const lent = { ...(borrowed.current[stat] ?? {}) };
     if (d > 0) {
@@ -82,14 +97,16 @@ export function StatSplitEditor({
 
   const soft = "var(--t-ink-soft)";
   return (
-    <div className="-mt-1 flex flex-col gap-1.5">
+    <div className={`${controlled ? "" : "-mt-1 "}flex flex-col gap-1.5`}>
       {/* A quiet link under the XP: share some of it with your character stats. */}
+      {!controlled && (
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex items-center gap-1 self-start text-[12px] underline-offset-2 hover:underline" style={{ color: soft }}>
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: open ? "rotate(90deg)" : undefined }}>
           <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         {total === 0 ? "Share XP with your stats" : `${toStats} XP to stats · ${xp - toStats} to your level`}
       </button>
+      )}
 
       {open && (
         <div

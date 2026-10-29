@@ -206,6 +206,7 @@ export function TaskRow({
     if (action === "focus") return openFocusMode({ ...task, categoryLabel });
     if (action === "earlier") return setDoneEarlier(true);
     if (action === "sequence") return setSequencing(true);
+    if (action === "board" && task.board_id) return router.push(`/boards/${task.board_id}`);
     if (action === "nextstep") {
       startTransition(async () => {
         try {
