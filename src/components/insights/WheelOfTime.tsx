@@ -189,10 +189,6 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
           {on ? "✓" : good ? "+" : "−"}
         </span>
         <span className="min-w-0 flex-1">{name}</span>
-        <span aria-hidden className="shrink-0 text-[13px] font-bold tabular-nums opacity-80">
-          {good ? "↻" : "↺"}
-          {weightOf(state.weights, name) > 1 ? ` ${weightOf(state.weights, name)}` : ""}
-        </span>
       </button>
     );
   };
