@@ -131,7 +131,7 @@ export function BoardGrid({
   const [, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
   const scroll = isAdventure && !dream;
-  const soft = dream ? "#5d5a7a" : isAdventure ? "#5a4a30" : "var(--t-ink-soft)";
+  const soft = dream ? "#5c6f8c" : isAdventure ? "#5a4a30" : "var(--t-ink-soft)";
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -228,7 +228,7 @@ export function BoardGrid({
     const nextStep = nextActionOf(board, open) ?? open[0];
     const previews = nextStep ? [nextStep] : [];
     const href = `/boards/${board.id}`;
-    const rule = dream ? "rgba(110,100,170,.22)" : isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)";
+    const rule = dream ? "rgba(120,150,190,.25)" : isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)";
 
     const body = (
       <div className="flex h-full flex-col gap-2 px-3 pb-2.5 pt-2.5">
@@ -250,9 +250,11 @@ export function BoardGrid({
                 </span>
               )}
             </span>
-            <span className="block text-[12px] tabular-nums" style={{ color: board.isComplete ? "var(--t-good)" : soft }}>
-              ({board.questDone}/{board.questTotal} completed)
-            </span>
+            {!dream && (
+              <span className="block text-[12px] tabular-nums" style={{ color: board.isComplete ? "var(--t-good)" : soft }}>
+                ({board.questDone}/{board.questTotal} completed)
+              </span>
+            )}
           </span>
         </Link>
 
@@ -271,9 +273,11 @@ export function BoardGrid({
                     <SubBoardsIcon />
                   </span>
                   <span className="truncate">{sb.title}</span>
-                  <span className="shrink-0 tabular-nums" style={{ color: soft }}>
-                    ({sb.questCount})
-                  </span>
+                  {!(dream && sb.questCount === 0) && (
+                    <span className="shrink-0 tabular-nums" style={{ color: soft }}>
+                      ({sb.questCount})
+                    </span>
+                  )}
                 </Link>
               </li>
             ))}
@@ -283,7 +287,7 @@ export function BoardGrid({
         {/* Quest previews — tap to open, press and drag onto another board to move */}
         {previews.length > 0 && (
           <ul className="-mx-1 flex flex-col border-t pt-1" style={{ borderColor: rule }}>
-            <li aria-hidden className="px-1 pt-0.5 text-[10.5px] font-bold uppercase tracking-[.12em]" style={{ color: dream ? "#7b6fb8" : isAdventure ? "#8a6116" : "var(--t-accent)" }}>
+            <li aria-hidden className="px-1 pt-0.5 text-[10.5px] font-bold uppercase tracking-[.12em]" style={{ color: dream ? "#5f87b8" : isAdventure ? "#8a6116" : "var(--t-accent)" }}>
               Next step
             </li>
             {previews.map((q) => (
@@ -328,7 +332,7 @@ export function BoardGrid({
             </ul>
           ) : (
             <p className="m-0 border-t pt-1.5 text-[12.5px]" style={{ borderColor: rule, color: soft }}>
-              No quests yet.
+              {dream ? "Nothing here yet." : "No quests yet."}
             </p>
           ))}
 
@@ -342,7 +346,7 @@ export function BoardGrid({
               onClick={() => setAddingTo(board.id)}
               aria-label={`Add a quest or sub-board to ${board.title}`}
               className="board-quest flex h-9 flex-1 items-center justify-center gap-1 rounded-lg border border-dashed text-[13px] font-semibold"
-              style={{ borderColor: dream ? "rgba(110,100,170,.4)" : isAdventure ? "rgba(120,90,40,.45)" : "var(--t-card-border)", color: soft }}
+              style={{ borderColor: dream ? "rgba(120,150,190,.45)" : isAdventure ? "rgba(120,90,40,.45)" : "var(--t-card-border)", color: soft }}
             >
               <span className="text-[16px] leading-none" aria-hidden>
                 +
@@ -356,7 +360,7 @@ export function BoardGrid({
               onClick={() => setEditingBoard(board)}
               aria-label={`Edit ${board.title}`}
               className="board-edit-foot board-quest h-9 w-9 shrink-0 items-center justify-center rounded-lg border"
-              style={{ borderColor: dream ? "rgba(110,100,170,.32)" : isAdventure ? "rgba(120,90,40,.35)" : "var(--t-card-border)", color: soft }}
+              style={{ borderColor: dream ? "rgba(120,150,190,.38)" : isAdventure ? "rgba(120,90,40,.35)" : "var(--t-card-border)", color: soft }}
             >
               <PencilIcon />
             </button>

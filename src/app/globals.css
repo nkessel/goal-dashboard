@@ -973,54 +973,84 @@ html[data-evening] [data-theme="adventure"] {
 
 /* ── Dreams cloud (under the scrolls on the Boards page) ───────────── */
 .dream-cloud {
-  --dream-top: #f8f6ff;
-  --dream-bottom: #e9e5f9;
-  border-radius: 48px;
-  background: linear-gradient(180deg, var(--dream-top) 0%, #f1eefc 55%, var(--dream-bottom) 100%);
-  /* one soft glow around the whole cloud, puffs included */
-  filter: drop-shadow(0 10px 22px rgba(150, 140, 220, 0.45)) drop-shadow(0 0 28px rgba(225, 220, 255, 0.35));
+  --dream-hi: #ffffff;
+  --dream-mid: #f4f8fd;
+  --dream-low: #dfe8f3;
+  --dream-shade: #c9d6e6;
+  /* one soft glow around the whole cloud, billows included */
+  filter: drop-shadow(0 14px 24px rgba(70, 100, 150, 0.35)) drop-shadow(0 0 34px rgba(255, 255, 255, 0.28));
   overflow-x: clip;
   overflow-y: visible;
+}
+/* The cloud's body sits over the billows' inner halves, so only their round edges show. */
+.dream-body {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 46px;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 30% 0%, var(--dream-hi) 0%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, var(--dream-hi) 0%, var(--dream-mid) 45%, var(--dream-low) 100%);
 }
 .dream-puff {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
 }
-.dream-puff.top { background: var(--dream-top); }
-.dream-puff.bottom { background: var(--dream-bottom); }
+.dream-puff.top {
+  z-index: 1;
+  /* lit from above: bright crown, a little grey where it curls under */
+  background: radial-gradient(circle at 45% 32%, var(--dream-hi) 0%, var(--dream-hi) 38%, var(--dream-mid) 62%, #e4ecf6 100%);
+}
+.dream-puff.back {
+  z-index: 0;
+  background: radial-gradient(circle at 50% 35%, #f2f6fc 0%, #dde6f2 70%, var(--dream-shade) 100%);
+  opacity: 0.9;
+  animation: dream-drift 14s ease-in-out infinite alternate;
+}
+.dream-puff.bottom {
+  z-index: 1;
+  background: radial-gradient(circle at 50% 10%, var(--dream-low) 0%, var(--dream-low) 50%, #d3dfed 82%, var(--dream-shade) 100%);
+}
+@keyframes dream-drift {
+  from { transform: translateX(-7px); }
+  to { transform: translateX(7px); }
+}
 .dream-sparkle {
   position: absolute;
-  z-index: 1;
-  font-size: 15px;
-  color: #b7a8f0;
+  z-index: 3;
+  font-size: 14px;
+  color: #e8c46a;
+  text-shadow: 0 0 8px rgba(255, 236, 170, 0.9);
   pointer-events: none;
   animation: dream-twinkle 3.6s ease-in-out infinite;
 }
 @keyframes dream-twinkle {
-  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
   50% { opacity: 0.95; transform: scale(1.1); }
 }
 .dream-card {
   position: relative;
   height: 100%;
-  border-radius: 24px;
+  border-radius: 26px;
   color: var(--t-ink);
-  background: linear-gradient(170deg, rgba(255, 255, 255, 0.95) 0%, rgba(246, 243, 255, 0.88) 100%);
-  border: 1px solid rgba(160, 150, 225, 0.4);
-  box-shadow: 0 6px 18px rgba(140, 128, 210, 0.22), inset 0 1px 0 #fff;
+  background: linear-gradient(175deg, rgba(255, 255, 255, 0.97) 0%, rgba(246, 250, 255, 0.92) 100%);
+  border: 1px solid rgba(170, 195, 225, 0.55);
+  box-shadow: 0 8px 20px rgba(80, 110, 160, 0.16), inset 0 1px 0 #fff, inset 0 -6px 14px rgba(200, 215, 235, 0.35);
 }
 .dream-card .board-quest:hover,
 .dream-card .board-quest:focus-visible {
-  background-color: rgba(130, 115, 210, 0.1);
+  background-color: rgba(110, 150, 200, 0.1);
 }
 .dream-btn {
   color: #fff;
-  background: linear-gradient(180deg, #a99cf0 0%, #8576d8 100%);
-  box-shadow: 0 3px 10px rgba(120, 100, 210, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  background: linear-gradient(180deg, #9ec3ea 0%, #6f9bd0 100%);
+  box-shadow: 0 3px 10px rgba(80, 120, 180, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 @media (prefers-reduced-motion: reduce) {
   .dream-sparkle { animation: none; opacity: 0.6; }
+  .dream-puff.back { animation: none; }
 }
 
 .board-edit-btn {
