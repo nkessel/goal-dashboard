@@ -6,13 +6,25 @@ import { WeatherLocation } from "@/components/ui/WeatherLocation";
 import { fromFeedback } from "@/lib/from-feedback";
 
 type Reading = { metric: string; level: number; at: string };
-type WinLite = { kind: string; at: string; xp: number; title?: string };
+type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null };
 
 /** Series colors, checked for contrast and color-blind separation on parchment. */
 const SERIES = ["#c4620f", "#2a6fb5", "#24875a", "#8a3fa0", "#c23a48", "#a0880a"];
 const INK = "#3b2a14";
 const INK_SOFT = "#6b5631";
 const GRID = "rgba(110,85,40,.18)";
+const XP_FILL = "#d9b45f";
+const XP_EDGE = "#8a6116";
+
+/** Kinds counted in a day's tally, in display order. */
+const TALLIES: { kind: string; one: string; many: string }[] = [
+  { kind: "quest", one: "quest", many: "quests" },
+  { kind: "habit", one: "habit", many: "habits" },
+  { kind: "rite", one: "rite", many: "rites" },
+  { kind: "journal", one: "journal", many: "journals" },
+  { kind: "feedback", one: "feedback", many: "feedback" },
+  { kind: "reward", one: "reward", many: "rewards" },
+];
 const DAY = 86_400_000;
 const VIEW_KEY = "insights-view-2";
 const SHOWN_KEY = "insights-shown";
@@ -154,6 +166,11 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
   const [hover, setHover] = useState<number | null>(null);
   const tapType = useRef("mouse");
   const gearRef = useRef<HTMLDivElement>(null);
+  // A zoomed-in window of time [from, to] in ms, set by pinching; null shows the whole span.
+  const [zoom, setZoom] = useState<[number, number] | null>(null);
+  const fingers = useRef(new Map<number, number>());
+  const gesture = useRef<{ dist: number; mid: number; win: [number, number]; moved: boolean } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- saved choices are only readable after hydration */
@@ -187,10 +204,11 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
 
   function setV(patch: Partial<View>) {
     const next = { ...view, ...patch };
+    if (patch.range && patch.range !== view.range) setZoom(null);
     setView(next);
     writeJSON(VIEW_KEY, next);
   }
-  // Metrics are on by default; weather and events off until ticked.
+  // Metrics and XP are on by default; weather and events off until ticked.
   const isOn = (k: string) => shown[k] ?? !(k === "weather" || EVENTS.some((e) => e.key === k));
   function flip(k: string) {
     const next = { ...shown, [k]: !isOn(k) };
@@ -220,8 +238,25 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
   const eventsH = activeEvents.length && marks === "lanes" ? 14 + activeEvents.length * 16 : 0;
   const B = 22 + eventsH;
   const H = T + plotH + B;
-  const x = (t: number) => L + ((t - start) / (end - start)) * (W - L - R);
+  const [v0, v1] = zoom && zoom[0] >= start && zoom[1] <= end ? zoom : [start, end];
+  const x = (t: number) => L + ((t - v0) / (v1 - v0)) * (W - L - R);
   const xDay = (i: number) => x(start + i * DAY + DAY / 2);
+  /** Where a pointer sits, in chart units (0…W). */
+  const svgX = (clientX: number) => {
+    const r = svgRef.current?.getBoundingClientRect();
+    return r ? ((clientX - r.left) / r.width) * W : 0;
+  };
+  const tAt = (px: number) => v0 + ((px - L) / (W - L - R)) * (v1 - v0);
+  const dayAt = (px: number) => Math.floor((tAt(px) - start) / DAY);
+  const inView = (i: number) => start + (i + 1) * DAY > v0 && start + i * DAY < v1;
+  const visDays = Math.max(1, Math.round((v1 - v0) / DAY));
+  /** Keep a zoom window inside the span, at least three days wide. */
+  function clampWin(a: number, b: number): [number, number] | null {
+    const span = Math.min(end - start, Math.max(3 * DAY, b - a));
+    if (span >= end - start - DAY / 4) return null;
+    const lo = Math.max(start, Math.min(a, end - span));
+    return [lo, lo + span];
+  }
   const y = (v: number) => T + ((10 - v) * plotH) / 9;
 
   const series = metrics.map((m, i) => {
@@ -249,7 +284,13 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
     eventsByDay.set(k, [...(eventsByDay.get(k) ?? []), w]);
   }
 
-  const tickEvery = n <= 7 ? 1 : n <= 30 ? 7 : 14;
+  const showXp = isOn("xp");
+  const xpByDay = days.map((d) => (eventsByDay.get(dayKey(d)) ?? []).reduce((a, w) => a + (w.xp || 0), 0));
+  const xpTop = Math.ceil(Math.max(10, ...xpByDay) / 10) * 10;
+  const xpTotal = xpByDay.reduce((a, b) => a + b, 0);
+  const dayW = ((W - L - R) * DAY) / (v1 - v0);
+
+  const tickEvery = visDays <= 7 ? 1 : visDays <= 30 ? 7 : 14;
   const hd = hover !== null ? days[hover] : null;
   const hk = hd ? dayKey(hd) : null;
   const hoverVals = hd
@@ -259,14 +300,34 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
       })
     : [];
   const hoverEvents = hk ? (eventsByDay.get(hk) ?? []).filter((w) => activeEvents.some((e) => e.kinds.includes(w.kind))) : [];
+  const hoverWins = hk ? (eventsByDay.get(hk) ?? []) : [];
+  const hoverTally = TALLIES.map((t) => ({ t, c: hoverWins.filter((w) => w.kind === t.kind).length }))
+    .filter(({ c }) => c)
+    .map(({ t, c }) => `${c} ${c === 1 ? t.one : t.many}`)
+    .join(" · ");
+  const hoverIcons = hoverWins.filter((w) => w.icon).slice(0, 6);
   const hoverWeather = hk && weather ? weather[hk] : null;
   const fmt = (v: number) => (Math.round(v * 10) / 10).toFixed(1);
 
   return (
     <div className="relative z-[1] flex flex-col gap-2">
-      {/* Toggles, kept small so the chart leads: each metric as a pill (its swatch is its line), the rest under "More". */}
-      <div className="flex items-center gap-1.5">
-        <div className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 py-0.5" role="group" aria-label="Lines to show" style={{ scrollbarWidth: "none" }}>
+      {/* Toggles, kept small so the chart leads: XP and each metric as a pill (its swatch is its mark), the rest under "Weather & events". */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <div className="contents" role="group" aria-label="Lines to show">
+          <button
+            type="button"
+            aria-pressed={showXp}
+            onClick={() => flip("xp")}
+            className="flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold"
+            style={showXp ? { background: "rgba(255,250,235,.85)", border: `1.5px solid ${XP_EDGE}`, color: INK } : { border: `1px dashed ${GRID}`, color: INK_SOFT, opacity: 0.75 }}
+          >
+            <svg aria-hidden width="12" height="12" viewBox="0 0 12 12">
+              <rect x="0.5" y="5" width="3" height="6.5" rx="0.8" fill={showXp ? XP_FILL : INK_SOFT} />
+              <rect x="4.5" y="2" width="3" height="9.5" rx="0.8" fill={showXp ? XP_FILL : INK_SOFT} />
+              <rect x="8.5" y="6.5" width="3" height="5" rx="0.8" fill={showXp ? XP_FILL : INK_SOFT} />
+            </svg>
+            XP per day
+          </button>
           {series.map((s) => {
             const on = isOn(s.metric);
             return (
@@ -284,7 +345,7 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
             );
           })}
         </div>
-        <div ref={moreRef} className="relative shrink-0">
+        <div ref={moreRef} className="relative ml-auto shrink-0">
           <button
             type="button"
             onClick={() => setMore((o) => !o)}
@@ -292,7 +353,11 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
             className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
             style={{ border: `1px solid ${extrasOn ? "#8a6116" : GRID}`, background: extrasOn ? "rgba(217,180,95,.3)" : undefined, color: INK }}
           >
-            More{extrasOn ? ` · ${extrasOn}` : ""}
+            <svg aria-hidden width="14" height="14" viewBox="0 0 24 24">
+              <circle cx="9" cy="9" r="4" fill="#e7b43c" />
+              <path d="M8 19h9.5a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.5A2.8 2.8 0 0 0 8 19z" fill="#f6f1e4" stroke="#7d8aa0" strokeWidth="1.4" />
+            </svg>
+            Weather &amp; events{extrasOn ? ` (${extrasOn} on)` : ""}
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M5 9l7 7 7-7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -342,34 +407,84 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
 
       <figure className="relative m-0 rounded-xl px-2 pb-1 pt-2" style={{ background: "rgba(255,250,235,.55)", border: `1px solid ${GRID}` }}>
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
-          // A finger dragging up or down scrolls the page; a tap shows that day's numbers.
+          // A finger dragging up or down scrolls the page; two fingers pinch to zoom, one drags a zoomed chart sideways; a tap shows that day's numbers.
           className="w-full touch-pan-y select-none"
           role="img"
-          aria-label={`${visible.map((s) => s.metric).join(", ") || "No metrics"} over the last ${n} days, on a 1 to 10 scale`}
+          aria-label={`${[showXp ? "XP per day" : "", ...visible.map((s) => s.metric)].filter(Boolean).join(", ") || "No metrics"} over the last ${n} days, on a 1 to 10 scale`}
           onPointerMove={(e) => {
+            const f = fingers.current;
+            if (f.has(e.pointerId)) {
+              f.set(e.pointerId, e.clientX);
+              const g = gesture.current;
+              if (g && f.size >= 2) {
+                const [a, b] = [...f.values()].map(svgX);
+                const dist = Math.max(8, Math.abs(a - b));
+                const span = ((g.win[1] - g.win[0]) * g.dist) / dist;
+                // Keep the moment first under the fingers' midpoint under it as they move.
+                const tMid = g.win[0] + ((g.mid - L) / (W - L - R)) * (g.win[1] - g.win[0]);
+                const lo = tMid - (((a + b) / 2 - L) / (W - L - R)) * span;
+                g.moved = true;
+                setZoom(clampWin(lo, lo + span));
+                return;
+              }
+              if (g && f.size === 1 && zoom) {
+                const dx = svgX(e.clientX) - g.mid;
+                if (Math.abs(dx) > 6 || g.moved) {
+                  g.moved = true;
+                  const shift = (dx / (W - L - R)) * (g.win[1] - g.win[0]);
+                  setZoom(clampWin(g.win[0] - shift, g.win[1] - shift));
+                }
+                return;
+              }
+            }
             if (e.pointerType !== "mouse") return;
-            const r = e.currentTarget.getBoundingClientRect();
-            const px = ((e.clientX - r.left) / r.width) * W;
-            const i = Math.floor(((px - L) / (W - L - R)) * n);
-            setHover(i >= 0 && i < n ? i : null);
+            const i = dayAt(svgX(e.clientX));
+            setHover(i >= 0 && i < n && inView(i) ? i : null);
           }}
           onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)}
-          onPointerDown={(e) => (tapType.current = e.pointerType)}
+          onPointerDown={(e) => {
+            tapType.current = e.pointerType;
+            if (e.pointerType === "mouse") return;
+            const f = fingers.current;
+            f.set(e.pointerId, e.clientX);
+            const xs = [...f.values()].map(svgX);
+            gesture.current = {
+              dist: xs.length >= 2 ? Math.max(8, Math.abs(xs[0] - xs[1])) : 0,
+              mid: xs.length >= 2 ? (xs[0] + xs[1]) / 2 : xs[0],
+              win: [v0, v1],
+              moved: xs.length >= 2 ? true : false,
+            };
+          }}
+          onPointerUp={(e) => {
+            fingers.current.delete(e.pointerId);
+            const left = [...fingers.current.values()];
+            // One finger lifted mid-pinch: carry on as a drag from where the other is.
+            if (left.length === 1 && gesture.current) gesture.current = { ...gesture.current, dist: 0, mid: svgX(left[0]), win: [v0, v1] };
+          }}
+          onPointerCancel={(e) => fingers.current.delete(e.pointerId)}
           onClick={(e) => {
-            const r = e.currentTarget.getBoundingClientRect();
-            const px = ((e.clientX - r.left) / r.width) * W;
-            const i = Math.floor(((px - L) / (W - L - R)) * n);
-            if (i < 0 || i >= n) return setHover(null);
+            // A pinch or drag just ended: not a tap.
+            const g = gesture.current;
+            gesture.current = null;
+            if (g?.moved) return;
+            const i = dayAt(svgX(e.clientX));
+            if (i < 0 || i >= n || !inView(i)) return setHover(null);
             // On a touch screen the first tap shows the day; tapping it again logs an event on it.
             if (tapType.current !== "mouse" && hover !== i) return setHover(i);
             window.dispatchEvent(new CustomEvent("insights-add-event", { detail: { date: dayKey(days[i]) } }));
           }}
           style={{ cursor: 'url("/design/cursor-hand.svg") 11 3, copy' }}
         >
+          <defs>
+            <clipPath id="plot-clip">
+              <rect x={L} y={0} width={W - L - R} height={H} />
+            </clipPath>
+          </defs>
           {/* Weather strip */}
           {showWeather && weather && (
-            <g>
+            <g clipPath="url(#plot-clip)">
               {days.map((d, i) => {
                 const w = weather[dayKey(d)];
                 if (!w) return null;
@@ -404,6 +519,23 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
             </g>
           )}
 
+          {/* XP per day: gilded columns behind the lines, on their own scale (top label, right). */}
+          {showXp && (
+            <g clipPath="url(#plot-clip)">
+              {xpByDay.map((xp, i) => {
+                if (!xp || !inView(i)) return null;
+                const h = (xp / xpTop) * plotH;
+                const bw = Math.max(2, dayW * 0.62);
+                return (
+                  <rect key={i} x={xDay(i) - bw / 2} y={T + plotH - h} width={bw} height={h} rx={Math.min(3, bw / 3)} fill={XP_FILL} opacity={hover === null || hover === i ? 0.42 : 0.25} stroke={XP_EDGE} strokeWidth="0.8" />
+                );
+              })}
+              <text x={W - R - 2} y={T + 11} textAnchor="end" fontSize="10.5" fontWeight="700" fill={XP_EDGE}>
+                {xpTop} XP
+              </text>
+            </g>
+          )}
+
           {/* Grid */}
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
             <g key={v}>
@@ -416,15 +548,16 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
             </g>
           ))}
           {days.map((d, i) =>
-            (n - 1 - i) % tickEvery === 0 ? (
+            (n - 1 - i) % tickEvery === 0 && inView(i) ? (
               <text key={i} x={xDay(i)} y={T + plotH + 16} textAnchor="middle" fontSize="12" fill={INK_SOFT}>
-                {i === n - 1 ? "today" : d.toLocaleDateString(undefined, n <= 7 ? { weekday: "short" } : { month: "short", day: "numeric" })}
+                {i === n - 1 ? "today" : d.toLocaleDateString(undefined, visDays <= 7 ? { weekday: "short" } : { month: "short", day: "numeric" })}
               </text>
             ) : null
           )}
           {hover !== null && <line x1={xDay(hover)} x2={xDay(hover)} y1={T} y2={T + plotH + eventsH + 20} stroke={INK_SOFT} strokeWidth="1" strokeDasharray="3 3" />}
 
           {/* Lines */}
+          <g clipPath="url(#plot-clip)">
           {visible.map((s) => {
             const pts = s.pts.map((p): [number, number] => [x(p.t), y(p.v)]);
             return (
@@ -446,7 +579,10 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
             );
           })}
 
+          </g>
+
           {/* Events by the lines: a marker line at the moment, or the icon sitting on the day's average. */}
+          <g clipPath="url(#plot-clip)">
           {marks !== "lanes" &&
             activeEvents.flatMap((ev, li) =>
               wins
@@ -482,6 +618,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
                 })
             )}
 
+          </g>
+
           {/* Event lanes */}
           {marks === "lanes" && activeEvents.map((ev, li) => {
             const ly = T + plotH + 32 + li * 16;
@@ -493,11 +631,11 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
                 </g>
                 {days.map((d, i) => {
                   const c = (eventsByDay.get(dayKey(d)) ?? []).filter((w) => ev.kinds.includes(w.kind)).length;
-                  if (!c) return null;
+                  if (!c || !inView(i)) return null;
                   return (
                     <g key={i} transform={`translate(${xDay(i).toFixed(1)} ${ly})`}>
-                      <EventMark k={ev.key} color={ev.color} size={n > 30 ? 8 : 10} />
-                      {c > 1 && n <= 30 && (
+                      <EventMark k={ev.key} color={ev.color} size={visDays > 30 ? 8 : 10} />
+                      {c > 1 && visDays <= 30 && (
                         <text x="7" y="3.5" fontSize="9" fontWeight="700" fill={ev.color}>
                           {c}
                         </text>
@@ -523,6 +661,21 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
                 {s.metric} <b className="ml-auto tabular-nums">{v === null ? "—" : fmt(v)}</b>
               </span>
             ))}
+            {showXp && (
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className="inline-block h-2 w-2 rounded-sm" style={{ background: XP_FILL, border: `1px solid ${XP_EDGE}` }} />
+                XP earned <b className="ml-auto tabular-nums">{xpByDay[hover!]}</b>
+              </span>
+            )}
+            {showXp && hoverTally && <span style={{ color: INK_SOFT }}>{hoverTally}</span>}
+            {showXp && hoverIcons.length > 0 && (
+              <span className="flex flex-wrap gap-1 pt-0.5">
+                {hoverIcons.map((w, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+                  <img key={i} src={w.icon!} alt="" className="h-6 w-6 rounded-full object-cover" style={{ border: "1px solid #a58c66" }} />
+                ))}
+              </span>
+            )}
             {showWeather && hoverWeather && (
               <span>
                 ⛅ {hoverWeather.hi}° / {hoverWeather.lo}°{hoverWeather.rain > 0.02 ? ` · 💧 ${hoverWeather.rain.toFixed(2)}` : ""}
@@ -570,6 +723,20 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
           )}
         </div>
       </figure>
+      {(zoom || showXp) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" style={{ color: INK_SOFT }}>
+          {showXp && (
+            <span className="tabular-nums">
+              {xpTotal} XP over {n === 7 ? "the week" : `${n} days`} · {Math.round(xpTotal / n)} a day on average
+            </span>
+          )}
+          {zoom && (
+            <button type="button" onClick={() => setZoom(null)} className="ml-auto h-7 rounded-full px-2.5 text-[13px] font-semibold" style={{ border: `1px solid ${GRID}`, color: INK }}>
+              Zoom out
+            </button>
+          )}
+        </div>
+      )}
       {visible.every((s) => s.pts.length < 3) && (
         <p className="m-0 text-[13px]" style={{ color: INK_SOFT }}>
           A few more check-ins and the trends will show. Tap a name to show or hide its line, or + to add an entry.

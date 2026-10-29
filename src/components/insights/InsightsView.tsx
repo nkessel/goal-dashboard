@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 type Reading = { metric: string; level: number; at: string };
 type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null };
@@ -14,19 +14,12 @@ function useMounted() {
 function dayKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-function lastDays(n: number): Date[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Array.from({ length: n }, (_, i) => new Date(today.getTime() - (n - 1 - i) * DAY));
-}
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const fmt1 = (n: number | null) => (n === null ? "—" : n.toFixed(1));
 
 const INK = "#3b2a14";
 const INK_SOFT = "#6b5631";
 const GRID = "rgba(110,85,40,.18)";
-const MARK = "#8a6116";
-const BAR = "#c89a3c";
 
 export function InsightsView({ theme, readings, wins }: { theme: "calm" | "adventure"; readings: Reading[]; wins: WinLite[] }) {
   const mounted = useMounted();
@@ -58,7 +51,6 @@ export function InsightsView({ theme, readings, wins }: { theme: "calm" | "adven
     { label: "Check-ins", now: new Set(readings.filter((r) => inRange(r.at, week, now + 1)).map((r) => dayKey(new Date(r.at)))).size, before: null, dec: false, suffix: " of 7 days" },
   ];
 
-  const days14 = lastDays(14);
   const xpByDay = new Map<string, number>();
   const doneByDay = new Map<string, number>();
   for (const w of wins) {
@@ -98,14 +90,6 @@ export function InsightsView({ theme, readings, wins }: { theme: "calm" | "adven
         </div>
       </section>
 
-      {/* XP per day */}
-      <section className={card} style={cardStyle} aria-label="XP per day, last 14 days">
-        <h2 className={h2} style={{ color: "var(--t-ink)" }}>
-          XP per day · last 14 days
-        </h2>
-        <XpBars days={days14} wins={wins} />
-      </section>
-
       {/* Patterns */}
       <section className={card} style={cardStyle} aria-label="Patterns">
         <h2 className={h2} style={{ color: "var(--t-ink)" }}>
@@ -113,168 +97,6 @@ export function InsightsView({ theme, readings, wins }: { theme: "calm" | "adven
         </h2>
         <Patterns energy={energy} quests={quests} />
       </section>
-    </div>
-  );
-}
-
-const XP_VIEW_KEY = "insights-xp-view-2";
-
-/** Quest kinds counted in the daily tallies, in display order. */
-const TALLIES: { kind: string; one: string; many: string }[] = [
-  { kind: "quest", one: "quest", many: "quests" },
-  { kind: "habit", one: "habit", many: "habits" },
-  { kind: "rite", one: "rite", many: "rites" },
-  { kind: "journal", one: "journal", many: "journals" },
-  { kind: "feedback", one: "feedback", many: "feedback" },
-  { kind: "reward", one: "reward", many: "rewards" },
-];
-
-/**
- * XP per day as gilded columns, each labelled with its weekday and date.
- * Optionally shows the portraits of what was finished that day, and a
- * written tally (XP, quests, journals, feedback…) under each day.
- */
-function XpBars({ days, wins }: { days: Date[]; wins: WinLite[] }) {
-  const [hover, setHover] = useState<number | null>(null);
-  // A tapped portrait: what it was, when, and what it earned.
-  const [picked, setPicked] = useState<WinLite | null>(null);
-  const [opts, setOpts] = useState<{ icons: boolean; tallies: boolean }>(() => {
-    try {
-      return { icons: true, tallies: true, ...(JSON.parse(window.localStorage.getItem(XP_VIEW_KEY) ?? "{}") as object) };
-    } catch {
-      return { icons: true, tallies: true };
-    }
-  });
-  function set(patch: Partial<typeof opts>) {
-    const next = { ...opts, ...patch };
-    setOpts(next);
-    try {
-      window.localStorage.setItem(XP_VIEW_KEY, JSON.stringify(next));
-    } catch {
-      /* storage unavailable */
-    }
-  }
-  const byDay = days.map((d) => {
-    const k = dayKey(d);
-    const ws = wins.filter((w) => dayKey(new Date(w.at)) === k);
-    return { d, ws, xp: ws.reduce((a, w) => a + w.xp, 0) };
-  });
-  const max = Math.max(10, ...byDay.map((b) => b.xp));
-  const nice = Math.ceil(max / 10) * 10;
-  const total = byDay.reduce((a, b) => a + b.xp, 0);
-  const BAR_H = 110;
-  const wide = opts.icons || opts.tallies;
-  const h = hover !== null ? byDay[hover] : null;
-  const todayKey = dayKey(new Date());
-
-  return (
-    <div className="relative z-[1] flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        {picked ? (
-          <p className="fade-in m-0 flex min-w-0 flex-1 items-center gap-2 text-[13.5px]" style={{ color: INK }}>
-            {picked.icon && (
-              // eslint-disable-next-line @next/next/no-img-element -- quest portrait
-              <img src={picked.icon} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" style={{ border: "1.5px solid #a58c66" }} />
-            )}
-            <span className="min-w-0 flex-1">
-              <b className="block truncate">{picked.title}</b>
-              <span style={{ color: INK_SOFT }}>
-                {picked.kind === "reward" ? "Reward" : "Quest"} · {new Date(picked.at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                {picked.xp ? ` · +${picked.xp} XP` : ""}
-              </span>
-            </span>
-            <button type="button" onClick={() => setPicked(null)} aria-label="Close" className="h-8 w-8 shrink-0 rounded-full text-[18px] leading-none hover:bg-black/[.06]" style={{ color: INK_SOFT }}>
-              ×
-            </button>
-          </p>
-        ) : (
-          <p className="m-0 min-w-0 flex-1 text-[13.5px] tabular-nums" style={{ color: INK_SOFT }}>
-            {h
-              ? `${h.d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}: ${h.xp} XP`
-              : `${total} XP over two weeks · ${Math.round(total / days.length)} a day on average`}
-          </p>
-        )}
-        <label className="flex min-h-8 items-center gap-1.5 text-[13.5px]" style={{ color: INK }}>
-          <input type="checkbox" checked={opts.icons} onChange={() => set({ icons: !opts.icons })} />
-          Portraits
-        </label>
-        <label className="flex min-h-8 items-center gap-1.5 text-[13.5px]" style={{ color: INK }}>
-          <input type="checkbox" checked={opts.tallies} onChange={() => set({ tallies: !opts.tallies })} />
-          Daily tallies
-        </label>
-      </div>
-
-      <div className={wide ? "-mx-1 overflow-x-auto px-1 pb-1" : ""}>
-        <div className="relative flex pt-2.5" style={{ minWidth: wide ? days.length * 52 : undefined }} onPointerLeave={() => setHover(null)}>
-          {/* Scale (with room above so its top number isn't cut off) */}
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-2.5" style={{ height: BAR_H }}>
-            {[nice, nice / 2, 0].map((v, i) => (
-              <div key={v} className="absolute inset-x-0 flex items-center" style={{ top: (i * BAR_H) / 2 - 1 }}>
-                <span className="w-7 shrink-0 pr-1 text-right text-[11px] tabular-nums" style={{ color: INK_SOFT, transform: "translateY(-50%)" }}>
-                  {v}
-                </span>
-                <span className="flex-1" style={{ borderTop: `1px solid ${GRID}` }} />
-              </div>
-            ))}
-          </div>
-          <span aria-hidden className="w-7 shrink-0" />
-          {byDay.map((b, i) => {
-            const isToday = dayKey(b.d) === todayKey;
-            const icons = b.ws.filter((w) => (w.kind === "quest" || w.kind === "reward") && w.icon);
-            return (
-              <div
-                key={i}
-                className="flex min-w-0 flex-1 flex-col items-center"
-                onPointerEnter={() => setHover(i)}
-                onPointerDown={() => setHover(i)}
-                style={{ background: hover === i ? "rgba(217,180,95,.12)" : undefined, borderRadius: 8 }}
-              >
-                <div className="relative flex w-full items-end justify-center" style={{ height: BAR_H }}>
-                  {b.xp > 0 && (
-                    <div
-                      className="w-[62%] max-w-[26px] rounded-t-[5px]"
-                      style={{ height: Math.max(3, (b.xp / nice) * BAR_H), background: `linear-gradient(180deg, #e8c46a, ${BAR})`, boxShadow: "inset 0 0 0 1px rgba(90,60,20,.25)" }}
-                      title={`${b.xp} XP`}
-                    />
-                  )}
-                </div>
-                <div className="flex flex-col items-center pt-1 leading-none" style={{ color: isToday ? INK : INK_SOFT }}>
-                  <span className="text-[10.5px] uppercase tracking-wide">{isToday ? "Today" : b.d.toLocaleDateString(undefined, { weekday: "short" })}</span>
-                  <span className={`text-[13px] tabular-nums ${isToday ? "font-bold" : ""}`}>{b.d.getDate()}</span>
-                </div>
-                {opts.icons && icons.length > 0 && (
-                  <div className="mt-1 flex flex-col items-center gap-0.5">
-                    {icons.slice(0, 3).map((w, k) => (
-                      <button key={k} type="button" onClick={() => setPicked(w)} aria-label={w.title} title={w.title} className="rounded-full transition-transform hover:scale-110">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- quest portrait */}
-                        <img src={w.icon!} alt="" className="h-6 w-6 rounded-full object-cover" style={{ border: `1.5px solid ${w.kind === "reward" ? "#b5521f" : "#a58c66"}` }} />
-                      </button>
-                    ))}
-                    {icons.length > 3 && (
-                      <span className="text-[10.5px] font-semibold" style={{ color: INK_SOFT }}>
-                        +{icons.length - 3}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {opts.tallies && (
-                  <div className="mt-1 flex flex-col items-center gap-px text-center text-[10.5px] leading-tight" style={{ color: INK_SOFT }}>
-                    {b.xp > 0 && <b style={{ color: INK }}>{b.xp} XP</b>}
-                    {TALLIES.map((t) => {
-                      const c = b.ws.filter((w) => w.kind === t.kind).length;
-                      return c ? (
-                        <span key={t.kind}>
-                          {c} {c === 1 ? t.one : t.many}
-                        </span>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }

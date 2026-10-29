@@ -40,9 +40,6 @@ export function NightFields({ value, onChange, effort, hindrances }: { value: Ni
   return (
     <div className="flex flex-col gap-1.5 pb-1">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <span className="w-5 shrink-0 text-center text-[14px]" aria-hidden title="Wheel of Time">
-          ☸
-        </span>
         <label className="flex items-center gap-1.5 text-[14px] font-semibold" style={{ color: CREAM }}>
           Slept
           <input type="time" value={value.bed} onChange={(e) => set({ bed: e.target.value })} aria-label="Last night's sleep time" className={timeBox} />

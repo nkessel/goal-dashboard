@@ -128,11 +128,26 @@ export function WelcomeCard({
         <span aria-hidden>{checkinLabelOf(fx).icon}</span> {checkinLabelOf(fx).text}
       </button>
     ) : (
-      <div className="w-full rounded-2xl px-2 py-2.5 text-left" style={{ background: "linear-gradient(180deg, rgba(28,24,16,.94), rgba(18,16,11,.94))", border: "1.5px solid rgba(217,180,95,.45)" }}>
-        <p className="m-0 mb-1 text-center font-display text-[17px]" style={{ color: "#f2d27e" }}>
+      // Parchment like the rest of the card, its words in ink rather than cream (as in Insights).
+      <div
+        className="w-full rounded-2xl px-2 py-2.5 text-left"
+        style={{
+          background: "linear-gradient(180deg, rgba(255,250,236,.75), rgba(240,226,190,.75))",
+          border: "1.5px solid rgba(139,112,64,.5)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,.6)",
+          ["--t-cream" as string]: "var(--t-ink)",
+          ["--ec-soft" as string]: "var(--t-ink-soft)",
+          ["--ec-chip" as string]: "rgba(120,90,40,.1)",
+          ["--ec-gold" as string]: "#8a6116",
+          ["--ec-line" as string]: "rgba(139,112,64,.45)",
+          ["--ec-value" as string]: "#5a3d12",
+          ["--ec-l" as string]: "30%",
+        }}
+      >
+        <p className="m-0 mb-1 text-center font-display text-[17px]" style={{ color: "#8a6116" }}>
           {checkedIn ? "Checked in ✓" : "Check in"}
         </p>
-        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} addNights simple={fx.welcomeMetrics !== false} />
+        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} addNights simple />
       </div>
     ),
     streak: award && award.streak > 0 ? (
@@ -269,8 +284,15 @@ export function WelcomeCard({
           ))}
           {snoozing ? (
             <div className="reveal mt-1 flex w-full flex-col items-center gap-1.5">
-              <span className="text-[13px] font-semibold" style={{ color: "#5a4a30" }}>
-                Ask me again…
+              <span className="flex items-center gap-1.5">
+                <button type="button" onClick={() => setSnoozing(false)} aria-label="Back" title="Back" className="flex h-8 w-8 items-center justify-center rounded-full" style={{ border: "1.5px solid #b39a6a", color: "#5a4a30", background: "rgba(255,250,238,.6)" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M14.5 5.5 8 12l6.5 6.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <span className="text-[13px] font-semibold" style={{ color: "#5a4a30" }}>
+                  Ask me again…
+                </span>
               </span>
               <div className="flex flex-wrap justify-center gap-1.5">
                 {snoozeChoices().map((c) => (
@@ -279,14 +301,9 @@ export function WelcomeCard({
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={onClose} className="h-9 px-1 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
-                  Skip for today
-                </button>
-                <button type="button" onClick={() => setSnoozing(false)} className="h-9 px-1 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
-                  Back
-                </button>
-              </div>
+              <button type="button" onClick={onClose} className="h-9 px-1 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                Skip for today
+              </button>
             </div>
           ) : (
             <button type="button" onClick={() => (snoozable ? setSnoozing(true) : onClose())} className="mt-1 h-10 rounded-full border px-5 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>

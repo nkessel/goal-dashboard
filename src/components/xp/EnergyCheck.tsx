@@ -49,6 +49,11 @@ const METRIC_IDEAS = ["Mood", "Focus", "Calm", "Motivation", "Sleep", "Pain"];
 const MAX_METRICS = 6;
 const EXPANDED_KEY = "checkin-expanded";
 
+/** After 5pm the check-in also asks, optionally, how the day was (1–10). */
+const DAY_METRIC = "My day";
+const noopSub = () => () => {};
+const afterFive = () => new Date().getHours() >= 17;
+
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 /**
@@ -72,7 +77,7 @@ export function EnergyCheck({
   addNights = false,
   simple = false,
 }: {
-  /** The welcome screen's check-in: always open (no caret) and no Edit check-in. */
+  /** The welcome screen's check-in: no Edit check-in, and no caret when it opens in full. */
   simple?: boolean;
   /** A link to the sleep and wake log in Insights, for other nights. */
   sleepLink?: boolean;
@@ -106,6 +111,9 @@ export function EnergyCheck({
   const [saved, setSaved] = useState<number | null>(today);
   const [savedAt, setSavedAt] = useState<string | null>(todayAt);
   const [metrics, setMetrics] = useState<string[]>(initialMetrics);
+  const evening = useSyncExternalStore(noopSub, afterFive, () => false);
+  // The metrics shown and saved here: yours, plus "My day" in the evening.
+  const rows = evening && !metrics.some((m) => m.toLowerCase() === DAY_METRIC.toLowerCase()) ? [...metrics, DAY_METRIC] : metrics;
   // A new check-in starts blank: only metrics moved this time are saved and shown.
   const [vals, setVals] = useState<Record<string, number>>({});
   const [savedVals, setSavedVals] = useState<Record<string, number>>(metricsToday);
@@ -231,7 +239,7 @@ export function EnergyCheck({
   const nightTouched = !!wheel && !noSleep && JSON.stringify(night) !== nightBase;
   function save() {
     setError(null);
-    const all = expanded ? metrics.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
+    const all = expanded ? rows.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
     // Last night's sleep alone is enough to save.
     if (!energySet && !all.length && !nightTouched && !nightsFilled.length) return;
     startSaving(async () => {
@@ -312,7 +320,7 @@ export function EnergyCheck({
   }
   const hue = Math.round(((shown - 1) / 9) * 110); // red → green
   const ideas = METRIC_IDEAS.filter((i) => !metrics.some((m) => m.toLowerCase() === i.toLowerCase()));
-  const savedExtras = metrics.filter((m) => savedVals[m] !== undefined);
+  const savedExtras = rows.filter((m) => savedVals[m] !== undefined);
 
   /** The caret before "Energy": opens the other metrics (or, once saved, what was saved). */
   const caret = (
@@ -374,7 +382,7 @@ export function EnergyCheck({
           </b>
         </li>
       )}
-      {metrics.filter((m) => savedVals[m] !== undefined).map((m) => (
+      {rows.filter((m) => savedVals[m] !== undefined).map((m) => (
         <li key={m} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px]" style={{ background: "var(--ec-chip, rgba(0,0,0,.28))", border: "1px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)" }}>
           {m}
           <b className="font-display text-[17px] tabular-nums" style={{ color: "var(--ec-value, #f2d58a)" }}>
@@ -441,7 +449,7 @@ export function EnergyCheck({
             {wheel && !noSleep && <NightFields value={night} onChange={setNight} effort={wheel.effort} hindrances={wheel.hindrances} />}
             <div className="flex items-center gap-2">
               {/* The welcome screen's check-in is always open, so no caret there. */}
-              {!simple && caret}
+              {!(simple && full) && caret}
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: energySet ? 1 : 0.6 }}>
                   Energy
@@ -467,21 +475,21 @@ export function EnergyCheck({
 
             {expanded && (
               <div id="checkin-more" className="reveal flex flex-col gap-1.5 pb-0.5">
-                {metrics.map((m) => {
+                {rows.map((m) => {
                   const set = vals[m] !== undefined;
                   const v = vals[m] ?? 5.5;
                   return (
                     // Untouched metrics aren't saved (their name and value sit faded, the slider stays bright); moving one counts it.
                     <div key={m} className="flex items-center gap-2">
-                      {!simple && <span aria-hidden className="w-5 shrink-0" />}
-                      <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: set ? 1 : 0.6 }} title={m}>
+                      {!(simple && full) && <span aria-hidden className="w-5 shrink-0" />}
+                      <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: set ? 1 : 0.6 }} title={m === DAY_METRIC ? "How was your day? (optional)" : m}>
                         {m}
                       </span>
-                      {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), `${m}, 1 to 10`, "#c9a24a")}
+                      {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), m === DAY_METRIC ? "How was your day, 1 to 10 (optional)" : `${m}, 1 to 10`, "#c9a24a")}
                       <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums transition-opacity" style={{ color: "var(--ec-value, #f2d58a)", opacity: set ? 1 : 0.6 }}>
                         {set ? fmt(v) : "–"}
                       </span>
-                      {editingList ? (
+                      {editingList && metrics.includes(m) ? (
                         <button
                           type="button"
                           onClick={() => removeMetric(m)}
@@ -502,7 +510,7 @@ export function EnergyCheck({
                 {/* Beneath the metrics: add another, or log an event / #tag. */}
                 {!adding && !noting && (
                   <div className="flex items-center gap-2">
-                    {!simple && <span aria-hidden className="w-5 shrink-0" />}
+                    {!(simple && full) && <span aria-hidden className="w-5 shrink-0" />}
                     {metrics.length < MAX_METRICS && (
                       <button
                         type="button"

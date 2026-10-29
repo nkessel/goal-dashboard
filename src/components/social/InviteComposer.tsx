@@ -5,29 +5,87 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 
 const DRAFT_KEY = "invite-draft";
 
-/** Ready-made invites to start from; {name} becomes your first name. */
-const STARTERS: { key: string; label: string; text: (name: string | null) => string }[] = [
+/** Ready-made invites to start from, a few wordings per theme; {name} becomes your first name. */
+type Name = string | null;
+const STARTERS: { key: string; label: string; texts: ((name: Name) => string)[] }[] = [
   {
     key: "warm",
     label: "Warm",
-    text: (n) => `Hey! ${n ? `It's ${n}. ` : ""}I've been using Goal Dashboard to keep up with my goals, and I'd love to have you in my party. We can cheer each other on and see each other's wins. Join me?`,
+    texts: [
+      (n) => `Hey! ${n ? `It's ${n}. ` : ""}I've been using Goal Dashboard to keep up with my goals, and I'd love to have you in my party. We can cheer each other on and see each other's wins. Join me?`,
+      (n) => `Hi friend! ${n ? `${n} here. ` : ""}I'd love to share my goals with you, and hear about yours. Come join my party on Goal Dashboard so we can root for each other?`,
+      () => `Thinking of you! I've started tracking my goals on Goal Dashboard and it would mean a lot to have you along. Want to join my party?`,
+      () => `You're one of the people I'd most like in my corner. Join my little party on Goal Dashboard? We'll see each other's wins and send cheers along the way.`,
+    ],
   },
   {
     key: "quest",
     label: "Quest call",
-    text: (n) => `Hail, friend! ${n ? `${n} seeks` : "I seek"} a companion for the road ahead. Join my party on Goal Dashboard, take on quests beside me, and let's celebrate every victory together. ⚔️`,
+    texts: [
+      (n) => `Hail, friend! ${n ? `${n} seeks` : "I seek"} a companion for the road ahead. Join my party on Goal Dashboard, take on quests beside me, and let's celebrate every victory together. ⚔️`,
+      () => `A quest awaits, and no hero travels alone. Will you join my party on Goal Dashboard? Dragons to slay, treasures to claim, victories to cheer. 🐉`,
+      (n) => `By lantern and by map, ${n ? `${n} calls` : "I call"} you to adventure! Join my party on Goal Dashboard and let's level up together. 🗺️`,
+      () => `The tavern's warm and the quest board is full. Pull up a chair and join my party on Goal Dashboard, adventurer? 🍻`,
+    ],
   },
   {
     key: "accountability",
     label: "Keep me going",
-    text: () => `I'm working on some big goals and could use a friend to keep me honest. Would you join my party on Goal Dashboard? We'd see each other's progress and can send a cheer when one of us needs it.`,
+    texts: [
+      () => `I'm working on some big goals and could use a friend to keep me honest. Would you join my party on Goal Dashboard? We'd see each other's progress and can send a cheer when one of us needs it.`,
+      () => `I do better with a buddy. Would you be my accountability partner on Goal Dashboard? We'll see each other's progress and nudge each other along.`,
+      () => `Small steps, every day, is my plan. Would you join my party on Goal Dashboard to help me keep going (and let me cheer you on too)?`,
+      () => `Want to keep each other on track? Join my party on Goal Dashboard: we'll see each other's streaks and wins, no pressure, just support.`,
+    ],
+  },
+  {
+    key: "grow",
+    label: "Grow together",
+    texts: [
+      () => `I'd love for us to grow together. Join my party on Goal Dashboard and let's set some intentions, take small steps and celebrate how far we come. 🌱`,
+      () => `What would you love to make happen this season? Let's do it side by side: join my party on Goal Dashboard. 🌿`,
+      () => `Growth is better shared. Come be part of my party on Goal Dashboard, and we'll water each other's goals. 🌻`,
+      () => `Let's become who we're becoming, together. Join my party on Goal Dashboard? 🌱`,
+    ],
+  },
+  {
+    key: "playful",
+    label: "Playful",
+    texts: [
+      () => `Psst. I turned my to-do list into a game and it's weirdly working. Want to play with me? Join my party on Goal Dashboard. 🎲`,
+      () => `New multiplayer game unlocked: real life. Join my party on Goal Dashboard and let's rack up some XP. 🎮`,
+      () => `I'm collecting XP for doing the dishes now. Come join my party on Goal Dashboard and judge me (lovingly). 😄`,
+      () => `Level up with me? Goal Dashboard turns goals into quests, and I need a party. 🏆`,
+    ],
   },
   {
     key: "short",
     label: "Short",
-    text: () => `Join my party on Goal Dashboard? 🌟`,
+    texts: [() => `Join my party on Goal Dashboard? 🌟`, () => `Quest with me? 🗡️`, () => `Come cheer me on (and let me cheer you)! 🎉`, () => `Join my party? ✨`],
   },
 ];
+
+const PICKS_KEY = "invite-theme-picks";
+/** The wording you last ended on for each theme: it opens on that one next time. */
+function readPicks(): Record<string, number> {
+  try {
+    const v = JSON.parse(localStorage.getItem(PICKS_KEY) ?? "{}");
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+function savePick(key: string, i: number) {
+  try {
+    localStorage.setItem(PICKS_KEY, JSON.stringify({ ...readPicks(), [key]: i }));
+  } catch {
+    /* not kept in a private window */
+  }
+}
+const textOf = (key: string, i: number, name: Name) => {
+  const s = STARTERS.find((x) => x.key === key)!;
+  return s.texts[((i % s.texts.length) + s.texts.length) % s.texts.length](name);
+};
 
 function readDraft(): string | null {
   try {
@@ -54,7 +112,10 @@ function saveDraft(text: string | null) {
 export function InviteComposer({ url, inviterName, canShare, theme, onClose }: { url: string; inviterName: string | null; canShare: boolean; theme: "calm" | "adventure"; onClose: () => void }) {
   const isAdventure = theme === "adventure";
   const [starter, setStarter] = useState<string | null>(() => (readDraft() === null ? STARTERS[0].key : null));
-  const [text, setText] = useState(() => readDraft() ?? STARTERS[0].text(inviterName));
+  const [text, setText] = useState(() => readDraft() ?? textOf(STARTERS[0].key, readPicks()[STARTERS[0].key] ?? 0, inviterName));
+  // Which wording of the theme is showing, and the ones before it (to go back to).
+  const [variant, setVariant] = useState(() => readPicks()[STARTERS[0].key] ?? 0);
+  const [history, setHistory] = useState<number[]>([]);
   const [copied, setCopied] = useState(false);
   const full = `${text.trim()}\n\n${url}`;
   const subject = `${inviterName ? `${inviterName} invited you` : "You're invited"} to join a party on Goal Dashboard`;
@@ -66,9 +127,34 @@ export function InviteComposer({ url, inviterName, canShare, theme, onClose }: {
   }
 
   function pick(key: string) {
-    const s = STARTERS.find((x) => x.key === key)!;
-    setText(s.text(inviterName));
+    const i = readPicks()[key] ?? 0;
+    setText(textOf(key, i, inviterName));
     setStarter(key);
+    setVariant(i);
+    setHistory([]);
+    saveDraft(null);
+  }
+
+  /** A new wording for the chosen theme (the one you end on becomes that theme's default). */
+  function another() {
+    const key = starter ?? STARTERS[0].key;
+    const n = STARTERS.find((x) => x.key === key)!.texts.length;
+    const i = (variant + 1) % n;
+    setHistory((h) => [...h, variant]);
+    show(key, i);
+  }
+  function back() {
+    const key = starter ?? STARTERS[0].key;
+    const prev = history[history.length - 1];
+    if (prev === undefined) return;
+    setHistory((h) => h.slice(0, -1));
+    show(key, prev);
+  }
+  function show(key: string, i: number) {
+    setText(textOf(key, i, inviterName));
+    setStarter(key);
+    setVariant(i);
+    savePick(key, i);
     saveDraft(null);
   }
 
@@ -127,18 +213,38 @@ export function InviteComposer({ url, inviterName, canShare, theme, onClose }: {
             })}
           </div>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="invite-text" className="text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
               Your message (change anything)
-            </span>
-            <textarea
-              value={text}
-              onChange={(e) => edit(e.target.value.slice(0, 1000))}
-              rows={5}
-              className="rounded-xl border px-3 py-2.5 text-[15.5px] leading-snug"
-              style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.55)", color: "var(--t-ink)", resize: "vertical" }}
-            />
-          </label>
+            </label>
+            <div className="relative">
+              <textarea
+                id="invite-text"
+                value={text}
+                onChange={(e) => edit(e.target.value.slice(0, 1000))}
+                rows={5}
+                className="block w-full rounded-xl border py-2.5 pl-3 pr-12 text-[15.5px] leading-snug"
+                style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.55)", color: "var(--t-ink)", resize: "vertical" }}
+              />
+              {/* Top right: another wording for this theme, and back to the one before. */}
+              <span className="absolute right-1.5 top-1.5 flex flex-col gap-1">
+                <button type="button" onClick={another} aria-label="Another wording for this theme" title="Another wording" className="hover-glow flex h-9 w-9 items-center justify-center rounded-full" style={goldBtn}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" />
+                    <path d="M19.8 3.8v4.6h-4.6" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {history.length > 0 && (
+                  <button type="button" onClick={back} aria-label="Back to the wording before" title="Undo" className="fade-in flex h-9 w-9 items-center justify-center rounded-full" style={outlineBtn}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M9 7H4.5V2.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M4.8 7A8 8 0 1 1 4 13" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
+              </span>
+            </div>
+          </div>
 
           <p className="m-0 flex min-w-0 items-center gap-1.5 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
             <span className="shrink-0">Your link goes at the end:</span>

@@ -307,7 +307,7 @@ async function InsightsView({ ownerId, card, cardStyle, h2 }: ViewProps) {
       <TrackingChart
         metrics={["Energy", ...metrics]}
         readings={[...energy.map((e) => ({ metric: "Energy", level: e.level, at: e.created_at })), ...checks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at }))]}
-        wins={wins.filter((w) => w.kind !== "feedback" && w.kind !== "journal").map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title }))}
+        wins={wins.filter((w) => w.kind !== "feedback" && w.kind !== "journal").map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null }))}
       />
     </section>
   );

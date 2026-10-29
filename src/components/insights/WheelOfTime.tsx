@@ -274,6 +274,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
           </button>
         </div>
         <span className="text-center text-[12.5px]" style={{ color: SOFT }}>
+          <span aria-hidden className="mr-1 text-[14px]" style={{ color: GOLD }}>☸</span>
           Turned forward <b style={{ color: GOLD }}>{turned.forward}</b> · back <b style={{ color: ROSE }}>{turned.back}</b>
         </span>
         <div className="mx-auto flex rounded-full p-0.5" role="group" aria-label="Which day" style={{ background: "rgba(0,0,0,.3)", border: "1px solid rgba(217,180,95,.35)" }}>
@@ -312,7 +313,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
             <ListEditor title="Right Effort" color={GOLD} items={state.effort} weights={state.weights} onChange={(effort) => saveSettings({ effort })} onWeight={(name, w) => saveSettings({ weights: { ...state.weights, [name]: w } })} />
             <ListEditor title="Hindrances" color={ROSE} items={state.hindrances} weights={state.weights} onChange={(hindrances) => saveSettings({ hindrances })} onWeight={(name, w) => saveSettings({ weights: { ...state.weights, [name]: w } })} />
             <span className="text-[12px] sm:col-span-2" style={{ color: SOFT }}>
-              The number beside each is how many marks one press turns the wheel. Changing it re-turns the wheel for every night it was logged. Nights already logged keep what was checked, even if you rename or remove something here.
+              The number beside each is how many turns one press gives the wheel. Changing it re-turns the wheel for every night it was logged. Nights already logged keep what was checked, even if you rename or remove something here.
             </span>
           </div>
         )}
@@ -453,8 +454,8 @@ function ListEditor({ title, color, items, weights, onChange, onWeight }: { titl
             <button type="button" onClick={() => onWeight(i, Math.max(1, weightOf(weights, i) - 1))} disabled={weightOf(weights, i) <= 1} aria-label={`Turn less for ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-bold hover:bg-white/10 disabled:opacity-30" style={{ color }}>
               −
             </button>
-            <span className="min-w-[2.6em] text-center text-[12.5px] font-bold tabular-nums" style={{ color }} title="Marks per press">
-              {weightOf(weights, i)} {weightOf(weights, i) === 1 ? "mark" : "marks"}
+            <span className="min-w-[2.6em] text-center text-[12.5px] font-bold tabular-nums" style={{ color }} title="Turns per press">
+              {weightOf(weights, i)} {weightOf(weights, i) === 1 ? "turn" : "turns"}
             </span>
             <button type="button" onClick={() => onWeight(i, Math.min(MAX_WEIGHT, weightOf(weights, i) + 1))} disabled={weightOf(weights, i) >= MAX_WEIGHT} aria-label={`Turn more for ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-bold hover:bg-white/10 disabled:opacity-30" style={{ color }}>
               +

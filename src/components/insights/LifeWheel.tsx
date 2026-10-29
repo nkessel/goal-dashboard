@@ -9,17 +9,26 @@ const INK = "#3b2a14";
 const INK_SOFT = "#6b5631";
 export const DEFAULT_WHEEL = ["Health", "Relationships", "Career", "Money", "Fun", "Growth", "Home", "Spirit"];
 const R = 120;
+// Room around the wheel for the area names, so none is cut off.
+const VW = 440;
+const VH = 344;
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 /**
  * The life wheel: one spoke per area of life. Drag a point along its spoke
  * (or use the sliders) to say how that area feels right now, then check in.
  * Your last check-in shows faintly behind, so you can see what moved.
+ * Markers start grey (at your last value) and turn gold once you set them;
+ * only the ones you set are saved. While you drag, the value shows large
+ * above the wheel, clear of your thumb.
  */
 export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; last: Record<string, { level: number; at: string }> }) {
   const router = useRouter();
   const [topics] = useState(initialTopics.length ? initialTopics : DEFAULT_WHEEL);
-  const [vals, setVals] = useState<Record<string, number>>(() => Object.fromEntries((initialTopics.length ? initialTopics : DEFAULT_WHEEL).map((t) => [t, last[t.slice(0, 20)]?.level ?? 5])));
+  // Only what you've set this time; the rest sit grey at their last value.
+  const [vals, setVals] = useState<Record<string, number>>({});
+  const [active, setActive] = useState<string | null>(null);
+  const shown = (t: string) => vals[t] ?? last[t.slice(0, 20)]?.level ?? 5;
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -49,8 +58,8 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
   function at(e: React.PointerEvent) {
     const el = svg.current!;
     const r = el.getBoundingClientRect();
-    const scale = r.width / 320;
-    return { x: (e.clientX - r.left) / scale - 160, y: (e.clientY - r.top) / scale - 160 };
+    const scale = r.width / VW;
+    return { x: (e.clientX - r.left) / scale - VW / 2, y: (e.clientY - r.top) / scale - VH / 2 };
   }
   function dragTo(e: React.PointerEvent) {
     const t = dragging.current;
@@ -77,6 +86,7 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
       }
     });
     dragging.current = topics[best];
+    setActive(topics[best]);
     e.currentTarget.setPointerCapture(e.pointerId);
     dragTo(e);
   }
@@ -84,8 +94,9 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
     setError(null);
     start(async () => {
       try {
-        await saveLifeWheelAction(topics.map((t) => ({ topic: t, level: vals[t] ?? 5 })));
+        await saveLifeWheelAction(topics.filter((t) => vals[t] !== undefined).map((t) => ({ topic: t, level: vals[t] })));
         setSaved(new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
+        setVals({});
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
@@ -95,28 +106,43 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
 
   return (
     <div className="flex flex-col gap-3">
+      {/* The value being set, large and above the wheel (a thumb covers the marker itself). */}
+      <p className="m-0 flex h-8 items-center justify-center gap-2 text-[15px]" style={{ color: INK }} aria-live="polite">
+        {active ? (
+          <>
+            <span className="font-semibold">{active}</span>
+            <b className="font-display rounded-full px-3 text-[22px] tabular-nums leading-8" style={{ background: "#f2d27e", border: "1.5px solid #5a3e12", color: "#2a1c10" }}>
+              {fmt(shown(active))}
+            </b>
+          </>
+        ) : (
+          <span className="text-[13px]" style={{ color: INK_SOFT }}>
+            {Object.keys(vals).length ? `${Object.keys(vals).length} of ${n} set · grey ones are still to go` : "Grey markers are still to set"}
+          </span>
+        )}
+      </p>
       <div className="flex justify-center">
         <svg
           ref={svg}
-          viewBox="-160 -160 320 320"
-          className="w-full max-w-[340px] touch-none select-none"
+          viewBox={`${-VW / 2} ${-VH / 2} ${VW} ${VH}`}
+          className="w-full max-w-[440px] touch-none select-none"
           role="img"
           aria-label="Life wheel"
           onPointerDown={grab}
           onPointerMove={dragTo}
-          onPointerUp={() => (dragging.current = null)}
-          onPointerCancel={() => (dragging.current = null)}
+          onPointerUp={() => ((dragging.current = null), setActive(null))}
+          onPointerCancel={() => ((dragging.current = null), setActive(null))}
         >
           {[2, 4, 6, 8, 10].map((r) => (
             <circle key={r} r={(r / 10) * R} fill={r === 10 ? "rgba(255,250,235,.55)" : "none"} stroke="rgba(110,85,40,.25)" strokeWidth={r === 10 ? 1.4 : 0.8} />
           ))}
           {topics.map((t, i) => {
             const [x, y] = pt(i, 10);
-            const [lx, ly] = pt(i, 11.9);
+            const [lx, ly] = pt(i, 11.7);
             return (
               <g key={t}>
                 <line x1="0" y1="0" x2={x} y2={y} stroke="rgba(110,85,40,.3)" strokeWidth=".8" />
-                <text x={lx} y={ly} textAnchor={Math.abs(lx) < 8 ? "middle" : lx > 0 ? "start" : "end"} dominantBaseline="middle" fontSize={n > 8 ? 10 : 11.5} fontWeight="600" fill={INK}>
+                <text x={lx} y={ly} textAnchor={Math.abs(lx) < 8 ? "middle" : lx > 0 ? "start" : "end"} dominantBaseline="middle" fontSize={n > 8 ? 11.5 : 13} fontWeight="600" fill={INK} stroke="rgba(246,236,210,.9)" strokeWidth="3" paintOrder="stroke">
                   {splitLabel(t).map((part, k, all) => (
                     <tspan key={k} x={lx} dy={k === 0 ? `${-(all.length - 1) * 0.55}em` : "1.1em"}>
                       {part}
@@ -127,17 +153,18 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
             );
           })}
           {hasLast && <polygon points={poly((t) => last[t.slice(0, 20)]?.level)} fill="rgba(110,85,40,.08)" stroke="rgba(110,85,40,.45)" strokeWidth="1.2" strokeDasharray="3 3" />}
-          <polygon points={poly((t) => vals[t])} fill="rgba(217,180,95,.35)" stroke="#a8761c" strokeWidth="2" strokeLinejoin="round" />
+          {Object.keys(vals).length > 0 && <polygon points={poly((t) => vals[t])} fill="rgba(217,180,95,.35)" stroke="#a8761c" strokeWidth="2" strokeLinejoin="round" />}
           {topics.map((t, i) => {
-            const [x, y] = pt(i, vals[t] ?? 5);
-            const [vx, vy] = pt(i, Math.min(10, (vals[t] ?? 5) + 1.3));
+            const set = vals[t] !== undefined;
+            const [x, y] = pt(i, shown(t));
+            const [vx, vy] = pt(i, Math.min(10, shown(t) + 1.3));
             return (
               <g key={t} style={{ cursor: 'url("/design/cursor-grab.svg") 13 12, grab' }}>
                 {/* A generous, invisible grip around each marker for fingers. */}
                 <circle cx={x} cy={y} r="18" fill="transparent" />
-                <circle cx={x} cy={y} r="8.5" fill="#f2d27e" stroke="#5a3e12" strokeWidth="1.6" />
-                <text x={vx} y={vy} textAnchor="middle" dominantBaseline="middle" fontSize="10" fontWeight="700" fill="#5a3e12" style={{ pointerEvents: "none" }}>
-                  {fmt(vals[t] ?? 5)}
+                <circle cx={x} cy={y} r="8.5" fill={set ? "#f2d27e" : "#cfc6b4"} stroke={set ? "#5a3e12" : "#8a8170"} strokeWidth="1.6" />
+                <text x={vx} y={vy} textAnchor="middle" dominantBaseline="middle" fontSize="10" fontWeight="700" fill={set ? "#5a3e12" : "#8a8170"} style={{ pointerEvents: "none" }}>
+                  {fmt(shown(t))}
                 </text>
               </g>
             );
@@ -151,7 +178,7 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={checkIn} disabled={pending} className="hover-glow h-10 rounded-full px-5 text-[14.5px] font-bold disabled:opacity-60" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+        <button type="button" onClick={checkIn} disabled={pending || !Object.keys(vals).length} className="hover-glow h-10 rounded-full px-5 text-[14.5px] font-bold disabled:opacity-60" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
           {pending ? "Saving…" : "Check in the wheel"}
         </button>
         <span className="text-[12.5px]" style={{ color: INK_SOFT }}>
@@ -166,7 +193,7 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
 
 /** Long area names go on two lines (split near the middle, at a space). */
 function splitLabel(t: string): string[] {
-  if (t.length <= 12 || !t.includes(" ")) return [t];
+  if (t.length <= 10 || !t.includes(" ")) return [t];
   const mid = t.length / 2;
   let best = -1;
   for (let i = 0; i < t.length; i++) if (t[i] === " " && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
