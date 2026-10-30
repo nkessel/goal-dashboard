@@ -2824,6 +2824,20 @@ export async function saveInventoryAction(inventory: unknown) {
   return clean;
 }
 
+// ---------------------------------------------------------------------------
+// Mess check-in: spaces, laundry bin and chore deck for the cleaning habit
+
+export async function saveCleaningAction(cleaning: unknown) {
+  const ownerId = await requireProfileId();
+  const { normalizeCleaning } = await import("@/lib/cleaning");
+  const clean = normalizeCleaning(cleaning);
+  if (!clean) throw new Error("Nothing to save.");
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, cleaning: clean } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return clean;
+}
+
 /** Paint an inventory item's portrait (from its name, or your own description of the picture). */
 export async function paintInventoryItemAction(name: string, description?: string | null): Promise<string> {
   const ownerId = await requireProfileId();

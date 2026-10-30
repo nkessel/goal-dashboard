@@ -200,7 +200,7 @@ export default async function Home() {
               theme={theme}
               between={
                 habits && rites?.some((r) => "slot" in r) ? (
-                  <DailyHabits habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} theme={theme} />
+                  <DailyHabits habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} />
                 ) : null
               }
             />

@@ -15,8 +15,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 | # | Work | State | Next step |
 |---|---|---|---|
 | 1 | **Ship pending in-app feedback** | Ready | Run the feedback loop in section 3. Last batch shipped Oct 29 02:37 UTC. |
-| 2 | **Mess check-in for the 20-min cleaning habit** ("Mess weather") | Owner deciding the final shape | Proposed: one-tap calm/cloudy/stormy rating per space; the messiest becomes today's 20-min focus. Plus a style picker in Settings (weather, jars, garden, critters, piles), spaces Desk, Art desk, Bedside box + clothing, Bathroom, **Kitchen**, and "+ Add a space"; a 🧺 laundry bin fill gauge that predicts the next load; a **chore deck** (vacuum, sheets, fridge, dust, recycling, each "every N days") that feeds due chores into the 20-min pick. Build once the owner says go. |
-| 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
+| 2 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
 
 **Open questions for the owner** (ask when relevant, don't block on them):
 - "Allow editing of quests here" on Tomorrow's Quests: tapping a name already opens the editor. Do they want editing in place?
@@ -110,7 +109,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
-- Oct 30: Bring from home: a gilded button on the backpack's right opens a side-drawer packing list (place name, tick-offs, clear packed or keep for next time). Stored in `life_wheel.inventory.bring`; the owner's list starts with Coconut milk and Energy tinctures for Natick until first saved (`withOwnerBringSeed` in `lib/inventory.ts`).
+- Oct 30: Mess check-in under the "20 mins of house cleaning" habit (`components/habits/CleaningCheckIn.tsx`, `lib/cleaning.ts`, stored in `life_wheel.cleaning`): today's 20-min pick from the messiest space, a due laundry load or a due chore; Spaces (one-tap rating, 5 styles also in Settings › Mess check-in, custom spaces, optional drift), Laundry bin fill with next-load prediction, Chore deck with snooze (day, week, custom). Bring from home: a gilded button on the backpack's right opens a side-drawer packing list (place name, tick-offs, clear packed or keep for next time). Stored in `life_wheel.inventory.bring`; the owner's list starts with Coconut milk and Energy tinctures for Natick until first saved (`withOwnerBringSeed` in `lib/inventory.ts`).
 - Oct 30: Welcome screen settings in context: its gear arranges the screen in place (each part gets show/hide, up/down and its own options where it sits; a strip on top for when it opens, the castle and confetti; greetings under the heading). `src/components/xp/WelcomeArrange.tsx`; the wise-line and greeting lists moved to `settings/LineLists.tsx`. Settings › Welcome Screen still has the same controls.
 - Oct 30: AR class homework now stands for the Mastering Facilitation board (follows the current week's quest and its due date; tapping "Now: Week …" on the card opens that board).
 - Oct 30: AR class (Mastering Facilitation) due dates moved back one week, old values and undo in `docs/data-changes/2026-10-30-mastering-facilitation-due-dates.md`.

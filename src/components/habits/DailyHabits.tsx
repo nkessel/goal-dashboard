@@ -13,6 +13,8 @@ import { FocusMode, habitAsTask } from "@/components/one-thing/OneThing";
 import { CoinIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
 import { fromFeedback } from "@/lib/from-feedback";
+import { defaultCleaning, normalizeCleaning } from "@/lib/cleaning";
+import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
 
 /**
  * Daily habits: small repeating quests on the day side (stored like evening
@@ -25,8 +27,11 @@ export function DailyHabits({
   completions,
   skips = [],
   stepChecks = [],
+  cleaning: cleaningRaw = null,
   theme,
 }: {
+  /** The mess check-in (spaces, laundry, chores) shown under the cleaning habit. */
+  cleaning?: unknown;
   /** Sub-habit ticks for the last couple of days. */
   stepChecks?: { rite_id: string; step_id: string; day: string }[];
   habits: RiteView[];
@@ -125,6 +130,9 @@ export function DailyHabits({
 
   // One stable quest-shaped copy of the habit while focus mode is open.
   const focusTask = useMemo(() => (focusing && day ? habitAsTask(focusing, day) : null), [focusing, day]);
+  // The mess check-in sits under the cleaning habit (the first with "clean" in its name).
+  const cleaning = useMemo(() => (day ? (normalizeCleaning(cleaningRaw) ?? defaultCleaning(day)) : null), [cleaningRaw, day]);
+  const cleanId = cleaning ? (cleaning.habitId && habits.some((h) => h.id === cleaning.habitId) ? cleaning.habitId : (habits.find((h) => /clean/i.test(h.title))?.id ?? null)) : null;
 
   const byId = new Map(habits.map((h) => [h.id, h]));
   const ordered = (order ?? habits.map((h) => h.id)).map((id) => byId.get(id)).filter((h): h is RiteView => !!h);
@@ -610,6 +618,7 @@ export function DailyHabits({
                     })}
                   </ul>
                 )}
+                {cleaning && day && h.id === cleanId && <CleaningCheckIn key={day} initial={cleaning} day={day} habitDone={d} isAdventure={isAdventure} />}
                 </SortableHabit>
               );
             })}
