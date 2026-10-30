@@ -17,6 +17,7 @@ import { useEscape } from "@/lib/use-escape";
 import { addJournalEntryAction, setTopPriorityAction } from "@/app/actions";
 import { PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
 import { SettingsGear } from "@/components/ui/SettingsGear";
+import { MistScene } from "./MistScene";
 
 export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
 
@@ -221,22 +222,26 @@ export function WelcomeCard({
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
-    <div className={`fixed inset-0 ${preview ? "z-[95]" : "z-[60]"} flex items-center justify-center bg-black/40 p-3`} onClick={onClose} role="dialog" aria-modal="true" aria-label={heading}>
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
+    <div className={`fixed inset-0 ${preview ? "z-[95]" : "z-[60]"} flex items-center justify-center p-3`} onClick={onClose} role="dialog" aria-modal="true" aria-label={heading}>
+      {/* A misty valley, and the card coming out of the mist. */}
+      <MistScene />
+      <div className="mist-emerge relative" onClick={(e) => e.stopPropagation()}>
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
               <span
                 key={i}
                 className="pc-confetti absolute block"
-                style={{ width: p.round ? 8 : 7, height: p.round ? 8 : 12, marginLeft: -4, marginTop: -5, borderRadius: p.round ? 999 : 2, background: p.color, "--dx": `${p.dx}px`, "--dy": `${p.dy}px`, "--rot": `${p.rot}deg`, animationDelay: `${p.delay}ms` } as React.CSSProperties}
+                style={{ width: p.round ? 8 : 7, height: p.round ? 8 : 12, marginLeft: -4, marginTop: -5, borderRadius: p.round ? 999 : 2, background: p.color, "--dx": `${p.dx}px`, "--dy": `${p.dy}px`, "--rot": `${p.rot}deg`, animationDelay: `${p.delay + 1300}ms` } as React.CSSProperties}
               />
             ))}
           </div>
         )}
+        {/* A soft light around the card, where the mist has thinned. */}
+        <span aria-hidden className="pointer-events-none absolute -inset-12" style={{ background: "radial-gradient(ellipse at center, rgba(255,250,240,.5), rgba(255,250,240,0) 70%)" }} />
         {/* What shows here, and in what order, is chosen in Settings. */}
-        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeLeave={onClose} className="pc-card absolute -right-2 -top-2 z-[2]" />
-        <div className="pc-card parchment relative flex max-h-[88vh] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center">
+        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeLeave={onClose} className="absolute -right-2 -top-2 z-[2]" />
+        <div className="parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[88vh] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center">
           <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
             {heading}
             {mode === "back" && !addingPhrase && (

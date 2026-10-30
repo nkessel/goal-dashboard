@@ -1092,6 +1092,46 @@ html[data-evening] [data-theme="adventure"] {
   .pc-confetti { display: none; }
 }
 
+/* ── The welcome screen's mist ────────────────────────────────────────
+   A veil of mist parts, the ridges rise far to near, and the card comes
+   into focus out of it. The mist between the ridges keeps drifting. */
+.mist-emerge { animation: mist-emerge 1.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.55s both; }
+@keyframes mist-emerge {
+  0% { opacity: 0; filter: blur(14px); transform: translateY(22px) scale(0.96); }
+  55% { opacity: 1; }
+  100% { opacity: 1; filter: blur(0); transform: none; }
+}
+.mist-veil-wash { animation: mist-fade 1.6s ease-out 0.1s both; }
+@keyframes mist-fade { from { opacity: 1; } to { opacity: 0; } }
+.mist-veil { opacity: 0; animation: mist-part 2.8s cubic-bezier(0.4, 0, 0.2, 1) both; }
+@keyframes mist-part {
+  0% { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(var(--dx)) scale(1.35); }
+}
+.mist-rise { animation: mist-rise 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes mist-rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+.mist-rise-side { animation: mist-rise 2.2s cubic-bezier(0.2, 0.7, 0.2, 1) 1.1s both; }
+.mist-drift { animation: mist-drift linear infinite; }
+.mist-drift-rev { animation: mist-drift linear infinite reverse; }
+@keyframes mist-drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.mist-rays { transform: translate(-50%, -50%); animation: mist-turn 160s linear infinite; }
+@keyframes mist-turn { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.mist-star { animation: mist-twinkle 4s ease-in-out infinite; }
+@keyframes mist-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.95; } }
+.mist-mote { opacity: 0; animation: mist-mote ease-in-out infinite; }
+@keyframes mist-mote {
+  0% { opacity: 0; transform: translate(0, 0); }
+  25% { opacity: 0.9; }
+  75% { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(18px, -90px); }
+}
+.mist-birds { animation: mist-birds 46s linear 1.5s infinite; transform: translateX(-140px); }
+@keyframes mist-birds { from { transform: translateX(-140px) translateY(0); } 50% { transform: translateX(50vw) translateY(-14px); } to { transform: translateX(105vw) translateY(4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .mist-emerge, .mist-rise, .mist-rise-side, .mist-drift, .mist-drift-rev, .mist-rays, .mist-star, .mist-birds { animation: none; }
+  .mist-veil, .mist-veil-wash, .mist-mote { display: none; }
+}
+
 /* Quest steps in the editor: the remove × appears on hover where hover exists. */
 @media (hover: hover) {
   .quest-step .step-remove { opacity: 0; }
