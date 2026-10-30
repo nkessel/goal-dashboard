@@ -564,35 +564,60 @@ function TopPriority({ last, question, register }: { last: { text: string; other
   };
   // Saved by the screen's own button on the way out (no Save of its own).
   useEffect(() => register(() => (saved && !editing ? Promise.resolve(true) : save(text, filled))));
-  if (saved && !editing)
+  const edit = () => {
+    if (!saved) return;
+    setText(saved.text);
+    setOthers([...saved.others, ""]);
+    setOthersOpen(saved.others.length > 0);
+    setEditing(true);
+  };
+  if (saved && !editing) {
+    // One item per line you wrote; long words and links wrap instead of running off the card.
+    const lines = saved.text.split("\n").filter((l) => l.trim());
     return (
-      <div className="flex w-full flex-col items-center gap-0.5">
-        <span className="text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
-          Top priority
-        </span>
-        <p className="m-0 text-[16px] leading-snug" style={{ color: "var(--t-ink)" }}>
-          {saved.text}{" "}
-          <button
-            type="button"
-            onClick={() => {
-              setText(saved.text);
-              setOthers([...saved.others, ""]);
-              setOthersOpen(saved.others.length > 0);
-              setEditing(true);
-            }}
-            className="text-[12.5px] underline underline-offset-2"
-            style={{ color: "#6b5631" }}
-          >
-            Change
-          </button>
-        </p>
+      <div className="flex w-full min-w-0 flex-col gap-1">
+        <div className="relative flex items-center justify-center">
+          <span className="text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
+            Top priority
+          </span>
+          <span className="absolute right-0 top-1/2 -translate-y-1/2">
+            <EditButton open={false} onClick={edit} label="Change top priority" />
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={edit}
+          aria-label={`Top priority: ${lines.join("; ")}. Change`}
+          className="font-display flex min-h-[44px] w-full min-w-0 flex-col gap-1.5 rounded-xl px-3 py-2 text-left text-[17px] font-medium leading-snug [overflow-wrap:anywhere] transition-colors hover:bg-[rgba(217,180,95,.12)]"
+          style={{ background: "rgba(255,250,238,.55)", border: "1px solid rgba(179,154,106,.55)", color: "var(--t-ink)" }}
+        >
+          {lines.map((l, i) => (
+            <span key={i} className="flex min-w-0 items-start gap-2">
+              {lines.length > 1 && (
+                <span aria-hidden className="mt-[.45em] h-2 w-2 shrink-0 rotate-45" style={{ background: "#c9a24a" }} />
+              )}
+              <span className="min-w-0 flex-1">{l}</span>
+            </span>
+          ))}
+        </button>
         {saved.others.length > 0 && (
-          <p className="m-0 text-[13.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
-            Also, when there&rsquo;s space: {saved.others.join(" · ")}
-          </p>
+          <div className="mt-0.5 flex w-full min-w-0 flex-col gap-0.5 px-1 text-left [overflow-wrap:anywhere]">
+            <span className="text-[12px] font-semibold" style={{ color: "#8a6116" }}>
+              When there&rsquo;s space
+            </span>
+            <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+              {saved.others.map((o, i) => (
+                <li key={i} className="flex min-w-0 items-start gap-2 text-[14.5px] leading-snug" style={{ color: "#5a4a30" }}>
+                  <span aria-hidden className="mt-[.5em] h-1.5 w-1.5 shrink-0 rotate-45 border" style={{ borderColor: "#b08a3a" }} />
+                  <span className="min-w-0 flex-1">{o}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     );
+  }
   return (
     <form
       className="flex w-full flex-col gap-1.5 text-left"
@@ -688,7 +713,7 @@ function TopPriority({ last, question, register }: { last: { text: string; other
             className="min-h-8 rounded-full px-3 text-left text-[13px] disabled:opacity-60"
             style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}
           >
-            Same as before: &ldquo;{earlier.text}&rdquo;
+            Same as before: &ldquo;{earlier.text.replace(/\n+/g, " · ")}&rdquo;
           </button>
         )}
       </div>

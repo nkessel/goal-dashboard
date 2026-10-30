@@ -2088,7 +2088,13 @@ function cleanPriorities(raw: unknown): Priority[] {
 /** Your top priority for today, from the welcome screen. The toucan keeps it in mind through the day, the week and the month. */
 export async function setTopPriorityAction(text: string, othersIn: string[] = []) {
   const ownerId = await requireProfileId();
-  const t = String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+  // Keeps your line breaks (one priority per line, if you like); tidies spaces within each line.
+  const t = String(text ?? "")
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 400);
   const others = [...new Set((Array.isArray(othersIn) ? othersIn : []).map((o) => String(o ?? "").replace(/\s+/g, " ").trim().slice(0, 160)).filter(Boolean))].slice(0, 8);
   if (!t) throw new Error("Write your top priority first.");
   const extras = await readExtras(ownerId);
@@ -3141,7 +3147,7 @@ export async function coachAction(message: string, lite = false, liteHistory: { 
     priorities: cleanPriorities(extras.priorities)
       .filter((p) => Date.parse(p.at) > now.getTime() - 35 * 86_400_000)
       .slice(0, 12)
-      .map((p, i) => `- ${p.day === tomorrowData.appDayKey() ? "Today" : new Date(`${p.day}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}${i === 0 ? " (latest)" : ""}: ${p.text}${p.others?.length ? ` · other priorities: ${p.others.join("; ")}` : ""}`),
+      .map((p, i) => `- ${p.day === tomorrowData.appDayKey() ? "Today" : new Date(`${p.day}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}${i === 0 ? " (latest)" : ""}: ${p.text.replace(/\n+/g, "; ")}${p.others?.length ? ` · other priorities: ${p.others.join("; ")}` : ""}`),
   });
   // The app's owner asking to build their feedback: the app starts that build (a card shows it).
   const ship = !lite && asksToShip(text) && (await feedbackData.isAdmin(ownerId)) ? await (await import("@/lib/data/feedback-run")).pendingFeedback(ownerId) : null;

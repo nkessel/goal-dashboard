@@ -61,8 +61,8 @@ export function DueSoonDrawer({ tasks, onOpenChange }: { tasks: Lite[]; onOpenCh
           </svg>
           Due soon
           <span className="tabular-nums opacity-80">({soon.length})</span>
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(90deg)" : undefined }}>
-            <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : undefined }}>
+            <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
         <span aria-hidden className="my-1.5 w-px" style={{ background: "rgba(74,57,19,.45)" }} />
