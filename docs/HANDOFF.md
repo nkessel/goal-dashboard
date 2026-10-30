@@ -112,7 +112,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
-- Oct 30: Welcome screen out of the mist (signpost check-in, fairytale castle, birds, toucan lands on welcome back, single greetings list); Due soon look-ahead setting and ranking; folded Settings groups show their value; stand-in quests keep their own due date; Check in button icons.
+- Oct 30: Welcome screen out of the mist (fairytale castle with 4 designs to pick in Settings › Welcome Screen › The castle, birds, toucan lands on welcome back, single greetings list, fog hides Today from first paint, dive into the forest on Continue; signpost removed); Due soon look-ahead setting and ranking; folded Settings groups show their value; stand-in quests keep their own due date; Check in button icons.
 - Oct 29: Feedback batches (check-in card, invite wording themes, life wheel readout, Insights XP columns and pinch zoom); dreams cloud on boards; invite popup; toucan "Not now" snoozes; welcome screen top priority.
 - Oct 28: Gear shortcuts and settings popups; sleep and wake log on the Wheel of Time; toucan-started feedback builds; toucan creates entries on command.
 - Oct 27: Daily check-in returns until closed; quest editor folds (steps, scheduling, Advanced); board chip and picker.

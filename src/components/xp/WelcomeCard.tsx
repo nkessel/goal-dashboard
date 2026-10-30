@@ -18,6 +18,7 @@ import { addJournalEntryAction, setTopPriorityAction } from "@/app/actions";
 import { PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import { MistScene } from "./MistScene";
+import { castleOf } from "./CastleArt";
 
 export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
 
@@ -231,16 +232,13 @@ export function WelcomeCard({
   const order = welcomeOrder(fx).filter((el) => welcomeShows(fx, el) && parts[el]);
   // Not checked in yet? "Not now" offers to ask again later, or to skip it for today.
   const snoozable = !!onSnooze && !checkedIn && order.includes("checkin");
-  // The check-in signpost greets the day's first visit (not welcome back).
-  const post = mode === "day";
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
     <div className={`fixed inset-0 ${preview ? "z-[95]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={leave} role="dialog" aria-modal="true" aria-label={heading}>
       {/* A misty valley, and the card coming out of the mist. */}
-      <MistScene leaving={leaving} />
-      <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative ${post ? "pt-[54px]" : ""}`} onClick={(e) => e.stopPropagation()}>
-        {post && <Signpost />}
+      <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} />
+      <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative`} onClick={(e) => e.stopPropagation()}>
         {mode === "back" && <WelcomeToucan />}
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
@@ -256,8 +254,8 @@ export function WelcomeCard({
         {/* A soft light around the card, where the mist has thinned. */}
         <span aria-hidden className="pointer-events-none absolute -inset-12" style={{ background: "radial-gradient(ellipse at center, rgba(255,250,240,.5), rgba(255,250,240,0) 70%)" }} />
         {/* What shows here, and in what order, is chosen in Settings. */}
-        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeLeave={preview ? onClose : undefined} className={`absolute -right-2 z-[2] ${post ? "top-[46px]" : "-top-2"}`} />
-        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${post ? "max-h-[calc(88vh-54px)]" : "max-h-[88vh]"} w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`}>
+        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeLeave={preview ? onClose : undefined} className="absolute -right-2 -top-2 z-[2]" />
+        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[88vh] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`}>
           <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
             {heading}
             {!preview && !addingPhrase && (
@@ -354,39 +352,6 @@ function WelcomeToucan() {
         </div>
       </div>
     </div>
-  );
-}
-
-/** The check-in signpost the card hangs from: one arm for here, one pointing on to town. */
-function Signpost() {
-  const wood = "url(#signpost-wood)";
-  return (
-    <svg aria-hidden width="230" height="64" viewBox="0 0 230 64" className="pointer-events-none absolute left-1/2 top-0 z-[1] -translate-x-1/2" style={{ filter: "drop-shadow(0 3px 4px rgba(30,20,10,.35))" }}>
-      <defs>
-        <linearGradient id="signpost-wood" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#9a6a3a" />
-          <stop offset=".55" stopColor="#7a5028" />
-          <stop offset="1" stopColor="#5c3a1c" />
-        </linearGradient>
-      </defs>
-      {/* The post, running down behind the card. */}
-      <rect x="108" y="2" width="14" height="62" rx="2" fill={wood} stroke="#3e2712" strokeWidth="1.2" />
-      <circle cx="115" cy="5" r="2" fill="#3e2712" opacity=".5" />
-      {/* Here: the check-in arm, pointing back at you. */}
-      <path d="M22,10 H120 V32 H22 L10,21 Z" fill={wood} stroke="#3e2712" strokeWidth="1.4" strokeLinejoin="round" />
-      <path d="M26,15 H114 M30,27 H110" stroke="#4a2f16" strokeWidth=".7" opacity=".45" />
-      <text x="66" y="25.5" textAnchor="middle" fontSize="12.5" fill="#f6e6bb" className="font-display" style={{ letterSpacing: ".06em" }}>
-        ✦ Check-in
-      </text>
-      {/* On to town. */}
-      <path d="M112,34 H208 L220,45 L208,56 H112 Z" fill={wood} stroke="#3e2712" strokeWidth="1.4" strokeLinejoin="round" />
-      <path d="M118,39 H204 M118,51 H202" stroke="#4a2f16" strokeWidth=".7" opacity=".45" />
-      <text x="162" y="49.5" textAnchor="middle" fontSize="12.5" fill="#f6e6bb" className="font-display" style={{ letterSpacing: ".06em" }}>
-        Town
-      </text>
-      <circle cx="116" cy="21" r="1.6" fill="#2e1c0c" />
-      <circle cx="116" cy="45" r="1.6" fill="#2e1c0c" />
-    </svg>
   );
 }
 

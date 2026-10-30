@@ -2,6 +2,7 @@
 
 import { FoldGroup } from "./FoldGroup";
 import { useEffect, useState, useRef } from "react";
+import { CASTLE_DESIGNS, CastleArt, castleOf } from "@/components/xp/CastleArt";
 import { CheckinIcon } from "@/components/xp/CheckinIcon";
 import { CHECKIN_ICONS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, checkinIconOf, checkinStyleOf, loadFx, saveFx, subscribeFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
@@ -123,6 +124,22 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           onToggle={(l, on) => update({ welcomeBackOff: on ? (fx.welcomeBackOff ?? []).filter((x) => x !== l) : [...(fx.welcomeBackOff ?? []), l] })}
         />
 
+          </div>
+        </FoldGroup>
+        <FoldGroup title="The castle" value={CASTLE_DESIGNS.find((d) => d.key === castleOf(fx.welcomeCastle))!.label}>
+          <div role="radiogroup" aria-label="The castle on the far hill" className="grid grid-cols-2 gap-1.5">
+            {CASTLE_DESIGNS.map((d) => (
+              <button key={d.key} type="button" role="radio" aria-checked={castleOf(fx.welcomeCastle) === d.key} onClick={() => update({ welcomeCastle: d.key })} className="flex flex-col items-center gap-1 rounded-xl px-2 py-2" style={{ border: castleOf(fx.welcomeCastle) === d.key ? "2px solid var(--t-gold-deep)" : "1px solid var(--t-card-border)" }}>
+                <svg aria-hidden viewBox="-80 -160 160 166" className="h-16 w-20 rounded-lg" style={{ background: "linear-gradient(180deg, #a9cbe6, #eef2ec)" }}>
+                  <path d="M-80,6 Q-30,-8 0,-2 T80,-4 V6 Z" fill="#7aa1a6" />
+                  <CastleArt design={d.key} colors={{ wall: "#f5f7f9", shade: "#c5d1dc", roof: "#4f7fb3", gold: "#e8c25c" }} />
+                </svg>
+                <span className="text-[13px] font-semibold">{d.label}</span>
+                <span className="text-center text-[11.5px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+                  {d.hint}
+                </span>
+              </button>
+            ))}
           </div>
         </FoldGroup>
         <FoldGroup title="What’s on it, and in what order">

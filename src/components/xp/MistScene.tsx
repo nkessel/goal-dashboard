@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { liftFog } from "@/lib/welcome-fog";
+import { CastleArt, type CastleDesign } from "./CastleArt";
 
 /**
  * The welcome screen's backdrop: a valley of layered mountains at the hour's
  * light (dawn, day, dusk or night), with mist drifting between the ridges. A
  * thick veil of mist covers it all as the screen opens, then parts, and the
- * ridges and the card rise out of it. A path winds from the check-in
- * signpost to a town on a far hill. Leaving, the valley fades first, then the
- * mist, layer by layer, to show the app beneath.
+ * ridges and the card rise out of it. A path winds from the foreground to
+ * a castle on a far hill (its design chosen in Settings). Leaving, the view
+ * dives into the forest and the mist rolls in, then thins to show the app.
  */
 export type MistTime = "dawn" | "day" | "dusk" | "night";
 
@@ -183,62 +184,10 @@ const SIDE_PINES = (() => {
   return d + "M-120,384 Q100,372 340,386 V400 H-120 Z";
 })();
 
-/**
- * The castle on the far hill: a curtain wall, round towers with flared
- * conical spires, a keep, and one tall central spire, each flying a pennant.
- * Drawn about its base centre (0, 0) and set in place on the second ridge.
- */
+/** Where the castle stands on the second ridge, and how large. */
 const CASTLE_X = 930;
 const CASTLE_Y = RIDGES[1][Math.round((CASTLE_X + 20) / 12)][1] + 8;
 const CASTLE_SCALE = 1.25;
-/** A round tower: x centre, width, wall height, spire height, from the ground at y. */
-const TOWERS: [number, number, number, number, number][] = [
-  [-58, 14, 40, 26, 0],
-  [58, 14, 40, 26, 0],
-  [-31, 15, 58, 34, 0],
-  [31, 15, 58, 34, 0],
-  [-13, 9, 74, 24, 0],
-  [13, 9, 74, 24, 0],
-  [0, 17, 90, 50, 0],
-];
-const CASTLE = (() => {
-  let walls = "";
-  let roofs = "";
-  let flags = "";
-  // The curtain wall and the keep, with battlements.
-  const battlements = (x0: number, x1: number, y: number) => {
-    let d = `M${x0},0 V${-y}`;
-    for (let x = x0; x < x1 - 0.1; x += 6) d += ` h2 v-3 h2 v3 h2`;
-    return d + ` V0 Z `;
-  };
-  walls += battlements(-58, 58, 22) + battlements(-24, 24, 54);
-  for (const [x, w, h, sh] of TOWERS) {
-    walls += `M${x - w / 2},0 V${-h} H${x + w / 2} V0 Z `;
-    const b = -h;
-    const half = w / 2 + 2.5;
-    // A flared cone: concave sides sweeping up to a needle point.
-    roofs += `M${x - half},${b} C${x - half * 0.45},${b - sh * 0.35} ${x - 1.2},${b - sh * 0.75} ${x},${b - sh} C${x + 1.2},${b - sh * 0.75} ${x + half * 0.45},${b - sh * 0.35} ${x + half},${b} Z `;
-    // An eave ring under it.
-    roofs += `M${x - half},${b} h${half * 2} v2 h${-half * 2} Z `;
-    flags += `M${x},${b - sh} v-9 l${7 + w * 0.15},2.5 l${-7 - w * 0.15},2.5 `;
-  }
-  return { walls, roofs, flags };
-})();
-/** Lit windows: x, height above the ground. */
-const CASTLE_WINDOWS: [number, number][] = [
-  [-58, 30],
-  [58, 30],
-  [-31, 46],
-  [-31, 32],
-  [31, 46],
-  [31, 32],
-  [-13, 64],
-  [13, 64],
-  [0, 78],
-  [0, 62],
-  [-8, 40],
-  [8, 40],
-];
 /** The path from where you stand to the castle gate, narrowing into the distance. */
 const GX = CASTLE_X;
 const GY = CASTLE_Y;
@@ -252,7 +201,7 @@ const BIRDS = [
   { top: 22, size: 0.6, fly: 74, delay: 18, flap: 2.8, flapDelay: 0.4, bob: 3.4, back: true },
 ];
 
-export function MistScene({ time, leaving = false }: { time?: MistTime; leaving?: boolean }) {
+export function MistScene({ time, leaving = false, castle = "spires" }: { time?: MistTime; leaving?: boolean; castle?: CastleDesign }) {
   const [when] = useState<MistTime>(() => time ?? mistTimeOf());
   // Here now: the fog that covered the app hands over to this screen's own.
   useEffect(() => liftFog(), []);
@@ -334,14 +283,7 @@ export function MistScene({ time, leaving = false }: { time?: MistTime; leaving?
             <path d={d} fill={`url(#mist-ridge-${i})`} />
             {i === 1 && (
               <g transform={`translate(${CASTLE_X},${CASTLE_Y}) scale(${CASTLE_SCALE})`}>
-                <path d={CASTLE.flags} fill={c.gold} stroke={c.gold} strokeWidth=".6" strokeLinejoin="round" />
-                <path d={CASTLE.walls} fill="url(#mist-castle-wall)" />
-                <path d={CASTLE.roofs} fill={c.roof} />
-                {/* The gate. */}
-                <path d="M-6,0 V-9 A6,6 0 0 1 6,-9 V0 Z" fill={c.roof} opacity=".85" />
-                {CASTLE_WINDOWS.map(([x, h], k) => (
-                  <path key={k} d={`M${x - 1.3},${-h} v-3.2 a1.3,1.3 0 0 1 2.6,0 v3.2 Z`} fill={night || when === "dusk" ? `rgb(${p.mote})` : c.shade} opacity={night || when === "dusk" ? 0.95 : 0.8} />
-                ))}
+                <CastleArt design={castle} colors={{ ...c, light: night || when === "dusk" ? `rgb(${p.mote})` : undefined }} wallFill="url(#mist-castle-wall)" />
               </g>
             )}
             {i === 4 && <path d={PATH} fill={p.tops[2]} opacity=".55" />}

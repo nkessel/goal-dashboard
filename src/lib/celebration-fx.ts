@@ -27,6 +27,8 @@ export type FxSettings = {
   /** The welcome screen's parts, in order, and the ones hidden (see lib/welcome). */
   welcomeOrder?: string[];
   welcomeHide?: string[];
+  /** The castle on the welcome screen's far hill (see CASTLE_DESIGNS). */
+  welcomeCastle?: string;
   /** Back after this many hours since your last check-in: a "welcome back" screen (0 = never). */
   welcomeBackHours?: number;
   /** Your own "welcome back" greetings, one per line (they take turns with the built-in ones left on). */
