@@ -368,11 +368,12 @@ function Signpost() {
   );
 }
 
-/** When "Not now" can ask again: soon, in a while, this evening (before then), or at bedtime. */
+/** When "Not now" can ask again: very soon, soon, in a while, this evening (before then), or at bedtime. */
 function snoozeChoices() {
   const now = new Date();
   const at = (h: number, m = 0) => new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime() - now.getTime();
   const out = [
+    { label: "In 15 min", ms: 15 * 60_000 },
     { label: "In 30 min", ms: 30 * 60_000 },
     { label: "In 1 hour", ms: 3_600_000 },
     { label: "In 3 hours", ms: 3 * 3_600_000 },
