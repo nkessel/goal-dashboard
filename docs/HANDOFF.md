@@ -2,9 +2,9 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30 night (last screen on sign-in, reward parts; see Recently shipped).
+- **Last updated:** 2026-10-30 night (arrange in context on editor, menu and Today; early reward; laundry run; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 19:50 UTC, still open: opening feedback on /settings/inventory reloads the page behind it (iOS; looked at KeyboardViewport pin/focusSteady and ScrollLock, cause not found from the cloud; needs a device repro).
+- **Pending in-app feedback:** as of 2026-10-30 20:30 UTC: snooze a quest for other times (30 min, 2 hrs, tomorrow, Other…; no dead ends); beautiful time pickers everywhere ("When was it completed?" was the example); ±5 XP buttons by the XP bar in the quest editor; a clearer, nicer "defeated" box on completed quests and tags last in More; "Also on other boards" and other board settings into the board tray, Private as an icon at the bottom, Ctrl+S must save (not Chrome's save page); track button click times for the UX teams; opening feedback on /settings/inventory reloads the page behind it (iOS; cause not found from the cloud, needs a device repro).
 
 ---
 
