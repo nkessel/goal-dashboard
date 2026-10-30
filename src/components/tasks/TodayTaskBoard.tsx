@@ -190,84 +190,94 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
   const ink = isAdventure ? "#ffd9b8" : "var(--t-ink)";
   const border = isAdventure ? "rgba(240,150,90,.55)" : "var(--t-card-border)";
   const reach = dueWindowLabel(hours);
+  const open = !folded;
   return (
-    <section
-      aria-label="Due soon"
-      className={`${folded ? "mb-4" : "mb-6"} flex flex-col gap-3 rounded-3xl px-2.5 sm:px-3 ${folded ? "py-1.5" : "pb-3 pt-2.5"}`}
-      style={
-        isAdventure
-          ? { background: "linear-gradient(180deg, rgba(120,52,24,.32), rgba(40,20,10,.3))", border: "1.5px solid rgba(240,150,90,.45)", boxShadow: "inset 0 1px 0 rgba(255,220,180,.08)" }
-          : { background: "var(--t-warn-bg)", border: "1px solid var(--t-card-border)" }
-      }
-    >
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
-        <div className="flex justify-start">
-          {!folded && shown.length > 0 && (
-            <button type="button" onClick={() => setEditing((v) => !v)} aria-pressed={editing} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${border}`, color: ink }}>
-              {editing ? "Done" : "Edit"}
-            </button>
-          )}
-        </div>
-        <h2 className="m-0">
-          <button type="button" onClick={() => fold(!folded)} aria-expanded={!folded} className={`flex min-h-9 items-center gap-2 whitespace-nowrap ${isAdventure ? "font-display text-[20px]" : "text-base font-extrabold"}`} style={{ color: ink }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+    // The same drawer as Additional Quests: the whole bar opens and closes it, and the tray slides.
+    <section aria-label="Due soon" className="mb-5">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => fold(open)}
+          aria-expanded={open}
+          className="drawer-header relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-24 py-2.5"
+          style={
+            isAdventure
+              ? {
+                  background: "linear-gradient(180deg, #5a3320 0%, #43241a 55%, #361c14 100%)",
+                  border: "2px solid #8d7642",
+                  boxShadow: "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
+                }
+              : { background: "var(--t-warn-bg)", border: "1px solid var(--t-card-border)" }
+          }
+        >
+          <span className={`flex items-center gap-2.5 whitespace-nowrap ${isAdventure ? "font-display text-[21px]" : "text-sm font-extrabold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: isAdventure ? "var(--t-gold)" : undefined }}>
               <path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Due soon
-            {folded && <span className="text-[14px] opacity-80">({shown.length})</span>}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: folded ? undefined : "rotate(90deg)", opacity: 0.8 }}>
-              <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <span className="text-[15px]" style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink-soft)", fontWeight: 400 }}>
+              ({shown.length})
+            </span>
+          </span>
+        </button>
+        {/* On the bar but not part of its tap: Edit on the left (while open), the reach and the chevron on the right. */}
+        {open && shown.length > 0 && (
+          <button type="button" onClick={() => setEditing((v) => !v)} aria-pressed={editing} className="fade-in absolute left-3 top-1/2 h-8 -translate-y-1/2 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${border}`, color: ink, background: editing ? "rgba(242,210,126,.2)" : "rgba(0,0,0,.12)" }}>
+            {editing ? "Done" : "Edit"}
           </button>
-        </h2>
-        <div className="relative flex justify-end">
+        )}
+        <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
           <button
             type="button"
             onClick={() => setPicking((v) => !v)}
             aria-expanded={picking}
             aria-haspopup="dialog"
             aria-label={`Counting quests due in the next ${reach}. Change`}
-            className={`flex h-8 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[13px] font-semibold ${refilling ? "opacity-60" : ""}`}
-            style={{ border: `1px solid ${border}`, color: ink }}
+            className={`flex h-8 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[12.5px] font-semibold ${refilling ? "opacity-60" : ""}`}
+            style={{ border: `1px solid ${border}`, color: ink, background: "rgba(0,0,0,.12)" }}
           >
             {reach}
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.8 }}>
-              <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </button>
+          <button type="button" onClick={() => fold(open)} aria-label={open ? "Close Due soon" : "Open Due soon"} tabIndex={-1} className="flex h-8 w-6 items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ transform: open ? "rotate(180deg)" : undefined }}>
+              <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           {picking && <DueWindowPicker hours={hours} onPick={pick} onClose={closePicker} ink={ink} isAdventure={isAdventure} />}
         </div>
       </div>
-      {!folded && (
-        <>
-          {editing && (
-            <p className="m-0 -mt-1 text-center text-[12.5px]" style={{ color: ink, opacity: 0.85 }}>
-              × takes a quest out of Due soon for good (it stays on its board).
-            </p>
-          )}
-          {!shown.length && (
-            <p className="m-0 -mt-1 pb-1 text-center text-[13.5px]" style={{ color: ink, opacity: 0.85 }}>
-              Nothing due in the next {reach}.
-            </p>
-          )}
-          <ul className="m-0 flex list-none flex-col gap-3 p-0">
-            {shown.map((task) =>
-              editing ? (
-                <li key={task.id} className="fade-in flex items-center gap-2">
-                  <ul className="m-0 min-w-0 flex-1 list-none p-0">
-                    <TaskRow task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
-                  </ul>
-                  <button type="button" onClick={() => snooze(task.id)} aria-label={`Take “${task.title}” out of Due soon for good`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] leading-none" style={{ border: "1.5px solid rgba(240,150,90,.6)", color: ink, background: "rgba(0,0,0,.18)" }}>
-                    ×
-                  </button>
-                </li>
-              ) : (
-                <TaskRow key={task.id} task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
-              )
+      <div className="drawer-body" data-open={open ? "true" : "false"}>
+        <div className="drawer-inner -mx-2 px-2">
+          <div className="quest-tray mt-2.5 rounded-2xl px-2 pb-3 pt-3" style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }} inert={!open}>
+            {editing && (
+              <p className="m-0 mb-2 text-center text-[12.5px]" style={{ color: ink, opacity: 0.85 }}>
+                × takes a quest out of Due soon for good (it stays on its board).
+              </p>
             )}
-          </ul>
-        </>
-      )}
+            {!shown.length && (
+              <p className="m-0 px-1 text-center text-[13.5px]" style={{ color: ink, opacity: 0.85 }}>
+                Nothing due in the next {reach}.
+              </p>
+            )}
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              {shown.map((task) =>
+                editing ? (
+                  <li key={task.id} className="fade-in flex items-center gap-2">
+                    <ul className="m-0 min-w-0 flex-1 list-none p-0">
+                      <TaskRow task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
+                    </ul>
+                    <button type="button" onClick={() => snooze(task.id)} aria-label={`Take “${task.title}” out of Due soon for good`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] leading-none" style={{ border: "1.5px solid rgba(240,150,90,.6)", color: ink, background: "rgba(0,0,0,.18)" }}>
+                      ×
+                    </button>
+                  </li>
+                ) : (
+                  <TaskRow key={task.id} task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
+                )
+              )}
+            </ul>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
