@@ -1,7 +1,7 @@
 "use client";
 
 import { NumberInput } from "@/components/ui/NumberInput";
-import { SettingsGear } from "@/components/ui/SettingsGear";
+import { GearIcon } from "@/components/ui/Icons";
 import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -49,6 +49,7 @@ import { QuestPicker, SequenceDialog } from "./Sequence";
 import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
 import type { QuestTemplate } from "@/lib/quest-templates";
 import { descendants, parentKeys, stepPayload, stepsShare, stepWeights, treeOrder, type StepDraft } from "@/lib/quest-steps";
+import { EditorArrange } from "./EditorArrange";
 import { EDITOR_PARTS, readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
 import { DateField } from "@/components/ui/DateField";
 
@@ -251,6 +252,8 @@ export function QuestEditorDialog({
   /** New quests: no portrait (just the empty check box) unless you tick "Paint a portrait". */
   const [noPortrait, setNoPortrait] = useState(true);
   const layout = useSyncExternalStore(subscribeEditorLayout, readEditorLayout, serverEditorLayout);
+  // Arranging the editor in place (its gear).
+  const [arranging, setArranging] = useState(false);
   const coarsePointer = useSyncExternalStore(noSubscribe, () => window.matchMedia("(pointer: coarse)").matches, () => false);
   const [advOpen, setAdvOpen] = useState(false);
   const schedRef = useRef<HTMLDivElement>(null);
@@ -2166,15 +2169,18 @@ export function QuestEditorDialog({
               {heading}
             </h3>
             {!toolbarHost && toolbarButtons}
-            {/* Which fields show, and in what order, is in Settings. A started quest waits in Drafts. */}
-            <SettingsGear
-              to="menus.quest-editor"
-              label="Quest editor settings"
-              tone="plain"
-              size={32}
-              beforeLeave={() => (hasWriting && !finished.current ? leaveWithDraft() : close())}
-              className="ml-0.5"
-            />
+            {/* The gear arranges the editor right here: which parts show, and in what order. */}
+            <button
+              type="button"
+              onClick={() => setArranging((v) => !v)}
+              aria-pressed={arranging}
+              aria-label={arranging ? "Done arranging" : "Arrange the editor"}
+              title={arranging ? "Done arranging" : "Arrange the editor"}
+              className="settings-gear ml-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
+              style={{ color: "var(--t-ink-soft)", background: arranging ? "rgba(217,180,95,.3)" : undefined }}
+            >
+              <GearIcon size={18} />
+            </button>
             <button type="button" onClick={requestClose} aria-label="Close" className="-mr-1.5 flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
               ×
             </button>
@@ -2391,8 +2397,9 @@ export function QuestEditorDialog({
           )}
           {toolbarHost && toolbarButtons && createPortal(toolbarButtons, toolbarHost)}
 
+          {arranging && <EditorArrange layout={layout} shown={partShown} names={MORE_NAMES} previews={partNodes} onDone={() => setArranging(false)} />}
           {/* Shown parts first (in your order), then the Advanced settings fold with the rest. */}
-          {layout.order.filter((k) => !layout.folded.includes(k)).map((k) => {
+          {!arranging && layout.order.filter((k) => !layout.folded.includes(k)).map((k) => {
             // Where it shows, its time, its XP and its board: one calm row of chips, each opening its control.
             if (FACT_KEYS.includes(k)) {
               const facts = layout.order.filter((x) => FACT_KEYS.includes(x) && !layout.folded.includes(x) && partShown[x]);
@@ -2498,8 +2505,8 @@ export function QuestEditorDialog({
             }
             return <Fragment key={k}>{partNodes[k]}</Fragment>;
           })}
-          {advancedHeader}
-          {advOpen && layout.order.filter((k) => layout.folded.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)}
+          {!arranging && advancedHeader}
+          {!arranging && advOpen && layout.order.filter((k) => layout.folded.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)}
           {pickingSlot && (
             <SlotPickerDialog
               durationMinutes={Math.max(15, Number(estimate) || 30)}

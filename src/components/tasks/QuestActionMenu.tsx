@@ -4,8 +4,10 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 import { GearIcon } from "@/components/ui/Icons";
-import { SettingsPopup } from "@/components/ui/SettingsPopup";
-import { arrangeMenu, readMenuLayout, serverMenuLayout, subscribeMenuLayout } from "@/lib/quest-menu-layout";
+import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { arrangeMenu, readMenuLayout, saveMenuLayout, serverMenuLayout, subscribeMenuLayout, type MenuLayout } from "@/lib/quest-menu-layout";
 
 export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "board" | "earlier" | "nextstep" | "sequence" | "delete";
 
@@ -50,8 +52,8 @@ export function QuestActionMenu({
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // The menu's own gear: its order and which items show, in a popup over it.
-  const [layoutOpen, setLayoutOpen] = useState(false);
+  // The menu's own gear arranges it in place: drag items, hide them with the eye on the right.
+  const [arranging, setArranging] = useState(false);
   // Order and hidden items, as chosen in Settings.
   const layout = useSyncExternalStore(subscribeMenuLayout, readMenuLayout, serverMenuLayout);
 
@@ -59,7 +61,7 @@ export function QuestActionMenu({
     if (!anchor) return;
     const place = () => {
       const r = anchor.getBoundingClientRect();
-      const w = 240;
+      const w = arranging ? 280 : 240;
       const h = ref.current?.offsetHeight ?? 260;
       let left = align === "right" ? r.right - w : r.left;
       left = Math.max(8, Math.min(window.innerWidth - w - 8, left));
@@ -75,16 +77,14 @@ export function QuestActionMenu({
       window.removeEventListener("scroll", place, true);
       window.removeEventListener("resize", place);
     };
-  }, [anchor, align, confirmDelete]);
+  }, [anchor, align, confirmDelete, arranging]);
 
-  useEscape(() => !layoutOpen && onClose());
+  useEscape(() => (arranging ? setArranging(false) : onClose()));
 
   useEffect(() => {
     function onDown(e: PointerEvent) {
       const el = e.target as Element | null;
       if (!ref.current || ref.current.contains(el as Node)) return;
-      // Its settings popup is open over it: leave the menu be.
-      if (layoutOpen) return;
       // Writing feedback about the menu keeps it open.
       if (el instanceof Element && el.closest("[data-feedback-root]")) return;
       onClose();
@@ -96,7 +96,7 @@ export function QuestActionMenu({
       clearTimeout(t);
       document.removeEventListener("pointerdown", onDown, true);
     };
-  }, [onClose, layoutOpen]);
+  }, [onClose]);
 
   const allItems: { key: QuestAction; icon: React.ReactNode; label: string }[] = [
     { key: "edit", icon: <Glyph d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />, label: isReward ? "Edit reward" : isAdventure ? "Edit quest" : "Edit task" },
@@ -136,7 +136,7 @@ export function QuestActionMenu({
       role="menu"
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
-      className="qa-menu fixed z-[70] flex w-60 flex-col overflow-hidden rounded-xl py-1 parchment shadow-2xl"
+      className={`qa-menu fixed z-[70] flex ${arranging ? "w-[280px]" : "w-60"} flex-col overflow-hidden rounded-xl py-1 parchment shadow-2xl`}
       style={{
         top: pos?.top ?? -9999,
         left: pos?.left ?? -9999,
@@ -166,15 +166,18 @@ export function QuestActionMenu({
         <>
         <button
           type="button"
-          onClick={() => setLayoutOpen(true)}
-          aria-label="Arrange this menu: order and which items show"
-          title="Arrange this menu"
+          onClick={() => setArranging((v) => !v)}
+          aria-pressed={arranging}
+          aria-label={arranging ? "Done arranging this menu" : "Arrange this menu: order and which items show"}
+          title={arranging ? "Done arranging" : "Arrange this menu"}
           className="absolute right-1.5 top-1.5 z-[1] flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5"
-          style={{ color: "var(--t-ink-soft)" }}
+          style={{ color: "var(--t-ink-soft)", background: arranging ? "rgba(217,180,95,.3)" : undefined }}
         >
           <GearIcon size={15} />
         </button>
-        {items.map((it, i) => (
+        {arranging ? (
+          <ArrangeItems items={allItems} layout={layout} isAdventure={isAdventure} onDone={() => setArranging(false)} />
+        ) : items.map((it, i) => (
           <button
             key={it.key}
             type="button"
@@ -201,9 +204,82 @@ export function QuestActionMenu({
         ))}
         </>
       )}
-      {layoutOpen && <SettingsPopup spot="menus.quest-card" onClose={() => setLayoutOpen(false)} />}
     </div>,
     document.body
+  );
+}
+
+/** The menu arranged in place: every item drags; the eye on its right hides it (or brings it back). */
+function ArrangeItems({ items, layout, isAdventure, onDone }: { items: { key: QuestAction; icon: React.ReactNode; label: string }[]; layout: MenuLayout; isAdventure: boolean; onDone: () => void }) {
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const at = (k: QuestAction) => {
+    const i = layout.order.indexOf(k);
+    return i < 0 ? 99 : i;
+  };
+  const list = [...items].sort((a, b) => at(a.key) - at(b.key));
+  const keys = list.map((it) => it.key);
+  function onDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const moved = arrayMove(keys, keys.indexOf(active.id as QuestAction), keys.indexOf(over.id as QuestAction));
+    // Items this quest doesn't offer keep their places after the ones it does.
+    saveMenuLayout({ ...layout, order: [...moved, ...layout.order.filter((k) => !moved.includes(k))] });
+  }
+  const toggle = (k: QuestAction) => saveMenuLayout({ ...layout, hidden: layout.hidden.includes(k) ? layout.hidden.filter((x) => x !== k) : [...layout.hidden, k] });
+  return (
+    <div className="reveal flex flex-col pt-1">
+      <span className="px-3.5 pb-1 pr-10 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+        Drag to reorder; the eye hides an item.
+      </span>
+      <DndContext id="dnd-quest-menu" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={keys} strategy={verticalListSortingStrategy}>
+          {list.map((it) => (
+            <ArrangeRow key={it.key} it={it} hidden={layout.hidden.includes(it.key)} canHide={it.key !== "edit"} isAdventure={isAdventure} onToggle={() => toggle(it.key)} />
+          ))}
+        </SortableContext>
+      </DndContext>
+      <button type="button" onClick={onDone} className="mx-3 my-1.5 h-8 self-end rounded-full px-4 text-[13px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+        Done
+      </button>
+    </div>
+  );
+}
+
+function ArrangeRow({ it, hidden, canHide, isAdventure, onToggle }: { it: { key: QuestAction; icon: React.ReactNode; label: string }; hidden: boolean; canHide: boolean; isAdventure: boolean; onToggle: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: it.key });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={`flex min-h-10 touch-manipulation items-center gap-3 pl-3.5 pr-1.5 text-[14.5px] ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        zIndex: isDragging ? 5 : undefined,
+        position: "relative",
+        background: isDragging ? (isAdventure ? "var(--t-panel)" : "var(--t-card)") : undefined,
+        boxShadow: isDragging ? "0 8px 18px rgba(0,0,0,.25)" : undefined,
+        opacity: hidden ? 0.45 : 1,
+      }}
+    >
+      <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm" style={{ color: "var(--t-ink-soft)" }}>
+        {it.icon}
+      </span>
+      <span className={`min-w-0 flex-1 ${hidden ? "line-through" : ""}`}>{it.label}</span>
+      {canHide && (
+        <button type="button" onClick={onToggle} onPointerDown={(e) => e.stopPropagation()} aria-label={hidden ? `Show ${it.label}` : `Hide ${it.label}`} title={hidden ? "Show it" : "Hide it"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+            {hidden ? <circle cx="12" cy="12" r="2.6" fill="currentColor" /> : <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />}
+          </svg>
+        </button>
+      )}
+    </div>
   );
 }
 
