@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30, `main` @ `561343b` + AR class due-date record (Mastering Facilitation dates moved back a week)
+- **Last updated:** 2026-10-30, `main` @ `333f71b` (welcome screen Due soon drawer), after the AR class due-date record
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** 25 notes not marked shipped (as of 2026-10-30 16:40 UTC, query below). Some may already have been built through chat requests without being marked.
 
@@ -112,7 +112,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
 - Oct 30: AR class (Mastering Facilitation) due dates moved back one week, old values and undo in `docs/data-changes/2026-10-30-mastering-facilitation-due-dates.md`.
-- Oct 30: Welcome screen out of the mist (fairytale castle with 4 designs to pick in Settings › Welcome Screen › The castle, birds, toucan lands on welcome back, single greetings list, fog hides Today from first paint, dive into the forest on Continue; signpost removed); Due soon look-ahead setting and ranking; folded Settings groups show their value; stand-in quests keep their own due date; Check in button icons.
+- Oct 30: Welcome screen out of the mist (fairytale castle with 4 designs to pick in Settings › Welcome Screen › The castle, birds, toucan lands on welcome back, single greetings list, fog hides Today from first paint, dive into the forest on Continue; signpost removed); Due soon look-ahead setting and ranking (due next first, past due last; reach picked from the chip on its header, kept in the `due-soon-hours` cookie, `src/lib/due-soon.ts`); on the welcome screen Due soon is a gilded button that opens a drawer of real quest cards (`DueSoonDrawer`; the screen drops to z-49 while it's open so a card's editor shows over it); folded Settings groups show their value; stand-in quests keep their own due date; Check in button icons.
 - Oct 29: Feedback batches (check-in card, invite wording themes, life wheel readout, Insights XP columns and pinch zoom); dreams cloud on boards; invite popup; toucan "Not now" snoozes; welcome screen top priority.
 - Oct 28: Gear shortcuts and settings popups; sleep and wake log on the Wheel of Time; toucan-started feedback builds; toucan creates entries on command.
 - Oct 27: Daily check-in returns until closed; quest editor folds (steps, scheduling, Advanced); board chip and picker.
