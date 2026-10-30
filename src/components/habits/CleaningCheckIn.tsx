@@ -22,6 +22,7 @@ import {
   type MessStyle,
   type Space,
 } from "@/lib/cleaning";
+import { LaundryRun } from "./LaundryRun";
 
 type Panel = "spaces" | "laundry" | "chores" | null;
 
@@ -42,8 +43,16 @@ const holdStill = {
  */
 export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: { initial: Cleaning; day: string; habitDone: boolean; isAdventure: boolean; /** The tray, opened from the habit's title. */ open: boolean }) {
   const [c, setC] = useState(initial);
-  // With fewer than two spaces, the tray opens straight onto setting them up.
-  const [panel, setPanel] = useState<Panel>(() => (initial.spaces.length < 2 ? "spaces" : null));
+  // With fewer than two spaces, the tray opens straight onto setting them up;
+  // on a laundry day (or with a load under way), onto the laundry.
+  const [panel, setPanel] = useState<Panel>(() => {
+    if (initial.spaces.length < 2) return "spaces";
+    if (todaysPicks(initial, day)[0]?.kind === "laundry") return "laundry";
+    try {
+      if (window.localStorage.getItem("laundry-run")) return "laundry";
+    } catch {}
+    return null;
+  });
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -396,6 +405,14 @@ function LaundryPanel({ c, day, save, onLoad }: { c: Cleaning; day: string; save
   // The slider moves freely; the reading is saved when you let go.
   const [drag, setDrag] = useState<number | null>(null);
   const value = drag ?? shown;
+  // A load under way (kept on this device) opens straight to where it is.
+  const [running, setRunning] = useState(() => {
+    try {
+      return !!window.localStorage.getItem("laundry-run");
+    } catch {
+      return false;
+    }
+  });
   const setFill = (fill: number) => save({ ...c, laundry: { ...c.laundry, readings: [...c.laundry.readings.filter((r) => r.on !== day), { on: day, fill }].slice(-30) } });
   const commit = () => {
     if (drag !== null && drag !== readToday) setFill(drag);
@@ -437,9 +454,30 @@ function LaundryPanel({ c, day, save, onLoad }: { c: Cleaning; day: string; save
           )}
           {c.laundry.loads.length > 0 && <span style={{ color: "var(--t-ink-soft)" }}> Last {c.laundry.loads.at(-1) === day ? "today" : ago(c.laundry.loads.at(-1)!, day)}.</span>}
         </span>
-        <button type="button" onClick={onLoad} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-          ✓ I did a load
-        </button>
+        {!running && (
+          <>
+            <button type="button" onClick={onLoad} className="h-8 rounded-full px-2 text-[12.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "var(--t-ink-soft)" }} title="Already did one: count it">
+              ✓ Did one
+            </button>
+            <button type="button" onClick={() => setRunning(true)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+              🧺 Start a load
+            </button>
+          </>
+        )}
+      </div>
+      {/* Load, wash, dry, fold: each with its timer. */}
+      <div className="drawer-body" data-open={running ? "true" : "false"}>
+        <div className="drawer-inner" inert={!running}>
+          {running && (
+            <LaundryRun
+              onClose={() => setRunning(false)}
+              onFolded={() => {
+                setRunning(false);
+                onLoad();
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
