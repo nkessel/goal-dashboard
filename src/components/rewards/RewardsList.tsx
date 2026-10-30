@@ -171,7 +171,7 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
             <SortableReward
               key={r.id}
               id={r.id}
-              className={`reward-shimmer relative flex flex-col gap-2 rounded-2xl py-3 pl-8 pr-4 ${isAdventure ? "parchment parchment-framed" : ""} ${dropped === r.id ? "reward-drop" : ""}`}
+              className={`reward-shimmer relative flex flex-col gap-2 rounded-2xl px-4 py-3 ${isAdventure ? "parchment parchment-framed" : ""} ${dropped === r.id ? "reward-drop" : ""}`}
               style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
             >
               {r.needs_review && (
@@ -345,25 +345,12 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
   );
 }
 
-/** A reward card that can be dragged by its bar to a new place in the chest. */
+/** A reward card that can be dragged to a new place in the chest. */
 function SortableReward({ id, className, style, children }: { id: string; className: string; style?: React.CSSProperties; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  // The whole card drags (no drag bar); taps on its buttons still work.
   return (
-    <div ref={setNodeRef} className={className} style={{ ...style, transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 5 : undefined, boxShadow: isDragging ? "0 12px 28px rgba(0,0,0,.35)" : undefined }}>
-      <button
-        ref={setActivatorNodeRef}
-        type="button"
-        {...attributes}
-        {...listeners}
-        aria-label="Drag to move this reward"
-        title="Drag to move"
-        className="absolute inset-y-2 left-1.5 z-[2] flex w-5 cursor-grab touch-none items-center justify-center rounded-md active:cursor-grabbing hover:bg-black/[.05]"
-        style={{ color: "#a58c66" }}
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M5 8h14M5 12h14M5 16h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-        </svg>
-      </button>
+    <div ref={setNodeRef} {...attributes} {...listeners} className={`${className} touch-manipulation`} style={{ ...style, transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 5 : undefined, cursor: isDragging ? "grabbing" : undefined, boxShadow: isDragging ? "0 12px 28px rgba(0,0,0,.35)" : undefined }}>
       {children}
     </div>
   );

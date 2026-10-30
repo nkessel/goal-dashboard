@@ -43,28 +43,33 @@ export function ArrangeAbove({ fx, castleHidden, onDone }: { fx: FxSettings; cas
           Done
         </button>
       </div>
-      <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-[13px] font-semibold" style={{ color: INK }}>
-          Opens
+      {/* When it opens, read as one sentence: the number sits between its own − and +. */}
+      <div className="relative z-[1] flex flex-col gap-1.5">
+        <span className="text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: GOLD }}>
+          When it opens
         </span>
-        <button type="button" onClick={() => set({ welcomeBackHours: Math.max(1, h - 1) })} disabled={!h} aria-label="Fewer hours" className="flex h-8 w-8 items-center justify-center rounded-full text-[16px] disabled:opacity-35" style={CHIP}>
-          −
-        </button>
-        <span className="min-w-[150px] text-center text-[13px] tabular-nums" style={{ color: INK }}>
-          {h ? `first visit, then every ${h} ${h === 1 ? "hour" : "hours"}` : "on the day's first visit only"}
-        </span>
-        <button type="button" onClick={() => set({ welcomeBackHours: Math.min(12, (h || 0) + 1) })} disabled={h >= 12} aria-label="More hours" className="flex h-8 w-8 items-center justify-center rounded-full text-[16px] disabled:opacity-35" style={CHIP}>
-          +
-        </button>
-        <label className="flex items-center gap-1.5 text-[12.5px]" style={{ color: SOFT }}>
-          <input type="checkbox" className="h-4 w-4 accent-[var(--t-gold-deep)]" checked={h === 0} onChange={(e) => set({ welcomeBackHours: e.target.checked ? 0 : 5 })} />
-          first visit only
-        </label>
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px]" style={{ color: INK, opacity: h ? 1 : 0.5 }}>
+          <span>On the day&rsquo;s first visit, then again after</span>
+          <span className="inline-flex h-8 items-center rounded-full" style={CHIP}>
+            <button type="button" onClick={() => set({ welcomeBackHours: Math.max(1, (h || 5) - 1) })} disabled={!h || h <= 1} aria-label="Fewer hours" className="flex h-8 w-7 items-center justify-center rounded-l-full text-[16px] disabled:opacity-30">
+              −
+            </button>
+            <span className="font-display min-w-[64px] text-center text-[14.5px] tabular-nums">
+              {h || 5} {(h || 5) === 1 ? "hour" : "hours"}
+            </span>
+            <button type="button" onClick={() => set({ welcomeBackHours: Math.min(12, (h || 5) + 1) })} disabled={!h || h >= 12} aria-label="More hours" className="flex h-8 w-7 items-center justify-center rounded-r-full text-[16px] disabled:opacity-30">
+              +
+            </button>
+          </span>
+          <span>away</span>
+        </div>
+        <GoldCheck checked={h === 0} onChange={(v) => set({ welcomeBackHours: v ? 0 : 5 })}>
+          Only the day&rsquo;s first visit
+        </GoldCheck>
+        <GoldCheck checked={fx.welcomeConfetti !== false} onChange={(v) => set({ welcomeConfetti: v })}>
+          Confetti on the day&rsquo;s first visit
+        </GoldCheck>
       </div>
-      <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[13px]" style={{ color: INK }}>
-        <input type="checkbox" className="h-4 w-4 accent-[var(--t-gold-deep)]" checked={fx.welcomeConfetti !== false} onChange={() => set({ welcomeConfetti: fx.welcomeConfetti === false })} />
-        Confetti on the day&rsquo;s first visit
-      </label>
       {/* On a narrow screen the castle is off to the side, out of view; its choice comes up here instead. */}
       {castleHidden && (
         <div className="relative z-[1] flex flex-col gap-1">
@@ -119,11 +124,11 @@ export function EditButton({ open, onClick, label }: { open: boolean; onClick: (
       aria-expanded={open}
       aria-label={label}
       title={label}
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full align-middle transition-transform hover:scale-110"
-      style={open ? CHIP_ON : { ...CHIP, boxShadow: "0 1px 3px rgba(0,0,0,.15)" }}
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle transition-colors hover:bg-[rgba(139,112,64,.14)]"
+      style={open ? { background: "rgba(217,180,95,.45)", color: "#4a3913" } : { color: "#8a6c2c" }}
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="2.1" strokeLinejoin="round" />
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
       </svg>
     </button>
   );
@@ -187,7 +192,7 @@ export function GreetingOptions({ fx }: { fx: FxSettings }) {
 const HAS_OPTIONS: WelcomeEl[] = ["checkin", "line", "focus", "intention"];
 
 /**
- * The card's parts while arranging: drag one by its bar to move it; its hide
+ * The card's parts while arranging: drag a part itself to move it; its hide
  * button sits in its top-right corner; its ✎ opens its finer options. Hidden
  * parts wait at the end, faded, to be shown again.
  */
@@ -243,11 +248,14 @@ export function ArrangeList({ fx, order, parts, empty }: { fx: FxSettings; order
 function Part({ el, fx, empty, children }: { el: WelcomeEl; fx: FxSettings; empty?: string; children: React.ReactNode }) {
   const meta = WELCOME_ELS.find((m) => m.key === el)!;
   const [open, setOpen] = useState(false);
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: el });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: el });
   return (
+    // The whole part drags (no drag bar): press and move it up or down.
     <div
       ref={setNodeRef}
-      className="relative flex w-full flex-col gap-1.5 rounded-xl py-2 pl-8 pr-2"
+      {...attributes}
+      {...listeners}
+      className={`relative flex w-full touch-manipulation flex-col gap-1.5 rounded-xl px-2.5 py-2 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
@@ -257,21 +265,6 @@ function Part({ el, fx, empty, children }: { el: WelcomeEl; fx: FxSettings; empt
         boxShadow: isDragging ? "0 10px 24px rgba(0,0,0,.25)" : undefined,
       }}
     >
-      {/* The drag bar down the left edge. */}
-      <button
-        ref={setActivatorNodeRef}
-        type="button"
-        {...attributes}
-        {...listeners}
-        aria-label={`Move ${meta.label}: drag up or down`}
-        title="Drag to move"
-        className="absolute inset-y-1 left-1 flex w-6 cursor-grab touch-none items-center justify-center rounded-lg active:cursor-grabbing hover:bg-black/[.05]"
-        style={{ color: "#a58c66" }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M5 8h14M5 12h14M5 16h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-        </svg>
-      </button>
       {/* Its name, its ✎, and hide in the top-right corner. */}
       <div className="flex min-h-8 items-center gap-1.5 pr-8">
         <span className="min-w-0 truncate text-left text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }} title={meta.hint}>

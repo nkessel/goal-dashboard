@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { LevelScales } from "@/components/ui/LevelScales";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import type { Board } from "@/lib/data/types";
@@ -128,9 +129,14 @@ export function BoardMatrixDialog({
         </div>
 
         <div className="relative z-[1] flex flex-col gap-1.5 rounded-xl px-3 py-2" style={{ background: isAdventure ? "rgba(120,90,40,.1)" : "var(--t-bg)", color: "var(--t-ink)" }}>
-          <IconScale label="Importance" icon="/design/ui-trophy.svg" value={importance} onChange={setImportance} />
-          <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />
-          <IconScale label="Challenge" icon="/design/ui-muscle.svg" hint="How much it takes out of you" value={effort} onChange={setEffort} />
+          <LevelScales
+            items={[
+              { key: "i", label: "Importance", icon: "/design/ui-trophy.svg", value: importance, onChange: setImportance },
+              { key: "u", label: "Urgency", icon: "/design/ui-flame-sm.png", value: urgency, onChange: setUrgency },
+              { key: "c", label: "Challenge", icon: "/design/ui-muscle.svg", hint: "How much it takes out of you", value: effort, onChange: setEffort },
+            ]}
+            renderRow={(it) => <IconScale label={it.label} icon={it.icon} hint={it.hint} value={it.value} onChange={it.onChange} />}
+          />
         </div>
 
         <p className="relative z-[1] m-0 text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>

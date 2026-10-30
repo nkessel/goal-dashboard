@@ -1,6 +1,7 @@
 "use client";
 
 import { FocusSteps as FocusStepsPanel } from "./FocusSteps";
+import { LevelScales } from "@/components/ui/LevelScales";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
@@ -624,9 +625,14 @@ function EditableFacts({ task, now, onSave }: { task: TaskWithCategory; now: num
       )}
       {open === "ratings" && (
         <div className="flex w-full flex-col gap-1 rounded-xl px-3 py-2 text-left" style={{ background: "rgba(120,90,40,.1)", color: "var(--t-ink)" }}>
-          <IconScale label="Importance" icon="/design/ui-flame-sm.png" value={Math.round(task.importance)} onChange={(v) => onSave({ importance: v })} />
-          <IconScale label="Urgency" icon="/design/ui-hourglass.svg" value={Math.round(task.urgency)} onChange={(v) => onSave({ urgency: v })} />
-          <IconScale label="Difficulty" icon="/design/ui-muscle.svg" value={Math.round(task.effort ?? 0)} onChange={(v) => onSave({ effort: v })} />
+          <LevelScales
+            items={[
+              { key: "i", label: "Importance", icon: "/design/ui-flame-sm.png", value: Math.round(task.importance), onChange: (v) => onSave({ importance: v }) },
+              { key: "u", label: "Urgency", icon: "/design/ui-hourglass.svg", value: Math.round(task.urgency), onChange: (v) => onSave({ urgency: v }) },
+              { key: "d", label: "Difficulty", icon: "/design/ui-muscle.svg", value: Math.round(task.effort ?? 0), onChange: (v) => onSave({ effort: v }) },
+            ]}
+            renderRow={(it) => <IconScale label={it.label} icon={it.icon} hint={it.hint} value={it.value} onChange={it.onChange} />}
+          />
         </div>
       )}
     </div>

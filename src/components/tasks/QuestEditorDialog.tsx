@@ -44,6 +44,7 @@ import { freshKey, loadDrafts, removeDraft, saveDraft, type QuestDraftSave } fro
 import { addOptimisticQuest, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { CoinIcon } from "@/components/ui/Icons";
 import { StatSplitEditor } from "./StatSplitEditor";
+import { LevelScales, useScaleStyle, type ScaleItem } from "@/components/ui/LevelScales";
 import { QuestPicker, SequenceDialog } from "./Sequence";
 import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
 import type { QuestTemplate } from "@/lib/quest-templates";
@@ -145,6 +146,7 @@ export function QuestEditorDialog({
   review?: { index: number; total: number; onLater: () => void };
 }) {
   const embedded = useIsEmbedded();
+  const scaleStyle = useScaleStyle();
   const isAdventure = theme === "adventure";
   const task = mode.kind === "edit" ? mode.task : null;
   const create = mode.kind === "create" ? mode : null;
@@ -990,6 +992,29 @@ export function QuestEditorDialog({
       </span>
     ) : null;
   // Each part of the editor, placed by the layout chosen in Settings (main list, or under Advanced settings).
+  // The 0–5 scales: rows of icons, or (by your choice) bars side by side. As bars, neighbouring
+  // scales in the layout stand together in one group, drawn where the first of them sits.
+  const SCALES: Record<string, ScaleItem> = {
+    importance: { key: "importance", label: "Importance", icon: "/design/ui-trophy.svg", value: importance, onChange: setImportance },
+    urgency: { key: "urgency", label: "Urgency", icon: "/design/ui-flame-sm.png", value: urgency, onChange: setUrgency },
+    difficulty: { key: "difficulty", label: "Difficulty", icon: "/design/ui-muscle.svg", hint: "How hard it is — how much it takes out of you", value: effort, onChange: setEffort },
+    energy: { key: "energy", label: "Energy boost", icon: "/design/ui-bolt.png", hint: "How much energy finishing it gives you", value: energyGain, onChange: setEnergyGain },
+  };
+  const scaleNode = (k: EditorPart) => {
+    if (doingNow) return null;
+    const run = (() => {
+      if (scaleStyle !== "bars") return [k];
+      const section = layout.folded.includes(k);
+      const list = layout.order.filter((x) => layout.folded.includes(x) === section);
+      const i = list.indexOf(k);
+      if (i > 0 && SCALES[list[i - 1]]) return [];
+      const out: EditorPart[] = [];
+      for (let j = i; j < list.length && SCALES[list[j]]; j++) out.push(list[j]);
+      return out;
+    })();
+    if (!run.length) return null;
+    return <LevelScales items={run.map((x) => SCALES[x])} renderRow={(it) => <IconScale label={it.label} icon={it.icon} hint={it.hint} value={it.value} onChange={it.onChange} />} />;
+  };
   const partNodes: Record<EditorPart, React.ReactNode> = {
     showsIn: (
       <>
@@ -1865,26 +1890,10 @@ export function QuestEditorDialog({
               )}
       </>
     ),
-    importance: (
-      <>
-              {!doingNow && <IconScale label="Importance" icon="/design/ui-trophy.svg" value={importance} onChange={setImportance} />}
-      </>
-    ),
-    urgency: (
-      <>
-              {!doingNow && <IconScale label="Urgency" icon="/design/ui-flame-sm.png" value={urgency} onChange={setUrgency} />}
-      </>
-    ),
-    difficulty: (
-      <>
-              {!doingNow && <IconScale label="Difficulty" icon="/design/ui-muscle.svg" hint="How hard it is — how much it takes out of you" value={effort} onChange={setEffort} />}
-      </>
-    ),
-    energy: (
-      <>
-              {!doingNow && <IconScale label="Energy boost" icon="/design/ui-bolt.png" hint="How much energy finishing it gives you" value={energyGain} onChange={setEnergyGain} />}
-      </>
-    ),
+    importance: scaleNode("importance"),
+    urgency: scaleNode("urgency"),
+    difficulty: scaleNode("difficulty"),
+    energy: scaleNode("energy"),
     board: (
       <>
               {/* Quest board (the tag on the card) */}

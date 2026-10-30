@@ -313,8 +313,10 @@ export function MistScene({ time, leaving = false, castle = "spires", castleSeed
             </defs>
             <path d={d} fill={`url(#mist-ridge-${i})`} />
             {i === 1 && (
-              <g ref={castleRef} transform={`translate(${CASTLE_X},${CASTLE_Y}) scale(${CASTLE_SCALE})`}>
+              <g transform={`translate(${CASTLE_X},${CASTLE_Y}) scale(${CASTLE_SCALE})`}>
+                <g ref={castleRef}>
                 <CastleArt design={castle} seed={castleSeed} colors={{ ...c, light: night || when === "dusk" ? `rgb(${p.mote})` : undefined }} wallFill="url(#mist-castle-wall)" />
+                </g>
                 {/* Fog drifting across its foot, so it stands off in the distance. */}
                 <ellipse cx="0" cy="2" rx="120" ry="18" fill="url(#mist-castle-fog)" />
               </g>
