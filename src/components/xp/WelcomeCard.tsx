@@ -230,14 +230,16 @@ export function WelcomeCard({
   const order = welcomeOrder(fx).filter((el) => welcomeShows(fx, el) && parts[el]);
   // Not checked in yet? "Not now" offers to ask again later, or to skip it for today.
   const snoozable = !!onSnooze && !checkedIn && order.includes("checkin");
+  // The check-in signpost greets the day's first visit (not welcome back).
+  const post = mode === "day";
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
     <div className={`fixed inset-0 ${preview ? "z-[95]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={leave} role="dialog" aria-modal="true" aria-label={heading}>
       {/* A misty valley, and the card coming out of the mist. */}
       <MistScene leaving={leaving} />
-      <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative pt-[54px]`} onClick={(e) => e.stopPropagation()}>
-        <Signpost />
+      <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative ${post ? "pt-[54px]" : ""}`} onClick={(e) => e.stopPropagation()}>
+        {post && <Signpost />}
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -252,8 +254,8 @@ export function WelcomeCard({
         {/* A soft light around the card, where the mist has thinned. */}
         <span aria-hidden className="pointer-events-none absolute -inset-12" style={{ background: "radial-gradient(ellipse at center, rgba(255,250,240,.5), rgba(255,250,240,0) 70%)" }} />
         {/* What shows here, and in what order, is chosen in Settings. */}
-        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeLeave={preview ? onClose : undefined} className="absolute -right-2 top-[46px] z-[2]" />
-        <div className="parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[calc(88vh-54px)] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center">
+        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeLeave={preview ? onClose : undefined} className={`absolute -right-2 z-[2] ${post ? "top-[46px]" : "-top-2"}`} />
+        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${post ? "max-h-[calc(88vh-54px)]" : "max-h-[88vh]"} w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`}>
           <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
             {heading}
             {mode === "back" && !addingPhrase && (
