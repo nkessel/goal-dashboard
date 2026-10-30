@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { addCheckNoteAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
-import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft } from "./NightFields";
+import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft, MoonIcon, SunIcon, TimeToken } from "./NightFields";
 import { DateField } from "@/components/ui/DateField";
 import { shiftDay } from "@/lib/wheel-of-time";
 import { BoltIcon } from "@/components/ui/Icons";
@@ -595,14 +595,8 @@ export function EnergyCheck({
                           Morning of
                           <DateField value={n.day} onChange={(v) => v && setNight2(i, { day: v })} max={eveningDayKey()} ariaLabel="The morning after the night" className="night-time font-display" />
                         </span>
-                        <label className="flex items-center gap-1.5 text-[14px] font-semibold" style={{ color: "var(--t-cream)" }}>
-                          Slept
-                          <input type="time" value={n.bed} onChange={(e) => setNight2(i, { bed: e.target.value })} aria-label="Sleep time" className="night-time w-[136px] shrink-0" />
-                        </label>
-                        <label className="flex items-center gap-1.5 text-[14px] font-semibold" style={{ color: "var(--t-cream)" }}>
-                          Woke
-                          <input type="time" value={n.wake} onChange={(e) => setNight2(i, { wake: e.target.value })} aria-label="Wake time" className="night-time w-[136px] shrink-0" />
-                        </label>
+                        <TimeToken value={n.bed} onChange={(v) => setNight2(i, { bed: v })} label="Sleep time" icon={<MoonIcon />} kind="bed" compact />
+                        <TimeToken value={n.wake} onChange={(v) => setNight2(i, { wake: v })} label="Wake time" icon={<SunIcon />} kind="wake" compact />
                         <button type="button" onClick={() => setOtherNights((o) => o.filter((x) => x.id !== n.id))} aria-label="Remove this night" className="ml-auto flex h-8 w-8 items-center justify-center text-[18px] leading-none" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
                           ×
                         </button>
