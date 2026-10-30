@@ -9,7 +9,8 @@ export type StandIn = { id: string; title: string; due_at: string | null; next_s
  * A stand-in quest ("AR class homework") speaks for a board: it keeps its own
  * clear title, but takes the due date and priority of that board's current
  * assignment (what's coming up first, then the oldest missed one), and shows
- * which assignment and step that is.
+ * which assignment and step that is. A due date set on the stand-in itself
+ * wins over the borrowed one.
  */
 export async function applyStandIns<T extends Task>(ownerId: string, tasks: T[]): Promise<(T & { stand_in?: StandIn | null })[]> {
   const standIns = tasks.filter((t) => t.stands_for);
@@ -71,10 +72,11 @@ export async function applyStandIns<T extends Task>(ownerId: string, tasks: T[])
   return tasks.map((t) => {
     if (!t.stands_for) return t;
     const p = picks.get(t.id);
-    if (!p) return { ...t, stand_in: null };
+    if (!p) return { ...t, stand_in: null, own_due_at: t.due_at ?? null };
     return {
       ...t,
-      due_at: p.due_at ?? t.due_at,
+      due_at: t.due_at ?? p.due_at,
+      own_due_at: t.due_at ?? null,
       importance: Math.max(t.importance ?? 0, p.importance ?? 0),
       urgency: Math.max(t.urgency ?? 0, p.urgency ?? 0),
       estimate_minutes: t.estimate_minutes ?? p.estimate_minutes,

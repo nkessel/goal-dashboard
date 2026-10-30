@@ -169,8 +169,10 @@ export function QuestEditorDialog({
   });
   // Pieces of time are no longer offered; an existing setting is kept as it is.
   const [chunk] = useState<string>(task?.chunk_minutes ? String(task.chunk_minutes) : "");
-  const [dueDate, setDueDate] = useState(localDate(task?.due_at));
-  const [dueTime, setDueTime] = useState(localTime(task?.due_at));
+  // A stand-in shows its board's due date; the editor only edits its own, so saving doesn't freeze the borrowed one in.
+  const ownDue = task && task.own_due_at !== undefined ? task.own_due_at : task?.due_at;
+  const [dueDate, setDueDate] = useState(localDate(ownDue));
+  const [dueTime, setDueTime] = useState(localTime(ownDue));
   type Placement = "today" | "additional" | "none";
   const initialPlacement: Placement = task
     ? task.is_manual_priority
