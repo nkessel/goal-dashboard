@@ -147,6 +147,8 @@ export function QuestEditorDialog({
 }) {
   const embedded = useIsEmbedded();
   const scaleStyle = useScaleStyle();
+  // Which quick-detail chip is open (one at a time).
+  const [factOpen, setFactOpen] = useState<EditorPart | null>(null);
   const isAdventure = theme === "adventure";
   const task = mode.kind === "edit" ? mode.task : null;
   const create = mode.kind === "create" ? mode : null;
@@ -979,14 +981,14 @@ export function QuestEditorDialog({
           className={smallBtn}
           style={smallBtnStyle(tiny)}
         >
-          <span aria-hidden>🌱</span> Tiny task
+          <span aria-hidden>🌱</span> <span className={toolbarHost ? "" : "sr-only"}>Tiny task</span>
         </button>
         <button type="button" onClick={() => (setShowTemplates((v) => !v), setShowDrafts(false))} aria-expanded={showTemplates} title="Start from a template or a quick set" className={smallBtn} style={smallBtnStyle(showTemplates)}>
-          <span aria-hidden>📜</span> Templates
+          <span aria-hidden>📜</span> <span className={toolbarHost ? "" : "sr-only"}>Templates</span>
         </button>
         {otherDrafts.length > 0 && (
           <button type="button" onClick={() => (setShowDrafts((v) => !v), setShowTemplates(false))} aria-expanded={showDrafts} title="Quests you started and didn't finish" className={smallBtn} style={smallBtnStyle(showDrafts)}>
-            <span aria-hidden>📝</span> Drafts <span className="tabular-nums opacity-70">{otherDrafts.length}</span>
+            <span aria-hidden>📝</span> <span className={toolbarHost ? "" : "sr-only"}>Drafts</span> <span className="tabular-nums opacity-70">{otherDrafts.length}</span>
           </button>
         )}
       </span>
@@ -1999,6 +2001,41 @@ export function QuestEditorDialog({
       </>
     ),
   };
+  const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp", "board"];
+  const factLabel = (f: EditorPart) =>
+    f === "showsIn"
+      ? placement === "today"
+        ? "Today"
+        : placement === "additional"
+          ? "Additional"
+          : "Backlog"
+      : f === "time"
+        ? estimate.trim()
+          ? `${estimate.trim()} min${slot ? " · scheduled" : ""}`
+          : slot
+            ? "Scheduled"
+            : "Time"
+        : f === "xp"
+          ? `${xp} XP`
+          : (boardOptions?.find((o) => o.id === boardId)?.label ?? "No board");
+  const factIcon = (f: EditorPart) => {
+    const src = f === "showsIn" ? null : f === "time" ? "/design/ui-clock.png" : f === "xp" ? null : "/design/ui-grid.png";
+    if (f === "xp")
+      return (
+        <span aria-hidden className="text-[11px] font-bold" style={{ color: "var(--t-xp)" }}>
+          ✦
+        </span>
+      );
+    if (f === "showsIn")
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "#8a6116" }}>
+          <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" stroke="currentColor" strokeWidth="2" />
+          <circle cx="12" cy="10" r="2.2" fill="currentColor" />
+        </svg>
+      );
+    // eslint-disable-next-line @next/next/no-img-element -- card glyph
+    return <img src={src!} alt="" width={15} height={15} className="h-[15px] w-[15px]" />;
+  };
   const partShown: Record<EditorPart, boolean> = {
     showsIn: !doingNow && !isCompleted && !fixedSchedule,
     time: !doingNow,
@@ -2109,8 +2146,8 @@ export function QuestEditorDialog({
             style={{ background: `linear-gradient(180deg, ${isAdventure ? "var(--t-panel)" : "var(--t-card)"} 70%, transparent)` }}
           >
             {/* The quest's own title stays at the top while you scroll. */}
-            <h3 className={`m-0 min-w-0 flex-1 truncate pr-2 text-[15px] ${isAdventure ? "font-display" : "font-bold"}`} style={{ color: title.trim() ? "var(--t-ink)" : "var(--t-ink-soft)" }} title={title.trim() || heading}>
-              {title.trim() || heading}
+            <h3 className={`m-0 min-w-0 flex-1 truncate pr-2 text-[15px] ${isAdventure ? "font-display" : "font-bold"}`} style={{ color: "var(--t-ink-soft)" }}>
+              {heading}
             </h3>
             {!toolbarHost && toolbarButtons}
             {/* Which fields show, and in what order, is in Settings. A started quest waits in Drafts. */}
@@ -2321,9 +2358,41 @@ export function QuestEditorDialog({
           {toolbarHost && toolbarButtons && createPortal(toolbarButtons, toolbarHost)}
 
           {/* Shown parts first (in your order), then the Advanced settings fold with the rest. */}
-          {layout.order.filter((k) => !layout.folded.includes(k)).map((k) => (
-            <Fragment key={k}>{partNodes[k]}</Fragment>
-          ))}
+          {layout.order.filter((k) => !layout.folded.includes(k)).map((k) => {
+            // Where it shows, its time, its XP and its board: one calm row of chips, each opening its control.
+            if (FACT_KEYS.includes(k)) {
+              const facts = layout.order.filter((x) => FACT_KEYS.includes(x) && !layout.folded.includes(x) && partShown[x]);
+              if (facts[0] !== k) return null;
+              return (
+                <Fragment key="facts">
+                  <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick details">
+                    {facts.map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setFactOpen((o) => (o === f ? null : f))}
+                        aria-expanded={factOpen === f}
+                        className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold"
+                        data-open={factOpen === f ? "true" : undefined}
+                      >
+                        {factIcon(f)}
+                        <span className="max-w-[150px] truncate">{factLabel(f)}</span>
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="opacity-60 transition-transform" style={{ transform: factOpen === f ? "rotate(180deg)" : undefined }}>
+                          <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                  {factOpen && facts.includes(factOpen) && (
+                    <div key={factOpen} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
+                      {partNodes[factOpen]}
+                    </div>
+                  )}
+                </Fragment>
+              );
+            }
+            return <Fragment key={k}>{partNodes[k]}</Fragment>;
+          })}
           {advancedHeader}
           {advOpen && layout.order.filter((k) => layout.folded.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)}
           {pickingSlot && (
@@ -2409,10 +2478,10 @@ export function QuestEditorDialog({
                       onClick={completeExisting}
                       disabled={isSaving || !title.trim()}
                       title={`Complete this ${noun} now`}
-                      className="hover-glow h-10 whitespace-nowrap rounded-full px-3.5 text-[15px] font-semibold disabled:cursor-default disabled:opacity-45"
-                      style={{ background: isAdventure ? "linear-gradient(180deg, #f8e3a0 0%, #e2bf63 45%, #b8913f 100%)" : "var(--t-gold, #d9b45f)", color: "#2a1c10", border: "1px solid #4a3913", boxShadow: "inset 0 1px 0 rgba(255,250,230,.7)" }}
+                      className="hover-glow flex h-10 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-[14.5px] font-semibold disabled:cursor-default disabled:opacity-45"
+                      style={{ background: "rgba(255,250,238,.5)", color: "#5a3d12", border: "1.5px solid #b39a6a" }}
                     >
-                      {isAdventure ? "Complete quest" : "Complete"}
+                      ✓ {isAdventure ? "Complete" : "Complete"}
                     </button>
                   )}
                   <button

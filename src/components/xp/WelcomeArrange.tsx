@@ -43,32 +43,29 @@ export function ArrangeAbove({ fx, castleHidden, onDone }: { fx: FxSettings; cas
           Done
         </button>
       </div>
-      {/* When it opens, read as one sentence: the number sits between its own − and +. */}
-      <div className="relative z-[1] flex flex-col gap-1.5">
-        <span className="text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: GOLD }}>
-          When it opens
-        </span>
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px]" style={{ color: INK, opacity: h ? 1 : 0.5 }}>
-          <span>On the day&rsquo;s first visit, then again after</span>
+      {/* When it opens, as one line: 0 hours = only the day's first visit. Confetti sits beside the title. */}
+      <div className="relative z-[1] flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: GOLD }}>
+            When it opens
+          </span>
+          <button type="button" role="switch" aria-checked={fx.welcomeConfetti !== false} onClick={() => set({ welcomeConfetti: fx.welcomeConfetti === false })} title="Confetti on the day's first visit" className="ml-auto flex h-7 items-center gap-1 rounded-full px-2.5 text-[12px] font-semibold" style={fx.welcomeConfetti !== false ? CHIP_ON : CHIP}>
+            🎉 Confetti {fx.welcomeConfetti !== false ? "on" : "off"}
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px]" style={{ color: INK }}>
+          <span>{h ? "First visit of the day, then again after" : "Only the day's first visit"}</span>
           <span className="inline-flex h-8 items-center rounded-full" style={CHIP}>
-            <button type="button" onClick={() => set({ welcomeBackHours: Math.max(1, (h || 5) - 1) })} disabled={!h || h <= 1} aria-label="Fewer hours" className="flex h-8 w-7 items-center justify-center rounded-l-full text-[16px] disabled:opacity-30">
+            <button type="button" onClick={() => set({ welcomeBackHours: Math.max(0, h - 1) })} disabled={h <= 0} aria-label="Fewer hours (0 = first visit only)" className="flex h-8 w-7 items-center justify-center rounded-l-full text-[16px] disabled:opacity-30">
               −
             </button>
-            <span className="font-display min-w-[64px] text-center text-[14.5px] tabular-nums">
-              {h || 5} {(h || 5) === 1 ? "hour" : "hours"}
-            </span>
-            <button type="button" onClick={() => set({ welcomeBackHours: Math.min(12, (h || 5) + 1) })} disabled={!h || h >= 12} aria-label="More hours" className="flex h-8 w-7 items-center justify-center rounded-r-full text-[16px] disabled:opacity-30">
+            <span className="font-display min-w-[58px] text-center text-[14.5px] tabular-nums">{h ? `${h} ${h === 1 ? "hr" : "hrs"}` : "never"}</span>
+            <button type="button" onClick={() => set({ welcomeBackHours: Math.min(12, h + 1) })} disabled={h >= 12} aria-label="More hours" className="flex h-8 w-7 items-center justify-center rounded-r-full text-[16px] disabled:opacity-30">
               +
             </button>
           </span>
-          <span>away</span>
+          {h > 0 && <span>away</span>}
         </div>
-        <GoldCheck checked={h === 0} onChange={(v) => set({ welcomeBackHours: v ? 0 : 5 })}>
-          Only the day&rsquo;s first visit
-        </GoldCheck>
-        <GoldCheck checked={fx.welcomeConfetti !== false} onChange={(v) => set({ welcomeConfetti: v })}>
-          Confetti on the day&rsquo;s first visit
-        </GoldCheck>
       </div>
       {/* On a narrow screen the castle is off to the side, out of view; its choice comes up here instead. */}
       {castleHidden && (
