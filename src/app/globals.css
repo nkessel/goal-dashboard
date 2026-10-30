@@ -147,7 +147,7 @@ body {
   transition: box-shadow 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 .hover-glow:hover {
-  box-shadow: 0 0 0 1px var(--t-glow), 0 0 16px var(--t-glow);
+  box-shadow: 0 0 0 1px var(--t-glow), 0 0 9px color-mix(in srgb, var(--t-glow) 55%, transparent);
 }
 .hover-glow:active {
   transform: scale(0.98);
@@ -1229,8 +1229,10 @@ html[data-fog-lift]::after { animation: fog-lift 0.9s ease forwards; }
 }
 @media (hover: hover) {
   :where(a[href], button:not(:disabled), [role="button"], summary):hover {
-    filter: brightness(1.12) saturate(1.06);
+    filter: brightness(1.06) saturate(1.03);
   }
+  /* Whole bars that open a tray only warm a touch. */
+  .drawer-header:hover { filter: brightness(1.03); }
   /* Plain text links also get an underline, so they read as links. */
   :where(a[href].underline, a[href]:not([class])):hover {
     text-decoration-thickness: 2px;
@@ -2742,3 +2744,13 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 /* The feedback picture upload bar: a gold sliver sliding along while it sends. */
 .upload-bar > span { animation: upload-slide 1.2s ease-in-out infinite; }
 @keyframes upload-slide { from { margin-left: -33%; } to { margin-left: 100%; } }
+
+/* ── Steps tray: rows warm softly under the pointer; the next step is marked ── */
+.step-row, .step-group { transition: background-color 160ms ease; }
+@media (hover: hover) {
+  .step-row:hover, .step-group:hover { background-color: rgba(226, 187, 92, 0.12); filter: none; }
+}
+.step-next { background-color: rgba(226, 187, 92, 0.1); }
+.xp-pop { animation: xp-pop 1.6s ease-out both; }
+@keyframes xp-pop { 0% { opacity: 0; transform: translateY(4px) scale(.9); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .xp-pop { animation: none; } }

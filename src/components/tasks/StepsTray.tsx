@@ -26,15 +26,6 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
   }, [task.id]);
 
   const holders = steps ? parentKeys(steps) : new Set<string>();
-  const depthOf = (st: StepDraft) => {
-    let d = 0;
-    let p = st.parentKey;
-    while (p && d < 6) {
-      d += 1;
-      p = steps?.find((y) => y.key === p)?.parentKey ?? null;
-    }
-    return d;
-  };
   const live = (steps ?? []).filter((st) => !holders.has(st.key) && st.state !== "skipped");
   const allDone = live.length > 0 && live.every((st) => st.done);
 
@@ -66,10 +57,97 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
     });
   }
 
-  const box = isAdventure ? "#8a6c2c" : "var(--t-card-border)";
+  // Groups (steps with steps inside) fold; the one holding your next step starts open.
+  const nextKey = steps?.find((st) => !holders.has(st.key) && !st.done && st.state !== "skipped" && st.state !== "failed")?.key ?? null;
+  const [openGroups, setOpenGroups] = useState<Set<string> | null>(null);
+  const groupOpen = (key: string) => (openGroups ? openGroups.has(key) : !!(nextKey && steps && descendants(steps, key).has(nextKey)));
+  const toggleGroup = (key: string) => {
+    const now = new Set(steps ? [...holders].filter((k) => groupOpen(k)) : []);
+    if (now.has(key)) now.delete(key);
+    else now.add(key);
+    setOpenGroups(now);
+  };
+  const doneCount = live.filter((x) => x.done).length;
+  const pct = live.length ? Math.round((doneCount / live.length) * 100) : 0;
+  const ink = isAdventure ? "#3a2a10" : "var(--t-ink)";
+  const soft = isAdventure ? "#7a6440" : "var(--t-ink-soft)";
+
+  const renderList = (parent: string | null, depth: number): React.ReactNode => {
+    const here = (steps ?? []).filter((st) => (st.parentKey ?? null) === parent);
+    if (!here.length) return null;
+    return (
+      <ul className="m-0 flex list-none flex-col p-0" style={depth ? { marginLeft: 11, paddingLeft: 10, borderLeft: `1.5px solid ${isAdventure ? "rgba(168,138,63,.35)" : "var(--t-card-border)"}` } : undefined}>
+        {here.map((st) => {
+          if (holders.has(st.key)) {
+            const inside = [...descendants(steps!, st.key)].filter((k) => k !== st.key && !holders.has(k)).map((k) => steps!.find((y) => y.key === k)!);
+            const done = inside.filter((x) => x.done || x.state === "skipped").length;
+            const open = groupOpen(st.key);
+            const all = inside.length > 0 && done === inside.length;
+            return (
+              <li key={st.key} className="flex flex-col">
+                <button type="button" onClick={() => toggleGroup(st.key)} aria-expanded={open} className="step-group flex min-h-9 w-full items-center gap-2 rounded-lg px-1 text-left">
+                  <GroupRing done={done} total={inside.length} isAdventure={isAdventure} />
+                  <span className={`min-w-0 flex-1 truncate text-[14px] font-semibold ${all ? "opacity-60" : ""}`} style={{ color: ink }}>
+                    {st.title}
+                  </span>
+                  <span className="text-[11.5px] tabular-nums" style={{ color: soft }}>
+                    {done}/{inside.length}
+                  </span>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform duration-300" style={{ color: soft, transform: open ? "rotate(180deg)" : undefined }}>
+                    <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <div className="drawer-body" data-open={open ? "true" : "false"}>
+                  <div className="drawer-inner" inert={!open}>
+                    {renderList(st.key, depth + 1)}
+                  </div>
+                </div>
+              </li>
+            );
+          }
+          const struck = st.state === "skipped" || st.state === "failed";
+          const checked = st.done;
+          const isNext = st.key === nextKey;
+          return (
+            <li key={st.key}>
+              <label className={`step-row flex min-h-8 items-center gap-2.5 rounded-lg px-1 py-[3px] ${struck ? "" : "cursor-pointer"} ${isNext ? "step-next" : ""}`}>
+                <input type="checkbox" checked={checked} disabled={struck} onChange={(e) => tick(st.key, e.target.checked)} className="peer sr-only" />
+                <span
+                  aria-hidden
+                  className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-[6px] transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#8a6116]"
+                  style={
+                    checked
+                      ? isAdventure
+                        ? { background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 0 6px rgba(242,210,126,.5), inset 0 1px 0 rgba(255,255,255,.6)" }
+                        : { border: "1.5px solid var(--t-good)", background: "var(--t-good)" }
+                      : { background: "rgba(255,250,238,.85)", border: `1.5px solid ${isAdventure ? "#b39a6a" : "var(--t-card-border)"}`, boxShadow: "inset 0 1px 2px rgba(0,0,0,.12)" }
+                  }
+                >
+                  {checked && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="gold-check-draw">
+                      <path d="M5 12.5l4.5 4.5L19 7.5" stroke={isAdventure ? "#3a2a10" : "#fff"} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
+                <span className={`min-w-0 flex-1 text-[13.5px] leading-snug transition-opacity duration-300 ${checked || struck ? "line-through opacity-55" : ""}`} style={{ color: ink }}>
+                  {st.title}
+                </span>
+                {isNext && (
+                  <span className="shrink-0 rounded-full px-1.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#6b4a12", background: "rgba(226,187,92,.28)" }}>
+                    Next
+                  </span>
+                )}
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
+
   return (
     <div
-      className={`steps-tray reveal relative -mt-3 mx-2 rounded-b-2xl px-3.5 pb-3 pt-5 ${isAdventure ? "parchment" : ""}`}
+      className={`steps-tray relative mx-2 rounded-b-2xl px-3 pb-2.5 pt-5 ${isAdventure ? "parchment" : ""}`}
       onClick={(e) => e.stopPropagation()}
       // A scroll unrolled from under the card: parchment, a gilded hairline inside the edge.
       style={
@@ -79,92 +157,64 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
       }
     >
       <div className="relative z-[1] flex flex-col">
-      {steps && steps.length > 0 && (
-        <div className="mb-1 flex items-center gap-2">
-          <span className={isAdventure ? "font-display text-[15px]" : "text-[12px] font-bold uppercase tracking-wide"} style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}>
-            Steps
-          </span>
-          <span aria-hidden className="h-px flex-1" style={{ background: isAdventure ? "linear-gradient(90deg, rgba(168,138,63,.6), transparent)" : "var(--t-card-border)" }} />
-          <span className="text-[12px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-            {live.filter((x) => x.done).length}/{live.length}
-          </span>
-        </div>
-      )}
-      {steps === null && !error && (
-        <p className="m-0 text-[13px] italic" style={{ color: "var(--t-ink-soft)" }}>
-          Unrolling the steps…
-        </p>
-      )}
-      {steps && (
-        <ul className="m-0 flex list-none flex-col p-0">
-          {steps.map((st) => {
-            const isHolder = holders.has(st.key);
-            const inside = isHolder ? [...descendants(steps, st.key)].filter((k) => k !== st.key && !holders.has(k)).map((k) => steps.find((y) => y.key === k)!) : [];
-            const checked = isHolder ? inside.length > 0 && inside.every((x) => x.done || x.state === "skipped") : st.done;
-            const struck = st.state === "skipped" || st.state === "failed";
-            return (
-              <li key={st.key} style={{ marginLeft: depthOf(st) * 20 }}>
-                <label className={`flex min-h-9 items-center gap-2.5 ${isHolder || struck ? "" : "cursor-pointer"}`}>
-                  {isHolder ? (
-                    <span className="w-[18px] shrink-0 text-center text-[11.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                      {inside.filter((x) => x.done).length}/{inside.length}
-                    </span>
-                  ) : (
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={struck}
-                      onChange={(e) => tick(st.key, e.target.checked)}
-                      className="peer sr-only"
-                    />
-                  )}
-                  {!isHolder && (
-                    <span
-                      aria-hidden
-                      className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] peer-focus-visible:outline peer-focus-visible:outline-2"
-                      style={
-                        isAdventure
-                          ? { border: `1.5px solid ${checked ? "#6b4a12" : box}`, background: checked ? "linear-gradient(180deg,#f6dc8e,#d9b45f 55%,#a88a3f)" : "rgba(255,250,235,.6)", boxShadow: checked ? "inset 0 1px 0 rgba(255,250,230,.7)" : "inset 0 1px 2px rgba(60,40,10,.2)" }
-                          : { border: `1.5px solid ${checked ? "var(--t-good)" : box}`, background: checked ? "var(--t-good)" : "rgba(255,250,235,.5)" }
-                      }
-                    >
-                      {checked && (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                          <path d="M5 12.5l4.5 4.5L19 7.5" stroke={isAdventure ? "#2a1c10" : "#fff"} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </span>
-                  )}
-                  <span className={`min-w-0 flex-1 text-[14.5px] leading-snug ${isHolder ? "font-semibold" : ""} ${checked || struck ? "line-through opacity-60" : ""}`} style={{ color: "var(--t-ink)" }}>
-                    {st.title}
-                  </span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {error && (
-        <p role="alert" className="m-0 text-[13px]" style={{ color: "var(--t-warn)" }}>
-          {error}
-        </p>
-      )}
-      <div className="mt-1 flex items-center gap-3 text-[13px]">
-        {pop !== null && (
-          <span aria-live="polite" className="font-bold" style={{ color: "var(--t-xp)" }}>
-            +{pop} XP
-          </span>
+        {steps && steps.length > 0 && (
+          // How far along: a gilded bar that fills as you tick.
+          <div className="mb-1.5 flex items-center gap-2.5 px-1">
+            <span className={isAdventure ? "font-display text-[14.5px]" : "text-[12px] font-bold uppercase tracking-wide"} style={{ color: isAdventure ? "#6b4a12" : soft }}>
+              Steps
+            </span>
+            <span className="relative h-[7px] flex-1 overflow-hidden rounded-full" style={{ background: "rgba(90,64,20,.16)", boxShadow: "inset 0 1px 2px rgba(0,0,0,.18)" }}>
+              <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#c99a3a,#f2d27e)", boxShadow: "0 0 6px rgba(242,210,126,.6)" }} />
+            </span>
+            <span className="text-[12px] tabular-nums" style={{ color: soft }}>
+              {doneCount}/{live.length}
+            </span>
+          </div>
         )}
-        {allDone && (
-          <button type="button" onClick={onComplete} className={`hover-glow h-8 rounded-full px-3 text-[13px] font-semibold ${isAdventure ? "one-thing-primary" : ""}`} style={isAdventure ? undefined : { background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f" }}>
-            All done · complete it
+        {steps === null && !error && (
+          <p className="m-0 px-1 text-[13px] italic" style={{ color: soft }}>
+            Unrolling the steps…
+          </p>
+        )}
+        {steps && <div className="max-h-[320px] overflow-y-auto overscroll-contain pr-0.5">{renderList(null, 0)}</div>}
+        {error && (
+          <p role="alert" className="m-0 text-[13px]" style={{ color: "var(--t-warn)" }}>
+            {error}
+          </p>
+        )}
+        <div className="mt-1.5 flex items-center gap-2.5 px-1 text-[13px]">
+          {pop !== null && (
+            <span aria-live="polite" className="xp-pop font-bold" style={{ color: "var(--t-xp)" }}>
+              +{pop} XP
+            </span>
+          )}
+          {allDone && (
+            <button type="button" onClick={onComplete} className={`reveal h-8 rounded-full px-3 text-[13px] font-semibold ${isAdventure ? "one-thing-primary" : ""}`} style={isAdventure ? undefined : { background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f" }}>
+              All done · complete it
+            </button>
+          )}
+          <button type="button" onClick={onEdit} className="ml-auto flex h-7 items-center gap-1 rounded-full px-2 text-[12.5px] font-semibold" style={{ color: soft }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+            </svg>
+            Edit steps
           </button>
-        )}
-        <button type="button" onClick={onEdit} className="ml-auto underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
-          Edit {isAdventure ? "quest" : "task"}
-        </button>
-      </div>
+        </div>
       </div>
     </div>
+  );
+}
+
+/** A group's progress: a small gilded ring that closes as its steps are done. */
+function GroupRing({ done, total, isAdventure }: { done: number; total: number; isAdventure: boolean }) {
+  const r = 7.5;
+  const c = 2 * Math.PI * r;
+  const f = total ? done / total : 0;
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden className="shrink-0">
+      <circle cx="10" cy="10" r={r} fill="none" stroke={isAdventure ? "rgba(139,112,64,.3)" : "var(--t-card-border)"} strokeWidth="2.5" />
+      <circle cx="10" cy="10" r={r} fill="none" stroke={isAdventure ? "#c99a3a" : "var(--t-good)"} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${c * f} ${c}`} transform="rotate(-90 10 10)" style={{ transition: "stroke-dasharray 400ms ease-out" }} />
+      {f === 1 && <path d="M6.5 10.2l2.3 2.3 4.7-4.9" stroke={isAdventure ? "#6b4a12" : "var(--t-good)"} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+    </svg>
   );
 }

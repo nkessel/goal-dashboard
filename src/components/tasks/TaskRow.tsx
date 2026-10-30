@@ -112,7 +112,13 @@ export function TaskRow({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   // A quest with steps: a tap slides out its checklist instead of opening the editor.
-  const [tray, setTray] = useState(false);
+  const [tray, setTrayOpen] = useState(false);
+  // Once opened, the steps stay mounted so the tray can slide closed too.
+  const [trayEver, setTrayEver] = useState(false);
+  const setTray = (v: boolean | ((t: boolean) => boolean)) => {
+    setTrayEver(true);
+    setTrayOpen(v);
+  };
   const hasSteps = (task.steps_total ?? 0) > 0 && task.status === "open";
   // "Edit first" from Already completed: when the editor closes, the day picker comes back.
   const [backToEarlier, setBackToEarlier] = useState(false);
@@ -154,7 +160,7 @@ export function TaskRow({
   const xpColor = isAdventure ? "var(--t-xp)" : "var(--t-accent)";
   const metaColor = "var(--t-ink-soft)";
   const dividerColor = isAdventure ? "var(--t-divider)" : "var(--t-card-border)";
-  const avatarSize = compact ? 48 : 60;
+  const avatarSize = compact ? 44 : 60;
   // Tiny tasks: half height, with just a check box (or a small portrait if one was added).
   const tiny = Boolean(task.is_tiny) && !compact;
 
@@ -449,11 +455,11 @@ export function TaskRow({
           </span>
         </div>
       ) : (
-      <div className="flex items-stretch gap-2 sm:gap-3">
+      <div className={`flex items-stretch ${compact ? "gap-1.5" : "gap-2 sm:gap-3"}`}>
         {/* Left: board tag centered over (and overlapping) the quest portrait.
             Quests without a goal get a quiet "+ Goal" tag in the same spot, so
             every card lines up and filing one is a click away. */}
-        <div className="relative flex w-[66px] shrink-0 flex-col items-center sm:w-[80px]" onClick={(e) => e.stopPropagation()}>
+        <div className={`relative flex shrink-0 flex-col items-center ${compact ? "w-[52px]" : "w-[66px] sm:w-[80px]"}`} onClick={(e) => e.stopPropagation()}>
           {task.reward_id ? (
             <span
               className="relative z-[2] -mb-2.5 flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-px text-[11.5px] font-semibold leading-snug sm:px-2 sm:text-[12.5px]"
@@ -463,7 +469,7 @@ export function TaskRow({
             </span>
           ) : categoryLabel ? (
             <span
-              className="relative z-[2] -mb-2.5 max-w-[76px] truncate rounded-md px-2 py-px text-[12.5px] leading-snug sm:max-w-[88px] sm:px-2.5 sm:text-[13px]"
+              className={`relative z-[2] -mb-2.5 truncate rounded-md py-px leading-snug ${compact ? "max-w-[60px] px-1.5 text-[11.5px]" : "max-w-[76px] px-2 text-[12.5px] sm:max-w-[88px] sm:px-2.5 sm:text-[13px]"}`}
               style={{
                 background: isAdventure ? "linear-gradient(180deg,#e2cfa6,#ccb588)" : "var(--t-accent-soft)",
                 border: `1px solid ${isAdventure ? "#8a7250" : "var(--t-card-border)"}`,
@@ -634,7 +640,7 @@ export function TaskRow({
         <div className="shrink-0" style={{ width: 1, background: dividerColor }} aria-hidden />
 
         {/* Right: time, XP, importance */}
-        <div className={`flex shrink-0 flex-col items-start justify-center ${compact ? "w-[62px] gap-1 pt-3" : "w-[66px] gap-1 pt-1.5 sm:w-[84px] sm:pl-1"}`}>
+        <div className={`flex shrink-0 flex-col items-start justify-center ${compact ? "w-[56px] gap-1 pt-3" : "w-[66px] gap-1 pt-1.5 sm:w-[84px] sm:pl-1"}`}>
           {task.estimate_minutes != null && (
             <span className="flex items-center gap-1.5" style={{ color: "var(--t-ink)", fontSize: compact ? 13.5 : 15 }}>
               {isAdventure ? (
@@ -721,8 +727,11 @@ export function TaskRow({
       </div>
     </div>
       </SwipeReveal>
-      {tray && hasSteps && !done && (
-        <StepsTray
+      {hasSteps && !done && (
+        // Tucked under the card's lower edge while open.
+        <div className="drawer-body" data-open={tray ? "true" : "false"} style={{ marginTop: tray ? -12 : 0, transition: "grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 240ms ease, margin-top 320ms ease" }}>
+        <div className="drawer-inner" inert={!tray}>
+        {trayEver && <StepsTray
           task={task}
           isAdventure={isAdventure}
           onEdit={() => {
@@ -733,7 +742,9 @@ export function TaskRow({
             setTray(false);
             pick("complete");
           }}
-        />
+        />}
+        </div>
+        </div>
       )}
     </li>
   );

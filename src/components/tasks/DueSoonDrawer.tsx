@@ -95,7 +95,7 @@ export function DueSoonDrawer({ tasks, onOpenChange }: { tasks: Lite[]; onOpenCh
           ) : shown ? (
             <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-left">
               {shown.map((t) => (
-                <TaskRow key={t.id} task={t} theme="adventure" categoryLabel={t.categoryLabel} />
+                <TaskRow key={t.id} task={t} theme="adventure" categoryLabel={t.categoryLabel} compact />
               ))}
             </ul>
           ) : (

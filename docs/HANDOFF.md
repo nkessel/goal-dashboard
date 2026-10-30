@@ -4,7 +4,7 @@
 
 - **Last updated:** 2026-10-30 night (last screen on sign-in, reward parts; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 19:50 UTC, still open: Due soon card layout and subquest drawer redesign; toucan popups from the bird itself; the bird in Settings when freed; early bonus on the due line with custom XP/coins/per-day bonus ("choose early-completion reward"); quest ⋯ menu gear = drag + hide; hover brightening too strong (Due soon tray); calendar Schedule button display and Settings button responsiveness; opening feedback on /settings/inventory reloads the page behind it. Also asked in chat: laundry habit steps (Load with towels/sheets/gently used reminders, Wash, Dry, Fold) with an elegant focus timer.
+- **Pending in-app feedback:** as of 2026-10-30 19:50 UTC, still open: toucan popups from the bird itself; the bird in Settings when freed; early bonus on the due line with custom XP/coins/per-day bonus ("choose early-completion reward"); quest ⋯ menu gear = drag + hide; calendar Schedule button display and Settings button responsiveness; opening feedback on /settings/inventory reloads the page behind it. Also asked in chat: laundry habit steps (Load with towels/sheets/gently used reminders, Wash, Dry, Fold) with an elegant focus timer.
 
 ---
 
@@ -46,7 +46,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0070_reward_prereq_steps.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0071_reward_sequence.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -118,7 +118,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
-- Oct 30 (night): Signing in returns you to the screen you were last on (`components/ui/LastScreen.tsx` keeps a `last-path` cookie; the sign-in in `app/page.tsx` reads it). Opening the app fresh still lands on Today for the welcome screen. Reward prerequisite quests can have parts (`rewards.prereq_steps`, migration 0070): listed under the quest in the reward editor, added as the quest's steps when the reward is accepted.
+- Oct 30 (night): Signing in returns you to the screen you were last on (`components/ui/LastScreen.tsx` keeps a `last-path` cookie; the sign-in in `app/page.tsx` reads it). Opening the app fresh still lands on Today for the welcome screen. A reward has a quest sequence (reward editor › "Add quests before or after"): quests before it (`prereq_title` + `rewards.prereq_more`) and after it (`rewards.followups`, migrations 0070–0071); accepting creates them chained by `locked_by_task_id`, the reward quest in its place. Steps tray redesigned (`StepsTray.tsx`): gilded progress bar, folding groups with progress rings (the one with your next step opens), a Next marker, gold checks; slides open and closed. Welcome Due soon uses compact cards (narrower portrait and XP columns so titles get room). Hover brightening toned down (buttons 1.06, tray bars 1.03, softer card glow).
 - Oct 30 (evening): Logged events keep their line breaks (cap 400; `tidyNote` in `lib/data/energy.ts`); Insights › Events shows them whole and edits them in a box (Shift+Enter for a new line); check-in chips show the first line. Feedback pictures upload in the background (`lib/feedback-uploads.ts`, 3 tries, then Retry): sending never waits, a late picture joins the saved note via `/api/feedback/attach`; a small closable bar bottom right shows progress (`UploadBar` in `FeedbackDock.tsx`). Before this, sending mid-upload dropped the picture (the Oct 29 event note).
 - Oct 30 (evening): "Vitamins before 12pm" added to the owner's Right Effort (Factors of sleep) and to the defaults.
 - Oct 30 (evening): Welcome toucan: right-click (or tap) opens his menu, now with Toucan settings; drag him anywhere (remembered, `welcome-toucan-at`); his bubble's ‹ › step through what he could ask (`TOUCAN_PROMPTS` in `lib/welcome.ts`) and its ⋯ gives thumbs (👍 asks it first, 👎 never again; `toucan-prompt-votes` in localStorage). Toucan "Not now…": 15 min, 30 min, 1 hour, Other… (2 hrs, 3 hrs, this evening, tomorrow, or a time); closing Other goes back to the choices. Settings cage no longer says "Resting".

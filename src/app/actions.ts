@@ -1287,7 +1287,7 @@ export async function removeTaskIconFromLibraryAction(id: string) {
 // ---------------------------------------------------------------------------
 // Rewards
 // ---------------------------------------------------------------------------
-/** A reward's prerequisite parts: trimmed, no blanks, at most 20. */
+/** A reward's sequence quests: trimmed, no blanks, at most 20. */
 function cleanParts(parts?: string[]): string[] {
   return (parts ?? []).map((p) => p.replace(/\s+/g, " ").trim().slice(0, 200)).filter(Boolean).slice(0, 20);
 }
@@ -1301,7 +1301,8 @@ export async function createRewardAction(input: {
   bonusCoins?: number;
   prereqTitle?: string;
   prereqXp?: number;
-  prereqSteps?: string[];
+  prereqMore?: string[];
+  followups?: string[];
 }) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
@@ -1315,7 +1316,8 @@ export async function createRewardAction(input: {
     bonusCoins: input.bonusCoins,
     prereqTitle: input.prereqTitle?.trim() || null,
     prereqXp: input.prereqXp,
-    prereqSteps: cleanParts(input.prereqSteps),
+    prereqMore: cleanParts(input.prereqMore),
+    followups: cleanParts(input.followups),
   });
   revalidatePath("/rewards");
   return reward.id;
@@ -1332,7 +1334,8 @@ export async function updateRewardAction(
     bonusCoins?: number;
     prereqTitle?: string;
     prereqXp?: number;
-    prereqSteps?: string[];
+    prereqMore?: string[];
+    followups?: string[];
     confirmImport?: boolean;
   }
 ) {
@@ -1348,7 +1351,8 @@ export async function updateRewardAction(
     bonusCoins: input.bonusCoins,
     prereqTitle: input.prereqTitle === undefined ? undefined : input.prereqTitle.trim() || null,
     prereqXp: input.prereqXp,
-    prereqSteps: input.prereqSteps === undefined ? undefined : cleanParts(input.prereqSteps),
+    prereqMore: input.prereqMore === undefined ? undefined : cleanParts(input.prereqMore),
+    followups: input.followups === undefined ? undefined : cleanParts(input.followups),
     needsReview: input.confirmImport ? false : undefined,
   });
   revalidatePath("/rewards");
@@ -1394,24 +1398,22 @@ export async function claimRewardAction(rewardId: string, taskId: string | null,
     revalidatePath("/", "layout");
     return { coins: coinsNow, received: true as const, bonusXp, bonusCoins, totalXp };
   }
-  // It goes straight into Today's Battle: the reward's own quest, stacked
-  // behind its prerequisite quest when it has one.
+  // It goes straight into Today's Battle as a quest sequence: the quests
+  // before it in order (only the first shows; the rest wait in its stack),
+  // then the reward's own quest, then any quests that follow it.
   if (reward.prereq_xp !== undefined) {
-    const prereq = reward.prereq_title
-      ? await tasksData.createTask(ownerId, {
-          title: reward.prereq_title,
-          description: reward.prereq_description || `Do this first to unlock: ${reward.title}`,
-          xpValue: reward.prereq_xp ?? 10,
-          isManualPriority: true,
-        })
-      : null;
-    // Its parts become the quest's steps.
-    if (prereq && reward.prereq_steps?.length) {
-      await stepsData
-        .replaceSteps(prereq.id, ownerId, reward.prereq_steps.map((title, i) => ({ key: `p${i}`, title, done: false })))
-        .catch(() => {});
+    let prereq: { id: string } | null = null;
+    const before = reward.prereq_title ? [reward.prereq_title, ...(reward.prereq_more ?? [])] : [];
+    for (const [i, title] of before.entries()) {
+      prereq = await tasksData.createTask(ownerId, {
+        title,
+        description: i === 0 ? reward.prereq_description || `Do this first to unlock: ${reward.title}` : `On the way to: ${reward.title}`,
+        xpValue: reward.prereq_xp ?? 10,
+        isManualPriority: i === 0,
+        lockedByTaskId: prereq?.id ?? null,
+      });
     }
-    await tasksData.createTask(ownerId, {
+    const rewardQuest = await tasksData.createTask(ownerId, {
       title: reward.title,
       description: reward.description || "Your reward — enjoy it!",
       xpValue: reward.bonus_xp ?? 0,
@@ -1421,6 +1423,11 @@ export async function claimRewardAction(rewardId: string, taskId: string | null,
       lockedByTaskId: prereq?.id ?? null,
       isManualPriority: true,
     });
+    let last = rewardQuest.id;
+    for (const title of reward.followups ?? []) {
+      const next = await tasksData.createTask(ownerId, { title, description: `After: ${reward.title}`, lockedByTaskId: last });
+      last = next.id;
+    }
   }
   revalidatePath("/rewards");
   revalidatePath("/", "layout");

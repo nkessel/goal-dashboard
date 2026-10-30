@@ -51,12 +51,11 @@ export function RewardEditorDialog({
     if (!icon) setIcon(reward?.icon_key ?? null);
   }
   const [price, setPrice] = useState<number>(reward?.cost_coins ?? 3);
-  const [prereq, setPrereq] = useState(reward?.prereq_title ?? "");
   const [prereqXp, setPrereqXp] = useState<number>(reward?.prereq_xp ?? 10);
-  // Parts of the quest (its steps once accepted); an empty one at the end is the "add" field.
-  const [parts, setParts] = useState<string[]>(reward?.prereq_steps ?? []);
-  const setPart = (i: number, v: string) => setParts((ps) => (i >= ps.length ? [...ps, v] : ps.map((p, j) => (j === i ? v : p))));
-  const dropPart = (i: number) => setParts((ps) => ps.filter((_, j) => j !== i));
+  // The reward's quest sequence: quests before it (the first is the prerequisite), and quests after it.
+  const [before, setBefore] = useState<string[]>(reward?.prereq_title ? [reward.prereq_title, ...(reward.prereq_more ?? [])] : []);
+  const [after, setAfter] = useState<string[]>(reward?.followups ?? []);
+  const prereq = before.find((b) => b.trim()) ?? "";
   const [bonusXp, setBonusXp] = useState<number>(reward?.bonus_xp ?? 0);
   const [bonusOpen, setBonusOpen] = useState(false);
   const [prereqOpen, setPrereqOpen] = useState(false);
@@ -64,7 +63,8 @@ export function RewardEditorDialog({
   // Only send bonus fields once the database has them (or when they're set).
   const bonusFields = (r?: Reward) => ({
     ...(r?.bonus_xp !== undefined || bonusXp || bonusCoins ? { bonusXp, bonusCoins } : {}),
-    ...(r?.prereq_xp !== undefined || prereq.trim() ? { prereqTitle: prereq, prereqXp, prereqSteps: parts.filter((p) => p.trim()) } : {}),
+    ...(r?.prereq_xp !== undefined || prereq.trim() ? { prereqTitle: prereq, prereqXp, prereqMore: before.filter((b) => b.trim()).slice(1) } : {}),
+    ...(r?.prereq_xp !== undefined || after.some((a) => a.trim()) ? { followups: after.filter((a) => a.trim()) } : {}),
   });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,80 +183,42 @@ export function RewardEditorDialog({
           </div>
         </div>
 
-        {/* Prerequisite quest: a button until you want one. */}
-        {!prereqOpen && !prereq.trim() ? (
+        {/* The reward's quest sequence: a button until you want one. */}
+        {!prereqOpen && !before.length && !after.length ? (
           <button type="button" onClick={() => setPrereqOpen(true)} className="flex h-10 items-center gap-1.5 self-start rounded-full px-4 text-[14px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: "var(--t-ink)", background: "rgba(255,250,238,.6)" }}>
             <span aria-hidden className="text-[16px] leading-none" style={{ color: "#8a6116" }}>+</span>
-            Add a quest to do first
+            Add quests before or after
           </button>
         ) : (
-        <div className="reveal flex flex-col gap-1.5 rounded-xl px-3.5 py-3" style={{ background: "rgba(255,250,238,.5)", border: "1.5px solid #b39a6a" }}>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[15px] font-semibold">First, a quest</span>
-            <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              unlocks the reward
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              value={prereq}
-              onChange={(e) => setPrereq(e.target.value)}
-              placeholder="e.g. Completely empty the car of all things"
-              aria-label="Prerequisite quest"
-              className="h-10 min-w-0 flex-1 rounded-lg border px-2.5 text-[14.5px]"
-              style={fieldStyle}
-            />
-            {prereq.trim() && (
-              <label className="flex h-10 shrink-0 items-center gap-1 rounded-lg border px-2" style={fieldStyle}>
-                <span className="text-[12px] font-bold" style={{ color: "var(--t-xp)" }}>
-                  XP
-                </span>
-                <NumberInput
-                  min={0}
-                  value={prereqXp}
-                  onValueChange={setPrereqXp}
-                  aria-label="Prerequisite XP"
-                  className="price-input w-9 bg-transparent text-center text-[15px] font-bold tabular-nums outline-none"
-                />
-              </label>
+          <div className="reveal flex flex-col gap-1 rounded-xl px-3.5 py-3" style={{ background: "rgba(255,250,238,.5)", border: "1.5px solid #b39a6a" }}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[15px] font-semibold">Quest sequence</span>
+              {prereq.trim() && (
+                <label className="flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2" style={fieldStyle} title="XP for each quest before the reward">
+                  <span className="text-[11.5px] font-bold" style={{ color: "var(--t-xp)" }}>
+                    XP each
+                  </span>
+                  <NumberInput min={0} value={prereqXp} onValueChange={setPrereqXp} aria-label="XP for each quest before the reward" className="price-input w-8 bg-transparent text-center text-[14px] font-bold tabular-nums outline-none" />
+                </label>
+              )}
+            </div>
+            <SeqList items={before} onChange={setBefore} fieldStyle={fieldStyle} addLabel={before.length ? "Then another quest" : "A quest to do first"} placeholder="e.g. Completely empty the car" />
+            {/* The reward itself, a gold link in the chain. */}
+            <div className="flex items-center gap-2 py-0.5">
+              <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px]" style={{ background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+                ◆
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[14px] font-semibold" style={{ color: "#6b4a12" }}>
+                {title.trim() || "This reward"}
+              </span>
+            </div>
+            <SeqList items={after} start={before.filter((b) => b.trim()).length + 2} onChange={setAfter} fieldStyle={fieldStyle} addLabel={after.length ? "Then another quest" : "A quest to do after"} placeholder="e.g. Share the photos" />
+            {(prereq.trim() || after.some((x) => x.trim())) && (
+              <p className="m-0 mt-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                Accepting puts them in Today&apos;s Quests in this order: each waits behind the one before it.
+              </p>
             )}
           </div>
-          {prereq.trim() && (
-            <div className="flex flex-col gap-1 pl-1">
-              {[...parts, ""].map((part, i) => (
-                <div key={i} className={`flex items-center gap-1.5 ${i < parts.length ? "reveal" : ""}`}>
-                  <span aria-hidden className="w-4 shrink-0 text-center text-[12px]" style={{ color: "#8a6116" }}>
-                    {i < parts.length ? "◆" : "+"}
-                  </span>
-                  <input
-                    value={part}
-                    onChange={(e) => setPart(i, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Backspace" && !part && i < parts.length) {
-                        e.preventDefault();
-                        dropPart(i);
-                      }
-                    }}
-                    placeholder={i < parts.length ? "" : parts.length ? "Add another part" : "Add a part (optional)"}
-                    aria-label={i < parts.length ? `Part ${i + 1}` : "Add a part"}
-                    className="h-8 min-w-0 flex-1 rounded-md border bg-transparent px-2 text-[13.5px]"
-                    style={{ ...fieldStyle, borderStyle: i < parts.length ? "solid" : "dashed" }}
-                  />
-                  {i < parts.length && (
-                    <button type="button" onClick={() => dropPart(i)} aria-label={`Remove part ${i + 1}`} className="flex h-8 w-6 shrink-0 items-center justify-center rounded text-[15px] opacity-50 hover:opacity-100" style={{ color: "var(--t-ink-soft)" }}>
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {prereq.trim() && (
-            <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              Accepting puts both in Today&apos;s Quests: this quest in front (its parts as steps), the reward locked behind it until it&apos;s done.
-            </p>
-          )}
-        </div>
         )}
 
         {/* Price in coins */}
@@ -451,5 +413,44 @@ export function RewardEditorDialog({
       </div>
     </div>,
     portalTarget
+  );
+}
+
+/** One side of a reward's quest sequence: a line per quest, in order, and a dashed line to add the next. */
+function SeqList({ items, onChange, fieldStyle, addLabel, placeholder, start = 1 }: { start?: number; items: string[]; onChange: (v: string[]) => void; fieldStyle: React.CSSProperties; addLabel: string; placeholder: string }) {
+  const set = (i: number, v: string) => onChange(i >= items.length ? [...items, v] : items.map((p, j) => (j === i ? v : p)));
+  const drop = (i: number) => onChange(items.filter((_, j) => j !== i));
+  return (
+    <div className="flex flex-col gap-1">
+      {[...items, ""].map((item, i) => {
+        const real = i < items.length;
+        return (
+          <div key={i} className={`flex items-center gap-2 ${real ? "reveal" : ""}`}>
+            <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold tabular-nums" style={real ? { border: "1.5px solid #8a6116", color: "#6b4a12", background: "rgba(255,250,238,.9)" } : { color: "#8a6116" }}>
+              {real ? start + i : "+"}
+            </span>
+            <input
+              value={item}
+              onChange={(e) => set(i, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Backspace" && !item && real) {
+                  e.preventDefault();
+                  drop(i);
+                }
+              }}
+              placeholder={real ? "" : i === 0 ? placeholder : addLabel}
+              aria-label={real ? `Quest ${start + i}` : addLabel}
+              className="h-8 min-w-0 flex-1 rounded-md border bg-transparent px-2 text-[13.5px]"
+              style={{ ...fieldStyle, borderStyle: real ? "solid" : "dashed" }}
+            />
+            {real && (
+              <button type="button" onClick={() => drop(i)} aria-label={`Remove quest ${start + i}`} className="flex h-8 w-6 shrink-0 items-center justify-center rounded text-[15px] opacity-50 hover:opacity-100" style={{ color: "var(--t-ink-soft)" }}>
+                ×
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
