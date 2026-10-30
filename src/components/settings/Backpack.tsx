@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { makeRefillQuestAction, paintInventoryItemAction, saveInventoryAction } from "@/app/actions";
-import { POCKETS, type Inventory, type InventoryItem, type ItemStatus, type PocketKey } from "@/lib/inventory";
+import { POCKETS, type BringList, type Inventory, type InventoryItem, type ItemStatus, type PocketKey } from "@/lib/inventory";
+import { CHECKIN_STYLES } from "@/lib/celebration-fx";
 import { useEscape } from "@/lib/use-escape";
 
 const STATUS: { v: ItemStatus; label: string; hint: string }[] = [
@@ -66,6 +67,7 @@ export function Backpack({ initial }: { initial: Inventory }) {
   // Tapping an item opens a small menu by it.
   const [menu, setMenu] = useState<{ item: InventoryItem; x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [bringOpen, setBringOpen] = useState(false);
   // How many rows each pocket shows (the rest scroll into view); remembered on this device.
   const [rows, setRows] = useState<Partial<Record<PocketKey, number>>>({});
   useEffect(() => {
@@ -248,8 +250,9 @@ export function Backpack({ initial }: { initial: Inventory }) {
         </p>
       )}
 
-      {/* The pack */}
-      <div className="backpack mx-auto w-full max-w-[420px]">
+      {/* The pack, with the gilded bring-from-home tab on its right */}
+      <div className="mx-auto flex w-full max-w-[460px] items-start gap-2">
+      <div className="backpack min-w-0 flex-1">
         <span aria-hidden className="backpack-strap backpack-strap-l" />
         <span aria-hidden className="backpack-strap backpack-strap-r" />
         <span aria-hidden className="backpack-handle" />
@@ -296,6 +299,20 @@ export function Backpack({ initial }: { initial: Inventory }) {
             </button>
           </section>
         ))}
+      </div>
+        <button
+          type="button"
+          onClick={() => setBringOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={bringOpen}
+          title={inv.bring.place ? `Bring from home to ${inv.bring.place}` : "Bring from home"}
+          className="hover-glow font-display mt-10 flex shrink-0 items-center gap-1.5 rounded-full px-1.5 py-3.5 text-[13.5px]"
+          style={{ ...CHECKIN_STYLES[0].style, writingMode: "vertical-rl" }}
+        >
+          <span aria-hidden>🏠</span>
+          Bring from home
+          {inv.bring.items.some((i) => !i.done) && <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: "#7a2e16", boxShadow: "0 0 0 1.5px rgba(255,240,200,.8)" }} />}
+        </button>
       </div>
 
       <p className="m-0 text-center text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -346,6 +363,7 @@ export function Backpack({ initial }: { initial: Inventory }) {
           }}
         />
       )}
+      {bringOpen && <BringDrawer list={inv.bring} onChange={(bring) => persist({ ...inv, bring })} onClose={() => setBringOpen(false)} />}
       {editing && (
         <ItemSheet
           initial={editing.item}
@@ -361,6 +379,83 @@ export function Backpack({ initial }: { initial: Inventory }) {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * The bring-from-home side drawer: a packing list for a trip (name the place,
+ * e.g. Natick), ticked off as things go in the bag. Clear the ticked ones, or
+ * untick them all to keep the list for next time.
+ */
+function BringDrawer({ list, onChange, onClose }: { list: BringList; onChange: (l: BringList) => void; onClose: () => void }) {
+  useEscape(onClose);
+  const [draft, setDraft] = useState("");
+  const [place, setPlace] = useState(list.place);
+  const addRef = useRef<HTMLInputElement>(null);
+  const ticked = list.items.filter((i) => i.done).length;
+  const add = () => {
+    const name = draft.replace(/\s+/g, " ").trim();
+    if (!name) return;
+    onChange({ ...list, items: [...list.items, { id: `b${crypto.randomUUID().slice(0, 8)}`, name, done: false }] });
+    setDraft("");
+    addRef.current?.focus();
+  };
+  const savePlace = () => place.trim() !== list.place && onChange({ ...list, place: place.trim() });
+  const link = "text-[13.5px] underline underline-offset-2";
+  return createPortal(
+    <div className="drawer-fade-in fixed inset-0 z-[56] flex justify-end overscroll-contain" style={{ background: "rgba(10,8,4,.35)" }} onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="Bring from home" onClick={(e) => e.stopPropagation()} className="drawer-slide-in parchment parchment-framed flex h-full w-[min(360px,88vw)] flex-col gap-3 overflow-y-auto overscroll-contain rounded-l-2xl p-4 pt-[max(16px,env(safe-area-inset-top))] pb-[max(16px,env(safe-area-inset-bottom))]" style={{ background: "var(--t-card)" }}>
+        <div className="relative z-[1] flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display m-0 text-[20px]" style={{ color: "var(--t-ink)" }}>
+              Bring from home
+            </h3>
+            <label className="mt-1 flex items-center gap-1.5 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
+              to
+              <input value={place} onChange={(e) => setPlace(e.target.value)} onBlur={savePlace} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur())} placeholder="where? (e.g. Natick)" maxLength={40} aria-label="Where you're bringing it" className="h-8 min-w-0 flex-1 rounded-md border-b bg-transparent px-1 text-[16px] font-semibold" style={{ borderColor: "rgba(139,112,64,.45)", color: "var(--t-ink)" }} />
+            </label>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+            ×
+          </button>
+        </div>
+
+        <ul className="relative z-[1] m-0 flex list-none flex-col p-0">
+          {list.items.map((it) => (
+            <li key={it.id} className="group flex min-h-11 items-center gap-2.5" style={{ borderBottom: "1px solid rgba(139,112,64,.2)" }}>
+              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 py-1.5">
+                <input type="checkbox" checked={it.done} onChange={() => onChange({ ...list, items: list.items.map((i) => (i.id === it.id ? { ...i, done: !i.done } : i)) })} className="h-5 w-5 shrink-0 cursor-pointer" style={{ accentColor: "#b8913f" }} />
+                <span className="min-w-0 break-words text-[15.5px] transition-opacity" style={{ color: "var(--t-ink)", textDecoration: it.done ? "line-through" : undefined, opacity: it.done ? 0.55 : 1 }}>
+                  {it.name}
+                </span>
+              </label>
+              <button type="button" onClick={() => onChange({ ...list, items: list.items.filter((i) => i.id !== it.id) })} aria-label={`Take ${it.name} off the list`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[16px] opacity-50 hover:bg-black/[.06] hover:opacity-100" style={{ color: "#9a3b26" }}>
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <div className="relative z-[1] flex items-center gap-2">
+          <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Add something to bring" maxLength={80} aria-label="Add something to bring" className="h-11 min-w-0 flex-1 rounded-lg border px-3 text-[16px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.75)", color: "var(--t-ink)" }} />
+          <button type="button" onClick={add} disabled={!draft.trim()} className="hover-glow font-display h-11 shrink-0 rounded-full px-4 text-[14.5px] disabled:opacity-50" style={CHECKIN_STYLES[0].style}>
+            Add
+          </button>
+        </div>
+
+        {ticked > 0 && (
+          <div className="relative z-[1] flex flex-wrap gap-x-4 gap-y-1">
+            <button type="button" onClick={() => onChange({ ...list, items: list.items.filter((i) => !i.done) })} className={link} style={{ color: "var(--t-ink)" }}>
+              Clear what&apos;s packed
+            </button>
+            <button type="button" onClick={() => onChange({ ...list, items: list.items.map((i) => ({ ...i, done: false })) })} className={link} style={{ color: "var(--t-ink)" }}>
+              Keep it all for next time
+            </button>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
   );
 }
 

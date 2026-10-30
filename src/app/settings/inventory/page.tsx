@@ -3,7 +3,8 @@ import { requireSession } from "@/lib/session";
 import { AppShell } from "@/components/layout/AppShell";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
 import { getProfileById } from "@/lib/data/profiles";
-import { normalizeInventory } from "@/lib/inventory";
+import { normalizeInventory, withOwnerBringSeed } from "@/lib/inventory";
+import { isAdmin } from "@/lib/data/feedback";
 import { Backpack } from "@/components/settings/Backpack";
 
 /** Your backpack: what you carry, and what needs refilling. */
@@ -11,6 +12,8 @@ export default async function InventoryPage() {
   const session = await requireSession();
   const profile = await getProfileById(session.user.id);
   if (!profile) notFound();
+  const raw = profile.life_wheel?.inventory;
+  const inventory = withOwnerBringSeed(normalizeInventory(raw), raw, await isAdmin(session.user.id));
   const isAdventure = profile.theme === "adventure";
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
@@ -36,7 +39,7 @@ export default async function InventoryPage() {
           </h1>
         </div>
         <section className="rounded-2xl p-4" style={{ background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}` }}>
-          <Backpack initial={normalizeInventory(profile.life_wheel?.inventory)} />
+          <Backpack initial={inventory} />
         </section>
       </div>
     </AppShell>
