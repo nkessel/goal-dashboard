@@ -2739,3 +2739,6 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 .toucan-bubble .bubble-ctl { opacity: 0; transition: opacity 0.18s; }
 .toucan-bubble:hover .bubble-ctl, .toucan-bubble .bubble-ctl:focus-visible { opacity: 1; }
 @media (hover: none) { .toucan-bubble .bubble-ctl { opacity: 0.6; } }
+/* The feedback picture upload bar: a gold sliver sliding along while it sends. */
+.upload-bar > span { animation: upload-slide 1.2s ease-in-out infinite; }
+@keyframes upload-slide { from { margin-left: -33%; } to { margin-left: 100%; } }

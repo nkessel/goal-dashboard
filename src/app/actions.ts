@@ -1687,6 +1687,18 @@ export async function addJournalEntryAction(body: string, mood: number | null, k
   return { ...entry, xpAwarded };
 }
 
+/** A picture that finished uploading after its note was sent: it joins the note. */
+export async function addFeedbackAttachmentAction(entryId: string, url: string) {
+  const ownerId = await requireProfileId();
+  if (typeof url !== "string" || !/^https:\/\/[^\s]+\/feedback\//.test(url)) throw new Error("That isn't a feedback picture.");
+  const { data } = await supabaseAdmin().from("journal_entries").select("attachments").eq("id", entryId).eq("owner_id", ownerId).maybeSingle<{ attachments: string[] | null }>();
+  if (!data) throw new Error("That note isn't there.");
+  const now = Array.isArray(data.attachments) ? data.attachments : [];
+  if (now.includes(url)) return;
+  await journalData.setAttachments(ownerId, entryId, [...now, url].slice(0, 8));
+  revalidatePath("/feedback-review");
+}
+
 /** The owner's decision on a piece of feedback (null = back to New). */
 export async function reviewFeedbackAction(entryId: string, status: feedbackData.ReviewStatus | null) {
   const profileId = await requireProfileId();

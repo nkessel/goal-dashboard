@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { loadFx, type FeedbackStyle } from "@/lib/celebration-fx";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
+import { noteSaved, subscribeUploads, uploadFor, uploadsNow, uploadsServer } from "@/lib/feedback-uploads";
 
 /** Ask the dock to start (or bring back) feedback from anywhere, e.g. the + sheet. */
 export const OPEN_FEEDBACK_EVENT = "open-feedback";
@@ -399,8 +400,10 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ body: d.body, kind: d.kind, xp: xpOf(d), images: [...(d.shot ? [d.shot] : []), ...(d.images ?? [])], page: d.page, context: d.context }),
         });
-        const res = (await r.json().catch(() => ({ ok: false, error: "Couldn't send it." }))) as { ok: boolean; xpAwarded?: number; error?: string };
+        const res = (await r.json().catch(() => ({ ok: false, error: "Couldn't send it." }))) as { ok: boolean; id?: string; xpAwarded?: number; error?: string };
         if (!r.ok || !res.ok) throw new Error(r.status === 401 || r.status === 403 ? "You've been signed out — sign in again to send (your note is saved)." : (res.error ?? "Couldn't send it."));
+        // Pictures still on their way join the saved note when they land.
+        if (res.id) noteSaved(d.id, res.id);
         setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...x, body: "", deleted: true, updatedAt: Date.now() } : x)));
       } catch (e) {
         // It didn't go: bring the note back, just as it was.
@@ -526,6 +529,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 
   return createPortal(
     <>
+      <UploadBar />
       {/* On a phone the box has its own minimize, so the button steps aside while it's open. */}
       {!(mobile && open && !isSent) && <button
         type="button"
@@ -867,11 +871,11 @@ function readContext(): string {
 }
 
 /**
- * A picture of the page as it is now (without the feedback box), uploaded
- * and returned as a URL. Uses modern-screenshot, loaded on first use.
+ * A picture of the page as it is now (without the feedback box), as a file
+ * to upload. Uses modern-screenshot, loaded on first use.
  * Only taken when asked for (the camera button).
  */
-async function captureScreen(): Promise<string | null> {
+async function captureScreen(): Promise<File | null> {
   try {
     const w = window as unknown as { __domToJpeg?: (el: Element, o: object) => Promise<string> };
     if (!w.__domToJpeg) {
@@ -893,11 +897,7 @@ async function captureScreen(): Promise<string | null> {
       filter: (n: Node) => !(n instanceof Element && n.closest("[data-feedback-root]")),
     });
     const blob = await (await fetch(dataUrl)).blob();
-    const fd = new FormData();
-    fd.append("file", new File([blob], "screen.jpg", { type: "image/jpeg" }));
-    const r = await fetch("/api/feedback/image", { method: "POST", body: fd });
-    const j = (await r.json().catch(() => ({ ok: false }))) as { ok: boolean; url?: string };
-    return r.ok && j.ok && j.url ? j.url : null;
+    return new File([blob], "screen.jpg", { type: "image/jpeg" });
   } catch {
     return null;
   }
@@ -962,33 +962,18 @@ function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shots]);
   const [attachError, setAttachError] = useState<string | null>(null);
-  // Submitted while a picture is still attaching: send once it's in, so the picture isn't lost.
-  const [sendWhenAttached, setSendWhenAttached] = useState(false);
-  const submit = () => (uploading ? setSendWhenAttached(true) : onSubmit());
-  useEffect(() => {
-    if (uploading || !sendWhenAttached) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot: send the note the moment its picture has attached
-    setSendWhenAttached(false);
-    onSubmit();
-  }, [uploading, sendWhenAttached, onSubmit]);
+  // Sending never waits for pictures: they keep uploading in the background and join the note.
+  const submit = onSubmit;
   // Tap an attachment to see it full size.
   const [viewing, setViewing] = useState<string | null>(null);
   async function attach(files: File[]) {
     setAttachError(null);
     setUploading(true);
     const urls: string[] = [];
-    for (const f of files.slice(0, 4 - (draft.images ?? []).length)) {
-      try {
-        const fd = new FormData();
-        fd.append("file", await shrinkImage(f));
-        const r = await fetch("/api/feedback/image", { method: "POST", body: fd });
-        const j = (await r.json().catch(() => ({ ok: false }))) as { ok: boolean; url?: string; error?: string };
-        if (!r.ok || !j.ok || !j.url) throw new Error(j.error ?? "Couldn't attach that image.");
-        urls.push(j.url);
-      } catch (e) {
-        setAttachError(e instanceof Error ? e.message : "Couldn't attach that image.");
-      }
-    }
+    // Each picture uploads in the background (with retries), so the note can be sent meanwhile.
+    const got = await Promise.all(files.slice(0, 4 - (draft.images ?? []).length).map((f) => uploadFor(draft.id, () => shrinkImage(f))));
+    for (const u of got) if (u) urls.push(u);
+    if (got.some((u) => !u)) setAttachError("A picture is still trying to send; see the bar at the bottom right.");
     setUploading(false);
     if (urls.length) onChange({ images: [...(draft.images ?? []), ...urls] });
   }
@@ -1101,7 +1086,7 @@ function Composer({
             </button>
           </span>
         ))}
-        {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>{sendWhenAttached ? "Attaching, then sending…" : "Attaching…"}</span>}
+        {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>Attaching…</span>}
         {attachError && <span className="text-[12.5px]" style={{ color: "var(--t-warn)" }}>{attachError}</span>}
         <span className="ml-auto flex items-center gap-1">
         {(draft.shot ? 1 : 0) + (draft.images ?? []).length < 5 && (
@@ -1109,7 +1094,8 @@ function Composer({
             type="button"
             onClick={async () => {
               setUploading(true);
-              const url = await captureScreen();
+              const shot = await captureScreen();
+              const url = shot ? await uploadFor(draft.id, async () => shot) : null;
               setUploading(false);
               // The first picture of the screen is "the" screenshot; more join the images.
               if (url) onChange(draft.shot ? { images: [...(draft.images ?? []), url] } : { shot: url });
@@ -1262,5 +1248,40 @@ function Sent({ kind, xp, isAdventure, onAnother }: { kind: WhenKind; xp: number
         Write another
       </button>
     </div>
+  );
+}
+
+/**
+ * Pictures still sending (or that need a retry), as a small bar at the bottom
+ * right. × hides the bar; the upload carries on.
+ */
+export function UploadBar() {
+  const list = useSyncExternalStore(subscribeUploads, uploadsNow, uploadsServer);
+  const [hiddenFor, setHiddenFor] = useState<string>("");
+  const key = list.map((u) => `${u.id}:${u.state}`).join("|");
+  if (!list.length || hiddenFor === key) return null;
+  const failed = list.filter((u) => u.state === "failed");
+  return createPortal(
+    <div role="status" data-feedback-root className="card-pop-in fixed bottom-[calc(16px+env(safe-area-inset-bottom))] right-3 z-[90] flex w-[230px] flex-col gap-1.5 rounded-xl px-3 py-2 shadow-xl" style={{ background: "rgba(22,26,44,.95)", border: "1.5px solid rgba(217,180,95,.6)", color: "#f1ead2" }}>
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 text-[12.5px] font-semibold">
+          {failed.length ? `${failed.length === 1 ? "A picture" : `${failed.length} pictures`} didn't send` : `Sending ${list.length === 1 ? "picture" : `${list.length} pictures`}…`}
+        </span>
+        {failed.length > 0 && (
+          <button type="button" onClick={() => failed.forEach((u) => u.retry())} className="h-6 rounded-full px-2.5 text-[12px] font-bold" style={{ background: "var(--t-gold, #d9b45f)", color: "#2a1c10" }}>
+            Retry
+          </button>
+        )}
+        <button type="button" onClick={() => setHiddenFor(key)} aria-label="Hide (it keeps sending)" title="Hide (it keeps sending)" className="flex h-6 w-6 items-center justify-center rounded-full text-[16px] leading-none" style={{ color: "rgba(241,234,210,.75)" }}>
+          ×
+        </button>
+      </div>
+      {!failed.length && (
+        <span className="upload-bar block h-1 w-full overflow-hidden rounded-full" style={{ background: "rgba(241,234,210,.15)" }}>
+          <span className="block h-full w-1/3 rounded-full" style={{ background: "linear-gradient(90deg, #b8913f, #e2bf63)" }} />
+        </span>
+      )}
+    </div>,
+    document.body
   );
 }
