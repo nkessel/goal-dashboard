@@ -18,7 +18,7 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "line", label: "The day's wise line", hint: "One short encouragement, a different one each day. You can switch off any line you don't like, or add your own." },
   { key: "bar", label: "Your level bar", hint: "Your level, filling with the XP that arriving earned you. Day's first visit only." },
   { key: "reward", label: "XP and coins", hint: "The XP and coins for showing up today, counted up as the screen opens. Day's first visit only." },
-  { key: "due", label: "Due soon", hint: "A short list of anything due today or tomorrow, so nothing sneaks up on you. Off by default to keep the screen calm." },
+  { key: "due", label: "Due soon", hint: "A gilded button that says how many quests are due soon (the same reach you pick on Today, changeable here too) and opens into a drawer of their cards. Off by default to keep the screen calm." },
 ];
 
 const DEFAULT_ORDER: WelcomeEl[] = ["toucan", "checkin", "focus", "intention", "plan", "streak", "line", "bar", "reward", "due"];

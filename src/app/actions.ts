@@ -3569,3 +3569,10 @@ export async function setAppDefaultsAction(values: Record<string, string | null>
   await saveAppDefaults(profileId, values);
   return { ok: true };
 }
+
+/** Open quests with a due date, as full cards (Due soon's drawer on the welcome screen). */
+export async function dueSoonCardsAction() {
+  const ownerId = await requireProfileId();
+  const tasks = await tasksData.listOpenTasksForOwnerWithCategory(ownerId);
+  return tasks.filter((t) => t.due_at && !t.needs_review && !t.reward_id);
+}

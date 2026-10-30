@@ -10,7 +10,6 @@ import { likeLine, likedLines, retireLine } from "@/lib/greetings";
 import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
 import { addBackGreeting, welcomeOrder, welcomeShows, type WelcomeEl } from "@/lib/welcome";
 import { eveningDayKey } from "@/components/evening/evening-clock";
-import { dueSoonList, dueWhen } from "@/lib/toucan-guide";
 import { voice, windowOf } from "@/lib/toucan-style";
 import { useToucanStyle } from "@/lib/toucan-style-store";
 import { useEscape } from "@/lib/use-escape";
@@ -18,6 +17,7 @@ import { addJournalEntryAction, setTopPriorityAction } from "@/app/actions";
 import { PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import { MistScene } from "./MistScene";
+import { DueSoonDrawer } from "@/components/tasks/DueSoonDrawer";
 import { castleOf } from "./CastleArt";
 
 export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
@@ -82,6 +82,8 @@ export function WelcomeCard({
   const [snoozing, setSnoozing] = useState(false);
   // The check-in starts as a gilded button and opens in its place.
   const [checkinOpen, setCheckinOpen] = useState(false);
+  // While Due soon's drawer is open, the screen steps down a layer so a card's editor can open over it.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   // Checked in within the last hour? Then there's no need to ask again here.
   const [recent] = useState(() => !!lastCheckInAt && Date.now() - Date.parse(lastCheckInAt) < 3_600_000);
   // Ready: into the forest, through the mist, and out onto Today.
@@ -109,8 +111,6 @@ export function WelcomeCard({
     return () => cancelAnimationFrame(raf);
   }, [award?.xp]);
 
-  // The welcome screen keeps to today and tomorrow, whatever Due soon on Today reaches.
-  const soon = dueSoonList(due, undefined, 48);
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
     focus: <TopPriority last={priority} />,
     intention: mode === "day" ? <Intention /> : null,
@@ -208,26 +208,8 @@ export function WelcomeCard({
         )}
       </div>
     ) : null,
-    due: (
-      <div className="w-full text-left">
-        <p className="m-0 text-[13px] font-semibold" style={{ color: "#5a4a30" }}>
-          Due soon
-        </p>
-        {soon.length ? (
-          <ul className="m-0 mt-0.5 flex list-none flex-col gap-0.5 p-0 text-[14.5px]" style={{ color: "var(--t-ink)" }}>
-            {soon.slice(0, 4).map((t) => (
-              <li key={t.id}>
-                “{t.title}” <span style={{ color: "#7a5f2e" }}>{dueWhen(t.due_at!)}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="m-0 text-[14px]" style={{ color: "#5a4a30" }}>
-            Nothing due today or tomorrow.
-          </p>
-        )}
-      </div>
-    ),
+    // A gilded button that opens into a drawer of the quests' cards.
+    due: <DueSoonDrawer tasks={due} onOpenChange={setDrawerOpen} />,
   };
   const order = welcomeOrder(fx).filter((el) => welcomeShows(fx, el) && parts[el]);
   // Not checked in yet? "Not now" offers to ask again later, or to skip it for today.
@@ -235,7 +217,7 @@ export function WelcomeCard({
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
-    <div className={`fixed inset-0 ${preview ? "z-[95]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={leave} role="dialog" aria-modal="true" aria-label={heading}>
+    <div className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={leave} role="dialog" aria-modal="true" aria-label={heading}>
       {/* A misty valley, and the card coming out of the mist. */}
       <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} />
       <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative`} onClick={(e) => e.stopPropagation()}>
