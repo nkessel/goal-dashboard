@@ -64,7 +64,9 @@ export default async function Home() {
         <form
           action={async () => {
             "use server";
-            await signIn("google");
+            // Back to the screen you were last on (remembered in a cookie), or Today.
+            const last = (await cookies()).get("last-path")?.value ?? "";
+            await signIn("google", { redirectTo: /^\/[\w\-/?=&%.]*$/.test(last) && !last.startsWith("//") ? last : "/" });
           }}
         >
           <button

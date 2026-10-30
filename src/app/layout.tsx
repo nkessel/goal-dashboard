@@ -6,6 +6,7 @@ import { ScrollLock } from "@/components/ui/ScrollLock";
 import { ContextMenuBridge } from "@/components/ui/ContextMenuBridge";
 import { MenuLayoutStyles } from "@/components/settings/MenuLayoutSettings";
 import { SaveKeys } from "@/components/ui/SaveKeys";
+import { LastScreen } from "@/components/ui/LastScreen";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -76,6 +77,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
         <ContextMenuBridge />
         <MenuLayoutStyles />
         <SaveKeys />
+        <LastScreen />
         <ViewTransitionProvider>
           {children}
           {drawer}
