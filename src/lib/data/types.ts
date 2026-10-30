@@ -227,6 +227,8 @@ export type Reward = {
   prereq_title?: string | null;
   prereq_description?: string | null;
   prereq_xp?: number;
+  /** Parts of the prerequisite quest, added as its steps when accepted. */
+  prereq_steps?: string[] | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

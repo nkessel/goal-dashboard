@@ -65,7 +65,10 @@ export default async function Home() {
           action={async () => {
             "use server";
             // Back to the screen you were last on (remembered in a cookie), or Today.
-            const last = (await cookies()).get("last-path")?.value ?? "";
+            let last = (await cookies()).get("last-path")?.value ?? "";
+            try {
+              if (last.startsWith("%2F")) last = decodeURIComponent(last);
+            } catch {}
             await signIn("google", { redirectTo: /^\/[\w\-/?=&%.]*$/.test(last) && !last.startsWith("//") ? last : "/" });
           }}
         >

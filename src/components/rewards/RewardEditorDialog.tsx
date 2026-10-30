@@ -53,6 +53,10 @@ export function RewardEditorDialog({
   const [price, setPrice] = useState<number>(reward?.cost_coins ?? 3);
   const [prereq, setPrereq] = useState(reward?.prereq_title ?? "");
   const [prereqXp, setPrereqXp] = useState<number>(reward?.prereq_xp ?? 10);
+  // Parts of the quest (its steps once accepted); an empty one at the end is the "add" field.
+  const [parts, setParts] = useState<string[]>(reward?.prereq_steps ?? []);
+  const setPart = (i: number, v: string) => setParts((ps) => (i >= ps.length ? [...ps, v] : ps.map((p, j) => (j === i ? v : p))));
+  const dropPart = (i: number) => setParts((ps) => ps.filter((_, j) => j !== i));
   const [bonusXp, setBonusXp] = useState<number>(reward?.bonus_xp ?? 0);
   const [bonusOpen, setBonusOpen] = useState(false);
   const [prereqOpen, setPrereqOpen] = useState(false);
@@ -60,7 +64,7 @@ export function RewardEditorDialog({
   // Only send bonus fields once the database has them (or when they're set).
   const bonusFields = (r?: Reward) => ({
     ...(r?.bonus_xp !== undefined || bonusXp || bonusCoins ? { bonusXp, bonusCoins } : {}),
-    ...(r?.prereq_xp !== undefined || prereq.trim() ? { prereqTitle: prereq, prereqXp } : {}),
+    ...(r?.prereq_xp !== undefined || prereq.trim() ? { prereqTitle: prereq, prereqXp, prereqSteps: parts.filter((p) => p.trim()) } : {}),
   });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -218,8 +222,38 @@ export function RewardEditorDialog({
             )}
           </div>
           {prereq.trim() && (
+            <div className="flex flex-col gap-1 pl-1">
+              {[...parts, ""].map((part, i) => (
+                <div key={i} className={`flex items-center gap-1.5 ${i < parts.length ? "reveal" : ""}`}>
+                  <span aria-hidden className="w-4 shrink-0 text-center text-[12px]" style={{ color: "#8a6116" }}>
+                    {i < parts.length ? "◆" : "+"}
+                  </span>
+                  <input
+                    value={part}
+                    onChange={(e) => setPart(i, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Backspace" && !part && i < parts.length) {
+                        e.preventDefault();
+                        dropPart(i);
+                      }
+                    }}
+                    placeholder={i < parts.length ? "" : parts.length ? "Add another part" : "Add a part (optional)"}
+                    aria-label={i < parts.length ? `Part ${i + 1}` : "Add a part"}
+                    className="h-8 min-w-0 flex-1 rounded-md border bg-transparent px-2 text-[13.5px]"
+                    style={{ ...fieldStyle, borderStyle: i < parts.length ? "solid" : "dashed" }}
+                  />
+                  {i < parts.length && (
+                    <button type="button" onClick={() => dropPart(i)} aria-label={`Remove part ${i + 1}`} className="flex h-8 w-6 shrink-0 items-center justify-center rounded text-[15px] opacity-50 hover:opacity-100" style={{ color: "var(--t-ink-soft)" }}>
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {prereq.trim() && (
             <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              Accepting puts both in Today&apos;s Quests — this quest in front, the reward locked behind it until it&apos;s done.
+              Accepting puts both in Today&apos;s Quests: this quest in front (its parts as steps), the reward locked behind it until it&apos;s done.
             </p>
           )}
         </div>

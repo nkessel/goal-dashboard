@@ -2,9 +2,9 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30 evening (UX synthesis batches 1–6 shipped; see Recently shipped).
+- **Last updated:** 2026-10-30 night (last screen on sign-in, reward parts; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 19:30 UTC, still open: Due soon card layout (first card squished, subquest drawer redesign), toucan popups coming from the bird itself, the bird appearing in Settings when freed, last-screen-on-login, reward quests with multiple parts.
+- **Pending in-app feedback:** as of 2026-10-30 19:50 UTC, still open: Due soon card layout and subquest drawer redesign; toucan popups from the bird itself; the bird in Settings when freed; early bonus on the due line with custom XP/coins/per-day bonus ("choose early-completion reward"); quest ⋯ menu gear = drag + hide; hover brightening too strong (Due soon tray); calendar Schedule button display and Settings button responsiveness; opening feedback on /settings/inventory reloads the page behind it. Also asked in chat: laundry habit steps (Load with towels/sheets/gently used reminders, Wash, Dry, Fold) with an elegant focus timer.
 
 ---
 
@@ -46,7 +46,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0069_early_bonus.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0070_reward_prereq_steps.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -118,6 +118,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30 (night): Signing in returns you to the screen you were last on (`components/ui/LastScreen.tsx` keeps a `last-path` cookie; the sign-in in `app/page.tsx` reads it). Opening the app fresh still lands on Today for the welcome screen. Reward prerequisite quests can have parts (`rewards.prereq_steps`, migration 0070): listed under the quest in the reward editor, added as the quest's steps when the reward is accepted.
 - Oct 30 (evening): Logged events keep their line breaks (cap 400; `tidyNote` in `lib/data/energy.ts`); Insights › Events shows them whole and edits them in a box (Shift+Enter for a new line); check-in chips show the first line. Feedback pictures upload in the background (`lib/feedback-uploads.ts`, 3 tries, then Retry): sending never waits, a late picture joins the saved note via `/api/feedback/attach`; a small closable bar bottom right shows progress (`UploadBar` in `FeedbackDock.tsx`). Before this, sending mid-upload dropped the picture (the Oct 29 event note).
 - Oct 30 (evening): "Vitamins before 12pm" added to the owner's Right Effort (Factors of sleep) and to the defaults.
 - Oct 30 (evening): Welcome toucan: right-click (or tap) opens his menu, now with Toucan settings; drag him anywhere (remembered, `welcome-toucan-at`); his bubble's ‹ › step through what he could ask (`TOUCAN_PROMPTS` in `lib/welcome.ts`) and its ⋯ gives thumbs (👍 asks it first, 👎 never again; `toucan-prompt-votes` in localStorage). Toucan "Not now…": 15 min, 30 min, 1 hour, Other… (2 hrs, 3 hrs, this evening, tomorrow, or a time); closing Other goes back to the choices. Settings cage no longer says "Resting".

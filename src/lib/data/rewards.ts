@@ -26,6 +26,7 @@ export async function createReward(
     bonusCoins?: number;
     prereqTitle?: string | null;
     prereqXp?: number;
+    prereqSteps?: string[];
   }
 ): Promise<Reward> {
   const db = supabaseAdmin();
@@ -44,6 +45,7 @@ export async function createReward(
       ...(input.bonusXp ? { bonus_xp: Math.max(0, Math.round(input.bonusXp)) } : {}),
       ...(input.bonusCoins ? { bonus_coins: Math.max(0, Math.round(input.bonusCoins)) } : {}),
       ...(input.prereqTitle ? { prereq_title: input.prereqTitle, prereq_xp: Math.max(0, Math.round(input.prereqXp ?? 10)) } : {}),
+      ...(input.prereqTitle && input.prereqSteps?.length ? { prereq_steps: input.prereqSteps } : {}),
     })
     .select("*")
     .single();
@@ -65,6 +67,7 @@ export async function updateReward(
     /** Undefined leaves it; null/"" clears the prerequisite. */
     prereqTitle?: string | null;
     prereqXp?: number;
+    prereqSteps?: string[];
   }
 ): Promise<void> {
   const db = supabaseAdmin();
@@ -80,6 +83,7 @@ export async function updateReward(
       ...(input.bonusCoins !== undefined ? { bonus_coins: Math.max(0, Math.round(input.bonusCoins)) } : {}),
       ...(input.prereqTitle !== undefined ? { prereq_title: input.prereqTitle || null } : {}),
       ...(input.prereqXp !== undefined ? { prereq_xp: Math.max(0, Math.round(input.prereqXp)) } : {}),
+      ...(input.prereqSteps !== undefined ? { prereq_steps: input.prereqTitle === null || !input.prereqSteps.length ? null : input.prereqSteps } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", rewardId)

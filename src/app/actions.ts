@@ -1287,6 +1287,11 @@ export async function removeTaskIconFromLibraryAction(id: string) {
 // ---------------------------------------------------------------------------
 // Rewards
 // ---------------------------------------------------------------------------
+/** A reward's prerequisite parts: trimmed, no blanks, at most 20. */
+function cleanParts(parts?: string[]): string[] {
+  return (parts ?? []).map((p) => p.replace(/\s+/g, " ").trim().slice(0, 200)).filter(Boolean).slice(0, 20);
+}
+
 export async function createRewardAction(input: {
   title: string;
   description?: string;
@@ -1296,6 +1301,7 @@ export async function createRewardAction(input: {
   bonusCoins?: number;
   prereqTitle?: string;
   prereqXp?: number;
+  prereqSteps?: string[];
 }) {
   const ownerId = await requireProfileId();
   const title = input.title.trim();
@@ -1309,6 +1315,7 @@ export async function createRewardAction(input: {
     bonusCoins: input.bonusCoins,
     prereqTitle: input.prereqTitle?.trim() || null,
     prereqXp: input.prereqXp,
+    prereqSteps: cleanParts(input.prereqSteps),
   });
   revalidatePath("/rewards");
   return reward.id;
@@ -1325,6 +1332,7 @@ export async function updateRewardAction(
     bonusCoins?: number;
     prereqTitle?: string;
     prereqXp?: number;
+    prereqSteps?: string[];
     confirmImport?: boolean;
   }
 ) {
@@ -1340,6 +1348,7 @@ export async function updateRewardAction(
     bonusCoins: input.bonusCoins,
     prereqTitle: input.prereqTitle === undefined ? undefined : input.prereqTitle.trim() || null,
     prereqXp: input.prereqXp,
+    prereqSteps: input.prereqSteps === undefined ? undefined : cleanParts(input.prereqSteps),
     needsReview: input.confirmImport ? false : undefined,
   });
   revalidatePath("/rewards");
@@ -1396,6 +1405,12 @@ export async function claimRewardAction(rewardId: string, taskId: string | null,
           isManualPriority: true,
         })
       : null;
+    // Its parts become the quest's steps.
+    if (prereq && reward.prereq_steps?.length) {
+      await stepsData
+        .replaceSteps(prereq.id, ownerId, reward.prereq_steps.map((title, i) => ({ key: `p${i}`, title, done: false })))
+        .catch(() => {});
+    }
     await tasksData.createTask(ownerId, {
       title: reward.title,
       description: reward.description || "Your reward — enjoy it!",
