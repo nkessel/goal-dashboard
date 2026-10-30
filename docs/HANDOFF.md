@@ -81,7 +81,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 **Commits:** one line saying what the user sees, then your session's attribution trailers.
 
-**Feedback builds from the app:** the toucan ("implement my feedback") or Settings › App feedback › Build now fires the owner's Claude scheduled task "Build app feedback (toucan)" (`src/lib/data/feedback-run.ts`). That run follows this same loop. Token and last-run time are in `app_defaults` (`secret.feedback_run_token`, `secret.feedback_run_last`); 15-minute cooldown.
+**Feedback builds from the app:** the toucan ("implement my feedback") or Settings › App feedback › Build now fires the owner's Claude scheduled task "Build app feedback (toucan)" (`src/lib/data/feedback-run.ts`). That run follows this same loop. Without a token the app writes `secret.feedback_build_requested` in `app_defaults`; the task runs hourly (:37), exits at once unless that row exists, and deletes it when it starts. With a token (`secret.feedback_run_token`) it fires the task's API at once; 15-minute cooldown via `secret.feedback_run_last`.
 
 ---
 

@@ -1235,9 +1235,11 @@ function ShipCard({ action: a }: { action: Extract<CoachAction, { type: "ship" }
       setMsg(
         !r.pending
           ? "Nothing new is waiting: every note you've sent is built."
-          : r.already
-            ? "A build started a few minutes ago and is still at work on your notes."
-            : `Started ✓ Your ${r.pending === 1 ? "note is" : `${r.pending} notes are`} being built. The changes go live on their own when it's done.`,
+          : r.queued
+            ? `Queued ✓ The builder checks in every hour, so your ${r.pending === 1 ? "note starts" : `${r.pending} notes start`} within the hour and go live on their own.`
+            : r.already
+              ? "A build started a few minutes ago and is still at work on your notes."
+              : `Started ✓ Your ${r.pending === 1 ? "note is" : `${r.pending} notes are`} being built. The changes go live on their own when it's done.`,
       );
       setState("done");
     } catch (e) {

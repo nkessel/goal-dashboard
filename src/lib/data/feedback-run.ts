@@ -12,6 +12,8 @@ const RUN_URL = process.env.FEEDBACK_RUN_URL || "https://api.anthropic.com/v1/cl
 // Kept in app_defaults (server-only; these keys are never shared as settings).
 const TOKEN_KEY = "secret.feedback_run_token";
 const LAST_KEY = "secret.feedback_run_last";
+/** Without a token: a request the scheduled task picks up on its next hourly check (it clears this when it starts). */
+const REQUEST_KEY = "secret.feedback_build_requested";
 /** Feedback before this was handled by hand, before builds could be started from the app. */
 const SINCE = "2026-10-27T19:21:30Z";
 /** One build at a time, roughly: don't start another within this long. */
@@ -39,15 +41,15 @@ export async function pendingFeedback(ownerId: string): Promise<number> {
   return error ? 0 : (count ?? 0);
 }
 
-export type RunStatus = { connected: boolean; lastAt: string | null; lastUrl: string | null };
+export type RunStatus = { connected: boolean; lastAt: string | null; lastUrl: string | null; requestedAt: string | null };
 
 export async function runStatus(): Promise<RunStatus> {
-  const [token, last] = await Promise.all([readSecret(TOKEN_KEY), readSecret(LAST_KEY)]);
+  const [token, last, requested] = await Promise.all([readSecret(TOKEN_KEY), readSecret(LAST_KEY), readSecret(REQUEST_KEY)]);
   let l: { at?: string; url?: string | null } = {};
   try {
     l = last ? JSON.parse(last) : {};
   } catch {}
-  return { connected: !!token, lastAt: l.at ?? null, lastUrl: l.url ?? null };
+  return { connected: !!token, lastAt: l.at ?? null, lastUrl: l.url ?? null, requestedAt: requested };
 }
 
 export async function saveRunToken(token: string | null) {
@@ -56,10 +58,16 @@ export async function saveRunToken(token: string | null) {
   await writeSecret(TOKEN_KEY, t || null);
 }
 
-/** Start a build. Returns the run's link, or says why it didn't start. */
-export async function startRun(pending: number): Promise<{ url: string | null; already?: boolean }> {
+/**
+ * Start a build. With the token it starts now and returns the run's link;
+ * without one it queues the build for the scheduled task's hourly check.
+ */
+export async function startRun(pending: number): Promise<{ url: string | null; already?: boolean; queued?: boolean }> {
   const token = await readSecret(TOKEN_KEY);
-  if (!token) throw new Error("I can't start builds yet: add the build token on the App feedback page first.");
+  if (!token) {
+    if (!(await readSecret(REQUEST_KEY))) await writeSecret(REQUEST_KEY, new Date().toISOString());
+    return { url: null, queued: true };
+  }
   const status = await runStatus();
   if (status.lastAt && Date.now() - Date.parse(status.lastAt) < COOLDOWN_MS) return { url: status.lastUrl, already: true };
   const res = await fetch(RUN_URL, {

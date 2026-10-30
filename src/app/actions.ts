@@ -3235,9 +3235,9 @@ export async function coachShipFeedbackAction() {
   if (!(await feedbackData.isAdmin(ownerId))) throw new Error("Only the app's owner can start an update.");
   const run = await import("@/lib/data/feedback-run");
   const pending = await run.pendingFeedback(ownerId);
-  if (!pending) return { url: null, already: false, pending };
+  if (!pending) return { url: null, already: false, queued: false, pending };
   const r = await run.startRun(pending);
-  return { url: r.url, already: !!r.already, pending };
+  return { url: r.url, already: !!r.already, queued: !!r.queued, pending };
 }
 
 /** Save (or remove, with "") the token that lets the app start feedback builds. */

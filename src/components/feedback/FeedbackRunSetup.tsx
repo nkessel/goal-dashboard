@@ -9,10 +9,10 @@ import { coachShipFeedbackAction, saveFeedbackRunTokenAction } from "@/app/actio
  * a Claude Code build of your unshipped "Next update" notes. It needs the
  * scheduled task's token, pasted in once.
  */
-export function FeedbackRunSetup({ connected, pending, lastAt, lastUrl, theme }: { connected: boolean; pending: number; lastAt: string | null; lastUrl: string | null; theme: "calm" | "adventure" }) {
+export function FeedbackRunSetup({ connected, pending, lastAt, lastUrl, requestedAt, theme }: { connected: boolean; pending: number; lastAt: string | null; lastUrl: string | null; requestedAt: string | null; theme: "calm" | "adventure" }) {
   const isAdventure = theme === "adventure";
   const router = useRouter();
-  const [editing, setEditing] = useState(!connected);
+  const [editing, setEditing] = useState(false);
   const [token, setToken] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string; url?: string | null } | null>(null);
   const [busy, start] = useTransition();
@@ -24,7 +24,7 @@ export function FeedbackRunSetup({ connected, pending, lastAt, lastUrl, theme }:
       try {
         await saveFeedbackRunTokenAction(value);
         setToken("");
-        setEditing(!value);
+        setEditing(false);
         setMsg({ ok: true, text: value ? "Saved. The toucan can start builds now." : "Removed. The toucan can't start builds until you add a token again." });
         router.refresh();
       } catch (e) {
@@ -39,7 +39,9 @@ export function FeedbackRunSetup({ connected, pending, lastAt, lastUrl, theme }:
         setMsg(
           !r.pending
             ? { ok: true, text: "Nothing new is waiting." }
-            : { ok: true, text: r.already ? "A build started a few minutes ago and is still at work." : `Started ✓ ${r.pending} note${r.pending === 1 ? "" : "s"} on the way.`, url: r.url },
+            : r.queued
+              ? { ok: true, text: "Queued ✓ It starts within the hour." }
+              : { ok: true, text: r.already ? "A build started a few minutes ago and is still at work." : `Started ✓ ${r.pending} note${r.pending === 1 ? "" : "s"} on the way.`, url: r.url },
         );
         router.refresh();
       } catch (e) {
@@ -63,16 +65,20 @@ export function FeedbackRunSetup({ connected, pending, lastAt, lastUrl, theme }:
           🛠 Build your feedback
         </span>
         <span className="text-[13px]" style={{ color: soft }}>
-          {connected
-            ? `Tell the toucan "implement my feedback", or press Build. ${pending ? `${pending} note${pending === 1 ? "" : "s"} waiting.` : "Nothing new waiting."}${lastAt ? ` Last build started ${new Date(lastAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.` : ""}`
-            : "Let the toucan start building your notes when you ask. Paste the token from your Claude scheduled task once."}
+          {`Tell the toucan "implement my feedback", or press Build now. ${pending ? `${pending} note${pending === 1 ? "" : "s"} waiting.` : "Nothing new waiting."} `}
+          {requestedAt
+            ? "A build is queued and starts within the hour."
+            : connected
+              ? lastAt
+                ? `Last build started ${new Date(lastAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`
+                : "Builds start right away."
+              : "Builds start within the hour (add a token to start them right away)."}
         </span>
       </div>
 
       {editing ? (
         <div className="flex flex-col gap-2">
-          {!connected && (
-            <ol className="m-0 list-decimal pl-5 text-[13px] leading-snug" style={{ color: soft }}>
+          <ol className="m-0 list-decimal pl-5 text-[13px] leading-snug" style={{ color: soft }}>
               <li>
                 Open{" "}
                 <a href="https://claude.ai/code/routines" target="_blank" rel="noreferrer" className="underline">
@@ -80,10 +86,9 @@ export function FeedbackRunSetup({ connected, pending, lastAt, lastUrl, theme }:
                 </a>{" "}
                 and edit <b>Build app feedback (toucan)</b>.
               </li>
-              <li>In the Trigger row, press + and choose API, then Generate token.</li>
+              <li>In the Trigger row, press + and choose API, then Generate token (on the web; not in the desktop app).</li>
               <li>Paste the token here.</li>
             </ol>
-          )}
           <div className="flex flex-wrap gap-2">
             <input
               type="password"
@@ -98,11 +103,9 @@ export function FeedbackRunSetup({ connected, pending, lastAt, lastUrl, theme }:
             <button type="button" className={btn} style={gold} disabled={busy || !token.trim()} onClick={() => save(token)}>
               Save
             </button>
-            {connected && (
-              <button type="button" className={btn} style={plain} onClick={() => setEditing(false)}>
-                Cancel
-              </button>
-            )}
+            <button type="button" className={btn} style={plain} onClick={() => setEditing(false)}>
+              Cancel
+            </button>
           </div>
         </div>
       ) : (
@@ -116,11 +119,13 @@ export function FeedbackRunSetup({ connected, pending, lastAt, lastUrl, theme }:
             </a>
           )}
           <button type="button" className={btn} style={plain} onClick={() => setEditing(true)}>
-            Change token
+            {connected ? "Change token" : "Add token (optional)"}
           </button>
-          <button type="button" className={btn} style={plain} disabled={busy} onClick={() => save("")}>
-            Remove
-          </button>
+          {connected && (
+            <button type="button" className={btn} style={plain} disabled={busy} onClick={() => save("")}>
+              Remove token
+            </button>
+          )}
         </div>
       )}
 
