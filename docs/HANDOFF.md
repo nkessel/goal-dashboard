@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30, `main` @ `70bcdb4` (welcome screen in-context settings and its feedback)
+- **Last updated:** 2026-10-30, `main` @ `d7f317a` (welcome screen toucan replaces Plan my day)
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** about 21 notes not marked shipped (as of 2026-10-30 17:45 UTC): the rewards editor batch (Oct 30 12:02–12:08), toucan menu and cage items, check-in slider greying and sleep/wake picker, toucan messages from the bird, drag bars everywhere, last-screen-on-login, and a few older ones.
 
@@ -110,6 +110,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30 (late afternoon): Welcome screen "Plan my day" part removed (stored orders drop it); the toucan lands on every visit, not just welcome back, and tapping him offers Plan my day, Talk to me, a wise saying, or changing what he asks first (`welcomeToucanAsk`, `toucanAsk()` in `lib/welcome.ts`); the wise line's thumbs sit in a right-hand column so they never drop below it on phones.
 - Oct 30 (afternoon): Welcome screen per the in-context design rule (panel above for when it opens and confetti; ✎ by every part; hide top-right; drag bars; castle ✎ by the castle); tap the greeting to write your own (asks to keep it in rotation and retire the original); Complete check-in bottom right; Snooze spreads its times in a line (15 min, 30 min, 1 hr, Other… → 2 hrs, 3 hrs, this evening, tomorrow, minutes); top priority box grows, "Other priorities" opens a 65% box with "Secondary Priorities"; check-in folds with a caret; quiet thumbs beside the wise line; one wise-lines list with a gold "+ My own words"; editable questions; smaller Due soon pill with its reach on it; fog on phone hide and on return so Today never shows before the mist.
 - Oct 30: Mess check-in under the "20 mins of house cleaning" habit (`components/habits/CleaningCheckIn.tsx`, `lib/cleaning.ts`, stored in `life_wheel.cleaning`): today's 20-min pick from the messiest space, a due laundry load or a due chore; Spaces (one-tap rating, 5 styles also in Settings › Mess check-in, custom spaces, optional drift), Laundry bin fill with next-load prediction, Chore deck with snooze (day, week, custom). Bring from home: a gilded button on the backpack's right opens a side-drawer packing list (place name, tick-offs, clear packed or keep for next time). Stored in `life_wheel.inventory.bring`; the owner's list starts with Coconut milk and Energy tinctures for Natick until first saved (`withOwnerBringSeed` in `lib/inventory.ts`).
 - Oct 30: Welcome screen settings in context: its gear arranges the screen in place (each part gets show/hide, up/down and its own options where it sits; a strip on top for when it opens, the castle and confetti; greetings under the heading). `src/components/xp/WelcomeArrange.tsx`; the wise-line and greeting lists moved to `settings/LineLists.tsx`. Settings › Welcome Screen still has the same controls.
