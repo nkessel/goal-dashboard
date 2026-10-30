@@ -3,6 +3,7 @@ import { auth, signIn } from "@/auth";
 import { DUE_HOURS_COOKIE, byDuePriority, inDueWindow, parseDueHours } from "@/lib/due-soon";
 import { LowLightToggle } from "@/components/evening/LowLightToggle";
 import { TodayArrange } from "@/components/today/TodayArrange";
+import { RefreshAt } from "@/components/today/RefreshAt";
 import { AppShell } from "@/components/layout/AppShell";
 import { TodayTaskBoard } from "@/components/tasks/TodayTaskBoard";
 import { VictoriesToday } from "@/components/xp/VictoriesToday";
@@ -157,8 +158,11 @@ export default async function Home() {
   // what's due next first and past due last.
   const dueHours = parseDueHours((await cookies()).get(DUE_HOURS_COOKIE)?.value);
   const nowMs = nowMsOutside();
-  const dueTasks = onToday.filter((t) => inDueWindow(t.due_at, nowMs, dueHours) && !t.reward_id).sort(byDuePriority(nowMs));
-  const rest = onToday.filter((t) => !dueTasks.includes(t));
+  // Snoozed for a while: off Today until then.
+  const awake = (t: { snoozed_until?: string | null }) => !t.snoozed_until || Date.parse(t.snoozed_until) <= nowMs;
+  const wakeAt = onToday.reduce<string | null>((m, t) => (t.snoozed_until && !awake(t) && (!m || t.snoozed_until < m) ? t.snoozed_until : m), null);
+  const dueTasks = onToday.filter((t) => awake(t) && inDueWindow(t.due_at, nowMs, dueHours) && !t.reward_id).sort(byDuePriority(nowMs));
+  const rest = onToday.filter((t) => awake(t) && !dueTasks.includes(t));
   const topPriorities = rest.filter((t) => t.is_manual_priority);
   // Deadlines coming up rise to the top of Additional Quests (due next first,
   // past due after); everything else keeps the order you gave it.
@@ -195,6 +199,8 @@ export default async function Home() {
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <DayNightFlip
         day={
+          <>
+          {wakeAt && <RefreshAt at={wakeAt} />}
           <TodayArrange
             parts={{
               stats,
@@ -235,6 +241,7 @@ export default async function Home() {
                 />
             }
           />
+          </>
         }
         evening={
           <div className="flex flex-col gap-6">

@@ -1781,6 +1781,26 @@ export async function snoozeQuestAction(taskId: string) {
   return prev;
 }
 
+/** Snooze a quest for a while (off Today until then). Returns what Undo needs. */
+export async function snoozeQuestUntilAction(taskId: string, untilISO: string) {
+  const ownerId = await requireProfileId();
+  const until = new Date(untilISO);
+  if (!Number.isFinite(until.getTime()) || until.getTime() < Date.now()) throw new Error("Pick a time that's still ahead.");
+  const db = supabaseAdmin();
+  const { data: t } = await db.from("tasks").select("snoozed_until, status").eq("id", taskId).eq("owner_id", ownerId).maybeSingle();
+  if (!t || t.status !== "open") throw new Error("That quest isn't open anymore.");
+  const { error } = await db.from("tasks").update({ snoozed_until: until.toISOString() }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(/snoozed_until/.test(error.message) ? "Snoozing for a while needs a quick database update first." : `Couldn't snooze: ${error.message}`);
+  revalidatePath("/");
+  return { snoozed_until: (t.snoozed_until as string | null) ?? null };
+}
+
+export async function undoSnoozeUntilAction(taskId: string, prev: { snoozed_until: string | null }) {
+  const ownerId = await requireProfileId();
+  await supabaseAdmin().from("tasks").update({ snoozed_until: prev.snoozed_until }).eq("id", taskId).eq("owner_id", ownerId);
+  revalidatePath("/");
+}
+
 export async function undoSnoozeAction(taskId: string, prev: tomorrowData.SnoozePrev) {
   const ownerId = await requireProfileId();
   await tomorrowData.undoSnooze(ownerId, taskId, prev);

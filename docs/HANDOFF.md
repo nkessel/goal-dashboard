@@ -4,7 +4,7 @@
 
 - **Last updated:** 2026-10-30 night (arrange in context on editor, menu and Today; early reward; laundry run; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 20:30 UTC: snooze a quest for other times (30 min, 2 hrs, tomorrow, Other…; no dead ends); beautiful time pickers everywhere ("When was it completed?" was the example); ±5 XP buttons by the XP bar in the quest editor; a clearer, nicer "defeated" box on completed quests and tags last in More; "Also on other boards" and other board settings into the board tray, Private as an icon at the bottom, Ctrl+S must save (not Chrome's save page); track button click times for the UX teams; opening feedback on /settings/inventory reloads the page behind it (iOS; cause not found from the cloud, needs a device repro).
+- **Pending in-app feedback:** as of 2026-10-30 20:30 UTC: beautiful time pickers everywhere ("When was it completed?" was the example; dialogs now get a parchment time field, a full custom picker is still to do); ±5 XP buttons by the XP bar in the quest editor; a clearer, nicer "defeated" box on completed quests and tags last in More; "Also on other boards" and other board settings into the board tray, Private as an icon at the bottom, Ctrl+S must save (not Chrome's save page); track button click times for the UX teams; opening feedback on /settings/inventory reloads the page behind it (iOS; cause not found from the cloud, needs a device repro).
 
 ---
 
@@ -47,7 +47,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0072_early_bonus_more.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0073_task_snoozed_until.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -119,6 +119,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30 (night): Snooze… from a quest's ⋯ menu asks how long (`tasks/SnoozePicker.tsx`): 30 minutes, 2 hours, Tomorrow (top of tomorrow's plan, as before), Other… (this evening, 4 hours, or a date and time; ‹ back, × or Esc changes nothing); short snoozes set `tasks.snoozed_until` (migration 0073), hide it from Today until then and `RefreshAt` brings it back; Undo on the toast. Swiping a card still snoozes to tomorrow. Time fields in dialogs and parchment get a parchment look (`.time-field`).
 - Oct 30 (night): Early-completion reward: Automatic / None / My own (XP, coins, extra XP per full day early; `tasks.early_bonus_coins`, `early_bonus_per_day`, migration 0072; `earlyBirdBonus`/`earlyBirdCoins` in `lib/next-action.ts`). Shared `EarlyBonusFields` in the quest editor's Early bonus chip and in a small popup from the card: the "+N XP early" pill opens it, and a quiet dashed "+ Early reward" shows when none applies and it's more than a day out.
 - Oct 30 (night): Calendar controls on phones: one row, "To schedule" no longer pushed off the left edge (only sticks out on wider screens), "Google" short label on phones, the display gear answers at once (press shrink, lit while open).
 - Oct 30 (night): Today arranges in place: a gear at Today's top right (hover; faint on phones) opens "Arrange Today" (`components/today/TodayArrange.tsx`, `lib/today-layout.ts`): every part drags, the eye hides it, hidden parts wait as + chips, Reset. The board's parts (Due soon, Today's Quests, Daily Habits, Additional Quests) move as a group and keep their own order (the old `today-section-order` is carried over; dragging closed sections still works). Quest cards: the early bonus is a small "+N XP early" pill (no bird).

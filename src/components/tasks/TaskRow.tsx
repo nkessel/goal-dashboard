@@ -5,11 +5,12 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, setNextStepAction } from "@/app/actions";
+import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, snoozeQuestUntilAction, undoSnoozeUntilAction, setNextStepAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
 import { earlyBirdBonus, earlyBirdCoins, roomToFinishEarly } from "@/lib/next-action";
 import { EarlyBonusPopup } from "./EarlyBonusFields";
+import { SnoozePicker, type SnoozeChoice } from "./SnoozePicker";
 import { QuestActionMenu, SnoozeGlyph, type QuestAction } from "./QuestActionMenu";
 import { SequenceDialog, SequenceStack, stackPad } from "./Sequence";
 import { StepsTray } from "./StepsTray";
@@ -114,6 +115,7 @@ export function TaskRow({
   const [editing, setEditing] = useState(false);
   // A quest with steps: a tap slides out its checklist instead of opening the editor.
   const [bonusOpen, setBonusOpen] = useState(false);
+  const [snoozing, setSnoozing] = useState(false);
   const [tray, setTrayOpen] = useState(false);
   // Once opened, the steps stay mounted so the tray can slide closed too.
   const [trayEver, setTrayEver] = useState(false);
@@ -207,7 +209,43 @@ export function TaskRow({
     });
   }
 
-  function pick(action: QuestAction) {
+  /** Snooze it: off Today now, back when chosen (or at the top of tomorrow's plan). Undo puts it back. */
+  function snoozeNow(choice: SnoozeChoice) {
+    setSnoozing(false);
+    if ("until" in choice) {
+      startTransition(async () => {
+        if (listMoves) {
+          await slideOut(liRef.current);
+          listMoves.move(null);
+        }
+        try {
+          const prev = await snoozeQuestUntilAction(task.id, choice.until.toISOString());
+          listMoves?.notify?.({ text: `Snoozed ${choice.label}: ${task.title}`, undo: () => undoSnoozeUntilAction(task.id, prev) });
+        } catch (e) {
+          resetSlide(liRef.current);
+          if (listMoves) listMoves.revert(e instanceof Error ? e.message : "Couldn't snooze that quest — try again.");
+          else setError(e instanceof Error ? e.message : "Couldn't snooze that quest.");
+        }
+      });
+      return;
+    }
+    startTransition(async () => {
+      if (listMoves) {
+        await slideOut(liRef.current);
+        listMoves.move(null);
+      }
+      try {
+        const prev = await snoozeQuestAction(task.id);
+        listMoves?.notify?.({ text: `Snoozed until tomorrow: ${task.title}`, undo: () => undoSnoozeAction(task.id, prev) });
+      } catch (e) {
+        resetSlide(liRef.current);
+        if (listMoves) listMoves.revert(e instanceof Error ? e.message : "Couldn't snooze that quest — try again.");
+        else setError(e instanceof Error ? e.message : "Couldn't snooze that quest.");
+      }
+    });
+  }
+
+  function pick(action: QuestAction, fromMenu = true) {
     setMenu(null);
     setError(null);
     if (action === "edit") return setEditing(true);
@@ -228,22 +266,9 @@ export function TaskRow({
       return;
     }
     if (action === "snooze") {
-      // Off today now; back at the top of the day tomorrow. Undo puts it back.
-      startTransition(async () => {
-        if (listMoves) {
-          await slideOut(liRef.current);
-          listMoves.move(null);
-        }
-        try {
-          const prev = await snoozeQuestAction(task.id);
-          listMoves?.notify?.({ text: `Snoozed until tomorrow: ${task.title}`, undo: () => undoSnoozeAction(task.id, prev) });
-        } catch (e) {
-          resetSlide(liRef.current);
-          if (listMoves) listMoves.revert(e instanceof Error ? e.message : "Couldn't snooze that quest — try again.");
-          else setError(e instanceof Error ? e.message : "Couldn't snooze that quest.");
-        }
-      });
-      return;
+      // From the menu: choose how long (swiping snoozes until tomorrow straight away).
+      if (fromMenu) return setSnoozing(true);
+      return snoozeNow({ tomorrow: true });
     }
     if (listMoves && (action === "battle" || action === "offtoday" || action === "delete")) {
       // Leave the list right away (slide left, fade, close the gap), then save.
@@ -361,7 +386,7 @@ export function TaskRow({
         background="linear-gradient(180deg,#56669c,#2f3a68)"
         color="#f6ecd2"
         disabled={!listMoves || task.status !== "open"}
-        onAction={() => pick("snooze")}
+        onAction={() => pick("snooze", false)}
       >
       <div
       onClick={() => (hasSteps && !done ? setTray((t) => !t) : setEditing(true))}
@@ -609,6 +634,7 @@ export function TaskRow({
                 </button>
               );
             })()}
+            {snoozing && <SnoozePicker title={task.title} onPick={snoozeNow} onClose={() => setSnoozing(false)} />}
             {bonusOpen && <EarlyBonusPopup taskId={task.id} initial={{ xp: task.early_bonus_xp ?? null, coins: task.early_bonus_coins ?? null, perDay: task.early_bonus_per_day ?? null }} onClose={() => setBonusOpen(false)} />}
           </div>
           {((task.progress ?? 0) > 0 || (task.steps_total ?? 0) > 0) && (

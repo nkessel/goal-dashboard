@@ -9,7 +9,7 @@ export const MENU_ITEMS: { key: QuestAction; label: string }[] = [
   { key: "complete", label: "Complete this quest" },
   { key: "focus", label: "Focus mode" },
   { key: "battle", label: "Add to / remove from Today's Quests" },
-  { key: "snooze", label: "Snooze until tomorrow" },
+  { key: "snooze", label: "Snooze…" },
   { key: "offtoday", label: "Remove from Additional Quests" },
   { key: "calendar", label: "Schedule on calendar" },
   { key: "board", label: "See quest in its board" },
