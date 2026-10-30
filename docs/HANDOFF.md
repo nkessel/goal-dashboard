@@ -4,7 +4,7 @@
 
 - **Last updated:** 2026-10-30 night (arrange in context on editor, menu and Today; early reward; laundry run; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 20:30 UTC: beautiful time pickers everywhere ("When was it completed?" was the example; dialogs now get a parchment time field, a full custom picker is still to do); ±5 XP buttons by the XP bar in the quest editor; a clearer, nicer "defeated" box on completed quests and tags last in More; "Also on other boards" and other board settings into the board tray, Private as an icon at the bottom, Ctrl+S must save (not Chrome's save page); track button click times for the UX teams; opening feedback on /settings/inventory reloads the page behind it (iOS; cause not found from the cloud, needs a device repro).
+- **Pending in-app feedback:** as of 2026-10-30 21:30 UTC: opening feedback on /settings/inventory reloads the page behind it (iOS; cause not found from the cloud, needs a device repro).
 
 ---
 
@@ -15,7 +15,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 | # | Work | State | Next step |
 |---|---|---|---|
 | 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
-| 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. |
+| 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. Left: consistent capitalization, pinned editor footer. The UX teams can now read real click timings from `ui_clicks`. |
 | 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. See the header list. |
 | 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
 
@@ -47,7 +47,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0074_mess_battle_xp.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0075_ui_clicks.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -118,6 +118,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Oct 30 (night): Feedback batch: every time field is the parchment time picker (`TimeToken` in `xp/NightFields.tsx`; a dark "spirit" look on the toucan's panels); quest editor XP has −5/+5 beside the amount (slider on its own line); a completed quest shows a victory seal ("Defeated! +N XP", when, Undo); the board tray holds "Stands for" and "Also on"; Private is a lock at the bottom; Tags last under More (editor layout v3); Ctrl/⌘+S never opens Chrome's Save page (feedback box sends with it); the victory screen survives a reload until Continue (sessionStorage `quest-celebration`); the click trail: every button, link and control pressed, with the time since the last, goes to `ui_clicks` (migration 0075, `ui/ClickTrail.tsx`, `/api/clicks`) for the UX teams (query it by `owner_id`, `at`, `path`, `label`, `gap_ms`). Wise-line thumbs have a bigger tap area.
 
 - Oct 30 (night): Fight back the mess: ⚔ on each space (priority list and Spaces) and "Before and after" after the 20 minutes open a battle log (`habits/MessBattle.tsx`): Before and After sliders on one 0–10 scale (the ground won glows green), optional time (10m/20m/30m/1 hr or minutes) and energy it took ⚡ and gave ✨ (1–5). Cleaner than before pays XP (4 per step + 2 per 10 min up to 8; 60 a day; `battleXp` in `lib/cleaning.ts`, xp kind `mess_battle`, migration 0074) with the progress celebration; the space takes its After level; kept in `life_wheel.cleaning.battles`. Insights, a board page and the calendar arrange in place from their gear (generic `ScreenArrange`; the board's quests and the calendar itself can't be hidden).
 

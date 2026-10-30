@@ -36,7 +36,8 @@ const WAKE_TIMES = ["05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30
  * opens a small parchment dial: the usual times as chips, and the hour and
  * minutes to fine-tune, in 5-minute steps.
  */
-export function TimeToken({ value, onChange, label, icon, kind, compact = false }: { value: string; onChange: (v: string) => void; label: string; icon?: React.ReactNode; kind: "bed" | "wake" | "any"; compact?: boolean }) {
+/** The app's time picker: a parchment token showing the time ("— : —" when unset) that opens the time dial. "spirit" suits the toucan's dark panels. */
+export function TimeToken({ value, onChange, label, icon, kind, compact = false, variant = "parchment" }: { value: string; onChange: (v: string) => void; label: string; icon?: React.ReactNode; kind: "bed" | "wake" | "any"; compact?: boolean; variant?: "parchment" | "spirit" }) {
   const [openAt, setOpenAt] = useState<HTMLElement | null>(null);
   const open = !!openAt;
   return (
@@ -49,7 +50,7 @@ export function TimeToken({ value, onChange, label, icon, kind, compact = false 
         }}
         aria-label={`${label}: ${value ? clock12(value) : "not set"}. Change`}
         aria-expanded={open}
-        className={`time-token flex items-center gap-1.5 rounded-full ${compact ? "h-8 px-2.5" : "h-10 px-3.5"}`}
+        className={`${variant === "spirit" ? "time-token time-token-spirit" : "time-token"} flex shrink-0 items-center gap-1.5 rounded-full ${compact ? "h-9 px-3" : "h-10 px-3.5"}`}
       >
         {icon}
         <span className={`font-display tabular-nums ${compact ? "text-[14px]" : "text-[17px]"}`} style={{ opacity: value ? 1 : 0.55 }}>

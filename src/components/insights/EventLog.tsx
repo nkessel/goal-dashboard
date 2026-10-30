@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addCheckNoteAction, deleteCheckNoteAction, updateCheckNoteAction } from "@/app/actions";
@@ -203,14 +204,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
               />
             )}
             {when === "pick" && !allDay && (
-              <input
-                type="time"
-                value={pickTime}
-                onChange={(e) => setPickTime(e.target.value)}
-                aria-label="What time"
-                className="h-8 rounded-lg border px-2 text-[14px]"
-                style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.65)", color: INK }}
-              />
+              <TimeToken value={pickTime} onChange={setPickTime} label="What time" kind="any" compact />
             )}
             <label className="flex h-8 items-center gap-1.5 px-1 text-[13.5px] font-semibold" style={{ color: INK }}>
               <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />

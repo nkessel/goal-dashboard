@@ -35,9 +35,40 @@ export function celebrateProgress(detail: ProgressCelebrationDetail) {
   window.dispatchEvent(new CustomEvent("quest-progress", { detail }));
 }
 
+/** The scene on screen, kept for this tab so a reload brings it back until Continue (an hour at most). */
+const KEEP = "quest-celebration";
+function keep(c: QuestCelebration | null) {
+  try {
+    if (c) sessionStorage.setItem(KEEP, JSON.stringify({ c, at: Date.now() }));
+    else sessionStorage.removeItem(KEEP);
+  } catch {
+    /* storage unavailable */
+  }
+}
+function kept(): QuestCelebration | null {
+  try {
+    const r = JSON.parse(sessionStorage.getItem(KEEP) ?? "null") as { c: QuestCelebration; at: number } | null;
+    return r && Date.now() - r.at < 3_600_000 ? r.c : null;
+  } catch {
+    return null;
+  }
+}
+
 /** App-wide: shows the Quest Complete scene, then Choose a Reward / Continue. */
 export function QuestCelebrationHost({ avatarSrc, totalXp: shellTotalXp, levelCap = 10 }: { avatarSrc: string; totalXp: number; levelCap?: number }) {
-  const [current, setCurrent] = useState<QuestCelebration | null>(null);
+  const [current, setCurrentRaw] = useState<QuestCelebration | null>(null);
+  const setCurrent = (next: QuestCelebration | null | ((c: QuestCelebration | null) => QuestCelebration | null)) =>
+    setCurrentRaw((c) => {
+      const v = typeof next === "function" ? next(c) : next;
+      keep(v);
+      return v;
+    });
+  // A reload mid-celebration: back where you were.
+  useEffect(() => {
+    const was = kept();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring from this tab's storage after mount
+    if (was) setCurrentRaw(was);
+  }, []);
   const [progress, setProgress] = useState<(ProgressCelebrationDetail & { n: number }) | null>(null);
   const [reward, setReward] = useState<(RewardCelebrationDetail & { n: number }) | null>(null);
   useEffect(() => {

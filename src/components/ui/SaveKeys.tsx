@@ -14,11 +14,14 @@ export function SaveKeys() {
     const onKey = (e: KeyboardEvent) => {
       const s = e.key === "s" || e.key === "S";
       if (!(e.ctrlKey || e.metaKey) || e.altKey || !(s || e.key === "Enter")) return;
-      if (e.defaultPrevented || fromFeedback(e) || document.querySelector("[data-save-keys]")) return;
+      // Ctrl/⌘+S never opens the browser's "Save page" in the app, whether or not there's anything to save.
+      const handled = e.defaultPrevented;
+      if (s) e.preventDefault();
+      if (fromFeedback(e) || document.querySelector("[data-save-keys]")) return;
       const popups = [...document.querySelectorAll<HTMLElement>('[role="dialog"], [role="menu"], [role="alertdialog"]')].filter((el) => !el.closest("[data-feedback-root]"));
       const active = document.activeElement;
       const first = popups.find((el) => active && el.contains(active)) ?? popups[popups.length - 1];
-      if (!first) return;
+      if (!first || handled) return;
       const submitIn = (el: HTMLElement) => el.querySelector<HTMLButtonElement>("[data-submit]:not(:disabled)") ?? el.querySelector<HTMLButtonElement>('button[type="submit"]:not(:disabled)');
       // A picker open over a form (a portrait chooser over the habit editor) has nothing to submit: save the form under it.
       const box = submitIn(first) || first.querySelector("form") ? first : ([...popups].reverse().find((el) => el !== first && submitIn(el)) ?? first);

@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeToken } from "@/components/xp/NightFields";
 import { useState, useTransition } from "react";
 import { nextOccurrence, repeatLabel, type Repeat } from "@/lib/habit-repeat";
 import { createPortal } from "react-dom";
@@ -417,14 +418,7 @@ export function RiteEditorDialog({
             </button>
             {dueOpen && (
             <label className="reveal flex items-center gap-2 pl-4 text-[14.5px] font-semibold">
-              <input
-                type="time"
-                value={dueTime}
-                onChange={(e) => setDueTime(e.target.value)}
-                aria-label="Due by (optional)"
-                className="h-9 rounded-lg border px-2 text-[16px] font-normal"
-                style={{ borderColor: "#b39a6a" }}
-              />
+              <TimeToken value={dueTime} onChange={setDueTime} label="Due by (optional)" kind="any" compact />
               {dueTime ? (
                 <button type="button" onClick={() => setDueTime("")} className="text-[13px] font-normal underline" style={{ color: "var(--t-ink-soft)" }}>
                   clear

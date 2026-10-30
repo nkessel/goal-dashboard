@@ -12,7 +12,7 @@ Work continues on `main` in small shipped batches (batch 1 shipped Oct 30 evenin
 
 ## Still to do (agreed by all three reviews)
 Welcome screen:
-- (Shipped batch 2: compact reward line, one Done, hidden parts as chips, no doubled label.) Left: bigger hit areas on the wise-line thumbs (28px now), consistent capitalization.
+- (Shipped batch 2: compact reward line, one Done, hidden parts as chips, no doubled label.) Left: consistent capitalization (thumbs' tap area done Oct 30 night).
 - Keep: the "+ Other priorities" seal and the "Complete check-in" label (owner's choices).
 
 Quest editor: shipped in batch 3 (see HANDOFF "Recently shipped"). Left on purpose: "Shows in" stays a chip (the owner chose the one row of chips this afternoon, after the reviews); pinned footer not done.

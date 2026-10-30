@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeToken } from "@/components/xp/NightFields";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { saveToucanStyleAction } from "@/app/actions";
@@ -174,13 +175,7 @@ export function ToucanQuiz({ onClose }: { onClose: () => void }) {
         {q.key === "gym" && draft.gym.days.length > 0 && (
           <label className="flex items-center gap-2 text-[14px]">
             Usual time
-            <input
-              type="time"
-              value={draft.gym.time ?? ""}
-              onChange={(e) => setDraft({ ...draft, gym: { ...draft.gym, time: e.target.value || null } })}
-              className="h-10 rounded-xl px-2"
-              style={{ background: "rgba(0,0,0,.25)", border: "1px solid rgba(140,240,220,.35)", color: "#e8fff8", colorScheme: "dark" }}
-            />
+            <TimeToken value={draft.gym.time ?? ""} onChange={(v) => setDraft({ ...draft, gym: { ...draft.gym, time: v || null } })} label="Usual time" kind="any" compact variant="spirit" />
           </label>
         )}
 

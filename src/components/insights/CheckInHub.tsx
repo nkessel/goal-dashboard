@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeToken } from "@/components/xp/NightFields";
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -125,7 +126,7 @@ function AddEntry({ metrics, onClose }: { metrics: string[]; onClose: () => void
         <h3 className="font-display relative z-[1] m-0 text-[19px]">Add an entry</h3>
         <div className="relative z-[1] flex flex-wrap items-center gap-2">
           <DateField value={day} onChange={(v) => setDay(v || dayKey(new Date()))} min={min} max={dayKey(new Date())} ariaLabel="Day" className="h-9 rounded-lg border px-2.5 text-[14.5px]" style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.6)" }} />
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Time" className="h-9 rounded-lg border px-2.5 text-[14.5px]" style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.6)", color: INK }} />
+          <TimeToken value={time} onChange={setTime} label="Time" kind="any" compact />
         </div>
         <ul className="relative z-[1] m-0 flex list-none flex-col gap-1 p-0">
           {metrics.map((m) => {

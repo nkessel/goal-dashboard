@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeToken } from "@/components/xp/NightFields";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { GearIcon } from "@/components/ui/Icons";
 import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
@@ -1753,7 +1754,7 @@ export function QuestEditorDialog({
                     )}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="range"
                     min={0}
@@ -1762,9 +1763,13 @@ export function QuestEditorDialog({
                     value={Math.min(XP_MAX, xp)}
                     onChange={(e) => (setXp(Number(e.target.value)), setXpOwn(true))}
                     aria-label="XP reward"
-                    className="h-8 min-w-0 flex-1"
+                    className="h-8 min-w-0 basis-full"
                     style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
                   />
+                  {/* −5 and +5 either side of the amount, for a quick nudge. */}
+                  <button type="button" onClick={() => (setXp(Math.max(0, xp - 5)), setXpOwn(true))} aria-label="5 XP less" title="−5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
+                    −5
+                  </button>
                   <span className="flex h-9 shrink-0 items-center rounded-lg border pr-1.5" style={fieldStyle}>
                     <NumberInput
                       min={0}
@@ -1780,8 +1785,11 @@ export function QuestEditorDialog({
                       XP
                     </span>
                   </span>
+                  <button type="button" onClick={() => (setXp(Math.min(1000, xp + 5)), setXpOwn(true))} aria-label="5 XP more" title="+5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
+                    +5
+                  </button>
                   {!doingNow && (
-                    <span className="flex h-9 shrink-0 items-center gap-0.5 rounded-lg border px-1" style={fieldStyle} title="Coins earned on completion">
+                    <span className="ml-auto flex h-9 shrink-0 items-center gap-0.5 rounded-lg border px-1" style={fieldStyle} title="Coins earned on completion">
                       <button
                         type="button"
                         onClick={() => setCoinValue(Math.max(0, coinsShown - 1))}
@@ -1944,7 +1952,7 @@ export function QuestEditorDialog({
       <>
               {/* A stand-in quest speaks for its board's current assignment. */}
               {task && !review && (
-                <label className="flex flex-wrap items-center gap-2 pl-7 text-[13px]" title="Keep this quest's clear name, but follow the board's current assignment: its due date, its priority and its next step">
+                <label className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px]" title="Keep this quest's clear name, but follow the board's current assignment: its due date, its priority and its next step">
                   <input type="checkbox" checked={!!standsFor} onChange={(e) => changeStandsFor(e.target.checked ? (boardId ?? null) : null)} disabled={!boardId && !standsFor} />
                   <span>Stands for the board&rsquo;s current assignment</span>
                   {standsFor && (
@@ -1964,7 +1972,7 @@ export function QuestEditorDialog({
       <>
               {/* Also show it on other boards (it still lives on the one above). */}
               {task && !review && (
-                <div className="flex flex-wrap items-center gap-1.5 pl-7 text-[13px]">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[13px]">
                   <span style={{ color: "var(--t-ink-soft)" }}>Also on</span>
                   {alsoOn.map((id) => (
                     <span key={id} className="flex h-7 items-center gap-0.5 rounded-full pl-2.5 pr-0.5" style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}>
@@ -2023,6 +2031,14 @@ export function QuestEditorDialog({
       </>
     ),
   };
+  // The board's own settings (stands for, also on) sit in the board tray; Private is a lock in the footer.
+  partNodes.board = (
+    <>
+      {partNodes.board}
+      {partNodes.standsFor}
+      {partNodes.alsoOn}
+    </>
+  );
   const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp", "board"];
   const factLabel = (f: EditorPart) =>
     f === "showsIn"
@@ -2457,7 +2473,7 @@ export function QuestEditorDialog({
                         <DateField value={dueDate} onChange={setDueDate} ariaLabel="Due date" placeholder="No due date" className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[15px]" style={fieldStyle} />
                         {dueDate && (
                           <>
-                            <input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} aria-label="Due time (optional)" className="h-9 w-[92px] shrink-0 rounded-lg border px-1.5 text-[15px]" style={fieldStyle} />
+                            <TimeToken value={dueTime} onChange={setDueTime} label="Due time (optional)" kind="any" compact />
                             <button type="button" onClick={() => (setDueDate(""), setDueTime(""))} aria-label="Clear the due date" title="No due date" className="h-9 w-7 shrink-0 text-[18px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
                               ×
                             </button>
@@ -2499,14 +2515,26 @@ export function QuestEditorDialog({
           )}
 
           {isCompleted && task && (
-            <div
-              className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px]"
-              style={{ background: "rgba(79,109,60,.12)", border: "1px solid rgba(79,109,60,.35)" }}
-            >
-              <span>
-                <span style={{ color: "var(--t-good)", fontWeight: 700 }}>✓</span> {isAdventure ? "Defeated" : "Completed"}
-                {task.completed_at && ` ${new Date(task.completed_at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`}
-                {" · changing XP updates what you earned"}
+            // A victory seal: what was won and when, with a quiet way to take it back.
+            <div className="defeated-box flex items-center gap-3 rounded-2xl px-3 py-2.5">
+              <span aria-hidden className="defeated-seal flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[18px]">
+                {isAdventure ? "⚔" : "✓"}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                <span className={`${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ color: "#2f4a1c" }}>
+                  {isAdventure ? "Defeated!" : "Completed"}
+                  <span className="ml-1.5 text-[13px] font-semibold tabular-nums" style={{ color: "#6a4b0e" }}>
+                    +{xp} XP
+                  </span>
+                </span>
+                {task.completed_at && (
+                  <span className="text-[13px]" style={{ color: "#4a3a20" }}>
+                    {new Date(task.completed_at).toLocaleString(undefined, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  </span>
+                )}
+                <span className="text-[11.5px]" style={{ color: "#6b5631" }}>
+                  Change the XP above and what you earned changes too.
+                </span>
               </span>
               <button
                 type="button"
@@ -2518,9 +2546,10 @@ export function QuestEditorDialog({
                     close();
                   })
                 }
-                className="shrink-0 text-[12.5px] font-semibold underline disabled:opacity-50"
+                className="h-8 shrink-0 rounded-full px-3 text-[12.5px] font-semibold disabled:opacity-50"
+                style={{ border: "1px solid rgba(139,112,64,.5)", color: "#4a3a20", background: "rgba(255,250,238,.6)" }}
               >
-                Undo completion
+                Undo
               </button>
             </div>
           )}
@@ -2586,6 +2615,23 @@ export function QuestEditorDialog({
               </button>
             ) : (
               <span />
+            )}
+            {/* Private: a lock at the bottom (hidden from your party, even on screens you share). */}
+            {!doingNow && (
+              <button
+                type="button"
+                onClick={() => changePrivate(!isPriv)}
+                aria-pressed={isPriv}
+                aria-label={isPriv ? "Private quest: hidden from your party. Make it visible" : "Make this quest private (hidden from your party)"}
+                title={isPriv ? "Private: hidden from your party" : "Visible to your party · tap to make it private"}
+                className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-black/[.06]"
+                style={{ color: isPriv ? "#8a6116" : "var(--t-ink-soft)", background: isPriv ? "rgba(217,180,95,.28)" : undefined, opacity: isPriv ? 1 : 0.6 }}
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="2" fill={isPriv ? "currentColor" : "none"} fillOpacity={isPriv ? 0.25 : 0} />
+                  <path d={isPriv ? "M8 11V8a4 4 0 0 1 8 0v3" : "M8 11V8a4 4 0 0 1 7.6-1.7"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
             )}
             <div className="ml-auto flex items-center gap-2">
               {autosave ? (

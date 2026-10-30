@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useRef, useState } from "react";
 import { FLOURISHES, readFlourish, saveFlourish, type Flourish } from "@/lib/toucan-flourish";
 import { createPortal } from "react-dom";
@@ -648,10 +649,18 @@ function PickTime({ onPick, onClose }: { onPick: (when: number) => void; onClose
         <p className="m-0 text-[12.5px]" style={{ color: "rgba(232,255,248,.7)" }}>
           Or at a time of your own:
         </p>
-        <input type="time" value={value} onChange={(e) => {
-            const when = nextAt(e.target.value);
-            setPick({ value: e.target.value, when, today: when?.toDateString() === new Date().toDateString() });
-          }} aria-label="Time" className="h-11 rounded-xl px-3 text-[16px]" style={{ background: "rgba(0,0,0,.25)", border: "1px solid rgba(140,240,220,.35)", color: "#e8fff8", colorScheme: "dark" }} />
+        <span className="flex">
+          <TimeToken
+            value={value}
+            onChange={(v) => {
+              const when = nextAt(v);
+              setPick({ value: v, when, today: when?.toDateString() === new Date().toDateString() });
+            }}
+            label="Time"
+            kind="any"
+            variant="spirit"
+          />
+        </span>
         {when && (
           <p className="m-0 text-[13px]" style={{ color: "rgba(232,255,248,.7)" }}>
             {today ? "Today" : "Tomorrow"} at {when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}

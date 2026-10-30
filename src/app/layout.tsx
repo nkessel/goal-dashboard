@@ -6,6 +6,7 @@ import { ScrollLock } from "@/components/ui/ScrollLock";
 import { ContextMenuBridge } from "@/components/ui/ContextMenuBridge";
 import { MenuLayoutStyles } from "@/components/settings/MenuLayoutSettings";
 import { SaveKeys } from "@/components/ui/SaveKeys";
+import { ClickTrail } from "@/components/ui/ClickTrail";
 import { LastScreen } from "@/components/ui/LastScreen";
 import "./globals.css";
 
@@ -77,6 +78,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
         <ContextMenuBridge />
         <MenuLayoutStyles />
         <SaveKeys />
+        <ClickTrail />
         <LastScreen />
         <ViewTransitionProvider>
           {children}

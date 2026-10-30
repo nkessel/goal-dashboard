@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useRef, useState, useTransition, useSyncExternalStore } from "react";
 import { arrangeSteps, readMenuLayouts, serverMenuLayouts, subscribeMenuLayouts } from "@/lib/menu-layouts";
 import Link from "next/link";
@@ -382,7 +383,7 @@ export function PairRitual(props: {
                   </div>
                   <label className="flex items-center gap-2 text-[14px] font-semibold" style={{ color: INK }}>
                     Bedtime
-                    <input type="time" value={d.bedtime[who]} onChange={(e) => setSide("bedtime", who, e.target.value)} className="h-9 rounded-lg border px-2 text-[15px]" style={FIELD_STYLE} aria-label={`${names[who]}: bedtime`} />
+                    <TimeToken value={d.bedtime[who]} onChange={(v) => setSide("bedtime", who, v)} label={`${names[who]}: bedtime`} kind="bed" compact />
                   </label>
                 </>
               ))}

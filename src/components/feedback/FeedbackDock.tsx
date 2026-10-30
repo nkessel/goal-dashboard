@@ -1002,7 +1002,7 @@ function Composer({
           } else if (e.key === "Tab" && !e.shiftKey && submitBtn.current && !submitBtn.current.disabled) {
             e.preventDefault();
             submitBtn.current.focus();
-          } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+          } else if ((e.key === "Enter" || e.key.toLowerCase() === "s") && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             submit();
           }
@@ -1053,7 +1053,8 @@ function Composer({
         // The box keeps its size while you write (the text scrolls); only you resize it.
         onChange={(e) => onChange({ body: e.target.value })}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+          // Ctrl/⌘+Enter or Ctrl/⌘+S sends it (never the browser's "Save page").
+          if ((e.key === "Enter" || e.key.toLowerCase() === "s") && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             submit();
           }

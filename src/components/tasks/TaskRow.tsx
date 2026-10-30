@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeToken } from "@/components/xp/NightFields";
 import { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -981,7 +982,7 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose }: { ti
         </div>
         <div className="relative z-[1] flex flex-wrap items-center gap-2 text-[14px]">
           <DateField value={day} max={keyOf(now)} onChange={(v) => v && setDay(v)} ariaLabel="Day" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Time (optional)" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
+          <TimeToken value={time} onChange={setTime} label="Time (optional)" kind="any" compact />
           <span style={{ color: "var(--t-ink-soft)" }}>time optional</span>
         </div>
         <div className="relative z-[1] flex flex-wrap justify-end gap-2 pt-1">

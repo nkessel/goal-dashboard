@@ -33,7 +33,6 @@ export const EDITOR_PARTS: { key: EditorPart; label: string }[] = [
   { key: "sequence", label: "Sequence" },
   { key: "steps", label: "Steps" },
   { key: "xp", label: "XP and coins" },
-  { key: "tags", label: "Tags" },
   { key: "board", label: "Board" },
   { key: "stats", label: "Character stats" },
   { key: "progress", label: "Progress" },
@@ -42,18 +41,18 @@ export const EDITOR_PARTS: { key: EditorPart; label: string }[] = [
   { key: "difficulty", label: "Difficulty" },
   { key: "energy", label: "Energy boost" },
   { key: "matrix", label: "Plot on the Priority Matrix" },
-  { key: "standsFor", label: "Stands for the board's assignment" },
-  { key: "alsoOn", label: "Also on other boards" },
-  { key: "private", label: "Private quest" },
   { key: "template", label: "Save as a template" },
+  // Last under More (owner, Oct 30).
+  { key: "tags", label: "Tags" },
 ];
+// Stands for and Also on live in the board tray, Private is a lock in the footer: they aren't arranged.
 
 export type EditorLayout = { order: EditorPart[]; folded: EditorPart[]; v?: number };
 
 export const DEFAULT_EDITOR_LAYOUT: EditorLayout = {
   order: EDITOR_PARTS.map((p) => p.key),
-  folded: ["stats", "progress", "importance", "urgency", "difficulty", "energy", "matrix", "standsFor", "alsoOn", "private", "template"],
-  v: 2,
+  folded: ["stats", "progress", "importance", "urgency", "difficulty", "energy", "matrix", "template", "tags"],
+  v: 3,
 };
 
 const KEY = "quest-editor-layout";
@@ -68,7 +67,13 @@ function clean(raw: unknown): EditorLayout {
   let folded = Array.isArray(r.folded) ? r.folded.filter((k): k is EditorPart => known.has(k as EditorPart)) : DEFAULT_EDITOR_LAYOUT.folded;
   // Layouts saved before v2: the board comes out of Advanced, and matrix plotting goes in.
   if ((r.v ?? 1) < 2) folded = [...folded.filter((k) => k !== "board"), "matrix"];
-  return { order: [...new Set(order)], folded: [...new Set(folded)], v: 2 };
+  // Before v3: tags go last, under More.
+  if ((r.v ?? 1) < 3) {
+    const at = order.indexOf("tags");
+    if (at >= 0) order.push(...order.splice(at, 1));
+    folded = [...folded.filter((k) => k !== "tags"), "tags"];
+  }
+  return { order: [...new Set(order)], folded: [...new Set(folded)], v: 3 };
 }
 
 let cache: { raw: string | null; value: EditorLayout } | null = null;

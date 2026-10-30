@@ -623,7 +623,7 @@ function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean
       aria-pressed={on}
       aria-label={like ? "I like this line: show it more" : "I don't like this line: don't show it again"}
       title={like ? "Like: show it more often" : "Dislike: never show it again"}
-      className={`flex h-7 w-7 items-center justify-center rounded-full transition-opacity hover:opacity-100 ${on ? "opacity-100" : "opacity-45"}`}
+      className={`relative flex h-7 w-7 items-center justify-center rounded-full transition-opacity before:absolute before:-inset-2 before:content-[''] hover:opacity-100 ${on ? "opacity-100" : "opacity-45"}`}
       style={{ background: on ? (like ? "rgba(120,170,80,.22)" : "rgba(192,80,58,.16)") : "transparent" }}
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden style={like ? undefined : { transform: "rotate(180deg)" }}>

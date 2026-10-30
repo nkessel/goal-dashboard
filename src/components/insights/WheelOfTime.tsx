@@ -1,5 +1,6 @@
 "use client";
 
+import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { saveNightAction, setWheelOfTimeAction } from "@/app/actions";
 import { NightFields, EMPTY_NIGHT, nightIsEmpty, type NightDraft } from "@/components/xp/NightFields";
@@ -417,13 +418,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-2.5" style={{ borderColor: "rgba(217,180,95,.25)" }}>
         <label className="flex items-center gap-1.5 text-[13.5px] font-semibold">
           Target bedtime
-          <input
-            type="time"
-            value={state.target ?? ""}
-            onChange={(e) => saveSettings({ target: e.target.value || null })}
-            aria-label="Target bedtime"
-            className="night-time w-[136px]"
-          />
+          <TimeToken value={state.target ?? ""} onChange={(v) => saveSettings({ target: v || null })} label="Target bedtime" kind="bed" compact />
         </label>
       </div>
       {error && (
