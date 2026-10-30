@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30, `main` @ `0cf6ede` (rewards chest, interval habits, Last night rebuilt, welcome fixes)
+- **Last updated:** 2026-10-30 evening, `main` @ (see git log) (top priority display fix, one-button welcome save, check-in −/+)
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** about 9 notes not marked shipped (as of 2026-10-30 18:15 UTC): toucan menu / cage / messages from the bird / Not now snooze flow, drag bars everywhere (app-wide), last-screen-on-login, reward quests with multiple parts, check-in slider +/- buttons, and an unclear "event isn't displaying properly" note.
 
@@ -14,8 +14,9 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 
 | # | Work | State | Next step |
 |---|---|---|---|
-| 1 | **Ship pending in-app feedback** | Ready | Run the feedback loop in section 3. Last batch shipped Oct 29 02:37 UTC. |
-| 2 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
+| 1 | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. |
+| 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. New Oct 30 asks: Due soon full redesign (squished first card, subquest drawer, animated), its reach picker cut off by the popup, right-click toucan menu (with settings), movable toucan with ‹ › to cycle sayings and ⋯ → thumbs on the bubble. |
+| 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
 
 **Open questions for the owner** (ask when relevant, don't block on them):
 - "Allow editing of quests here" on Tomorrow's Quests: tapping a name already opens the editor. Do they want editing in place?
@@ -115,6 +116,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30 (evening): Top priority keeps your line breaks (cap 400), wraps long words/links, shows one ◆ item per line in a parchment box that taps to edit, ✎ by its label, "When there's space" list for the others (three-team synthesis in `docs/ux/2026-10-30-top-priority.md`); the welcome screen's bottom button saves priority, intention and check-in together (no per-field Save); check-in −/+ beside each slider; Due soon chevron points down.
 - Oct 30 (late afternoon): Welcome screen "Plan my day" part removed (stored orders drop it); the toucan lands on every visit, not just welcome back, and tapping him offers Plan my day, Talk to me, a wise saying, or changing what he asks first (`welcomeToucanAsk`, `toucanAsk()` in `lib/welcome.ts`); the wise line's thumbs sit in a right-hand column so they never drop below it on phones.
 - Oct 30 (late afternoon): Treasure Chest (drag to reorder, compact cards, quiet coin count, "Reward cost", default 3 coins, prerequisite and bonus behind buttons, new rewards drop in); habits repeating every week/month/year or every N days/weeks/months/years from a start date (migration 0068, `lib/habit-repeat.ts`; up until done or skipped), Not today list, snooze until tomorrow; generated spire castle (Generate castle); greeting ✎ at its upper right with true-layout editing; only the bottom-right button leaves the welcome screen; Last night rebuilt (`NightFields.tsx`: time tokens + parchment time dial, Wheel of Time, Factors of sleep chips); Daily Habits gear top right with + options; feedback Tab → XP (arrows) → Submit.
 - Oct 30 (afternoon): Welcome screen per the in-context design rule (panel above for when it opens and confetti; ✎ by every part; hide top-right; drag bars; castle ✎ by the castle); tap the greeting to write your own (asks to keep it in rotation and retire the original); Complete check-in bottom right; Snooze spreads its times in a line (15 min, 30 min, 1 hr, Other… → 2 hrs, 3 hrs, this evening, tomorrow, minutes); top priority box grows, "Other priorities" opens a 65% box with "Secondary Priorities"; check-in folds with a caret; quiet thumbs beside the wise line; one wise-lines list with a gold "+ My own words"; editable questions; smaller Due soon pill with its reach on it; fog on phone hide and on return so Today never shows before the mist.
