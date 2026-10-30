@@ -176,6 +176,7 @@ export async function updateTask(
     dueAt?: string | null;
     chunkMinutes?: number | null;
     coinValue?: number | null;
+    earlyBonusXp?: number | null;
     /** Undefined leaves it untouched. */
     isTiny?: boolean;
   }
@@ -202,6 +203,7 @@ export async function updateTask(
       ...(input.dueAt !== undefined ? { due_at: input.dueAt } : {}),
       ...(input.chunkMinutes !== undefined ? { chunk_minutes: input.chunkMinutes === null ? null : Math.max(1, Math.round(input.chunkMinutes)) } : {}),
       ...(input.coinValue !== undefined ? { coin_value: input.coinValue === null ? null : Math.max(0, Math.round(input.coinValue)) } : {}),
+      ...(input.earlyBonusXp !== undefined ? { early_bonus_xp: input.earlyBonusXp === null ? null : Math.max(0, Math.round(input.earlyBonusXp)) } : {}),
     })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
@@ -380,6 +382,7 @@ export async function createTask(
     dueAt?: string | null;
     chunkMinutes?: number | null;
     coinValue?: number | null;
+    earlyBonusXp?: number | null;
     isTiny?: boolean;
   }
 ): Promise<Task> {
@@ -395,6 +398,7 @@ export async function createTask(
       ...(input.dueAt ? { due_at: input.dueAt } : {}),
       ...(input.chunkMinutes ? { chunk_minutes: Math.max(1, Math.round(input.chunkMinutes)) } : {}),
       ...(input.coinValue != null ? { coin_value: Math.max(0, Math.round(input.coinValue)) } : {}),
+      ...(input.earlyBonusXp != null ? { early_bonus_xp: Math.max(0, Math.round(input.earlyBonusXp)) } : {}),
       ...(input.iconKey ? { icon_key: input.iconKey, icon_source: input.iconSource ?? "library" } : {}),
       owner_id: ownerId,
       goal_id: input.goalId || null,

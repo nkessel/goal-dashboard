@@ -134,6 +134,8 @@ export type Task = {
   chunk_minutes?: number | null;
   /** Custom coin payout; null = automatic from XP. */
   coin_value?: number | null;
+  /** XP for finishing before it's due, set in the editor (null = the automatic early-bird bonus; 0 = none). */
+  early_bonus_xp?: number | null;
   /** Matrix screen placement: 'unplotted' / 'later' lots, or 'hidden' (off the matrix). */
   matrix_state?: "unplotted" | "later" | "hidden" | null;
   /** A tiny task: quick (5 min by default), drawn half height with just a check box. */

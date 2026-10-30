@@ -30,9 +30,11 @@ export function oneStepPerProject<X extends T>(tasks: X[], boards: B[], all: T[]
   return tasks.filter((t) => !t.board_id || !next.has(t.board_id) || next.get(t.board_id) === t.id);
 }
 
-/** Finishing a dated quest at least two days early earns half its XP again. */
-export function earlyBirdBonus(t: { due_at?: string | null; xp_value: number }, now = Date.now()): number {
+/** Finishing a dated quest at least two days early earns half its XP again, unless you set its early bonus yourself. */
+export function earlyBirdBonus(t: { due_at?: string | null; xp_value: number; early_bonus_xp?: number | null }, now = Date.now()): number {
   if (!t.due_at) return 0;
+  // Your own early bonus: paid for finishing any time before it's due.
+  if (t.early_bonus_xp != null) return Date.parse(t.due_at) > now ? Math.max(0, t.early_bonus_xp) : 0;
   if (Date.parse(t.due_at) - now < 2 * 86_400_000) return 0;
   return Math.max(5, Math.round(t.xp_value * 0.5));
 }

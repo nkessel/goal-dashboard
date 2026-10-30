@@ -487,6 +487,7 @@ export async function updateTaskAction(
     chunkMinutes?: number | null;
     /** Coins paid on completion; null = automatic (see lib/coins). */
     coinValue?: number | null;
+    earlyBonusXp?: number | null;
     isTiny?: boolean;
   }
 ) {
@@ -525,6 +526,7 @@ export async function updateTaskAction(
     dueAt: input.dueAt,
     chunkMinutes: input.chunkMinutes,
     coinValue: input.coinValue,
+    earlyBonusXp: input.earlyBonusXp,
     isTiny: input.isTiny,
   });
   revalidatePath("/");
@@ -1169,6 +1171,7 @@ export async function createQuestAction(input: {
   dueAt?: string | null;
   chunkMinutes?: number | null;
   coinValue?: number | null;
+  earlyBonusXp?: number | null;
   /** Where it shows on Today ("none" = just on its board). */
   placement?: "today" | "additional" | "none";
   /** A tiny task (half height on Today, just a check box). */
@@ -1193,6 +1196,7 @@ export async function createQuestAction(input: {
     dueAt: input.dueAt ?? null,
     chunkMinutes: input.chunkMinutes ?? null,
     coinValue: input.coinValue ?? null,
+    earlyBonusXp: input.earlyBonusXp ?? null,
     isTiny: input.isTiny,
   });
   revalidatePath("/power-ups");
