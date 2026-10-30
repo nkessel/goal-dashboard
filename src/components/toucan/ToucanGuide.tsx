@@ -151,7 +151,8 @@ export function ToucanGuide() {
   const [open, setOpen] = useState<{ plan: PlanTarget | null; mode: Mode; say?: string; n?: number } | null>(null);
   const [minimized, setMinimized] = useState(false);
   const [fallback, setFallback] = useState<{ text: string; actions: NoteAction[] } | null>(null);
-  const [pickTime, setPickTime] = useState<((when: number) => void) | null>(null);
+  // Pick a time: where the time goes, and the choices to come back to if you close it.
+  const [pickTime, setPickTime] = useState<{ at: (when: number) => void; back?: () => void } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -201,14 +202,15 @@ export function ToucanGuide() {
         if (n.taskId) void snoozeToucanAction(n.taskId, Math.max(0.01, (when - Date.now()) / 86_400_000)).catch(() => {});
       };
       const inHours = (h: number) => at(Date.now() + h * 3_600_000);
-      raiseRef.current("When should I bring it back?", [
-        { label: "30 min", run: () => inHours(0.5) },
-        { label: "1 hour", run: () => inHours(1) },
-        { label: "2 hours", run: () => inHours(2) },
-        { label: "Tomorrow", run: () => at(tomorrowMorning()) },
-        { label: "Pick a time…", run: () => setPickTime(() => at) },
-        { label: "Skip it", run: () => void (n.taskId && snoozeToucanAction(n.taskId, 1).catch(() => {})) },
-      ]);
+      const ask = () =>
+        raiseRef.current("When should I bring it back?", [
+          { label: "15 min", run: () => inHours(0.25) },
+          { label: "30 min", run: () => inHours(0.5) },
+          { label: "1 hour", run: () => inHours(1) },
+          { label: "Other…", run: () => setPickTime({ at, back: ask }) },
+          { label: "Skip it", run: () => void (n.taskId && snoozeToucanAction(n.taskId, 1).catch(() => {})) },
+        ]);
+      ask();
     },
   });
   const actionsRef = useRef(actionsFor);
@@ -497,13 +499,14 @@ export function ToucanGuide() {
                       label: "Not now…",
                       run: () => {
                         const push = (minutes: number) => void coachPromiseAction({ push: { id: p.id, minutes } }).then(arm).catch(() => {});
-                        raiseRef.current("When should I bring it back?", [
-                          { label: "15 min", run: () => push(15) },
-                          { label: "30 min", run: () => push(30) },
-                          { label: "1 hour", run: () => push(60) },
-                          { label: "2 hours", run: () => push(120) },
-                          { label: "Pick a time…", run: () => setPickTime(() => (when: number) => push(Math.max(1, Math.round((when - Date.now()) / 60_000)))) },
-                        ]);
+                        const ask = () =>
+                          raiseRef.current("When should I bring it back?", [
+                            { label: "15 min", run: () => push(15) },
+                            { label: "30 min", run: () => push(30) },
+                            { label: "1 hour", run: () => push(60) },
+                            { label: "Other…", run: () => setPickTime({ at: (when: number) => push(Math.max(1, Math.round((when - Date.now()) / 60_000))), back: ask }) },
+                          ]);
+                        ask();
                       },
                     },
                     { label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: p.id, status: "kept" } }).catch(() => {}) },
@@ -553,10 +556,15 @@ export function ToucanGuide() {
       {pickTime && (
         <PickTime
           onPick={(when) => {
-            pickTime(when);
+            pickTime.at(when);
             setPickTime(null);
           }}
-          onClose={() => setPickTime(null)}
+          onClose={() => {
+            // Closing goes back to the snooze choices, not off the screen.
+            const back = pickTime.back;
+            setPickTime(null);
+            back?.();
+          }}
         />
       )}
       {fallback && <NudgeNote text={fallback.text} actions={fallback.actions} onClose={() => setFallback(null)} />}
@@ -593,7 +601,20 @@ export function ToucanGuide() {
 
 type NoteAction = { label: string; run: () => void };
 
-/** Choose when a reminder comes back: a time today, or tomorrow if that time has passed. */
+/** The longer snoozes: in a couple of hours, this evening, tomorrow morning. */
+function laterChoices(): { label: string; at: number }[] {
+  const now = Date.now();
+  const evening = new Date();
+  evening.setHours(18, 0, 0, 0);
+  return [
+    { label: "2 hours", at: now + 2 * 3_600_000 },
+    { label: "3 hours", at: now + 3 * 3_600_000 },
+    ...(evening.getTime() - now > 3.5 * 3_600_000 ? [{ label: "This evening", at: evening.getTime() }] : []),
+    { label: "Tomorrow", at: tomorrowMorning() },
+  ];
+}
+
+/** Choose when a reminder comes back: a quick choice, a time today, or tomorrow if that time has passed. */
 function PickTime({ onPick, onClose }: { onPick: (when: number) => void; onClose: () => void }) {
   useEscape(onClose);
   const nextAt = (value: string) => {
@@ -613,10 +634,20 @@ function PickTime({ onPick, onClose }: { onPick: (when: number) => void; onClose
   return createPortal(
     <div className="fixed inset-0 z-[72] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-label="Bring it back at" onClick={(e) => e.stopPropagation()} className="card-pop-in relative flex w-[min(320px,calc(100vw-32px))] flex-col gap-3 rounded-2xl p-4" style={{ background: "linear-gradient(180deg, rgba(14,38,40,.98), rgba(8,22,26,.99))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 10px 28px rgba(0,0,0,.5)" }}>
-        <button type="button" onClick={onClose} aria-label="Close" title="Close" className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(232,255,248,.75)" }}>
-          ×
+        <button type="button" onClick={onClose} aria-label="Back to the snooze choices" title="Back" className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[16px] leading-none" style={{ color: "rgba(232,255,248,.75)" }}>
+          ‹
         </button>
-        <p className="m-0 text-[15px] font-semibold">Bring it back at…</p>
+        <p className="m-0 text-[15px] font-semibold">Bring it back…</p>
+        <div className="flex flex-wrap gap-1.5">
+          {laterChoices().map((c) => (
+            <button key={c.label} type="button" onClick={() => onPick(c.at)} className="h-9 rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "rgba(140,240,220,.14)", border: "1px solid rgba(140,240,220,.45)", color: "#e8fff8" }}>
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <p className="m-0 text-[12.5px]" style={{ color: "rgba(232,255,248,.7)" }}>
+          Or at a time of your own:
+        </p>
         <input type="time" value={value} onChange={(e) => {
             const when = nextAt(e.target.value);
             setPick({ value: e.target.value, when, today: when?.toDateString() === new Date().toDateString() });

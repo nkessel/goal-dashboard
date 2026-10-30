@@ -2,9 +2,9 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30 evening, `main` @ (see git log) (top priority display fix, one-button welcome save, check-in −/+)
+- **Last updated:** 2026-10-30 evening (UX synthesis batches 1–6 shipped; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** about 9 notes not marked shipped (as of 2026-10-30 18:15 UTC): toucan menu / cage / messages from the bird / Not now snooze flow, drag bars everywhere (app-wide), last-screen-on-login, reward quests with multiple parts, check-in slider +/- buttons, and an unclear "event isn't displaying properly" note.
+- **Pending in-app feedback:** as of 2026-10-30 19:30 UTC, still open: Due soon card layout (first card squished, subquest drawer redesign), toucan popups coming from the bird itself, the bird appearing in Settings when freed, last-screen-on-login, reward quests with multiple parts, "vitamins before 12pm on the right effort list" and "event isn't displaying properly" (both unclear).
 
 ---
 
@@ -15,7 +15,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 | # | Work | State | Next step |
 |---|---|---|---|
 | 1 | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. |
-| 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. New Oct 30 asks: Due soon full redesign (squished first card, subquest drawer, animated), its reach picker cut off by the popup, right-click toucan menu (with settings), movable toucan with ‹ › to cycle sayings and ⋯ → thumbs on the bubble. |
+| 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. See the header list. |
 | 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
 
 **Open questions for the owner** (ask when relevant, don't block on them):
@@ -118,6 +118,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30 (evening): Welcome toucan: right-click (or tap) opens his menu, now with Toucan settings; drag him anywhere (remembered, `welcome-toucan-at`); his bubble's ‹ › step through what he could ask (`TOUCAN_PROMPTS` in `lib/welcome.ts`) and its ⋯ gives thumbs (👍 asks it first, 👎 never again; `toucan-prompt-votes` in localStorage). Toucan "Not now…": 15 min, 30 min, 1 hour, Other… (2 hrs, 3 hrs, this evening, tomorrow, or a time); closing Other goes back to the choices. Settings cage no longer says "Resting".
 - Oct 30 (evening): Habits polish: gilded habit cards on a green velvet tray, gilded check circles; the house cleaning habit reads "…: 🍳 Kitchen" and its title opens the mess check-in tray (slides; priority list, then Spaces/Laundry/Chores; opens on Spaces when fewer than 2 spaces); spaces and laundry are compact sliders (clean end sparkles); chores can repeat on a weekday (`weekday` in `lib/cleaning.ts`; the owner's trash & recycling is set to Tuesdays); Coming up chores show by default; editors say Close, not Done (chores, spaces, quest editor, sequence, power-ups); whole check-in UI tighter.
 - Oct 30 (evening): Due soon on Today rebuilt as a real drawer like Additional Quests (the whole bar opens it, the tray slides open and closed, Edit and the reach sit on the bar); the welcome screen's Due soon tray slides too and its reach picker opens over everything (no longer cut off); the Daily Habits gear shows on hover (faint on phones).
 - Oct 30 (evening): Quest editor: a Due chip on the surface with Today / Tomorrow / This Friday / In a week and a date picker (due row left Scheduling); an Early bonus chip once it has a due date (Automatic, None, or your own XP for finishing any time before it's due; `tasks.early_bonus_xp`, migration 0069, `earlyBirdBonus` in `lib/next-action.ts`); Tiny task in one place under the portrait (🌱 header toggle gone); "Add steps"; "More" fold with a one-line list of what's in it; footer: no Cancel when creating (× closes), Already done quietly on the left, no "✓ Saved", Delete behind ⋯ (right-click too).

@@ -102,12 +102,12 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
       </button>
       {compact ? (
         <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }}>
-          <span className="block font-semibold">Resting</span>
-          Tap to set it free
+          <span className="block font-semibold">Your toucan</span>
+          Tap the cage to set him free
         </span>
       ) : (
         <span className="text-[14px] leading-snug" style={{ color: "var(--t-ink)" }}>
-          Your bird is resting in its cage.
+          Your toucan is in his cage.
           <br />
           <span className="font-semibold">Tap the cage to set it free.</span>
         </span>

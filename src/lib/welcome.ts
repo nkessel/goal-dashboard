@@ -143,3 +143,35 @@ export function addBackGreeting(fx: FxSettings, line: string): Partial<FxSetting
 /** What the toucan asks first as he lands on the welcome screen (tap him to change it). */
 export const TOUCAN_ASK = "Shall we plan your day together?";
 export const toucanAsk = (fx: FxSettings) => fx.welcomeToucanAsk?.trim() || TOUCAN_ASK;
+
+/** Other things he can open with: ‹ › on his bubble steps through them, and your thumbs keep the best. */
+export const TOUCAN_PROMPTS = [
+  "What would make today feel good?",
+  "What matters most today?",
+  "How's your energy? Let's pick quests that fit it.",
+  "What's one small win before lunch?",
+  "Is there something you've been putting off that we could make lighter?",
+  "What would you like to be proud of tonight?",
+  "Want to clear one small thing first?",
+];
+const VOTES = "toucan-prompt-votes";
+export type PromptVotes = { liked: string[]; hidden: string[] };
+export function readPromptVotes(): PromptVotes {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(VOTES) || "null") as PromptVotes | null;
+    return { liked: Array.isArray(v?.liked) ? v.liked : [], hidden: Array.isArray(v?.hidden) ? v.hidden : [] };
+  } catch {
+    return { liked: [], hidden: [] };
+  }
+}
+export function writePromptVotes(v: PromptVotes) {
+  try {
+    window.localStorage.setItem(VOTES, JSON.stringify(v));
+  } catch {}
+}
+/** The prompts he cycles through: yours first, then liked ones, then the rest; ones you thumbed down never. */
+export function toucanPrompts(fx: FxSettings, votes: PromptVotes): string[] {
+  const all = [...new Set([toucanAsk(fx), ...votes.liked, ...TOUCAN_PROMPTS])];
+  const kept = all.filter((p) => !votes.hidden.includes(p));
+  return kept.length ? kept : [toucanAsk(fx)];
+}

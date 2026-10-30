@@ -2734,3 +2734,8 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 /* Check-in −/+ beside each slider; a 44px touch area around a small mark. */
 .ec-step { color: var(--ec-gold, #f2d27e); border: 1px solid var(--ec-line, rgba(217,180,95,.5)); background: rgba(255, 250, 238, 0.12); }
 .ec-step::before { content: ""; position: absolute; inset: -8px; }
+
+/* The welcome toucan's bubble: ‹ › and ⋯ show on hover (faintly on touch screens). */
+.toucan-bubble .bubble-ctl { opacity: 0; transition: opacity 0.18s; }
+.toucan-bubble:hover .bubble-ctl, .toucan-bubble .bubble-ctl:focus-visible { opacity: 1; }
+@media (hover: none) { .toucan-bubble .bubble-ctl { opacity: 0.6; } }

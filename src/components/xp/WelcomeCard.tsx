@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { CoinIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { EnergyCheck } from "./EnergyCheck";
 import { CheckinIcon } from "./CheckinIcon";
 import { likeLine, likedLines, lineForDay, retireLine } from "@/lib/greetings";
 import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
-import { addBackGreeting, toucanAsk, welcomeOrder, welcomeShows, type WelcomeEl } from "@/lib/welcome";
+import { addBackGreeting, readPromptVotes, toucanPrompts, welcomeOrder, welcomeShows, writePromptVotes, type PromptVotes, type WelcomeEl } from "@/lib/welcome";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { voice, windowOf } from "@/lib/toucan-style";
 import { useToucanStyle } from "@/lib/toucan-style-store";
@@ -248,7 +249,7 @@ export function WelcomeCard({
       {/* What isn't part of the card (when it opens, confetti) sits above it while arranging. */}
       {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} />}
       <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
-        {!arranging && <WelcomeToucan ask={toucanAsk(fx)} />}
+        {!arranging && <WelcomeToucan fx={fx} />}
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -425,40 +426,139 @@ export function WelcomeCard({
  * corner. Tap him: plan the day together, talk, hear a wise saying, or change
  * what he asks first.
  */
-function WelcomeToucan({ ask }: { ask: string }) {
+const TOUCAN_AT = "welcome-toucan-at";
+function readToucanAt(): { x: number; y: number } {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(TOUCAN_AT) || "null") as { x: number; y: number } | null;
+    return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? v : { x: 0, y: 0 };
+  } catch {
+    return { x: 0, y: 0 };
+  }
+}
+
+/**
+ * The toucan on the welcome screen. Tap (or right-click) him for a menu; drag
+ * him anywhere (he remembers). His bubble's ‹ › step through what he could
+ * ask, and its ⋯ gives your thumbs on a line.
+ */
+function WelcomeToucan({ fx }: { fx: FxSettings }) {
   const [landed, setLanded] = useState(false);
   const [menu, setMenu] = useState(false);
   const [saying, setSaying] = useState<string | null>(null);
   const [rewording, setRewording] = useState(false);
   const [words, setWords] = useState("");
+  const [votes, setVotes] = useState(readPromptVotes);
+  const prompts = toucanPrompts(fx, votes);
+  const [idx, setIdx] = useState(0);
+  const ask = prompts[idx % prompts.length];
+  const [rate, setRate] = useState(false);
+  const [off, setOff] = useState(readToucanAt);
+  const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   useEffect(() => {
     const t = setTimeout(() => setLanded(true), 2700);
     return () => clearTimeout(t);
   }, []);
+  const vote = (up: boolean) => {
+    const next: PromptVotes = up ? { liked: [...new Set([ask, ...votes.liked])].slice(0, 30), hidden: votes.hidden.filter((x) => x !== ask) } : { liked: votes.liked.filter((x) => x !== ask), hidden: [...new Set([...votes.hidden, ask])] };
+    writePromptVotes(next);
+    setVotes(next);
+    setRate(false);
+    if (up) patchFx({ welcomeToucanAsk: ask });
+  };
+  const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
+  const item = "font-semibold underline underline-offset-2";
   return (
-    <div className="welcome-toucan absolute -top-[47px] left-2 z-[3]">
-      <button type="button" onClick={() => landed && (setMenu((v) => !v), setSaying(null), setRewording(false))} aria-label="The toucan: plan the day, talk, or a wise saying" aria-expanded={menu} className={`owl-body block ${landed ? "owl-perched cursor-pointer" : "pointer-events-none"}`}>
+    <div className="welcome-toucan absolute z-[3]" style={{ left: 8 + off.x, top: -47 + off.y }}>
+      <button
+        type="button"
+        onClick={() => {
+          if (drag.current?.moved || !landed) return;
+          setMenu((v) => !v);
+          setSaying(null);
+          setRewording(false);
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          if (!landed) return;
+          setMenu(true);
+          setSaying(null);
+          setRewording(false);
+        }}
+        onPointerDown={(e) => {
+          if (!landed) return;
+          drag.current = { x: e.clientX, y: e.clientY, ox: off.x, oy: off.y, moved: false };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+          d.moved = true;
+          setOff({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y });
+        }}
+        onPointerUp={() => {
+          const d = drag.current;
+          if (d?.moved) {
+            try {
+              window.localStorage.setItem(TOUCAN_AT, JSON.stringify(off));
+            } catch {}
+            // Let this release's click pass without opening the menu.
+            setTimeout(() => (drag.current = null), 0);
+          } else drag.current = null;
+        }}
+        aria-label="The toucan: plan the day, talk, or a wise saying (drag to move him)"
+        aria-expanded={menu}
+        className={`owl-body block touch-none ${landed ? "owl-perched cursor-grab" : "pointer-events-none"}`}
+      >
         <span className="owl-idle block">
           <ToucanArt flying={!landed} size={58} />
         </span>
       </button>
       {landed && (
-        <div className="owl-say absolute left-[58px] -top-1 z-[5] w-max max-w-[min(250px,62vw)] rounded-2xl px-3 py-2 text-left text-[13.5px] leading-snug" style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
-          {saying ?? (menu ? "How can I help?" : ask)}
+        <div className="toucan-bubble owl-say absolute left-[58px] -top-1 z-[5] w-max max-w-[min(250px,62vw)] rounded-2xl px-3 py-2 text-left text-[13.5px] leading-snug" style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+          {/* On hover: ‹ › to step through what he could ask, and ⋯ for your thumbs. Always faintly there on touch screens. */}
+          {!menu && !saying && prompts.length > 1 && (
+            <>
+              <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-ctl absolute -left-7 top-1/2 flex h-7 w-6 -translate-y-1/2 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "#f6e6bb", textShadow: "0 1px 3px rgba(0,0,0,.6)" }}>
+                ‹
+              </button>
+              <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="bubble-ctl absolute -right-7 top-1/2 flex h-7 w-6 -translate-y-1/2 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "#f6e6bb", textShadow: "0 1px 3px rgba(0,0,0,.6)" }}>
+                ›
+              </button>
+            </>
+          )}
+          {!menu && !saying && (
+            <button type="button" onClick={() => setRate((v) => !v)} aria-label="Is this a good thing for him to ask?" aria-expanded={rate} className="bubble-ctl absolute -right-2 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full text-[13px] leading-none" style={{ background: "#fffaf0", border: "1px solid #b39a6a", color: "#6b5631" }}>
+              ⋯
+            </button>
+          )}
+          <span className={!menu && !saying ? "block pr-2" : undefined}>{saying ?? (menu ? "How can I help?" : ask)}</span>
+          {rate && !menu && !saying && (
+            <span className="fade-in mt-1.5 flex items-center gap-1">
+              <LineVote kind="like" on={votes.liked.includes(ask)} onClick={() => vote(true)} />
+              <LineVote kind="dislike" on={false} onClick={() => vote(false)} />
+              <span className="text-[11.5px]" style={{ color: "#6b5631" }}>
+                👍 asks this first · 👎 never again
+              </span>
+            </span>
+          )}
           {menu && !rewording && (
             <span className="mt-1.5 flex flex-col items-start gap-1">
-              <button type="button" onClick={() => (setMenu(false), talkToToucan(undefined, "talk", PLAN_DAY))} className="font-semibold underline underline-offset-2">
+              <button type="button" onClick={() => (setMenu(false), talkToToucan(undefined, "talk", PLAN_DAY))} className={item}>
                 Plan my day
               </button>
-              <button type="button" onClick={() => (setMenu(false), talkToToucan())} className="font-semibold underline underline-offset-2">
+              <button type="button" onClick={() => (setMenu(false), talkToToucan())} className={item}>
                 Talk to me
               </button>
-              <button type="button" onClick={() => setSaying(lineForDay(`${Date.now()}`))} className="font-semibold underline underline-offset-2">
+              <button type="button" onClick={() => setSaying(lineForDay(`${Date.now()}`))} className={item}>
                 Tell me a wise saying
               </button>
               <button type="button" onClick={() => (setRewording(true), setWords(ask))} className="underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
                 Change what I ask first
               </button>
+              <Link href="/settings?open=toucan-spirit" className="underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+                Toucan settings
+              </Link>
             </span>
           )}
           {menu && rewording && (
@@ -469,6 +569,7 @@ function WelcomeToucan({ ask }: { ask: string }) {
                 patchFx({ welcomeToucanAsk: words.trim().slice(0, 120) });
                 setRewording(false);
                 setMenu(false);
+                setIdx(0);
               }}
             >
               <input autoFocus value={words} onChange={(e) => setWords(e.target.value)} maxLength={120} aria-label="What the toucan asks first" className="h-8 min-w-0 flex-1 rounded-full px-2.5 text-[16px]" style={FIELD} />
