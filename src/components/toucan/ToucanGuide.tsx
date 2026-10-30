@@ -719,7 +719,7 @@ function eventWhen(d: Date) {
   return `${d.toLocaleDateString("en-US", { weekday: "long" })} at ${time}`;
 }
 
-export const PLAN_DAY = "Help me plan my day so nothing slips: what's due soonest first, then what matters most. Suggest an order and times that fit around my calendar.";
+export const PLAN_DAY = "Help me plan my day so nothing slips: what's due next first, then what matters most, and anything past due after that. Suggest an order and times that fit around my calendar.";
 
 /** Begin a promise: its quest in focus mode if it has one, otherwise a word with the toucan. */
 async function beginPromise(p: CoachPromise) {

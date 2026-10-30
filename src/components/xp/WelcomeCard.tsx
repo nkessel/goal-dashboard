@@ -108,7 +108,8 @@ export function WelcomeCard({
     return () => cancelAnimationFrame(raf);
   }, [award?.xp]);
 
-  const soon = dueSoonList(due);
+  // The welcome screen keeps to today and tomorrow, whatever Due soon on Today reaches.
+  const soon = dueSoonList(due, undefined, 48);
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
     focus: <TopPriority last={priority} />,
     intention: mode === "day" ? <Intention /> : null,

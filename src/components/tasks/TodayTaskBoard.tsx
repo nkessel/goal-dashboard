@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
   DndContext,
@@ -26,6 +27,8 @@ import { TaskRow } from "./TaskRow";
 import { GoldRule, Leaf, QuestShield } from "@/components/ui/Ornaments";
 import { CreateSheet } from "@/components/create/CreateSheet";
 import { SectionStack } from "./SectionStack";
+import { DEFAULT_DUE_HOURS, DUE_WINDOWS, MAX_DUE_DAYS, dueWindowLabel, saveDueHours } from "@/lib/due-soon";
+import { useEscape } from "@/lib/use-escape";
 import { settleOptimisticQuests, takeOptimisticFailure, useOptimisticQuests, type OptimisticQuest } from "@/lib/optimistic-quests";
 
 /** A just-created quest, drawn like the rest while it saves (blank checkbox until its portrait is ready). */
@@ -128,16 +131,99 @@ function readHidden(): string[] {
   }
 }
 
+/** Due soon's reach: the ready-made ones, or a custom number of days. */
+function DueWindowPicker({ hours, onPick, onClose, ink, isAdventure }: { hours: number; onPick: (h: number) => void; onClose: () => void; ink: string; isAdventure: boolean }) {
+  const [custom, setCustom] = useState(DUE_WINDOWS.includes(hours) ? "" : String(Math.max(1, Math.round(hours / 24))));
+  const ref = useRef<HTMLDivElement>(null);
+  useEscape(onClose);
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [onClose]);
+  const days = Math.round(Number(custom));
+  const ok = Number.isFinite(days) && days >= 1 && days <= MAX_DUE_DAYS;
+  const border = isAdventure ? "rgba(240,150,90,.55)" : "var(--t-card-border)";
+  return (
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label="How far ahead Due soon looks"
+      className="fade-in absolute right-0 top-full z-30 mt-1.5 flex w-56 flex-col gap-1.5 rounded-2xl p-2.5"
+      style={isAdventure ? { background: "#2b170c", border: `1.5px solid ${border}`, boxShadow: "0 10px 28px rgba(0,0,0,.45)" } : { background: "var(--t-bg)", border: `1px solid ${border}`, boxShadow: "0 10px 28px rgba(0,0,0,.18)" }}
+    >
+      <p className="m-0 px-1 text-[12.5px]" style={{ color: ink, opacity: 0.85 }}>
+        Show what&apos;s due within…
+      </p>
+      <div className="grid grid-cols-2 gap-1.5">
+        {DUE_WINDOWS.map((h) => (
+          <button
+            key={h}
+            type="button"
+            onClick={() => onPick(h)}
+            aria-pressed={h === hours}
+            className="h-9 rounded-full text-[13.5px] font-semibold"
+            style={{ border: `1px solid ${border}`, color: ink, background: h === hours ? (isAdventure ? "rgba(240,150,90,.35)" : "var(--t-warn-bg)") : "transparent" }}
+          >
+            {dueWindowLabel(h)}
+          </button>
+        ))}
+      </div>
+      <form
+        className="flex items-center gap-1.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (ok) onPick(days * 24);
+        }}
+      >
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={MAX_DUE_DAYS}
+          value={custom}
+          onChange={(e) => setCustom(e.target.value)}
+          placeholder="Custom"
+          aria-label="Custom number of days"
+          className="h-9 w-0 min-w-0 flex-1 rounded-full bg-transparent px-3 text-[13.5px]"
+          style={{ border: `1px solid ${border}`, color: ink }}
+        />
+        <span className="text-[13px]" style={{ color: ink }}>
+          days
+        </span>
+        <button type="submit" disabled={!ok} className="h-9 rounded-full px-3 text-[13px] font-semibold disabled:opacity-50" style={{ border: `1px solid ${border}`, color: ink }}>
+          Set
+        </button>
+      </form>
+    </div>
+  );
+}
+
 /**
- * What's due today or tomorrow, above everything else on Today. It fills
- * itself from due dates (nothing to drag here) and empties as you finish.
- * Tap its title to fold it away; Edit lets you × a quest out of it for good.
+ * What's due within the reach you choose (24 hrs to a custom number of days,
+ * shown on the right of the title), plus anything missed this past week,
+ * above everything else on Today. What's due next comes first; past due goes
+ * last. It fills itself from due dates (nothing to drag here) and empties as
+ * you finish. Tap its title to fold it away (it still says how many are
+ * inside); Edit lets you × a quest out of it for good.
  */
-function DueSoonBand({ tasks, theme, lockedBehind }: { tasks: TaskWithCategory[]; theme: "calm" | "adventure"; lockedBehind: Map<string, TaskWithCategory> }) {
+function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks: TaskWithCategory[]; hours: number; theme: "calm" | "adventure"; lockedBehind: Map<string, TaskWithCategory> }) {
   const isAdventure = theme === "adventure";
+  const router = useRouter();
   const [folded, setFolded] = useState(false);
   const [hidden, setHidden] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
+  const [picking, setPicking] = useState(false);
+  // The reach just picked, until the page refills with it.
+  const [hours, setHours] = useState(shownHours);
+  const [refilling, startRefill] = useTransition();
+  const [seenHours, setSeenHours] = useState(shownHours);
+  if (seenHours !== shownHours) {
+    setSeenHours(shownHours);
+    setHours(shownHours);
+  }
   // Both live in this browser, so read them after hydration.
   useEffect(() => {
     let f = false;
@@ -162,9 +248,18 @@ function DueSoonBand({ tasks, theme, lockedBehind }: { tasks: TaskWithCategory[]
       window.localStorage.setItem(DUE_HIDDEN_KEY, JSON.stringify(next));
     } catch {}
   };
+  const pick = (h: number) => {
+    setPicking(false);
+    if (h === hours) return;
+    setHours(h);
+    saveDueHours(h);
+    startRefill(() => router.refresh());
+  };
+  const closePicker = useCallback(() => setPicking(false), []);
   const shown = tasks.filter((t) => !hidden.includes(t.id));
-  if (!shown.length) return null;
   const ink = isAdventure ? "#ffd9b8" : "var(--t-ink)";
+  const border = isAdventure ? "rgba(240,150,90,.55)" : "var(--t-card-border)";
+  const reach = dueWindowLabel(hours);
   return (
     <section
       aria-label="Due soon"
@@ -175,9 +270,16 @@ function DueSoonBand({ tasks, theme, lockedBehind }: { tasks: TaskWithCategory[]
           : { background: "var(--t-warn-bg)", border: "1px solid var(--t-card-border)" }
       }
     >
-      <div className="relative flex items-center justify-center">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+        <div className="flex justify-start">
+          {!folded && shown.length > 0 && (
+            <button type="button" onClick={() => setEditing((v) => !v)} aria-pressed={editing} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${border}`, color: ink }}>
+              {editing ? "Done" : "Edit"}
+            </button>
+          )}
+        </div>
         <h2 className="m-0">
-          <button type="button" onClick={() => fold(!folded)} aria-expanded={!folded} className={`flex min-h-9 items-center gap-2 ${isAdventure ? "font-display text-[20px]" : "text-base font-extrabold"}`} style={{ color: ink }}>
+          <button type="button" onClick={() => fold(!folded)} aria-expanded={!folded} className={`flex min-h-9 items-center gap-2 whitespace-nowrap ${isAdventure ? "font-display text-[20px]" : "text-base font-extrabold"}`} style={{ color: ink }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -188,17 +290,34 @@ function DueSoonBand({ tasks, theme, lockedBehind }: { tasks: TaskWithCategory[]
             </svg>
           </button>
         </h2>
-        {!folded && (
-          <button type="button" onClick={() => setEditing((v) => !v)} aria-pressed={editing} className="absolute right-0 h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${isAdventure ? "rgba(240,150,90,.55)" : "var(--t-card-border)"}`, color: ink }}>
-            {editing ? "Done" : "Edit"}
+        <div className="relative flex justify-end">
+          <button
+            type="button"
+            onClick={() => setPicking((v) => !v)}
+            aria-expanded={picking}
+            aria-haspopup="dialog"
+            aria-label={`Counting quests due in the next ${reach}. Change`}
+            className={`flex h-8 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[13px] font-semibold ${refilling ? "opacity-60" : ""}`}
+            style={{ border: `1px solid ${border}`, color: ink }}
+          >
+            {reach}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.8 }}>
+              <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-        )}
+          {picking && <DueWindowPicker hours={hours} onPick={pick} onClose={closePicker} ink={ink} isAdventure={isAdventure} />}
+        </div>
       </div>
       {!folded && (
         <>
           {editing && (
             <p className="m-0 -mt-1 text-center text-[12.5px]" style={{ color: ink, opacity: 0.85 }}>
               × takes a quest out of Due soon for good (it stays on its board).
+            </p>
+          )}
+          {!shown.length && (
+            <p className="m-0 -mt-1 pb-1 text-center text-[13.5px]" style={{ color: ink, opacity: 0.85 }}>
+              Nothing due in the next {reach}.
             </p>
           )}
           <ul className="m-0 flex list-none flex-col gap-3 p-0">
@@ -244,13 +363,16 @@ function Zone({ id, children, className, style }: { id: string; children: React.
  */
 export function TodayTaskBoard({
   dueTasks = [],
+  dueHours = DEFAULT_DUE_HOURS,
   priorityTasks,
   otherTasks,
   theme = "calm",
   between,
 }: {
-  /** Due today or tomorrow (or just missed): shown above everything, soonest first, until done. */
+  /** Due within `dueHours` (or just missed): shown above everything, due next first and past due last, until done. */
   dueTasks?: TaskWithCategory[];
+  /** How far ahead Due soon looks, in hours. */
+  dueHours?: number;
   priorityTasks: TaskWithCategory[];
   otherTasks: TaskWithCategory[];
   theme?: "calm" | "adventure";
@@ -443,7 +565,7 @@ export function TodayTaskBoard({
 
   return (
     <DndContext id="dnd-TodayTaskBoard" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-      {due.length > 0 && <DueSoonBand tasks={due} theme={theme} lockedBehind={lockedBehind} />}
+      <DueSoonBand tasks={due} hours={dueHours} theme={theme} lockedBehind={lockedBehind} />
       {/* Daily Habits, Today's Quests and Additional Quests: drag a closed one to reorder. */}
       <SectionStack
         storageKey="today-section-order"

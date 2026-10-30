@@ -27,6 +27,7 @@ import * as partyData from "@/lib/data/party";
 import * as bossesData from "@/lib/data/bosses";
 import * as energyData from "@/lib/data/energy";
 import { computeLevelForXp } from "@/lib/levels";
+import { byDuePriority } from "@/lib/due-soon";
 import * as xp from "@/lib/data/xp";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { generateAndStoreImage, buildAvatarPrompt, buildQuestScenePrompt, buildTreasureIconPrompt, visualSubjectFor } from "@/lib/ai-image";
@@ -2067,7 +2068,7 @@ export async function welcomeContextAction() {
   const [metrics, last, tasks] = await Promise.all([energyData.getCheckMetrics(ownerId).catch(() => []), energyData.latestEnergy(ownerId), guideTasks(ownerId).catch(() => [])]);
   // Candidates for today's main quest: what's due in the next two days, then what matters most.
   const soon = Date.now() + 2 * 86_400_000;
-  const dueSoon = tasks.filter((t) => t.due_at && Date.parse(t.due_at) <= soon).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
+  const dueSoon = tasks.filter((t) => t.due_at && Date.parse(t.due_at) <= soon).sort(byDuePriority(Date.now()));
   const important = tasks.filter((t) => !dueSoon.includes(t) && (t.importance ?? 0) >= 4).sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0));
   const suggestions = [...dueSoon, ...important].slice(0, 4).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at }));
   const priority = (cleanPriorities((await readExtras(ownerId).catch(() => ({}) as Record<string, unknown>)).priorities)[0] as Priority | undefined) ?? null;

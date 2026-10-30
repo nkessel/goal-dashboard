@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { auth, signIn } from "@/auth";
+import { DUE_HOURS_COOKIE, byDuePriority, inDueWindow, parseDueHours } from "@/lib/due-soon";
 import { LowLightToggle } from "@/components/evening/LowLightToggle";
 import { AppShell } from "@/components/layout/AppShell";
 import { TodayTaskBoard } from "@/components/tasks/TodayTaskBoard";
@@ -26,13 +28,18 @@ import { getPlanSession, getWeekChapter, lastPairSession } from "@/lib/data/plan
 import { WeekChapter } from "@/components/plan/WeekChapter";
 import { slipMatcher } from "@/lib/streaks";
 import { DailyHabits } from "@/components/habits/DailyHabits";
-import { appDayKey, nextDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
+import { appDayKey, listTomorrowQueue, promoteQueuedQuests } from "@/lib/data/tomorrow";
 import { getCheckMetrics, latestCheckIns, latestEnergy, listCheckNotesSince } from "@/lib/data/energy";
 import { bossesTableExists, getActiveBoss } from "@/lib/data/bosses";
 
 /** Start of a window `n` days back (kept outside render for purity). */
 function daysAgoISO(n: number) {
   return new Date(Date.now() - n * 86_400_000).toISOString();
+}
+
+/** The current time (kept outside render for purity). */
+function nowMsOutside() {
+  return Date.now();
 }
 
 export default async function Home() {
@@ -138,20 +145,16 @@ export default async function Home() {
   // Imports wait for approval before they show here at all; quests taken off
   // the Today screen live only on their boards.
   const onToday = openTasks.filter((t) => !t.needs_review);
-  // Due today or tomorrow (or missed this past week): these go to the very top
-  // of Today on their own, whatever list they're in, soonest first.
-  const tomorrowKey = nextDayKey(dayKey);
-  const dueNow = (t: { due_at?: string | null }) => {
-    if (!t.due_at) return false;
-    const ms = Date.parse(t.due_at);
-    return ms > Date.parse(daysAgoISO(7)) && appDayKey(new Date(ms)) <= tomorrowKey;
-  };
-  const dueTasks = onToday.filter((t) => dueNow(t) && !t.reward_id).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
+  // Due within the reach you chose in Due soon (or missed this past week):
+  // these go to the very top of Today on their own, whatever list they're in,
+  // what's due next first and past due last.
+  const dueHours = parseDueHours((await cookies()).get(DUE_HOURS_COOKIE)?.value);
+  const nowMs = nowMsOutside();
+  const dueTasks = onToday.filter((t) => inDueWindow(t.due_at, nowMs, dueHours) && !t.reward_id).sort(byDuePriority(nowMs));
   const rest = onToday.filter((t) => !dueTasks.includes(t));
   const topPriorities = rest.filter((t) => t.is_manual_priority);
-  // Deadlines coming up rise to the top of Additional Quests (soonest first);
-  // everything else keeps the order you gave it.
-  const nowMs = Date.now();
+  // Deadlines coming up rise to the top of Additional Quests (due next first,
+  // past due after); everything else keeps the order you gave it.
   const dueSoon = (t: { due_at?: string | null }) => {
     if (!t.due_at) return false;
     const ms = Date.parse(t.due_at) - nowMs;
@@ -159,7 +162,7 @@ export default async function Home() {
   };
   // A project (a board on your matrix) offers just its next step here.
   const extras = oneStepPerProject(rest.filter((t) => !t.is_manual_priority && t.in_additional !== false), projectBoards, openTasks);
-  const soon = extras.filter(dueSoon).sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
+  const soon = extras.filter(dueSoon).sort(byDuePriority(nowMs));
   const otherTasks = [...soon, ...extras.filter((t) => !dueSoon(t))];
   const theme = profile?.theme ?? "adventure";
   // The evening side shows the same summary without the check-in.
@@ -191,6 +194,7 @@ export default async function Home() {
             {chapter && <WeekChapter chapter={chapter} theme={profile?.theme ?? "adventure"} />}
             <TodayTaskBoard
               dueTasks={dueTasks}
+              dueHours={dueHours}
               priorityTasks={topPriorities}
               otherTasks={otherTasks}
               theme={theme}

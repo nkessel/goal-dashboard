@@ -4,6 +4,8 @@
  * browser, so "9 AM" means the viewer's 9 AM).
  */
 
+import { byDuePriority } from "./due-soon";
+
 export type TimeOfDay = "any" | "morning" | "afternoon" | "evening";
 
 export type SchedulerSettings = {
@@ -92,10 +94,11 @@ export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: Schedu
   const placed: Placement[] = [];
   const unplaced: PlanResult["unplaced"] = [];
 
-  // Deadlines first (soonest due first), then the rest in the list's order.
+  // Deadlines first (due next first, past due after), then the rest in the list's order.
   const horizonEnd = now.getTime() + s.horizon * 86_400_000;
+  const byDue = byDuePriority(now.getTime());
   const dueSoon = (i: PlanItem) => (i.dueAt ? new Date(i.dueAt).getTime() <= horizonEnd : false);
-  const ordered = [...items.filter(dueSoon).sort((a, b) => new Date(a.dueAt!).getTime() - new Date(b.dueAt!).getTime()), ...items.filter((i) => !dueSoon(i))];
+  const ordered = [...items.filter(dueSoon).sort((a, b) => byDue({ due_at: a.dueAt }, { due_at: b.dueAt })), ...items.filter((i) => !dueSoon(i))];
 
   for (const item of ordered) {
     const want = Math.max(STEP, Math.ceil((item.minutes ?? 30) / STEP) * STEP);

@@ -35,7 +35,7 @@ export type Weighable = {
 export const FACTORS: { key: FactorKey; label: string; short: string; color: string; about: string }[] = [
   { key: "importance", label: "Importance", short: "Important", color: "#2a78d6", about: "How much it matters" },
   { key: "urgency", label: "Urgency", short: "Urgent", color: "#eb6834", about: "How soon it needs you" },
-  { key: "due", label: "Due soon", short: "Due soon", color: "#1baf7a", about: "Close to its due date or scheduled time (overdue counts most)" },
+  { key: "due", label: "Due soon", short: "Due soon", color: "#1baf7a", about: "Close to its due date or scheduled time (due next counts most; past due counts little)" },
   { key: "ease", label: "Low effort", short: "Easy", color: "#eda100", about: "Takes little energy" },
   { key: "quick", label: "Quick", short: "Quick", color: "#e87ba4", about: "Takes little time" },
   { key: "momentum", label: "Momentum", short: "Under way", color: "#008300", about: "Already partly done — finishing feels close" },
@@ -64,7 +64,8 @@ export function factorValues(t: Weighable, now: number, maxXp: number): Record<F
   let due = 0;
   if (when) {
     const days = (new Date(when).getTime() - now) / 86_400_000;
-    due = days <= 0 ? 1 : clamp01(Math.exp(-days / 3));
+    // Past due is low priority; the nearer a date ahead, the stronger the pull.
+    due = days < 0 ? 0.15 : clamp01(Math.exp(-days / 3));
   }
   const minutes = t.estimate_minutes;
   const quick = minutes == null ? 0.5 : clamp01(1 - Math.log(Math.max(minutes, 15) / 15) / Math.log(16));

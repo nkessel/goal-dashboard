@@ -8,6 +8,8 @@
  * move is always the same small ladder: estimate it, schedule it, do it.
  */
 
+import { byDuePriority, inDueWindow, readDueHours } from "./due-soon";
+
 export type GuideTask = {
   id: string;
   title: string;
@@ -66,8 +68,8 @@ export function neglected(tasks: GuideTask[], now = new Date(), snoozed: Record<
     const idle = Math.max(0, (now.getTime() - touched) / DAY);
 
     let score = 0;
-    // Coming up soon outranks already missed (missed ones: oldest first, by a hair).
-    if (daysToDue !== null) score += daysToDue < 0 ? 3.6 + Math.min(0.4, -daysToDue / 100) : daysToDue < 1 ? 6 : daysToDue < 3 ? 5 : daysToDue < 7 ? 3.5 : daysToDue < 14 ? 1.5 : 0;
+    // What's due next is the top priority; already missed is low priority.
+    if (daysToDue !== null) score += daysToDue < 0 ? 1 : daysToDue < 1 ? 6 : daysToDue < 3 ? 5 : daysToDue < 7 ? 3.5 : daysToDue < 14 ? 1.5 : 0;
     score += Math.max(0, imp - 2) * 1.1;
     score += Math.min(3, idle / 4);
     score += Math.min(1.5, (t.reschedule_count ?? 0) * 0.5);
@@ -99,7 +101,8 @@ export function contextLines(tasks: GuideTask[], now = new Date(), max = 50): st
   const scored = tasks
     .map((t) => {
       const due = t.due_at ? Date.parse(t.due_at) : null;
-      const s = (t.importance ?? 3) * 2 + (due ? Math.max(0, 14 - (due - now.getTime()) / DAY) : 0);
+      // Due next counts most; past due barely more than no date at all.
+      const s = (t.importance ?? 3) * 2 + (due ? (due < now.getTime() ? 1 : Math.max(0, 14 - (due - now.getTime()) / DAY)) : 0);
       return { t, s };
     })
     .sort((a, b) => b.s - a.s)
@@ -130,18 +133,9 @@ export function mentioned(reply: string, tasks: { id: string; title: string }[])
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
-/** Open quests due today or tomorrow (or missed this past week), soonest first. */
-export function dueSoonList<T extends { due_at: string | null }>(tasks: T[], now = new Date()): T[] {
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(23, 59, 59, 999);
-  return tasks
-    .filter((t) => {
-      if (!t.due_at) return false;
-      const ms = Date.parse(t.due_at);
-      return ms > now.getTime() - 7 * DAY && ms <= tomorrow.getTime();
-    })
-    .sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
+/** Open quests due within Due soon's reach (or missed this past week): due next first, past due last. */
+export function dueSoonList<T extends { due_at: string | null }>(tasks: T[], now = new Date(), hours = readDueHours()): T[] {
+  return tasks.filter((t) => inDueWindow(t.due_at, now.getTime(), hours)).sort(byDuePriority(now.getTime()));
 }
 
 /** "due today", "due tomorrow" or "was due yesterday", for the morning summary. */
