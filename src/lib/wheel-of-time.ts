@@ -21,6 +21,7 @@ export const DEFAULT_EFFORT = [
   "Dinner done 2-3 hours before bed",
   "Wind-down routine started before 7:30pm",
   "No cannabis after 3pm",
+  "Vitamins before 12pm",
 ];
 export const DEFAULT_HINDRANCES = ["Cannabis after 3pm", "Late night movie with partner", "Late night working"];
 
