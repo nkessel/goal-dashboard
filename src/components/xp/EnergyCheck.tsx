@@ -76,7 +76,10 @@ export function EnergyCheck({
   sleepLink = true,
   addNights = false,
   simple = false,
+  submit,
 }: {
+  /** Hands the screen around it a way to save what's entered (e.g. the welcome screen's Complete check-in); the save runs `after` once saved, or straight away if nothing was entered. */
+  submit?: (save: (after: () => void) => void) => void;
   /** The welcome screen's check-in: no Edit check-in, and no caret when it opens in full. */
   simple?: boolean;
   /** A link to the sleep and wake log in Insights, for other nights. */
@@ -237,11 +240,11 @@ export function EnergyCheck({
   }
 
   const nightTouched = !!wheel && !noSleep && JSON.stringify(night) !== nightBase;
-  function save() {
+  function save(after?: () => void) {
     setError(null);
     const all = expanded ? rows.filter((m) => vals[m] !== undefined).map((m) => ({ metric: m, level: vals[m] })) : [];
     // Last night's sleep alone is enough to save.
-    if (!energySet && !all.length && !nightTouched && !nightsFilled.length) return;
+    if (!energySet && !all.length && !nightTouched && !nightsFilled.length) return after?.();
     startSaving(async () => {
       try {
         // Other nights only change their times; anything else logged for them stays.
@@ -266,6 +269,7 @@ export function EnergyCheck({
         setAdding(false);
         setEditingList(false);
         onSaved?.();
+        after?.();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't save.");
       }
@@ -441,6 +445,10 @@ export function EnergyCheck({
     />
   );
 
+  // The latest save, for the screen around it.
+  useEffect(() => {
+    submit?.((after) => save(after));
+  });
   return (
     <div className={`mx-auto flex w-full items-start gap-2 px-1 ${full ? "max-w-[640px]" : "max-w-[420px]"}`}>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -462,7 +470,7 @@ export function EnergyCheck({
               {/* Same width open or closed, so the slider never jumps. */}
               <button
                 type="button"
-                onClick={save}
+                onClick={() => save()}
                 disabled={isSaving || expanded || !canSave}
                 aria-hidden={expanded || !canSave}
                 tabIndex={expanded || !canSave ? -1 : 0}
@@ -634,7 +642,7 @@ export function EnergyCheck({
                   {canSave && (
                     <button
                       type="button"
-                      onClick={save}
+                      onClick={() => save()}
                       disabled={isSaving}
                       className="fade-in hover-glow h-8 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60"
                       style={{ background: "var(--t-gold)", color: "#2a1c10" }}

@@ -11,7 +11,7 @@ import { welcomeContextAction } from "@/app/actions";
 import { lineForDay } from "@/lib/greetings";
 import { WELCOME_ELS, backHours, backOwnOn, greetingFor, greetingPool, moveEl, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
-import { PhraseList, WiseLines } from "./LineLists";
+import { OwnWordsPill, PhraseList, WiseLines } from "./LineLists";
 
 type NumKey = "dens" | "vel" | "reach" | "size" | "embers" | "fill";
 
@@ -219,22 +219,24 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           <FoldGroup title="The day’s wise line">
           <div className="flex flex-col gap-2">
 
-            <label className="flex min-h-9 items-center gap-2.5 text-sm">
-              <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={ownLinesOn(fx)} onChange={() => update({ welcomeOwnOn: !ownLinesOn(fx) })} />
-              Add my own wise lines
-            </label>
-            {ownLinesOn(fx) && (
-              <textarea
-                value={fx.welcomeOwnLines ?? ""}
-                onChange={(e) => update({ welcomeOwnLines: e.target.value.slice(0, 2400) })}
-                rows={3}
-                placeholder={"One per line; mixed in with the built-in lines.\ne.g. Breathe. Then the next small thing."}
-                aria-label="Your own wise lines"
-                className="reveal rounded-lg border px-3 py-2 text-[16px]"
-                style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
-              />
-            )}
-            <WiseLines own={ownLines(fx)} />
+            <WiseLines
+              own={ownLines(fx)}
+              alwaysOpen
+              extra={<OwnWordsPill on={ownLinesOn(fx)} onClick={() => update({ welcomeOwnOn: !ownLinesOn(fx) })} />}
+              ownBox={
+                ownLinesOn(fx) && (
+                <textarea
+                  value={fx.welcomeOwnLines ?? ""}
+                  onChange={(e) => update({ welcomeOwnLines: e.target.value.slice(0, 2400) })}
+                  rows={3}
+                  placeholder={"One per line; mixed in with the built-in lines.\ne.g. Breathe. Then the next small thing."}
+                  aria-label="Your own wise lines"
+                  className="reveal rounded-lg border px-3 py-2 text-[16px]"
+                  style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
+                />
+                )
+              }
+            />
           </div>
         </FoldGroup>
         )}

@@ -7,8 +7,9 @@ import { ROTATION, likeLine, likedLines, retireLine, retiredLines, rotationFor }
  * The wise lines in rotation: like one to see it more, × to delete it (the
  * next line waiting takes its place). Deleted lines can be brought back.
  */
-export function WiseLines({ own }: { own: string[] }) {
-  const [open, setOpen] = useState(false);
+export function WiseLines({ own, alwaysOpen = false, extra, ownBox }: { own: string[]; alwaysOpen?: boolean; extra?: React.ReactNode; ownBox?: React.ReactNode }) {
+  const [openState, setOpen] = useState(false);
+  const open = alwaysOpen || openState;
   // Re-read after each change (the lists live in this browser).
   const [, setTick] = useState(0);
   const today = new Date().toISOString().slice(0, 10);
@@ -29,9 +30,20 @@ export function WiseLines({ own }: { own: string[] }) {
   );
   return (
     <div className="flex flex-col gap-1">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="hover-glow flex h-9 items-center gap-1.5 self-start rounded-full px-3.5 text-[13px] font-semibold" style={{ border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}>
-        The wise lines in rotation <span style={{ color: "var(--t-ink-soft)" }}>{open ? "▾" : "▸"}</span>
-      </button>
+      {alwaysOpen ? (
+        <div className="flex min-h-9 items-center gap-2">
+          <span className="text-[13px] font-semibold">The wise lines in rotation</span>
+          <span className="ml-auto">{extra}</span>
+        </div>
+      ) : (
+        <div className="flex min-h-9 items-center gap-2">
+          <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="hover-glow flex h-9 items-center gap-1.5 self-start rounded-full px-3.5 text-[13px] font-semibold" style={{ border: "1.5px solid var(--t-card-border)", color: "var(--t-ink)" }}>
+            The wise lines in rotation <span style={{ color: "var(--t-ink-soft)" }}>{open ? "▾" : "▸"}</span>
+          </button>
+          {open && <span className="ml-auto">{extra}</span>}
+        </div>
+      )}
+      {open && ownBox}
       {open && (
         <div className="reveal flex flex-col gap-1 rounded-xl p-1.5" style={{ border: "1px solid var(--t-card-border)" }}>
           <p className="m-0 px-1.5 text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
@@ -100,5 +112,20 @@ export function PhraseList({ title, lines, isOn, onToggle, retired = false }: { 
         </ul>
       )}
     </div>
+  );
+}
+
+/** "+ My own words": the gold pill beside a list's header that opens your own lines. */
+export function OwnWordsPill({ on, onClick, label = "My own words" }: { on: boolean; onClick: () => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className="flex h-8 items-center gap-1 rounded-full px-3 text-[12.5px] font-bold"
+      style={on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { background: "linear-gradient(180deg, #f6dc8e, #d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10", opacity: 0.85 }}
+    >
+      {on ? "✓" : "+"} {label}
+    </button>
   );
 }

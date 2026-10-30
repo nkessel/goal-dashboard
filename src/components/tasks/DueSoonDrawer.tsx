@@ -53,40 +53,33 @@ export function DueSoonDrawer({ tasks, onOpenChange }: { tasks: Lite[]; onOpenCh
 
   return (
     <div className="w-full">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={toggle}
-          aria-expanded={open}
-          className="font-display flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-4 text-[16px]"
-          style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      {/* One small gilded pill: the count opens the drawer, the reach (on the pill itself) changes how far ahead it looks. */}
+      <div className="relative mx-auto flex w-fit items-stretch overflow-visible rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+        <button type="button" onClick={toggle} aria-expanded={open} className="font-display flex h-8 items-center gap-1.5 rounded-l-full pl-3 pr-2 text-[14.5px]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           Due soon
-          <span className="text-[14px] opacity-80">({soon.length})</span>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(90deg)" : undefined }}>
-            <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+          <span className="tabular-nums opacity-80">({soon.length})</span>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(90deg)" : undefined }}>
+            <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setPicking((v) => !v)}
-            aria-expanded={picking}
-            aria-haspopup="dialog"
-            aria-label={`Counting quests due in the next ${reach}. Change`}
-            className="flex h-8 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[13px] font-semibold"
-            style={{ border: "1px solid rgba(139,112,64,.6)", color: ink, background: "rgba(255,250,236,.5)" }}
-          >
-            {reach}
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.8 }}>
-              <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          {picking && <DueWindowPicker hours={hours} onPick={pick} onClose={closePicker} ink={ink} isAdventure={false} paper />}
-        </div>
+        <span aria-hidden className="my-1.5 w-px" style={{ background: "rgba(74,57,19,.45)" }} />
+        <button
+          type="button"
+          onClick={() => setPicking((v) => !v)}
+          aria-expanded={picking}
+          aria-haspopup="dialog"
+          aria-label={`Counting quests due in the next ${reach}. Change`}
+          className="flex h-8 items-center gap-1 whitespace-nowrap rounded-r-full pl-2 pr-2.5 text-[12.5px] font-semibold"
+        >
+          {reach}
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.8 }}>
+            <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        {picking && <DueWindowPicker hours={hours} onPick={pick} onClose={closePicker} ink={ink} isAdventure={false} paper />}
       </div>
       {open && (
         <div className="fade-in mt-2 max-h-[46vh] overflow-y-auto rounded-2xl p-1.5" style={{ background: "rgba(60,40,18,.12)", border: "1px solid rgba(139,112,64,.35)" }}>

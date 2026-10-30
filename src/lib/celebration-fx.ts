@@ -50,6 +50,10 @@ export type FxSettings = {
   welcomeMetrics?: boolean;
   /** Confetti when the welcome screen opens. */
   welcomeConfetti?: boolean;
+  /** Your own words for the welcome screen's questions (blank = the usual ones). */
+  welcomeFocusQ?: string;
+  welcomeIntentionQ?: string;
+  welcomeIntentionHint?: string;
   /** Seconds the "Feedback submitted" card stays (0 = until you close it). */
   feedbackHold?: number;
   /** How quickly the effects play: 0.75 quick, 1 as designed, 1.4 leisurely. */

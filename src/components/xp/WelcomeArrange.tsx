@@ -1,48 +1,57 @@
 "use client";
 
 import { useState } from "react";
-import { CHECKIN_ICONS, CHECKIN_STYLES, checkinIconOf, checkinStyleOf, patchFx, type FxSettings } from "@/lib/celebration-fx";
-import { WELCOME_ELS, backHours, backOwnOn, greetingPool, moveEl, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeShows, type WelcomeEl } from "@/lib/welcome";
-import { CASTLE_DESIGNS, castleOf } from "./CastleArt";
+import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { CHECKIN_ICONS, CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
+import { WELCOME_ELS, addBackGreeting, backHours, backOwnOn, greetingPool, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeShows, type WelcomeEl } from "@/lib/welcome";
+import { CASTLE_DESIGNS, CastleArt, castleOf } from "./CastleArt";
 import { CheckinIcon } from "./CheckinIcon";
-import { PhraseList, WiseLines } from "@/components/settings/LineLists";
+import { OwnWordsPill, PhraseList, WiseLines } from "@/components/settings/LineLists";
 
 /*
- * The welcome screen's settings, shown on the welcome screen itself: tap its
- * gear and each part gets its own small controls right where it sits (show
- * or hide, move up or down, and its own options), with the few screen-wide
- * choices in a strip at the top. Every change applies at once.
+ * Settings in context (the app-wide pattern; see docs/HANDOFF.md, Product
+ * taste): the gear arranges the screen it's on. What isn't part of the screen
+ * itself (when it opens, confetti) sits in a panel above it; on the screen,
+ * every part gets a ✎ beside it for its finer options, a hide button in its
+ * top-right corner, and a drag bar to move it. Every change applies at once.
  */
 
 const INK = "#3d2f18";
 const SOFT = "#6b5631";
-const CHIP = { border: "1.5px solid #b39a6a", background: "rgba(255,250,238,.7)", color: INK } as const;
+const GOLD = "#8a6116";
+const CHIP = { border: "1.5px solid #b39a6a", background: "rgba(255,250,238,.75)", color: INK } as const;
 const CHIP_ON = { border: "1.5px solid #4a3913", background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10" } as const;
+const PANEL = { border: "1px solid rgba(139,112,64,.4)", background: "rgba(255,250,238,.7)" } as const;
+const FIELD = { borderColor: "#b39a6a", background: "rgba(255,250,238,.95)", color: "#2a1c10" } as const;
 const set = (patch: Partial<FxSettings>) => patchFx(patch);
 
-/** The screen-wide choices: when it opens, the castle, confetti. */
-export function ArrangeStrip({ fx, onDone }: { fx: FxSettings; onDone: () => void }) {
+/** Above the welcome card: the choices that aren't part of the card itself. */
+export function ArrangeAbove({ fx, castleHidden, onDone }: { fx: FxSettings; castleHidden: boolean; onDone: () => void }) {
   const h = backHours(fx);
   return (
-    <div className="reveal flex w-full flex-col gap-2 rounded-xl px-3 py-2.5 text-left" style={{ border: "1.5px dashed rgba(139,112,64,.6)", background: "rgba(255,250,238,.55)" }}>
-      <div className="flex items-center gap-2">
-        <span className="font-display text-[17px]" style={{ color: "#8a6116" }}>
-          Arranging this screen
+    <div className="parchment card-pop-in mb-3 flex w-[min(440px,94vw)] flex-col gap-2 rounded-2xl px-4 py-3 text-left shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative z-[1] flex items-center gap-2">
+        <span className="font-display text-[17px]" style={{ color: GOLD }}>
+          Welcome screen
+        </span>
+        <span className="text-[12px]" style={{ color: SOFT }}>
+          ✎ by each part for more
         </span>
         <button type="button" onClick={onDone} className="ml-auto h-8 rounded-full px-4 text-[13.5px] font-bold" style={CHIP_ON}>
           Done
         </button>
       </div>
-      <p className="m-0 -mt-1 text-[12px] leading-snug" style={{ color: SOFT }}>
-        Each part below has its own controls. Changes apply as you make them.
-      </p>
-
-      <Row label="Opens">
+      <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-[13px] font-semibold" style={{ color: INK }}>
+          Opens
+        </span>
         <button type="button" onClick={() => set({ welcomeBackHours: Math.max(1, h - 1) })} disabled={!h} aria-label="Fewer hours" className="flex h-8 w-8 items-center justify-center rounded-full text-[16px] disabled:opacity-35" style={CHIP}>
           −
         </button>
-        <span className="min-w-[110px] text-center text-[13.5px] font-semibold tabular-nums" style={{ color: INK }}>
-          {h ? `+ every ${h} ${h === 1 ? "hour" : "hours"}` : "first visit only"}
+        <span className="min-w-[150px] text-center text-[13px] tabular-nums" style={{ color: INK }}>
+          {h ? `first visit, then every ${h} ${h === 1 ? "hour" : "hours"}` : "on the day's first visit only"}
         </span>
         <button type="button" onClick={() => set({ welcomeBackHours: Math.min(12, (h || 0) + 1) })} disabled={h >= 12} aria-label="More hours" className="flex h-8 w-8 items-center justify-center rounded-full text-[16px] disabled:opacity-35" style={CHIP}>
           +
@@ -51,144 +60,289 @@ export function ArrangeStrip({ fx, onDone }: { fx: FxSettings; onDone: () => voi
           <input type="checkbox" className="h-4 w-4 accent-[var(--t-gold-deep)]" checked={h === 0} onChange={(e) => set({ welcomeBackHours: e.target.checked ? 0 : 5 })} />
           first visit only
         </label>
-      </Row>
-
-      <Row label="Castle">
-        {CASTLE_DESIGNS.map((d) => {
-          const on = castleOf(fx.welcomeCastle) === d.key;
-          return (
-            <button key={d.key} type="button" role="radio" aria-checked={on} title={d.hint} onClick={() => set({ welcomeCastle: d.key })} className="h-8 rounded-full px-3 text-[12.5px] font-semibold" style={on ? CHIP_ON : CHIP}>
-              {d.label}
-            </button>
-          );
-        })}
-      </Row>
-
-      <label className="flex min-h-8 items-center gap-2 text-[13px]" style={{ color: INK }}>
+      </div>
+      <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[13px]" style={{ color: INK }}>
         <input type="checkbox" className="h-4 w-4 accent-[var(--t-gold-deep)]" checked={fx.welcomeConfetti !== false} onChange={() => set({ welcomeConfetti: fx.welcomeConfetti === false })} />
         Confetti on the day&rsquo;s first visit
       </label>
-    </div>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="w-[52px] shrink-0 text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: "#8a6116" }}>
-        {label}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-/** Under the greeting: which greetings take turns, and your own. */
-export function GreetingOptions({ fx }: { fx: FxSettings }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="flex w-full flex-col items-center gap-1.5">
-      <OptionsToggle open={open} onClick={() => setOpen((v) => !v)} label="Greetings" />
-      {open && (
-        <div className="reveal flex w-full flex-col gap-2 rounded-xl p-2.5 text-left" style={{ border: "1px solid rgba(139,112,64,.4)", background: "rgba(255,250,238,.6)" }}>
-          <label className="flex min-h-8 items-center gap-2 text-[13.5px]" style={{ color: INK }}>
-            <input type="checkbox" className="h-4 w-4 accent-[var(--t-gold-deep)]" checked={backOwnOn(fx)} onChange={() => set({ welcomeBackOwn: !backOwnOn(fx) })} />
-            Use my own words too
-          </label>
-          {backOwnOn(fx) && (
-            <textarea
-              value={ownGreetings(fx).join("\n")}
-              onChange={(e) => set({ welcomeBackText: e.target.value.slice(0, 1200), welcomeText: "" })}
-              rows={3}
-              placeholder={"One per line; they take turns with the others.\ne.g. The hearth is warm, come in"}
-              aria-label="Your own greetings"
-              className="reveal rounded-lg border px-3 py-2 text-[16px]"
-              style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
-            />
-          )}
-          <PhraseList
-            title="Choose which greetings show"
-            lines={greetingPool(fx)}
-            isOn={(l) => !(fx.welcomeBackOff ?? []).includes(l)}
-            onToggle={(l, on) => set({ welcomeBackOff: on ? (fx.welcomeBackOff ?? []).filter((x) => x !== l) : [...(fx.welcomeBackOff ?? []), l] })}
-          />
+      {/* On a narrow screen the castle is off to the side, out of view; its choice comes up here instead. */}
+      {castleHidden && (
+        <div className="relative z-[1] flex flex-col gap-1">
+          <span className="text-[13px] font-semibold" style={{ color: INK }}>
+            The castle on the far hill
+          </span>
+          <CastleChoices fx={fx} />
         </div>
       )}
     </div>
   );
 }
 
-/**
- * One part of the screen while arranging: a slim header (show or hide, its
- * name, move up or down, and its own options where it has some) above the
- * part itself. A hidden part keeps only its header, faded.
- */
-export function ArrangeFrame({ el, fx, first, last, children, empty }: { el: WelcomeEl; fx: FxSettings; first: boolean; last: boolean; children: React.ReactNode; empty?: string }) {
-  const meta = WELCOME_ELS.find((e) => e.key === el)!;
-  const on = welcomeShows(fx, el);
-  const hasOptions = el === "checkin" || el === "line";
+/** The castle's designs, each drawn small. */
+function CastleChoices({ fx }: { fx: FxSettings }) {
+  return (
+    <div role="radiogroup" aria-label="The castle on the far hill" className="flex flex-wrap gap-1.5">
+      {CASTLE_DESIGNS.map((d) => {
+        const on = castleOf(fx.welcomeCastle) === d.key;
+        return (
+          <button key={d.key} type="button" role="radio" aria-checked={on} title={d.hint} onClick={() => set({ welcomeCastle: d.key })} className="flex flex-col items-center gap-0.5 rounded-xl p-1" style={{ border: on ? "2px solid var(--t-gold-deep, #8a6116)" : "1px solid rgba(139,112,64,.4)" }}>
+            <svg aria-hidden viewBox="-80 -160 160 166" className="h-10 w-12 rounded-lg" style={{ background: "linear-gradient(180deg, #a9cbe6, #eef2ec)" }}>
+              <path d="M-80,6 Q-30,-8 0,-2 T80,-4 V6 Z" fill="#7aa1a6" />
+              <CastleArt design={d.key} colors={{ wall: "#f5f7f9", shade: "#c5d1dc", roof: "#4f7fb3", gold: "#e8c25c" }} />
+            </svg>
+            <span className="text-[11px] font-semibold" style={{ color: INK }}>
+              {d.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The ✎ that sits right beside the castle, with its choices. */
+export function CastleEdit({ fx }: { fx: FxSettings }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="flex w-full flex-col gap-1.5 rounded-xl px-2 pb-2 pt-1" style={{ border: `1.5px ${on ? "solid" : "dashed"} rgba(139,112,64,${on ? 0.45 : 0.35})`, background: on ? "rgba(255,250,238,.35)" : "transparent" }}>
-      <div className="flex min-h-9 items-center gap-1">
-        <button type="button" role="switch" aria-checked={on} onClick={() => set(toggleEl(fx, el))} title={on ? "Showing: tap to hide" : "Hidden: tap to show"} aria-label={`${on ? "Hide" : "Show"} ${meta.label}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={on ? CHIP_ON : CHIP}>
-          <Eye open={on} />
+    <div className="pointer-events-auto relative" onClick={(e) => e.stopPropagation()}>
+      <EditButton open={open} onClick={() => setOpen((v) => !v)} label="Change the castle" />
+      {open && (
+        <div className="parchment card-pop-in absolute bottom-10 right-0 z-10 w-[240px] rounded-xl p-2 shadow-xl">
+          <div className="relative z-[1]">
+            <CastleChoices fx={fx} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The small ✎ beside a part: opens its finer options. */
+export function EditButton({ open, onClick, label }: { open: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      aria-label={label}
+      title={label}
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full align-middle transition-transform hover:scale-110"
+      style={open ? CHIP_ON : { ...CHIP, boxShadow: "0 1px 3px rgba(0,0,0,.15)" }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="2.1" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
+/** Under the heading, from its ✎: add a greeting, your own words, and which greetings take turns. */
+export function GreetingOptions({ fx }: { fx: FxSettings }) {
+  const [phrase, setPhrase] = useState("");
+  const [saved, setSaved] = useState(false);
+  return (
+    <div className="reveal flex w-full flex-col gap-2 rounded-xl p-2.5 text-left" style={PANEL}>
+      <form
+        className="flex gap-1.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!phrase.trim()) return;
+          patchFx(addBackGreeting(loadFx(), phrase));
+          setPhrase("");
+          setSaved(true);
+        }}
+      >
+        <input value={phrase} onChange={(e) => (setPhrase(e.target.value), setSaved(false))} maxLength={120} placeholder="Add a greeting, e.g. The hearth is warm, come in" aria-label="Add a greeting" className="h-9 min-w-0 flex-1 rounded-full border px-3 text-[16px]" style={FIELD} />
+        <button type="submit" disabled={!phrase.trim()} className="h-9 shrink-0 rounded-full px-3.5 text-[13px] font-bold disabled:opacity-50" style={CHIP_ON}>
+          Add
         </button>
-        <span className="min-w-0 flex-1 truncate text-left text-[13px] font-semibold" style={{ color: on ? INK : SOFT }} title={meta.hint}>
+      </form>
+      {saved && (
+        <p className="fade-in m-0 text-[12.5px] italic" style={{ color: "#3d5a1e" }}>
+          ✓ Added. It takes its turn on future visits.
+        </p>
+      )}
+      <PhraseList
+        title="Greetings that take turns"
+        lines={greetingPool(fx)}
+        isOn={(l) => !(fx.welcomeBackOff ?? []).includes(l)}
+        onToggle={(l, on) => set({ welcomeBackOff: on ? (fx.welcomeBackOff ?? []).filter((x) => x !== l) : [...(fx.welcomeBackOff ?? []), l] })}
+      />
+      <div className="flex items-center gap-2">
+        <span className="text-[13px] font-semibold" style={{ color: INK }}>
+          Your own greetings
+        </span>
+        <span className="ml-auto">
+          <OwnWordsPill on={backOwnOn(fx)} onClick={() => set({ welcomeBackOwn: !backOwnOn(fx) })} label="Use them" />
+        </span>
+      </div>
+      {backOwnOn(fx) && (
+        <textarea
+          value={ownGreetings(fx).join("\n")}
+          onChange={(e) => set({ welcomeBackText: e.target.value.slice(0, 1200), welcomeText: "" })}
+          rows={3}
+          placeholder={"One per line; they take turns with the others."}
+          aria-label="Your own greetings"
+          className="reveal rounded-lg border px-3 py-2 text-[16px]"
+          style={FIELD}
+        />
+      )}
+    </div>
+  );
+}
+
+const HAS_OPTIONS: WelcomeEl[] = ["checkin", "line", "focus", "intention"];
+
+/**
+ * The card's parts while arranging: drag one by its bar to move it; its hide
+ * button sits in its top-right corner; its ✎ opens its finer options. Hidden
+ * parts wait at the end, faded, to be shown again.
+ */
+export function ArrangeList({ fx, order, parts, empty }: { fx: FxSettings; order: WelcomeEl[]; parts: Partial<Record<WelcomeEl, React.ReactNode>>; empty: Partial<Record<WelcomeEl, string>> }) {
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const shown = order.filter((el) => welcomeShows(fx, el));
+  const hidden = order.filter((el) => !welcomeShows(fx, el));
+  function onDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const next = arrayMove(shown, shown.indexOf(active.id as WelcomeEl), shown.indexOf(over.id as WelcomeEl));
+    set({ welcomeOrder: [...next, ...hidden] });
+  }
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <DndContext id="dnd-welcome" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={shown} strategy={verticalListSortingStrategy}>
+          {shown.map((el) => (
+            <Part key={el} el={el} fx={fx} empty={empty[el]}>
+              {parts[el]}
+            </Part>
+          ))}
+        </SortableContext>
+      </DndContext>
+      {hidden.length > 0 && (
+        <div className="flex flex-col gap-1.5 pt-1">
+          <span className="text-left text-[12px] font-bold uppercase tracking-[.1em]" style={{ color: GOLD }}>
+            Hidden
+          </span>
+          {hidden.map((el) => {
+            const meta = WELCOME_ELS.find((m) => m.key === el)!;
+            return (
+              <div key={el} className="flex min-h-10 items-center gap-2 rounded-xl px-3 text-left" style={{ border: "1.5px dashed rgba(139,112,64,.4)" }}>
+                <span className="min-w-0 flex-1 text-[13.5px]" style={{ color: SOFT }} title={meta.hint}>
+                  {meta.label}
+                </span>
+                <button type="button" onClick={() => set(toggleEl(fx, el))} className="h-8 rounded-full px-3 text-[12.5px] font-semibold" style={CHIP}>
+                  Show
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Part({ el, fx, empty, children }: { el: WelcomeEl; fx: FxSettings; empty?: string; children: React.ReactNode }) {
+  const meta = WELCOME_ELS.find((m) => m.key === el)!;
+  const [open, setOpen] = useState(false);
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: el });
+  return (
+    <div
+      ref={setNodeRef}
+      className="relative flex w-full flex-col gap-1.5 rounded-xl py-2 pl-8 pr-2"
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        zIndex: isDragging ? 5 : undefined,
+        border: "1.5px solid rgba(139,112,64,.4)",
+        background: isDragging ? "rgba(255,248,228,.97)" : "rgba(255,250,238,.4)",
+        boxShadow: isDragging ? "0 10px 24px rgba(0,0,0,.25)" : undefined,
+      }}
+    >
+      {/* The drag bar down the left edge. */}
+      <button
+        ref={setActivatorNodeRef}
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label={`Move ${meta.label}: drag up or down`}
+        title="Drag to move"
+        className="absolute inset-y-1 left-1 flex w-6 cursor-grab touch-none items-center justify-center rounded-lg active:cursor-grabbing hover:bg-black/[.05]"
+        style={{ color: "#a58c66" }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M5 8h14M5 12h14M5 16h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      </button>
+      {/* Its name, its ✎, and hide in the top-right corner. */}
+      <div className="flex min-h-8 items-center gap-1.5 pr-8">
+        <span className="min-w-0 truncate text-left text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }} title={meta.hint}>
           {meta.label}
         </span>
-        {hasOptions && on && <OptionsToggle open={open} onClick={() => setOpen((v) => !v)} label="Options" small />}
-        <button type="button" onClick={() => set(moveEl(fx, el, -1))} disabled={first} aria-label={`Move ${meta.label} up`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[14px] disabled:opacity-25" style={CHIP}>
-          ↑
-        </button>
-        <button type="button" onClick={() => set(moveEl(fx, el, 1))} disabled={last} aria-label={`Move ${meta.label} down`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[14px] disabled:opacity-25" style={CHIP}>
-          ↓
-        </button>
+        {HAS_OPTIONS.includes(el) && <EditButton open={open} onClick={() => setOpen((v) => !v)} label={`Edit ${meta.label}`} />}
       </div>
-      {on && open && el === "checkin" && <CheckinOptions fx={fx} />}
-      {on && open && el === "line" && <LineOptions fx={fx} />}
-      {on &&
-        (children ? (
-          // The part as it looks, not live while arranging.
-          <div inert className="pointer-events-none flex w-full flex-col items-center opacity-90">
-            {children}
-          </div>
-        ) : (
-          <p className="m-0 text-[12.5px] italic" style={{ color: SOFT }}>
-            {empty ?? "Shows when there's something to show."}
-          </p>
-        ))}
-      {!on && (
-        <p className="m-0 text-left text-[12px] leading-snug" style={{ color: SOFT }}>
-          {meta.hint}
+      <button
+        type="button"
+        onClick={() => set(toggleEl(fx, el))}
+        aria-label={`Hide ${meta.label}`}
+        title="Hide this part"
+        className="absolute right-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]"
+        style={{ color: SOFT }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+          <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open && el === "checkin" && <CheckinOptions fx={fx} />}
+      {open && el === "line" && <LineOptions fx={fx} />}
+      {open && el === "focus" && <QuestionOptions fx={fx} k="welcomeFocusQ" label="The question" fallback="What are your top priorities today?" />}
+      {open && el === "intention" && (
+        <>
+          <QuestionOptions fx={fx} k="welcomeIntentionQ" label="The question" fallback="Today is about…" />
+          <QuestionOptions fx={fx} k="welcomeIntentionHint" label="The example in its box" fallback="e.g. Steady and kind to myself" />
+        </>
+      )}
+      {children ? (
+        // The part as it looks (not live while arranging).
+        <div inert className="pointer-events-none flex w-full flex-col items-center">
+          {children}
+        </div>
+      ) : (
+        <p className="m-0 text-left text-[12.5px] italic" style={{ color: SOFT }}>
+          {empty ?? "Shows when there's something to show."}
         </p>
       )}
     </div>
   );
 }
 
-function OptionsToggle({ open, onClick, label, small = false }: { open: boolean; onClick: () => void; label: string; small?: boolean }) {
+/** Your own words for one of the screen's questions. */
+function QuestionOptions({ fx, k, label, fallback }: { fx: FxSettings; k: "welcomeFocusQ" | "welcomeIntentionQ" | "welcomeIntentionHint"; label: string; fallback: string }) {
   return (
-    <button type="button" onClick={onClick} aria-expanded={open} className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 font-semibold ${small ? "h-8 text-[12px]" : "h-8 text-[12.5px]"}`} style={CHIP}>
-      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: open ? "rotate(90deg)" : undefined }}>
-        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+    <label className="reveal flex flex-col gap-1 rounded-xl p-2.5 text-left text-[12.5px] font-semibold" style={{ ...PANEL, color: INK }}>
       {label}
-    </button>
+      <input value={fx[k] ?? ""} onChange={(e) => set({ [k]: e.target.value.slice(0, 140) })} placeholder={fallback} className="h-9 rounded-lg border px-2.5 text-[16px] font-normal" style={FIELD} />
+    </label>
   );
 }
 
 function CheckinOptions({ fx }: { fx: FxSettings }) {
   return (
-    <div className="reveal flex flex-col gap-2 rounded-xl p-2.5 text-left" style={{ border: "1px solid rgba(139,112,64,.4)", background: "rgba(255,250,238,.6)" }}>
-      <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: "#8a6116" }}>
+    <div className="reveal flex flex-col gap-2 rounded-xl p-2.5 text-left" style={PANEL}>
+      <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }}>
         The button
       </span>
       <div role="radiogroup" aria-label="The Check in button's look" className="flex flex-wrap justify-center gap-1.5">
         {CHECKIN_STYLES.map((c) => {
           const on = checkinStyleOf(fx).key === c.key;
           return (
-            <button key={c.key} type="button" role="radio" aria-checked={on} aria-label={c.label} title={c.hint} onClick={() => set({ checkinStyle: c.key })} className="rounded-full p-0.5" style={{ boxShadow: on ? "0 0 0 2px #8a6116" : undefined }}>
+            <button key={c.key} type="button" role="radio" aria-checked={on} aria-label={c.label} title={c.hint} onClick={() => set({ checkinStyle: c.key })} className="rounded-full p-0.5" style={{ boxShadow: on ? `0 0 0 2px ${GOLD}` : undefined }}>
               <span className="font-display flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px]" style={c.style}>
                 <CheckinIcon icon={checkinIconOf(fx)} /> Check in
               </span>
@@ -196,7 +350,7 @@ function CheckinOptions({ fx }: { fx: FxSettings }) {
           );
         })}
       </div>
-      <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: "#8a6116" }}>
+      <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }}>
         Its icon
       </span>
       <div role="radiogroup" aria-label="The Check in button's icon" className="flex flex-wrap gap-1">
@@ -224,34 +378,53 @@ function CheckinOptions({ fx }: { fx: FxSettings }) {
   );
 }
 
+/** One list of the wise lines, with "+ My own words" beside its header. */
 function LineOptions({ fx }: { fx: FxSettings }) {
   return (
-    <div className="reveal flex flex-col gap-2 rounded-xl p-2.5 text-left" style={{ border: "1px solid rgba(139,112,64,.4)", background: "rgba(255,250,238,.6)" }}>
-      <label className="flex min-h-8 items-center gap-2 text-[13.5px]" style={{ color: INK }}>
-        <input type="checkbox" className="h-4 w-4 accent-[var(--t-gold-deep)]" checked={ownLinesOn(fx)} onChange={() => set({ welcomeOwnOn: !ownLinesOn(fx) })} />
-        Add my own wise lines
-      </label>
-      {ownLinesOn(fx) && (
-        <textarea
-          value={fx.welcomeOwnLines ?? ""}
-          onChange={(e) => set({ welcomeOwnLines: e.target.value.slice(0, 2400) })}
-          rows={3}
-          placeholder={"One per line; mixed in with the built-in lines.\ne.g. Breathe. Then the next small thing."}
-          aria-label="Your own wise lines"
-          className="reveal rounded-lg border px-3 py-2 text-[16px]"
-          style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
-        />
-      )}
-      <WiseLines own={ownLines(fx)} />
+    <div className="reveal flex flex-col gap-2 rounded-xl p-2.5 text-left" style={PANEL}>
+      <WiseLines
+        own={ownLines(fx)}
+        alwaysOpen
+        extra={<OwnWordsPill on={ownLinesOn(fx)} onClick={() => set({ welcomeOwnOn: !ownLinesOn(fx) })} />}
+        ownBox={
+          ownLinesOn(fx) && (
+            <textarea
+              value={fx.welcomeOwnLines ?? ""}
+              onChange={(e) => set({ welcomeOwnLines: e.target.value.slice(0, 2400) })}
+              rows={3}
+              placeholder={"One per line; mixed in with the built-in lines."}
+              aria-label="Your own wise lines"
+              className="reveal rounded-lg border px-3 py-2 text-[16px]"
+              style={FIELD}
+            />
+          )
+        }
+      />
     </div>
   );
 }
 
-function Eye({ open }: { open: boolean }) {
+/** A gilded checkbox: a small wax-gold square that fills with a drawn check. */
+export function GoldCheck({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
-      {open ? <circle cx="12" cy="12" r="2.8" fill="currentColor" /> : <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />}
-    </svg>
+    <label className="flex min-h-9 cursor-pointer items-start gap-2.5 text-left text-[14px] leading-snug" style={{ color: INK }}>
+      <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span
+        aria-hidden
+        className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#8a6116]"
+        style={
+          checked
+            ? { background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 0 8px rgba(242,210,126,.55), inset 0 1px 0 rgba(255,255,255,.6)" }
+            : { background: "rgba(255,250,238,.85)", border: "1.5px solid #b39a6a", boxShadow: "inset 0 1px 2px rgba(0,0,0,.12)" }
+        }
+      >
+        {checked && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="gold-check-draw">
+            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#3a2a10" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </span>
+      <span>{children}</span>
+    </label>
   );
 }

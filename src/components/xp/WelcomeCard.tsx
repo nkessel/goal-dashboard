@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CoinIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
@@ -16,7 +16,7 @@ import { useEscape } from "@/lib/use-escape";
 import { addJournalEntryAction, setTopPriorityAction } from "@/app/actions";
 import { PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
 import { GearIcon } from "@/components/ui/Icons";
-import { ArrangeFrame, ArrangeStrip, GreetingOptions } from "./WelcomeArrange";
+import { ArrangeAbove, ArrangeList, CastleEdit, EditButton, GoldCheck, GreetingOptions } from "./WelcomeArrange";
 import { MistScene } from "./MistScene";
 import { DueSoonDrawer } from "@/components/tasks/DueSoonDrawer";
 import { castleOf } from "./CastleArt";
@@ -82,10 +82,33 @@ export function WelcomeCard({
   // Your verdict on the day's wise line: liked lines come back often, disliked ones never.
   const [verdict, setVerdict] = useState<"like" | "dislike" | null>(() => (line && typeof window !== "undefined" && likedLines().has(line) ? "like" : null));
   const [checkedIn, setCheckedIn] = useState(false);
-  const [addingPhrase, setAddingPhrase] = useState(false);
-  const [phrase, setPhrase] = useState("");
-  const [phraseSaved, setPhraseSaved] = useState(false);
-  const [snoozing, setSnoozing] = useState(false);
+  // While arranging: the greeting's own options (from the ✎ beside it), and whether the castle is in view.
+  const [greetingOpen, setGreetingOpen] = useState(false);
+  // The greeting is yours to rewrite: tap it, write your own, and choose whether to keep it.
+  const [greeting, setGreeting] = useState(heading);
+  const [writing, setWriting] = useState<string | null>(null);
+  const [keepAsk, setKeepAsk] = useState<{ text: string; was: string; keep: boolean; retire: boolean } | null>(null);
+  function finishWriting() {
+    const t = (writing ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+    setWriting(null);
+    if (!t || t === greeting) return;
+    setKeepAsk({ text: t, was: greeting, keep: true, retire: true });
+    setGreeting(t);
+  }
+  function settleGreeting() {
+    if (!keepAsk) return;
+    const now = loadFx();
+    const patch: Partial<FxSettings> = keepAsk.keep ? addBackGreeting(now, keepAsk.text) : {};
+    if (keepAsk.retire) patch.welcomeBackOff = [...new Set([...(patch.welcomeBackOff ?? now.welcomeBackOff ?? []), keepAsk.was])];
+    if (Object.keys(patch).length) patchFx(patch);
+    setKeepAsk(null);
+  }
+  const [castleSeen, setCastleSeen] = useState(true);
+  // Snooze: the times spread out in a line from the button ("other" brings the rest).
+  const [snoozing, setSnoozing] = useState<false | "main" | "other">(false);
+  const [customMin, setCustomMin] = useState("");
+  // Complete check-in: saves whatever is entered in the check-in, then on into the forest.
+  const submitCheckin = useRef<((after: () => void) => void) | null>(null);
   // The check-in starts as a gilded button and opens in its place.
   const [checkinOpen, setCheckinOpen] = useState(false);
   // While Due soon's drawer is open, the screen steps down a layer so a card's editor can open over it.
@@ -118,8 +141,8 @@ export function WelcomeCard({
   }, [award?.xp]);
 
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
-    focus: <TopPriority last={priority} />,
-    intention: mode === "day" ? <Intention /> : null,
+    focus: <TopPriority last={priority} question={fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} />,
+    intention: mode === "day" ? <Intention question={fx.welcomeIntentionQ?.trim() || "Today is about…"} hint={fx.welcomeIntentionHint?.trim() || "e.g. Steady and kind to myself"} /> : null,
     plan: (
       <button
         type="button"
@@ -141,7 +164,7 @@ export function WelcomeCard({
     ),
     checkin: (recent || checkinOpen) && !arranging ? (recent ? null : (
       // Parchment like the rest of the card, its words in ink rather than cream (as in Insights).
-      <CheckinPanel fx={fx} mode={mode} metrics={metrics} checkedIn={checkedIn} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} />
+      <CheckinPanel fx={fx} mode={mode} metrics={metrics} checkedIn={checkedIn} submit={(f) => (submitCheckin.current = f)} onCollapse={() => setCheckinOpen(false)} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} />
     )) : (
       <button
         type="button"
@@ -150,6 +173,9 @@ export function WelcomeCard({
         style={checkinStyleOf(fx).style}
       >
         <CheckinIcon icon={checkinIconOf(fx)} /> Check in
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.8 }}>
+          <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
     ),
     streak: award && award.streak > 0 ? (
@@ -158,19 +184,20 @@ export function WelcomeCard({
       </p>
     ) : null,
     line: line ? (
-      <div className="flex w-full flex-col items-center gap-1.5">
-        <p className={`m-0 text-[16px] leading-snug ${verdict === "dislike" ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
-          {line}
+      <div className="flex w-full flex-col items-center gap-0.5">
+        <p className="m-0 text-[16px] leading-snug" style={{ color: "var(--t-ink)" }}>
+          <span className={verdict === "dislike" ? "line-through opacity-50" : ""}>{line}</span>
+          {/* Quiet thumbs, right after the line (they wrap below it only when there's no room). */}
+          <span className="ml-1.5 inline-flex translate-y-[2px] items-center gap-0.5 whitespace-nowrap align-middle">
+            <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"))} />
+            <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"))} />
+          </span>
         </p>
-        <div className="flex items-center gap-1.5">
-          <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"))} />
-          <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"))} />
-          {verdict && (
-            <span className="fade-in text-[12px] italic" style={{ color: "#6b5631" }}>
-              {verdict === "like" ? "It'll come back often." : "You won't see it again."}
-            </span>
-          )}
-        </div>
+        {verdict && (
+          <span className="fade-in text-[12px] italic" style={{ color: "#6b5631" }}>
+            {verdict === "like" ? "It'll come back often." : "You won't see it again."}
+          </span>
+        )}
       </div>
     ) : null,
     bar: award ? (
@@ -206,9 +233,12 @@ export function WelcomeCard({
 
   return createPortal(
     <div className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={() => (arranging ? setArranging(false) : leave())} role="dialog" aria-modal="true" aria-label={heading}>
-      {/* A misty valley, and the card coming out of the mist. */}
-      <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} />
-      <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative`} onClick={(e) => e.stopPropagation()}>
+      {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
+      <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} castleSlot={arranging ? <CastleEdit fx={fx} /> : null} onCastleVisible={setCastleSeen} />
+      <div className="relative flex max-h-full flex-col items-center">
+      {/* What isn't part of the card (when it opens, confetti) sits above it while arranging. */}
+      {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} onDone={() => setArranging(false)} />}
+      <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
         {mode === "back" && <WelcomeToucan />}
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
@@ -223,13 +253,13 @@ export function WelcomeCard({
         )}
         {/* A soft light around the card, where the mist has thinned. */}
         <span aria-hidden className="pointer-events-none absolute -inset-12" style={{ background: "radial-gradient(ellipse at center, rgba(255,250,240,.5), rgba(255,250,240,0) 70%)" }} />
-        {/* The gear arranges this screen right here (what shows, in what order, and each part's options). */}
+        {/* The gear: settings in context (each part's controls right where it sits). */}
         <button
           type="button"
           onClick={() => setArranging((v) => !v)}
           aria-pressed={arranging}
-          aria-label={arranging ? "Done arranging" : "Arrange this screen"}
-          title={arranging ? "Done arranging" : "Arrange this screen"}
+          aria-label={arranging ? "Done arranging" : "Welcome screen settings"}
+          title={arranging ? "Done arranging" : "Welcome screen settings"}
           className="settings-gear absolute -right-2 -top-2 z-[2] flex h-[30px] w-[30px] items-center justify-center rounded-full"
           style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: arranging ? "0 0 0 2px #f2d27e, 0 0 12px rgba(242,210,126,.7)" : "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
         >
@@ -241,94 +271,132 @@ export function WelcomeCard({
             <GearIcon size={17} />
           )}
         </button>
-        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[88vh] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`}>
-          {arranging && <ArrangeStrip fx={fx} onDone={() => setArranging(false)} />}
-          <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
-            {heading}
-            {!preview && !addingPhrase && !arranging && (
-              <button type="button" onClick={() => setAddingPhrase(true)} aria-label="Add a greeting of your own" title="Add a greeting of your own" className="ml-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full align-middle hover:bg-black/[.06]">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-          </p>
-          {addingPhrase && (
-            <form
-              className="reveal flex w-full flex-col gap-1.5 text-left"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!phrase.trim()) return;
-                patchFx(addBackGreeting(loadFx(), phrase));
-                setPhrase("");
-                setAddingPhrase(false);
-                setPhraseSaved(true);
+        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70vh]" : "max-h-[88vh]"} w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`}>
+          {writing !== null ? (
+            // Your own words for today's greeting, right where it was.
+            <input
+              autoFocus
+              value={writing}
+              onChange={(e) => setWriting(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  finishWriting();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setWriting(null);
+                }
               }}
-            >
-              <label htmlFor="welcome-phrase" className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                A greeting for another time
-              </label>
-              <div className="flex gap-1.5">
-                <input id="welcome-phrase" autoFocus value={phrase} onChange={(e) => setPhrase(e.target.value)} maxLength={120} placeholder="e.g. The hearth is warm, come in" className="h-10 min-w-0 flex-1 rounded-full px-3.5 text-[16px]" style={FIELD} />
-                <button type="submit" disabled={!phrase.trim()} className="h-10 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-                  Add
+              onBlur={finishWriting}
+              maxLength={120}
+              aria-label="Your own greeting"
+              className="font-display m-0 w-full rounded-lg bg-transparent px-1 text-center text-[25px] leading-tight focus:outline-none"
+              style={{ color: "var(--t-ink)", boxShadow: "0 2px 0 rgba(139,112,64,.5)" }}
+            />
+          ) : (
+            <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
+              {arranging ? (
+                <WithEdit text={greeting} edit={<EditButton open={greetingOpen} onClick={() => setGreetingOpen((v) => !v)} label="Edit the greetings" />} />
+              ) : (
+                <button type="button" onClick={() => setWriting(greeting)} title="Write your own greeting" className="cursor-text rounded-lg px-1 hover:bg-black/[.04]">
+                  {greeting}
                 </button>
-                <button type="button" onClick={() => setAddingPhrase(false)} aria-label="Cancel" className="h-10 w-8 shrink-0 text-[18px]" style={{ color: "#6b5631" }}>
-                  ×
-                </button>
-              </div>
-            </form>
-          )}
-          {phraseSaved && (
-            <p className="fade-in m-0 -mt-1 text-[12.5px] italic" style={{ color: "#3d5a1e" }}>
-              ✓ Saved. It will greet you on a future visit.
+              )}
             </p>
           )}
-          {arranging && <GreetingOptions fx={fx} />}
-          {arranging
-            ? allEls.map((el, i) => (
-                <ArrangeFrame key={el} el={el} fx={fx} first={i === 0} last={i === allEls.length - 1} empty={EMPTY[el]}>
-                  {parts[el]}
-                </ArrangeFrame>
-              ))
-            : order.map((el) => (
-                <div key={el} className="flex w-full flex-col items-center">
-                  {parts[el]}
-                </div>
-              ))}
+          {keepAsk && (
+            <div className="reveal flex w-full flex-col gap-1.5 rounded-xl px-3 py-2.5" style={{ border: "1px solid rgba(139,112,64,.45)", background: "rgba(255,250,238,.7)" }}>
+              <GoldCheck checked={keepAsk.keep} onChange={(v) => setKeepAsk({ ...keepAsk, keep: v })}>
+                Save &ldquo;{keepAsk.text}&rdquo; for the future, in the rotation of greetings
+              </GoldCheck>
+              <GoldCheck checked={keepAsk.retire} onChange={(v) => setKeepAsk({ ...keepAsk, retire: v })}>
+                Retire today&rsquo;s original, &ldquo;{keepAsk.was}&rdquo;
+              </GoldCheck>
+              <div className="flex justify-end">
+                <button type="button" onClick={settleGreeting} className="h-8 rounded-full px-4 text-[13px] font-bold" style={GILT}>
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+          {arranging && greetingOpen && <GreetingOptions fx={fx} />}
           {arranging ? (
-            <button type="button" onClick={() => setArranging(false)} className="mt-1 h-10 rounded-full px-6 text-[14px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
-              Done arranging
+            <ArrangeList fx={fx} order={allEls} parts={parts} empty={EMPTY} />
+          ) : (
+            order.map((el) => (
+              <div key={el} className="flex w-full flex-col items-center">
+                {parts[el]}
+              </div>
+            ))
+          )}
+          {arranging ? (
+            <button type="button" onClick={() => setArranging(false)} className="mt-1 h-10 rounded-full px-6 text-[14px] font-bold" style={GILT}>
+              Done
             </button>
           ) : snoozing ? (
-            <div className="reveal mt-1 flex w-full flex-col items-center gap-1.5">
-              <span className="flex items-center gap-1.5">
-                <button type="button" onClick={() => setSnoozing(false)} aria-label="Back" title="Back" className="flex h-8 w-8 items-center justify-center rounded-full" style={{ border: "1.5px solid #b39a6a", color: "#5a4a30", background: "rgba(255,250,238,.6)" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M14.5 5.5 8 12l6.5 6.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <span className="text-[13px] font-semibold" style={{ color: "#5a4a30" }}>
-                  Ask me again…
-                </span>
-              </span>
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {snoozeChoices().map((c) => (
-                  <button key={c.label} type="button" onClick={() => onSnooze!(c.ms)} className="h-9 rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}>
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              <button type="button" onClick={leave} className="h-9 px-1 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
-                Skip for today
+            // The times spread out in one line from where Snooze was.
+            <div className="mt-1 flex w-full flex-wrap items-center justify-center gap-1.5">
+              <button type="button" onClick={() => (snoozing === "other" ? setSnoozing("main") : setSnoozing(false))} aria-label="Back" title="Back" className="snooze-pop flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={PILL}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M14.5 5.5 8 12l6.5 6.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </button>
+              {(snoozing === "main" ? SNOOZE_MAIN : snoozeOther()).map((c, i) => (
+                <button key={`${snoozing}-${c.label}`} type="button" onClick={() => (c.ms === "tomorrow" ? leave() : onSnooze!(c.ms))} className="snooze-pop h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold" style={{ ...PILL, animationDelay: `${i * 45}ms` }}>
+                  {c.label}
+                </button>
+              ))}
+              {snoozing === "main" ? (
+                <button key="other" type="button" onClick={() => setSnoozing("other")} className="snooze-pop h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold" style={{ ...PILL, animationDelay: `${SNOOZE_MAIN.length * 45}ms` }}>
+                  Other…
+                </button>
+              ) : (
+                <form
+                  className="snooze-pop flex h-8 items-center gap-1 rounded-full pl-2.5 pr-1"
+                  style={{ ...PILL, animationDelay: "180ms" }}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const n = Math.round(Number(customMin));
+                    if (n > 0) onSnooze!(Math.min(24 * 60, n) * 60_000);
+                  }}
+                >
+                  <input value={customMin} onChange={(e) => setCustomMin(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="45" aria-label="Minutes" className="h-6 w-9 bg-transparent text-center text-[16px] tabular-nums focus:outline-none" />
+                  <span className="text-[12.5px]">min</span>
+                  <button type="submit" disabled={!Number(customMin)} aria-label="Snooze for that long" className="flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold disabled:opacity-40" style={GILT}>
+                    ✓
+                  </button>
+                </form>
+              )}
             </div>
           ) : (
-            <button type="button" onClick={() => (snoozable ? setSnoozing(true) : leave())} className="mt-1 h-10 rounded-full border px-5 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>
-              {snoozable ? "Not now" : "Continue to town"}
-            </button>
+            <div className="mt-1 flex w-full items-center gap-2">
+              <button type="button" onClick={() => (snoozable ? setSnoozing("main") : leave())} className="h-10 rounded-full border px-4 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>
+                {snoozable ? (
+                  <span className="flex items-center gap-1.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                    </svg>
+                    Snooze
+                  </span>
+                ) : (
+                  "Continue to town"
+                )}
+              </button>
+              {/* Bottom right: done here. Saves what's entered in the check-in, then on into the forest. */}
+              {order.includes("checkin") && !checkedIn && (
+                <button type="button" onClick={() => (checkinOpen && submitCheckin.current ? submitCheckin.current(leave) : leave())} className="font-display ml-auto flex h-10 items-center gap-1.5 rounded-full px-4 text-[15px]" style={GILT}>
+                  Complete check-in
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+            </div>
           )}
         </div>
+      </div>
       </div>
     </div>,
     document.body
@@ -353,18 +421,41 @@ function WelcomeToucan() {
   );
 }
 
-/** When "Not now" can ask again: very soon, soon, in a while, this evening (before then), or at bedtime. */
-function snoozeChoices() {
+/** Snooze's first line: soon, or Other… for the rest. */
+const SNOOZE_MAIN: { label: string; ms: number | "tomorrow" }[] = [
+  { label: "15 min", ms: 15 * 60_000 },
+  { label: "30 min", ms: 30 * 60_000 },
+  { label: "1 hr", ms: 3_600_000 },
+];
+/** Other…: longer, this evening (when it's a while off), tomorrow, or a number of minutes. */
+function snoozeOther() {
   const now = new Date();
-  const at = (h: number, m = 0) => new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime() - now.getTime();
-  const out = [
-    { label: "In 15 min", ms: 15 * 60_000 },
-    { label: "In 30 min", ms: 30 * 60_000 },
-    { label: "In 1 hour", ms: 3_600_000 },
-    { label: "In 3 hours", ms: 3 * 3_600_000 },
+  const evening = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18).getTime() - now.getTime();
+  const out: { label: string; ms: number | "tomorrow" }[] = [
+    { label: "2 hrs", ms: 2 * 3_600_000 },
+    { label: "3 hrs", ms: 3 * 3_600_000 },
   ];
-  if (at(18) > 3.5 * 3_600_000) out.push({ label: "This evening", ms: at(18) });
+  if (evening > 3.5 * 3_600_000) out.push({ label: "This evening", ms: evening });
+  out.push({ label: "Tomorrow", ms: "tomorrow" });
   return out;
+}
+
+const GILT = { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } as const;
+const PILL = { border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.7)" } as const;
+
+/** Text with its ✎ kept right beside the last word (never dropped onto a line of its own). */
+function WithEdit({ text, edit }: { text: string; edit: React.ReactNode }) {
+  const words = text.trim().split(/\s+/);
+  const last = words.pop() ?? "";
+  return (
+    <>
+      {words.length ? `${words.join(" ")} ` : ""}
+      <span className="whitespace-nowrap">
+        {last}
+        <span className="ml-1.5 inline-block align-middle">{edit}</span>
+      </span>
+    </>
+  );
 }
 
 /** A small round thumbs up or down for the day's wise line. */
@@ -377,10 +468,10 @@ function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean
       aria-pressed={on}
       aria-label={like ? "I like this line: show it more" : "I don't like this line: don't show it again"}
       title={like ? "Like: show it more often" : "Dislike: never show it again"}
-      className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
-      style={{ border: `1.5px solid ${on ? (like ? "#5b8a3a" : "#a0503a") : "#b39a6a"}`, background: on ? (like ? "rgba(120,170,80,.22)" : "rgba(192,80,58,.16)") : "rgba(255,250,238,.6)" }}
+      className={`flex h-7 w-7 items-center justify-center rounded-full transition-opacity hover:opacity-100 ${on ? "opacity-100" : "opacity-45"}`}
+      style={{ background: on ? (like ? "rgba(120,170,80,.22)" : "rgba(192,80,58,.16)") : "transparent" }}
     >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden style={like ? undefined : { transform: "rotate(180deg)" }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden style={like ? undefined : { transform: "rotate(180deg)" }}>
         <path d="M7 10v10H4V10h3zm2 10h8.2a2 2 0 0 0 2-1.6l1.3-6.5A2 2 0 0 0 18.5 9.5H14l.8-4a1.6 1.6 0 0 0-2.9-1.2L9 9v11z" fill={on ? (like ? "#4f7a30" : "#93402c") : "none"} stroke={on ? (like ? "#4f7a30" : "#93402c") : "#8a6116"} strokeWidth="1.6" strokeLinejoin="round" />
       </svg>
     </button>
@@ -389,17 +480,19 @@ function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean
 
 const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };
 
-/** Your top priority, in your own words: saved for the day, and kept in mind by the app and the toucan. */
-function TopPriority({ last }: { last: { text: string; others?: string[]; day: string } | null }) {
+/** Your top priorities, in your own words: saved for the day, and kept in mind by the app and the toucan. */
+function TopPriority({ last, question }: { last: { text: string; others?: string[]; day: string } | null; question: string }) {
   const [today] = useState(() => eveningDayKey());
   const [saved, setSaved] = useState<{ text: string; others: string[] } | null>(last && last.day === today ? { text: last.text, others: last.others ?? [] } : null);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
-  // Important but not urgent: the other priorities, one small field each.
-  const [others, setOthers] = useState<string[]>([]);
+  // Secondary priorities (important, not urgent): opened from the button under the box.
+  const [othersOpen, setOthersOpen] = useState(false);
+  const [others, setOthers] = useState<string[]>([""]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const earlier = last && last.day !== today ? last : null;
+  const filled = others.filter((o) => o.trim());
   const save = async (value: string, more: string[]) => {
     if (!value.trim()) return;
     setBusy(true);
@@ -422,7 +515,17 @@ function TopPriority({ last }: { last: { text: string; others?: string[]; day: s
         </span>
         <p className="m-0 text-[16px] leading-snug" style={{ color: "var(--t-ink)" }}>
           {saved.text}{" "}
-          <button type="button" onClick={() => (setText(saved.text), setOthers(saved.others), setEditing(true))} className="text-[12.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setText(saved.text);
+              setOthers([...saved.others, ""]);
+              setOthersOpen(saved.others.length > 0);
+              setEditing(true);
+            }}
+            className="text-[12.5px] underline underline-offset-2"
+            style={{ color: "#6b5631" }}
+          >
             Change
           </button>
         </p>
@@ -438,61 +541,84 @@ function TopPriority({ last }: { last: { text: string; others?: string[]; day: s
       className="flex w-full flex-col gap-1.5 text-left"
       onSubmit={(e) => {
         e.preventDefault();
-        void save(text, others);
+        void save(text, filled);
       }}
     >
       <label htmlFor="welcome-priority" className="text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
-        What are your top priorities?
+        {question}
       </label>
       <div className="relative pb-4">
+        {/* Grows with what you write. */}
         <textarea
           id="welcome-priority"
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={200}
+          onChange={(e) => {
+            setText(e.target.value);
+            const el = e.currentTarget;
+            el.style.height = "auto";
+            el.style.height = `${Math.min(260, el.scrollHeight)}px`;
+          }}
+          maxLength={400}
           rows={2}
           placeholder="What is most important now?"
           className="block min-h-[72px] w-full resize-none rounded-xl px-3 pb-4 pt-2 text-[16px] leading-snug"
           style={FIELD}
         />
-        {/* Sits on the box's lower border. */}
+        {/* Sits on the box's lower border; opens (and closes) the secondary priorities. */}
         <button
           type="button"
-          onClick={() => setOthers((o) => [...o, ""])}
-          disabled={others.length >= 8}
-          className="font-display absolute bottom-0 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-[13.5px] disabled:opacity-50"
+          onClick={() => setOthersOpen((v) => !v)}
+          aria-expanded={othersOpen}
+          className="font-display absolute bottom-0 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[13.5px]"
           style={CHECKIN_STYLES[0].style}
         >
-          ✦ Add other priorities
+          {othersOpen ? (
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M5.5 15l6.5-6.5 6.5 6.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <span aria-hidden className="text-[16px] leading-none">+</span>
+          )}
+          Other priorities{filled.length && !othersOpen ? ` (${filled.length})` : ""}
         </button>
       </div>
-      {others.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <span className="text-[12px]" style={{ color: "#6b5631" }}>
-            Important, not urgent: the toucan brings these up gently, when you have space.
-          </span>
+      {othersOpen && (
+        <div className="reveal mx-auto flex w-[65%] min-w-[220px] flex-col items-center gap-1">
           {others.map((o, i) => (
-            <div key={i} className="reveal flex items-center gap-1.5">
+            <div key={i} className="flex w-full items-center gap-1">
               <input
-                autoFocus={!o}
+                autoFocus={i === others.length - 1 && !o}
                 value={o}
-                onChange={(e) => setOthers((all) => all.map((x, j) => (j === i ? e.target.value : x)))}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setOthers((all) => {
+                    const next = all.map((x, j) => (j === i ? v : x));
+                    // Writing in the last box brings a fresh one below it.
+                    if (i === next.length - 1 && v.trim() && next.length < 8) next.push("");
+                    return next;
+                  });
+                }}
                 maxLength={160}
-                placeholder="Another priority"
-                aria-label={`Other priority ${i + 1}`}
+                placeholder={i === 0 ? "e.g. Call Mom about the visit, by Sunday" : "Another"}
+                aria-label={`Secondary priority ${i + 1}`}
                 className="h-9 min-w-0 flex-1 rounded-full px-3 text-[16px]"
                 style={FIELD}
               />
-              <button type="button" onClick={() => setOthers((all) => all.filter((_, j) => j !== i))} aria-label="Remove" className="h-9 w-7 shrink-0 text-[17px]" style={{ color: "#6b5631" }}>
-                ×
-              </button>
+              {o && (
+                <button type="button" onClick={() => setOthers((all) => (all.length > 1 ? all.filter((_, j) => j !== i) : [""]))} aria-label="Remove" className="h-9 w-6 shrink-0 text-[16px]" style={{ color: "#6b5631" }}>
+                  ×
+                </button>
+              )}
             </div>
           ))}
+          <span className="text-center text-[12px] leading-snug" style={{ color: "#6b5631" }}>
+            <b>Secondary Priorities</b> · important, not urgent. Add a due date or anything else the toucan should know, and he&rsquo;ll bring them up when there&rsquo;s space.
+          </span>
         </div>
       )}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {earlier && !text && (
-          <button type="button" disabled={busy} onClick={() => void save(earlier.text, [...(earlier.others ?? []), ...others])} className="mr-auto min-h-8 rounded-full px-3 text-left text-[13px] disabled:opacity-60" style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}>
+          <button type="button" disabled={busy} onClick={() => void save(earlier.text, [...(earlier.others ?? []), ...filled])} className="mr-auto min-h-8 rounded-full px-3 text-left text-[13px] disabled:opacity-60" style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}>
             Same as before: &ldquo;{earlier.text}&rdquo;
           </button>
         )}
@@ -510,14 +636,14 @@ function TopPriority({ last }: { last: { text: string; others?: string[]; day: s
 }
 
 /** A line on what today is about, kept in the journal as an intention. */
-function Intention() {
+function Intention({ question, hint }: { question: string; hint: string }) {
   const [text, setText] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   if (saved)
     return (
       <p className="m-0 text-[15px] italic" style={{ color: "#3d5a1e" }}>
-        ✓ Today is about: {text}
+        ✓ {question.replace(/(…|\.\.\.)\s*$/, "").trim()}: {text}
       </p>
     );
   return (
@@ -538,10 +664,10 @@ function Intention() {
       }}
     >
       <label className="text-[15px] font-semibold" style={{ color: "var(--t-ink)" }} htmlFor="welcome-intention">
-        Today is about…
+        {question}
       </label>
       <div className="flex gap-1.5">
-        <input id="welcome-intention" value={text} onChange={(e) => setText(e.target.value)} maxLength={200} placeholder="e.g. Steady and kind to myself" className="h-10 min-w-0 flex-1 rounded-lg px-2.5 text-[16px]" style={FIELD} />
+        <input id="welcome-intention" value={text} onChange={(e) => setText(e.target.value)} maxLength={200} placeholder={hint} className="h-10 min-w-0 flex-1 rounded-lg px-2.5 text-[16px]" style={FIELD} />
         <button type="submit" disabled={busy || !text.trim()} className="h-10 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
           Save
         </button>
@@ -551,7 +677,7 @@ function Intention() {
 }
 
 /** The check-in, opened in place of its button. */
-function CheckinPanel({ fx, mode, metrics, checkedIn, onSaved }: { fx: FxSettings; mode: "day" | "back"; metrics: string[]; checkedIn: boolean; onSaved: () => void }) {
+function CheckinPanel({ fx, mode, metrics, checkedIn, onSaved, onCollapse, submit }: { fx: FxSettings; mode: "day" | "back"; metrics: string[]; checkedIn: boolean; onSaved: () => void; onCollapse: () => void; submit: (save: (after: () => void) => void) => void }) {
   return (
       <div
         className="w-full rounded-2xl px-2 py-2.5 text-left"
@@ -568,10 +694,14 @@ function CheckinPanel({ fx, mode, metrics, checkedIn, onSaved }: { fx: FxSetting
           ["--ec-l" as string]: "30%",
         }}
       >
-        <p className="m-0 mb-1 text-center font-display text-[17px]" style={{ color: "#8a6116" }}>
+        {/* Its title folds it back into the button. */}
+        <button type="button" onClick={onCollapse} aria-expanded className="mx-auto mb-1 flex items-center gap-1.5 font-display text-[17px]" style={{ color: "#8a6116" }}>
           {checkedIn ? "Checked in ✓" : "Check in"}
-        </p>
-        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={onSaved} addNights simple />
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: "rotate(180deg)" }}>
+            <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={onSaved} submit={submit} addNights simple />
       </div>
   );
 }

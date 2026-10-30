@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { liftFog } from "@/lib/welcome-fog";
 import { CastleArt, type CastleDesign } from "./CastleArt";
 
@@ -201,8 +201,32 @@ const BIRDS = [
   { top: 22, size: 0.6, fly: 74, delay: 18, flap: 2.8, flapDelay: 0.4, bob: 3.4, back: true },
 ];
 
-export function MistScene({ time, leaving = false, castle = "spires" }: { time?: MistTime; leaving?: boolean; castle?: CastleDesign }) {
+export function MistScene({ time, leaving = false, castle = "spires", castleSlot, onCastleVisible }: { time?: MistTime; leaving?: boolean; castle?: CastleDesign; castleSlot?: React.ReactNode; onCastleVisible?: (visible: boolean) => void }) {
   const [when] = useState<MistTime>(() => time ?? mistTimeOf());
+  // Where the castle stands on screen, so something can sit right beside it (its ✎ while arranging).
+  const castleRef = useRef<SVGGElement>(null);
+  const [castleAt, setCastleAt] = useState<{ x: number; y: number } | null>(null);
+  const reportVisible = useRef(onCastleVisible);
+  useEffect(() => {
+    reportVisible.current = onCastleVisible;
+  });
+  useEffect(() => {
+    const measure = () => {
+      const r = castleRef.current?.getBoundingClientRect();
+      if (!r || !r.width) return;
+      const visible = r.right > 8 && r.left < window.innerWidth - 8;
+      setCastleAt(visible ? { x: r.right, y: r.top } : null);
+      reportVisible.current?.(visible);
+    };
+    measure();
+    // Again once the ridges have risen into place.
+    const t = setTimeout(measure, 2700);
+    window.addEventListener("resize", measure);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", measure);
+    };
+  }, [castle]);
   // Here now: the fog that covered the app hands over to this screen's own.
   useEffect(() => liftFog(), []);
   const p = PALETTES[when];
@@ -211,9 +235,9 @@ export function MistScene({ time, leaving = false, castle = "spires" }: { time?:
   const c = p.castle;
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
       {/* Everything you see; leaving, it all dives forward into the forest. */}
-      <div className={`absolute inset-0 ${leaving ? "mist-dive" : ""}`}>
+      <div aria-hidden className={`absolute inset-0 ${leaving ? "mist-dive" : ""}`}>
         <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, ${p.sky[0]} 0%, ${p.sky[1]} 45%, ${p.sky[2]} 75%)` }}>
           {/* Stars at night, twinkling. */}
           {night && STARS.map((s, i) => <span key={i} className="mist-star absolute rounded-full" style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, background: "#fff", animationDelay: `${s.d}s` }} />)}
@@ -282,7 +306,7 @@ export function MistScene({ time, leaving = false, castle = "spires" }: { time?:
             </defs>
             <path d={d} fill={`url(#mist-ridge-${i})`} />
             {i === 1 && (
-              <g transform={`translate(${CASTLE_X},${CASTLE_Y}) scale(${CASTLE_SCALE})`}>
+              <g ref={castleRef} transform={`translate(${CASTLE_X},${CASTLE_Y}) scale(${CASTLE_SCALE})`}>
                 <CastleArt design={castle} colors={{ ...c, light: night || when === "dusk" ? `rgb(${p.mote})` : undefined }} wallFill="url(#mist-castle-wall)" />
               </g>
             )}
@@ -368,6 +392,12 @@ export function MistScene({ time, leaving = false, castle = "spires" }: { time?:
             background: `radial-gradient(ellipse 40% 22% at 30% 40%, ${mist(1)}, ${mist(0)} 70%), radial-gradient(ellipse 36% 20% at 72% 62%, ${mist(1)}, ${mist(0)} 70%), radial-gradient(ellipse 120% 100% at 50% 50%, ${mist(0.97)}, ${mist(0.85)})`,
           }}
         />
+      )}
+      {/* Right beside the castle, above the scene. */}
+      {castleSlot && castleAt && (
+        <div className="pointer-events-auto fixed z-[3]" style={{ left: castleAt.x + 4, top: castleAt.y - 4 }}>
+          {castleSlot}
+        </div>
       )}
     </div>
   );

@@ -11,7 +11,7 @@ import { backHours, greetingFor, ownLines } from "@/lib/welcome";
 import { voice } from "@/lib/toucan-style";
 import { readStyle } from "@/lib/toucan-style-store";
 import { loadFx, subscribeFx } from "@/lib/celebration-fx";
-import { fogOn, liftFog } from "@/lib/welcome-fog";
+import { clearFog, fogOn, liftFog, welcomeDue } from "@/lib/welcome-fog";
 
 const BACK_KEY = "welcome-back-at";
 /** The day's open check-in screen: it comes back on each visit until you check in or close it. */
@@ -70,6 +70,40 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       if (!isOpen.current) return;
       const p = readPending(eveningDayKey());
       if (p) setPending({ ...p, kept: true, away: here });
+    };
+  }, []);
+
+  // Coming back to the app (a phone waking it, a tab brought forward) checks again, behind the fog.
+  const [wake, setWake] = useState(0);
+  const shownNow = useRef(false);
+  useEffect(() => {
+    shownNow.current = !!shown;
+  }, [shown]);
+  useEffect(() => {
+    const onVis = () => {
+      if (shownNow.current) return;
+      if (document.visibilityState === "hidden") {
+        // On a phone, mist before leaving: the snapshot it shows when you come back is misty too
+        // (cleared at once if nothing's due by then).
+        if (window.matchMedia("(pointer: coarse)").matches) fogOn(60 * 60_000);
+        return;
+      }
+      if (welcomeDue()) {
+        fogOn(25_000);
+        setWake((n) => n + 1);
+      } else clearFog();
+    };
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted && !shownNow.current && welcomeDue()) {
+        fogOn(25_000);
+        setWake((n) => n + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pageshow", onShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pageshow", onShow);
     };
   }, []);
 
@@ -179,7 +213,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     return () => {
       live = false;
     };
-  }, [router, levelCap]);
+  }, [router, levelCap, wake]);
 
   if (!shown) return null;
   const fx = loadFx();
