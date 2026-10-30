@@ -66,6 +66,8 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      // The welcome screen's fog is set on it before the app loads.
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${ebGaramond.variable} ${manrope.variable} ${naskh.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

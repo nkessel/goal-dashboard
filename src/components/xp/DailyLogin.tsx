@@ -11,6 +11,7 @@ import { backGreeting, backHours, linesOf, ownLines, pickFor } from "@/lib/welco
 import { voice } from "@/lib/toucan-style";
 import { readStyle } from "@/lib/toucan-style-store";
 import { loadFx } from "@/lib/celebration-fx";
+import { fogOn, liftFog } from "@/lib/welcome-fog";
 
 /** The day's first greeting: a small cheer for arriving, in the realm's voice (a different one each day). */
 const HEADINGS = {
@@ -32,8 +33,12 @@ function dawnHeading(dayKey: string) {
 const BACK_KEY = "welcome-back-at";
 /** The day's open check-in screen: it comes back on each visit until you check in or close it. */
 const PENDING_KEY = "welcome-pending";
-/** `until`: snoozed, so it waits until then. */
-type Pending = { day: string; mode: "day" | "back"; at: number; until?: number };
+/**
+ * `until`: snoozed, so it waits until then. `kept`: you checked in here or
+ * stepped away from it (to the toucan, or another page), so it stays until you
+ * say you're ready. `away`: the page you left it on, where it comes back.
+ */
+type Pending = { day: string; mode: "day" | "back"; at: number; until?: number; kept?: boolean; away?: string };
 function readPending(today: string): Pending | null {
   try {
     const p = JSON.parse(window.localStorage.getItem(PENDING_KEY) || "null") as Pending | null;
@@ -67,6 +72,19 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   // A snooze that ends while the app is still open brings it back then.
   const snoozeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(snoozeTimer.current), []);
+  // Following a link away while it's open keeps it for when you come back to this page.
+  const isOpen = useRef(false);
+  useEffect(() => {
+    isOpen.current = !!shown;
+  }, [shown]);
+  useEffect(() => {
+    const here = window.location.pathname;
+    return () => {
+      if (!isOpen.current) return;
+      const p = readPending(eveningDayKey());
+      if (p) setPending({ ...p, kept: true, away: here });
+    };
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -95,7 +113,10 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       backDue = !!hours && readStyle().returnCheckIn && Date.now() - Number(window.localStorage.getItem(BACK_KEY) || 0) >= away;
     } catch {}
     // Snoozed: nothing until the snooze is over (on a later visit, or right then if the app's still open).
+    // Left on another page: it waits for you there.
+    if (pending?.away && pending.away !== window.location.pathname) return liftFog();
     if (pending?.until && Date.now() < pending.until) {
+      liftFog();
       const wait = pending.until - Date.now();
       if (wait > 6 * 3_600_000) return;
       const t = setTimeout(() => {
@@ -108,12 +129,12 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
         clearTimeout(t);
       };
     }
-    if (!first && !backDue && !pending) return;
+    if (!first && !backDue && !pending) return liftFog();
     // No surprise pop-ups: the toucan asks first, and the screen opens only if you say so ("Later" skips it).
     const present = (open: () => void) => {
       if (readStyle().avoid.includes("popups")) {
         const unseen = window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text: voice.welcomeBack(readStyle()), actions: [{ label: "Check in", run: open }, { label: "Later", run: () => setPending(null) }] } }));
-        if (!unseen) return;
+        if (!unseen) return liftFog();
       }
       open();
     };
@@ -122,10 +143,11 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       if (pending) {
         const ctx = await ctxP;
         if (!live) return;
-        // Checked in somewhere else since it opened? Then it's done.
-        if (ctx.lastCheckInAt && Date.parse(ctx.lastCheckInAt) >= pending.at) return setPending(null);
+        // Checked in somewhere else since it opened? Then it's done (unless you're coming back to it).
+        if (!pending.kept && ctx.lastCheckInAt && Date.parse(ctx.lastCheckInAt) >= pending.at) return (setPending(null), liftFog());
         markBack();
-        if (pending.mode === "day") setShown({ mode: "day", award: null, ctx });
+        if (pending.away) setPending({ ...pending, away: undefined });
+        if (pending.mode === "day" || pending.kept) setShown({ mode: pending.mode, award: null, ctx });
         else present(() => setShown({ mode: "back", award: null, ctx }));
         return;
       }
@@ -157,10 +179,10 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
         return;
       }
       // Welcome back: a few hours since your last check-in (and since this screen last came up).
-      if (!backDue) return;
+      if (!backDue) return liftFog();
       const ctx = await ctxP;
       if (!live) return;
-      if (ctx.lastCheckInAt && Date.now() - Date.parse(ctx.lastCheckInAt) < away) return;
+      if (ctx.lastCheckInAt && Date.now() - Date.parse(ctx.lastCheckInAt) < away) return liftFog();
       markBack();
       present(() => {
         setPending({ day: today, mode: "back", at: Date.now() });
@@ -186,7 +208,11 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       due={shown.ctx.tasks}
       priority={shown.ctx.priority}
       fx={fx}
-      onCheckedIn={() => setPending(null)}
+      // Checked in: it stays until you say you're ready, even if you step away first.
+      onCheckedIn={() => {
+        const today = eveningDayKey();
+        setPending({ ...(readPending(today) ?? { day: today, mode: shown.mode }), at: Date.now() + 60_000, kept: true });
+      }}
       onSnooze={(ms) => {
         const today = eveningDayKey();
         setPending({ ...(readPending(today) ?? { day: today, mode: shown.mode, at: Date.now() }), until: Date.now() + ms });
@@ -196,9 +222,16 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
         if (ms <= 6 * 3_600_000) snoozeTimer.current = setTimeout(() => setShown(again), ms);
       }}
       onClose={() => {
+        isOpen.current = false;
         setPending(null);
         setShown(null);
         router.refresh();
+      }}
+      // On to Today: through the fog if it's another page.
+      toToday={() => {
+        if (window.location.pathname === "/") return;
+        fogOn();
+        router.push("/");
       }}
     />
   );

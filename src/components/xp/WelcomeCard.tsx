@@ -45,6 +45,7 @@ export function WelcomeCard({
   priority = null,
   fx,
   onClose,
+  toToday,
   onCheckedIn,
   onSnooze,
   preview = false,
@@ -60,6 +61,8 @@ export function WelcomeCard({
   priority?: { text: string; others?: string[]; day: string } | null;
   fx: FxSettings;
   onClose: () => void;
+  /** Saying you're ready goes on to Today (called as the welcome screen fades). */
+  toToday?: () => void;
   /** Called once a check-in is saved here. */
   onCheckedIn?: () => void;
   /** Bring it back after this many milliseconds instead of skipping it for today. */
@@ -80,7 +83,17 @@ export function WelcomeCard({
   const [checkinOpen, setCheckinOpen] = useState(false);
   // Checked in within the last hour? Then there's no need to ask again here.
   const [recent] = useState(() => !!lastCheckInAt && Date.now() - Date.parse(lastCheckInAt) < 3_600_000);
-  useEscape(onClose);
+  // Ready: the card zooms out and fades, then the mist fades layer by layer to reveal Today.
+  const [leaving, setLeaving] = useState(false);
+  const leave = () => {
+    if (leaving) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return (onClose(), toToday?.());
+    setLeaving(true);
+    const elsewhere = !!toToday && window.location.pathname !== "/";
+    // From another page, the fog takes over once the card is gone, and Today lifts it.
+    setTimeout(() => (onClose(), toToday?.()), elsewhere ? 650 : 2500);
+  };
+  useEscape(leave);
 
   useEffect(() => {
     if (!award?.xp) return;
@@ -102,10 +115,8 @@ export function WelcomeCard({
     plan: (
       <button
         type="button"
-        onClick={() => {
-          onClose();
-          talkToToucan(undefined, "talk", PLAN_DAY);
-        }}
+        // The toucan opens over this screen, which waits here until you're ready.
+        onClick={() => talkToToucan(undefined, "talk", PLAN_DAY)}
         className="flex h-11 items-center gap-2 rounded-full px-5 text-[14.5px] font-bold"
         style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
       >
@@ -222,10 +233,11 @@ export function WelcomeCard({
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
-    <div className={`fixed inset-0 ${preview ? "z-[95]" : "z-[60]"} flex items-center justify-center p-3`} onClick={onClose} role="dialog" aria-modal="true" aria-label={heading}>
+    <div className={`fixed inset-0 ${preview ? "z-[95]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={leave} role="dialog" aria-modal="true" aria-label={heading}>
       {/* A misty valley, and the card coming out of the mist. */}
-      <MistScene />
-      <div className="mist-emerge relative" onClick={(e) => e.stopPropagation()}>
+      <MistScene leaving={leaving} />
+      <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative pt-[54px]`} onClick={(e) => e.stopPropagation()}>
+        <Signpost />
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -240,8 +252,8 @@ export function WelcomeCard({
         {/* A soft light around the card, where the mist has thinned. */}
         <span aria-hidden className="pointer-events-none absolute -inset-12" style={{ background: "radial-gradient(ellipse at center, rgba(255,250,240,.5), rgba(255,250,240,0) 70%)" }} />
         {/* What shows here, and in what order, is chosen in Settings. */}
-        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeLeave={onClose} className="absolute -right-2 -top-2 z-[2]" />
-        <div className="parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[88vh] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center">
+        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeLeave={preview ? onClose : undefined} className="absolute -right-2 top-[46px] z-[2]" />
+        <div className="parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[calc(88vh-54px)] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center">
           <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
             {heading}
             {mode === "back" && !addingPhrase && (
@@ -307,19 +319,52 @@ export function WelcomeCard({
                   </button>
                 ))}
               </div>
-              <button type="button" onClick={onClose} className="h-9 px-1 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+              <button type="button" onClick={leave} className="h-9 px-1 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
                 Skip for today
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => (snoozable ? setSnoozing(true) : onClose())} className="mt-1 h-10 rounded-full border px-5 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>
-              {snoozable ? "Not now" : "Continue"}
+            <button type="button" onClick={() => (snoozable ? setSnoozing(true) : leave())} className="mt-1 h-10 rounded-full border px-5 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>
+              {snoozable ? "Not now" : "Continue to town"}
             </button>
           )}
         </div>
       </div>
     </div>,
     document.body
+  );
+}
+
+/** The check-in signpost the card hangs from: one arm for here, one pointing on to town. */
+function Signpost() {
+  const wood = "url(#signpost-wood)";
+  return (
+    <svg aria-hidden width="230" height="64" viewBox="0 0 230 64" className="pointer-events-none absolute left-1/2 top-0 z-[1] -translate-x-1/2" style={{ filter: "drop-shadow(0 3px 4px rgba(30,20,10,.35))" }}>
+      <defs>
+        <linearGradient id="signpost-wood" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#9a6a3a" />
+          <stop offset=".55" stopColor="#7a5028" />
+          <stop offset="1" stopColor="#5c3a1c" />
+        </linearGradient>
+      </defs>
+      {/* The post, running down behind the card. */}
+      <rect x="108" y="2" width="14" height="62" rx="2" fill={wood} stroke="#3e2712" strokeWidth="1.2" />
+      <circle cx="115" cy="5" r="2" fill="#3e2712" opacity=".5" />
+      {/* Here: the check-in arm, pointing back at you. */}
+      <path d="M22,10 H120 V32 H22 L10,21 Z" fill={wood} stroke="#3e2712" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M26,15 H114 M30,27 H110" stroke="#4a2f16" strokeWidth=".7" opacity=".45" />
+      <text x="66" y="25.5" textAnchor="middle" fontSize="12.5" fill="#f6e6bb" className="font-display" style={{ letterSpacing: ".06em" }}>
+        ✦ Check-in
+      </text>
+      {/* On to town. */}
+      <path d="M112,34 H208 L220,45 L208,56 H112 Z" fill={wood} stroke="#3e2712" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M118,39 H204 M118,51 H202" stroke="#4a2f16" strokeWidth=".7" opacity=".45" />
+      <text x="162" y="49.5" textAnchor="middle" fontSize="12.5" fill="#f6e6bb" className="font-display" style={{ letterSpacing: ".06em" }}>
+        Town
+      </text>
+      <circle cx="116" cy="21" r="1.6" fill="#2e1c0c" />
+      <circle cx="116" cy="45" r="1.6" fill="#2e1c0c" />
+    </svg>
   );
 }
 

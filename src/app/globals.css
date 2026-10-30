@@ -1127,9 +1127,38 @@ html[data-evening] [data-theme="adventure"] {
 }
 .mist-birds { animation: mist-birds 46s linear 1.5s infinite; transform: translateX(-140px); }
 @keyframes mist-birds { from { transform: translateX(-140px) translateY(0); } 50% { transform: translateX(50vw) translateY(-14px); } to { transform: translateX(105vw) translateY(4px); } }
+/* Ready: the card zooms out and fades, the valley fades, then each layer of mist. */
+.mist-card-out { animation: mist-card-out 0.6s cubic-bezier(0.4, 0, 0.6, 1) both; }
+@keyframes mist-card-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.82); filter: blur(4px); } }
+.mist-layer-out { animation: mist-layer-out 0.8s ease var(--out-delay, 0ms) both; }
+@keyframes mist-layer-out { from { opacity: 1; } to { opacity: 0; } }
+.mist-veil-out { animation: mist-part 1.3s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+/* The fog over the app before the welcome screen (and on the walk to Today):
+   set on <html> by a small script at first paint, lifted by the app. */
+html[data-fog]::before,
+html[data-fog]::after { content: ""; position: fixed; inset: 0; z-index: 59; }
+html[data-fog]::before { background: radial-gradient(ellipse 80% 70% at 50% 45%, rgb(var(--fog)), rgb(var(--fog-edge))); }
+html[data-fog]::after {
+  background:
+    radial-gradient(ellipse 40% 22% at 30% 40%, rgba(255, 255, 255, 0.55), transparent 70%),
+    radial-gradient(ellipse 36% 20% at 72% 62%, rgba(255, 255, 255, 0.45), transparent 70%),
+    radial-gradient(ellipse 50% 24% at 50% 85%, rgba(255, 255, 255, 0.4), transparent 70%);
+  animation: fog-breathe 6s ease-in-out infinite alternate;
+}
+html[data-fog="dawn"] { --fog: 255, 243, 236; --fog-edge: 226, 212, 214; }
+html[data-fog="day"] { --fog: 250, 252, 255; --fog-edge: 214, 224, 232; }
+html[data-fog="dusk"] { --fog: 255, 230, 220; --fog-edge: 210, 186, 196; }
+html[data-fog="night"] { --fog: 196, 206, 240; --fog-edge: 120, 132, 176; }
+html[data-fog-lift]::before,
+html[data-fog-lift]::after { animation: fog-lift 0.9s ease forwards; }
+@keyframes fog-breathe { from { transform: translateX(-3%); opacity: 0.7; } to { transform: translateX(3%); opacity: 1; } }
+@keyframes fog-lift { to { opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   .mist-emerge, .mist-rise, .mist-rise-side, .mist-drift, .mist-drift-rev, .mist-rays, .mist-star, .mist-birds { animation: none; }
-  .mist-veil, .mist-veil-wash, .mist-mote { display: none; }
+  .mist-veil, .mist-veil-wash, .mist-mote, .mist-veil-out { display: none; }
+  html[data-fog]::after { animation: none; }
 }
 
 /* Quest steps in the editor: the remove × appears on hover where hover exists. */

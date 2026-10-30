@@ -8,6 +8,7 @@ import { ThemeOnBody } from "@/components/layout/ThemeOnBody";
 import { SettingsDefaultsSeed } from "@/components/settings/SettingsDefaultsSeed";
 import { NotificationsButton } from "@/components/layout/NotificationsButton";
 import { DailyLogin } from "@/components/xp/DailyLogin";
+import { FOG_SCRIPT } from "@/lib/welcome-fog";
 import { QuestCelebrationHost } from "@/components/celebration/QuestCelebrationHost";
 import { defaultPortraitFor } from "@/components/settings/Avatar";
 import { countImports, countMissingPortraits } from "@/lib/data/rewards";
@@ -69,6 +70,8 @@ export async function AppShell({
 
   return (
     <div data-theme={theme} data-palette={palette} className="flex min-h-screen flex-col items-center">
+      {/* Before anything paints: fog, if the day's welcome screen is about to come through it. */}
+      {profileId && <script dangerouslySetInnerHTML={{ __html: FOG_SCRIPT }} />}
       <ThemeOnBody theme={theme} palette={palette ?? null} />
       {profileId && <SettingsDefaultsSeed />}
       {profileId && <DailyLogin levelCap={cap} />}
