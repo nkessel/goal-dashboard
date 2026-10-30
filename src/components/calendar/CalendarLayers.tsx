@@ -124,7 +124,7 @@ export function CalendarLayers({
 
   return (
     <div className="flex flex-col gap-2">
-      <div ref={panel} className="relative z-[25] -mt-1 flex flex-wrap items-center justify-end gap-2">
+      <div ref={panel} className="relative z-[25] -mt-1 flex items-center justify-end gap-1.5 sm:gap-2">
         {/* Top-left: the scheduling list, as a calendar button with its count. */}
         <button
           type="button"
@@ -132,10 +132,10 @@ export function CalendarLayers({
           aria-label={`To schedule (${toSchedule})`}
           title="To schedule"
           // A labelled pill that sticks out over the calendar's top-left corner.
-          className="hover-glow relative z-[30] mr-auto flex h-11 items-center gap-1.5 rounded-full pl-3 pr-4 text-[14.5px] font-bold"
+          // Sticks out over the calendar's corner on wide screens; on phones it stays inside the edge.
+          className="hover-glow relative z-[30] mr-auto flex h-11 shrink-0 translate-y-5 items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14.5px] font-bold touch-manipulation sm:-translate-x-3"
           style={{
             ...(isAdventure ? { background: "radial-gradient(circle at 35% 25%, #f6e3a8, #d9b45f 60%, #a88a3f)", border: "2px solid #4a3913", color: "#2a1c10" } : { ...chip, color: "var(--t-ink)" }),
-            transform: "translate(-12px, 20px)",
             boxShadow: "0 6px 14px rgba(0,0,0,.4)",
           }}
         >
@@ -163,7 +163,8 @@ export function CalendarLayers({
                 className="flex h-full items-center gap-2 whitespace-nowrap rounded-l-full pl-3 pr-1.5 text-[13.5px] font-semibold"
                 title={othersOn ? "Hide your other calendars" : "Show your other calendars"}
               >
-                Google calendars
+                <span className="sm:hidden">Google</span>
+                <span className="hidden sm:inline">Google calendars</span>
                 <span className="relative h-5 w-9 shrink-0 rounded-full transition-colors" style={{ background: othersOn ? "#a88a3f" : "rgba(127,127,127,.35)" }}>
                   <span className="absolute top-0.5 h-4 w-4 rounded-full transition-[left]" style={{ left: othersOn ? 18 : 2, background: othersOn ? "#f6dc8e" : "#e5e0d4" }} />
                 </span>
@@ -191,8 +192,8 @@ export function CalendarLayers({
           aria-expanded={open === "display"}
           aria-label="Display settings"
           title="Display settings"
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover-glow"
-          style={{ ...chip, color: isAdventure ? "var(--t-gold)" : "var(--t-ink)" }}
+          className="settings-gear relative flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full transition-[background-color,transform] duration-100 active:scale-90"
+          style={{ ...chip, color: isAdventure ? "var(--t-gold)" : "var(--t-ink)", ...(open === "display" ? { background: isAdventure ? "rgba(217,180,95,.35)" : "var(--t-accent-soft)" } : {}) }}
         >
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" stroke="currentColor" strokeWidth="2" />

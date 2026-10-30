@@ -4,7 +4,7 @@
 
 - **Last updated:** 2026-10-30 night (last screen on sign-in, reward parts; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 19:50 UTC, still open: early bonus: bird removed and pill on the due line done; still wanted: custom XP + coins + a bonus per extra day early, a "Choose early-completion reward" button opening a small popup when none is set (UX teams to place it); calendar Schedule button display and Settings button responsiveness; opening feedback on /settings/inventory reloads the page behind it.
+- **Pending in-app feedback:** as of 2026-10-30 19:50 UTC, still open: early bonus: bird removed and pill on the due line done; still wanted: custom XP + coins + a bonus per extra day early, a "Choose early-completion reward" button opening a small popup when none is set (UX teams to place it); opening feedback on /settings/inventory reloads the page behind it (iOS; looked at KeyboardViewport pin/focusSteady and ScrollLock, cause not found from the cloud; needs a device repro).
 
 ---
 
@@ -119,6 +119,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30 (night): Calendar controls on phones: one row, "To schedule" no longer pushed off the left edge (only sticks out on wider screens), "Google" short label on phones, the display gear answers at once (press shrink, lit while open).
 - Oct 30 (night): Today arranges in place: a gear at Today's top right (hover; faint on phones) opens "Arrange Today" (`components/today/TodayArrange.tsx`, `lib/today-layout.ts`): every part drags, the eye hides it, hidden parts wait as + chips, Reset. The board's parts (Due soon, Today's Quests, Daily Habits, Additional Quests) move as a group and keep their own order (the old `today-section-order` is carried over; dragging closed sections still works). Quest cards: the early bonus is a small "+N XP early" pill (no bird).
 - Oct 30 (night): Arrange in context, round 2: the quest editor's gear arranges it in place (`EditorArrange.tsx`: drag parts, the eye tucks one under More, drag the "Under More" line, Reset); the quest ⋯ menu's gear turns the menu itself into a draggable list with an eye on each row (no popup).
 - Oct 30 (night): Laundry run (`components/habits/LaundryRun.tsx`): Laundry panel › "🧺 Start a load" steps through Load (reminders: house towels, bed sheets, gently used clothes), Wash, Dry, Fold; each has a gilded dial timer (start/pause, ±5 min, glows and buzzes when done; minutes remembered); moving on starts the next timer; Fold records the load. Kept in localStorage `laundry-run`, so a timer survives closing the app. The cleaning tray opens on Laundry on laundry days or mid-load. "✓ Did one" still counts a load without the run.
