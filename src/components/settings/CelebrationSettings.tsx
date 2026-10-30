@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { CHECKIN_LABELS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, checkinLabelOf, checkinStyleOf, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
+import { CheckinIcon } from "@/components/xp/CheckinIcon";
+import { CHECKIN_ICONS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, checkinIconOf, checkinStyleOf, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { WelcomeCard } from "@/components/xp/WelcomeCard";
 import { welcomeContextAction } from "@/app/actions";
@@ -168,7 +169,7 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
               {CHECKIN_STYLES.map((c) => (
                 <button key={c.key} type="button" role="radio" aria-checked={checkinStyleOf(fx).key === c.key} onClick={() => update({ checkinStyle: c.key })} className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-2.5" style={{ border: checkinStyleOf(fx).key === c.key ? "2px solid var(--t-gold-deep)" : "1px solid var(--t-card-border)" }}>
                   <span aria-hidden className="font-display flex h-9 items-center gap-1 rounded-full px-4 text-[15px]" style={c.style}>
-                    {checkinLabelOf(fx).icon} {checkinLabelOf(fx).text}
+                    <CheckinIcon icon={checkinIconOf(fx)} /> Check in
                   </span>
                   <span className="text-[13px] font-semibold">{c.label}</span>
                   <span className="text-center text-[11.5px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
@@ -177,11 +178,11 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
                 </button>
               ))}
             </div>
-            <span className="mt-1 text-[13px] font-semibold">What it says</span>
-            <div role="radiogroup" aria-label="What the Check in button says" className="flex flex-wrap gap-1.5">
-              {CHECKIN_LABELS.map((c) => (
-                <button key={c.key} type="button" role="radio" aria-checked={checkinLabelOf(fx).key === c.key} onClick={() => update({ checkinLabel: c.key })} className="font-display flex h-9 items-center gap-1 rounded-full px-3 text-[14px]" style={checkinLabelOf(fx).key === c.key ? checkinStyleOf(fx).style : { border: "1px solid var(--t-card-border)" }}>
-                  <span aria-hidden>{c.icon}</span> {c.text}
+            <span className="mt-1 text-[13px] font-semibold">Its icon</span>
+            <div role="radiogroup" aria-label="The Check in button's icon" className="flex flex-wrap gap-1.5">
+              {CHECKIN_ICONS.map((c) => (
+                <button key={c.key} type="button" role="radio" aria-checked={checkinIconOf(fx) === c.key} aria-label={c.label} title={c.label} onClick={() => update({ checkinIcon: c.key })} className="flex h-11 min-w-11 items-center justify-center rounded-full px-2.5 text-[12.5px] font-semibold" style={checkinIconOf(fx) === c.key ? checkinStyleOf(fx).style : { border: "1px solid var(--t-card-border)", color: "var(--t-ink)" }}>
+                  {c.key === "none" ? "None" : <CheckinIcon icon={c.key} size={20} />}
                 </button>
               ))}
             </div>

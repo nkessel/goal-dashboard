@@ -41,8 +41,8 @@ export type FxSettings = {
   welcomeOwnOn?: boolean;
   /** The look of the welcome screen's Check in button (see CHECKIN_STYLES). */
   checkinStyle?: CheckinStyle;
-  /** The Check in button's icon and words (see CHECKIN_LABELS). */
-  checkinLabel?: CheckinLabel;
+  /** The Check in button's icon (see CHECKIN_ICONS). */
+  checkinIcon?: CheckinIconKey;
   /** In the check-in on the welcome screen: last night's sleep times, and mood and the rest. */
   welcomeSleep?: boolean;
   welcomeMetrics?: boolean;
@@ -97,19 +97,20 @@ export const CHECKIN_STYLES: { key: CheckinStyle; label: string; hint: string; s
   { key: "parchment", label: "Parchment", hint: "Quiet: parchment with an ink-brown rim", style: { background: "linear-gradient(180deg, #fbf3dc, #ecdcb4)", border: "1.5px solid #8b7040", color: "#3b2a14", boxShadow: "0 1px 3px rgba(80,60,20,.25)" } },
   { key: "wax", label: "Wax seal", hint: "Deep red wax with cream letters", style: { background: "radial-gradient(circle at 35% 30%, #c0503a, #8e2a1d 70%)", border: "1.5px solid #5a160d", color: "#fbefd4", boxShadow: "inset 0 1px 0 rgba(255,200,180,.35), 0 2px 6px rgba(90,22,13,.35)" } },
 ];
-export type CheckinLabel = "check" | "arrive" | "pause" | "hearth" | "compass" | "lantern" | "breath" | "dawn";
-/** What the Check in button says: an icon and a few words. */
-export const CHECKIN_LABELS: { key: CheckinLabel; icon: string; text: string }[] = [
-  { key: "check", icon: "✦", text: "Check in" },
-  { key: "arrive", icon: "🌿", text: "How am I arriving?" },
-  { key: "pause", icon: "🕯", text: "Pause & check in" },
-  { key: "hearth", icon: "🔥", text: "Sit by the hearth" },
-  { key: "compass", icon: "🧭", text: "Find my bearings" },
-  { key: "lantern", icon: "🏮", text: "Light the lantern" },
-  { key: "breath", icon: "🍃", text: "Take a breath" },
-  { key: "dawn", icon: "☀", text: "Greet the day" },
+export type CheckinIconKey = "sun" | "leaf" | "flame" | "compass" | "lantern" | "heart" | "feather" | "moon" | "none";
+/** The Check in button's icon (it always says "Check in"). */
+export const CHECKIN_ICONS: { key: CheckinIconKey; label: string }[] = [
+  { key: "sun", label: "Sun" },
+  { key: "leaf", label: "Leaf" },
+  { key: "flame", label: "Flame" },
+  { key: "compass", label: "Compass" },
+  { key: "lantern", label: "Lantern" },
+  { key: "heart", label: "Heart" },
+  { key: "feather", label: "Feather" },
+  { key: "moon", label: "Moon" },
+  { key: "none", label: "No icon" },
 ];
-export const checkinLabelOf = (fx: FxSettings) => CHECKIN_LABELS.find((c) => c.key === fx.checkinLabel) ?? CHECKIN_LABELS[0];
+export const checkinIconOf = (fx: FxSettings): CheckinIconKey => CHECKIN_ICONS.find((c) => c.key === fx.checkinIcon)?.key ?? "sun";
 export const checkinStyleOf = (fx: FxSettings) => CHECKIN_STYLES.find((c) => c.key === fx.checkinStyle) ?? CHECKIN_STYLES[0];
 
 export type FabStyle = "seal" | "coin" | "emerald" | "ruby" | "moon" | "wax";

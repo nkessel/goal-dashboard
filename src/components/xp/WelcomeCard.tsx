@@ -5,8 +5,9 @@ import { createPortal } from "react-dom";
 import { CoinIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { EnergyCheck } from "./EnergyCheck";
+import { CheckinIcon } from "./CheckinIcon";
 import { likeLine, likedLines, retireLine } from "@/lib/greetings";
-import { CHECKIN_STYLES, checkinLabelOf, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
+import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
 import { addBackGreeting, welcomeOrder, welcomeShows, type WelcomeEl } from "@/lib/welcome";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { dueSoonList, dueWhen } from "@/lib/toucan-guide";
@@ -125,7 +126,7 @@ export function WelcomeCard({
         className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]"
         style={checkinStyleOf(fx).style}
       >
-        <span aria-hidden>{checkinLabelOf(fx).icon}</span> {checkinLabelOf(fx).text}
+        <CheckinIcon icon={checkinIconOf(fx)} /> Check in
       </button>
     ) : (
       // Parchment like the rest of the card, its words in ink rather than cream (as in Insights).
