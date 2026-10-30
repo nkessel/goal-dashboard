@@ -52,6 +52,8 @@ export type FxSettings = {
   welcomeConfetti?: boolean;
   /** Your own words for the welcome screen's questions (blank = the usual ones). */
   welcomeFocusQ?: string;
+  /** What the toucan asks first on the welcome screen. */
+  welcomeToucanAsk?: string;
   welcomeIntentionQ?: string;
   welcomeIntentionHint?: string;
   /** Seconds the "Feedback submitted" card stays (0 = until you close it). */

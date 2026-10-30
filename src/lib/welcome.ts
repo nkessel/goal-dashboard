@@ -6,14 +6,13 @@
  */
 import type { FxSettings } from "./celebration-fx";
 
-export type WelcomeEl = "toucan" | "checkin" | "focus" | "intention" | "plan" | "streak" | "line" | "bar" | "reward" | "due";
+export type WelcomeEl = "toucan" | "checkin" | "focus" | "intention" | "streak" | "line" | "bar" | "reward" | "due";
 
 export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "toucan", label: "The toucan's greeting", hint: "The Great Toucan Spirit says hello in the check-in style you chose with him, and asks how you're arriving. Good if you like a warm voice to start with; leave it off for a quieter screen." },
   { key: "checkin", label: "Check-in", hint: "A gilded Check in button that opens energy, mood and anything else you track, right there (plus last night's sleep and wake times on the day's first visit). Your check-ins feed Insights and tell the toucan how you're doing." },
   { key: "focus", label: "Your top priority", hint: "Asks “What's your top priority?” with a box to answer in your own words. The app and the toucan keep it in mind, so his check-ins through the day, the week and the month come back to what really matters to you." },
   { key: "intention", label: "Today is about…", hint: "Today's intention: a line on how you want today to feel or what it's about (e.g. “steady and kind to myself”), kept in your journal. Day's first visit only. Choose it if you like setting a tone as well as a goal." },
-  { key: "plan", label: "Plan my day", hint: "One button that opens the toucan to plan the day with you: what's due next first, then what matters most (past due after), fitted around your calendar. Nothing goes on the calendar unless you press." },
   { key: "streak", label: "Your streak", hint: "How many days in a row you've shown up. Day's first visit only. Motivating for some; leave it off if streaks feel like pressure." },
   { key: "line", label: "The day's wise line", hint: "One short encouragement, a different one each day. You can switch off any line you don't like, or add your own." },
   { key: "bar", label: "Your level bar", hint: "Your level, filling with the XP that arriving earned you. Day's first visit only." },
@@ -21,7 +20,7 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "due", label: "Due soon", hint: "A gilded button that says how many quests are due soon (the same reach you pick on Today, changeable here too) and opens into a drawer of their cards. Off by default to keep the screen calm." },
 ];
 
-const DEFAULT_ORDER: WelcomeEl[] = ["toucan", "checkin", "focus", "intention", "plan", "streak", "line", "bar", "reward", "due"];
+const DEFAULT_ORDER: WelcomeEl[] = ["toucan", "checkin", "focus", "intention", "streak", "line", "bar", "reward", "due"];
 const DEFAULT_HIDE: WelcomeEl[] = ["toucan", "due"];
 const KEYS = new Set<string>(DEFAULT_ORDER);
 
@@ -140,3 +139,7 @@ export function addBackGreeting(fx: FxSettings, line: string): Partial<FxSetting
   if (!l || own.includes(l)) return { welcomeBackOwn: true };
   return { welcomeBackText: [...own, l].join("\n"), welcomeText: "", welcomeBackOwn: true, welcomeBackOff: (fx.welcomeBackOff ?? []).filter((x) => x !== l) };
 }
+
+/** What the toucan asks first as he lands on the welcome screen (tap him to change it). */
+export const TOUCAN_ASK = "Shall we plan your day together?";
+export const toucanAsk = (fx: FxSettings) => fx.welcomeToucanAsk?.trim() || TOUCAN_ASK;

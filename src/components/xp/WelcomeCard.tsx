@@ -6,9 +6,9 @@ import { CoinIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { EnergyCheck } from "./EnergyCheck";
 import { CheckinIcon } from "./CheckinIcon";
-import { likeLine, likedLines, retireLine } from "@/lib/greetings";
+import { likeLine, likedLines, lineForDay, retireLine } from "@/lib/greetings";
 import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
-import { addBackGreeting, welcomeOrder, welcomeShows, type WelcomeEl } from "@/lib/welcome";
+import { addBackGreeting, toucanAsk, welcomeOrder, welcomeShows, type WelcomeEl } from "@/lib/welcome";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { voice, windowOf } from "@/lib/toucan-style";
 import { useToucanStyle } from "@/lib/toucan-style-store";
@@ -143,17 +143,6 @@ export function WelcomeCard({
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
     focus: <TopPriority last={priority} question={fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} />,
     intention: mode === "day" ? <Intention question={fx.welcomeIntentionQ?.trim() || "Today is about…"} hint={fx.welcomeIntentionHint?.trim() || "e.g. Steady and kind to myself"} /> : null,
-    plan: (
-      <button
-        type="button"
-        // The toucan opens over this screen, which waits here until you're ready.
-        onClick={() => talkToToucan(undefined, "talk", PLAN_DAY)}
-        className="flex h-11 items-center gap-2 rounded-full px-5 text-[14.5px] font-bold"
-        style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
-      >
-        🗓 Plan my day with the toucan
-      </button>
-    ),
     toucan: (
       <div className="flex w-full items-center gap-2.5 text-left">
         <ToucanArt size={40} />
@@ -185,14 +174,17 @@ export function WelcomeCard({
     ) : null,
     line: line ? (
       <div className="flex w-full flex-col items-center gap-0.5">
-        <p className="m-0 text-[16px] leading-snug" style={{ color: "var(--t-ink)" }}>
-          <span className={verdict === "dislike" ? "line-through opacity-50" : ""}>{line}</span>
-          {/* Quiet thumbs, right after the line (they wrap below it only when there's no room). */}
-          <span className="ml-1.5 inline-flex translate-y-[2px] items-center gap-0.5 whitespace-nowrap align-middle">
+        {/* Quiet thumbs, always to the right of the line (at its bottom right when it wraps), the line still centred. */}
+        <div className="grid w-full grid-cols-[3.5rem_1fr_3.5rem] items-end gap-1">
+          <span aria-hidden />
+          <p className={`m-0 text-[16px] leading-snug ${verdict === "dislike" ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
+            {line}
+          </p>
+          <span className="flex items-center gap-0.5">
             <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"))} />
             <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"))} />
           </span>
-        </p>
+        </div>
         {verdict && (
           <span className="fade-in text-[12px] italic" style={{ color: "#6b5631" }}>
             {verdict === "like" ? "It'll come back often." : "You won't see it again."}
@@ -239,7 +231,7 @@ export function WelcomeCard({
       {/* What isn't part of the card (when it opens, confetti) sits above it while arranging. */}
       {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} onDone={() => setArranging(false)} />}
       <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
-        {mode === "back" && <WelcomeToucan />}
+        {!arranging && <WelcomeToucan ask={toucanAsk(fx)} />}
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -403,20 +395,65 @@ export function WelcomeCard({
   );
 }
 
-/** Welcome back: the toucan flies in over the valley, flaps, glides, and lands on the card's corner to greet you. */
-function WelcomeToucan() {
+/**
+ * The toucan flies in over the valley, flaps, glides, and lands on the card's
+ * corner. Tap him: plan the day together, talk, hear a wise saying, or change
+ * what he asks first.
+ */
+function WelcomeToucan({ ask }: { ask: string }) {
   const [landed, setLanded] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [saying, setSaying] = useState<string | null>(null);
+  const [rewording, setRewording] = useState(false);
+  const [words, setWords] = useState("");
   useEffect(() => {
     const t = setTimeout(() => setLanded(true), 2700);
     return () => clearTimeout(t);
   }, []);
   return (
-    <div aria-hidden className="welcome-toucan pointer-events-none absolute -top-[47px] left-2 z-[3]">
-      <div className={`owl-body ${landed ? "owl-perched" : ""}`}>
-        <div className="owl-idle">
+    <div className="welcome-toucan absolute -top-[47px] left-2 z-[3]">
+      <button type="button" onClick={() => landed && (setMenu((v) => !v), setSaying(null), setRewording(false))} aria-label="The toucan: plan the day, talk, or a wise saying" aria-expanded={menu} className={`owl-body block ${landed ? "owl-perched cursor-pointer" : "pointer-events-none"}`}>
+        <span className="owl-idle block">
           <ToucanArt flying={!landed} size={58} />
+        </span>
+      </button>
+      {landed && (
+        <div className="owl-say absolute left-[58px] -top-1 z-[5] w-max max-w-[min(250px,62vw)] rounded-2xl px-3 py-2 text-left text-[13.5px] leading-snug" style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+          {saying ?? (menu ? "How can I help?" : ask)}
+          {menu && !rewording && (
+            <span className="mt-1.5 flex flex-col items-start gap-1">
+              <button type="button" onClick={() => (setMenu(false), talkToToucan(undefined, "talk", PLAN_DAY))} className="font-semibold underline underline-offset-2">
+                Plan my day
+              </button>
+              <button type="button" onClick={() => (setMenu(false), talkToToucan())} className="font-semibold underline underline-offset-2">
+                Talk to me
+              </button>
+              <button type="button" onClick={() => setSaying(lineForDay(`${Date.now()}`))} className="font-semibold underline underline-offset-2">
+                Tell me a wise saying
+              </button>
+              <button type="button" onClick={() => (setRewording(true), setWords(ask))} className="underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+                Change what I ask first
+              </button>
+            </span>
+          )}
+          {menu && rewording && (
+            <form
+              className="mt-1.5 flex gap-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                patchFx({ welcomeToucanAsk: words.trim().slice(0, 120) });
+                setRewording(false);
+                setMenu(false);
+              }}
+            >
+              <input autoFocus value={words} onChange={(e) => setWords(e.target.value)} maxLength={120} aria-label="What the toucan asks first" className="h-8 min-w-0 flex-1 rounded-full px-2.5 text-[16px]" style={FIELD} />
+              <button type="submit" className="h-8 shrink-0 rounded-full px-2.5 text-[12.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+                Save
+              </button>
+            </form>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
