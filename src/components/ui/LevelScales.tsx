@@ -5,8 +5,8 @@ import { useRef, useSyncExternalStore } from "react";
 /*
  * Importance, urgency, difficulty and the like (0–5): as rows of little
  * icons, or as vertical bars side by side with the icon at each bar's foot.
- * The choice is kept in this browser and changed from the small toggle
- * beside any group of them.
+ * Bars by default; the choice is kept in this browser and changed from the
+ * small toggle beside any group of them. Quest cards follow the same choice.
  */
 
 export type ScaleStyle = "icons" | "bars";
@@ -15,9 +15,10 @@ const EVENT = "scale-style-change";
 
 export function readScaleStyle(): ScaleStyle {
   try {
-    return localStorage.getItem(KEY) === "bars" ? "bars" : "icons";
+    // Bars unless you've chosen rows of icons.
+    return localStorage.getItem(KEY) === "icons" ? "icons" : "bars";
   } catch {
-    return "icons";
+    return "bars";
   }
 }
 export function setScaleStyle(v: ScaleStyle) {
@@ -37,7 +38,7 @@ export function useScaleStyle(): ScaleStyle {
       };
     },
     readScaleStyle,
-    () => "icons"
+    () => "bars"
   );
 }
 

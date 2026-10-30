@@ -19,6 +19,7 @@ import { QuestMonogram } from "./QuestMonogram";
 import { openFocusMode } from "@/lib/focus-timer";
 import { coinsForXp } from "@/lib/coins";
 import { DateField } from "@/components/ui/DateField";
+import { useScaleStyle } from "@/components/ui/LevelScales";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
  * Kept as a plain helper (not inlined in the component) so the impure
@@ -949,6 +950,20 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose }: { ti
 
 /** A short run of trophies or flames, always on one row (they shrink a little rather than wrap). */
 function IconRun({ src, n, compact, title }: { src: string; n: number; compact: boolean; title: string }) {
+  const style = useScaleStyle();
+  // As bars: the icon once, with a small five-step bar filled to the level.
+  if (style === "bars")
+    return (
+      <span className="flex items-center gap-[3px]" title={title}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public */}
+        <img src={src} alt="" width={14} height={14} className={`shrink-0 ${compact ? "h-[11px] w-[11px]" : "h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]"}`} />
+        <span aria-hidden className={`level-bar flex w-[7px] flex-col-reverse gap-px rounded-full p-px ${compact ? "h-[13px]" : "h-[15px]"}`}>
+          {[1, 2, 3, 4, 5].map((k) => (
+            <span key={k} className={`level-step block flex-1 rounded-full ${k <= n ? "level-on" : ""}`} style={{ ["--lv" as string]: k }} />
+          ))}
+        </span>
+      </span>
+    );
   return (
     <span className={`flex flex-nowrap items-center ${compact ? "gap-px" : "gap-px sm:gap-[3px]"}`} title={title}>
       {Array.from({ length: n }).map((_, i) => (

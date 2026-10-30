@@ -28,20 +28,18 @@ const FIELD = { borderColor: "#b39a6a", background: "rgba(255,250,238,.95)", col
 const set = (patch: Partial<FxSettings>) => patchFx(patch);
 
 /** Above the welcome card: the choices that aren't part of the card itself. */
-export function ArrangeAbove({ fx, castleHidden, onDone }: { fx: FxSettings; castleHidden: boolean; onDone: () => void }) {
+export function ArrangeAbove({ fx, castleHidden }: { fx: FxSettings; castleHidden: boolean }) {
   const h = backHours(fx);
   return (
     <div className="parchment card-pop-in mb-3 flex w-[min(440px,94vw)] flex-col gap-2 rounded-2xl px-4 py-3 text-left shadow-xl" onClick={(e) => e.stopPropagation()}>
-      <div className="relative z-[1] flex items-center gap-2">
-        <span className="font-display text-[17px]" style={{ color: GOLD }}>
+      {/* One Done, at the bottom of the card (and the gear itself). */}
+      <div className="relative z-[1] flex flex-wrap items-baseline gap-x-2">
+        <span className="font-display whitespace-nowrap text-[17px]" style={{ color: GOLD }}>
           Welcome screen
         </span>
         <span className="text-[12px]" style={{ color: SOFT }}>
-          ✎ by each part for more
+          Drag parts to move them; ✎ for more
         </span>
-        <button type="button" onClick={onDone} className="ml-auto h-8 rounded-full px-4 text-[13.5px] font-bold" style={CHIP_ON}>
-          Done
-        </button>
       </div>
       {/* When it opens, as one line: 0 hours = only the day's first visit. Confetti sits beside the title. */}
       <div className="relative z-[1] flex flex-col gap-1">
@@ -218,22 +216,21 @@ export function ArrangeList({ fx, order, parts, empty }: { fx: FxSettings; order
           ))}
         </SortableContext>
       </DndContext>
+      {/* Hidden parts wait as chips: tap one to bring it back. */}
       {hidden.length > 0 && (
-        <div className="flex flex-col gap-1.5 pt-1">
-          <span className="text-left text-[12px] font-bold uppercase tracking-[.1em]" style={{ color: GOLD }}>
-            Hidden
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <span className="text-[12px] font-semibold" style={{ color: SOFT }}>
+            Hidden:
           </span>
           {hidden.map((el) => {
             const meta = WELCOME_ELS.find((m) => m.key === el)!;
             return (
-              <div key={el} className="flex min-h-10 items-center gap-2 rounded-xl px-3 text-left" style={{ border: "1.5px dashed rgba(139,112,64,.4)" }}>
-                <span className="min-w-0 flex-1 text-[13.5px]" style={{ color: SOFT }} title={meta.hint}>
-                  {meta.label}
+              <button key={el} type="button" onClick={() => set(toggleEl(fx, el))} title={meta.hint} aria-label={`Show ${meta.label}`} className="flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ ...CHIP, borderStyle: "dashed" }}>
+                <span aria-hidden className="text-[15px] leading-none">
+                  +
                 </span>
-                <button type="button" onClick={() => set(toggleEl(fx, el))} className="h-8 rounded-full px-3 text-[12.5px] font-semibold" style={CHIP}>
-                  Show
-                </button>
-              </div>
+                {meta.label}
+              </button>
             );
           })}
         </div>

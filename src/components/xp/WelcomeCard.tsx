@@ -157,7 +157,7 @@ export function WelcomeCard({
   }, [award?.xp]);
 
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
-    focus: <TopPriority register={(f) => (savers.current.focus = f)} last={priority} question={fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} />,
+    focus: <TopPriority arranging={arranging} register={(f) => (savers.current.focus = f)} last={priority} question={fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} />,
     intention: mode === "day" ? <Intention register={(f) => (savers.current.intention = f)} question={fx.welcomeIntentionQ?.trim() || "Today is about…"} hint={fx.welcomeIntentionHint?.trim() || "e.g. Steady and kind to myself"} /> : null,
     toucan: (
       <div className="flex w-full items-center gap-2.5 text-left">
@@ -218,17 +218,18 @@ export function WelcomeCard({
         </p>
       </div>
     ) : null,
+    // One compact line: XP, then coins beside it.
     reward: award && award.xp > 0 ? (
-      <div className="flex flex-col items-center gap-1">
-        <p className="pc-xp m-0 text-[34px] font-bold leading-none tabular-nums" style={{ color: "var(--t-xp)" }}>
+      <p className="m-0 flex items-baseline justify-center gap-2.5 tabular-nums">
+        <span className="pc-xp text-[26px] font-bold leading-none" style={{ color: "var(--t-xp)" }}>
           +{shown} XP
-        </p>
+        </span>
         {award.coins > 0 && (
-          <p className="m-0 flex items-center gap-1.5 text-[14px]" style={{ color: "#5a4a30" }}>
+          <span className="flex items-center gap-1 text-[14px]" style={{ color: "#5a4a30" }}>
             <CoinIcon size={16} /> +{award.coins} {award.coins === 1 ? "coin" : "coins"}
-          </p>
+          </span>
         )}
-      </div>
+      </p>
     ) : null,
     // A gilded button that opens into a drawer of the quests' cards.
     due: <DueSoonDrawer tasks={due} onOpenChange={setDrawerOpen} />,
@@ -245,7 +246,7 @@ export function WelcomeCard({
       <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} castleSeed={fx.welcomeCastleSeed} castleSlot={arranging ? <CastleEdit fx={fx} /> : null} onCastleVisible={setCastleSeen} />
       <div className="relative flex max-h-full flex-col items-center">
       {/* What isn't part of the card (when it opens, confetti) sits above it while arranging. */}
-      {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} onDone={() => setArranging(false)} />}
+      {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} />}
       <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
         {!arranging && <WelcomeToucan ask={toucanAsk(fx)} />}
         {confetti && (
@@ -534,7 +535,7 @@ function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean
 const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };
 
 /** Your top priorities, in your own words: saved for the day, and kept in mind by the app and the toucan. */
-function TopPriority({ last, question, register }: { last: { text: string; others?: string[]; day: string } | null; question: string; register: (save: () => Promise<boolean>) => void }) {
+function TopPriority({ last, question, register, arranging = false }: { last: { text: string; others?: string[]; day: string } | null; question: string; register: (save: () => Promise<boolean>) => void; arranging?: boolean }) {
   const [today] = useState(() => eveningDayKey());
   const [saved, setSaved] = useState<{ text: string; others: string[] } | null>(last && last.day === today ? { text: last.text, others: last.others ?? [] } : null);
   const [editing, setEditing] = useState(false);
@@ -576,14 +577,17 @@ function TopPriority({ last, question, register }: { last: { text: string; other
     const lines = saved.text.split("\n").filter((l) => l.trim());
     return (
       <div className="flex w-full min-w-0 flex-col gap-1">
-        <div className="relative flex items-center justify-center">
-          <span className="text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
-            Top priority
-          </span>
-          <span className="absolute right-0 top-1/2 -translate-y-1/2">
-            <EditButton open={false} onClick={edit} label="Change top priority" />
-          </span>
-        </div>
+        {/* While arranging, the part's own name stands in for this label. */}
+        {!arranging && (
+          <div className="relative flex items-center justify-center">
+            <span className="text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
+              Top priority
+            </span>
+            <span className="absolute right-0 top-1/2 -translate-y-1/2">
+              <EditButton open={false} onClick={edit} label="Change top priority" />
+            </span>
+          </div>
+        )}
         <button
           type="button"
           onClick={edit}
