@@ -2,9 +2,9 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30, `main` @ `e26e4c9` (mess check-in on the cleaning habit)
+- **Last updated:** 2026-10-30, `main` @ `70bcdb4` (welcome screen in-context settings and its feedback)
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** 25 notes not marked shipped (as of 2026-10-30 16:40 UTC, query below). Some may already have been built through chat requests without being marked.
+- **Pending in-app feedback:** about 21 notes not marked shipped (as of 2026-10-30 17:45 UTC): the rewards editor batch (Oct 30 12:02–12:08), toucan menu and cage items, check-in slider greying and sleep/wake picker, toucan messages from the bird, drag bars everywhere, last-screen-on-login, and a few older ones.
 
 ---
 
