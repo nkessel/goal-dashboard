@@ -4,7 +4,6 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ViewTransitionLink } from "@/components/ui/ViewTransitionLink";
 import { getProfileById } from "@/lib/data/profiles";
 import { normalizeInventory, withOwnerBringSeed } from "@/lib/inventory";
-import { isAdmin } from "@/lib/data/feedback";
 import { Backpack } from "@/components/settings/Backpack";
 
 /** Your backpack: what you carry, and what needs refilling. */
@@ -13,7 +12,8 @@ export default async function InventoryPage() {
   const profile = await getProfileById(session.user.id);
   if (!profile) notFound();
   const raw = profile.life_wheel?.inventory;
-  const inventory = withOwnerBringSeed(normalizeInventory(raw), raw, await isAdmin(session.user.id));
+  // The profile row already says whether you're the owner: no second round trip.
+  const inventory = withOwnerBringSeed(normalizeInventory(raw), raw, !!(profile as { is_admin?: boolean }).is_admin);
   const isAdventure = profile.theme === "adventure";
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>

@@ -1,5 +1,6 @@
 "use client";
 
+import { GearIcon } from "@/components/ui/Icons";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { makeRefillQuestAction, paintInventoryItemAction, saveInventoryAction } from "@/app/actions";
@@ -13,8 +14,12 @@ const STATUS: { v: ItemStatus; label: string; hint: string }[] = [
   { v: "empty", label: "Needs refill", hint: "Ran out" },
 ];
 
+/** How see-through the "Refill" band is by default (the portrait shows through it); set from the backpack's gear. */
+const REFILL_ALPHA = 0.6;
+const ALPHA_KEY = "inv-refill-alpha";
+
 /** One slot: an item's portrait, or an empty leather square to fill. */
-function Slot({ item, painting, onTap, moving, at, onGrab, lifted = false }: { item: InventoryItem | null; painting: boolean; onTap: (rect: DOMRect) => void; moving: boolean; at: string; onGrab?: (e: React.PointerEvent) => void; lifted?: boolean }) {
+function Slot({ item, painting, onTap, moving, at, onGrab, lifted = false, refillAlpha = REFILL_ALPHA }: { item: InventoryItem | null; painting: boolean; onTap: (rect: DOMRect) => void; moving: boolean; at: string; onGrab?: (e: React.PointerEvent) => void; lifted?: boolean; refillAlpha?: number }) {
   const empty = item?.status === "empty";
   return (
     <button
@@ -32,14 +37,14 @@ function Slot({ item, painting, onTap, moving, at, onGrab, lifted = false }: { i
         <>
           {item.icon ? (
             // eslint-disable-next-line @next/next/no-img-element -- item portrait
-            <img src={item.icon} alt="" draggable={false} className="h-full w-full object-cover transition-[filter] duration-300" style={empty ? { filter: "grayscale(.85) brightness(.6)" } : undefined} />
+            <img src={item.icon} alt="" draggable={false} decoding="async" className="h-full w-full object-cover transition-[filter] duration-300" style={empty ? { filter: "grayscale(.6) brightness(.75)" } : undefined} />
           ) : (
             <span className={`flex h-full w-full items-center justify-center px-1 text-center text-[12px] font-semibold leading-tight ${painting ? "inv-painting" : ""}`} style={{ color: "#f2d27e" }}>
               {painting ? "Painting…" : item.name}
             </span>
           )}
           {empty && (
-            <span className="inv-refill absolute inset-x-0 bottom-0 py-[3px] text-center text-[11px] font-bold uppercase tracking-[.06em]" style={{ background: "rgba(150,36,20,.95)", color: "#fff1e0", boxShadow: "0 -1px 0 rgba(242,210,126,.6)" }}>
+            <span className="inv-refill absolute inset-x-0 bottom-0 py-[3px] text-center text-[11px] font-bold uppercase tracking-[.06em]" style={{ background: `rgba(150,36,20,${refillAlpha})`, color: "#fff1e0", boxShadow: "0 -1px 0 rgba(242,210,126,.6)", textShadow: "0 1px 2px rgba(60,10,5,.9)" }}>
               ↻ Refill
             </span>
           )}
@@ -68,6 +73,22 @@ export function Backpack({ initial }: { initial: Inventory }) {
   const [menu, setMenu] = useState<{ item: InventoryItem; x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [bringOpen, setBringOpen] = useState(false);
+  // The view's own settings, opened from its gear (above the pack).
+  const [arranging, setArranging] = useState(false);
+  const [refillAlpha, setRefillAlpha] = useState(REFILL_ALPHA);
+  useEffect(() => {
+    const v = Number(window.localStorage.getItem(ALPHA_KEY));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+    if (window.localStorage.getItem(ALPHA_KEY) !== null && Number.isFinite(v)) setRefillAlpha(Math.max(0.15, Math.min(1, v)));
+  }, []);
+  function changeAlpha(v: number) {
+    setRefillAlpha(v);
+    try {
+      window.localStorage.setItem(ALPHA_KEY, String(v));
+    } catch {
+      /* storage unavailable */
+    }
+  }
   // How many rows each pocket shows (the rest scroll into view); remembered on this device.
   const [rows, setRows] = useState<Partial<Record<PocketKey, number>>>({});
   useEffect(() => {
@@ -250,9 +271,40 @@ export function Backpack({ initial }: { initial: Inventory }) {
         </p>
       )}
 
-      {/* The pack, with the gilded bring-from-home tab on its right */}
-      <div className="mx-auto flex w-full max-w-[460px] items-start gap-2">
-      <div className="backpack min-w-0 flex-1">
+      {/* Its gear: this view's settings, in a panel above the pack. */}
+      <div className="-mb-2 flex justify-end">
+        <button type="button" onClick={() => setArranging((v) => !v)} aria-pressed={arranging} aria-label="Inventory settings" title="Inventory settings" className="settings-gear flex h-8 w-8 items-center justify-center rounded-full" style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)", opacity: arranging ? 1 : 0.7 }}>
+          <GearIcon size={16} />
+        </button>
+      </div>
+      {arranging && (
+        <div className="reveal parchment flex flex-col gap-2 rounded-2xl p-3" style={{ border: "1.5px solid #a88a3f", color: "#2a1c10" }}>
+          <div className="flex items-center gap-3">
+            {/* A live sample of the band over a portrait-like square. */}
+            <span aria-hidden className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg" style={{ background: "linear-gradient(135deg,#c9a24a,#6b8a4a 55%,#3d5a7a)" }}>
+              <span className="absolute inset-x-0 bottom-0 py-[2px] text-center text-[9px] font-bold uppercase" style={{ background: `rgba(150,36,20,${refillAlpha})`, color: "#fff1e0", textShadow: "0 1px 2px rgba(60,10,5,.9)" }}>
+                ↻ Refill
+              </span>
+            </span>
+            <label className="flex min-w-0 flex-1 flex-col gap-0.5 text-[13.5px] font-semibold">
+              <span className="flex items-baseline justify-between">
+                Refill band
+                <span className="text-[12px] font-normal tabular-nums" style={{ color: "#6b5631" }}>
+                  {Math.round((1 - refillAlpha) * 100)}% see-through
+                </span>
+              </span>
+              <input type="range" min={0.15} max={1} step={0.05} value={refillAlpha} onChange={(e) => changeAlpha(Number(e.target.value))} aria-label="How solid the Refill band is" className="h-7 w-full" style={{ accentColor: "#a88a3f" }} />
+            </label>
+          </div>
+          <button type="button" onClick={() => setArranging(false)} className="ml-auto h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+            Done
+          </button>
+        </div>
+      )}
+
+      {/* The pack, with the gilded bring-from-home tab tucked against its right edge (no column of its own) */}
+      <div className="relative mx-auto w-full max-w-[460px]">
+      <div className="backpack min-w-0">
         <span aria-hidden className="backpack-strap backpack-strap-l" />
         <span aria-hidden className="backpack-strap backpack-strap-r" />
         <span aria-hidden className="backpack-handle" />
@@ -280,6 +332,7 @@ export function Backpack({ initial }: { initial: Inventory }) {
                       lifted={!!drag && drag.item.id === item?.id}
                       onGrab={(e) => grab(e, item)}
                       onTap={(r) => tapSlot(p.key, slot, r)}
+                      refillAlpha={refillAlpha}
                     />
                     {/* The whole name, on up to three short lines (tap for the full menu). */}
                     <span title={item?.name} className="line-clamp-3 block w-full break-words text-center text-[10.5px] leading-[1.15]" style={{ color: item ? "rgba(246,236,210,.85)" : "transparent", hyphens: "auto" }}>
@@ -306,12 +359,12 @@ export function Backpack({ initial }: { initial: Inventory }) {
           aria-haspopup="dialog"
           aria-expanded={bringOpen}
           title={inv.bring.place ? `Bring from home to ${inv.bring.place}` : "Bring from home"}
-          className="hover-glow font-display mt-10 flex shrink-0 items-center gap-1.5 rounded-full px-1.5 py-3.5 text-[13.5px]"
-          style={{ ...CHECKIN_STYLES[0].style, writingMode: "vertical-rl" }}
+          className="bring-tab font-display absolute right-0 top-[92px] z-[2] block whitespace-nowrap rounded-l-xl py-3 pl-[4px] pr-[2px] text-[12px] leading-none"
+          style={{ writingMode: "vertical-rl" }}
         >
-          <span aria-hidden>🏠</span>
+          <span aria-hidden className="mb-1 inline-block">🏠</span>
           Bring from home
-          {inv.bring.items.some((i) => !i.done) && <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: "#7a2e16", boxShadow: "0 0 0 1.5px rgba(255,240,200,.8)" }} />}
+          {inv.bring.items.some((i) => !i.done) && <span aria-hidden className="mt-1 inline-block h-2 w-2 rounded-full" style={{ background: "#7a2e16", boxShadow: "0 0 0 1.5px rgba(255,240,200,.8)" }} />}
         </button>
       </div>
 
