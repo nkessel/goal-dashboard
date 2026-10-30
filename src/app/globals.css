@@ -2754,3 +2754,10 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 .xp-pop { animation: xp-pop 1.6s ease-out both; }
 @keyframes xp-pop { 0% { opacity: 0; transform: translateY(4px) scale(.9); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .xp-pop { animation: none; } }
+
+/* A toucan note: he flies in from the side, lands, and then speaks. */
+.nudge-bird { animation: nudge-fly 620ms cubic-bezier(.2,.9,.3,1.15) both; }
+@keyframes nudge-fly { 0% { opacity: 0; transform: translate(140px, -90px) rotate(-14deg) scale(.8); } 60% { opacity: 1; transform: translate(-4px, 6px) rotate(4deg); } 100% { transform: none; } }
+.nudge-bubble { animation: nudge-bubble 300ms 460ms cubic-bezier(.2,.9,.3,1.2) both; transform-origin: 0% 100%; }
+@keyframes nudge-bubble { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nudge-bird, .nudge-bubble { animation: none; } }

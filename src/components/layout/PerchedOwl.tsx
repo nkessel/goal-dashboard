@@ -189,6 +189,13 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   const [flourish, setFlourish] = useState<Flourish>("glow");
   const flewWise = useRef(false);
   // Dropped onto the menu button, it goes into its cage (Settings sets it free).
+  // Just set free in the menu: shown over it (the menu drawer sits above the perches).
+  const [over, setOver] = useState(false);
+  const [overPath, setOverPath] = useState(pathname);
+  if (overPath !== pathname) {
+    setOverPath(pathname);
+    if (over) setOver(false);
+  }
   const [caged, setCaged] = useState(() => {
     try {
       return typeof window !== "undefined" && window.localStorage.getItem("owl-caged") === "1";
@@ -205,10 +212,22 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         /* storage unavailable */
       }
       setCaged(false);
-      // Out of the cage, then off to a perch.
+      // Out of the cage and right there with you: over the menu, landing beside the cage.
+      // (Off to a perch once you move on.)
+      setOver(true);
       setTimeout(() => {
-        if (at0) put(at0);
-        setTimeout(() => fly(), 60);
+        if (!at0) return void setTimeout(() => fly(), 60);
+        put(at0);
+        setTimeout(() => {
+          const x = Math.min(window.innerWidth - OWL_W / 2 - 8, at0.x + 64);
+          // A little hop out of the door.
+          const el = box.current;
+          if (el) el.style.transition = "transform 420ms cubic-bezier(.3,1.35,.5,1)";
+          put({ x, y: at0.y + 6 });
+          setTimeout(() => el && (el.style.transition = ""), 450);
+          setFacing(-1);
+          setTimeout(() => speakBrief("Free again! Thank you, friend.", 4000), 380);
+        }, 80);
       }, 60);
     };
     window.addEventListener("owl-free", free);
@@ -713,7 +732,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         }}
         aria-label={spirit ? "The great toucan spirit — tap for wisdom, hold to return to the owl" : "A snowy owl — tap and it flies to another perch; hold to summon the great toucan spirit"}
         title={spirit ? "The great toucan spirit" : "Hoo!"}
-        className={`owl-perch fixed left-0 top-0 z-[45] touch-none select-none p-0 ${dragging ? "owl-dragging" : ""} ${hidingHere && !dragging ? "owl-hidden-here" : ""}`}
+        className={`owl-perch fixed left-0 top-0 ${over ? "z-[48]" : "z-[45]"} touch-none select-none p-0 ${dragging ? "owl-dragging" : ""} ${hidingHere && !dragging ? "owl-hidden-here" : ""}`}
         style={{
           width: OWL_W,
           height: OWL_H,
@@ -740,7 +759,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         <div
           ref={sayRef}
           role="status"
-          className={`owl-say-wrap fixed left-0 top-0 z-[46] ${sayActions?.for === say ? "touch-none" : "pointer-events-none"}`}
+          className={`owl-say-wrap fixed left-0 top-0 ${over ? "z-[49]" : "z-[46]"} ${sayActions?.for === say ? "touch-none" : "pointer-events-none"}`}
           style={{ "--tail-bg": spirit ? "#0c2427" : "#fbf5e6", "--tail-border": spirit ? "rgba(140,240,220,.55)" : "#b39a6a" } as React.CSSProperties}
           onPointerDown={(e) => {
             if (!pos.current || e.button > 0 || (e.target as HTMLElement).closest("button")) return;

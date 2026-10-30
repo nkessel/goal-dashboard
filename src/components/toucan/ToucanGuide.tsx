@@ -684,8 +684,9 @@ function NudgeNote({ text, actions, onClose }: { text: string; actions: NoteActi
   return createPortal(
     <div
       role="status"
-      className={`card-pop-in fixed z-[58] flex w-[min(360px,calc(100vw-24px))] cursor-grab touch-none items-start gap-2.5 rounded-2xl p-3 pr-8 ${place ? "" : "bottom-24 left-1/2 -translate-x-1/2"}`}
-      style={{ ...(place ?? {}), background: "linear-gradient(180deg, rgba(14,38,40,.96), rgba(8,22,26,.98))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 10px 28px rgba(0,0,0,.5)" }}
+      // The toucan himself flies in and says it: the bird on the left, his words in a bubble beside him.
+      className={`fixed z-[58] flex w-[min(380px,calc(100vw-24px))] cursor-grab touch-none items-end gap-1 ${place ? "" : "bottom-24 left-1/2 -translate-x-1/2"}`}
+      style={place ?? undefined}
       onPointerDown={(e) => {
         if ((e.target as HTMLElement).closest("button")) return;
         const r = e.currentTarget.getBoundingClientRect();
@@ -709,13 +710,18 @@ function NudgeNote({ text, actions, onClose }: { text: string; actions: NoteActi
         }
       }}
     >
-      <button type="button" onClick={onClose} aria-label="Close" title="Close" className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(232,255,248,.75)" }}>
-        ×
-      </button>
-      <span className="shrink-0">
-        <ToucanArt size={40} />
+      <span className="nudge-bird shrink-0" aria-hidden style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,.45))" }}>
+        <ToucanArt size={58} />
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
+      <div
+        className="nudge-bubble relative mb-6 flex min-w-0 flex-1 flex-col gap-2 rounded-2xl p-3 pr-8"
+        style={{ background: "linear-gradient(180deg, rgba(14,38,40,.96), rgba(8,22,26,.98))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.3), 0 10px 28px rgba(0,0,0,.5)" }}
+      >
+        {/* The bubble's tail points back at his bill. */}
+        <span aria-hidden className="absolute -left-[7px] bottom-4 h-3 w-3 rotate-45" style={{ background: "rgba(10,28,32,.98)", borderLeft: "1.5px solid rgba(140,240,220,.55)", borderBottom: "1.5px solid rgba(140,240,220,.55)" }} />
+        <button type="button" onClick={onClose} aria-label="Close" title="Close" className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(232,255,248,.75)" }}>
+          ×
+        </button>
         <p className="m-0 text-[14px] leading-snug">{text}</p>
         <span className="flex flex-wrap gap-1.5">
           {(actions.length ? actions : [{ label: "OK", run: () => {} }]).map((a, i) => (
