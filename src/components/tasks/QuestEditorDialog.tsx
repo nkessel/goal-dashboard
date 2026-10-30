@@ -2626,7 +2626,7 @@ export function QuestEditorDialog({
                     className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold"
                     style={{ background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)" }}
                   >
-                    Done
+                    Close
                   </button>
                 </>
               ) : (

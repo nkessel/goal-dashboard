@@ -407,7 +407,7 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose, onStepsMov
         )}
         <div className="relative z-[1] flex justify-end">
           <button type="button" onClick={onClose} className="hover-glow h-10 rounded-full px-5 text-[15px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-            Done
+            Close
           </button>
         </div>
       </div>

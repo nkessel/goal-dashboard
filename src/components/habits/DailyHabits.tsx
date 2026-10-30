@@ -14,7 +14,7 @@ import { FocusMode, habitAsTask } from "@/components/one-thing/OneThing";
 import { CoinIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
 import { fromFeedback } from "@/lib/from-feedback";
-import { defaultCleaning, normalizeCleaning } from "@/lib/cleaning";
+import { defaultCleaning, normalizeCleaning, todaysPicks } from "@/lib/cleaning";
 import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
 
 /**
@@ -150,6 +150,9 @@ export function DailyHabits({
   // The mess check-in sits under the cleaning habit (the first with "clean" in its name).
   const cleaning = useMemo(() => (day ? (normalizeCleaning(cleaningRaw) ?? defaultCleaning(day)) : null), [cleaningRaw, day]);
   const cleanId = cleaning ? (cleaning.habitId && habits.some((h) => h.id === cleaning.habitId) ? cleaning.habitId : (habits.find((h) => /clean/i.test(h.title))?.id ?? null)) : null;
+  // Its title says where today's 20 minutes go ("…: 🎨 Art desk"); tapping it opens the check-in tray.
+  const cleanTop = cleaning && day ? (todaysPicks(cleaning, day)[0] ?? null) : null;
+  const [cleanOpen, setCleanOpen] = useState(false);
 
   const byId = new Map(habits.map((h) => [h.id, h]));
   const ordered = (order ?? habits.map((h) => h.id)).map((id) => byId.get(id)).filter((h): h is RiteView => !!h);
@@ -425,9 +428,10 @@ export function DailyHabits({
         <div className="drawer-inner">
           {/* Joined to the header: the same border runs down its sides and round its bottom. */}
           <div
-            className="rounded-b-2xl px-2 pb-2.5 pt-3.5"
+            className="rounded-b-2xl px-2.5 pb-3 pt-3.5"
             style={{
-              background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)",
+              // A deep green velvet tray, lit softly from the middle.
+              background: isAdventure ? "radial-gradient(120% 80% at 50% 0%, rgba(74,92,58,.55), rgba(24,32,20,.85) 70%), linear-gradient(180deg, #232c1e, #161c13)" : "var(--t-bg)",
               border: isAdventure ? "2px solid #8d7642" : "1px solid var(--t-card-border)",
               borderTop: "none",
               boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)",
@@ -454,8 +458,9 @@ export function DailyHabits({
                     setMenuUp(window.innerHeight - r.bottom < 200);
                     setMenuFor(h.id);
                   }}
-                  className={`relative flex items-center gap-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
-                  style={isAdventure ? { borderRadius: 16 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
+                  className={`habit-row relative flex items-center gap-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
+                  // A gilded edge and a soft shadow, so each habit sits on the velvet like a card.
+                  style={isAdventure ? { borderRadius: 16, boxShadow: "0 0 0 1.5px #b39a6a, 0 0 0 3px rgba(60,44,16,.55), 0 4px 10px rgba(0,0,0,.4)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
                 >
                   {h.icon_key ? (
                     <button
@@ -486,8 +491,9 @@ export function DailyHabits({
                       onClick={() => toggle(h)}
                       className="relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
                       style={{
-                        background: d ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "rgba(255,250,238,.6)",
-                        border: `2px solid ${d ? "#2f5a26" : "#a58c66"}`,
+                        background: d ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "radial-gradient(circle at 40% 35%, #fffaf0, #efe2c2)",
+                        border: `2px solid ${d ? "#2f5a26" : "#b08a3a"}`,
+                        boxShadow: d ? "0 0 8px rgba(120,190,90,.55)" : "inset 0 1px 2px rgba(90,60,20,.25), 0 0 0 1px rgba(255,240,200,.6)",
                       }}
                     >
                       {d && (
@@ -497,12 +503,31 @@ export function DailyHabits({
                       )}
                     </button>
                   )}
-                  <button type="button" onClick={() => setEditing(h)} className="relative z-[1] min-w-0 flex-1 text-left" title="Edit habit">
+                  <button
+                    type="button"
+                    onClick={() => (h.id === cleanId && cleaning ? setCleanOpen((v) => !v) : setEditing(h))}
+                    aria-expanded={h.id === cleanId && cleaning ? cleanOpen : undefined}
+                    className="relative z-[1] min-w-0 flex-1 text-left"
+                    title={h.id === cleanId && cleaning ? "Today's pick, your spaces, laundry and chores" : "Edit habit"}
+                  >
                     <span
                       className="block text-[16px] font-semibold leading-snug"
                       style={{ color: "var(--t-ink)", textDecoration: d ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)", opacity: d ? 0.7 : 1 }}
                     >
                       {h.title}
+                      {h.id === cleanId && cleaning && (
+                        <>
+                          {cleanTop ? ": " : ""}
+                          {cleanTop && (
+                            <span style={{ color: "#7a5410" }}>
+                              {cleanTop.icon} {cleanTop.name}
+                            </span>
+                          )}
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="ml-1.5 inline-block align-middle opacity-60 transition-transform duration-300" style={{ transform: cleanOpen ? "rotate(180deg)" : undefined }}>
+                            <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </>
+                      )}
                     </span>
                     {(h.description || h.due_time || h.estimate_minutes || (h.days && h.days.length < 7)) && (
                       <span className="block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
@@ -688,7 +713,7 @@ export function DailyHabits({
                     })}
                   </ul>
                 )}
-                {cleaning && day && h.id === cleanId && <CleaningCheckIn key={day} initial={cleaning} day={day} habitDone={d} isAdventure={isAdventure} />}
+                {cleaning && day && h.id === cleanId && <CleaningCheckIn key={day} initial={cleaning} day={day} habitDone={d} isAdventure={isAdventure} open={cleanOpen} />}
                 </SortableHabit>
               );
             })}

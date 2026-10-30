@@ -25,6 +25,9 @@ import {
 
 type Panel = "spaces" | "laundry" | "chores" | null;
 
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const chipOn = (on: boolean): React.CSSProperties => ({ background: on ? "rgba(217,180,95,.5)" : "rgba(255,250,238,.55)", boxShadow: on ? "inset 0 0 0 1.5px #a88a3f" : "inset 0 0 0 1px rgba(139,112,64,.35)", color: "var(--t-ink)" });
+
 /** Keeps a press inside the check-in from starting a drag of the habit row. */
 const holdStill = {
   onMouseDown: (e: React.SyntheticEvent) => e.stopPropagation(),
@@ -37,9 +40,10 @@ const holdStill = {
  * minutes, with three buttons behind it (spaces, the laundry bin, the
  * chore deck). Once the habit is ticked, it asks how the space looks now.
  */
-export function CleaningCheckIn({ initial, day, habitDone, isAdventure }: { initial: Cleaning; day: string; habitDone: boolean; isAdventure: boolean }) {
+export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: { initial: Cleaning; day: string; habitDone: boolean; isAdventure: boolean; /** The tray, opened from the habit's title. */ open: boolean }) {
   const [c, setC] = useState(initial);
-  const [panel, setPanel] = useState<Panel>(null);
+  // With fewer than two spaces, the tray opens straight onto setting them up.
+  const [panel, setPanel] = useState<Panel>(() => (initial.spaces.length < 2 ? "spaces" : null));
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -80,67 +84,80 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure }: { init
       boxShadow: on ? "inset 0 0 0 1.5px #a88a3f" : "inset 0 0 0 1px rgba(139,112,64,.35)",
     }) as React.CSSProperties;
 
+  const box = isAdventure ? { background: "linear-gradient(180deg, rgba(250,240,214,.96), rgba(238,222,186,.96))", border: "1.5px solid #b39a6a", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" };
   return (
-    <div {...holdStill} className="reveal ml-7 mt-1 flex flex-col gap-2 rounded-xl px-2.5 py-2" style={isAdventure ? { background: "rgba(240,226,196,.92)", border: "1.5px solid #b39a6a" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
-      {error && (
-        <p className="m-0 text-[13px]" style={{ color: "var(--t-warn)" }}>
-          {error}
-        </p>
+    <div {...holdStill}>
+      {/* After the 20 minutes, one question, right under the habit (tray open or not). */}
+      {askAfter && top && (
+        <div className="reveal ml-7 mt-1 rounded-xl px-2.5 py-1.5" style={box}>
+          <AfterQuestion
+            pick={top}
+            style={c.style}
+            onRate={(lv) => (setAnswered(true), rate(top.id, lv))}
+            onDone={() => (setAnswered(true), top.kind === "laundry" ? loadDone() : choreDone(top.id))}
+            onDismiss={() => setAnswered(true)}
+          />
+        </div>
       )}
-      {askAfter && top ? (
-        <AfterQuestion
-          pick={top}
-          style={c.style}
-          onRate={(lv) => (setAnswered(true), rate(top.id, lv))}
-          onDone={() => (setAnswered(true), top.kind === "laundry" ? loadDone() : choreDone(top.id))}
-          onDismiss={() => setAnswered(true)}
-        />
-      ) : (
-        <p className="m-0 text-[14.5px] leading-snug" style={{ color: ink }}>
-          {top ? (
-            <>
-              <span style={{ color: soft }}>Today&apos;s 20 min:</span>{" "}
-              <b>
-                {top.icon} {top.name}
-              </b>{" "}
-              <span style={{ color: soft }}>· {top.why}</span>
-              {picks.length > 1 && (
-                <span className="block text-[13px]" style={{ color: soft }}>
-                  If there&apos;s time: {picks.slice(1, 3).map((p) => `${p.icon} ${p.name}`).join(" · ")}
-                </span>
-              )}
-            </>
-          ) : (
-            <span style={{ color: soft }}>Everything&apos;s calm. Any 20 minutes you like today ✨</span>
-          )}
-        </p>
-      )}
+      <div className="drawer-body" data-open={open ? "true" : "false"}>
+        <div className="drawer-inner" inert={!open}>
+          <div className="ml-7 mt-1 flex flex-col gap-1.5 rounded-xl px-2.5 py-1.5" style={box}>
+            {error && (
+              <p className="m-0 text-[13px]" style={{ color: "var(--t-warn)" }}>
+                {error}
+              </p>
+            )}
+            {/* The priority list: messiest and most due first. */}
+            {picks.length > 0 ? (
+              <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
+                {picks.map((p, i) => (
+                  <li key={`${p.kind}-${p.id}`} className="flex items-baseline gap-1.5 text-[14px] leading-snug" style={{ color: ink }}>
+                    <span className="w-4 shrink-0 text-right text-[12px] font-bold tabular-nums" style={{ color: "#8a6116" }}>
+                      {i + 1}
+                    </span>
+                    <span className={i === 0 ? "font-semibold" : undefined}>
+                      {p.icon} {p.name}
+                    </span>
+                    <span className="text-[12.5px]" style={{ color: soft }}>
+                      · {p.why}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="m-0 text-[14px]" style={{ color: soft }}>
+                Everything&apos;s calm. Any 20 minutes you like today ✨
+              </p>
+            )}
 
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Check in">
-        <button type="button" onClick={() => setPanel(panel === "spaces" ? null : "spaces")} aria-expanded={panel === "spaces"} className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" style={chip(panel === "spaces")}>
-          <span aria-hidden>{style.mark}</span> Spaces
-        </button>
-        <button type="button" onClick={() => setPanel(panel === "laundry" ? null : "laundry")} aria-expanded={panel === "laundry"} className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" style={chip(panel === "laundry")}>
-          <span aria-hidden>🧺</span> Laundry
-          {laundry.dueOn && (
-            <span className="font-normal" style={{ color: panel === "laundry" && !isAdventure ? "#fff" : soft }}>
-              · {laundry.daysLeft! <= 0 ? "due" : dayLabel(laundry.dueOn, day)}
-            </span>
-          )}
-        </button>
-        <button type="button" onClick={() => setPanel(panel === "chores" ? null : "chores")} aria-expanded={panel === "chores"} className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" style={chip(panel === "chores")}>
-          <span aria-hidden>🃏</span> Chores
-          {dueChores > 0 && (
-            <span className="font-normal" style={{ color: panel === "chores" && !isAdventure ? "#fff" : soft }}>
-              · {dueChores} due
-            </span>
-          )}
-        </button>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Check in">
+              <button type="button" onClick={() => setPanel(panel === "spaces" ? null : "spaces")} aria-expanded={panel === "spaces"} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" style={chip(panel === "spaces")}>
+                <span aria-hidden>{style.mark}</span> Spaces
+              </button>
+              <button type="button" onClick={() => setPanel(panel === "laundry" ? null : "laundry")} aria-expanded={panel === "laundry"} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" style={chip(panel === "laundry")}>
+                <span aria-hidden>🧺</span> Laundry
+                {laundry.dueOn && (
+                  <span className="font-normal" style={{ color: panel === "laundry" && !isAdventure ? "#fff" : soft }}>
+                    · {laundry.daysLeft! <= 0 ? "due" : dayLabel(laundry.dueOn, day)}
+                  </span>
+                )}
+              </button>
+              <button type="button" onClick={() => setPanel(panel === "chores" ? null : "chores")} aria-expanded={panel === "chores"} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" style={chip(panel === "chores")}>
+                <span aria-hidden>🃏</span> Chores
+                {dueChores > 0 && (
+                  <span className="font-normal" style={{ color: panel === "chores" && !isAdventure ? "#fff" : soft }}>
+                    · {dueChores} due
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {panel === "spaces" && <SpacesPanel c={c} day={day} save={save} />}
+            {panel === "laundry" && <LaundryPanel c={c} day={day} save={save} onLoad={loadDone} />}
+            {panel === "chores" && <ChoresPanel c={c} day={day} save={save} onDone={choreDone} />}
+          </div>
+        </div>
       </div>
-
-      {panel === "spaces" && <SpacesPanel c={c} day={day} save={save} />}
-      {panel === "laundry" && <LaundryPanel c={c} day={day} save={save} onLoad={loadDone} />}
-      {panel === "chores" && <ChoresPanel c={c} day={day} save={save} onDone={choreDone} />}
     </div>
   );
 }
@@ -149,7 +166,7 @@ function AfterQuestion({ pick, style, onRate, onDone, onDismiss }: { pick: Retur
   const s = styleOf(style);
   return (
     <div className="flex flex-col gap-1.5">
-      <p className="m-0 text-[14.5px] leading-snug" style={{ color: "var(--t-ink)" }}>
+      <p className="m-0 text-[13.5px] leading-snug" style={{ color: "var(--t-ink)" }}>
         {pick.kind === "space" ? (
           <>
             Nice work! How does <b>{pick.icon} {pick.name}</b> look now?
@@ -165,16 +182,16 @@ function AfterQuestion({ pick, style, onRate, onDone, onDismiss }: { pick: Retur
       <div className="flex flex-wrap items-center gap-1.5">
         {pick.kind === "space" ? (
           s.glyphs.map((g, i) => (
-            <button key={i} type="button" onClick={() => onRate(i as MessLevel)} title={s.words[i]} className="flex h-10 items-center gap-1 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(255,250,238,.7)", boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)", color: "var(--t-ink)" }}>
+            <button key={i} type="button" onClick={() => onRate(i as MessLevel)} title={s.words[i]} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(255,250,238,.7)", boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)", color: "var(--t-ink)" }}>
               <span aria-hidden>{g}</span> {s.words[i]}
             </button>
           ))
         ) : (
-          <button type="button" onClick={onDone} className="flex h-10 items-center gap-1 rounded-full px-4 text-[14px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+          <button type="button" onClick={onDone} className="flex h-8 items-center gap-1 rounded-full px-3 text-[14px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
             ✓ Done
           </button>
         )}
-        <button type="button" onClick={onDismiss} className="h-10 px-2 text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
+        <button type="button" onClick={onDismiss} className="h-8 px-2 text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
           Not yet
         </button>
       </div>
@@ -185,30 +202,39 @@ function AfterQuestion({ pick, style, onRate, onDone, onDismiss }: { pick: Retur
 // ---------------------------------------------------------------------------
 // Spaces
 
+/** How messy a space is: one compact slider, the style's calm end on the left and its messy end on the right. */
 function LevelPicker({ value, styleKey, onPick, label }: { value: MessLevel; styleKey: MessStyle; onPick: (lv: MessLevel) => void; label: string }) {
   const s = styleOf(styleKey);
+  // Moves freely; saved when you let go.
+  const [drag, setDrag] = useState<number | null>(null);
+  const v = drag ?? value;
+  const commit = () => {
+    if (drag !== null && drag !== value) onPick(drag as MessLevel);
+    setDrag(null);
+  };
   return (
-    <div role="radiogroup" aria-label={`How messy is ${label}?`} className="flex gap-1">
-      {s.glyphs.map((g, i) => (
-        <button
-          key={i}
-          type="button"
-          role="radio"
-          aria-checked={value === i}
-          aria-label={s.words[i]}
-          title={s.words[i]}
-          onClick={() => onPick(i as MessLevel)}
-          className="flex h-10 min-w-10 items-center justify-center rounded-lg px-1.5 text-[17px] leading-none transition-transform active:scale-90"
-          style={{
-            background: value === i ? "rgba(217,180,95,.45)" : "rgba(255,250,238,.5)",
-            boxShadow: value === i ? "inset 0 0 0 2px #a88a3f" : "inset 0 0 0 1px rgba(139,112,64,.3)",
-            opacity: value === i ? 1 : 0.55,
-            letterSpacing: "-0.12em",
-          }}
-        >
-          {g}
-        </button>
-      ))}
+    <div className="flex min-w-0 flex-1 items-center gap-1.5" title={s.words[v]}>
+      <span aria-hidden className="shrink-0 text-[14px] leading-none" style={{ letterSpacing: "-0.12em", opacity: v === 0 ? 1 : 0.55 }}>
+        {s.glyphs[0]}
+      </span>
+      <input
+        type="range"
+        min={0}
+        max={2}
+        step={1}
+        value={v}
+        onChange={(e) => setDrag(Number(e.target.value))}
+        onPointerUp={commit}
+        onKeyUp={commit}
+        onBlur={commit}
+        aria-label={`How messy is ${label}?`}
+        aria-valuetext={s.words[v]}
+        className="h-7 min-w-0 flex-1"
+        style={{ accentColor: v === 2 ? "#c0563a" : v === 1 ? "#a88a3f" : "#6f9a4a" }}
+      />
+      <span aria-hidden className="shrink-0 text-[14px] leading-none" style={{ letterSpacing: "-0.12em", opacity: v === 2 ? 1 : 0.55 }}>
+        {s.glyphs[2]}
+      </span>
     </div>
   );
 }
@@ -229,7 +255,7 @@ function SpacesPanel({ c, day, save }: { c: Cleaning; day: string; save: (n: Cle
   return (
     <div className="flex flex-col gap-1.5 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.3)" }}>
       <p className="m-0 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-        Tap how each space looks right now. The messiest one comes up first.
+        Slide each space to how it looks now. The messiest comes up first.
       </p>
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {c.spaces.map((s) => {
@@ -237,11 +263,11 @@ function SpacesPanel({ c, day, save }: { c: Cleaning; day: string; save: (n: Cle
           const drifted = lv !== s.level;
           return (
             <li key={s.id} className="flex flex-col gap-1 rounded-lg px-1 py-1" style={{ background: editing === s.id ? "rgba(255,250,238,.5)" : undefined }}>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button type="button" onClick={() => setEditing(editing === s.id ? null : s.id)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left" title="Edit this space">
                   <span aria-hidden className="text-[18px]">{s.icon}</span>
                   <span className="min-w-0">
-                    <span className="block text-[15px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
+                    <span className="block text-[14px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
                       {s.name}
                     </span>
                     <span className="block text-[12px] leading-tight" style={{ color: "var(--t-ink-soft)" }}>
@@ -259,11 +285,11 @@ function SpacesPanel({ c, day, save }: { c: Cleaning; day: string; save: (n: Cle
                     aria-label="Name"
                     onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== s.name && setSpace(s.id, { name: e.target.value.trim().slice(0, 40) })}
                     onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-                    className="h-9 rounded-lg px-2 text-[15px]"
+                    className="h-8 rounded-lg px-2 text-[14px]"
                     style={{ background: "rgba(255,255,255,.7)", border: "1px solid rgba(139,112,64,.4)", color: "var(--t-ink)" }}
                   />
                   <IconRow icons={SPACE_ICONS} value={s.icon} onPick={(icon) => setSpace(s.id, { icon })} />
-                  <label className="flex flex-wrap items-center gap-2 text-[13.5px]" style={{ color: "var(--t-ink)" }}>
+                  <label className="flex flex-wrap items-center gap-1.5 text-[13.5px]" style={{ color: "var(--t-ink)" }}>
                     Gets messier on its own
                     <select value={s.driftDays ?? 0} onChange={(e) => setSpace(s.id, { driftDays: Number(e.target.value) || null, level: lv, ratedOn: day })} className="h-8 rounded-lg px-1.5 text-[13.5px]" style={{ background: "rgba(255,255,255,.7)", border: "1px solid rgba(139,112,64,.4)" }}>
                       <option value={0}>no, only when I say</option>
@@ -276,7 +302,7 @@ function SpacesPanel({ c, day, save }: { c: Cleaning; day: string; save: (n: Cle
                   </label>
                   <div className="flex justify-between">
                     <button type="button" onClick={() => setEditing(null)} className="h-8 rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-                      Done
+                      Close
                     </button>
                     <button type="button" onClick={() => (setEditing(null), save({ ...c, spaces: c.spaces.filter((x) => x.id !== s.id) }))} className="h-8 px-2 text-[13px] underline" style={{ color: "var(--t-warn)" }}>
                       Remove this space
@@ -295,9 +321,9 @@ function SpacesPanel({ c, day, save }: { c: Cleaning; day: string; save: (n: Cle
         }}
         className="flex gap-1.5"
       >
-        <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="+ Add a space (closet, car…)" aria-label="Add a space" className="h-9 min-w-0 flex-1 rounded-lg px-2 text-[14.5px]" style={{ background: "rgba(255,255,255,.6)", border: "1px dashed rgba(139,112,64,.5)", color: "var(--t-ink)" }} />
+        <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="+ Add a space (closet, car…)" aria-label="Add a space" className="h-8 min-w-0 flex-1 rounded-lg px-2 text-[13.5px]" style={{ background: "rgba(255,255,255,.6)", border: "1px dashed rgba(139,112,64,.5)", color: "var(--t-ink)" }} />
         {adding.trim() && (
-          <button type="submit" className="h-9 rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+          <button type="submit" className="h-8 rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
             Add
           </button>
         )}
@@ -323,7 +349,7 @@ export function MessStylePicker({ value, onPick, compact = false }: { value: Mes
             aria-checked={value === s.key}
             onClick={() => onPick(s.key)}
             title={s.label}
-            className={`flex items-center gap-2 rounded-lg px-2 text-left ${compact ? "h-9 text-[13px]" : "min-h-11 text-[14px]"}`}
+            className={`flex items-center gap-1.5 rounded-lg px-2 text-left ${compact ? "h-8 text-[13px]" : "min-h-11 text-[14px]"}`}
             style={{ background: value === s.key ? "rgba(217,180,95,.4)" : "rgba(255,250,238,.45)", boxShadow: value === s.key ? "inset 0 0 0 1.5px #a88a3f" : "inset 0 0 0 1px rgba(139,112,64,.3)", color: "var(--t-ink)" }}
           >
             {compact ? (
@@ -366,73 +392,71 @@ const FILL_WORDS = ["Empty", "¼", "½", "¾", "Full"];
 function LaundryPanel({ c, day, save, onLoad }: { c: Cleaning; day: string; save: (n: Cleaning) => void; onLoad: () => void }) {
   const now = laundryNow(c.laundry, day);
   const readToday = c.laundry.readings.find((r) => r.on === day)?.fill ?? null;
-  const shown = readToday ?? (now.fill === null ? null : Math.round(now.fill));
+  const shown = readToday ?? (now.fill === null ? 0 : Math.round(now.fill));
+  // The slider moves freely; the reading is saved when you let go.
+  const [drag, setDrag] = useState<number | null>(null);
+  const value = drag ?? shown;
   const setFill = (fill: number) => save({ ...c, laundry: { ...c.laundry, readings: [...c.laundry.readings.filter((r) => r.on !== day), { on: day, fill }].slice(-30) } });
+  const commit = () => {
+    if (drag !== null && drag !== readToday) setFill(drag);
+    setDrag(null);
+  };
 
   return (
-    <div className="flex flex-col gap-2 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.3)" }}>
-      <p className="m-0 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-        How full is the laundry bin?{readToday === null && shown !== null ? " (my guess is marked)" : ""}
-      </p>
-      <div className="flex items-end gap-3">
-        <Bin fill={now.fill ?? 0} />
-        <div role="radiogroup" aria-label="How full is the bin?" className="grid flex-1 grid-cols-5 gap-1">
-          {FILL_WORDS.map((w, i) => (
-            <button
-              key={w}
-              type="button"
-              role="radio"
-              aria-checked={shown === i}
-              onClick={() => setFill(i)}
-              className="flex h-10 items-center justify-center rounded-lg px-0.5 text-[13.5px] font-semibold"
-              style={{
-                background: shown === i ? "rgba(217,180,95,.45)" : "rgba(255,250,238,.5)",
-                boxShadow: shown === i ? `inset 0 0 0 ${readToday === i ? 2 : 1.5}px ${readToday === i ? "#a88a3f" : "rgba(168,138,63,.6)"}` : "inset 0 0 0 1px rgba(139,112,64,.3)",
-                borderStyle: "dashed",
-                color: "var(--t-ink)",
-              }}
-            >
-              {w}
-            </button>
-          ))}
-        </div>
+    <div className="flex flex-col gap-1.5 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.3)" }}>
+      {/* How full the bin is: one slider, empty on the left, full on the right. */}
+      <div className="flex items-center gap-1.5">
+        <Bin fill={0} size={22} />
+        <input
+          type="range"
+          min={0}
+          max={4}
+          step={1}
+          value={value}
+          onChange={(e) => setDrag(Number(e.target.value))}
+          onPointerUp={commit}
+          onKeyUp={commit}
+          onBlur={commit}
+          aria-label="How full is the laundry bin?"
+          aria-valuetext={FILL_WORDS[value]}
+          className="h-8 min-w-0 flex-1"
+          style={{ accentColor: value >= 4 ? "#c0563a" : value >= 3 ? "#d08a3a" : "#a88a3f", opacity: readToday === null && drag === null ? 0.7 : 1 }}
+        />
+        <Bin fill={4} size={22} />
       </div>
-      <p className="m-0 text-[14px]" style={{ color: "var(--t-ink)" }}>
-        {now.dueOn === null ? (
-          "Tell me how full it is, and after a couple of check-ins I'll predict when the next load is due."
-        ) : now.daysLeft! <= 0 ? (
-          <>🧺 A load is due {now.daysLeft! < 0 ? "now" : "today"}.</>
-        ) : (
-          <>
-            Next load due around <b>{dayLabel(now.dueOn, day)}</b>.
-          </>
-        )}
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onLoad} className="h-9 rounded-full px-4 text-[14px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="min-w-0 flex-1 text-[13px]" style={{ color: "var(--t-ink)" }}>
+          {now.dueOn === null ? (
+            "Slide it now and then, and I'll predict the next load."
+          ) : now.daysLeft! <= 0 ? (
+            <>🧺 A load is due {now.daysLeft! < 0 ? "now" : "today"}.</>
+          ) : (
+            <>
+              Next load around <b>{dayLabel(now.dueOn, day)}</b>.
+            </>
+          )}
+          {c.laundry.loads.length > 0 && <span style={{ color: "var(--t-ink-soft)" }}> Last {c.laundry.loads.at(-1) === day ? "today" : ago(c.laundry.loads.at(-1)!, day)}.</span>}
+        </span>
+        <button type="button" onClick={onLoad} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
           ✓ I did a load
         </button>
-        {c.laundry.loads.length > 0 && (
-          <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-            Last load {c.laundry.loads.at(-1) === day ? "today" : ago(c.laundry.loads.at(-1)!, day)}
-          </span>
-        )}
       </div>
     </div>
   );
 }
 
 /** A little wicker bin, filled to the guess. */
-function Bin({ fill }: { fill: number }) {
+function Bin({ fill, size = 44 }: { fill: number; size?: number }) {
   const h = Math.max(0, Math.min(4, fill)) / 4;
+  const clip = `bin-clip-${Math.round(fill)}`;
   return (
-    <svg width="44" height="48" viewBox="0 0 44 48" aria-hidden className="shrink-0">
+    <svg width={size} height={(size * 48) / 44} viewBox="0 0 44 48" aria-hidden className="shrink-0">
       <defs>
-        <clipPath id="bin-clip">
+        <clipPath id={clip}>
           <path d="M6 10h32l-3.5 34a3 3 0 0 1-3 2.7H12.5a3 3 0 0 1-3-2.7z" />
         </clipPath>
       </defs>
-      <g clipPath="url(#bin-clip)">
+      <g clipPath={`url(#${clip})`}>
         <rect x="0" y="0" width="44" height="48" fill="#e8d6ae" />
         <rect x="0" y={10 + 37 * (1 - h)} width="44" height="48" fill={h >= 1 ? "#c0563a" : h >= 0.75 ? "#d08a3a" : "#7f9fc8"} style={{ transition: "y .4s ease" }} />
         {[18, 26, 34].map((y) => (
@@ -473,26 +497,26 @@ function ChoresPanel({ c, day, save, onDone }: { c: Cleaning; day: string; save:
     const dueOn = choreDueOn(ch, day);
     const snoozed = ch.snoozedUntil && ch.snoozedUntil > day;
     return (
-      <li key={ch.id} className="relative flex flex-col gap-1.5 rounded-xl px-2.5 py-2" style={{ background: isDue ? "rgba(255,250,238,.85)" : "rgba(255,250,238,.4)", boxShadow: isDue ? "0 1px 0 rgba(139,112,64,.35), inset 0 0 0 1.5px #c9ab66" : "inset 0 0 0 1px rgba(139,112,64,.25)" }}>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setEditing(editing === ch.id ? null : ch.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left" title="Edit this chore">
-            <span aria-hidden className="text-[20px]">{ch.icon}</span>
+      <li key={ch.id} className="relative flex flex-col gap-1.5 rounded-xl px-2.5 py-1.5" style={{ background: isDue ? "rgba(255,250,238,.85)" : "rgba(255,250,238,.4)", boxShadow: isDue ? "0 1px 0 rgba(139,112,64,.35), inset 0 0 0 1.5px #c9ab66" : "inset 0 0 0 1px rgba(139,112,64,.25)" }}>
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={() => setEditing(editing === ch.id ? null : ch.id)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left" title="Edit this chore">
+            <span aria-hidden className="text-[17px]">{ch.icon}</span>
             <span className="min-w-0">
-              <span className="block truncate text-[15px] font-semibold" style={{ color: "var(--t-ink)", opacity: isDue ? 1 : 0.8 }}>
+              <span className="block truncate text-[14px] font-semibold" style={{ color: "var(--t-ink)", opacity: isDue ? 1 : 0.8 }}>
                 {ch.name}
               </span>
               <span className="block text-[12px] leading-tight" style={{ color: "var(--t-ink-soft)" }}>
-                every {ch.everyDays === 1 ? "day" : ch.everyDays === 7 ? "week" : `${ch.everyDays} days`} ·{" "}
+                {ch.weekday != null ? `every ${WEEKDAYS[ch.weekday]}` : `every ${ch.everyDays === 1 ? "day" : ch.everyDays === 7 ? "week" : `${ch.everyDays} days`}`} ·{" "}
                 {snoozed ? `💤 until ${dayLabel(ch.snoozedUntil!, day)}` : isDue ? (dueOn < day ? `due ${ago(dueOn, day)}` : "due today") : `next ${dayLabel(dueOn, day)}`}
               </span>
             </span>
           </button>
           {isDue && (
             <>
-              <button type="button" onClick={() => setSnoozing(snoozing === ch.id ? null : ch.id)} aria-expanded={snoozing === ch.id} className="flex h-9 items-center rounded-full px-2.5 text-[13px]" style={{ color: "var(--t-ink)", boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)" }}>
+              <button type="button" onClick={() => setSnoozing(snoozing === ch.id ? null : ch.id)} aria-expanded={snoozing === ch.id} className="flex h-8 items-center rounded-full px-2.5 text-[13px]" style={{ color: "var(--t-ink)", boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)" }}>
                 💤 Snooze
               </button>
-              <button type="button" onClick={() => onDone(ch.id)} className="flex h-9 items-center rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+              <button type="button" onClick={() => onDone(ch.id)} className="flex h-8 items-center rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
                 ✓ Done
               </button>
             </>
@@ -500,10 +524,10 @@ function ChoresPanel({ c, day, save, onDone }: { c: Cleaning; day: string; save:
         </div>
         {snoozing === ch.id && (
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={`Snooze ${ch.name}`}>
-            <button type="button" onClick={() => snooze(ch.id, 1)} className="h-9 rounded-full px-3 text-[13.5px]" style={{ boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)", color: "var(--t-ink)" }}>
+            <button type="button" onClick={() => snooze(ch.id, 1)} className="h-8 rounded-full px-3 text-[13.5px]" style={{ boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)", color: "var(--t-ink)" }}>
               A day
             </button>
-            <button type="button" onClick={() => snooze(ch.id, 7)} className="h-9 rounded-full px-3 text-[13.5px]" style={{ boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)", color: "var(--t-ink)" }}>
+            <button type="button" onClick={() => snooze(ch.id, 7)} className="h-8 rounded-full px-3 text-[13.5px]" style={{ boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)", color: "var(--t-ink)" }}>
               A week
             </button>
             <form
@@ -514,9 +538,9 @@ function ChoresPanel({ c, day, save, onDone }: { c: Cleaning; day: string; save:
               className="flex items-center gap-1 text-[13.5px]"
               style={{ color: "var(--t-ink)" }}
             >
-              <input type="number" min={1} max={365} inputMode="numeric" value={custom} onChange={(e) => setCustom(e.target.value)} aria-label="Days to snooze" className="h-9 w-14 rounded-lg px-1.5 text-center text-[15px]" style={{ background: "rgba(255,255,255,.7)", border: "1px solid rgba(139,112,64,.4)" }} />
+              <input type="number" min={1} max={365} inputMode="numeric" value={custom} onChange={(e) => setCustom(e.target.value)} aria-label="Days to snooze" className="h-8 w-14 rounded-lg px-1.5 text-center text-[14px]" style={{ background: "rgba(255,255,255,.7)", border: "1px solid rgba(139,112,64,.4)" }} />
               days
-              <button type="submit" className="h-9 rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "rgba(217,180,95,.45)", boxShadow: "inset 0 0 0 1px #a88a3f" }}>
+              <button type="submit" className="h-8 rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "rgba(217,180,95,.45)", boxShadow: "inset 0 0 0 1px #a88a3f" }}>
                 Snooze
               </button>
             </form>
@@ -529,19 +553,29 @@ function ChoresPanel({ c, day, save, onDone }: { c: Cleaning; day: string; save:
               aria-label="Name"
               onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== ch.name && setChore(ch.id, { name: e.target.value.trim().slice(0, 48) })}
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-              className="h-9 rounded-lg px-2 text-[15px]"
+              className="h-8 rounded-lg px-2 text-[14px]"
               style={{ background: "rgba(255,255,255,.7)", border: "1px solid rgba(139,112,64,.4)", color: "var(--t-ink)" }}
             />
             <IconRow icons={CHORE_ICONS} value={ch.icon} onPick={(icon) => setChore(ch.id, { icon })} />
-            <label className="flex items-center gap-2 text-[13.5px]" style={{ color: "var(--t-ink)" }}>
-              Every
-              <input type="number" min={1} max={366} inputMode="numeric" defaultValue={ch.everyDays} onBlur={(e) => Number(e.target.value) >= 1 && setChore(ch.id, { everyDays: Math.round(Number(e.target.value)) })} className="h-8 w-16 rounded-lg px-1.5 text-center" style={{ background: "rgba(255,255,255,.7)", border: "1px solid rgba(139,112,64,.4)" }} />
-              days
-            </label>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="flex gap-2">
+            {/* Repeats every N days, or on one day of the week (trash night). */}
+            <div className="flex flex-wrap items-center gap-1" role="radiogroup" aria-label="Repeats on">
+              {WEEKDAYS.map((w, i) => (
+                <button key={w} type="button" role="radio" aria-checked={ch.weekday === i} onClick={() => setChore(ch.id, { weekday: ch.weekday === i ? null : i })} title={`Every ${w}`} className="flex h-8 w-9 items-center justify-center rounded-full text-[12.5px] font-semibold" style={chipOn(ch.weekday === i)}>
+                  {w.slice(0, 2)}
+                </button>
+              ))}
+            </div>
+            {ch.weekday == null && (
+              <label className="flex items-center gap-1.5 text-[13.5px]" style={{ color: "var(--t-ink)" }}>
+                Or every
+                <input type="number" min={1} max={366} inputMode="numeric" defaultValue={ch.everyDays} onBlur={(e) => Number(e.target.value) >= 1 && setChore(ch.id, { everyDays: Math.round(Number(e.target.value)) })} className="h-8 w-16 rounded-lg px-1.5 text-center" style={{ background: "rgba(255,255,255,.7)", border: "1px solid rgba(139,112,64,.4)" }} />
+                days
+              </label>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <span className="flex gap-1.5">
                 <button type="button" onClick={() => setEditing(null)} className="h-8 rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-                  Done
+                  Close
                 </button>
                 {!isDue && (
                   <button type="button" onClick={() => onDone(ch.id)} className="h-8 rounded-full px-3 text-[13px]" style={{ boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)", color: "var(--t-ink)" }}>
@@ -573,12 +607,13 @@ function ChoresPanel({ c, day, save, onDone }: { c: Cleaning; day: string; save:
       )}
       <ul className="m-0 flex list-none flex-col gap-1.5 p-0">{due.map((ch) => card(ch, true))}</ul>
       {later.length > 0 && (
-        <details>
-          <summary className="cursor-pointer py-1 text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
-            Coming up ({later.length})
-          </summary>
-          <ul className="m-0 mt-1 flex list-none flex-col gap-1.5 p-0">{later.map((ch) => card(ch, false))}</ul>
-        </details>
+        // Coming up shows straight away: what's next is worth seeing.
+        <div>
+          <p className="m-0 pb-0.5 text-[12px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+            Coming up
+          </p>
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">{later.map((ch) => card(ch, false))}</ul>
+        </div>
       )}
       <form
         onSubmit={(e) => {
@@ -587,9 +622,9 @@ function ChoresPanel({ c, day, save, onDone }: { c: Cleaning; day: string; save:
         }}
         className="flex gap-1.5"
       >
-        <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="+ Add a chore (mop, windows…)" aria-label="Add a chore" className="h-9 min-w-0 flex-1 rounded-lg px-2 text-[14.5px]" style={{ background: "rgba(255,255,255,.6)", border: "1px dashed rgba(139,112,64,.5)", color: "var(--t-ink)" }} />
+        <input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="+ Add a chore (mop, windows…)" aria-label="Add a chore" className="h-8 min-w-0 flex-1 rounded-lg px-2 text-[13.5px]" style={{ background: "rgba(255,255,255,.6)", border: "1px dashed rgba(139,112,64,.5)", color: "var(--t-ink)" }} />
         {adding.trim() && (
-          <button type="submit" className="h-9 rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+          <button type="submit" className="h-8 rounded-full px-3 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
             Add
           </button>
         )}

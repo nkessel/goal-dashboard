@@ -277,7 +277,7 @@ export function PowerUpsList({ open, done, theme }: { open: Task[]; done: Task[]
           </div>
           <div className="relative z-[1] flex justify-end gap-2">
             <button type="button" onClick={() => setAdding(false)} className="h-10 px-3 text-[15px]" style={{ color: "var(--t-ink-soft)" }}>
-              Done
+              Close
             </button>
             <button type="button" disabled={isPending || !title.trim()} onClick={add} className="h-10 rounded-full px-5 text-[15px] disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
               Add power-up

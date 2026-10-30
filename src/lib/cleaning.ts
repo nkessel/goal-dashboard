@@ -25,6 +25,8 @@ export type Chore = {
   name: string;
   icon: string;
   everyDays: number;
+  /** Repeats on this weekday instead (0 Sunday … 6 Saturday), e.g. trash night. */
+  weekday?: number | null;
   lastDone: string | null;
   snoozedUntil: string | null;
 };
@@ -42,11 +44,11 @@ export type Cleaning = {
 };
 
 export const MESS_STYLES: { key: MessStyle; label: string; mark: string; glyphs: [string, string, string]; words: [string, string, string] }[] = [
-  { key: "weather", mark: "⛅", label: "Weather", glyphs: ["☀️", "⛅", "⛈️"], words: ["Calm", "Cloudy", "Stormy"] },
-  { key: "jars", mark: "🫙", label: "Jars & bottles", glyphs: ["🫙", "🫙🍶🧴", "🫙🍶🧴🍾🥫🫙"], words: ["One tidy jar", "A few bottles", "A crowded shelf"] },
-  { key: "garden", mark: "🌿", label: "Garden", glyphs: ["🌱", "🌿🌾", "🌳🌿🍃🌾"], words: ["Neat sprout", "Overgrown", "Jungle"] },
-  { key: "critters", mark: "👺", label: "Critters", glyphs: ["🐰", "👺", "🐉"], words: ["Sleepy dust bunny", "Grumpy gremlin", "Mess dragon"] },
-  { key: "piles", mark: "📚", label: "Piles", glyphs: ["📕", "📚", "📚📚📦"], words: ["One book", "A stack", "A teetering tower"] },
+  { key: "weather", mark: "⛅", label: "Weather", glyphs: ["✨☀️", "⛅", "⛈️"], words: ["Fresh and clear", "Cloudy", "Stormy"] },
+  { key: "jars", mark: "🫙", label: "Jars & bottles", glyphs: ["✨🫙", "🫙🍶🧴", "🫙🍶🧴🍾🥫🫙"], words: ["Spotless shelf", "A few bottles", "A crowded shelf"] },
+  { key: "garden", mark: "🌿", label: "Garden", glyphs: ["🌱✨", "🌿🌾", "🌳🌿🍃🌾"], words: ["Neat and tidy", "Overgrown", "Jungle"] },
+  { key: "critters", mark: "👺", label: "Critters", glyphs: ["🫧✨", "👺", "🐉"], words: ["Squeaky clean", "Grumpy gremlin", "Mess dragon"] },
+  { key: "piles", mark: "📚", label: "Piles", glyphs: ["✨📕", "📚", "📚📚📦"], words: ["All put away", "A stack", "A teetering tower"] },
 ];
 
 export const styleOf = (k: MessStyle) => MESS_STYLES.find((s) => s.key === k) ?? MESS_STYLES[0];
@@ -61,12 +63,12 @@ const DEFAULT_SPACES: Omit<Space, "id">[] = [
   { name: "Bedroom", icon: "🛏️", level: 1, ratedOn: null, driftDays: null },
 ];
 
-const DEFAULT_CHORES: { name: string; icon: string; everyDays: number }[] = [
+const DEFAULT_CHORES: { name: string; icon: string; everyDays: number; weekday?: number }[] = [
   { name: "Vacuum", icon: "🧹", everyDays: 7 },
   { name: "Change the sheets", icon: "🛏️", everyDays: 14 },
   { name: "Clean out the fridge", icon: "🧊", everyDays: 14 },
   { name: "Dust", icon: "🪶", everyDays: 14 },
-  { name: "Take out recycling", icon: "♻️", everyDays: 7 },
+  { name: "Take out trash and recycling", icon: "♻️", everyDays: 7, weekday: 2 },
 ];
 
 /** A first deck for someone new: chores come due one at a time over the next days, not all at once. */
@@ -106,6 +108,7 @@ export function normalizeCleaning(raw: unknown): Cleaning | null {
       name: text(c.name, 48),
       icon: text(c.icon, 16) || "✨",
       everyDays: Math.max(1, Math.min(366, Math.round(Number(c.everyDays) || 7))),
+      weekday: Number.isInteger(c.weekday) && c.weekday! >= 0 && c.weekday! <= 6 ? c.weekday! : null,
       lastDone: isDay(c.lastDone) ? c.lastDone : null,
       snoozedUntil: isDay(c.snoozedUntil) ? c.snoozedUntil : null,
     }));
@@ -182,8 +185,15 @@ export function laundryNow(l: Laundry, today: string): { fill: number | null; du
 }
 
 /** The day a chore next wants doing (a snooze pushes it on). */
+/** The first day on or after `from` that falls on this weekday. */
+function nextWeekday(from: string, weekday: number): string {
+  const dow = new Date(toUTC(from)).getUTCDay();
+  return addDays(from, (weekday - dow + 7) % 7);
+}
+
 export function choreDueOn(c: Chore, today: string): string {
-  const base = c.lastDone ? addDays(c.lastDone, c.everyDays) : today;
+  // On a weekday: the first one after it was last done (or the next one from today).
+  const base = c.weekday != null ? nextWeekday(c.lastDone ? addDays(c.lastDone, 1) : today, c.weekday) : c.lastDone ? addDays(c.lastDone, c.everyDays) : today;
   return c.snoozedUntil && c.snoozedUntil > base ? c.snoozedUntil : base;
 }
 
