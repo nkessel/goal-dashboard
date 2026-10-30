@@ -14,6 +14,7 @@ import { liftFog } from "@/lib/welcome-fog";
 export type MistTime = "dawn" | "day" | "dusk" | "night";
 
 type Palette = {
+  castle: { wall: string; shade: string; roof: string; gold: string };
   sky: [string, string, string];
   sun: string;
   glow: string;
@@ -26,6 +27,7 @@ type Palette = {
 
 const PALETTES: Record<MistTime, Palette> = {
   dawn: {
+    castle: { wall: "#f2e0e2", shade: "#c9b2c4", roof: "#7f78ad", gold: "#f3c77a" },
     sky: ["#b9c6e4", "#f1cdc4", "#fde3c3"],
     sun: "#fff4dc",
     glow: "255,214,160",
@@ -36,6 +38,7 @@ const PALETTES: Record<MistTime, Palette> = {
     rays: true,
   },
   day: {
+    castle: { wall: "#f5f7f9", shade: "#c5d1dc", roof: "#4f7fb3", gold: "#e8c25c" },
     sky: ["#8fbbe0", "#cfe2ee", "#f4efdc"],
     sun: "#fffdf0",
     glow: "255,244,200",
@@ -46,6 +49,7 @@ const PALETTES: Record<MistTime, Palette> = {
     rays: true,
   },
   dusk: {
+    castle: { wall: "#f0cdbf", shade: "#b893a3", roof: "#5e4f86", gold: "#ffcf7a" },
     sky: ["#55548f", "#c98ba0", "#f6b98a"],
     sun: "#ffe0a8",
     glow: "255,184,120",
@@ -56,6 +60,7 @@ const PALETTES: Record<MistTime, Palette> = {
     rays: true,
   },
   night: {
+    castle: { wall: "#8a93bf", shade: "#5b6390", roof: "#2f3866", gold: "#ffd98a" },
     sky: ["#0d1330", "#1f2850", "#3a4474"],
     sun: "#f6f2de",
     glow: "200,210,255",
@@ -154,11 +159,11 @@ const MOTES = (() => {
 /** The veil: big soft billows that part to either side as the screen opens. */
 const VEIL = (() => {
   const r = rng(3);
-  return Array.from({ length: 12 }, (_, i) => {
+  return Array.from({ length: 8 }, (_, i) => {
     const left = i % 2 === 0;
     return {
       x: (left ? 20 : 80) + (r() - 0.5) * 50,
-      y: 8 + (i / 12) * 84 + (r() - 0.5) * 10,
+      y: 8 + (i / 8) * 84 + (r() - 0.5) * 10,
       size: 70 + r() * 50,
       dx: (left ? -1 : 1) * (45 + r() * 35),
       delay: 120 + r() * 500,
@@ -178,32 +183,74 @@ const SIDE_PINES = (() => {
   return d + "M-120,384 Q100,372 340,386 V400 H-120 Z";
 })();
 
-/** The town on a far hill: roofs, a hall, and a tower with a pennant, standing on the second ridge. */
-const TOWN_X = 860;
-const TOWN_Y = RIDGES[1][Math.round((TOWN_X + 20) / 12)][1] + 6;
-const TOWN = (() => {
-  const b = (x: number, w: number, h: number, roof: number) => `M${x},${TOWN_Y} V${TOWN_Y - h} L${x + w / 2},${TOWN_Y - h - roof} L${x + w},${TOWN_Y - h} V${TOWN_Y} Z`;
-  return [
-    b(TOWN_X - 52, 16, 10, 7),
-    b(TOWN_X - 38, 20, 14, 9),
-    b(TOWN_X - 16, 26, 18, 12),
-    `M${TOWN_X + 12},${TOWN_Y} V${TOWN_Y - 40} L${TOWN_X + 18},${TOWN_Y - 50} L${TOWN_X + 24},${TOWN_Y - 40} V${TOWN_Y} Z`,
-    `M${TOWN_X + 18},${TOWN_Y - 50} V${TOWN_Y - 60} L${TOWN_X + 27},${TOWN_Y - 57} L${TOWN_X + 18},${TOWN_Y - 55}`,
-    b(TOWN_X + 26, 22, 12, 9),
-    b(TOWN_X + 50, 15, 9, 6),
-  ].join(" ");
-})();
-const WINDOWS = [
-  [TOWN_X - 46, 6],
-  [TOWN_X - 30, 8],
-  [TOWN_X - 6, 10],
-  [TOWN_X + 3, 6],
-  [TOWN_X + 17, 28],
-  [TOWN_X + 34, 6],
-  [TOWN_X + 56, 4],
+/**
+ * The castle on the far hill: a curtain wall, round towers with flared
+ * conical spires, a keep, and one tall central spire, each flying a pennant.
+ * Drawn about its base centre (0, 0) and set in place on the second ridge.
+ */
+const CASTLE_X = 930;
+const CASTLE_Y = RIDGES[1][Math.round((CASTLE_X + 20) / 12)][1] + 8;
+const CASTLE_SCALE = 1.25;
+/** A round tower: x centre, width, wall height, spire height, from the ground at y. */
+const TOWERS: [number, number, number, number, number][] = [
+  [-58, 14, 40, 26, 0],
+  [58, 14, 40, 26, 0],
+  [-31, 15, 58, 34, 0],
+  [31, 15, 58, 34, 0],
+  [-13, 9, 74, 24, 0],
+  [13, 9, 74, 24, 0],
+  [0, 17, 90, 50, 0],
 ];
-/** The path from where you stand to the town, narrowing into the distance. */
-const PATH = `M520,${H + 10} C560,740 720,730 690,690 S640,640 760,622 S${TOWN_X - 30},${TOWN_Y + 8} ${TOWN_X - 2},${TOWN_Y} L${TOWN_X + 4},${TOWN_Y} C${TOWN_X - 20},${TOWN_Y + 14} 800,625 785,628 S680,650 728,688 S640,760 700,${H + 10} Z`;
+const CASTLE = (() => {
+  let walls = "";
+  let roofs = "";
+  let flags = "";
+  // The curtain wall and the keep, with battlements.
+  const battlements = (x0: number, x1: number, y: number) => {
+    let d = `M${x0},0 V${-y}`;
+    for (let x = x0; x < x1 - 0.1; x += 6) d += ` h2 v-3 h2 v3 h2`;
+    return d + ` V0 Z `;
+  };
+  walls += battlements(-58, 58, 22) + battlements(-24, 24, 54);
+  for (const [x, w, h, sh] of TOWERS) {
+    walls += `M${x - w / 2},0 V${-h} H${x + w / 2} V0 Z `;
+    const b = -h;
+    const half = w / 2 + 2.5;
+    // A flared cone: concave sides sweeping up to a needle point.
+    roofs += `M${x - half},${b} C${x - half * 0.45},${b - sh * 0.35} ${x - 1.2},${b - sh * 0.75} ${x},${b - sh} C${x + 1.2},${b - sh * 0.75} ${x + half * 0.45},${b - sh * 0.35} ${x + half},${b} Z `;
+    // An eave ring under it.
+    roofs += `M${x - half},${b} h${half * 2} v2 h${-half * 2} Z `;
+    flags += `M${x},${b - sh} v-9 l${7 + w * 0.15},2.5 l${-7 - w * 0.15},2.5 `;
+  }
+  return { walls, roofs, flags };
+})();
+/** Lit windows: x, height above the ground. */
+const CASTLE_WINDOWS: [number, number][] = [
+  [-58, 30],
+  [58, 30],
+  [-31, 46],
+  [-31, 32],
+  [31, 46],
+  [31, 32],
+  [-13, 64],
+  [13, 64],
+  [0, 78],
+  [0, 62],
+  [-8, 40],
+  [8, 40],
+];
+/** The path from where you stand to the castle gate, narrowing into the distance. */
+const GX = CASTLE_X;
+const GY = CASTLE_Y;
+const PATH = `M520,${H + 10} C560,740 720,730 690,690 S700,640 820,622 S${GX - 30},${GY + 8} ${GX - 3},${GY} L${GX + 4},${GY} C${GX - 20},${GY + 14} 870,625 855,628 S700,650 728,688 S640,760 700,${H + 10} Z`;
+
+/** Birds by day: each flies its own line at its own pace, beating its wings in bursts and gliding between. */
+const BIRDS = [
+  { top: 12, size: 1, fly: 52, delay: 1.5, flap: 2.6, flapDelay: 0, bob: 3.1, back: false },
+  { top: 16, size: 0.8, fly: 61, delay: 4, flap: 3.1, flapDelay: 0.7, bob: 3.7, back: false },
+  { top: 10, size: 0.7, fly: 58, delay: 6.5, flap: 2.2, flapDelay: 1.3, bob: 2.9, back: false },
+  { top: 22, size: 0.6, fly: 74, delay: 18, flap: 2.8, flapDelay: 0.4, bob: 3.4, back: true },
+];
 
 export function MistScene({ time, leaving = false }: { time?: MistTime; leaving?: boolean }) {
   const [when] = useState<MistTime>(() => time ?? mistTimeOf());
@@ -212,177 +259,126 @@ export function MistScene({ time, leaving = false }: { time?: MistTime; leaving?
   const p = PALETTES[when];
   const mist = (a: number) => `rgba(${p.mist},${a})`;
   const night = when === "night";
+  const c = p.castle;
 
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Leaving: the last of the mist, which parts once the valley has faded. */}
-      {leaving &&
-        VEIL.map((v, i) => (
-          <span
-            key={i}
-            className="mist-veil-out absolute rounded-full"
-            style={
-              {
-                left: `${v.x}%`,
-                top: `${v.y}%`,
-                width: `${v.size}vmax`,
-                height: `${v.size * 0.7}vmax`,
-                marginLeft: `${-v.size / 2}vmax`,
-                marginTop: `${-v.size * 0.35}vmax`,
-                background: `radial-gradient(ellipse, ${mist(0.95)} 30%, ${mist(0.75)} 50%, ${mist(0)} 70%)`,
-                "--dx": `${v.dx}vw`,
-                animationDelay: `${1000 + v.delay / 2}ms`,
-              } as React.CSSProperties
-            }
-          />
-        ))}
-      {/* The valley. */}
-      <div
-        className={`absolute inset-0 ${leaving ? "mist-layer-out" : ""}`}
-        style={
-          {
-            background: `linear-gradient(180deg, ${p.sky[0]} 0%, ${p.sky[1]} 45%, ${p.sky[2]} 75%)`,
-            "--out-delay": "250ms",
-          } as React.CSSProperties
-        }
-      >
-        {/* Stars at night, twinkling. */}
-        {night &&
-          STARS.map((s, i) => (
-            <span
-              key={i}
-              className="mist-star absolute rounded-full"
-              style={{
-                left: `${s.x}%`,
-                top: `${s.y}%`,
-                width: s.s,
-                height: s.s,
-                background: "#fff",
-                animationDelay: `${s.d}s`,
-              }}
-            />
-          ))}
+      {/* Everything you see; leaving, it all dives forward into the forest. */}
+      <div className={`absolute inset-0 ${leaving ? "mist-dive" : ""}`}>
+        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, ${p.sky[0]} 0%, ${p.sky[1]} 45%, ${p.sky[2]} 75%)` }}>
+          {/* Stars at night, twinkling. */}
+          {night && STARS.map((s, i) => <span key={i} className="mist-star absolute rounded-full" style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, background: "#fff", animationDelay: `${s.d}s` }} />)}
 
-        {/* The sun (or moon), its glow, and slow light rays. */}
-        <div className="absolute left-1/2 top-[22%] -translate-x-1/2 -translate-y-1/2">
-          <div
-            className="absolute left-1/2 top-1/2 h-[120vmax] w-[120vmax] -translate-x-1/2 -translate-y-1/2 rounded-full"
-            style={{
-              background: `radial-gradient(circle, rgba(${p.glow},.55) 0%, rgba(${p.glow},.18) 18%, rgba(${p.glow},0) 42%)`,
-            }}
-          />
-          {p.rays && (
+          {/* The sun (or moon), its glow, and slow light rays. */}
+          <div className="absolute left-1/2 top-[22%] -translate-x-1/2 -translate-y-1/2">
             <div
-              className="mist-rays absolute left-1/2 top-1/2 h-[140vmax] w-[140vmax] rounded-full"
-              style={{
-                background: `repeating-conic-gradient(from 0deg, rgba(${p.glow},.22) 0deg 4deg, rgba(${p.glow},0) 4deg 13deg)`,
-                WebkitMaskImage: "radial-gradient(circle, #000 0%, rgba(0,0,0,.5) 18%, transparent 46%)",
-                maskImage: "radial-gradient(circle, #000 0%, rgba(0,0,0,.5) 18%, transparent 46%)",
-              }}
+              className="absolute left-1/2 top-1/2 h-[120vmax] w-[120vmax] -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{ background: `radial-gradient(circle, rgba(${p.glow},.55) 0%, rgba(${p.glow},.18) 18%, rgba(${p.glow},0) 42%)` }}
             />
-          )}
-          <div
-            className="relative h-[13vmin] max-h-24 w-[13vmin] max-w-24 rounded-full"
-            style={{
-              background: night ? `radial-gradient(circle at 38% 36%, #fffef6, ${p.sun} 60%, #d9d6c4)` : `radial-gradient(circle, #fff, ${p.sun} 65%)`,
-              boxShadow: `0 0 40px 12px rgba(${p.glow},.7)`,
-            }}
-          >
-            {night && <span className="absolute right-[18%] top-[30%] h-[22%] w-[22%] rounded-full" style={{ background: "rgba(190,186,165,.35)" }} />}
+            {p.rays && (
+              <div
+                className="mist-rays absolute left-1/2 top-1/2 h-[140vmax] w-[140vmax] rounded-full"
+                style={{
+                  background: `repeating-conic-gradient(from 0deg, rgba(${p.glow},.22) 0deg 4deg, rgba(${p.glow},0) 4deg 13deg)`,
+                  WebkitMaskImage: "radial-gradient(circle, #000 0%, rgba(0,0,0,.5) 18%, transparent 46%)",
+                  maskImage: "radial-gradient(circle, #000 0%, rgba(0,0,0,.5) 18%, transparent 46%)",
+                }}
+              />
+            )}
+            <div
+              className="relative h-[13vmin] max-h-24 w-[13vmin] max-w-24 rounded-full"
+              style={{ background: night ? `radial-gradient(circle at 38% 36%, #fffef6, ${p.sun} 60%, #d9d6c4)` : `radial-gradient(circle, #fff, ${p.sun} 65%)`, boxShadow: `0 0 40px 12px rgba(${p.glow},.7)` }}
+            >
+              {night && <span className="absolute right-[18%] top-[30%] h-[22%] w-[22%] rounded-full" style={{ background: "rgba(190,186,165,.35)" }} />}
+            </div>
           </div>
         </div>
 
-        {/* A few birds crossing the sky by day. */}
-        {!night && (
-          <svg className="mist-birds absolute left-0 top-[14%] h-10 w-28" viewBox="0 0 112 40" fill="none">
-            {[
-              [8, 22, 1],
-              [30, 12, 0.8],
-              [46, 26, 0.7],
-            ].map(([x, y, s], i) => (
-              <path
-                key={i}
-                d={`M${x},${y} q${6 * s},${-6 * s} ${12 * s},0 q${6 * s},${-6 * s} ${12 * s},0`}
-                stroke={when === "dusk" ? "#3a2b45" : "#4a5468"}
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                opacity=".6"
-              />
-            ))}
-          </svg>
-        )}
-
-        {/* The ridges, far to near, each rising out of the mist in turn, with mist lying between them. */}
-        <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMax slice">
-          <defs>
-            {p.ridges.map((c, i) => (
-              <linearGradient key={i} id={`mist-ridge-${i}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor={p.tops[i]} />
-                <stop offset={i === 0 ? ".28" : ".4"} stopColor={c} />
-                <stop offset="1" stopColor={c} />
-              </linearGradient>
-            ))}
-            <linearGradient id="mist-haze" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor={mist(0)} />
-              <stop offset=".5" stopColor={mist(0.55)} />
-              <stop offset="1" stopColor={mist(0)} />
-            </linearGradient>
-          </defs>
-          {RIDGE_PATHS.map((d, i) => (
-            <g key={i} className="mist-rise" style={{ animationDelay: `${300 + i * 260}ms` }}>
-              <path d={d} fill={`url(#mist-ridge-${i})`} />
-              {i === 1 && (
-                <g>
-                  <path d={TOWN} fill={p.ridges[2]} />
-                  {WINDOWS.map(([x, h], k) => (
-                    <rect key={k} x={x} y={TOWN_Y - h} width="2.4" height="3" fill={`rgb(${p.mote})`} opacity={when === "day" ? 0.25 : 0.95} />
-                  ))}
-                </g>
-              )}
-              {i === 4 && <path d={PATH} fill={p.tops[2]} opacity=".55" />}
-              {FORESTS[i] && <path d={FORESTS[i]!} fill={p.ridges[i]} />}
-              {/* Haze pooled in the valley at this ridge's foot. */}
-              {i < 4 && <rect x="-20" y={RIDGES[i + 1][50][1] - 70} width={W + 40} height="110" fill="url(#mist-haze)" />}
-            </g>
+        {/* Birds crossing the sky by day. */}
+        {!night &&
+          BIRDS.map((b, i) => (
+            <div key={i} className={`${b.back ? "mist-bird-back" : "mist-bird"} absolute left-0`} style={{ top: `${b.top}%`, animationDuration: `${b.fly}s`, animationDelay: `${b.delay}s` }}>
+              <div className="mist-bird-bob" style={{ animationDuration: `${b.bob}s` }}>
+                <svg width={26 * b.size} height={14 * b.size} viewBox="0 0 26 14" fill="none" stroke={when === "dusk" ? "#3a2b45" : "#4a5468"} strokeWidth="1.5" strokeLinecap="round" opacity=".7">
+                  <path className="mist-wing-l" d="M13,9 Q8,3.5 1.5,6" style={{ animationDuration: `${b.flap}s`, animationDelay: `${b.flapDelay}s` }} />
+                  <path className="mist-wing-r" d="M13,9 Q18,3.5 24.5,6" style={{ animationDuration: `${b.flap}s`, animationDelay: `${b.flapDelay}s` }} />
+                </svg>
+              </div>
+            </div>
           ))}
-        </svg>
+
+        {/* The ridges, far to near, each its own layer rising out of the mist in turn, with haze between them. */}
+        {RIDGE_PATHS.map((d, i) => (
+          <svg key={i} className="mist-rise absolute inset-0 h-full w-full" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMax slice" style={{ animationDelay: `${300 + i * 260}ms` }}>
+            <defs>
+              <linearGradient id={`mist-ridge-${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={p.tops[i]} />
+                <stop offset={i === 0 ? ".28" : ".4"} stopColor={p.ridges[i]} />
+                <stop offset="1" stopColor={p.ridges[i]} />
+              </linearGradient>
+              {i < 4 && (
+                <linearGradient id={`mist-haze-${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor={mist(0)} />
+                  <stop offset=".5" stopColor={mist(0.55)} />
+                  <stop offset="1" stopColor={mist(0)} />
+                </linearGradient>
+              )}
+              {i === 1 && (
+                <linearGradient id="mist-castle-wall" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stopColor={c.wall} />
+                  <stop offset=".55" stopColor={c.wall} />
+                  <stop offset="1" stopColor={c.shade} />
+                </linearGradient>
+              )}
+            </defs>
+            <path d={d} fill={`url(#mist-ridge-${i})`} />
+            {i === 1 && (
+              <g transform={`translate(${CASTLE_X},${CASTLE_Y}) scale(${CASTLE_SCALE})`}>
+                <path d={CASTLE.flags} fill={c.gold} stroke={c.gold} strokeWidth=".6" strokeLinejoin="round" />
+                <path d={CASTLE.walls} fill="url(#mist-castle-wall)" />
+                <path d={CASTLE.roofs} fill={c.roof} />
+                {/* The gate. */}
+                <path d="M-6,0 V-9 A6,6 0 0 1 6,-9 V0 Z" fill={c.roof} opacity=".85" />
+                {CASTLE_WINDOWS.map(([x, h], k) => (
+                  <path key={k} d={`M${x - 1.3},${-h} v-3.2 a1.3,1.3 0 0 1 2.6,0 v3.2 Z`} fill={night || when === "dusk" ? `rgb(${p.mote})` : c.shade} opacity={night || when === "dusk" ? 0.95 : 0.8} />
+                ))}
+              </g>
+            )}
+            {i === 4 && <path d={PATH} fill={p.tops[2]} opacity=".55" />}
+            {FORESTS[i] && <path d={FORESTS[i]!} fill={p.ridges[i]} />}
+            {/* Haze pooled in the valley at this ridge's foot. */}
+            {i < 4 && <rect x="-20" y={RIDGES[i + 1][50][1] - 70} width={W + 40} height="110" fill={`url(#mist-haze-${i})`} />}
+          </svg>
+        ))}
 
         {/* Foreground pines framing the screen. */}
         <svg className="mist-rise-side absolute bottom-0 left-0 h-[42vh] max-h-[380px]" viewBox="0 0 220 400" overflow="visible" style={{ marginLeft: "-3%" }}>
           <path d={SIDE_PINES} fill={p.ridges[4]} />
         </svg>
-        <svg className="mist-rise-side absolute bottom-0 right-0 h-[36vh] max-h-[330px]" viewBox="0 0 220 400" overflow="visible" style={{ transform: "scaleX(-1)", marginRight: "-3%" }}>
-          <path d={SIDE_PINES} fill={p.ridges[4]} />
-        </svg>
+        <div className="absolute bottom-0 right-0" style={{ transform: "scaleX(-1)", marginRight: "-3%" }}>
+          <svg className="mist-rise-side block h-[36vh] max-h-[330px]" viewBox="0 0 220 400" overflow="visible">
+            <path d={SIDE_PINES} fill={p.ridges[4]} />
+          </svg>
+        </div>
 
         {/* Little lights drifting up: dust in the sun by day, fireflies after dark. */}
         {MOTES.map((m, i) => (
           <span
             key={i}
             className="mist-mote absolute rounded-full"
-            style={{
-              left: `${m.x}%`,
-              top: `${m.y}%`,
-              width: m.s,
-              height: m.s,
-              background: `rgb(${p.mote})`,
-              boxShadow: `0 0 ${m.s * 3}px rgba(${p.mote},.9)`,
-              animationDelay: `${m.d}s`,
-              animationDuration: `${m.t}s`,
-            }}
+            style={{ left: `${m.x}%`, top: `${m.y}%`, width: m.s, height: m.s, background: `rgb(${p.mote})`, boxShadow: `0 0 ${m.s * 3}px rgba(${p.mote},.9)`, animationDelay: `${m.d}s`, animationDuration: `${m.t}s` }}
           />
         ))}
-      </div>
 
-      {/* Drifting bands of mist between the ridges. */}
-      {[
-        { bottom: "34%", h: "16%", a: 0.5, t: 90, rev: false },
-        { bottom: "22%", h: "14%", a: 0.6, t: 70, rev: true },
-        { bottom: "8%", h: "18%", a: 0.55, t: 55, rev: false },
-        { bottom: "-4%", h: "16%", a: 0.75, t: 45, rev: true },
-      ].map((b, i) => (
-        <div key={i} className={`absolute inset-0 ${leaving ? "mist-layer-out" : ""}`} style={{ "--out-delay": `${700 + (3 - i) * 160}ms` } as React.CSSProperties}>
+        {/* Drifting bands of mist between the ridges. */}
+        {[
+          { bottom: "34%", h: "16%", a: 0.5, t: 90, rev: false },
+          { bottom: "22%", h: "14%", a: 0.6, t: 70, rev: true },
+          { bottom: "8%", h: "18%", a: 0.55, t: 55, rev: false },
+          { bottom: "-4%", h: "16%", a: 0.75, t: 45, rev: true },
+        ].map((b, i) => (
           <div
+            key={i}
             className={b.rev ? "mist-drift-rev absolute left-0 w-[200%]" : "mist-drift absolute left-0 w-[200%]"}
             style={{
               bottom: b.bottom,
@@ -394,19 +390,11 @@ export function MistScene({ time, leaving = false }: { time?: MistTime; leaving?
               backgroundRepeat: "repeat-x",
             }}
           />
-        </div>
-      ))}
+        ))}
 
-      {/* A low soft wash, so the card reads clearly against the art. */}
-      <div
-        className={`absolute inset-0 ${leaving ? "mist-layer-out" : ""}`}
-        style={
-          {
-            "--out-delay": "500ms",
-            background: `radial-gradient(ellipse 60% 55% at 50% 52%, ${mist(night ? 0.12 : 0.28)}, ${mist(0)} 75%)`,
-          } as React.CSSProperties
-        }
-      />
+        {/* A low soft wash, so the card reads clearly against the art. */}
+        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 60% 55% at 50% 52%, ${mist(night ? 0.12 : 0.28)}, ${mist(0)} 75%)` }} />
+      </div>
 
       {/* The veil: thick mist at first, parting to reveal the valley. */}
       <div className="mist-veil-wash absolute inset-0" style={{ background: mist(1) }} />
@@ -429,6 +417,16 @@ export function MistScene({ time, leaving = false }: { time?: MistTime; leaving?
           }
         />
       ))}
+
+      {/* Leaving: mist rolls in as you go into the forest, then thins away to show Today. */}
+      {leaving && (
+        <div
+          className="mist-through absolute inset-0"
+          style={{
+            background: `radial-gradient(ellipse 40% 22% at 30% 40%, ${mist(1)}, ${mist(0)} 70%), radial-gradient(ellipse 36% 20% at 72% 62%, ${mist(1)}, ${mist(0)} 70%), radial-gradient(ellipse 120% 100% at 50% 50%, ${mist(0.97)}, ${mist(0.85)})`,
+          }}
+        />
+      )}
     </div>
   );
 }

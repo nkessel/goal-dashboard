@@ -3,12 +3,12 @@
 import { FoldGroup } from "./FoldGroup";
 import { useEffect, useState, useRef } from "react";
 import { CheckinIcon } from "@/components/xp/CheckinIcon";
-import { CHECKIN_ICONS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, checkinIconOf, checkinStyleOf, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
+import { CHECKIN_ICONS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, checkinIconOf, checkinStyleOf, loadFx, saveFx, subscribeFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { WelcomeCard } from "@/components/xp/WelcomeCard";
 import { welcomeContextAction } from "@/app/actions";
 import { ROTATION, likeLine, likedLines, lineForDay, retireLine, retiredLines, rotationFor } from "@/lib/greetings";
-import { WELCOME_ELS, backGreeting, backHours, backOwnOn, backPool, linesOf, moveEl, ownLines, ownLinesOn, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
+import { WELCOME_ELS, backHours, backOwnOn, greetingFor, greetingPool, moveEl, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
 
 type NumKey = "dens" | "vel" | "reach" | "size" | "embers" | "fill";
@@ -52,8 +52,11 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
   useEffect(() => setFx(loadFx()), []);
 
   // Every change is saved straight away, so Preview always plays the latest values.
+  // Kept in step with the other places these settings show (the welcome screen's gear, the Settings page).
+  useEffect(() => subscribeFx(() => setFx(loadFx())), []);
   function update(patch: Partial<FxSettings>) {
-    const next = { ...fx, ...patch };
+    // On top of what's saved now, so a change made elsewhere is never undone from here.
+    const next = { ...loadFx(), ...patch };
     setFx(next);
     setNote(saveFx(next) ? "Saved automatically." : "Could not save in this browser.");
   }
@@ -95,32 +98,8 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
         </FoldGroup>
         <FoldGroup title="Greetings">
           <div className="flex flex-col gap-2">
-        <span className="text-[13px] font-semibold">The greeting, day&rsquo;s first visit</span>
-        <div role="radiogroup" aria-label="The welcome greeting" className="flex flex-wrap gap-1.5">
-          {WELCOME_HEADINGS.map((w) => (
-            <button key={w.key} type="button" role="radio" aria-checked={(fx.welcomeHeading ?? "cheer") === w.key} title={w.hint} onClick={() => update({ welcomeHeading: w.key })} className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick((fx.welcomeHeading ?? "cheer") === w.key)}>
-              <span className="text-[14px] font-bold">{w.label}</span>
-              <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
-                {w.hint}
-              </span>
-            </button>
-          ))}
-        </div>
-        {fx.welcomeHeading === "custom" && (
-          <textarea
-            value={fx.welcomeText ?? ""}
-            onChange={(e) => update({ welcomeText: e.target.value.slice(0, 1200) })}
-            rows={3}
-            placeholder={"One per line; they take turns each day.\ne.g. Welcome back, friend"}
-            aria-label="Your welcome greetings"
-            className="rounded-lg border px-3 py-2 text-[16px]"
-            style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
-          />
-        )}
-
-        <span className="mt-1 text-[13px] font-semibold">The greeting, welcome back</span>
-        <p className="m-0 -mt-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-          A different one each time, from the greetings you leave switched on. You can also add one from the welcome back screen with its ✎ button.
+        <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+          One list for the day&rsquo;s first visit and welcome back. Each time the screen opens it picks one of the greetings you leave switched on (a morning cheer only in the morning, and so on). You can also add one from the welcome screen with its ✎ button.
         </p>
         <label className="flex min-h-9 items-center gap-2.5 text-sm">
           <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={backOwnOn(fx)} onChange={() => update({ welcomeBackOwn: !backOwnOn(fx) })} />
@@ -128,18 +107,18 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
         </label>
         {backOwnOn(fx) && (
           <textarea
-            value={fx.welcomeBackText ?? ""}
-            onChange={(e) => update({ welcomeBackText: e.target.value.slice(0, 1200) })}
+            value={ownGreetings(fx).join("\n")}
+            onChange={(e) => update({ welcomeBackText: e.target.value.slice(0, 1200), welcomeText: "" })}
             rows={3}
             placeholder={"One per line; they take turns with the others.\ne.g. The hearth is warm, come in"}
-            aria-label="Your welcome back greetings"
+            aria-label="Your own greetings"
             className="reveal rounded-lg border px-3 py-2 text-[16px]"
             style={{ borderColor: "var(--t-card-border)", background: "rgba(255,250,238,.9)", color: "#2a1c10" }}
           />
         )}
         <PhraseList
           title="Choose which greetings show"
-          lines={backPool(fx)}
+          lines={greetingPool(fx)}
           isOn={(l) => !(fx.welcomeBackOff ?? []).includes(l)}
           onToggle={(l, on) => update({ welcomeBackOff: on ? (fx.welcomeBackOff ?? []).filter((x) => x !== l) : [...(fx.welcomeBackOff ?? []), l] })}
         />
@@ -252,7 +231,7 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
       {welcomePreview && (
         <WelcomeCard
           mode={welcomePreview.mode}
-          heading={welcomePreview.mode === "day" ? (fx.welcomeHeading === "custom" && linesOf(fx.welcomeText).length ? linesOf(fx.welcomeText)[0] : fx.welcomeHeading === "dawn" ? "A new day dawns, adventurer" : "Huzzah! Here you are!") : backGreeting(fx, welcomePreview.key)}
+          heading={greetingFor(fx, welcomePreview.key)}
           award={welcomePreview.mode === "day" ? { xp: 10, streak: 8, coins: 2, fromPct: 40, toPct: 55, caption: "Level 4 · 1,960 / 2,500 XP to level 5" } : null}
           line={lineForDay(new Date().toDateString(), ownLines(fx))}
           metrics={welcomePreview.ctx.metrics}
@@ -413,7 +392,7 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
       {welcomePreview && (
         <WelcomeCard
           mode={welcomePreview.mode}
-          heading={welcomePreview.mode === "day" ? (fx.welcomeHeading === "custom" && linesOf(fx.welcomeText).length ? linesOf(fx.welcomeText)[0] : fx.welcomeHeading === "dawn" ? "A new day dawns, adventurer" : "Huzzah! Here you are!") : backGreeting(fx, welcomePreview.key)}
+          heading={greetingFor(fx, welcomePreview.key)}
           award={welcomePreview.mode === "day" ? { xp: 10, streak: 8, coins: 2, fromPct: 40, toPct: 55, caption: "Level 4 · 1,960 / 2,500 XP to level 5" } : null}
           line={lineForDay(new Date().toDateString(), ownLines(fx))}
           metrics={welcomePreview.ctx.metrics}

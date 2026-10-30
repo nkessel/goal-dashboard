@@ -83,15 +83,15 @@ export function WelcomeCard({
   const [checkinOpen, setCheckinOpen] = useState(false);
   // Checked in within the last hour? Then there's no need to ask again here.
   const [recent] = useState(() => !!lastCheckInAt && Date.now() - Date.parse(lastCheckInAt) < 3_600_000);
-  // Ready: the card zooms out and fades, then the mist fades layer by layer to reveal Today.
+  // Ready: into the forest, through the mist, and out onto Today.
   const [leaving, setLeaving] = useState(false);
   const leave = () => {
     if (leaving) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return (onClose(), toToday?.());
     setLeaving(true);
     const elsewhere = !!toToday && window.location.pathname !== "/";
-    // From another page, the fog takes over once the card is gone, and Today lifts it.
-    setTimeout(() => (onClose(), toToday?.()), elsewhere ? 650 : 2500);
+    // From another page, the fog takes over once the mist has rolled in, and Today lifts it.
+    setTimeout(() => (onClose(), toToday?.()), elsewhere ? 1350 : 2400);
   };
   useEscape(leave);
 
@@ -241,6 +241,7 @@ export function WelcomeCard({
       <MistScene leaving={leaving} />
       <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative ${post ? "pt-[54px]" : ""}`} onClick={(e) => e.stopPropagation()}>
         {post && <Signpost />}
+        {mode === "back" && <WelcomeToucan />}
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -259,8 +260,8 @@ export function WelcomeCard({
         <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${post ? "max-h-[calc(88vh-54px)]" : "max-h-[88vh]"} w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`}>
           <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
             {heading}
-            {mode === "back" && !addingPhrase && (
-              <button type="button" onClick={() => setAddingPhrase(true)} aria-label="Add a welcome back greeting of your own" title="Add a welcome back greeting of your own" className="ml-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full align-middle hover:bg-black/[.06]">
+            {!preview && !addingPhrase && (
+              <button type="button" onClick={() => setAddingPhrase(true)} aria-label="Add a greeting of your own" title="Add a greeting of your own" className="ml-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full align-middle hover:bg-black/[.06]">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
                 </svg>
@@ -280,7 +281,7 @@ export function WelcomeCard({
               }}
             >
               <label htmlFor="welcome-phrase" className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                A welcome back greeting for another time
+                A greeting for another time
               </label>
               <div className="flex gap-1.5">
                 <input id="welcome-phrase" autoFocus value={phrase} onChange={(e) => setPhrase(e.target.value)} maxLength={120} placeholder="e.g. The hearth is warm, come in" className="h-10 min-w-0 flex-1 rounded-full px-3.5 text-[16px]" style={FIELD} />
@@ -335,6 +336,24 @@ export function WelcomeCard({
       </div>
     </div>,
     document.body
+  );
+}
+
+/** Welcome back: the toucan flies in over the valley, flaps, glides, and lands on the card's corner to greet you. */
+function WelcomeToucan() {
+  const [landed, setLanded] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setLanded(true), 2700);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div aria-hidden className="welcome-toucan pointer-events-none absolute -top-[47px] left-2 z-[3]">
+      <div className={`owl-body ${landed ? "owl-perched" : ""}`}>
+        <div className="owl-idle">
+          <ToucanArt flying={!landed} size={58} />
+        </div>
+      </div>
+    </div>
   );
 }
 

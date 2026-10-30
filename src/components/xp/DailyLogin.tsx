@@ -1,34 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { dailyCheckInAction, welcomeContextAction } from "@/app/actions";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { WelcomeCard, type WelcomeAward } from "./WelcomeCard";
 import { xpToNextLevel } from "@/lib/levels";
 import { lineForDay } from "@/lib/greetings";
-import { backGreeting, backHours, linesOf, ownLines, pickFor } from "@/lib/welcome";
+import { backHours, greetingFor, ownLines } from "@/lib/welcome";
 import { voice } from "@/lib/toucan-style";
 import { readStyle } from "@/lib/toucan-style-store";
-import { loadFx } from "@/lib/celebration-fx";
+import { loadFx, subscribeFx } from "@/lib/celebration-fx";
 import { fogOn, liftFog } from "@/lib/welcome-fog";
-
-/** The day's first greeting: a small cheer for arriving, in the realm's voice (a different one each day). */
-const HEADINGS = {
-  morning: ["Huzzah! The day's first step is taken", "Here you are, bright and early!", "The sun rose, and so did you!", "Look who's here at first light!"],
-  day: ["Huzzah! Here you are!", "The realm rejoices: you've arrived!", "And there you are, right on time!", "Hail, traveller! You made it!", "Trumpets, please: you're here!"],
-  evening: ["Here you are, even now. Huzzah!", "The lanterns are lit for your arrival!", "You came, and the evening is brighter for it!", "Look who walked through the door tonight!"],
-};
-function dawnHeading(dayKey: string) {
-  const fx = loadFx();
-  if (fx.welcomeHeading === "dawn") return "A new day dawns, adventurer";
-  // Your own words: one per line, taking turns day by day.
-  const own = linesOf(fx.welcomeText);
-  if (fx.welcomeHeading === "custom" && own.length) return pickFor(dayKey, own);
-  const h = new Date().getHours();
-  const list = h < 12 ? HEADINGS.morning : h < 17 ? HEADINGS.day : HEADINGS.evening;
-  return pickFor(dayKey, list);
-}
 
 const BACK_KEY = "welcome-back-at";
 /** The day's open check-in screen: it comes back on each visit until you check in or close it. */
@@ -56,7 +39,7 @@ function setPending(p: Pending | null) {
   } catch {}
 }
 
-type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<ReturnType<typeof welcomeContextAction>> };
+type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<ReturnType<typeof welcomeContextAction>>; seed?: string };
 
 /**
  * The welcome screen. On the day's first visit it records the daily check-in
@@ -68,8 +51,12 @@ type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<Re
  */
 export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   const router = useRouter();
-  const [shown, setShown] = useState<Shown | null>(null);
+  const [shown, setShownRaw] = useState<Shown | null>(null);
+  const setShown = (s: Shown | null) => setShownRaw(s && { ...s, seed: s.seed ?? `${Date.now()}:${Math.random()}` });
   // A snooze that ends while the app is still open brings it back then.
+  // Settings changed (from its gear, say) show on the open screen straight away.
+  const [, fxChanged] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => subscribeFx(fxChanged), []);
   const snoozeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(snoozeTimer.current), []);
   // Following a link away while it's open keeps it for when you come back to this page.
@@ -196,11 +183,12 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
 
   if (!shown) return null;
   const fx = loadFx();
-  const key = shown.mode === "day" ? eveningDayKey() : `${eveningDayKey()}:${new Date().getHours()}`;
+  // A fresh greeting each time the screen opens (kept while it's open).
+  const key = shown.seed ?? eveningDayKey();
   return (
     <WelcomeCard
       mode={shown.mode}
-      heading={shown.mode === "day" ? dawnHeading(eveningDayKey()) : backGreeting(fx, key)}
+      heading={greetingFor(fx, key)}
       award={shown.award}
       line={lineForDay(eveningDayKey(), ownLines(fx))}
       metrics={shown.ctx.metrics}

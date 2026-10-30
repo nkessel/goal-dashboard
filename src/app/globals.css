@@ -1094,27 +1094,28 @@ html[data-evening] [data-theme="adventure"] {
 
 /* ── The welcome screen's mist ────────────────────────────────────────
    A veil of mist parts, the ridges rise far to near, and the card comes
-   into focus out of it. The mist between the ridges keeps drifting. */
-.mist-emerge { animation: mist-emerge 1.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.55s both; }
+   into view out of it. The mist between the ridges keeps drifting. Only
+   transform and opacity move, each on its own layer, so it stays smooth. */
+.mist-emerge { animation: mist-emerge 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.5s both; will-change: transform, opacity; }
 @keyframes mist-emerge {
-  0% { opacity: 0; filter: blur(14px); transform: translateY(22px) scale(0.96); }
-  55% { opacity: 1; }
-  100% { opacity: 1; filter: blur(0); transform: none; }
+  0% { opacity: 0; transform: translateY(18px) scale(0.97); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
 }
-.mist-veil-wash { animation: mist-fade 1.6s ease-out 0.1s both; }
+.mist-veil-wash { animation: mist-fade 1.6s ease-out 0.1s both; will-change: opacity; }
 @keyframes mist-fade { from { opacity: 1; } to { opacity: 0; } }
-.mist-veil { opacity: 0; animation: mist-part 2.8s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.mist-veil { opacity: 0; animation: mist-part 2.8s cubic-bezier(0.4, 0, 0.2, 1) both; will-change: transform, opacity; }
 @keyframes mist-part {
   0% { opacity: 1; transform: translateX(0) scale(1); }
   100% { opacity: 0; transform: translateX(var(--dx)) scale(1.35); }
 }
-.mist-rise { animation: mist-rise 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.mist-rise { animation: mist-rise 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; will-change: transform, opacity; }
 @keyframes mist-rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
-.mist-rise-side { animation: mist-rise 2.2s cubic-bezier(0.2, 0.7, 0.2, 1) 1.1s both; }
-.mist-drift { animation: mist-drift linear infinite; }
-.mist-drift-rev { animation: mist-drift linear infinite reverse; }
+.mist-rise-side { animation: mist-rise 2.2s cubic-bezier(0.2, 0.7, 0.2, 1) 1.1s both; will-change: transform, opacity; }
+.mist-drift { animation: mist-drift linear infinite; will-change: transform; }
+.mist-drift-rev { animation: mist-drift linear infinite reverse; will-change: transform; }
 @keyframes mist-drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.mist-rays { transform: translate(-50%, -50%); animation: mist-turn 160s linear infinite; }
+.mist-rays { transform: translate(-50%, -50%); animation: mist-turn 160s linear infinite; will-change: transform; }
 @keyframes mist-turn { to { transform: translate(-50%, -50%) rotate(360deg); } }
 .mist-star { animation: mist-twinkle 4s ease-in-out infinite; }
 @keyframes mist-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.95; } }
@@ -1125,14 +1126,53 @@ html[data-evening] [data-theme="adventure"] {
   75% { opacity: 0.6; }
   100% { opacity: 0; transform: translate(18px, -90px); }
 }
-.mist-birds { animation: mist-birds 46s linear 1.5s infinite; transform: translateX(-140px); }
-@keyframes mist-birds { from { transform: translateX(-140px) translateY(0); } 50% { transform: translateX(50vw) translateY(-14px); } to { transform: translateX(105vw) translateY(4px); } }
-/* Ready: the card zooms out and fades, the valley fades, then each layer of mist. */
-.mist-card-out { animation: mist-card-out 0.6s cubic-bezier(0.4, 0, 0.6, 1) both; }
-@keyframes mist-card-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.82); filter: blur(4px); } }
-.mist-layer-out { animation: mist-layer-out 0.8s ease var(--out-delay, 0ms) both; }
-@keyframes mist-layer-out { from { opacity: 1; } to { opacity: 0; } }
-.mist-veil-out { animation: mist-part 1.3s cubic-bezier(0.4, 0, 0.2, 1) both; }
+/* Birds: each crosses on its own line and pace, rising and falling a little,
+   with a few quick wingbeats and then a glide, wings held slightly raised. */
+.mist-bird, .mist-bird-back { transform: translateX(-12vw); animation: mist-bird linear infinite both; will-change: transform; }
+.mist-bird-back { animation-name: mist-bird-back; transform: translateX(112vw); }
+@keyframes mist-bird { 0% { transform: translate(-12vw, 0); } 35% { transform: translate(30vw, -2.5vh); } 70% { transform: translate(72vw, -1vh); } 100% { transform: translate(112vw, -4vh); } }
+@keyframes mist-bird-back { 0% { transform: translate(112vw, 0); } 40% { transform: translate(60vw, -2vh); } 100% { transform: translate(-12vw, -3vh); } }
+.mist-bird-bob { animation: mist-bob ease-in-out infinite alternate; }
+@keyframes mist-bob { from { transform: translateY(-3px); } to { transform: translateY(3px); } }
+.mist-wing-l, .mist-wing-r { transform-box: view-box; transform-origin: 13px 9px; animation: mist-flap-l ease-in-out infinite; }
+.mist-wing-r { animation-name: mist-flap-r; }
+@keyframes mist-flap-l {
+  0%, 30% { transform: rotate(0deg); }
+  34%, 46%, 58% { transform: rotate(-38deg); }
+  40%, 52%, 64% { transform: rotate(16deg); }
+  72%, 100% { transform: rotate(4deg); }
+}
+@keyframes mist-flap-r {
+  0%, 30% { transform: rotate(0deg); }
+  34%, 46%, 58% { transform: rotate(38deg); }
+  40%, 52%, 64% { transform: rotate(-16deg); }
+  72%, 100% { transform: rotate(-4deg); }
+}
+/* Welcome back: the toucan sweeps in from the far sky in a long arc and lands on the card. */
+.welcome-toucan { animation: welcome-toucan 2.7s cubic-bezier(0.3, 0.1, 0.25, 1) 0.4s both; will-change: transform, opacity; }
+@keyframes welcome-toucan {
+  0% { opacity: 0; transform: translate(70vw, -30vh) scale(0.45) rotate(-8deg); }
+  12% { opacity: 1; }
+  45% { transform: translate(40vw, -2vh) scale(0.75) rotate(-4deg); }
+  80% { transform: translate(6vw, -6vh) scale(0.95) rotate(4deg); }
+  100% { opacity: 1; transform: none; }
+}
+/* Ready: the card slips past, the view dives into the forest, mist rolls in
+   and then thins away to show Today. */
+.mist-card-out { animation: mist-card-out 0.55s cubic-bezier(0.4, 0, 0.8, 0.6) both; }
+@keyframes mist-card-out { to { opacity: 0; transform: scale(1.18); } }
+.mist-dive { transform-origin: 50% 82%; animation: mist-dive 2.4s cubic-bezier(0.45, 0, 0.55, 1) both; will-change: transform, opacity; }
+@keyframes mist-dive {
+  0% { transform: scale(1); opacity: 1; }
+  55% { transform: scale(2.6); opacity: 1; }
+  60%, 100% { transform: scale(2.7); opacity: 0; }
+}
+.mist-through { animation: mist-through 2.4s ease both; will-change: opacity; }
+@keyframes mist-through {
+  0%, 20% { opacity: 0; }
+  52%, 62% { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 /* The fog over the app before the welcome screen (and on the walk to Today):
    set on <html> by a small script at first paint, lifted by the app. */
@@ -1156,8 +1196,9 @@ html[data-fog-lift]::after { animation: fog-lift 0.9s ease forwards; }
 @keyframes fog-lift { to { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .mist-emerge, .mist-rise, .mist-rise-side, .mist-drift, .mist-drift-rev, .mist-rays, .mist-star, .mist-birds { animation: none; }
-  .mist-veil, .mist-veil-wash, .mist-mote, .mist-veil-out { display: none; }
+  .mist-emerge, .mist-rise, .mist-rise-side, .mist-drift, .mist-drift-rev, .mist-rays, .mist-star, .mist-bird-bob, .mist-wing-l, .mist-wing-r { animation: none; }
+  .mist-veil, .mist-veil-wash, .mist-mote, .mist-bird, .mist-bird-back { display: none; }
+  .welcome-toucan { animation: none; }
   html[data-fog]::after { animation: none; }
 }
 

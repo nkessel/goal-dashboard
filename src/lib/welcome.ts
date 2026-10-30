@@ -103,28 +103,40 @@ export function pickFor(key: string, list: string[]) {
   return list[n % list.length];
 }
 
-/** Whether your own welcome back greetings and wise lines are in use (yes by default if you wrote some). */
-export const backOwnOn = (fx: FxSettings) => fx.welcomeBackOwn ?? !!linesOf(fx.welcomeBackText).length;
+/** The cheers for arriving, each for its part of the day. */
+const CHEERS: Record<"morning" | "day" | "evening", string[]> = {
+  morning: ["Huzzah! The day's first step is taken", "Here you are, bright and early!", "The sun rose, and so did you!", "Look who's here at first light!"],
+  day: ["Huzzah! Here you are!", "The realm rejoices: you've arrived!", "And there you are, right on time!", "Hail, traveller! You made it!", "Trumpets, please: you're here!"],
+  evening: ["Here you are, even now. Huzzah!", "The lanterns are lit for your arrival!", "You came, and the evening is brighter for it!", "Look who walked through the door tonight!"],
+};
+const PART_OF_DAY = new Map(Object.entries(CHEERS).flatMap(([when, lines]) => lines.map((l) => [l, when] as const)));
+
+/** Your own greetings: those written for welcome back, and any written for the day's first visit before the two lists became one. */
+export const ownGreetings = (fx: FxSettings) => [...new Set([...linesOf(fx.welcomeBackText), ...linesOf(fx.welcomeText)])].slice(0, 40);
+
+/** Whether your own greetings and wise lines are in use (yes by default if you wrote some). */
+export const backOwnOn = (fx: FxSettings) => fx.welcomeBackOwn ?? (!!ownGreetings(fx).length || fx.welcomeHeading === "custom");
 export const ownLinesOn = (fx: FxSettings) => fx.welcomeOwnOn ?? !!linesOf(fx.welcomeOwnLines).length;
 /** Your own wise lines, when they're switched on. */
 export const ownLines = (fx: FxSettings) => (ownLinesOn(fx) ? linesOf(fx.welcomeOwnLines) : []);
 
-/** Every welcome back greeting that can come up: the built-in ones, then yours. */
-export function backPool(fx: FxSettings) {
-  return [...BACK_GREETINGS, ...(backOwnOn(fx) ? linesOf(fx.welcomeBackText) : [])];
+/** Every greeting that can open the welcome screen, in one list: the cheers, the welcome backs, then yours. */
+export function greetingPool(fx: FxSettings) {
+  return [...new Set([...CHEERS.morning, ...CHEERS.day, ...CHEERS.evening, "A new day dawns, adventurer", ...BACK_GREETINGS, ...(backOwnOn(fx) ? ownGreetings(fx) : [])])];
 }
 
-/** The "welcome back" greeting: one of those still switched on (the built-in ones if you've switched them all off). */
-export function backGreeting(fx: FxSettings, key: string) {
+/** The greeting for this visit: one still switched on, picked by `seed` (a morning cheer only in the morning, and so on). */
+export function greetingFor(fx: FxSettings, seed: string, hour = new Date().getHours()) {
   const off = new Set(fx.welcomeBackOff ?? []);
-  const on = backPool(fx).filter((l) => !off.has(l));
-  return pickFor(key, on.length ? on : BACK_GREETINGS);
+  const now = hour < 12 ? "morning" : hour < 17 ? "day" : "evening";
+  const on = greetingPool(fx).filter((l) => !off.has(l) && (PART_OF_DAY.get(l) ?? now) === now);
+  return pickFor(seed, on.length ? on : BACK_GREETINGS);
 }
 
 /** Add a welcome back greeting of your own (it joins the ones that take turns), as a settings patch. */
 export function addBackGreeting(fx: FxSettings, line: string): Partial<FxSettings> {
   const l = line.replace(/\s+/g, " ").trim().slice(0, 120);
-  const own = linesOf(fx.welcomeBackText);
+  const own = ownGreetings(fx);
   if (!l || own.includes(l)) return { welcomeBackOwn: true };
-  return { welcomeBackText: [...own, l].join("\n"), welcomeBackOwn: true, welcomeBackOff: (fx.welcomeBackOff ?? []).filter((x) => x !== l) };
+  return { welcomeBackText: [...own, l].join("\n"), welcomeText: "", welcomeBackOwn: true, welcomeBackOff: (fx.welcomeBackOff ?? []).filter((x) => x !== l) };
 }
