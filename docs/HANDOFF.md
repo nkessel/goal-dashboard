@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30, `main` @ `34fba11` (welcome screen settings in context)
+- **Last updated:** 2026-10-30, `main` @ `61e4560` + AR class homework linked to the Mastering Facilitation course
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** 25 notes not marked shipped (as of 2026-10-30 16:40 UTC, query below). Some may already have been built through chat requests without being marked.
 
@@ -112,6 +112,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
 - Oct 30: Welcome screen settings in context: its gear arranges the screen in place (each part gets show/hide, up/down and its own options where it sits; a strip on top for when it opens, the castle and confetti; greetings under the heading). `src/components/xp/WelcomeArrange.tsx`; the wise-line and greeting lists moved to `settings/LineLists.tsx`. Settings › Welcome Screen still has the same controls.
+- Oct 30: AR class homework now stands for the Mastering Facilitation board (follows the current week's quest and its due date; tapping "Now: Week …" on the card opens that board).
 - Oct 30: AR class (Mastering Facilitation) due dates moved back one week, old values and undo in `docs/data-changes/2026-10-30-mastering-facilitation-due-dates.md`.
 - Oct 30: Welcome screen out of the mist (fairytale castle with 4 designs to pick in Settings › Welcome Screen › The castle, birds, toucan lands on welcome back, single greetings list, fog hides Today from first paint, dive into the forest on Continue; signpost removed); Due soon look-ahead setting and ranking (due next first, past due last; reach picked from the chip on its header, kept in the `due-soon-hours` cookie, `src/lib/due-soon.ts`); on the welcome screen Due soon is a gilded button that opens a drawer of real quest cards (`DueSoonDrawer`; the screen drops to z-49 while it's open so a card's editor shows over it); folded Settings groups show their value; stand-in quests keep their own due date; Check in button icons.
 - Oct 29: Feedback batches (check-in card, invite wording themes, life wheel readout, Insights XP columns and pinch zoom); dreams cloud on boards; invite popup; toucan "Not now" snoozes; welcome screen top priority.

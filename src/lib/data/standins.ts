@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { catchUpOrder, catchUpPlan } from "@/lib/catch-up";
 import type { Task } from "./types";
 
-export type StandIn = { id: string; title: string; due_at: string | null; next_step: string | null; board: string | null };
+export type StandIn = { id: string; title: string; due_at: string | null; next_step: string | null; board: string | null; board_id?: string | null };
 
 /**
  * A stand-in quest ("AR class homework") speaks for a board: it keeps its own
@@ -80,7 +80,7 @@ export async function applyStandIns<T extends Task>(ownerId: string, tasks: T[])
       importance: Math.max(t.importance ?? 0, p.importance ?? 0),
       urgency: Math.max(t.urgency ?? 0, p.urgency ?? 0),
       estimate_minutes: t.estimate_minutes ?? p.estimate_minutes,
-      stand_in: { id: p.id, title: p.title, due_at: p.due_at, next_step: nextStep.get(p.id) ?? null, board: names.get(p.board_id!) ?? null },
+      stand_in: { id: p.id, title: p.title, due_at: p.due_at, next_step: nextStep.get(p.id) ?? null, board: names.get(p.board_id!) ?? null, board_id: p.board_id },
     };
   });
 }

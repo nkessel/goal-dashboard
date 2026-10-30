@@ -75,7 +75,7 @@ export type Task = {
   /** A stand-in quest: it speaks for this board's current assignment. */
   stands_for?: string | null;
   /** Filled in for a stand-in: the assignment it points at right now. */
-  stand_in?: { id: string; title: string; due_at: string | null; next_step: string | null; board: string | null } | null;
+  stand_in?: { id: string; title: string; due_at: string | null; next_step: string | null; board: string | null; board_id?: string | null } | null;
   /** A stand-in's own due date (`due_at` may be borrowed from its board's assignment). */
   own_due_at?: string | null;
   /** Hidden from your party, even on screens you share. */

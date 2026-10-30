@@ -533,7 +533,22 @@ export function TaskRow({
           </p>
           {task.stand_in && (
             <p className="m-0 line-clamp-2 text-[12.5px] leading-snug" style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }} title={`This quest stands for ${task.stand_in.board ?? "a board"}: it follows its current assignment`}>
-              <b style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink)" }}>Now:</b> {task.stand_in.title}
+              <b style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink)" }}>Now:</b>{" "}
+              {task.stand_in.board_id ? (
+                <button
+                  type="button"
+                  className="underline decoration-dotted underline-offset-2"
+                  title={`Open ${task.stand_in.board ?? "its board"}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/boards/${task.stand_in!.board_id}`);
+                  }}
+                >
+                  {task.stand_in.title}
+                </button>
+              ) : (
+                task.stand_in.title
+              )}
               {task.stand_in.next_step && <span> · next: {task.stand_in.next_step}</span>}
             </p>
           )}
