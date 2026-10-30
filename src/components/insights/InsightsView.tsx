@@ -21,7 +21,8 @@ const INK = "#3b2a14";
 const INK_SOFT = "#6b5631";
 const GRID = "rgba(110,85,40,.18)";
 
-export function InsightsView({ theme, readings, wins }: { theme: "calm" | "adventure"; readings: Reading[]; wins: WinLite[] }) {
+/** "This week" tiles or the Patterns card (each its own part of the Insights screen); both when no part is named. */
+export function InsightsView({ theme, readings, wins, part }: { theme: "calm" | "adventure"; readings: Reading[]; wins: WinLite[]; part?: "week" | "patterns" }) {
   const mounted = useMounted();
   const isAdventure = theme === "adventure";
   const card = `relative flex flex-col gap-3 rounded-2xl px-4 py-4 ${isAdventure ? "parchment parchment-framed" : ""}`;
@@ -62,7 +63,7 @@ export function InsightsView({ theme, readings, wins }: { theme: "calm" | "adven
   return (
     <div className="flex flex-col gap-4">
       {/* This week */}
-      <section className={card} style={cardStyle} aria-label="This week">
+      {part !== "patterns" && <section className={card} style={cardStyle} aria-label="This week">
         <h2 className={h2} style={{ color: "var(--t-ink)" }}>
           This week
         </h2>
@@ -88,15 +89,15 @@ export function InsightsView({ theme, readings, wins }: { theme: "calm" | "adven
             );
           })}
         </div>
-      </section>
+      </section>}
 
       {/* Patterns */}
-      <section className={card} style={cardStyle} aria-label="Patterns">
+      {part !== "week" && <section className={card} style={cardStyle} aria-label="Patterns">
         <h2 className={h2} style={{ color: "var(--t-ink)" }}>
           Patterns
         </h2>
         <Patterns energy={energy} quests={quests} />
-      </section>
+      </section>}
     </div>
   );
 }

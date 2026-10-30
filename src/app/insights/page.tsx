@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CreateFab } from "@/components/create/CreateFab";
 import { InsightsView } from "@/components/insights/InsightsView";
+import { ScreenArrange } from "@/components/ui/ScreenArrange";
 import { CheckInHub } from "@/components/insights/CheckInHub";
 import { getProfileById } from "@/lib/data/profiles";
 import { getCheckMetrics, listCheckInsSince, listCheckNotesSince, listEnergySince } from "@/lib/data/energy";
@@ -79,75 +80,114 @@ export default async function InsightsPage() {
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <div className="flex flex-col gap-4">
         <PageHeader isAdventure={isAdventure} title="Insights" calmTitle="Insights" subtitle="What your check-ins and quests are telling you" />
-        <section
-          aria-label="Check in"
-          // A parchment card like the rest of the app, its words in ink rather than cream.
-          className={`flex flex-col gap-2 rounded-2xl px-4 py-3.5 ${isAdventure ? "parchment parchment-framed" : ""}`}
-          style={{
-            ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }),
-            ["--t-cream" as string]: "var(--t-ink)",
-            ["--ec-soft" as string]: "var(--t-ink-soft)",
-            ["--ec-chip" as string]: "rgba(120,90,40,.1)",
-            ["--ec-gold" as string]: "#8a6116",
-            ["--ec-line" as string]: "rgba(139,112,64,.45)",
-            ["--ec-value" as string]: "#5a3d12",
-            ["--ec-l" as string]: "30%",
-          }}
-        >
-          <div className="relative z-[1] flex flex-col gap-2">
-          <h2 className={`m-0 text-center ${isAdventure ? "font-display text-[20px]" : "text-[16px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
-            Check in
-          </h2>
-          {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
-          <EnergyCheck full sleepLink={false} today={null} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
-          <CheckInHub readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} />
-          </div>
-        </section>
-        <section
-          id="wheel-of-time"
-          aria-label="Wheel of Time"
-          className="flex scroll-mt-4 flex-col gap-2 rounded-2xl px-4 py-3.5"
-          style={{ background: "linear-gradient(180deg, rgba(22,24,38,.94), rgba(14,15,24,.94))", border: "1.5px solid rgba(217,180,95,.45)", boxShadow: "0 6px 18px rgba(0,0,0,.35)" }}
-        >
-          <h2 className={`m-0 ${isAdventure ? "font-display text-[19px]" : "text-[16px] font-bold"}`} style={{ color: "#f2d27e" }}>
-            ☸ Wheel of Time <span className="text-[13px] font-normal" style={{ color: "rgba(239,230,204,.7)" }}>— Right Effort turns it forward, Hindrances turn it back</span>
-          </h2>
-          <WheelOfTime initial={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime)} today={appDayKey()} />
-        </section>
-        <section
-          aria-label="Events and tags"
-          className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
-          style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
-        >
-          <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
-            Events &amp; #tags <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— log anything, any time</span>
-          </h2>
-          <EventLog notes={notes.map((n) => ({ id: n.id, body: n.body, created_at: n.created_at }))} />
-        </section>
-        <section
-          aria-label="Streaks"
-          className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
-          style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
-        >
-          <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
-            Streaks <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— habits you keep, and what you keep away from · just for you</span>
-          </h2>
-          <Streaks initial={streakDefs} notes={streakNotes} habits={habitStreaks} />
-        </section>
-        <section
-          aria-label="Life wheel"
-          className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
-          style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
-        >
-          <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
-            Life wheel <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— how each part of life feels</span>
-          </h2>
-          <LifeWheel topics={wheelTopics} last={wheelLast} />
-        </section>
-        <InsightsView
-          theme={theme}
-          readings={readings}
-          wins={chartWins}
+        {/* Its gear arranges the screen in place: drag the parts, the eye hides one. */}
+        <ScreenArrange
+          screen="insights"
+          name="Insights"
+          parts={[
+            {
+              key: "checkin",
+              label: "Check in",
+              hint: "Energy and how you're doing",
+              node: (
+              <section
+                aria-label="Check in"
+                // A parchment card like the rest of the app, its words in ink rather than cream.
+                className={`flex flex-col gap-2 rounded-2xl px-4 py-3.5 ${isAdventure ? "parchment parchment-framed" : ""}`}
+                style={{
+                  ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }),
+                  ["--t-cream" as string]: "var(--t-ink)",
+                  ["--ec-soft" as string]: "var(--t-ink-soft)",
+                  ["--ec-chip" as string]: "rgba(120,90,40,.1)",
+                  ["--ec-gold" as string]: "#8a6116",
+                  ["--ec-line" as string]: "rgba(139,112,64,.45)",
+                  ["--ec-value" as string]: "#5a3d12",
+                  ["--ec-l" as string]: "30%",
+                }}
+              >
+                <div className="relative z-[1] flex flex-col gap-2">
+                <h2 className={`m-0 text-center ${isAdventure ? "font-display text-[20px]" : "text-[16px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
+                  Check in
+                </h2>
+                {/* A fresh check-in each visit; today's earlier ones are listed under it, with the chart. */}
+                <EnergyCheck full sleepLink={false} today={null} metrics={metrics} notesToday={notes.filter((n) => appDayKey(new Date(n.created_at)) === appDayKey() && !isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, at: n.created_at }))} />
+                <CheckInHub readings={readings} metrics={["Energy", ...metrics]} wins={chartWins} />
+                </div>
+              </section>
+              ),
+            },
+            {
+              key: "wheel",
+              label: "Wheel of Time",
+              hint: "Sleep, right effort and hindrances",
+              node: (
+              <section
+                id="wheel-of-time"
+                aria-label="Wheel of Time"
+                className="flex scroll-mt-4 flex-col gap-2 rounded-2xl px-4 py-3.5"
+                style={{ background: "linear-gradient(180deg, rgba(22,24,38,.94), rgba(14,15,24,.94))", border: "1.5px solid rgba(217,180,95,.45)", boxShadow: "0 6px 18px rgba(0,0,0,.35)" }}
+              >
+                <h2 className={`m-0 ${isAdventure ? "font-display text-[19px]" : "text-[16px] font-bold"}`} style={{ color: "#f2d27e" }}>
+                  ☸ Wheel of Time <span className="text-[13px] font-normal" style={{ color: "rgba(239,230,204,.7)" }}>— Right Effort turns it forward, Hindrances turn it back</span>
+                </h2>
+                <WheelOfTime initial={cleanWheel((profile?.life_wheel as Record<string, unknown> | null | undefined)?.wheelOfTime)} today={appDayKey()} />
+              </section>
+              ),
+            },
+            {
+              key: "events",
+              label: "Events & #tags",
+              hint: "Log anything, any time",
+              node: (
+              <section
+                aria-label="Events and tags"
+                className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
+                style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
+              >
+                <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
+                  Events &amp; #tags <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— log anything, any time</span>
+                </h2>
+                <EventLog notes={notes.map((n) => ({ id: n.id, body: n.body, created_at: n.created_at }))} />
+              </section>
+              ),
+            },
+            {
+              key: "streaks",
+              label: "Streaks",
+              hint: "Habits you keep, and what you keep away from",
+              node: (
+              <section
+                aria-label="Streaks"
+                className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
+                style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
+              >
+                <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
+                  Streaks <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— habits you keep, and what you keep away from · just for you</span>
+                </h2>
+                <Streaks initial={streakDefs} notes={streakNotes} habits={habitStreaks} />
+              </section>
+              ),
+            },
+            {
+              key: "lifewheel",
+              label: "Life wheel",
+              hint: "How each part of life feels",
+              node: (
+              <section
+                aria-label="Life wheel"
+                className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
+                style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
+              >
+                <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
+                  Life wheel <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— how each part of life feels</span>
+                </h2>
+                <LifeWheel topics={wheelTopics} last={wheelLast} />
+              </section>
+              ),
+            },
+            { key: "week", label: "This week", hint: "Quests, XP, energy and check-ins against last week", node: <InsightsView theme={theme} readings={readings} wins={chartWins} part="week" /> },
+            { key: "patterns", label: "Patterns", hint: "When your energy peaks and quests get done", node: <InsightsView theme={theme} readings={readings} wins={chartWins} part="patterns" /> },
+          ]}
         />
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>

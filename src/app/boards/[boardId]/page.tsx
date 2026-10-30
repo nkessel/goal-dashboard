@@ -16,7 +16,7 @@ export default async function BoardDetailPage({ params }: { params: Promise<{ bo
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <div className="flex flex-col gap-4">
         <BoardTrail ancestors={data.head.ancestors} current={data.head.title} isAdventure={theme === "adventure"} />
-        <BoardBody data={data} theme={theme} />
+        <BoardBody data={data} theme={theme} arrange />
         {boardId !== UNCATEGORIZED_ID && <BoardFabMenu boardId={boardId} theme={theme} />}
       </div>
     </AppShell>

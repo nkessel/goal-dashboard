@@ -6,6 +6,7 @@ import { UNCATEGORIZED_ID } from "@/lib/board-ids";
 import { BoardGrid } from "./BoardGrid";
 import { BoardQuestList } from "./BoardQuestList";
 import { BoardSeal } from "./BoardSeal";
+import { ScreenArrange } from "@/components/ui/ScreenArrange";
 
 export type BoardHead = { title: string; ancestors: { id: string; title: string }[] };
 
@@ -39,10 +40,13 @@ export function BoardBody({
   data,
   theme,
   onDark = true,
+  arrange = false,
 }: {
   data: Awaited<ReturnType<typeof loadBoard>>;
   theme: "calm" | "adventure";
   onDark?: boolean;
+  /** On the full page, its gear arranges the parts below the title (the same order for every board). */
+  arrange?: boolean;
 }) {
   const isAdventure = theme === "adventure";
   const text = onDark && isAdventure ? "var(--t-cream)" : "var(--t-ink)";
@@ -63,6 +67,34 @@ export function BoardBody({
   const quests = allTasks.filter((t) => !(t.is_aspiration && t.status === "open"));
   const doneCount = quests.filter((t) => t.status === "completed").length;
   const xpEarned = allTasks.filter((t) => t.status === "completed").reduce((sum, t) => sum + t.xp_value, 0);
+
+  const parts = [
+    {
+      key: "about",
+      label: "About",
+      hint: "The board's description",
+      node: board.description ? (
+        <p className="-mt-3 m-0 text-sm" style={{ color: soft, opacity: 0.8 }}>
+          {board.description}
+        </p>
+      ) : null,
+    },
+    {
+      key: "inside",
+      label: isAdventure ? "Boards inside" : "Sub-boards",
+      hint: "The boards inside this one",
+      node:
+        subBoards.length > 0 ? (
+          <section className="flex flex-col gap-2">
+            <h2 className={`m-0 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`} style={{ color: text, opacity: 0.9 }}>
+              {isAdventure ? "Boards inside" : "Sub-boards"} <span className="font-normal opacity-70">({subBoards.length})</span>
+            </h2>
+            <BoardGrid boards={subBoards} theme={theme} parentBoardId={board.id} />
+          </section>
+        ) : null,
+    },
+    { key: "quests", label: "Quests", hint: "The board's quests", keep: true, node: <BoardQuestList tasks={allTasks} boardId={board.id} nextTaskId={board.next_task_id ?? null} theme={theme} /> },
+  ];
 
   return (
     <div className="flex flex-col gap-5">
@@ -87,22 +119,7 @@ export function BoardBody({
         </Link>
       </div>
 
-      {board.description && (
-        <p className="-mt-3 m-0 text-sm" style={{ color: soft, opacity: 0.8 }}>
-          {board.description}
-        </p>
-      )}
-
-      {subBoards.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className={`m-0 ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`} style={{ color: text, opacity: 0.9 }}>
-            {isAdventure ? "Boards inside" : "Sub-boards"} <span className="font-normal opacity-70">({subBoards.length})</span>
-          </h2>
-          <BoardGrid boards={subBoards} theme={theme} parentBoardId={board.id} />
-        </section>
-      )}
-
-      <BoardQuestList tasks={allTasks} boardId={board.id} nextTaskId={board.next_task_id ?? null} theme={theme} />
+      {arrange ? <ScreenArrange screen="board" name="this board" gap="gap-5" gearClass="-top-4 right-0" parts={parts} /> : parts.map((p) => (p.node ? <div key={p.key} className="contents">{p.node}</div> : null))}
     </div>
   );
 }

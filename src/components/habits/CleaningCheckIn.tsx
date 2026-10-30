@@ -15,6 +15,7 @@ import {
   laundryNow,
   levelNow,
   styleOf,
+  tenOf,
   todaysPicks,
   type Chore,
   type Cleaning,
@@ -23,6 +24,7 @@ import {
   type Space,
 } from "@/lib/cleaning";
 import { LaundryRun } from "./LaundryRun";
+import { MessBattle } from "./MessBattle";
 
 type Panel = "spaces" | "laundry" | "chores" | null;
 
@@ -76,11 +78,25 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
   const laundry = laundryNow(c.laundry, day);
   const dueChores = c.chores.filter((ch) => choreIsDue(ch, day)).length;
   // After the 20 minutes: one question about what you cleaned, until something is logged today.
-  const loggedToday = c.spaces.some((s) => s.ratedOn === day && s.level === 0) || c.chores.some((ch) => ch.lastDone === day) || c.laundry.loads.at(-1) === day;
+  const loggedToday = (c.battles ?? []).some((b) => b.on === day) || c.spaces.some((s) => s.ratedOn === day && s.level === 0) || c.chores.some((ch) => ch.lastDone === day) || c.laundry.loads.at(-1) === day;
   const [answered, setAnswered] = useState(false);
   const askAfter = habitDone && !answered && !loggedToday && top;
+  // Fighting back the mess in a space: the battle log, opened in place.
+  const [battle, setBattle] = useState<string | null>(null);
+  const battleSpace = battle ? c.spaces.find((s) => s.id === battle) ?? null : null;
+  const battleNode = (onDone?: () => void) =>
+    battleSpace && (
+      <MessBattle
+        key={battleSpace.id}
+        c={c}
+        space={battleSpace}
+        day={day}
+        startBefore={tenOf(levelNow(battleSpace, day))}
+        onLogged={(next) => (setC(next), setAnswered(true), onDone?.())}
+        onClose={() => setBattle(null)}
+      />
+    );
 
-  const rate = (id: string, level: MessLevel) => save({ ...c, spaces: c.spaces.map((s) => (s.id === id ? { ...s, level, ratedOn: day } : s)) });
   const choreDone = (id: string) => save({ ...c, chores: c.chores.map((ch) => (ch.id === id ? { ...ch, lastDone: day, snoozedUntil: null } : ch)) });
   const loadDone = () => save({ ...c, laundry: { readings: [...c.laundry.readings.filter((r) => r.on !== day), { on: day, fill: 0 }].slice(-30), loads: [...c.laundry.loads.filter((d) => d !== day), day].slice(-20) } });
 
@@ -99,13 +115,16 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
       {/* After the 20 minutes, one question, right under the habit (tray open or not). */}
       {askAfter && top && (
         <div className="reveal ml-7 mt-1 rounded-xl px-2.5 py-1.5" style={box}>
-          <AfterQuestion
-            pick={top}
-            style={c.style}
-            onRate={(lv) => (setAnswered(true), rate(top.id, lv))}
-            onDone={() => (setAnswered(true), top.kind === "laundry" ? loadDone() : choreDone(top.id))}
-            onDismiss={() => setAnswered(true)}
-          />
+          {battle && top.kind === "space" && battle === top.id ? (
+            battleNode()
+          ) : (
+            <AfterQuestion
+              pick={top}
+              onFight={() => setBattle(top.id)}
+              onDone={() => (setAnswered(true), top.kind === "laundry" ? loadDone() : choreDone(top.id))}
+              onDismiss={() => setAnswered(true)}
+            />
+          )}
         </div>
       )}
       <div className="drawer-body" data-open={open ? "true" : "false"}>
@@ -117,6 +136,8 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
               </p>
             )}
             {/* The priority list: messiest and most due first. */}
+            {/* A battle opened from the list or a space shows here, at the top of the tray. */}
+            {battleSpace && !(askAfter && top?.id === battleSpace.id) && <div className="rounded-lg px-1.5 py-1" style={{ background: "rgba(255,250,238,.55)", boxShadow: "inset 0 0 0 1px rgba(168,138,63,.45)" }}>{battleNode()}</div>}
             {picks.length > 0 ? (
               <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
                 {picks.map((p, i) => (
@@ -130,6 +151,9 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
                     <span className="text-[12.5px]" style={{ color: soft }}>
                       · {p.why}
                     </span>
+                    {p.kind === "space" && (
+                      <FightButton onClick={() => setBattle(battle === p.id ? null : p.id)} on={battle === p.id} name={p.name} />
+                    )}
                   </li>
                 ))}
               </ol>
@@ -161,7 +185,7 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
               </button>
             </div>
 
-            {panel === "spaces" && <SpacesPanel c={c} day={day} save={save} />}
+            {panel === "spaces" && <SpacesPanel c={c} day={day} save={save} onFight={(id) => setBattle(battle === id ? null : id)} fighting={battle} />}
             {panel === "laundry" && <LaundryPanel c={c} day={day} save={save} onLoad={loadDone} />}
             {panel === "chores" && <ChoresPanel c={c} day={day} save={save} onDone={choreDone} />}
           </div>
@@ -171,14 +195,13 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
   );
 }
 
-function AfterQuestion({ pick, style, onRate, onDone, onDismiss }: { pick: ReturnType<typeof todaysPicks>[number]; style: MessStyle; onRate: (lv: MessLevel) => void; onDone: () => void; onDismiss: () => void }) {
-  const s = styleOf(style);
+function AfterQuestion({ pick, onFight, onDone, onDismiss }: { pick: ReturnType<typeof todaysPicks>[number]; onFight: () => void; onDone: () => void; onDismiss: () => void }) {
   return (
     <div className="flex flex-col gap-1.5">
       <p className="m-0 text-[13.5px] leading-snug" style={{ color: "var(--t-ink)" }}>
         {pick.kind === "space" ? (
           <>
-            Nice work! How does <b>{pick.icon} {pick.name}</b> look now?
+            Nice work! How much of the mess in <b>{pick.icon} {pick.name}</b> did you fight back?
           </>
         ) : pick.kind === "laundry" ? (
           <>Nice work! Did a load of laundry get done?</>
@@ -190,11 +213,9 @@ function AfterQuestion({ pick, style, onRate, onDone, onDismiss }: { pick: Retur
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         {pick.kind === "space" ? (
-          s.glyphs.map((g, i) => (
-            <button key={i} type="button" onClick={() => onRate(i as MessLevel)} title={s.words[i]} className="flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px]" style={{ background: "rgba(255,250,238,.7)", boxShadow: "inset 0 0 0 1px rgba(139,112,64,.4)", color: "var(--t-ink)" }}>
-              <span aria-hidden>{g}</span> {s.words[i]}
-            </button>
-          ))
+          <button type="button" onClick={onFight} className="flex h-8 items-center gap-1 rounded-full px-3 text-[14px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+            ⚔ Before and after
+          </button>
         ) : (
           <button type="button" onClick={onDone} className="flex h-8 items-center gap-1 rounded-full px-3 text-[14px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
             ✓ Done
@@ -210,6 +231,23 @@ function AfterQuestion({ pick, style, onRate, onDone, onDismiss }: { pick: Retur
 
 // ---------------------------------------------------------------------------
 // Spaces
+
+/** ⚔: log a round of fighting back the mess in this space (before and after). */
+function FightButton({ onClick, on, name }: { onClick: () => void; on: boolean; name: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={on}
+      aria-label={`Fight back the mess in ${name}`}
+      title="Fought back the mess? Log before and after for XP"
+      className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full text-[14px] transition-opacity hover:opacity-100"
+      style={{ opacity: on ? 1 : 0.7, background: on ? "rgba(217,180,95,.45)" : undefined }}
+    >
+      ⚔
+    </button>
+  );
+}
 
 /** How messy a space is: one compact slider, the style's calm end on the left and its messy end on the right. */
 function LevelPicker({ value, styleKey, onPick, label }: { value: MessLevel; styleKey: MessStyle; onPick: (lv: MessLevel) => void; label: string }) {
@@ -248,7 +286,7 @@ function LevelPicker({ value, styleKey, onPick, label }: { value: MessLevel; sty
   );
 }
 
-function SpacesPanel({ c, day, save }: { c: Cleaning; day: string; save: (n: Cleaning) => void }) {
+function SpacesPanel({ c, day, save, onFight, fighting }: { c: Cleaning; day: string; save: (n: Cleaning) => void; onFight: (id: string) => void; fighting: string | null }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState("");
   const style = styleOf(c.style);
@@ -286,6 +324,7 @@ function SpacesPanel({ c, day, save }: { c: Cleaning; day: string; save: (n: Cle
                   </span>
                 </button>
                 <LevelPicker value={lv} styleKey={c.style} label={s.name} onPick={(level) => setSpace(s.id, { level, ratedOn: day })} />
+                <FightButton onClick={() => onFight(s.id)} on={fighting === s.id} name={s.name} />
               </div>
               {editing === s.id && (
                 <div className="flex flex-col gap-1.5 px-1 pb-1">

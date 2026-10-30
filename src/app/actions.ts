@@ -2925,6 +2925,39 @@ export async function saveCleaningAction(cleaning: unknown) {
   return clean;
 }
 
+/**
+ * Fighting back the mess in a space: logs before and after (0–10), and
+ * optionally minutes and the energy it took and gave; sets the space to how
+ * it looks now; pays XP when it's cleaner than before (capped per day).
+ */
+export async function fightMessAction(input: { day: string; spaceId: string; before: number; after: number; minutes?: number | null; took?: number | null; gave?: number | null }) {
+  const ownerId = await requireProfileId();
+  const { normalizeCleaning, battleXp, battleXpToday, levelOfTen } = await import("@/lib/cleaning");
+  const extras = await readExtras(ownerId);
+  const c = normalizeCleaning(extras.cleaning);
+  if (!c) throw new Error("Set up your spaces first.");
+  const space = c.spaces.find((s) => s.id === input.spaceId);
+  if (!space) throw new Error("That space is gone.");
+  // The app day the screen is on (the client knows the owner's time zone).
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.day)) throw new Error("Bad day.");
+  const day = input.day;
+  const n = (v: unknown, max: number) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.min(max, Math.round(Number(v)))));
+  const before = n(input.before, 10) ?? 5;
+  const after = n(input.after, 10) ?? before;
+  const minutes = n(input.minutes, 600);
+  const xpEarned = battleXpToday(c, day, battleXp(before, after, minutes));
+  const next = normalizeCleaning({
+    ...c,
+    spaces: c.spaces.map((s) => (s.id === space.id ? { ...s, level: levelOfTen(after), ratedOn: day } : s)),
+    battles: [...(c.battles ?? []), { on: day, spaceId: space.id, before, after, minutes, took: n(input.took, 5), gave: n(input.gave, 5), xp: xpEarned }],
+  })!;
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, cleaning: next } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  const award = xpEarned > 0 ? await xp.awardXp(ownerId, xpEarned, "mess_battle") : null;
+  revalidatePath("/");
+  return { cleaning: next, xp: xpEarned, totalXp: award?.totalXp ?? null, coinsEarned: award?.coinsEarned ?? 0 };
+}
+
 /** Paint an inventory item's portrait (from its name, or your own description of the picture). */
 export async function paintInventoryItemAction(name: string, description?: string | null): Promise<string> {
   const ownerId = await requireProfileId();

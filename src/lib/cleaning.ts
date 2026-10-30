@@ -34,8 +34,13 @@ export type Chore = {
 /** Bin fill in quarters: 0 empty … 4 full. */
 export type Laundry = { readings: { on: string; fill: number }[]; loads: string[] };
 
+/** One round of fighting back the mess in a space: how messy before and after (0 spotless … 10 a disaster), and optionally how long it took and the energy it took and gave (0–5). */
+export type Battle = { on: string; spaceId: string; before: number; after: number; minutes: number | null; took: number | null; gave: number | null; xp: number };
+
 export type Cleaning = {
   style: MessStyle;
+  /** The battle log, newest last. */
+  battles?: Battle[];
   spaces: Space[];
   chores: Chore[];
   laundry: Laundry;
@@ -120,8 +125,14 @@ export function normalizeCleaning(raw: unknown): Cleaning | null {
       .slice(-30),
     loads: (Array.isArray(l.loads) ? l.loads : []).filter(isDay).slice(-20),
   };
+  const small = (v: unknown, max: number) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.min(max, Math.round(Number(v)))));
+  const battles: Battle[] = (Array.isArray(r.battles) ? r.battles : [])
+    .filter((b) => b && isDay(b.on) && typeof b.spaceId === "string")
+    .map((b) => ({ on: b.on, spaceId: b.spaceId.slice(0, 40), before: small(b.before, 10) ?? 5, after: small(b.after, 10) ?? 5, minutes: small(b.minutes, 600), took: small(b.took, 5), gave: small(b.gave, 5), xp: small(b.xp, 200) ?? 0 }))
+    .slice(-80);
   return {
     style: MESS_STYLES.some((s) => s.key === r.style) ? (r.style as MessStyle) : "weather",
+    battles,
     spaces,
     chores,
     laundry,
@@ -220,3 +231,33 @@ export function todaysPicks(c: Cleaning, today: string): Pick[] {
   }
   return scored.sort((a, b) => b.score - a.score).map((p) => ({ kind: p.kind, id: p.id, name: p.name, icon: p.icon, why: p.why }));
 }
+
+// ---------------------------------------------------------------------------
+// Fighting back the mess
+
+/** Where a space's 3-step level sits on the battle's 0–10 scale (the starting "before"). */
+export const tenOf = (lv: MessLevel) => [1, 5, 8][lv];
+/** Back from the 0–10 scale to the space's level. */
+export const levelOfTen = (n: number): MessLevel => (n <= 2 ? 0 : n <= 6 ? 1 : 2);
+
+/** XP a day can earn from battles (the rest still goes in the log). */
+export const MESS_XP_DAY_CAP = 60;
+
+/**
+ * XP for pushing the mess back: 4 for each step cleaner, plus 2 for every 10
+ * minutes spent (up to 8). Nothing when it's no cleaner than before.
+ */
+export function battleXp(before: number, after: number, minutes: number | null): number {
+  const won = before - after;
+  if (won <= 0) return 0;
+  return 4 * won + Math.min(8, 2 * Math.floor((minutes ?? 0) / 10));
+}
+
+/** What a battle may still pay today, after the day's earlier ones. */
+export function battleXpToday(c: Cleaning, day: string, xp: number): number {
+  const earned = (c.battles ?? []).filter((b) => b.on === day).reduce((a, b) => a + b.xp, 0);
+  return Math.max(0, Math.min(xp, MESS_XP_DAY_CAP - earned));
+}
+
+/** "Messy" words for a point on the 0–10 scale, in the chosen style. */
+export const tenWords = (style: MessStyle, n: number) => styleOf(style).words[levelOfTen(n)];

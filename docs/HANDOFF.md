@@ -14,7 +14,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 
 | # | Work | State | Next step |
 |---|---|---|---|
-| 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu and Today done. Next: boards, calendar, Insights. Pattern in section 5. |
+| 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
 | 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. |
 | 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. See the header list. |
 | 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
@@ -47,7 +47,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0073_task_snoozed_until.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0074_mess_battle_xp.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -118,6 +118,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Oct 30 (night): Fight back the mess: ⚔ on each space (priority list and Spaces) and "Before and after" after the 20 minutes open a battle log (`habits/MessBattle.tsx`): Before and After sliders on one 0–10 scale (the ground won glows green), optional time (10m/20m/30m/1 hr or minutes) and energy it took ⚡ and gave ✨ (1–5). Cleaner than before pays XP (4 per step + 2 per 10 min up to 8; 60 a day; `battleXp` in `lib/cleaning.ts`, xp kind `mess_battle`, migration 0074) with the progress celebration; the space takes its After level; kept in `life_wheel.cleaning.battles`. Insights, a board page and the calendar arrange in place from their gear (generic `ScreenArrange`; the board's quests and the calendar itself can't be hidden).
 
 - Oct 30 (night): Snooze… from a quest's ⋯ menu asks how long (`tasks/SnoozePicker.tsx`): 30 minutes, 2 hours, Tomorrow (top of tomorrow's plan, as before), Other… (this evening, 4 hours, or a date and time; ‹ back, × or Esc changes nothing); short snoozes set `tasks.snoozed_until` (migration 0073), hide it from Today until then and `RefreshAt` brings it back; Undo on the toast. Swiping a card still snoozes to tomorrow. Time fields in dialogs and parchment get a parchment look (`.time-field`).
 - Oct 30 (night): Early-completion reward: Automatic / None / My own (XP, coins, extra XP per full day early; `tasks.early_bonus_coins`, `early_bonus_per_day`, migration 0072; `earlyBirdBonus`/`earlyBirdCoins` in `lib/next-action.ts`). Shared `EarlyBonusFields` in the quest editor's Early bonus chip and in a small popup from the card: the "+N XP early" pill opens it, and a quiet dashed "+ Early reward" shows when none applies and it's more than a day out.
