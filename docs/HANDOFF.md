@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30, `main` @ `203289f` (welcome screen castle choices, signpost removed)
+- **Last updated:** 2026-10-30, `main` @ `561343b` + AR class due-date record (Mastering Facilitation dates moved back a week)
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** 25 notes not marked shipped (as of 2026-10-30 16:40 UTC, query below). Some may already have been built through chat requests without being marked.
 
@@ -17,8 +17,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 | 1 | **Ship pending in-app feedback** | Ready | Run the feedback loop in section 3. Last batch shipped Oct 29 02:37 UTC. |
 | 2 | **Mess check-in for the 20-min cleaning habit** ("Mess weather") | Owner deciding the final shape | Proposed: one-tap calm/cloudy/stormy rating per space; the messiest becomes today's 20-min focus. Plus a style picker in Settings (weather, jars, garden, critters, piles), spaces Desk, Art desk, Bedside box + clothing, Bathroom, **Kitchen**, and "+ Add a space"; a 🧺 laundry bin fill gauge that predicts the next load; a **chore deck** (vacuum, sheets, fridge, dust, recycling, each "every N days") that feeds due chores into the 20-min pick. Build once the owner says go. |
 | 3 | **Bring-from-home list** | Owner to confirm the design | A leather side pocket on the backpack/inventory, labelled "Bring from home", nameable for a place (e.g. "Natick"). Tick-off lines; clear ticked or keep for next time. Seed it with Coconut milk and Energy tinctures. |
-| 4 | **AR course (Mastering Facilitation) due dates** | Owner to confirm | The 15 weekly quests on the Mastering Facilitation Skills Course board look one week late since the Oct 13 import (Week 01 Sep 22 … Week 15 Dec 29). Proposed: move all 15 back one week. **Save the old dates first** (in a migration or note) so it can be undone. This is a production data change. |
-| 5 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
+| 4 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
 
 **Open questions for the owner** (ask when relevant, don't block on them):
 - "Allow editing of quests here" on Tomorrow's Quests: tapping a name already opens the editor. Do they want editing in place?
@@ -112,6 +111,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30: AR class (Mastering Facilitation) due dates moved back one week, old values and undo in `docs/data-changes/2026-10-30-mastering-facilitation-due-dates.md`.
 - Oct 30: Welcome screen out of the mist (fairytale castle with 4 designs to pick in Settings › Welcome Screen › The castle, birds, toucan lands on welcome back, single greetings list, fog hides Today from first paint, dive into the forest on Continue; signpost removed); Due soon look-ahead setting and ranking; folded Settings groups show their value; stand-in quests keep their own due date; Check in button icons.
 - Oct 29: Feedback batches (check-in card, invite wording themes, life wheel readout, Insights XP columns and pinch zoom); dreams cloud on boards; invite popup; toucan "Not now" snoozes; welcome screen top priority.
 - Oct 28: Gear shortcuts and settings popups; sleep and wake log on the Wheel of Time; toucan-started feedback builds; toucan creates entries on command.
