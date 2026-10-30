@@ -50,6 +50,7 @@ import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
 import type { QuestTemplate } from "@/lib/quest-templates";
 import { descendants, parentKeys, stepPayload, stepsShare, stepWeights, treeOrder, type StepDraft } from "@/lib/quest-steps";
 import { EditorArrange } from "./EditorArrange";
+import { EarlyBonusFields } from "./EarlyBonusFields";
 import { EDITOR_PARTS, readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
 import { DateField } from "@/components/ui/DateField";
 
@@ -220,6 +221,8 @@ export function QuestEditorDialog({
   const [coinValue, setCoinValue] = useState<number | null>(task?.coin_value ?? null);
   // Early bonus: null = automatic (half its XP for 2+ days early), 0 = none, or your own amount.
   const [earlyBonus, setEarlyBonus] = useState<number | null>(task?.early_bonus_xp ?? null);
+  const [earlyCoins, setEarlyCoins] = useState<number | null>(task?.early_bonus_coins ?? null);
+  const [earlyPerDay, setEarlyPerDay] = useState<number | null>(task?.early_bonus_per_day ?? null);
   const [effort, setEffort] = useState(task?.effort ?? Math.round(prefill?.effort ?? 0));
   const [energyGain, setEnergyGain] = useState(task?.energy_gain ?? 0);
   const [aspiration, setAspiration] = useState(Boolean(task?.is_aspiration));
@@ -588,7 +591,7 @@ export function QuestEditorDialog({
   const autosave = Boolean(task) && !review;
   // Placement isn't saved as you go: moving the quest to another list would
   // take its card (and this dialog) away mid-edit. It's saved on close.
-  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, earlyBonus, effort, energyGain, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration, tiny]);
+  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, earlyBonus, earlyCoins, earlyPerDay, effort, energyGain, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration, tiny]);
   const [savedFields, setSavedFields] = useState(fields);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const dirty = fields !== savedFields || stepsDirty;
@@ -619,7 +622,7 @@ export function QuestEditorDialog({
       dueAt,
       chunkMinutes,
       coinValue,
-      earlyBonusXp: earlyBonus,
+      earlyBonusXp: earlyBonus, earlyBonusCoins: earlyBonus === null ? null : earlyCoins, earlyBonusPerDay: earlyBonus === null ? null : earlyPerDay,
       isTiny: tiny,
     };
     const newSlot = !fixedSchedule && slot && slot.start !== savedSlotStart.current ? slot : null;
@@ -827,7 +830,7 @@ export function QuestEditorDialog({
             dueAt,
             chunkMinutes,
             coinValue,
-            earlyBonusXp: earlyBonus,
+            earlyBonusXp: earlyBonus, earlyBonusCoins: earlyBonus === null ? null : earlyCoins, earlyBonusPerDay: earlyBonus === null ? null : earlyPerDay,
             isTiny: tiny,
             confirmImport: Boolean(review),
           });
@@ -890,7 +893,7 @@ export function QuestEditorDialog({
           dueAt,
           chunkMinutes,
           coinValue,
-          earlyBonusXp: earlyBonus,
+          earlyBonusXp: earlyBonus, earlyBonusCoins: earlyBonus === null ? null : earlyCoins, earlyBonusPerDay: earlyBonus === null ? null : earlyPerDay,
           isTiny: tiny,
           });
         } catch (e) {
@@ -2435,7 +2438,7 @@ export function QuestEditorDialog({
                     {!doingNow && !isCompleted && dueDate && (
                       <button type="button" onClick={() => setFactOpen((o) => (o === "bonus" ? null : "bonus"))} aria-expanded={factOpen === "bonus"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "bonus" ? "true" : undefined}>
                         <span aria-hidden className="text-[12px]">⏱</span>
-                        <span className="max-w-[150px] truncate">{earlyBonus === null ? "Early bonus" : earlyBonus > 0 ? `Early bonus +${earlyBonus} XP` : "No early bonus"}</span>
+                        <span className="max-w-[150px] truncate">{earlyBonus === null ? "Early bonus" : earlyBonus > 0 || earlyCoins || earlyPerDay ? `Early bonus +${earlyBonus} XP${earlyCoins ? ` · ${earlyCoins} coins` : ""}` : "No early bonus"}</span>
                         <FactCaret open={factOpen === "bonus"} />
                       </button>
                     )}
@@ -2466,33 +2469,9 @@ export function QuestEditorDialog({
                   {factOpen === "bonus" && dueDate && (
                     <div key="bonus" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
                       <span className="text-[13.5px]" style={{ color: "var(--t-ink)" }}>
-                        Extra XP for finishing before it&rsquo;s due.
+                        A reward for finishing before it&rsquo;s due.
                       </span>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {[
-                          { v: null, label: "Automatic" },
-                          { v: 0, label: "None" },
-                        ].map((o) => (
-                          <button key={o.label} type="button" onClick={() => setEarlyBonus(o.v)} aria-pressed={earlyBonus === o.v} className="h-9 rounded-full px-3 text-[13.5px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: earlyBonus === o.v ? "rgba(217,180,95,.45)" : "rgba(255,250,235,.35)" }}>
-                            {o.label}
-                          </button>
-                        ))}
-                        <span className="flex h-9 items-center gap-0.5 rounded-full border px-1" style={{ ...fieldStyle, background: earlyBonus ? "rgba(217,180,95,.3)" : fieldStyle.background }}>
-                          <button type="button" onClick={() => setEarlyBonus(Math.max(0, (earlyBonus ?? 0) - 5))} aria-label="Less bonus XP" className="flex h-8 w-7 items-center justify-center text-[17px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                            −
-                          </button>
-                          <NumberInput min={0} max={1000} value={earlyBonus ?? 0} onValueChange={(v) => setEarlyBonus(v)} blankZero aria-label="Bonus XP" className="bare-input h-full w-10 bg-transparent text-center text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" style={{ color: "var(--t-xp)" }} />
-                          <span className="text-[12px] font-bold" style={{ color: "var(--t-xp)" }}>
-                            XP
-                          </span>
-                          <button type="button" onClick={() => setEarlyBonus((earlyBonus ?? 0) + 5)} aria-label="More bonus XP" className="flex h-8 w-7 items-center justify-center text-[17px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                            +
-                          </button>
-                        </span>
-                      </div>
-                      <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-                        {earlyBonus === null ? `Automatic: half its XP when you finish 2 or more days early.` : earlyBonus > 0 ? `Finish any time before it's due to get +${earlyBonus} XP (and the coins that come with it).` : "No bonus for finishing early."}
-                      </span>
+                      <EarlyBonusFields value={{ xp: earlyBonus, coins: earlyCoins, perDay: earlyPerDay }} onChange={(v) => (setEarlyBonus(v.xp), setEarlyCoins(v.coins), setEarlyPerDay(v.perDay))} chipBorder={chipBorder} />
                     </div>
                   )}
                   {factOpen && factOpen !== "due" && factOpen !== "bonus" && facts.includes(factOpen) && (

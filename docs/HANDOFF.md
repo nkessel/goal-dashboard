@@ -4,7 +4,7 @@
 
 - **Last updated:** 2026-10-30 night (last screen on sign-in, reward parts; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 19:50 UTC, still open: early bonus: bird removed and pill on the due line done; still wanted: custom XP + coins + a bonus per extra day early, a "Choose early-completion reward" button opening a small popup when none is set (UX teams to place it); opening feedback on /settings/inventory reloads the page behind it (iOS; looked at KeyboardViewport pin/focusSteady and ScrollLock, cause not found from the cloud; needs a device repro).
+- **Pending in-app feedback:** as of 2026-10-30 19:50 UTC, still open: opening feedback on /settings/inventory reloads the page behind it (iOS; looked at KeyboardViewport pin/focusSteady and ScrollLock, cause not found from the cloud; needs a device repro).
 
 ---
 
@@ -47,7 +47,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0071_reward_sequence.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0072_early_bonus_more.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -119,6 +119,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30 (night): Early-completion reward: Automatic / None / My own (XP, coins, extra XP per full day early; `tasks.early_bonus_coins`, `early_bonus_per_day`, migration 0072; `earlyBirdBonus`/`earlyBirdCoins` in `lib/next-action.ts`). Shared `EarlyBonusFields` in the quest editor's Early bonus chip and in a small popup from the card: the "+N XP early" pill opens it, and a quiet dashed "+ Early reward" shows when none applies and it's more than a day out.
 - Oct 30 (night): Calendar controls on phones: one row, "To schedule" no longer pushed off the left edge (only sticks out on wider screens), "Google" short label on phones, the display gear answers at once (press shrink, lit while open).
 - Oct 30 (night): Today arranges in place: a gear at Today's top right (hover; faint on phones) opens "Arrange Today" (`components/today/TodayArrange.tsx`, `lib/today-layout.ts`): every part drags, the eye hides it, hidden parts wait as + chips, Reset. The board's parts (Due soon, Today's Quests, Daily Habits, Additional Quests) move as a group and keep their own order (the old `today-section-order` is carried over; dragging closed sections still works). Quest cards: the early bonus is a small "+N XP early" pill (no bird).
 - Oct 30 (night): Arrange in context, round 2: the quest editor's gear arranges it in place (`EditorArrange.tsx`: drag parts, the eye tucks one under More, drag the "Under More" line, Reset); the quest ⋯ menu's gear turns the menu itself into a draggable list with an eye on each row (no popup).

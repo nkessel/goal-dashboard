@@ -31,10 +31,23 @@ export function oneStepPerProject<X extends T>(tasks: X[], boards: B[], all: T[]
 }
 
 /** Finishing a dated quest at least two days early earns half its XP again, unless you set its early bonus yourself. */
-export function earlyBirdBonus(t: { due_at?: string | null; xp_value: number; early_bonus_xp?: number | null }, now = Date.now()): number {
+type EarlyBird = { due_at?: string | null; xp_value: number; early_bonus_xp?: number | null; early_bonus_coins?: number | null; early_bonus_per_day?: number | null };
+/** Full days left before it's due (0 on its last day). */
+const daysEarly = (due: string, now: number) => Math.max(0, Math.floor((Date.parse(due) - now) / 86_400_000));
+export function earlyBirdBonus(t: EarlyBird, now = Date.now()): number {
   if (!t.due_at) return 0;
-  // Your own early bonus: paid for finishing any time before it's due.
-  if (t.early_bonus_xp != null) return Date.parse(t.due_at) > now ? Math.max(0, t.early_bonus_xp) : 0;
+  // Your own early bonus: paid for finishing any time before it's due, plus any extra for each full day early.
+  if (t.early_bonus_xp != null) return Date.parse(t.due_at) > now ? Math.max(0, t.early_bonus_xp) + Math.max(0, t.early_bonus_per_day ?? 0) * daysEarly(t.due_at, now) : 0;
   if (Date.parse(t.due_at) - now < 2 * 86_400_000) return 0;
   return Math.max(5, Math.round(t.xp_value * 0.5));
+}
+
+/** Coins for finishing early, with your own early bonus (none with the automatic one). */
+export function earlyBirdCoins(t: EarlyBird, now = Date.now()): number {
+  if (!t.due_at || t.early_bonus_xp == null || Date.parse(t.due_at) <= now) return 0;
+  return Math.max(0, t.early_bonus_coins ?? 0);
+}
+/** More than a day before it's due: time enough for an early bonus to mean something. */
+export function roomToFinishEarly(t: { due_at?: string | null }, now = Date.now()): boolean {
+  return !!t.due_at && Date.parse(t.due_at) - now > 86_400_000;
 }

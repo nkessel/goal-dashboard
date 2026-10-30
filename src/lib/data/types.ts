@@ -136,6 +136,10 @@ export type Task = {
   coin_value?: number | null;
   /** XP for finishing before it's due, set in the editor (null = the automatic early-bird bonus; 0 = none). */
   early_bonus_xp?: number | null;
+  /** Coins for finishing early (with your own bonus). */
+  early_bonus_coins?: number | null;
+  /** Extra XP for each full day early (with your own bonus). */
+  early_bonus_per_day?: number | null;
   /** Matrix screen placement: 'unplotted' / 'later' lots, or 'hidden' (off the matrix). */
   matrix_state?: "unplotted" | "later" | "hidden" | null;
   /** A tiny task: quick (5 min by default), drawn half height with just a check box. */

@@ -44,7 +44,7 @@ import {
   listEvents,
 } from "@/lib/google-calendar";
 import { coinsForXp } from "@/lib/coins";
-import { earlyBirdBonus } from "@/lib/next-action";
+import { earlyBirdBonus, earlyBirdCoins } from "@/lib/next-action";
 
 async function requireProfileId(): Promise<string> {
   const session = await auth();
@@ -454,6 +454,11 @@ async function finishTaskItself(ownerId: string, taskId: string, completedAt?: s
       coinsEarned += award.coins === null ? 0 : award.coinsEarned;
     }
   }
+  const earlyCoins = earlyBirdCoins(completed, completedAt ? Date.parse(completedAt) : Date.now());
+  if (earlyCoins > 0) {
+    await rewardsData.addCoins(ownerId, earlyCoins).catch(() => {});
+    coinsEarned += earlyCoins;
+  }
   // A project's next action is done: the next one takes its place.
   await supabaseAdmin().from("boards").update({ next_task_id: null }).eq("owner_id", ownerId).eq("next_task_id", taskId);
   revalidatePath("/");
@@ -488,6 +493,8 @@ export async function updateTaskAction(
     /** Coins paid on completion; null = automatic (see lib/coins). */
     coinValue?: number | null;
     earlyBonusXp?: number | null;
+    earlyBonusCoins?: number | null;
+    earlyBonusPerDay?: number | null;
     isTiny?: boolean;
   }
 ) {
@@ -527,6 +534,8 @@ export async function updateTaskAction(
     chunkMinutes: input.chunkMinutes,
     coinValue: input.coinValue,
     earlyBonusXp: input.earlyBonusXp,
+    earlyBonusCoins: input.earlyBonusCoins,
+    earlyBonusPerDay: input.earlyBonusPerDay,
     isTiny: input.isTiny,
   });
   revalidatePath("/");
@@ -562,6 +571,14 @@ export async function listBoardOptionsAction() {
  * Mark partial progress on a quest (0–100%). Pays the matching share of its
  * XP now; completing it later pays the rest.
  */
+/** A quest's early bonus, set from its card: null XP = automatic. */
+export async function setEarlyBonusAction(taskId: string, b: { xp: number | null; coins: number | null; perDay: number | null }) {
+  const ownerId = await requireProfileId();
+  await tasksData.updateTask(taskId, ownerId, { earlyBonusXp: b.xp, earlyBonusCoins: b.xp === null ? null : b.coins, earlyBonusPerDay: b.xp === null ? null : b.perDay } as Parameters<typeof tasksData.updateTask>[2]);
+  revalidatePath("/");
+  revalidatePath("/boards", "layout");
+}
+
 export async function setTaskProgressAction(taskId: string, progress: number) {
   const ownerId = await requireProfileId();
   const task = await tasksData.getTask(taskId, ownerId);
@@ -1172,6 +1189,8 @@ export async function createQuestAction(input: {
   chunkMinutes?: number | null;
   coinValue?: number | null;
   earlyBonusXp?: number | null;
+  earlyBonusCoins?: number | null;
+  earlyBonusPerDay?: number | null;
   /** Where it shows on Today ("none" = just on its board). */
   placement?: "today" | "additional" | "none";
   /** A tiny task (half height on Today, just a check box). */
@@ -1197,6 +1216,8 @@ export async function createQuestAction(input: {
     chunkMinutes: input.chunkMinutes ?? null,
     coinValue: input.coinValue ?? null,
     earlyBonusXp: input.earlyBonusXp ?? null,
+    earlyBonusCoins: input.earlyBonusCoins ?? null,
+    earlyBonusPerDay: input.earlyBonusPerDay ?? null,
     isTiny: input.isTiny,
   });
   revalidatePath("/power-ups");

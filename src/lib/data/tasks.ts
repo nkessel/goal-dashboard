@@ -177,6 +177,8 @@ export async function updateTask(
     chunkMinutes?: number | null;
     coinValue?: number | null;
     earlyBonusXp?: number | null;
+    earlyBonusCoins?: number | null;
+    earlyBonusPerDay?: number | null;
     /** Undefined leaves it untouched. */
     isTiny?: boolean;
   }
@@ -204,6 +206,8 @@ export async function updateTask(
       ...(input.chunkMinutes !== undefined ? { chunk_minutes: input.chunkMinutes === null ? null : Math.max(1, Math.round(input.chunkMinutes)) } : {}),
       ...(input.coinValue !== undefined ? { coin_value: input.coinValue === null ? null : Math.max(0, Math.round(input.coinValue)) } : {}),
       ...(input.earlyBonusXp !== undefined ? { early_bonus_xp: input.earlyBonusXp === null ? null : Math.max(0, Math.round(input.earlyBonusXp)) } : {}),
+      ...(input.earlyBonusCoins !== undefined ? { early_bonus_coins: input.earlyBonusCoins === null ? null : Math.max(0, Math.round(input.earlyBonusCoins)) } : {}),
+      ...(input.earlyBonusPerDay !== undefined ? { early_bonus_per_day: input.earlyBonusPerDay === null ? null : Math.max(0, Math.round(input.earlyBonusPerDay)) } : {}),
     })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
@@ -383,6 +387,8 @@ export async function createTask(
     chunkMinutes?: number | null;
     coinValue?: number | null;
     earlyBonusXp?: number | null;
+    earlyBonusCoins?: number | null;
+    earlyBonusPerDay?: number | null;
     isTiny?: boolean;
   }
 ): Promise<Task> {
@@ -399,6 +405,8 @@ export async function createTask(
       ...(input.chunkMinutes ? { chunk_minutes: Math.max(1, Math.round(input.chunkMinutes)) } : {}),
       ...(input.coinValue != null ? { coin_value: Math.max(0, Math.round(input.coinValue)) } : {}),
       ...(input.earlyBonusXp != null ? { early_bonus_xp: Math.max(0, Math.round(input.earlyBonusXp)) } : {}),
+      ...(input.earlyBonusCoins ? { early_bonus_coins: Math.max(0, Math.round(input.earlyBonusCoins)) } : {}),
+      ...(input.earlyBonusPerDay ? { early_bonus_per_day: Math.max(0, Math.round(input.earlyBonusPerDay)) } : {}),
       ...(input.iconKey ? { icon_key: input.iconKey, icon_source: input.iconSource ?? "library" } : {}),
       owner_id: ownerId,
       goal_id: input.goalId || null,

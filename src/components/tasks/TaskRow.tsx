@@ -8,7 +8,8 @@ import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, setNextStepAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
-import { earlyBirdBonus } from "@/lib/next-action";
+import { earlyBirdBonus, earlyBirdCoins, roomToFinishEarly } from "@/lib/next-action";
+import { EarlyBonusPopup } from "./EarlyBonusFields";
 import { QuestActionMenu, SnoozeGlyph, type QuestAction } from "./QuestActionMenu";
 import { SequenceDialog, SequenceStack, stackPad } from "./Sequence";
 import { StepsTray } from "./StepsTray";
@@ -112,6 +113,7 @@ export function TaskRow({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   // A quest with steps: a tap slides out its checklist instead of opening the editor.
+  const [bonusOpen, setBonusOpen] = useState(false);
   const [tray, setTrayOpen] = useState(false);
   // Once opened, the steps stay mounted so the tray can slide closed too.
   const [trayEver, setTrayEver] = useState(false);
@@ -585,15 +587,29 @@ export function TaskRow({
             )}
 
             {(() => {
-              // Get ahead of the deadline: finishing early pays a bonus.
-              const bonus = task.status === "open" ? earlyBirdBonus(task) : 0;
-              return bonus > 0 ? (
-                // A small pill beside the due date (no extra line).
-                <span className="-ml-1 whitespace-nowrap rounded-full px-1.5 text-[0.9em] font-semibold leading-[1.5]" style={{ color: isAdventure ? "#4d6b1f" : "var(--t-accent)", background: isAdventure ? "rgba(122,160,60,.14)" : "var(--t-accent-soft)" }} title={task.early_bonus_xp != null ? "Your early bonus: finish it before it's due" : "Finish it 2+ days before it's due for bonus XP"}>
-                  +{bonus} XP early
-                </span>
-              ) : null;
+              // Get ahead of the deadline: finishing early pays a bonus. The pill opens its choices;
+              // with none set (and time to spare), a quiet invitation to choose one.
+              if (task.status !== "open" || !task.due_at) return null;
+              const bonus = earlyBirdBonus(task);
+              const coins = earlyBirdCoins(task);
+              const roomy = roomToFinishEarly(task);
+              if (bonus <= 0 && coins <= 0 && (!roomy || task.early_bonus_xp === 0)) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setBonusOpen(true);
+                  }}
+                  className="-ml-1 whitespace-nowrap rounded-full px-1.5 text-[0.9em] font-semibold leading-[1.5]"
+                  style={bonus > 0 || coins > 0 ? { color: isAdventure ? "#4d6b1f" : "var(--t-accent)", background: isAdventure ? "rgba(122,160,60,.14)" : "var(--t-accent-soft)" } : { color: "var(--t-ink-soft)", border: "1px dashed rgba(139,112,64,.45)" }}
+                  title="Early-completion reward"
+                >
+                  {bonus > 0 || coins > 0 ? `+${bonus} XP${coins ? ` · ${coins}🪙` : ""} early` : "+ Early reward"}
+                </button>
+              );
             })()}
+            {bonusOpen && <EarlyBonusPopup taskId={task.id} initial={{ xp: task.early_bonus_xp ?? null, coins: task.early_bonus_coins ?? null, perDay: task.early_bonus_per_day ?? null }} onClose={() => setBonusOpen(false)} />}
           </div>
           {((task.progress ?? 0) > 0 || (task.steps_total ?? 0) > 0) && (
             <div className="mt-2 flex items-center gap-2" title={`${task.progress ?? 0}% done`}>
