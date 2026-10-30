@@ -7,7 +7,7 @@ import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { EnergyCheck } from "./EnergyCheck";
 import { CheckinIcon } from "./CheckinIcon";
 import { likeLine, likedLines, retireLine } from "@/lib/greetings";
-import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
+import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
 import { addBackGreeting, welcomeOrder, welcomeShows, type WelcomeEl } from "@/lib/welcome";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { voice, windowOf } from "@/lib/toucan-style";
@@ -15,7 +15,8 @@ import { useToucanStyle } from "@/lib/toucan-style-store";
 import { useEscape } from "@/lib/use-escape";
 import { addJournalEntryAction, setTopPriorityAction } from "@/app/actions";
 import { PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
-import { SettingsGear } from "@/components/ui/SettingsGear";
+import { GearIcon } from "@/components/ui/Icons";
+import { ArrangeFrame, ArrangeStrip, GreetingOptions } from "./WelcomeArrange";
 import { MistScene } from "./MistScene";
 import { DueSoonDrawer } from "@/components/tasks/DueSoonDrawer";
 import { castleOf } from "./CastleArt";
@@ -44,7 +45,7 @@ export function WelcomeCard({
   lastCheckInAt,
   due,
   priority = null,
-  fx,
+  fx: fxProp,
   onClose,
   toToday,
   onCheckedIn,
@@ -72,6 +73,11 @@ export function WelcomeCard({
   preview?: boolean;
 }) {
   const style = useToucanStyle();
+  // The settings as they are now: changed right here while arranging, or anywhere else.
+  const [fx, setFx] = useState(fxProp);
+  useEffect(() => subscribeFx(() => setFx(loadFx())), []);
+  // The gear arranges the screen in place: each part gets its own controls where it sits.
+  const [arranging, setArranging] = useState(false);
   const [shown, setShown] = useState(0);
   // Your verdict on the day's wise line: liked lines come back often, disliked ones never.
   const [verdict, setVerdict] = useState<"like" | "dislike" | null>(() => (line && typeof window !== "undefined" && likedLines().has(line) ? "like" : null));
@@ -96,7 +102,7 @@ export function WelcomeCard({
     // From another page, the fog takes over once the mist has rolled in, and Today lifts it.
     setTimeout(() => (onClose(), toToday?.()), elsewhere ? 1350 : 2400);
   };
-  useEscape(leave);
+  useEscape(() => (arranging ? setArranging(false) : leave()));
 
   useEffect(() => {
     if (!award?.xp) return;
@@ -133,7 +139,10 @@ export function WelcomeCard({
         </p>
       </div>
     ),
-    checkin: recent ? null : !checkinOpen ? (
+    checkin: (recent || checkinOpen) && !arranging ? (recent ? null : (
+      // Parchment like the rest of the card, its words in ink rather than cream (as in Insights).
+      <CheckinPanel fx={fx} mode={mode} metrics={metrics} checkedIn={checkedIn} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} />
+    )) : (
       <button
         type="button"
         onClick={() => setCheckinOpen(true)}
@@ -142,28 +151,6 @@ export function WelcomeCard({
       >
         <CheckinIcon icon={checkinIconOf(fx)} /> Check in
       </button>
-    ) : (
-      // Parchment like the rest of the card, its words in ink rather than cream (as in Insights).
-      <div
-        className="w-full rounded-2xl px-2 py-2.5 text-left"
-        style={{
-          background: "linear-gradient(180deg, rgba(255,250,236,.75), rgba(240,226,190,.75))",
-          border: "1.5px solid rgba(139,112,64,.5)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,.6)",
-          ["--t-cream" as string]: "var(--t-ink)",
-          ["--ec-soft" as string]: "var(--t-ink-soft)",
-          ["--ec-chip" as string]: "rgba(120,90,40,.1)",
-          ["--ec-gold" as string]: "#8a6116",
-          ["--ec-line" as string]: "rgba(139,112,64,.45)",
-          ["--ec-value" as string]: "#5a3d12",
-          ["--ec-l" as string]: "30%",
-        }}
-      >
-        <p className="m-0 mb-1 text-center font-display text-[17px]" style={{ color: "#8a6116" }}>
-          {checkedIn ? "Checked in ✓" : "Check in"}
-        </p>
-        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} addNights simple />
-      </div>
     ),
     streak: award && award.streak > 0 ? (
       <p className="m-0 text-[14.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
@@ -211,13 +198,14 @@ export function WelcomeCard({
     // A gilded button that opens into a drawer of the quests' cards.
     due: <DueSoonDrawer tasks={due} onOpenChange={setDrawerOpen} />,
   };
-  const order = welcomeOrder(fx).filter((el) => welcomeShows(fx, el) && parts[el]);
+  const allEls = welcomeOrder(fx);
+  const order = allEls.filter((el) => welcomeShows(fx, el) && parts[el]);
   // Not checked in yet? "Not now" offers to ask again later, or to skip it for today.
   const snoozable = !!onSnooze && !checkedIn && order.includes("checkin");
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
-    <div className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={leave} role="dialog" aria-modal="true" aria-label={heading}>
+    <div className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={() => (arranging ? setArranging(false) : leave())} role="dialog" aria-modal="true" aria-label={heading}>
       {/* A misty valley, and the card coming out of the mist. */}
       <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} />
       <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative`} onClick={(e) => e.stopPropagation()}>
@@ -235,12 +223,29 @@ export function WelcomeCard({
         )}
         {/* A soft light around the card, where the mist has thinned. */}
         <span aria-hidden className="pointer-events-none absolute -inset-12" style={{ background: "radial-gradient(ellipse at center, rgba(255,250,240,.5), rgba(255,250,240,0) 70%)" }} />
-        {/* What shows here, and in what order, is chosen in Settings. */}
-        <SettingsGear to="welcome-screen" label="Welcome screen settings" beforeLeave={preview ? onClose : undefined} className="absolute -right-2 -top-2 z-[2]" />
+        {/* The gear arranges this screen right here (what shows, in what order, and each part's options). */}
+        <button
+          type="button"
+          onClick={() => setArranging((v) => !v)}
+          aria-pressed={arranging}
+          aria-label={arranging ? "Done arranging" : "Arrange this screen"}
+          title={arranging ? "Done arranging" : "Arrange this screen"}
+          className="settings-gear absolute -right-2 -top-2 z-[2] flex h-[30px] w-[30px] items-center justify-center rounded-full"
+          style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: arranging ? "0 0 0 2px #f2d27e, 0 0 12px rgba(242,210,126,.7)" : "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
+        >
+          {arranging ? (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <GearIcon size={17} />
+          )}
+        </button>
         <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[88vh] w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`}>
+          {arranging && <ArrangeStrip fx={fx} onDone={() => setArranging(false)} />}
           <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
             {heading}
-            {!preview && !addingPhrase && (
+            {!preview && !addingPhrase && !arranging && (
               <button type="button" onClick={() => setAddingPhrase(true)} aria-label="Add a greeting of your own" title="Add a greeting of your own" className="ml-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full align-middle hover:bg-black/[.06]">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
@@ -279,12 +284,23 @@ export function WelcomeCard({
               ✓ Saved. It will greet you on a future visit.
             </p>
           )}
-          {order.map((el) => (
-            <div key={el} className="flex w-full flex-col items-center">
-              {parts[el]}
-            </div>
-          ))}
-          {snoozing ? (
+          {arranging && <GreetingOptions fx={fx} />}
+          {arranging
+            ? allEls.map((el, i) => (
+                <ArrangeFrame key={el} el={el} fx={fx} first={i === 0} last={i === allEls.length - 1} empty={EMPTY[el]}>
+                  {parts[el]}
+                </ArrangeFrame>
+              ))
+            : order.map((el) => (
+                <div key={el} className="flex w-full flex-col items-center">
+                  {parts[el]}
+                </div>
+              ))}
+          {arranging ? (
+            <button type="button" onClick={() => setArranging(false)} className="mt-1 h-10 rounded-full px-6 text-[14px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+              Done arranging
+            </button>
+          ) : snoozing ? (
             <div className="reveal mt-1 flex w-full flex-col items-center gap-1.5">
               <span className="flex items-center gap-1.5">
                 <button type="button" onClick={() => setSnoozing(false)} aria-label="Back" title="Back" className="flex h-8 w-8 items-center justify-center rounded-full" style={{ border: "1.5px solid #b39a6a", color: "#5a4a30", background: "rgba(255,250,238,.6)" }}>
@@ -533,3 +549,38 @@ function Intention() {
     </form>
   );
 }
+
+/** The check-in, opened in place of its button. */
+function CheckinPanel({ fx, mode, metrics, checkedIn, onSaved }: { fx: FxSettings; mode: "day" | "back"; metrics: string[]; checkedIn: boolean; onSaved: () => void }) {
+  return (
+      <div
+        className="w-full rounded-2xl px-2 py-2.5 text-left"
+        style={{
+          background: "linear-gradient(180deg, rgba(255,250,236,.75), rgba(240,226,190,.75))",
+          border: "1.5px solid rgba(139,112,64,.5)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,.6)",
+          ["--t-cream" as string]: "var(--t-ink)",
+          ["--ec-soft" as string]: "var(--t-ink-soft)",
+          ["--ec-chip" as string]: "rgba(120,90,40,.1)",
+          ["--ec-gold" as string]: "#8a6116",
+          ["--ec-line" as string]: "rgba(139,112,64,.45)",
+          ["--ec-value" as string]: "#5a3d12",
+          ["--ec-l" as string]: "30%",
+        }}
+      >
+        <p className="m-0 mb-1 text-center font-display text-[17px]" style={{ color: "#8a6116" }}>
+          {checkedIn ? "Checked in ✓" : "Check in"}
+        </p>
+        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={onSaved} addNights simple />
+      </div>
+  );
+}
+
+/** What a part shows when there's nothing in it right now (while arranging). */
+const EMPTY: Partial<Record<WelcomeEl, string>> = {
+  intention: "Asks on the day's first visit.",
+  streak: "Shows on the day's first visit, once you have a streak.",
+  bar: "Shows on the day's first visit.",
+  reward: "Shows on the day's first visit.",
+  line: "A new line each day.",
+};
