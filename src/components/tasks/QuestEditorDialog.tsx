@@ -49,7 +49,7 @@ import { QuestPicker, SequenceDialog } from "./Sequence";
 import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
 import type { QuestTemplate } from "@/lib/quest-templates";
 import { descendants, parentKeys, stepPayload, stepsShare, stepWeights, treeOrder, type StepDraft } from "@/lib/quest-steps";
-import { readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
+import { EDITOR_PARTS, readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
 import { DateField } from "@/components/ui/DateField";
 
 export type QuestDraft = {
@@ -95,6 +95,59 @@ function localDate(iso: string | null | undefined) {
   if (!iso) return "";
   const d = new Date(iso);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+/** Short names for the "More" fold's one-line summary. */
+const MORE_NAMES: Partial<Record<EditorPart, string>> = {
+  stats: "stats",
+  progress: "progress",
+  importance: "importance",
+  urgency: "urgency",
+  difficulty: "difficulty",
+  energy: "energy",
+  matrix: "matrix",
+  standsFor: "stands for",
+  alsoOn: "other boards",
+  private: "private",
+  template: "template",
+  tags: "tags",
+  board: "board",
+  sequence: "sequence",
+  steps: "steps",
+};
+/** The due chip's label: "today", "tomorrow", "Fri", or "Nov 12". */
+function dueChipLabel(day: string) {
+  const d = new Date(`${day}T12:00`);
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const days = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
+  if (days > 1 && days < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+/** One tap for the usual due dates: today, tomorrow, the end of this week, a week from now. */
+function dueQuickPicks() {
+  const at = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return localDate(d.toISOString());
+  };
+  const dow = new Date().getDay();
+  // This Friday; on Friday or the weekend, it's next Friday.
+  const toFri = dow < 5 ? 5 - dow : 12 - dow;
+  return [
+    { label: "Today", day: at(0) },
+    { label: "Tomorrow", day: at(1) },
+    { label: dow < 5 ? "This Friday" : "Next Friday", day: at(toFri) },
+    { label: "In a week", day: at(7) },
+  ].filter((q, i, all) => all.findIndex((x) => x.day === q.day) === i);
+}
+function FactCaret({ open }: { open: boolean }) {
+  return (
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="opacity-60 transition-transform" style={{ transform: open ? "rotate(180deg)" : undefined }}>
+      <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 /** "" for an end-of-day deadline (no particular time). */
 function localTime(iso: string | null | undefined) {
@@ -148,7 +201,7 @@ export function QuestEditorDialog({
   const embedded = useIsEmbedded();
   const scaleStyle = useScaleStyle();
   // Which quick-detail chip is open (one at a time).
-  const [factOpen, setFactOpen] = useState<EditorPart | null>(null);
+  const [factOpen, setFactOpen] = useState<EditorPart | "due" | "bonus" | null>(null);
   const isAdventure = theme === "adventure";
   const task = mode.kind === "edit" ? mode.task : null;
   const create = mode.kind === "create" ? mode : null;
@@ -164,6 +217,8 @@ export function QuestEditorDialog({
   // Tiny tasks start at 15 XP.
   const [xp, setXp] = useState(task?.xp_value ?? (doingNow ? 30 : create?.tiny ? 15 : 0));
   const [coinValue, setCoinValue] = useState<number | null>(task?.coin_value ?? null);
+  // Early bonus: null = automatic (half its XP for 2+ days early), 0 = none, or your own amount.
+  const [earlyBonus, setEarlyBonus] = useState<number | null>(task?.early_bonus_xp ?? null);
   const [effort, setEffort] = useState(task?.effort ?? Math.round(prefill?.effort ?? 0));
   const [energyGain, setEnergyGain] = useState(task?.energy_gain ?? 0);
   const [aspiration, setAspiration] = useState(Boolean(task?.is_aspiration));
@@ -517,7 +572,7 @@ export function QuestEditorDialog({
   const autosave = Boolean(task) && !review;
   // Placement isn't saved as you go: moving the quest to another list would
   // take its card (and this dialog) away mid-edit. It's saved on close.
-  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, effort, energyGain, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration, tiny]);
+  const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, earlyBonus, effort, energyGain, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration, tiny]);
   const [savedFields, setSavedFields] = useState(fields);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const dirty = fields !== savedFields || stepsDirty;
@@ -548,6 +603,7 @@ export function QuestEditorDialog({
       dueAt,
       chunkMinutes,
       coinValue,
+      earlyBonusXp: earlyBonus,
       isTiny: tiny,
     };
     const newSlot = !fixedSchedule && slot && slot.start !== savedSlotStart.current ? slot : null;
@@ -755,6 +811,7 @@ export function QuestEditorDialog({
             dueAt,
             chunkMinutes,
             coinValue,
+            earlyBonusXp: earlyBonus,
             isTiny: tiny,
             confirmImport: Boolean(review),
           });
@@ -817,6 +874,7 @@ export function QuestEditorDialog({
           dueAt,
           chunkMinutes,
           coinValue,
+          earlyBonusXp: earlyBonus,
           isTiny: tiny,
           });
         } catch (e) {
@@ -967,22 +1025,6 @@ export function QuestEditorDialog({
   const toolbarButtons =
     create && !doingNow ? (
       <span className="flex items-center gap-1">
-        {/* A tiny task: half height on Today, 5 minutes and 15 XP to start with. */}
-        <button
-          type="button"
-          onClick={() => {
-            const on = !tiny;
-            setTiny(on);
-            if (on && xp === 0) setXp(15);
-            if (on && !estimate.trim()) setEstimate("5");
-          }}
-          aria-pressed={tiny}
-          title="A tiny task: half height on Today, with just a check box"
-          className={smallBtn}
-          style={smallBtnStyle(tiny)}
-        >
-          <span aria-hidden>🌱</span> <span className={toolbarHost ? "" : "sr-only"}>Tiny task</span>
-        </button>
         <button type="button" onClick={() => (setShowTemplates((v) => !v), setShowDrafts(false))} aria-expanded={showTemplates} title="Start from a template or a quick set" className={smallBtn} style={smallBtnStyle(showTemplates)}>
           <span aria-hidden>📜</span> <span className={toolbarHost ? "" : "sr-only"}>Templates</span>
         </button>
@@ -1129,7 +1171,7 @@ export function QuestEditorDialog({
                         style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
                       >
                         <StepsGlyph size={15} />
-                        Add tasks
+                        Add steps
                       </button>
                     )}
                   </div>
@@ -1147,7 +1189,6 @@ export function QuestEditorDialog({
                     </span>
                     <span className="ml-auto min-w-0 truncate text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
                       {[
-                        dueDate && `due ${new Date(`${dueDate}T12:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
                         (fixedSchedule || slot) && new Date((fixedSchedule?.startISO ?? slot?.start)!).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }),
                         toSchedule && "on the scheduling list",
                         aspiration && "not actionable yet",
@@ -1158,44 +1199,6 @@ export function QuestEditorDialog({
                   </button>
                   {schedOpen && (
                     <div className="reveal flex flex-col gap-2.5 pb-1">
-              {/* Due date */}
-              {!doingNow && (
-                <div className="flex items-center gap-2.5">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
-                  <img src="/design/ui-calendar.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-                  <span className={`${labelCls} w-[58px] shrink-0`}>Due</span>
-                  <DateField
-                    value={dueDate}
-                    onChange={setDueDate}
-                    ariaLabel="Due date"
-                    placeholder="No due date"
-                    className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[15px]"
-                    style={fieldStyle}
-                  />
-                  {dueDate && (
-                    <>
-                      <input
-                        type="time"
-                        value={dueTime}
-                        onChange={(e) => setDueTime(e.target.value)}
-                        aria-label="Due time (optional)"
-                        className="h-9 w-[92px] shrink-0 rounded-lg border px-1.5 text-[15px]"
-                        style={fieldStyle}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => (setDueDate(""), setDueTime(""))}
-                        aria-label="Clear the due date"
-                        className="h-8 w-6 shrink-0 text-[18px] leading-none"
-                        style={{ color: "var(--t-ink-soft)" }}
-                      >
-                        ×
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-
               {/* Calendar slot */}
               {!doingNow && (
                 <div className="flex items-center gap-2.5">
@@ -2064,10 +2067,10 @@ export function QuestEditorDialog({
         <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       <span className="text-[14px] font-semibold" style={{ color: "var(--t-ink)" }}>
-        Advanced settings
+        More
       </span>
       <span className="ml-auto min-w-0 truncate text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-        {advOpen ? "" : `${foldedParts.length} more`}
+        {advOpen ? "" : foldedParts.map((k) => MORE_NAMES[k] ?? EDITOR_PARTS.find((p) => p.key === k)?.label).join(", ")}
       </span>
     </button>
   );
@@ -2230,6 +2233,24 @@ export function QuestEditorDialog({
                       Paint a portrait
                     </label>
                   )}
+                  {/* Tiny lives here, in one place, for new and existing quests alike. */}
+                  {!doingNow && (
+                    <label className="flex cursor-pointer items-center gap-1 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }} title="Tiny tasks show half height on Today, with just a check box unless they have a portrait">
+                      <input
+                        type="checkbox"
+                        checked={tiny}
+                        onChange={(e) => {
+                          const on = e.target.checked;
+                          setTiny(on);
+                          if (on && xp === 0) setXp(15);
+                          if (on && !estimate.trim()) setEstimate("5");
+                        }}
+                        className="h-3.5 w-3.5"
+                        style={{ accentColor: "#7a5f2a" }}
+                      />
+                      Tiny task
+                    </label>
+                  )}
                 </>
               )}
             </div>
@@ -2382,8 +2403,79 @@ export function QuestEditorDialog({
                         </svg>
                       </button>
                     ))}
+                    {/* When it's due, right on the surface; and once it has a date, an optional bonus for finishing early. */}
+                    {!doingNow && !isCompleted && (
+                      <button type="button" onClick={() => setFactOpen((o) => (o === "due" ? null : "due"))} aria-expanded={factOpen === "due"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "due" ? "true" : undefined}>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
+                        <img src="/design/ui-calendar.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />
+                        <span className="max-w-[150px] truncate">{dueDate ? `Due ${dueChipLabel(dueDate)}` : "Due date"}</span>
+                        <FactCaret open={factOpen === "due"} />
+                      </button>
+                    )}
+                    {!doingNow && !isCompleted && dueDate && (
+                      <button type="button" onClick={() => setFactOpen((o) => (o === "bonus" ? null : "bonus"))} aria-expanded={factOpen === "bonus"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "bonus" ? "true" : undefined}>
+                        <span aria-hidden className="text-[12px]">⏱</span>
+                        <span className="max-w-[150px] truncate">{earlyBonus === null ? "Early bonus" : earlyBonus > 0 ? `Early bonus +${earlyBonus} XP` : "No early bonus"}</span>
+                        <FactCaret open={factOpen === "bonus"} />
+                      </button>
+                    )}
                   </div>
-                  {factOpen && facts.includes(factOpen) && (
+                  {factOpen === "due" && (
+                    <div key="due" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {dueQuickPicks().map((q) => (
+                          <button key={q.label} type="button" onClick={() => setDueDate(q.day)} className="h-9 rounded-full px-3 text-[13.5px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: dueDate === q.day ? "rgba(217,180,95,.45)" : "rgba(255,250,235,.35)" }}>
+                            {q.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`${labelCls} shrink-0`}>Pick a date</span>
+                        <DateField value={dueDate} onChange={setDueDate} ariaLabel="Due date" placeholder="No due date" className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[15px]" style={fieldStyle} />
+                        {dueDate && (
+                          <>
+                            <input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} aria-label="Due time (optional)" className="h-9 w-[92px] shrink-0 rounded-lg border px-1.5 text-[15px]" style={fieldStyle} />
+                            <button type="button" onClick={() => (setDueDate(""), setDueTime(""))} aria-label="Clear the due date" title="No due date" className="h-9 w-7 shrink-0 text-[18px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
+                              ×
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {factOpen === "bonus" && dueDate && (
+                    <div key="bonus" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
+                      <span className="text-[13.5px]" style={{ color: "var(--t-ink)" }}>
+                        Extra XP for finishing before it&rsquo;s due.
+                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {[
+                          { v: null, label: "Automatic" },
+                          { v: 0, label: "None" },
+                        ].map((o) => (
+                          <button key={o.label} type="button" onClick={() => setEarlyBonus(o.v)} aria-pressed={earlyBonus === o.v} className="h-9 rounded-full px-3 text-[13.5px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: earlyBonus === o.v ? "rgba(217,180,95,.45)" : "rgba(255,250,235,.35)" }}>
+                            {o.label}
+                          </button>
+                        ))}
+                        <span className="flex h-9 items-center gap-0.5 rounded-full border px-1" style={{ ...fieldStyle, background: earlyBonus ? "rgba(217,180,95,.3)" : fieldStyle.background }}>
+                          <button type="button" onClick={() => setEarlyBonus(Math.max(0, (earlyBonus ?? 0) - 5))} aria-label="Less bonus XP" className="flex h-8 w-7 items-center justify-center text-[17px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
+                            −
+                          </button>
+                          <NumberInput min={0} max={1000} value={earlyBonus ?? 0} onValueChange={(v) => setEarlyBonus(v)} blankZero aria-label="Bonus XP" className="bare-input h-full w-10 bg-transparent text-center text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" style={{ color: "var(--t-xp)" }} />
+                          <span className="text-[12px] font-bold" style={{ color: "var(--t-xp)" }}>
+                            XP
+                          </span>
+                          <button type="button" onClick={() => setEarlyBonus((earlyBonus ?? 0) + 5)} aria-label="More bonus XP" className="flex h-8 w-7 items-center justify-center text-[17px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
+                            +
+                          </button>
+                        </span>
+                      </div>
+                      <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+                        {earlyBonus === null ? `Automatic: half its XP when you finish 2 or more days early.` : earlyBonus > 0 ? `Finish any time before it's due to get +${earlyBonus} XP (and the coins that come with it).` : "No bonus for finishing early."}
+                      </span>
+                    </div>
+                  )}
+                  {factOpen && factOpen !== "due" && factOpen !== "bonus" && facts.includes(factOpen) && (
                     <div key={factOpen} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
                       {partNodes[factOpen]}
                     </div>
@@ -2462,6 +2554,18 @@ export function QuestEditorDialog({
                   </button>
                 </div>
               )
+            ) : create && !doingNow ? (
+              // Already done it: create it and complete it in one go. Quiet, on the left, so it's never mistaken for Create.
+              <button
+                type="button"
+                onClick={() => save(true)}
+                disabled={isSaving || !title.trim()}
+                title={`Already done it? Create this ${noun} and complete it now`}
+                className="h-10 whitespace-nowrap rounded-full px-3 text-[13.5px] font-semibold disabled:cursor-default disabled:opacity-45"
+                style={{ background: "transparent", color: "var(--t-ink-soft)", border: "1px dashed var(--t-panel-border, rgba(139,112,64,.5))" }}
+              >
+                Already done ✓
+              </button>
             ) : (
               <span />
             )}
@@ -2469,7 +2573,7 @@ export function QuestEditorDialog({
               {autosave ? (
                 <>
                   <span className="text-[12.5px]" style={{ color: saveState === "error" ? "var(--t-warn)" : "var(--t-ink-soft)" }} aria-live="polite">
-                    {saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : dirty ? "Editing…" : savedTick ? "" : "✓ Saved"}
+                    {saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : ""}
                   </span>
                   {/* Complete in gold, then Done in green at the bottom right. */}
                   {!isCompleted && (
@@ -2499,14 +2603,7 @@ export function QuestEditorDialog({
                     <button type="button" onClick={review.onLater} className="h-10 rounded-full px-3 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
                       Save the rest for later
                     </button>
-                  ) : (
-                    // In the + sheet its × closes it, so there's room for Complete.
-                    !embedded && (
-                      <button type="button" onClick={requestClose} className="h-10 rounded-full px-2.5 text-[15px]" style={{ color: "var(--t-ink-soft)" }}>
-                        Cancel
-                      </button>
-                    )
-                  )}
+                  ) : null}
                   <button
                     type="button"
                     data-submit
@@ -2517,20 +2614,6 @@ export function QuestEditorDialog({
                   >
                     {isSaving ? "Saving…" : review ? "Confirm" : doingNow ? `Log it · +${xp} XP` : `Create ${noun}`}
                   </button>
-                  {/* Already done it: create it and complete it in one go. */}
-                  {create && !doingNow && (
-                    // A quiet outline, so it's never mistaken for Create (it was too easy to complete a new quest by accident).
-                    <button
-                      type="button"
-                      onClick={() => save(true)}
-                      disabled={isSaving || !title.trim()}
-                      title={`Already done it? Create this ${noun} and complete it now`}
-                      className="h-10 whitespace-nowrap rounded-full px-3 text-[13.5px] font-semibold disabled:cursor-default disabled:opacity-45"
-                      style={{ background: "transparent", color: "var(--t-ink-soft)", border: "1px dashed var(--t-panel-border, rgba(139,112,64,.5))" }}
-                    >
-                      Already done ✓
-                    </button>
-                  )}
                 </>
               )}
             </div>
