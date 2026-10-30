@@ -39,6 +39,12 @@ function setPending(p: Pending | null) {
   } catch {}
 }
 
+function stampBack() {
+  try {
+    window.localStorage.setItem(BACK_KEY, String(Date.now()));
+  } catch {}
+}
+
 type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<ReturnType<typeof welcomeContextAction>>; seed?: string };
 
 /**
@@ -232,6 +238,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       fx={fx}
       // Checked in: it stays until you say you're ready, even if you step away first.
       onCheckedIn={() => {
+        stampBack();
         const today = eveningDayKey();
         setPending({ ...(readPending(today) ?? { day: today, mode: shown.mode }), at: Date.now() + 60_000, kept: true });
       }}
@@ -244,6 +251,8 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
         if (ms <= 6 * 3_600_000) snoozeTimer.current = setTimeout(() => setShown(again), ms);
       }}
       onClose={() => {
+        // The next "welcome back" counts from now, so one screen never follows straight on from another.
+        stampBack();
         isOpen.current = false;
         setPending(null);
         setShown(null);

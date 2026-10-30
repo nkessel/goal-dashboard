@@ -125,7 +125,10 @@ export function WelcomeCard({
     // From another page, the fog takes over once the mist has rolled in, and Today lifts it.
     setTimeout(() => (onClose(), toToday?.()), elsewhere ? 1350 : 2400);
   };
-  useEscape(() => (arranging ? setArranging(false) : leave()));
+  // Only the bottom-right button goes on to town: Escape and taps on the mist just close what's open.
+  useEscape(() => {
+    if (arranging) setArranging(false);
+  });
 
   useEffect(() => {
     if (!award?.xp) return;
@@ -224,7 +227,7 @@ export function WelcomeCard({
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
-    <div className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={() => (arranging ? setArranging(false) : leave())} role="dialog" aria-modal="true" aria-label={heading}>
+    <div className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
       {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
       <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} castleSeed={fx.welcomeCastleSeed} castleSlot={arranging ? <CastleEdit fx={fx} /> : null} onCastleVisible={setCastleSeen} />
       <div className="relative flex max-h-full flex-col items-center">
@@ -378,27 +381,21 @@ export function WelcomeCard({
             </div>
           ) : (
             <div className="mt-1 flex w-full items-center gap-2">
-              <button type="button" onClick={() => (snoozable ? setSnoozing("main") : leave())} className="h-10 rounded-full border px-4 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>
-                {snoozable ? (
-                  <span className="flex items-center gap-1.5">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                    </svg>
-                    Snooze
-                  </span>
-                ) : (
-                  "Continue to town"
-                )}
-              </button>
-              {/* Bottom right: done here. Saves what's entered in the check-in, then on into the forest. */}
-              {order.includes("checkin") && !checkedIn && (
-                <button type="button" onClick={() => (checkinOpen && submitCheckin.current ? submitCheckin.current(leave) : leave())} className="font-display ml-auto flex h-10 items-center gap-1.5 rounded-full px-4 text-[15px]" style={GILT}>
-                  Complete check-in
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              {snoozable && (
+                <button type="button" onClick={() => setSnoozing("main")} className="flex h-10 items-center gap-1.5 rounded-full border px-4 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
                   </svg>
+                  Snooze
                 </button>
               )}
+              {/* Bottom right, the one way on: saves what's entered in the check-in, then on into the forest. */}
+              <button type="button" onClick={() => (checkinOpen && !checkedIn && submitCheckin.current ? submitCheckin.current(leave) : leave())} className="font-display ml-auto flex h-10 items-center gap-1.5 rounded-full px-4 text-[15px]" style={GILT}>
+                {order.includes("checkin") && !checkedIn ? "Complete check-in" : "Continue to town"}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
             </div>
           )}
         </div>
