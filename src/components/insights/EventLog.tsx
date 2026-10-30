@@ -248,17 +248,22 @@ export function EventLog({ notes }: { notes: Note[] }) {
                   style={tag ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 } : { background: "rgba(255,250,235,.7)", border: "1px solid rgba(139,112,64,.4)", color: INK }}
                 >
                   {!tag && <EventGlyph />}
-                  <span className="min-w-0 truncate">{body}</span>
+                  <span className="min-w-0 truncate">{body.split("\n")[0]}</span>
                 </button>
                 {openNote === n.id && (
                   <div role="dialog" aria-label="Event" className="card-pop-in absolute left-0 top-8 z-20 flex w-[min(300px,80vw)] flex-col gap-2 rounded-xl p-3" style={{ background: "#fbf3df", border: "1.5px solid #b39a6a", boxShadow: "0 10px 24px rgba(0,0,0,.25)" }}>
                     {editingNote === n.id ? (
-                      <input
+                      <textarea
                         autoFocus
                         defaultValue={body}
-                        maxLength={200}
+                        maxLength={400}
+                        rows={Math.min(6, body.split("\n").length + 1)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") saveEdit(n.id, e.currentTarget.value);
+                          // Enter saves; Shift+Enter starts a new line.
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            saveEdit(n.id, e.currentTarget.value);
+                          }
                           if (e.key === "Escape") {
                             e.preventDefault();
                             setEditingNote(null);
@@ -266,12 +271,12 @@ export function EventLog({ notes }: { notes: Note[] }) {
                         }}
                         onBlur={(e) => saveEdit(n.id, e.currentTarget.value)}
                         aria-label="Edit this event"
-                        className="event-input h-10 rounded-lg px-2.5 text-[16px]"
+                        className="event-input resize-none rounded-lg px-2.5 py-2 text-[16px] leading-snug"
                         style={{ color: INK }}
                       />
                     ) : (
                       <div className="flex items-start gap-2">
-                        <p className="m-0 min-w-0 flex-1 break-words text-[15px] leading-snug" style={{ color: INK }}>
+                        <p className="m-0 min-w-0 flex-1 whitespace-pre-line text-[15px] leading-snug [overflow-wrap:anywhere]" style={{ color: INK }}>
                           {body}
                         </p>
                         <button type="button" onClick={() => setEditingNote(n.id)} aria-label="Edit" title="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: INK_SOFT }}>

@@ -4,7 +4,7 @@
 
 - **Last updated:** 2026-10-30 evening (UX synthesis batches 1–6 shipped; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 19:30 UTC, still open: Due soon card layout (first card squished, subquest drawer redesign), toucan popups coming from the bird itself, the bird appearing in Settings when freed, last-screen-on-login, reward quests with multiple parts, and "event isn't displaying properly" (Oct 29, sent from Settings › Welcome Screen preview; owner asked to see it again, still unclear).
+- **Pending in-app feedback:** as of 2026-10-30 19:30 UTC, still open: Due soon card layout (first card squished, subquest drawer redesign), toucan popups coming from the bird itself, the bird appearing in Settings when freed, last-screen-on-login, reward quests with multiple parts.
 
 ---
 
@@ -118,6 +118,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30 (evening): Logged events keep their line breaks (cap 400; `tidyNote` in `lib/data/energy.ts`); Insights › Events shows them whole and edits them in a box (Shift+Enter for a new line); check-in chips show the first line. Feedback: submitting while a picture is still attaching now waits for it (that's how the Oct 29 event note lost its screenshot).
 - Oct 30 (evening): "Vitamins before 12pm" added to the owner's Right Effort (Factors of sleep) and to the defaults.
 - Oct 30 (evening): Welcome toucan: right-click (or tap) opens his menu, now with Toucan settings; drag him anywhere (remembered, `welcome-toucan-at`); his bubble's ‹ › step through what he could ask (`TOUCAN_PROMPTS` in `lib/welcome.ts`) and its ⋯ gives thumbs (👍 asks it first, 👎 never again; `toucan-prompt-votes` in localStorage). Toucan "Not now…": 15 min, 30 min, 1 hour, Other… (2 hrs, 3 hrs, this evening, tomorrow, or a time); closing Other goes back to the choices. Settings cage no longer says "Resting".
 - Oct 30 (evening): Habits polish: gilded habit cards on a green velvet tray, gilded check circles; the house cleaning habit reads "…: 🍳 Kitchen" and its title opens the mess check-in tray (slides; priority list, then Spaces/Laundry/Chores; opens on Spaces when fewer than 2 spaces); spaces and laundry are compact sliders (clean end sparkles); chores can repeat on a weekday (`weekday` in `lib/cleaning.ts`; the owner's trash & recycling is set to Tuesdays); Coming up chores show by default; editors say Close, not Done (chores, spaces, quest editor, sequence, power-ups); whole check-in UI tighter.

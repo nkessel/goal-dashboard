@@ -132,8 +132,18 @@ export function tagsIn(text: string): string[] {
   return [...new Set([...text.matchAll(/#([\p{L}\p{N}_-]{1,24})/gu)].map((m) => m[1].toLowerCase()))].slice(0, 8);
 }
 
+/** Keeps your line breaks; tidies spaces within each line. */
+function tidyNote(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 400);
+}
+
 export async function addCheckNote(ownerId: string, text: string, atISO?: string | null, allDay = false): Promise<CheckNote> {
-  const body = text.replace(/\s+/g, " ").trim().slice(0, 200);
+  const body = tidyNote(text);
   if (!body) throw new Error("Write something first.");
   // Logged for another moment (earlier today, yesterday…): up to 90 days back, never in the future.
   let at: string | undefined;
@@ -161,7 +171,7 @@ export async function listCheckNotesSince(ownerId: string, sinceISO: string): Pr
 }
 
 export async function updateCheckNote(ownerId: string, id: string, text: string): Promise<CheckNote> {
-  const body = text.replace(/\s+/g, " ").trim().slice(0, 200);
+  const body = tidyNote(text);
   if (!body) throw new Error("Write something first.");
   const { data, error } = await supabaseAdmin().from("check_in_notes").update({ body, tags: tagsIn(body) }).eq("owner_id", ownerId).eq("id", id).select("id, body, tags, created_at").single();
   if (error) throw new Error(`Couldn't save that: ${error.message}`);

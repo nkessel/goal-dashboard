@@ -962,6 +962,15 @@ function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shots]);
   const [attachError, setAttachError] = useState<string | null>(null);
+  // Submitted while a picture is still attaching: send once it's in, so the picture isn't lost.
+  const [sendWhenAttached, setSendWhenAttached] = useState(false);
+  const submit = () => (uploading ? setSendWhenAttached(true) : onSubmit());
+  useEffect(() => {
+    if (uploading || !sendWhenAttached) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot: send the note the moment its picture has attached
+    setSendWhenAttached(false);
+    onSubmit();
+  }, [uploading, sendWhenAttached, onSubmit]);
   // Tap an attachment to see it full size.
   const [viewing, setViewing] = useState<string | null>(null);
   async function attach(files: File[]) {
@@ -1010,7 +1019,7 @@ function Composer({
             submitBtn.current.focus();
           } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
-            onSubmit();
+            submit();
           }
         }}
       >
@@ -1061,7 +1070,7 @@ function Composer({
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
-            onSubmit();
+            submit();
           }
           // Tab: on to the XP (arrows change it), and Tab again to Submit.
           if (e.key === "Tab" && !e.shiftKey) {
@@ -1092,7 +1101,7 @@ function Composer({
             </button>
           </span>
         ))}
-        {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>Attaching…</span>}
+        {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>{sendWhenAttached ? "Attaching, then sending…" : "Attaching…"}</span>}
         {attachError && <span className="text-[12.5px]" style={{ color: "var(--t-warn)" }}>{attachError}</span>}
         <span className="ml-auto flex items-center gap-1">
         {(draft.shot ? 1 : 0) + (draft.images ?? []).length < 5 && (
@@ -1131,7 +1140,7 @@ function Composer({
         <button
           ref={submitBtn}
           type="button"
-          onClick={onSubmit}
+          onClick={submit}
           disabled={saving || !draft.body.trim()}
           title="Submit feedback (Ctrl + Enter)"
           className="hover-glow ml-1 h-8 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"

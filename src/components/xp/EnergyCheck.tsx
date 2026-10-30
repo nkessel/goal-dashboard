@@ -356,8 +356,9 @@ export function EnergyCheck({
               : { background: "rgba(242,210,126,.14)", border: "1px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)" }
           }
         >
-          <span className="truncate">
-            {n.body.split(/(#[\p{L}\p{N}_-]+)/u).map((part, i) =>
+          <span className="truncate" title={n.body}>
+            {/* A chip shows the first line; the whole event (with its line breaks) is in Insights › Events. */}
+            {n.body.split("\n")[0].split(/(#[\p{L}\p{N}_-]+)/u).map((part, i) =>
               part.startsWith("#") ? (
                 <b key={i} style={{ color: /^#\S+$/.test(n.body) ? "#2a1c10" : "var(--ec-gold, #f2d27e)" }}>
                   {part}
