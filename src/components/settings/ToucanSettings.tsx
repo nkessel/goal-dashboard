@@ -1,5 +1,6 @@
 "use client";
 
+import { FoldGroup } from "./FoldGroup";
 import { useEffect, useState } from "react";
 import { saveToucanPrefsAction } from "@/app/actions";
 import { FLOURISHES, TALK_LOOKS, readFlourish, readTalkLook, saveFlourish, saveTalkLook, type Flourish, type TalkLook } from "@/lib/toucan-flourish";
@@ -73,8 +74,7 @@ function CheckInStyle() {
     : [];
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-semibold">How he checks in with you</span>
-      <p className="m-0 -mt-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+      <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
         {st.done ? bits.join(" · ") : "A few taps teach him your way: tone, timing, what helps and what doesn't, and the gym."}
       </p>
       {st.done && <ToucanPreview text={voice.eveningPrep(st)} />}
@@ -115,7 +115,8 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
 
   return (
     <div className="flex flex-col gap-2.5" style={{ color: "var(--t-ink)" }}>
-      <span className="text-sm font-semibold">How much he does</span>
+      <FoldGroup title="How much he does">
+      <div className="flex flex-col gap-1.5">
       <div role="radiogroup" aria-label="How much the toucan does" className="flex flex-col gap-1.5">
         {TOUCAN_MODES.map((m) => (
           <button key={m.key} type="button" role="radio" aria-checked={mode === m.key} onClick={() => chooseMode(m.key)} onPointerEnter={() => setHover(m.key)} onPointerLeave={() => setHover(null)} className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick(mode === m.key)}>
@@ -127,17 +128,17 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
         ))}
       </div>
       <ToucanPreview text={MODE_EXAMPLES[hover ?? mode]} />
+      </div>
+      </FoldGroup>
 
       {mode !== "simple" && (
-        <div className="mt-1">
+        <FoldGroup title="How he checks in with you">
           <CheckInStyle />
-        </div>
+        </FoldGroup>
       )}
 
-      <span className="mt-1 text-sm font-semibold">What he says</span>
-      <p className="m-0 -mt-1.5 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-        Untick any line you&rsquo;d rather not hear again.
-      </p>
+      <FoldGroup title="What he says" hint="Untick any line you’d rather not hear again.">
+      <div className="flex flex-col gap-1.5">
       {LINE_GROUPS.map((g) => {
         const on = g.lines.filter((l) => !off.has(l)).length;
         const isOpen = openGroup === g.key;
@@ -172,6 +173,8 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
           </div>
         );
       })}
+      </div>
+      </FoldGroup>
     </div>
   );
 }

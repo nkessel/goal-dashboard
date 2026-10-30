@@ -1,5 +1,6 @@
 "use client";
 
+import { FoldGroup } from "./FoldGroup";
 import { useEffect, useState, useRef } from "react";
 import { CheckinIcon } from "@/components/xp/CheckinIcon";
 import { CHECKIN_ICONS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, WELCOME_HEADINGS, checkinIconOf, checkinStyleOf, loadFx, saveFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
@@ -71,8 +72,9 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
   if (welcomeOnly)
     return (
       <div className="flex flex-col gap-2" style={{ color: "var(--t-ink)" }}>
-        <span className="text-[13px] font-semibold">When it opens</span>
-        <p className="m-0 -mt-1 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+        <FoldGroup title="When it opens">
+          <div className="flex flex-col gap-2">
+        <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
           On the day&rsquo;s first visit, with last night&rsquo;s sleep times. After that, a check-in (without sleep) once this long has passed since your last one:
         </p>
         <div className="flex items-center gap-2">
@@ -89,7 +91,11 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           </label>
         </div>
 
-        <span className="mt-1 text-[13px] font-semibold">The greeting, day&rsquo;s first visit</span>
+          </div>
+        </FoldGroup>
+        <FoldGroup title="Greetings">
+          <div className="flex flex-col gap-2">
+        <span className="text-[13px] font-semibold">The greeting, day&rsquo;s first visit</span>
         <div role="radiogroup" aria-label="The welcome greeting" className="flex flex-wrap gap-1.5">
           {WELCOME_HEADINGS.map((w) => (
             <button key={w.key} type="button" role="radio" aria-checked={(fx.welcomeHeading ?? "cheer") === w.key} title={w.hint} onClick={() => update({ welcomeHeading: w.key })} className="flex min-h-11 flex-1 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick((fx.welcomeHeading ?? "cheer") === w.key)}>
@@ -138,7 +144,11 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           onToggle={(l, on) => update({ welcomeBackOff: on ? (fx.welcomeBackOff ?? []).filter((x) => x !== l) : [...(fx.welcomeBackOff ?? []), l] })}
         />
 
-        <span className="mt-1 text-[13px] font-semibold">What&rsquo;s on it, and in what order</span>
+          </div>
+        </FoldGroup>
+        <FoldGroup title="What’s on it, and in what order">
+          <div className="flex flex-col gap-2">
+
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
           {welcomeOrder(fx).map((el, i, all) => {
             const meta = WELCOME_ELS.find((e) => e.key === el)!;
@@ -162,9 +172,16 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
             );
           })}
         </ul>
+        <label className="mt-1 flex min-h-9 items-center gap-2.5 text-sm">
+          <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.welcomeConfetti !== false} onChange={() => update({ welcomeConfetti: fx.welcomeConfetti === false })} />
+          Confetti on the day&rsquo;s first visit
+        </label>
+          </div>
+        </FoldGroup>
         {welcomeShows(fx, "checkin") && (
-          <>
-            <span className="mt-1 text-[13px] font-semibold">The Check in button</span>
+          <FoldGroup title="Check-in">
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] font-semibold">The Check in button</span>
             <div role="radiogroup" aria-label="The Check in button's look" className="grid grid-cols-2 gap-1.5">
               {CHECKIN_STYLES.map((c) => (
                 <button key={c.key} type="button" role="radio" aria-checked={checkinStyleOf(fx).key === c.key} onClick={() => update({ checkinStyle: c.key })} className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-2.5" style={{ border: checkinStyleOf(fx).key === c.key ? "2px solid var(--t-gold-deep)" : "1px solid var(--t-card-border)" }}>
@@ -198,11 +215,13 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
                 {label}
               </label>
             ))}
-          </>
+          </div>
+        </FoldGroup>
         )}
         {welcomeShows(fx, "line") && (
-          <>
-            <span className="mt-1 text-[13px] font-semibold">The day&rsquo;s wise line</span>
+          <FoldGroup title="The day’s wise line">
+          <div className="flex flex-col gap-2">
+
             <label className="flex min-h-9 items-center gap-2.5 text-sm">
               <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={ownLinesOn(fx)} onChange={() => update({ welcomeOwnOn: !ownLinesOn(fx) })} />
               Add my own wise lines
@@ -219,12 +238,9 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
               />
             )}
             <WiseLines own={ownLines(fx)} />
-          </>
+          </div>
+        </FoldGroup>
         )}
-        <label className="mt-1 flex min-h-9 items-center gap-2.5 text-sm">
-          <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.welcomeConfetti !== false} onChange={() => update({ welcomeConfetti: fx.welcomeConfetti === false })} />
-          Confetti on the day&rsquo;s first visit
-        </label>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => openWelcome("day")} className={playBtn} style={playStyle}>
             <Play /> Preview: first visit

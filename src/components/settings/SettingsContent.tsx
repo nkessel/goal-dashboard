@@ -1,3 +1,4 @@
+import { FoldGroup as FxGroup } from "./FoldGroup";
 import Link from "next/link";
 import { ToucanWorkshop } from "./ToucanWorkshop";
 import { BackpackIcon } from "./BackpackIcon";
@@ -385,13 +386,13 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               initialMode={(((profile.life_wheel as { toucanPrefs?: { mode?: string } } | null)?.toucanPrefs?.mode as "simple" | "lite" | "full" | undefined) ?? "full")}
               initialRetired={(profile.life_wheel as { toucanPrefs?: { retired?: string[] } } | null)?.toucanPrefs?.retired ?? []}
             />
-            {/* His look gets its own heading, apart from what he does. */}
-            <div className="mt-4 flex flex-col gap-3 pt-4" style={{ borderTop: "1px solid var(--t-card-border)" }}>
-              <h4 className={`m-0 ${isAdventure ? "font-display text-[16px]" : "text-sm font-bold"}`} style={{ color: "var(--t-ink)" }}>
-                His look
-              </h4>
-              <ToucanLookSettings />
-              <ToucanWorkshop initial={profile.toucan ?? null} coins={profile.coins ?? 0} />
+            <div className="mt-2 flex flex-col gap-2">
+              <FxGroup title="His look" hint="How “Talk with me” shows, and how he moves when he shares wisdom." isAdventure={isAdventure}>
+                <ToucanLookSettings />
+              </FxGroup>
+              <FxGroup title="His add-ons" hint="Hats, trinkets and the rest, bought with coins." isAdventure={isAdventure}>
+                <ToucanWorkshop initial={profile.toucan ?? null} coins={profile.coins ?? 0} />
+              </FxGroup>
             </div>
           </SettingsRow>
           </SectionItem>
@@ -561,19 +562,3 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
   );
 }
 
-/** One folded group of settings inside a section. */
-function FxGroup({ title, hint, isAdventure, open, children }: { title: string; hint?: string; isAdventure: boolean; open?: boolean; children: React.ReactNode }) {
-  return (
-    <details open={open || undefined} className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
-      <summary className={`cursor-pointer ${isAdventure ? "font-display text-[15px]" : "text-sm font-bold"}`}>{title}</summary>
-      <div className="mt-2">
-        {hint && (
-          <p className="mb-2 mt-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-            {hint}
-          </p>
-        )}
-        {children}
-      </div>
-    </details>
-  );
-}
