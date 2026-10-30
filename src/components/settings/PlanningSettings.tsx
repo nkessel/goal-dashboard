@@ -27,7 +27,7 @@ export function PlanningSettings({ isAdventure, withPair }: { isAdventure: boole
   const chip = (on: boolean) => (on ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" } : { border: "1px solid rgba(139,112,64,.45)", color: "var(--t-ink)" });
   return (
     <div className="flex flex-col gap-2">
-      <FoldGroup title="Evening routine" hint="It sits at the top of Today from this time (in place of a planning invitation), with a small “hide”." isAdventure={isAdventure}>
+      <FoldGroup title="Evening routine" value={at === "off" ? "Off" : `From ${label(at)}`} hint="It sits at the top of Today from this time (in place of a planning invitation), with a small “hide”." isAdventure={isAdventure}>
       <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-1.5">
         {TIMES.map((m) => (

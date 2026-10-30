@@ -27,9 +27,9 @@ import { NotificationPrefs } from "@/components/settings/NotificationPrefs";
 import { SettingsRow } from "@/components/settings/SettingsRow";
 import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
-import { CelebrationSettings, FabSettings, WelcomeSettings } from "@/components/settings/CelebrationSettings";
+import { CelebrationSettings, FabSettings, FabValue, WelcomeSettings } from "@/components/settings/CelebrationSettings";
 import { MenusSettings } from "@/components/settings/MenuLayoutSettings";
-import { EveningButtonFxSettings, LoadingSettings, VictoriesHeaderSettings } from "@/components/settings/VisualFxSettings";
+import { EveningButtonFxSettings, EveningButtonValue, LoadingSettings, LoadingValue, VictoriesHeaderSettings, VictoriesValue } from "@/components/settings/VisualFxSettings";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { isAdmin, countUnreviewed } from "@/lib/data/feedback";
 import { ChatIcon } from "@/components/feedback/FeedbackDock";
@@ -431,18 +431,18 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               <FxGroup open={opens("visual-effects") && openGroup === "celebrations"} title="Celebrations" hint="The dust and sparks that fly when you complete a quest." isAdventure={isAdventure}>
                 <CelebrationSettings />
               </FxGroup>
-              <FxGroup open={opens("visual-effects") && openGroup === "evening-button"} title="Evening Routine button" isAdventure={isAdventure}>
+              <FxGroup open={opens("visual-effects") && openGroup === "evening-button"} title="Evening Routine button" value={<EveningButtonValue />} isAdventure={isAdventure}>
                 <EveningButtonFxSettings />
               </FxGroup>
               {isAdventure && (
-                <FxGroup open={opens("visual-effects") && openGroup === "fab"} title="The + button" isAdventure={isAdventure}>
+                <FxGroup open={opens("visual-effects") && openGroup === "fab"} title="The + button" value={<FabValue />} isAdventure={isAdventure}>
                   <FabSettings />
                 </FxGroup>
               )}
-              <FxGroup open={opens("visual-effects") && openGroup === "loading"} title="While a screen loads" isAdventure={isAdventure}>
+              <FxGroup open={opens("visual-effects") && openGroup === "loading"} title="While a screen loads" value={<LoadingValue />} isAdventure={isAdventure}>
                 <LoadingSettings />
               </FxGroup>
-              <FxGroup open={opens("visual-effects") && openGroup === "victories"} title="Victories Today, when closed" hint="Tap its title to close it. Its header then shows:" isAdventure={isAdventure}>
+              <FxGroup open={opens("visual-effects") && openGroup === "victories"} title="Victories Today, when closed" value={<VictoriesValue />} hint="Tap its title to close it. Its header then shows:" isAdventure={isAdventure}>
                 <VictoriesHeaderSettings />
               </FxGroup>
               <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>

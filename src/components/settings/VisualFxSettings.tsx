@@ -10,6 +10,21 @@ const EVENING: { k: "eveningStarShimmer" | "eveningStarTwinkle" | "eveningBorder
   { k: "eveningBorderShimmer", label: "Border shimmers" },
 ];
 
+/** Short words for what's set, shown on each folded group's title while it's closed. */
+const listOf = (on: string[], none: string) => (on.length ? on.join(" · ") : none);
+export function EveningButtonValue() {
+  const fx = useVisualFx();
+  return <>{listOf(EVENING.filter(({ k }) => fx[k]).map(({ label }) => label.split(" (")[0]), "No effects")}</>;
+}
+export function VictoriesValue() {
+  const fx = useVisualFx();
+  return <>{listOf(VICTORIES.filter(({ k }) => fx[k]).map(({ label }) => label), "Just its title")}</>;
+}
+export function LoadingValue() {
+  const fx = useVisualFx();
+  return <>{LOADING_LOOKS.find((l) => l.key === fx.loadingLook)?.label}</>;
+}
+
 /** Evening Routine button effects, with a live preview. Saved on this device. */
 export function EveningButtonFxSettings() {
   const fx = useVisualFx();

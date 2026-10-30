@@ -72,7 +72,7 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
   if (welcomeOnly)
     return (
       <div className="flex flex-col gap-2" style={{ color: "var(--t-ink)" }}>
-        <FoldGroup title="When it opens">
+        <FoldGroup title="When it opens" value={backHours(fx) ? `Every ${backHours(fx)} ${backHours(fx) === 1 ? "hour" : "hours"}` : "Once a day"}>
           <div className="flex flex-col gap-2">
         <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
           On the day&rsquo;s first visit, with last night&rsquo;s sleep times. After that, a check-in (without sleep) once this long has passed since your last one:
@@ -468,6 +468,18 @@ function Play() {
       <path d="M2 1l7 4-7 4z" fill="currentColor" />
     </svg>
   );
+}
+
+/** The + button's look, by name (for its folded group's title). */
+export function FabValue() {
+  const [fx, setFx] = useState<FxSettings>(FX_DEFAULTS);
+  useEffect(() => {
+    const read = () => setFx(loadFx());
+    read();
+    window.addEventListener("fx-change", read);
+    return () => window.removeEventListener("fx-change", read);
+  }, []);
+  return <>{(FAB_STYLES.find((f) => f.key === fx.fabStyle) ?? FAB_STYLES[0]).label}</>;
 }
 
 /** The + button's look, in its own part of Visual Effects (not a celebration). */

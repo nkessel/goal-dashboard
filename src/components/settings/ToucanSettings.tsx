@@ -62,9 +62,8 @@ export function ToucanPreview({ text, talk, flourish, play = 0 }: { text: string
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** How you like to be checked in: what the quiz found, a sample, and a way to take it (again). */
-function CheckInStyle() {
-  const st = useToucanStyle();
-  const bits = st.done
+function styleBits(st: ReturnType<typeof useToucanStyle>) {
+  return st.done
     ? [
         st.tone === "gentle" ? "Gentle" : st.tone === "direct" ? "Straight to the point" : "Playful",
         st.often === "rare" ? "once a day at most" : st.often === "some" ? "a few times a day" : "whenever it helps",
@@ -72,6 +71,10 @@ function CheckInStyle() {
         ...(st.gym.days.length ? [`gym ${st.gym.days.map((d) => DAY_NAMES[d]).join(", ")}${st.gym.time ? ` at ${clockWord(st.gym.time)}` : ""}`] : []),
       ]
     : [];
+}
+function CheckInStyle() {
+  const st = useToucanStyle();
+  const bits = styleBits(st);
   return (
     <div className="flex flex-col gap-2">
       <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -94,6 +97,7 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
   const [off, setOff] = useState<Set<string>>(() => new Set(initialRetired));
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [hover, setHover] = useState<ToucanMode | null>(null);
+  const st = useToucanStyle();
 
   function chooseMode(m: ToucanMode) {
     setMode(m);
@@ -115,7 +119,7 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
 
   return (
     <div className="flex flex-col gap-2.5" style={{ color: "var(--t-ink)" }}>
-      <FoldGroup title="How much he does">
+      <FoldGroup title="How much he does" value={TOUCAN_MODES.find((m) => m.key === mode)?.label}>
       <div className="flex flex-col gap-1.5">
       <div role="radiogroup" aria-label="How much the toucan does" className="flex flex-col gap-1.5">
         {TOUCAN_MODES.map((m) => (
@@ -132,7 +136,7 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
       </FoldGroup>
 
       {mode !== "simple" && (
-        <FoldGroup title="How he checks in with you">
+        <FoldGroup title="How he checks in with you" value={styleBits(st).join(" · ") || "Not set up yet"}>
           <CheckInStyle />
         </FoldGroup>
       )}
