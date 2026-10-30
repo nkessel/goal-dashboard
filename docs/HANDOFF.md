@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30, `main` @ `61e4560` + AR class homework linked to the Mastering Facilitation course
+- **Last updated:** 2026-10-30, `main` @ `aee754f` (bring-from-home drawer on the backpack)
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** 25 notes not marked shipped (as of 2026-10-30 16:40 UTC, query below). Some may already have been built through chat requests without being marked.
 
@@ -16,8 +16,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 |---|---|---|---|
 | 1 | **Ship pending in-app feedback** | Ready | Run the feedback loop in section 3. Last batch shipped Oct 29 02:37 UTC. |
 | 2 | **Mess check-in for the 20-min cleaning habit** ("Mess weather") | Owner deciding the final shape | Proposed: one-tap calm/cloudy/stormy rating per space; the messiest becomes today's 20-min focus. Plus a style picker in Settings (weather, jars, garden, critters, piles), spaces Desk, Art desk, Bedside box + clothing, Bathroom, **Kitchen**, and "+ Add a space"; a 🧺 laundry bin fill gauge that predicts the next load; a **chore deck** (vacuum, sheets, fridge, dust, recycling, each "every N days") that feeds due chores into the 20-min pick. Build once the owner says go. |
-| 3 | **Bring-from-home list** | Owner to confirm the design | A leather side pocket on the backpack/inventory, labelled "Bring from home", nameable for a place (e.g. "Natick"). Tick-off lines; clear ticked or keep for next time. Seed it with Coconut milk and Energy tinctures. |
-| 4 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
+| 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
 
 **Open questions for the owner** (ask when relevant, don't block on them):
 - "Allow editing of quests here" on Tomorrow's Quests: tapping a name already opens the editor. Do they want editing in place?
@@ -111,6 +110,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30: Bring from home: a gilded button on the backpack's right opens a side-drawer packing list (place name, tick-offs, clear packed or keep for next time). Stored in `life_wheel.inventory.bring`; the owner's list starts with Coconut milk and Energy tinctures for Natick until first saved (`withOwnerBringSeed` in `lib/inventory.ts`).
 - Oct 30: Welcome screen settings in context: its gear arranges the screen in place (each part gets show/hide, up/down and its own options where it sits; a strip on top for when it opens, the castle and confetti; greetings under the heading). `src/components/xp/WelcomeArrange.tsx`; the wise-line and greeting lists moved to `settings/LineLists.tsx`. Settings › Welcome Screen still has the same controls.
 - Oct 30: AR class homework now stands for the Mastering Facilitation board (follows the current week's quest and its due date; tapping "Now: Week …" on the card opens that board).
 - Oct 30: AR class (Mastering Facilitation) due dates moved back one week, old values and undo in `docs/data-changes/2026-10-30-mastering-facilitation-due-dates.md`.
