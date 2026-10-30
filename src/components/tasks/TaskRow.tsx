@@ -582,7 +582,7 @@ export function TaskRow({
               // Get ahead of the deadline: finishing early pays a bonus.
               const bonus = task.status === "open" ? earlyBirdBonus(task) : 0;
               return bonus > 0 ? (
-                <span className="flex items-center gap-1 font-semibold" style={{ color: isAdventure ? "#5a7a2a" : "var(--t-accent)" }} title="Finish it 2+ days before it's due for bonus XP">
+                <span className="flex items-center gap-1 font-semibold" style={{ color: isAdventure ? "#5a7a2a" : "var(--t-accent)" }} title={task.early_bonus_xp != null ? "Your early bonus: finish it before it's due" : "Finish it 2+ days before it's due for bonus XP"}>
                   🐦 +{bonus} XP if done early
                 </span>
               ) : null;

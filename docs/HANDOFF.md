@@ -46,7 +46,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0067_tiny_tasks.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0069_early_bonus.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -116,6 +116,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 30 (evening): Quest editor: a Due chip on the surface with Today / Tomorrow / This Friday / In a week and a date picker (due row left Scheduling); an Early bonus chip once it has a due date (Automatic, None, or your own XP for finishing any time before it's due; `tasks.early_bonus_xp`, migration 0069, `earlyBirdBonus` in `lib/next-action.ts`); Tiny task in one place under the portrait (🌱 header toggle gone); "Add steps"; "More" fold with a one-line list of what's in it; footer: no Cancel when creating (× closes), Already done quietly on the left, no "✓ Saved", Delete behind ⋯ (right-click too).
 - Oct 30 (evening): Level bars are the default scale style everywhere, quest cards included (icon once + a small 5-step bar; `IconRun` in `TaskRow.tsx`); welcome arranging has one Done (bottom), hidden parts as + chips, no doubled Top priority label, "Today's intention" as that part's name, XP and coins on one line.
 - Oct 30 (evening): Top priority keeps your line breaks (cap 400), wraps long words/links, shows one ◆ item per line in a parchment box that taps to edit, ✎ by its label, "When there's space" list for the others (three-team synthesis in `docs/ux/2026-10-30-top-priority.md`); the welcome screen's bottom button saves priority, intention and check-in together (no per-field Save); check-in −/+ beside each slider; Due soon chevron points down.
 - Oct 30 (late afternoon): Welcome screen "Plan my day" part removed (stored orders drop it); the toucan lands on every visit, not just welcome back, and tapping him offers Plan my day, Talk to me, a wise saying, or changing what he asks first (`welcomeToucanAsk`, `toucanAsk()` in `lib/welcome.ts`); the wise line's thumbs sit in a right-hand column so they never drop below it on phones.

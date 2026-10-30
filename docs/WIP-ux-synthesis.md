@@ -15,13 +15,7 @@ Welcome screen:
 - (Shipped batch 2: compact reward line, one Done, hidden parts as chips, no doubled label.) Left: bigger hit areas on the wise-line thumbs (28px now), consistent capitalization.
 - Keep: the "+ Other priorities" seal and the "Complete check-in" label (owner's choices).
 
-Quest editor (`src/components/tasks/QuestEditorDialog.tsx`):
-- Due date on the surface with quick chips (Today, Tomorrow, This week, Pick…).
-- "Shows in" always visible as a segmented control; clear labelled rows (time stepper, XP inline).
-- Footer: no Cancel when creating; "Already done" quiet on the left; in edit, a ⋯ menu for Delete / Save as template; drop the "✓ Saved" text; pinned footer.
-- Tiny in one place (remove the 🌱 header toggle); Paint portrait / Tiny / Private as pills or `GoldCheck`s in one row.
-- One scale-style toggle per group in icon mode too (`LevelScales`). (Bars are now the default.)
-- "Advanced settings · N more" → "More" + one-line summary; rename "Add tasks" → "Steps".
+Quest editor: shipped in batch 3 (see HANDOFF "Recently shipped"). Left on purpose: "Shows in" stays a chip (the owner chose the one row of chips this afternoon, after the reviews); pinned footer not done.
 
 Then: check new in-app feedback (HANDOFF §3 query; about 9 pending, list in HANDOFF header), build, screenshot, merge to `main`, push, mark feedback shipped, update HANDOFF, concise debrief (owner wants debriefs short).
 

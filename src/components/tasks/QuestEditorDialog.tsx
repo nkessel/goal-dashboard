@@ -376,6 +376,19 @@ export function QuestEditorDialog({
   const [stepXpPop, setStepXpPop] = useState<number | null>(null);
   const newStepRef = useRef<HTMLInputElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [moreMenu, setMoreMenu] = useState(false);
+  const moreRef = useRef<HTMLSpanElement>(null);
+  // The ⋯ menu closes on a click anywhere else (except in the feedback box).
+  useEffect(() => {
+    if (!moreMenu) return;
+    const off = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (moreRef.current?.contains(t) || t?.closest?.("[data-feedback-root]")) return;
+      setMoreMenu(false);
+    };
+    document.addEventListener("pointerdown", off);
+    return () => document.removeEventListener("pointerdown", off);
+  }, [moreMenu]);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const [phase, setPhase] = useState<"open" | "closing">("open");
@@ -2535,9 +2548,28 @@ export function QuestEditorDialog({
           <div className="qe-actions flex flex-wrap items-center justify-between gap-2 pt-1">
             {task ? (
               !confirmingDelete ? (
-                <button type="button" onClick={() => setConfirmingDelete(true)} className="min-h-9 text-sm underline" style={{ color: "var(--t-warn)" }}>
-                  Delete {noun}
-                </button>
+                // Rarely needed, so it waits in a ⋯ menu (right-click opens it too).
+                <span ref={moreRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMoreMenu((v) => !v)}
+                    onContextMenu={(e) => (e.preventDefault(), setMoreMenu(true))}
+                    aria-expanded={moreMenu}
+                    aria-label="More actions"
+                    title="More actions"
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-[20px] leading-none hover:bg-black/[.06]"
+                    style={{ color: "var(--t-ink-soft)" }}
+                  >
+                    ⋯
+                  </button>
+                  {moreMenu && (
+                    <span className="card-pop-in absolute bottom-11 left-0 z-10 flex min-w-[160px] flex-col rounded-xl p-1 shadow-xl" style={{ background: "var(--t-card, #fffaf0)", border: "1px solid rgba(139,112,64,.4)" }}>
+                      <button type="button" onClick={() => (setMoreMenu(false), setConfirmingDelete(true))} className="flex h-10 items-center rounded-lg px-3 text-left text-[14px] font-semibold hover:bg-black/[.05]" style={{ color: "var(--t-warn)" }}>
+                        Delete {noun}
+                      </button>
+                    </span>
+                  )}
+                </span>
               ) : (
                 <div className="flex items-center gap-2 text-sm">
                   <button
