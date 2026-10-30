@@ -12,8 +12,7 @@ Work continues on `main` in small shipped batches (batch 1 shipped Oct 30 evenin
 
 ## Still to do (agreed by all three reviews)
 Welcome screen:
-- Compact reward line; arrange mode: no duplicate caps label on focus/intention, hide/✎ absolute top-right, one Done (bottom), hidden parts as chips, "Comes back after (−) N hrs (+)".
-- Bigger hit areas, consistent capitalization.
+- (Shipped batch 2: compact reward line, one Done, hidden parts as chips, no doubled label.) Left: bigger hit areas on the wise-line thumbs (28px now), consistent capitalization.
 - Keep: the "+ Other priorities" seal and the "Complete check-in" label (owner's choices).
 
 Quest editor (`src/components/tasks/QuestEditorDialog.tsx`):
@@ -21,7 +20,7 @@ Quest editor (`src/components/tasks/QuestEditorDialog.tsx`):
 - "Shows in" always visible as a segmented control; clear labelled rows (time stepper, XP inline).
 - Footer: no Cancel when creating; "Already done" quiet on the left; in edit, a ⋯ menu for Delete / Save as template; drop the "✓ Saved" text; pinned footer.
 - Tiny in one place (remove the 🌱 header toggle); Paint portrait / Tiny / Private as pills or `GoldCheck`s in one row.
-- One scale-style toggle per group in icon mode too (`LevelScales`).
+- One scale-style toggle per group in icon mode too (`LevelScales`). (Bars are now the default.)
 - "Advanced settings · N more" → "More" + one-line summary; rename "Add tasks" → "Steps".
 
 Then: check new in-app feedback (HANDOFF §3 query; about 9 pending, list in HANDOFF header), build, screenshot, merge to `main`, push, mark feedback shipped, update HANDOFF, concise debrief (owner wants debriefs short).
