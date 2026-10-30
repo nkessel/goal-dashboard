@@ -2827,3 +2827,9 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 /* Inventory while it loads: the pack's outline, gently breathing. */
 .inv-loading { animation: inv-breathe 1.2s ease-in-out infinite; }
 @keyframes inv-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.85; } }
+
+/* Bring from home's place: an inked line on the parchment, never a box. */
+.place-input { background: transparent; border: 0; border-bottom: 1.5px solid rgba(184,145,63,.7); border-radius: 0; box-shadow: none; outline: none; -webkit-appearance: none; appearance: none; }
+.place-input:focus { border-bottom-color: #8a6116; box-shadow: 0 2px 0 rgba(217,180,95,.35); }
+.place-input::placeholder { color: var(--t-ink-soft); opacity: .6; font-weight: 400; font-style: italic; }
+.place-input:-webkit-autofill { -webkit-box-shadow: 0 0 0 40px transparent inset; transition: background-color 9999s; -webkit-text-fill-color: var(--t-ink); }

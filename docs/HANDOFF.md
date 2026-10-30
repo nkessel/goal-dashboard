@@ -2,9 +2,9 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-30 night (arrange in context on editor, menu and Today; early reward; laundry run; see Recently shipped).
+- **Last updated:** 2026-10-30 night (Bring from home place field as an inked line; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 21:30 UTC: opening feedback on /settings/inventory reloads the page behind it (iOS; cause not found from the cloud, needs a device repro).
+- **Pending in-app feedback:** as of 2026-10-30 22:00 UTC: opening feedback on /settings/inventory reloads the page behind it (iOS; cause not found from the cloud, needs a device repro).
 
 ---
 
@@ -118,6 +118,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Oct 30 (night): Bring from home: the place ("to …") is an inked gold line on the parchment, no half-box or theme wash (`.place-input`, `bare-input`).
 
 - Oct 30 (night): Inventory: Bring from home is a slim gilded tab against the backpack's right edge (flat right, rounded left; `.bring-tab`, no column of its own); the "↻ Refill" band is see-through (default 60% solid) and the backpack's gear opens a panel above it with a live sample and a slider (`inv-refill-alpha` in localStorage); the page loads with one profile query (no separate `isAdmin`) and shows an instant pack outline (`settings/inventory/loading.tsx`) instead of a blank screen.
 

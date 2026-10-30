@@ -465,7 +465,7 @@ function BringDrawer({ list, onChange, onClose }: { list: BringList; onChange: (
             </h3>
             <label className="mt-1 flex items-center gap-1.5 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
               to
-              <input value={place} onChange={(e) => setPlace(e.target.value)} onBlur={savePlace} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur())} placeholder="where? (e.g. Natick)" maxLength={40} aria-label="Where you're bringing it" className="h-8 min-w-0 flex-1 rounded-md border-b bg-transparent px-1 text-[16px] font-semibold" style={{ borderColor: "rgba(139,112,64,.45)", color: "var(--t-ink)" }} />
+              <input value={place} onChange={(e) => setPlace(e.target.value)} onBlur={savePlace} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur())} placeholder="where? (e.g. Natick)" maxLength={40} aria-label="Where you're bringing it" autoComplete="off" className="bare-input place-input h-8 min-w-0 flex-1 px-1 text-[16px] font-semibold" style={{ color: "var(--t-ink)" }} />
             </label>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
