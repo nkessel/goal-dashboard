@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { auth, signIn } from "@/auth";
 import { DUE_HOURS_COOKIE, byDuePriority, inDueWindow, parseDueHours } from "@/lib/due-soon";
 import { LowLightToggle } from "@/components/evening/LowLightToggle";
+import { TodayArrange } from "@/components/today/TodayArrange";
 import { AppShell } from "@/components/layout/AppShell";
 import { TodayTaskBoard } from "@/components/tasks/TodayTaskBoard";
 import { VictoriesToday } from "@/components/xp/VictoriesToday";
@@ -194,38 +195,46 @@ export default async function Home() {
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <DayNightFlip
         day={
-          <div className="flex flex-col gap-6">
-            {stats}
-            <EveningPromptOr>{planNudge}</EveningPromptOr>
-            {chapter && <WeekChapter chapter={chapter} theme={profile?.theme ?? "adventure"} />}
-            <TodayTaskBoard
-              dueTasks={dueTasks}
-              dueHours={dueHours}
-              priorityTasks={topPriorities}
-              otherTasks={otherTasks}
-              theme={theme}
-              between={
-                habits && rites?.some((r) => "slot" in r) ? (
-                  <DailyHabits habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} />
-                ) : null
-              }
-            />
-            <BeginEveningButton />
-            <section>
-              <AddTaskForm theme={theme} />
-            </section>
-            <VictoriesToday
-              tasks={completedTasks}
-              claimed={recentClaims.map((r) => ({ id: r.id, title: r.title, claimed_at: r.claimed_at, status: r.status, completed_at: r.completed_at ?? null, bonus_xp: r.bonus_xp ?? 0, bonus_coins: r.bonus_coins ?? 0 }))}
-              lastCheckInAt={profile?.last_check_in_at ?? null}
-              rites={riteCompletions.flatMap((c) => {
-                const r = rites?.find((x) => x.id === c.rite_id);
-                return r ? [{ id: c.id, title: r.title, day: c.day, xp: c.xp_awarded }] : [];
-              })}
-              journal={(journal ?? []).filter((j) => j.created_at >= daysAgoISO(2)).map((j) => ({ id: j.id, body: j.body, kind: j.kind, created_at: j.created_at, xp: j.xp_awarded ?? 0 }))}
-              theme={theme}
-            />
-          </div>
+          <TodayArrange
+            parts={{
+              stats,
+              plan: <EveningPromptOr>{planNudge}</EveningPromptOr>,
+              chapter: chapter ? <WeekChapter chapter={chapter} theme={profile?.theme ?? "adventure"} /> : null,
+              evening: <BeginEveningButton />,
+              add: (
+                <section>
+                  <AddTaskForm theme={theme} />
+                </section>
+              ),
+              victories: (
+                  <VictoriesToday
+                    tasks={completedTasks}
+                    claimed={recentClaims.map((r) => ({ id: r.id, title: r.title, claimed_at: r.claimed_at, status: r.status, completed_at: r.completed_at ?? null, bonus_xp: r.bonus_xp ?? 0, bonus_coins: r.bonus_coins ?? 0 }))}
+                    lastCheckInAt={profile?.last_check_in_at ?? null}
+                    rites={riteCompletions.flatMap((c) => {
+                      const r = rites?.find((x) => x.id === c.rite_id);
+                      return r ? [{ id: c.id, title: r.title, day: c.day, xp: c.xp_awarded }] : [];
+                    })}
+                    journal={(journal ?? []).filter((j) => j.created_at >= daysAgoISO(2)).map((j) => ({ id: j.id, body: j.body, kind: j.kind, created_at: j.created_at, xp: j.xp_awarded ?? 0 }))}
+                    theme={theme}
+                  />
+              ),
+            }}
+            board={
+                <TodayTaskBoard
+                  dueTasks={dueTasks}
+                  dueHours={dueHours}
+                  priorityTasks={topPriorities}
+                  otherTasks={otherTasks}
+                  theme={theme}
+                  between={
+                    habits && rites?.some((r) => "slot" in r) ? (
+                      <DailyHabits habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} />
+                    ) : null
+                  }
+                />
+            }
+          />
         }
         evening={
           <div className="flex flex-col gap-6">

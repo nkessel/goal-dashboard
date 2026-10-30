@@ -32,7 +32,12 @@ export function SectionStack({
   defaultOrder,
   storageKey,
   className = "flex flex-col gap-6",
+  order: given,
+  onOrder,
 }: {
+  /** Kept by the caller (with `onOrder`) instead of in this browser under `storageKey`. */
+  order?: string[];
+  onOrder?: (next: string[]) => void;
   sections: { id: string; node: React.ReactNode }[];
   defaultOrder: string[];
   storageKey: string;
@@ -51,9 +56,11 @@ export function SectionStack({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
-  const live = [...order.filter((id) => ids.includes(id)), ...ids.filter((id) => !order.includes(id))];
+  const base = given ?? order;
+  const live = [...base.filter((id) => ids.includes(id)), ...ids.filter((id) => !base.includes(id))];
 
   function save(next: string[]) {
+    if (onOrder) return onOrder(next);
     setOrder(next);
     try {
       window.localStorage.setItem(storageKey, JSON.stringify(next));

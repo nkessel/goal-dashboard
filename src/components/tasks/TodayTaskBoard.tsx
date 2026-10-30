@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
@@ -27,6 +27,7 @@ import { TaskRow } from "./TaskRow";
 import { GoldRule, Leaf, QuestShield } from "@/components/ui/Ornaments";
 import { CreateSheet } from "@/components/create/CreateSheet";
 import { SectionStack } from "./SectionStack";
+import { readTodayLayout, saveTodayLayout, serverTodayLayout, subscribeTodayLayout, type TodayPart } from "@/lib/today-layout";
 import { DEFAULT_DUE_HOURS, dueWindowLabel, saveDueHours } from "@/lib/due-soon";
 import { DueWindowPicker } from "./DueWindowPicker";
 import { settleOptimisticQuests, takeOptimisticFailure, useOptimisticQuests, type OptimisticQuest } from "@/lib/optimistic-quests";
@@ -319,6 +320,8 @@ export function TodayTaskBoard({
   /** Daily habits: a section of its own, above Today's Quests unless moved. */
   between?: React.ReactNode;
 }) {
+  // Today's arrangement (order and hidden parts), set from Today's gear.
+  const layout = useSyncExternalStore(subscribeTodayLayout, readTodayLayout, serverTodayLayout);
   const [localPriority, setLocalPriority] = useState<TaskWithCategory[] | null>(null);
   const [localOther, setLocalOther] = useState<TaskWithCategory[] | null>(null);
   const [seenPriorityTasks, setSeenPriorityTasks] = useState(priorityTasks);
@@ -505,11 +508,21 @@ export function TodayTaskBoard({
 
   return (
     <DndContext id="dnd-TodayTaskBoard" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-      <DueSoonBand tasks={due} hours={dueHours} theme={theme} lockedBehind={lockedBehind} />
+      {/* Its parts follow Today's arrangement (gear on Today): order and which show. */}
+      {!layout.hidden.includes("due") && <DueSoonBand tasks={due} hours={dueHours} theme={theme} lockedBehind={lockedBehind} />}
       {/* Daily Habits, Today's Quests and Additional Quests: drag a closed one to reorder. */}
       <SectionStack
         storageKey="today-section-order"
         defaultOrder={["habits", "today", "other"]}
+        order={layout.order.filter((k) => k === "habits" || k === "today" || k === "other")}
+        onOrder={(next) => {
+          // Their new order among themselves, in the same places in the whole of Today.
+          const slots = layout.order.map((k, i) => (next.includes(k) ? i : -1)).filter((i) => i >= 0);
+          const order = [...layout.order];
+          const moved = [...(next as TodayPart[]), ...layout.order.filter((k) => (k === "habits" || k === "today" || k === "other") && !next.includes(k))];
+          slots.forEach((at, j) => (order[at] = moved[j]));
+          saveTodayLayout({ ...layout, order });
+        }}
         sections={[
           {
             id: "today",
@@ -665,7 +678,7 @@ export function TodayTaskBoard({
               </section>
             ),
           },
-        ]}
+        ].filter((sec) => !layout.hidden.includes(sec.id as TodayPart))}
       />
 
       <DragOverlay dropAnimation={{ duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }}>
