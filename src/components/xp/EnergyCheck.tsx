@@ -431,7 +431,22 @@ export function EnergyCheck({
       </button>
     </div>
   ) : null;
-  const slider = (v: number, onChange: (n: number) => void, aria: string, color: string) => (
+  // On the welcome screen each slider has its own − and + right beside it, for an exact value.
+  const slider = (v: number, onChange: (n: number) => void, aria: string, color: string) =>
+    simple ? (
+      <span className="flex min-w-0 flex-1 items-center gap-1">
+        <button type="button" onClick={() => onChange(Math.max(1, Math.round((v - sliderStep) * 10) / 10))} aria-label={`${aria}: less`} className="ec-step relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[15px] leading-none">
+          −
+        </button>
+        {rawSlider(v, onChange, aria, color)}
+        <button type="button" onClick={() => onChange(Math.min(10, Math.round((v + sliderStep) * 10) / 10))} aria-label={`${aria}: more`} className="ec-step relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[15px] leading-none">
+          +
+        </button>
+      </span>
+    ) : (
+      rawSlider(v, onChange, aria, color)
+    );
+  const rawSlider = (v: number, onChange: (n: number) => void, aria: string, color: string) => (
     <input
       type="range"
       min={1}
@@ -467,8 +482,8 @@ export function EnergyCheck({
                   {energySet ? fmt(value) : "–"}
                 </span>
               </span>
-              {/* Same width open or closed, so the slider never jumps. */}
-              <button
+              {/* Same width open or closed, so the slider never jumps. (On the welcome screen its own button saves.) */}
+              {!simple && <button
                 type="button"
                 onClick={() => save()}
                 disabled={isSaving || expanded || !canSave}
@@ -478,7 +493,7 @@ export function EnergyCheck({
                 style={{ background: "var(--t-gold)", color: "#2a1c10", visibility: expanded || !canSave ? "hidden" : "visible" }}
               >
                 {isSaving ? "…" : "Save"}
-              </button>
+              </button>}
             </div>
 
             {expanded && (
@@ -491,7 +506,7 @@ export function EnergyCheck({
                     <div key={m} className="flex items-center gap-2">
                       {!(simple && full) && <span aria-hidden className="w-5 shrink-0" />}
                       <span className={`${label} transition-opacity`} style={{ color: "var(--t-cream)", opacity: set ? 1 : 0.6 }} title={m === DAY_METRIC ? "How was your day? (optional)" : m}>
-                        {m}
+                        {simple ? m.charAt(0).toUpperCase() + m.slice(1) : m}
                       </span>
                       {slider(v, (n) => setVals((o) => ({ ...o, [m]: n })), m === DAY_METRIC ? "How was your day, 1 to 10 (optional)" : `${m}, 1 to 10`, "#c9a24a")}
                       <span className="w-9 shrink-0 text-right font-display text-[18px] tabular-nums transition-opacity" style={{ color: "var(--ec-value, #f2d58a)", opacity: set ? 1 : 0.6 }}>
@@ -508,7 +523,7 @@ export function EnergyCheck({
                         >
                           Remove
                         </button>
-                      ) : (
+                      ) : simple ? null : (
                         <span aria-hidden className="w-[58px] shrink-0" />
                       )}
                     </div>
@@ -632,8 +647,8 @@ export function EnergyCheck({
                       Edit check-in
                     </Link>
                   )}
-                  {/* Only once something has been entered. */}
-                  {canSave && (
+                  {/* Only once something has been entered (the welcome screen saves from its own button). */}
+                  {canSave && !simple && (
                     <button
                       type="button"
                       onClick={() => save()}

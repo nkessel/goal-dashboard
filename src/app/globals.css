@@ -2731,3 +2731,6 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 .qe-fact:hover { border-color: #a88a3f; }
 .qe-fact[data-open="true"] { background: rgba(217, 180, 95, 0.35); border-color: #8a6116; box-shadow: 0 0 0 2px rgba(217, 180, 95, 0.3); }
 .qe-fact-panel { border: 1px solid rgba(139, 112, 64, 0.35); background: rgba(255, 250, 238, 0.45); }
+/* Check-in −/+ beside each slider; a 44px touch area around a small mark. */
+.ec-step { color: var(--ec-gold, #f2d27e); border: 1px solid var(--ec-line, rgba(217,180,95,.5)); background: rgba(255, 250, 238, 0.12); }
+.ec-step::before { content: ""; position: absolute; inset: -8px; }

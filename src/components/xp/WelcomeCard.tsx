@@ -109,6 +109,19 @@ export function WelcomeCard({
   const [customMin, setCustomMin] = useState("");
   // Complete check-in: saves whatever is entered in the check-in, then on into the forest.
   const submitCheckin = useRef<((after: () => void) => void) | null>(null);
+  // The top priority and the intention save with it too: nothing typed here is lost on the way out.
+  const savers = useRef<Partial<Record<"focus" | "intention", () => Promise<boolean>>>>({});
+  const [finishing, setFinishing] = useState(false);
+  const complete = async () => {
+    if (finishing || leaving) return;
+    setFinishing(true);
+    const ok = (await Promise.all(Object.values(savers.current).map((f) => f?.() ?? true))).every(Boolean);
+    setFinishing(false);
+    // A save that failed says so where it is, and the screen stays.
+    if (!ok) return;
+    if (checkinOpen && !checkedIn && submitCheckin.current) submitCheckin.current(leave);
+    else leave();
+  };
   // The check-in starts as a gilded button and opens in its place.
   const [checkinOpen, setCheckinOpen] = useState(false);
   // While Due soon's drawer is open, the screen steps down a layer so a card's editor can open over it.
@@ -144,8 +157,8 @@ export function WelcomeCard({
   }, [award?.xp]);
 
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
-    focus: <TopPriority last={priority} question={fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} />,
-    intention: mode === "day" ? <Intention question={fx.welcomeIntentionQ?.trim() || "Today is about…"} hint={fx.welcomeIntentionHint?.trim() || "e.g. Steady and kind to myself"} /> : null,
+    focus: <TopPriority register={(f) => (savers.current.focus = f)} last={priority} question={fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} />,
+    intention: mode === "day" ? <Intention register={(f) => (savers.current.intention = f)} question={fx.welcomeIntentionQ?.trim() || "Today is about…"} hint={fx.welcomeIntentionHint?.trim() || "e.g. Steady and kind to myself"} /> : null,
     toucan: (
       <div className="flex w-full items-center gap-2.5 text-left">
         <ToucanArt size={40} />
@@ -390,8 +403,8 @@ export function WelcomeCard({
                 </button>
               )}
               {/* Bottom right, the one way on: saves what's entered in the check-in, then on into the forest. */}
-              <button type="button" onClick={() => (checkinOpen && !checkedIn && submitCheckin.current ? submitCheckin.current(leave) : leave())} className="font-display ml-auto flex h-10 items-center gap-1.5 rounded-full px-4 text-[15px]" style={GILT}>
-                {order.includes("checkin") && !checkedIn ? "Complete check-in" : "Continue to town"}
+              <button type="button" disabled={finishing} onClick={() => void complete()} className="font-display ml-auto flex h-10 items-center gap-1.5 rounded-full px-4 text-[15px] disabled:opacity-70" style={GILT}>
+                {finishing ? "Saving…" : order.includes("checkin") && !checkedIn ? "Complete check-in" : "Continue to town"}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -521,7 +534,7 @@ function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean
 const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };
 
 /** Your top priorities, in your own words: saved for the day, and kept in mind by the app and the toucan. */
-function TopPriority({ last, question }: { last: { text: string; others?: string[]; day: string } | null; question: string }) {
+function TopPriority({ last, question, register }: { last: { text: string; others?: string[]; day: string } | null; question: string; register: (save: () => Promise<boolean>) => void }) {
   const [today] = useState(() => eveningDayKey());
   const [saved, setSaved] = useState<{ text: string; others: string[] } | null>(last && last.day === today ? { text: last.text, others: last.others ?? [] } : null);
   const [editing, setEditing] = useState(false);
@@ -534,19 +547,23 @@ function TopPriority({ last, question }: { last: { text: string; others?: string
   const earlier = last && last.day !== today ? last : null;
   const filled = others.filter((o) => o.trim());
   const save = async (value: string, more: string[]) => {
-    if (!value.trim()) return;
+    if (!value.trim()) return true;
     setBusy(true);
     setError(null);
     try {
       const r = await setTopPriorityAction(value, more.filter((o) => o.trim()));
       setSaved({ text: r.text, others: r.others });
       setEditing(false);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that.");
+      return false;
     } finally {
       setBusy(false);
     }
   };
+  // Saved by the screen's own button on the way out (no Save of its own).
+  useEffect(() => register(() => (saved && !editing ? Promise.resolve(true) : save(text, filled))));
   if (saved && !editing)
     return (
       <div className="flex w-full flex-col items-center gap-0.5">
@@ -656,15 +673,24 @@ function TopPriority({ last, question }: { last: { text: string; others?: string
           </span>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center gap-2 empty:hidden">
         {earlier && !text && (
-          <button type="button" disabled={busy} onClick={() => void save(earlier.text, [...(earlier.others ?? []), ...filled])} className="mr-auto min-h-8 rounded-full px-3 text-left text-[13px] disabled:opacity-60" style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setText(earlier.text);
+              if (earlier.others?.length) {
+                setOthers([...earlier.others, ""]);
+                setOthersOpen(true);
+              }
+            }}
+            className="min-h-8 rounded-full px-3 text-left text-[13px] disabled:opacity-60"
+            style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}
+          >
             Same as before: &ldquo;{earlier.text}&rdquo;
           </button>
         )}
-        <button type="submit" disabled={busy || !text.trim()} className="h-9 shrink-0 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-          {busy ? "…" : "Save"}
-        </button>
       </div>
       {error && (
         <p className="m-0 text-[12.5px]" style={{ color: "#a33" }}>
@@ -676,10 +702,25 @@ function TopPriority({ last, question }: { last: { text: string; others?: string
 }
 
 /** A line on what today is about, kept in the journal as an intention. */
-function Intention({ question, hint }: { question: string; hint: string }) {
+function Intention({ question, hint, register }: { question: string; hint: string; register: (save: () => Promise<boolean>) => void }) {
   const [text, setText] = useState("");
   const [saved, setSaved] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const save = async () => {
+    if (saved || !text.trim()) return true;
+    setError(false);
+    try {
+      await addJournalEntryAction(text.trim(), null, "intention");
+      setSaved(true);
+      return true;
+    } catch {
+      // Keep the words so they can try again.
+      setError(true);
+      return false;
+    }
+  };
+  // Saved by the screen's own button on the way out.
+  useEffect(() => register(save));
   if (saved)
     return (
       <p className="m-0 text-[15px] italic" style={{ color: "#3d5a1e" }}>
@@ -689,29 +730,20 @@ function Intention({ question, hint }: { question: string; hint: string }) {
   return (
     <form
       className="flex w-full flex-col gap-1.5 text-left"
-      onSubmit={async (e) => {
+      onSubmit={(e) => {
         e.preventDefault();
-        if (!text.trim()) return;
-        setBusy(true);
-        try {
-          await addJournalEntryAction(text.trim(), null, "intention");
-          setSaved(true);
-        } catch {
-          /* keep the words so they can try again */
-        } finally {
-          setBusy(false);
-        }
+        void save();
       }}
     >
       <label className="text-[15px] font-semibold" style={{ color: "var(--t-ink)" }} htmlFor="welcome-intention">
         {question}
       </label>
-      <div className="flex gap-1.5">
-        <input id="welcome-intention" value={text} onChange={(e) => setText(e.target.value)} maxLength={200} placeholder={hint} className="h-10 min-w-0 flex-1 rounded-lg px-2.5 text-[16px]" style={FIELD} />
-        <button type="submit" disabled={busy || !text.trim()} className="h-10 shrink-0 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-          Save
-        </button>
-      </div>
+      <input id="welcome-intention" value={text} onChange={(e) => setText(e.target.value)} maxLength={200} placeholder={hint} className="h-10 w-full rounded-lg px-2.5 text-[16px]" style={FIELD} />
+      {error && (
+        <p className="m-0 text-[12.5px]" style={{ color: "#a33" }}>
+          Couldn&rsquo;t save that. Try again in a moment.
+        </p>
+      )}
     </form>
   );
 }
