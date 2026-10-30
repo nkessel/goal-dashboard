@@ -11,7 +11,6 @@ import { useEscape } from "@/lib/use-escape";
 import { usePortalTarget } from "@/components/ui/EmbedHost";
 import { coinsForXp } from "@/lib/coins";
 
-const PRICE_PRESETS = [0, 5, 10, 25, 50, 100];
 
 /** Slider position (0–100) ↔ price: 1-coin steps to 20, then 5s to 100, then 25s to 500. */
 function sliderToPrice(v: number): number {
@@ -51,10 +50,12 @@ export function RewardEditorDialog({
     setSeenIcon(reward?.icon_key ?? null);
     if (!icon) setIcon(reward?.icon_key ?? null);
   }
-  const [price, setPrice] = useState<number>(reward?.cost_coins ?? 10);
+  const [price, setPrice] = useState<number>(reward?.cost_coins ?? 3);
   const [prereq, setPrereq] = useState(reward?.prereq_title ?? "");
   const [prereqXp, setPrereqXp] = useState<number>(reward?.prereq_xp ?? 10);
   const [bonusXp, setBonusXp] = useState<number>(reward?.bonus_xp ?? 0);
+  const [bonusOpen, setBonusOpen] = useState(false);
+  const [prereqOpen, setPrereqOpen] = useState(false);
   const [bonusCoins, setBonusCoins] = useState<number>(reward?.bonus_coins ?? 0);
   // Only send bonus fields once the database has them (or when they're set).
   const bonusFields = (r?: Reward) => ({
@@ -178,12 +179,18 @@ export function RewardEditorDialog({
           </div>
         </div>
 
-        {/* Prerequisite quest */}
-        <div className="flex flex-col gap-1.5 rounded-xl px-3.5 py-3" style={{ background: "rgba(255,250,238,.5)", border: "1.5px dashed #b39a6a" }}>
+        {/* Prerequisite quest: a button until you want one. */}
+        {!prereqOpen && !prereq.trim() ? (
+          <button type="button" onClick={() => setPrereqOpen(true)} className="flex h-10 items-center gap-1.5 self-start rounded-full px-4 text-[14px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: "var(--t-ink)", background: "rgba(255,250,238,.6)" }}>
+            <span aria-hidden className="text-[16px] leading-none" style={{ color: "#8a6116" }}>+</span>
+            Add a quest to do first
+          </button>
+        ) : (
+        <div className="reveal flex flex-col gap-1.5 rounded-xl px-3.5 py-3" style={{ background: "rgba(255,250,238,.5)", border: "1.5px solid #b39a6a" }}>
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-[15px] font-semibold">First, a quest</span>
             <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-              optional — unlocks the reward
+              unlocks the reward
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -216,6 +223,7 @@ export function RewardEditorDialog({
             </p>
           )}
         </div>
+        )}
 
         {/* Price in coins */}
         <div
@@ -228,7 +236,7 @@ export function RewardEditorDialog({
         >
           <div className="flex items-center gap-3">
             <span className="text-[15px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
-              Price to accept
+              Reward cost
             </span>
             <div className="ml-auto flex items-center gap-1.5">
               <button
@@ -265,23 +273,6 @@ export function RewardEditorDialog({
               </button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {PRICE_PRESETS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPrice(p)}
-                className="h-8 rounded-full px-3 text-[13.5px] font-semibold tabular-nums"
-                style={
-                  price === p
-                    ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" }
-                    : { background: "rgba(255,235,180,.08)", color: "#e9dcb8", border: "1px solid rgba(217,180,95,.35)" }
-                }
-              >
-                {p === 0 ? "Free" : p}
-              </button>
-            ))}
-          </div>
           {/* Slide to set the price: fine steps low down, bigger ones higher up. */}
           <div className="relative h-6">
             <div className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1.5px solid #8a6c2c", boxShadow: "inset 0 2px 4px rgba(0,0,0,.6)" }}>
@@ -300,13 +291,19 @@ export function RewardEditorDialog({
           </div>
           <p className="m-0 text-[13px]" style={{ color: isAdventure ? "rgba(243,231,203,.75)" : "var(--t-ink-soft)" }}>
             {price === 0
-              ? "Free to accept — any time you finish a quest."
-              : `Costs ${price} coin${price === 1 ? "" : "s"} to accept — about ${(price * 10).toLocaleString("en-US")} XP of quests.`}
+              ? "Free — yours any time you finish a quest."
+              : `Buy it for ${price} coin${price === 1 ? "" : "s"} from your treasure (about ${(price * 10).toLocaleString("en-US")} XP of quests).`}
           </p>
         </div>
 
-        {/* Completion bonus */}
-        <div className="flex flex-col gap-2 rounded-xl px-3.5 py-3" style={{ background: "rgba(255,250,238,.5)", border: "1.5px dashed #b39a6a" }}>
+        {/* Completion bonus: behind a button until wanted. */}
+        {!bonusOpen && !bonusXp && !bonusCoins ? (
+          <button type="button" onClick={() => setBonusOpen(true)} className="flex h-10 items-center gap-1.5 self-start rounded-full px-4 text-[14px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: "var(--t-ink)", background: "rgba(255,250,238,.6)" }}>
+            <span aria-hidden className="text-[16px] leading-none" style={{ color: "#8a6116" }}>+</span>
+            Add a completion bonus
+          </button>
+        ) : (
+        <div className="reveal flex flex-col gap-2 rounded-xl px-3.5 py-3" style={{ background: "rgba(255,250,238,.5)", border: "1.5px solid #b39a6a" }}>
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-[15px] font-semibold">Completion bonus</span>
             <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -362,6 +359,7 @@ export function RewardEditorDialog({
             </p>
           )}
         </div>
+        )}
 
         {error && (
           <p className="text-sm" style={{ color: "var(--t-warn)" }}>

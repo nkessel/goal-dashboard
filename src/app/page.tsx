@@ -16,6 +16,7 @@ import { getProfileById } from "@/lib/data/profiles";
 import { getWeeklyXpEarned, currentWeekStart } from "@/lib/data/xp";
 import { listFriendIds } from "@/lib/data/friendships";
 import { listClaimedSince } from "@/lib/data/rewards";
+import { cleanRepeat } from "@/lib/habit-repeat";
 import { listRites, listRiteCompletions, listCompletionsFor, listHabitSkips, listRiteStepChecks, cleanRiteSteps } from "@/lib/data/rites";
 import { listJournalEntries } from "@/lib/data/journal";
 import { DayNightFlip } from "@/components/evening/DayNightFlip";
@@ -131,12 +132,12 @@ export default async function Home() {
       .map(([k, r]) => [k, r.level])
   ) as Record<string, number>;
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
-  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, kind: r.kind ?? null, icon_key: r.icon_source ? r.icon_key : null, icon_source: r.icon_source ?? null, coin_value: r.coin_value ?? null, estimate_minutes: r.estimate_minutes ?? null, steps: cleanRiteSteps(r.steps) });
+  const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, kind: r.kind ?? null, icon_key: r.icon_source ? r.icon_key : null, icon_source: r.icon_source ?? null, coin_value: r.coin_value ?? null, estimate_minutes: r.estimate_minutes ?? null, steps: cleanRiteSteps(r.steps), repeat: cleanRepeat(r.repeat) });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
   // Habit streaks look back a few months; skips end a streak. Journal entries join today's victories.
   const [habitHistory, habitSkips, journal, projectBoards, stepChecks] = await Promise.all([
-    habits?.length ? listCompletionsFor(session.user.id, habits.map((h) => h.id), daysAgoISO(120).slice(0, 10)) : Promise.resolve([]),
-    listHabitSkips(session.user.id, daysAgoISO(120).slice(0, 10)),
+    habits?.length ? listCompletionsFor(session.user.id, habits.map((h) => h.id), daysAgoISO(habits.some((h) => h.repeat) ? 800 : 120).slice(0, 10)) : Promise.resolve([]),
+    listHabitSkips(session.user.id, daysAgoISO(habits?.some((h) => h.repeat) ? 800 : 120).slice(0, 10)),
     listJournalEntries(session.user.id, 150).catch(() => null),
     listBoardsForOwner(session.user.id).catch(() => []),
     habits?.some((h) => h.steps.length) ? listRiteStepChecks(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => null) : Promise.resolve([]),

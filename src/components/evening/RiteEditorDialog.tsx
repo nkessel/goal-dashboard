@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { nextOccurrence, repeatLabel, type Repeat } from "@/lib/habit-repeat";
 import { createPortal } from "react-dom";
 import { createRiteAction, removeRiteAction, setRiteStepsAction, updateRiteAction } from "@/app/actions";
 import type { RiteView } from "./EveningRites";
@@ -53,6 +54,13 @@ export function RiteEditorDialog({
   const [subsOpen, setSubsOpen] = useState((rite?.steps?.length ?? 0) > 0 || !!startWithSub);
   const focusSub = !!startWithSub;
   const [repeatsOpen, setRepeatsOpen] = useState(true);
+  // Or on an interval: every N days, weeks, months or years, from a start date.
+  const [repeat, setRepeat] = useState<Repeat | null>(rite?.repeat ?? null);
+  const todayKey = () => {
+    const d = new Date(Date.now() - 330 * 60_000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const [customOpen, setCustomOpen] = useState(!!rite?.repeat && !(rite.repeat.every === 1 && rite.repeat.unit !== "day"));
   const [dueOpen, setDueOpen] = useState(!!rite?.due_time);
   const subsChanged = JSON.stringify(subs) !== JSON.stringify(rite?.steps ?? []);
   function addSub() {
@@ -75,9 +83,9 @@ export function RiteEditorDialog({
     setError(null);
     startSaving(async () => {
       try {
-        if (isHabit && days.length === 0) throw new Error("Pick at least one day.");
+        if (isHabit && !repeat && days.length === 0) throw new Error("Pick at least one day.");
         const picture = { iconKey: icon?.url ?? null, iconSource: icon?.source ?? null };
-        const schedule = isHabit ? { days: days.length === 7 ? null : days, dueTime: dueTime || null, ...picture, coinValue, estimateMinutes: minutes } : picture;
+        const schedule = isHabit ? { days: repeat ? null : days.length === 7 ? null : days, repeat, dueTime: dueTime || null, ...picture, coinValue, estimateMinutes: minutes } : picture;
         const pending = subText.trim() ? [...subs, { id: Math.random().toString(36).slice(2, 10), title: subText.trim() }] : subs;
         if (rite) {
           await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
@@ -183,17 +191,83 @@ export function RiteEditorDialog({
             <button type="button" onClick={() => setRepeatsOpen((o) => !o)} aria-expanded={repeatsOpen} className="flex items-center gap-1.5 self-start text-[14.5px] font-semibold">
               <Caret open={repeatsOpen} />
               Repeats
-              {!repeatsOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{days.length === 7 ? "every day" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "no days"}</span>}
+              {!repeatsOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{repeat ? repeatLabel(repeat).toLowerCase() : days.length === 7 ? "every day" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "no days"}</span>}
             </button>
             {repeatsOpen && (
-            <div className="reveal flex flex-wrap items-center gap-1.5">
+            <div className="reveal flex flex-col gap-2">
+            {/* Every week, month or year (or any number of them), from a start date. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(
+                [
+                  ["weekdays", "On weekdays"],
+                  ["week", "Every week"],
+                  ["month", "Every month"],
+                  ["year", "Every year"],
+                  ["custom", "Custom…"],
+                ] as const
+              ).map(([k, label]) => {
+                const on = k === "weekdays" ? !repeat : k === "custom" ? !!repeat && customOpen : !!repeat && !customOpen && repeat.every === 1 && repeat.unit === k;
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => {
+                      if (k === "weekdays") return (setRepeat(null), setCustomOpen(false));
+                      if (k === "custom") return (setCustomOpen(true), setRepeat((r) => r ?? { every: 2, unit: "week", from: todayKey() }));
+                      setCustomOpen(false);
+                      setRepeat((r) => ({ every: 1, unit: k, from: r?.from ?? todayKey() }));
+                    }}
+                    className="h-8 rounded-full px-3 text-[13px] font-semibold"
+                    style={on ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" } : { border: "1px solid #b39a6a", color: "var(--t-ink)" }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {repeat && (
+              <div className="reveal flex flex-wrap items-center gap-1.5 text-[14px]">
+                {customOpen && (
+                  <>
+                    <span>Every</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={999}
+                      value={repeat.every}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onChange={(e) => setRepeat({ ...repeat, every: Math.max(1, Math.min(999, Math.round(Number(e.target.value) || 1))) })}
+                      aria-label="How many"
+                      className="h-8 w-[58px] rounded-full border px-1.5 text-center text-[16px] font-semibold tabular-nums"
+                      style={{ borderColor: "#b39a6a" }}
+                    />
+                    <select value={repeat.unit} onChange={(e) => setRepeat({ ...repeat, unit: e.target.value as Repeat["unit"] })} aria-label="Days, weeks, months or years" className="h-8 rounded-full border bg-transparent px-2 text-[14px]" style={{ borderColor: "#b39a6a" }}>
+                      {(["day", "week", "month", "year"] as const).map((u) => (
+                        <option key={u} value={u}>
+                          {repeat.every === 1 ? u : `${u}s`}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                <span>starting</span>
+                <input type="date" value={repeat.from} onChange={(e) => e.target.value && setRepeat({ ...repeat, from: e.target.value })} aria-label="Starting" className="h-8 rounded-lg border px-2 text-[15px]" style={{ borderColor: "#b39a6a" }} />
+                <span className="w-full text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                  It comes up on {repeat.from <= todayKey() ? "each" : "its first"} day and stays up until you do it or skip it. Next: {new Date(`${nextOccurrence(repeat, todayKey())}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: repeat.unit === "year" ? "numeric" : undefined })}.
+                </span>
+              </div>
+            )}
+            {!repeat && (
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setDays(days.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
                 className="h-8 rounded-full px-3 text-[13.5px] font-semibold"
-                style={days.length === 7 ? { background: "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #5a4520" } : { border: "1px solid #b39a6a", color: "var(--t-ink)" }}
+                style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}
               >
-                Every day
+                {days.length === 7 ? "Deselect all" : "Select all"}
               </button>
               {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => {
                 const on = days.includes(i);
@@ -211,6 +285,8 @@ export function RiteEditorDialog({
                   </button>
                 );
               })}
+            </div>
+            )}
             </div>
             )}
           </div>
@@ -248,7 +324,7 @@ export function RiteEditorDialog({
                 setMinutes(n > 0 ? Math.min(600, n) : null);
               }}
               aria-label="Minutes it takes (any amount)"
-              className="h-8 w-[60px] rounded-full border px-1.5 text-center text-[16px] font-semibold tabular-nums"
+              className="other-pill h-8 w-[78px] appearance-none rounded-full border bg-[rgba(255,250,238,.7)] px-2 text-center text-[15px] font-semibold tabular-nums placeholder:font-normal placeholder:italic placeholder:text-[13.5px] placeholder:text-[var(--t-ink-soft)] [appearance:textfield] focus:outline-none focus:ring-2 focus:ring-[rgba(138,97,22,.35)] [&::-webkit-inner-spin-button]:appearance-none"
               style={{
                 borderColor: minutes !== null && !MINUTE_PRESETS.includes(minutes) ? "#5a4520" : "#b39a6a",
                 background: minutes !== null && !MINUTE_PRESETS.includes(minutes) ? "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" : undefined,
@@ -294,7 +370,7 @@ export function RiteEditorDialog({
               </span>
             ) : (
               <button type="button" onClick={() => setCoinValue(null)} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
-                back to automatic
+                reset
               </button>
             )}
           </div>
@@ -327,7 +403,7 @@ export function RiteEditorDialog({
             placeholder="other"
             onChange={(e) => setXp(Math.max(0, Math.min(500, Math.round(Number(e.target.value) || 0))))}
             aria-label="XP (any amount)"
-            className="h-8 w-[60px] rounded-full border px-1.5 text-center text-[16px] font-semibold tabular-nums"
+            className="other-pill h-8 w-[78px] appearance-none rounded-full border bg-[rgba(255,250,238,.7)] px-2 text-center text-[15px] font-semibold tabular-nums placeholder:font-normal placeholder:italic placeholder:text-[13.5px] placeholder:text-[var(--t-ink-soft)] [appearance:textfield] focus:outline-none focus:ring-2 focus:ring-[rgba(138,97,22,.35)] [&::-webkit-inner-spin-button]:appearance-none"
             style={{ borderColor: XP_PRESETS.includes(xp) ? "#b39a6a" : "#5a4520", background: XP_PRESETS.includes(xp) ? undefined : "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" }}
           />
         </div>

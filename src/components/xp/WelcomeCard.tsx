@@ -161,7 +161,7 @@ export function WelcomeCard({
         className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]"
         style={checkinStyleOf(fx).style}
       >
-        <CheckinIcon icon={checkinIconOf(fx)} /> Check in
+        <CheckinIcon icon={checkinIconOf(fx)} /> {fx.checkinText?.trim() || "Check in"}
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.8 }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -226,7 +226,7 @@ export function WelcomeCard({
   return createPortal(
     <div className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center p-3 ${leaving ? "pointer-events-none" : ""}`} onClick={() => (arranging ? setArranging(false) : leave())} role="dialog" aria-modal="true" aria-label={heading}>
       {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
-      <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} castleSlot={arranging ? <CastleEdit fx={fx} /> : null} onCastleVisible={setCastleSeen} />
+      <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} castleSeed={fx.welcomeCastleSeed} castleSlot={arranging ? <CastleEdit fx={fx} /> : null} onCastleVisible={setCastleSeen} />
       <div className="relative flex max-h-full flex-col items-center">
       {/* What isn't part of the card (when it opens, confetti) sits above it while arranging. */}
       {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} onDone={() => setArranging(false)} />}
@@ -264,40 +264,54 @@ export function WelcomeCard({
           )}
         </button>
         <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70vh]" : "max-h-[88vh]"} w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`}>
-          {writing !== null ? (
-            // Your own words for today's greeting, right where it was.
-            <input
-              autoFocus
-              value={writing}
-              onChange={(e) => setWriting(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  finishWriting();
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setWriting(null);
-                }
-              }}
-              onBlur={finishWriting}
-              maxLength={120}
-              aria-label="Your own greeting"
-              className="font-display m-0 w-full rounded-lg bg-transparent px-1 text-center text-[25px] leading-tight focus:outline-none"
-              style={{ color: "var(--t-ink)", boxShadow: "0 2px 0 rgba(139,112,64,.5)" }}
-            />
-          ) : (
-            <p className="font-display m-0 text-[25px] leading-tight" style={{ color: "var(--t-ink)" }}>
-              {arranging ? (
-                <WithEdit text={greeting} edit={<EditButton open={greetingOpen} onClick={() => setGreetingOpen((v) => !v)} label="Edit the greetings" />} />
-              ) : (
-                <button type="button" onClick={() => setWriting(greeting)} title="Write your own greeting" className="cursor-text rounded-lg px-1 hover:bg-black/[.04]">
-                  {greeting}
-                </button>
-              )}
-            </p>
-          )}
+          {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
+          <div className="relative w-full px-8">
+            {writing !== null ? (
+              <textarea
+                autoFocus
+                rows={1}
+                value={writing}
+                ref={(el) => {
+                  if (!el) return;
+                  el.style.height = "auto";
+                  el.style.height = `${el.scrollHeight}px`;
+                }}
+                onChange={(e) => setWriting(e.target.value.replace(/\n/g, " "))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    finishWriting();
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setWriting(null);
+                  }
+                }}
+                onBlur={finishWriting}
+                maxLength={120}
+                aria-label="Your own greeting"
+                className="font-display m-0 block w-full resize-none overflow-hidden rounded-lg bg-transparent p-0 text-center leading-tight focus:outline-none"
+                style={{ color: "var(--t-ink)", fontSize: greetingSize(writing), boxShadow: "0 0 0 1.5px rgba(139,112,64,.45)", caretColor: "#8a6116" }}
+              />
+            ) : (
+              <p className="font-display m-0 leading-tight [text-wrap:balance]" style={{ color: "var(--t-ink)", fontSize: greetingSize(greeting) }}>
+                {greeting}
+              </p>
+            )}
+            {writing === null && (
+              <span className={`absolute -top-1 right-0 transition-opacity ${arranging ? "" : "opacity-50 hover:opacity-100 focus-within:opacity-100"}`}>
+                <EditButton
+                  open={arranging && greetingOpen}
+                  onClick={() => {
+                    setWriting(greeting);
+                    if (arranging) setGreetingOpen(true);
+                  }}
+                  label="Edit the greeting"
+                />
+              </span>
+            )}
+          </div>
           {keepAsk && (
             <div className="reveal flex w-full flex-col gap-1.5 rounded-xl px-3 py-2.5" style={{ border: "1px solid rgba(139,112,64,.45)", background: "rgba(255,250,238,.7)" }}>
               <GoldCheck checked={keepAsk.keep} onChange={(v) => setKeepAsk({ ...keepAsk, keep: v })}>
@@ -480,20 +494,12 @@ function snoozeOther() {
 const GILT = { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } as const;
 const PILL = { border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.7)" } as const;
 
-/** Text with its ✎ kept right beside the last word (never dropped onto a line of its own). */
-function WithEdit({ text, edit }: { text: string; edit: React.ReactNode }) {
-  const words = text.trim().split(/\s+/);
-  const last = words.pop() ?? "";
-  return (
-    <>
-      {words.length ? `${words.join(" ")} ` : ""}
-      <span className="whitespace-nowrap">
-        {last}
-        <span className="ml-1.5 inline-block align-middle">{edit}</span>
-      </span>
-    </>
-  );
-}
+/** The greeting's size: full for a short one, a little smaller as it grows (it may wrap onto a second line). */
+const greetingSize = (t: string) => {
+  const n = t.trim().length;
+  return n <= 26 ? 25 : n <= 40 ? 23 : n <= 60 ? 21 : 19;
+};
+
 
 /** A small round thumbs up or down for the day's wise line. */
 function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean; onClick: () => void }) {

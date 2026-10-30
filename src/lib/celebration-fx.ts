@@ -29,6 +29,8 @@ export type FxSettings = {
   welcomeHide?: string[];
   /** The castle on the welcome screen's far hill (see CASTLE_DESIGNS). */
   welcomeCastle?: string;
+  /** The generated spire castle's seed (Generate castle draws a new one). */
+  welcomeCastleSeed?: number;
   /** Back after this many hours since your last check-in: a "welcome back" screen (0 = never). */
   welcomeBackHours?: number;
   /** Your own "welcome back" greetings, one per line (they take turns with the built-in ones left on). */
@@ -54,6 +56,8 @@ export type FxSettings = {
   welcomeFocusQ?: string;
   /** What the toucan asks first on the welcome screen. */
   welcomeToucanAsk?: string;
+  /** The Check in button's own words (blank = "Check in"). */
+  checkinText?: string;
   welcomeIntentionQ?: string;
   welcomeIntentionHint?: string;
   /** Seconds the "Feedback submitted" card stays (0 = until you close it). */

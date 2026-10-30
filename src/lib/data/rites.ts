@@ -24,6 +24,8 @@ export type Rite = {
   coin_value?: number | null;
   /** Minutes it usually takes (for focus mode's timer). */
   estimate_minutes?: number | null;
+  /** Repeats on an interval (every N days/weeks/months/years from a date); null = on its weekdays. */
+  repeat?: unknown;
   /** Sub-habits: a checklist ticked off each day (the last tick completes the habit). */
   steps?: RiteStep[] | null;
   sort_order: number;
@@ -185,6 +187,7 @@ export async function createRite(
     .single<Rite>();
   if (error && /slot/.test(error.message)) throw new Error("Daily habits need a quick database update first.");
   if (error && /icon_source|coin_value|estimate_minutes/.test(error.message)) throw new Error("Habit avatars, coins and times need a quick database update first.");
+  if (error && /repeat/.test(error.message)) throw new Error("Repeating every week, month or year needs a quick database update first.");
   if (error && /days|due_time/.test(error.message)) throw new Error("Weekly habits need a quick database update first.");
   if (error || !data) throw new Error(`Failed to add rite: ${error?.message}`);
   return data;
@@ -212,6 +215,7 @@ export async function updateRite(
     .eq("owner_id", ownerId);
   if (error && /days|due_time/.test(error.message)) throw new Error("Weekly habits need a quick database update first.");
   if (error && /icon_source|coin_value|estimate_minutes/.test(error.message)) throw new Error("Habit avatars, coins and times need a quick database update first.");
+  if (error && /repeat/.test(error.message)) throw new Error("Repeating every week, month or year needs a quick database update first.");
   if (error) throw new Error(`Failed to update rite: ${error.message}`);
 }
 
@@ -285,6 +289,8 @@ export async function removeRiteCompletion(ownerId: string, riteId: string, day:
 
 /** A habit's avatar, coins and usual time (undefined leaves each as it is; null clears). */
 export type HabitExtras = {
+  /** Repeat on an interval instead of weekdays (null = weekdays). */
+  repeat?: { every: number; unit: "day" | "week" | "month" | "year"; from: string } | null;
   iconKey?: string | null;
   iconSource?: "library" | "ai" | null;
   coinValue?: number | null;
@@ -299,6 +305,7 @@ function habitExtrasPatch(input: HabitExtras) {
     out.icon_source = ok ? (input.iconSource === "ai" ? "ai" : "library") : null;
   }
   if (input.coinValue !== undefined) out.coin_value = input.coinValue === null ? null : Math.max(0, Math.min(1000, Math.round(input.coinValue)));
+  if (input.repeat !== undefined) out.repeat = input.repeat;
   if (input.estimateMinutes !== undefined) out.estimate_minutes = input.estimateMinutes && input.estimateMinutes > 0 ? Math.min(600, Math.round(input.estimateMinutes)) : null;
   return out;
 }

@@ -943,6 +943,8 @@ function Composer({
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null);
   const xp = xpOf(draft);
+  const xpBox = useRef<HTMLDivElement>(null);
+  const submitBtn = useRef<HTMLButtonElement>(null);
   // Past three paragraphs, the note's own count joins the choices.
   const long = Math.min(XP_MAX, paragraphs(draft.body));
   const [uploading, setUploading] = useState(false);
@@ -993,7 +995,25 @@ function Composer({
         }}
         options={WHEN.map(([k, label, hint]) => ({ value: k, label, hint }))}
       />}
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div
+        ref={xpBox}
+        className="flex shrink-0 items-center gap-1.5"
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "ArrowDown") {
+            // Up and down from the current XP, past 3 too.
+            e.preventDefault();
+            const up = e.key === "ArrowRight" || e.key === "ArrowUp";
+            onChange({ xp: Math.max(0, Math.min(99, xp + (up ? 1 : -1))), xpPicked: true });
+            requestAnimationFrame(() => xpBox.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus());
+          } else if (e.key === "Tab" && !e.shiftKey && submitBtn.current && !submitBtn.current.disabled) {
+            e.preventDefault();
+            submitBtn.current.focus();
+          } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            onSubmit();
+          }
+        }}
+      >
       <Segmented
         label="XP you earn"
         lead="XP"
@@ -1006,7 +1026,7 @@ function Composer({
           textRef.current?.focus();
         }}
         // Past three paragraphs, the note's own count takes the +3's place (no extra button).
-        options={[...XP_CHOICES.filter((n) => !(long > 3 && n === 3)), ...(long > 3 ? [long] : [])].map((n) => ({ value: n, label: `+${n}`, hint: n > 3 ? `${n} paragraphs, ${n} XP` : `Earn ${n} XP for this feedback` }))}
+        options={[...new Set([...XP_CHOICES.filter((n) => !(long > 3 && n === 3)), ...(long > 3 ? [long] : []), ...(xp > 3 && xp !== long ? [xp] : [])])].sort((a, b) => a - b).map((n) => ({ value: n, label: `+${n}`, hint: n > 3 ? `${n} paragraphs, ${n} XP` : `Earn ${n} XP for this feedback` }))}
       />
       {compact && (
         // Phones: when it gets built, as one small chip right of the XP.
@@ -1042,6 +1062,14 @@ function Composer({
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             onSubmit();
+          }
+          // Tab: on to the XP (arrows change it), and Tab again to Submit.
+          if (e.key === "Tab" && !e.shiftKey) {
+            const xpOn = xpBox.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]') ?? xpBox.current?.querySelector<HTMLButtonElement>("button");
+            if (xpOn) {
+              e.preventDefault();
+              xpOn.focus();
+            }
           }
         }}
         placeholder={draft.kind === "future" ? "An idea for later. It goes in the future ideas log." : "What would make this better?"}
@@ -1101,6 +1129,7 @@ function Composer({
         )}
         {/* Submit sits right under the writing. */}
         <button
+          ref={submitBtn}
           type="button"
           onClick={onSubmit}
           disabled={saving || !draft.body.trim()}

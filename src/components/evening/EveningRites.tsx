@@ -58,6 +58,8 @@ export type RiteView = {
   coin_value?: number | null;
   /** Habits: minutes it usually takes. */
   estimate_minutes?: number | null;
+  /** Habits: repeat on an interval (every N days/weeks/months/years); null = weekdays. */
+  repeat?: import("@/lib/habit-repeat").Repeat | null;
   /** Habits: sub-habits ticked off each day. */
   steps?: { id: string; title: string }[];
 };

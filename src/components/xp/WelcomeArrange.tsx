@@ -6,7 +6,7 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { CHECKIN_ICONS, CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
 import { WELCOME_ELS, addBackGreeting, backHours, backOwnOn, greetingPool, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeShows, type WelcomeEl } from "@/lib/welcome";
-import { CASTLE_DESIGNS, CastleArt, castleOf } from "./CastleArt";
+import { CastleArt } from "./CastleArt";
 import { CheckinIcon } from "./CheckinIcon";
 import { OwnWordsPill, PhraseList, WiseLines } from "@/components/settings/LineLists";
 
@@ -78,24 +78,17 @@ export function ArrangeAbove({ fx, castleHidden, onDone }: { fx: FxSettings; cas
   );
 }
 
-/** The castle's designs, each drawn small. */
+/** The castle: a spire castle drawn from a seed; Generate castle draws a new one. */
 function CastleChoices({ fx }: { fx: FxSettings }) {
   return (
-    <div role="radiogroup" aria-label="The castle on the far hill" className="flex flex-wrap gap-1.5">
-      {CASTLE_DESIGNS.map((d) => {
-        const on = castleOf(fx.welcomeCastle) === d.key;
-        return (
-          <button key={d.key} type="button" role="radio" aria-checked={on} title={d.hint} onClick={() => set({ welcomeCastle: d.key })} className="flex flex-col items-center gap-0.5 rounded-xl p-1" style={{ border: on ? "2px solid var(--t-gold-deep, #8a6116)" : "1px solid rgba(139,112,64,.4)" }}>
-            <svg aria-hidden viewBox="-80 -160 160 166" className="h-10 w-12 rounded-lg" style={{ background: "linear-gradient(180deg, #a9cbe6, #eef2ec)" }}>
-              <path d="M-80,6 Q-30,-8 0,-2 T80,-4 V6 Z" fill="#7aa1a6" />
-              <CastleArt design={d.key} colors={{ wall: "#f5f7f9", shade: "#c5d1dc", roof: "#4f7fb3", gold: "#e8c25c" }} />
-            </svg>
-            <span className="text-[11px] font-semibold" style={{ color: INK }}>
-              {d.label}
-            </span>
-          </button>
-        );
-      })}
+    <div className="flex items-center gap-2">
+      <svg aria-hidden viewBox="-110 -170 220 182" className="h-16 w-20 shrink-0 rounded-lg" style={{ background: "linear-gradient(180deg, #a9cbe6, #eef2ec)" }}>
+        <path d="M-110,12 Q-40,-6 0,0 T110,-2 V12 Z" fill="#7aa1a6" />
+        <CastleArt design="spires" seed={fx.welcomeCastleSeed} colors={{ wall: "#f5f7f9", shade: "#c5d1dc", roof: "#4f7fb3", gold: "#e8c25c" }} />
+      </svg>
+      <button type="button" onClick={() => set({ welcomeCastleSeed: 1 + Math.floor(Math.random() * 2_000_000_000) })} className="flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold" style={CHIP_ON}>
+        ✦ Generate castle
+      </button>
     </div>
   );
 }
@@ -107,7 +100,7 @@ export function CastleEdit({ fx }: { fx: FxSettings }) {
     <div className="pointer-events-auto relative" onClick={(e) => e.stopPropagation()}>
       <EditButton open={open} onClick={() => setOpen((v) => !v)} label="Change the castle" />
       {open && (
-        <div className="parchment card-pop-in absolute bottom-10 right-0 z-10 w-[240px] rounded-xl p-2 shadow-xl">
+        <div className="parchment card-pop-in absolute bottom-10 right-0 z-10 w-max rounded-xl p-2 shadow-xl">
           <div className="relative z-[1]">
             <CastleChoices fx={fx} />
           </div>
@@ -344,12 +337,16 @@ function CheckinOptions({ fx }: { fx: FxSettings }) {
           return (
             <button key={c.key} type="button" role="radio" aria-checked={on} aria-label={c.label} title={c.hint} onClick={() => set({ checkinStyle: c.key })} className="rounded-full p-0.5" style={{ boxShadow: on ? `0 0 0 2px ${GOLD}` : undefined }}>
               <span className="font-display flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px]" style={c.style}>
-                <CheckinIcon icon={checkinIconOf(fx)} /> Check in
+                <CheckinIcon icon={checkinIconOf(fx)} /> {fx.checkinText?.trim() || "Check in"}
               </span>
             </button>
           );
         })}
       </div>
+      <label className="flex flex-col gap-1 text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }}>
+        Its words
+        <input value={fx.checkinText ?? ""} onChange={(e) => set({ checkinText: e.target.value.slice(0, 40) })} placeholder="Check in" className="h-9 rounded-lg border px-2.5 text-[16px] font-normal normal-case tracking-normal" style={FIELD} />
+      </label>
       <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }}>
         Its icon
       </span>

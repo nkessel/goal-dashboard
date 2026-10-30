@@ -1553,6 +1553,7 @@ export async function createRiteAction(input: { title: string; description?: str
     iconSource: input.iconSource,
     coinValue: input.coinValue,
     estimateMinutes: input.estimateMinutes,
+    ...(input.repeat !== undefined ? { repeat: cleanRepeatInput(input.repeat) } : {}),
   });
   revalidatePath("/");
   return rite.id;
@@ -1572,6 +1573,7 @@ export async function updateRiteAction(riteId: string, input: { title?: string; 
     iconSource: input.iconSource,
     coinValue: input.coinValue,
     estimateMinutes: input.estimateMinutes,
+    ...(input.repeat !== undefined ? { repeat: cleanRepeatInput(input.repeat) } : {}),
   });
   revalidatePath("/");
 }
@@ -3589,4 +3591,21 @@ export async function dueSoonCardsAction() {
   const ownerId = await requireProfileId();
   const tasks = await tasksData.listOpenTasksForOwnerWithCategory(ownerId);
   return tasks.filter((t) => t.due_at && !t.needs_review && !t.reward_id);
+}
+
+/** Drag to reorder the Treasure Chest. */
+export async function reorderRewardsAction(ids: string[]) {
+  const ownerId = await requireProfileId();
+  await rewardsData.reorderRewards(ownerId, ids.filter((x) => typeof x === "string").slice(0, 200));
+  revalidatePath("/rewards");
+}
+
+/** A habit's interval repeat from the editor, cleaned (null = weekdays). */
+function cleanRepeatInput(r: unknown) {
+  const u = (r ?? null) as { every?: unknown; unit?: unknown; from?: unknown } | null;
+  if (!u) return null;
+  const every = Math.round(Number(u.every));
+  const unit = u.unit === "day" || u.unit === "week" || u.unit === "month" || u.unit === "year" ? u.unit : null;
+  const from = typeof u.from === "string" && /^\d{4}-\d{2}-\d{2}$/.test(u.from) ? u.from : null;
+  return every >= 1 && every <= 999 && unit && from ? { every, unit: unit as "day" | "week" | "month" | "year", from } : null;
 }

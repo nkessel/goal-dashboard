@@ -17,11 +17,12 @@ export function SaveKeys() {
       if (e.defaultPrevented || fromFeedback(e) || document.querySelector("[data-save-keys]")) return;
       const popups = [...document.querySelectorAll<HTMLElement>('[role="dialog"], [role="menu"], [role="alertdialog"]')].filter((el) => !el.closest("[data-feedback-root]"));
       const active = document.activeElement;
-      const box = popups.find((el) => active && el.contains(active)) ?? popups[popups.length - 1];
-      if (!box) return;
-      const btn =
-        box.querySelector<HTMLButtonElement>("[data-submit]:not(:disabled)") ??
-        box.querySelector<HTMLButtonElement>('button[type="submit"]:not(:disabled)');
+      const first = popups.find((el) => active && el.contains(active)) ?? popups[popups.length - 1];
+      if (!first) return;
+      const submitIn = (el: HTMLElement) => el.querySelector<HTMLButtonElement>("[data-submit]:not(:disabled)") ?? el.querySelector<HTMLButtonElement>('button[type="submit"]:not(:disabled)');
+      // A picker open over a form (a portrait chooser over the habit editor) has nothing to submit: save the form under it.
+      const box = submitIn(first) || first.querySelector("form") ? first : ([...popups].reverse().find((el) => el !== first && submitIn(el)) ?? first);
+      const btn = submitIn(box);
       if (btn) {
         e.preventDefault();
         btn.click();

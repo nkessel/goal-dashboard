@@ -29,10 +29,14 @@ export async function createReward(
   }
 ): Promise<Reward> {
   const db = supabaseAdmin();
+  // New rewards land at the top of the chest.
+  const { data: first } = await db.from("rewards").select("sort_order").eq("owner_id", ownerId).order("sort_order", { ascending: true }).limit(1);
+  const top = ((first?.[0]?.sort_order as number | undefined) ?? 1) - 1;
   const { data, error } = await db
     .from("rewards")
     .insert({
       owner_id: ownerId,
+      sort_order: top,
       title: input.title,
       description: input.description || null,
       icon_key: input.iconKey ?? null,
@@ -287,4 +291,10 @@ export async function setImportIcon(kind: "quest" | "reward", id: string, ownerI
   const patch = kind === "quest" ? { icon_key: url, icon_source: "ai" } : { icon_key: url };
   const { error } = await db.from(kind === "quest" ? "tasks" : "rewards").update(patch).eq("id", id).eq("owner_id", ownerId);
   if (error) throw new Error(`Failed to save portrait: ${error.message}`);
+}
+
+/** Put the chest's rewards in this order. */
+export async function reorderRewards(ownerId: string, ids: string[]): Promise<void> {
+  const db = supabaseAdmin();
+  await Promise.all(ids.map((id, i) => db.from("rewards").update({ sort_order: i }).eq("id", id).eq("owner_id", ownerId)));
 }

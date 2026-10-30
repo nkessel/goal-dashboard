@@ -201,7 +201,7 @@ const BIRDS = [
   { top: 22, size: 0.6, fly: 74, delay: 18, flap: 2.8, flapDelay: 0.4, bob: 3.4, back: true },
 ];
 
-export function MistScene({ time, leaving = false, castle = "spires", castleSlot, onCastleVisible }: { time?: MistTime; leaving?: boolean; castle?: CastleDesign; castleSlot?: React.ReactNode; onCastleVisible?: (visible: boolean) => void }) {
+export function MistScene({ time, leaving = false, castle = "spires", castleSeed, castleSlot, onCastleVisible }: { time?: MistTime; leaving?: boolean; castle?: CastleDesign; castleSeed?: number; castleSlot?: React.ReactNode; onCastleVisible?: (visible: boolean) => void }) {
   const [when] = useState<MistTime>(() => time ?? mistTimeOf());
   // Where the castle stands on screen, so something can sit right beside it (its ✎ while arranging).
   const castleRef = useRef<SVGGElement>(null);
@@ -226,7 +226,7 @@ export function MistScene({ time, leaving = false, castle = "spires", castleSlot
       clearTimeout(t);
       window.removeEventListener("resize", measure);
     };
-  }, [castle]);
+  }, [castle, castleSeed]);
   // Here now: the fog that covered the app hands over to this screen's own.
   useEffect(() => liftFog(), []);
   const p = PALETTES[when];
@@ -297,6 +297,13 @@ export function MistScene({ time, leaving = false, castle = "spires", castleSlot
                 </linearGradient>
               )}
               {i === 1 && (
+                <radialGradient id="mist-castle-fog">
+                  <stop offset="0" stopColor={mist(0.85)} />
+                  <stop offset=".6" stopColor={mist(0.45)} />
+                  <stop offset="1" stopColor={mist(0)} />
+                </radialGradient>
+              )}
+              {i === 1 && (
                 <linearGradient id="mist-castle-wall" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0" stopColor={c.wall} />
                   <stop offset=".55" stopColor={c.wall} />
@@ -307,7 +314,9 @@ export function MistScene({ time, leaving = false, castle = "spires", castleSlot
             <path d={d} fill={`url(#mist-ridge-${i})`} />
             {i === 1 && (
               <g ref={castleRef} transform={`translate(${CASTLE_X},${CASTLE_Y}) scale(${CASTLE_SCALE})`}>
-                <CastleArt design={castle} colors={{ ...c, light: night || when === "dusk" ? `rgb(${p.mote})` : undefined }} wallFill="url(#mist-castle-wall)" />
+                <CastleArt design={castle} seed={castleSeed} colors={{ ...c, light: night || when === "dusk" ? `rgb(${p.mote})` : undefined }} wallFill="url(#mist-castle-wall)" />
+                {/* Fog drifting across its foot, so it stands off in the distance. */}
+                <ellipse cx="0" cy="2" rx="120" ry="18" fill="url(#mist-castle-fog)" />
               </g>
             )}
             {i === 4 && <path d={PATH} fill={p.tops[2]} opacity=".55" />}

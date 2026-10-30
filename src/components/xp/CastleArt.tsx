@@ -13,7 +13,8 @@ export const CASTLE_DESIGNS: { key: CastleDesign; label: string; hint: string }[
   { key: "none", label: "No castle", hint: "Just the hills and the mist" },
 ];
 
-export const castleOf = (v: unknown): CastleDesign => (CASTLE_DESIGNS.some((d) => d.key === v) ? (v as CastleDesign) : "spires");
+/** Every castle is a spire castle now (one generated from a seed); older choices fall back to it. */
+export const castleOf = (v?: unknown): CastleDesign => (v === "spires" || !v ? "spires" : "spires");
 
 type Shape = { walls: string; roofs: string; flags: string; windows: [number, number][]; gate: boolean };
 
@@ -83,7 +84,8 @@ function domes(): Shape {
 }
 
 function tower(): Shape {
-  const walls = battlements(-18, 18, 12, 6) + rect(0, 15, 112) + `M-12,-84 h24 v3.5 h-24 Z ` + rect(10, 7, 74);
+  // Its footing reaches down into the hill so it never floats.
+  const walls = "M-18,14 V0 H18 V14 Z " + battlements(-18, 18, 12, 6) + "M-7.5,14 V-112 H7.5 V14 Z " + `M-12,-84 h24 v3.5 h-24 Z ` + rect(10, 7, 74);
   const roofs = cone(0, 15, 112, 40) + cone(10, 7, 74, 15);
   const flags = pennant(0, -152, 10);
   return { walls, roofs, flags, gate: false, windows: [[0, 100], [0, 72], [0, 52], [0, 30], [10, 62]] };
@@ -91,12 +93,63 @@ function tower(): Shape {
 
 const SHAPES: Record<Exclude<CastleDesign, "none">, Shape> = { spires: spires(), highland: highland(), domes: domes(), tower: tower() };
 
+/** A small seeded random, so the same seed always draws the same castle. */
+function rng(seed: number) {
+  let a = seed >>> 0 || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A spire castle grown from a seed: a tall central keep, two to four pairs of
+ * towers stepping down to either side (a little uneven, as real castles are),
+ * flared blue spires with pennants, and its footing sunk into the hill.
+ */
+export function generatedSpires(seed: number): Shape {
+  const r = rng(seed);
+  const between = (a: number, b: number) => a + r() * (b - a);
+  const centreH = between(84, 104);
+  const centreW = between(15, 20);
+  const towers: [number, number, number, number][] = [[0, centreW, centreH, between(42, 58)]];
+  const pairs = 2 + Math.floor(r() * 3);
+  let x = centreW / 2 + between(5, 9);
+  let h = centreH;
+  for (let i = 0; i < pairs; i++) {
+    const w = between(8, 15) - i * 0.6;
+    h = h * between(0.68, 0.86);
+    const sh = between(18, 34) * (h / 70);
+    x += w / 2;
+    // Mirror each pair, with a touch of difference between the sides.
+    towers.push([-x - between(0, 2), w, h * between(0.94, 1.04), sh]);
+    towers.push([x + between(0, 2), w, h * between(0.94, 1.04), sh]);
+    x += w / 2 + between(5, 11);
+  }
+  const span = x - 4;
+  // Footings run below the base line so it stands in the hill, never above it.
+  let walls = `M${-span},10 V0 H${span} V10 Z ` + battlements(-span, span, between(18, 24)) + battlements(-x * 0.45, x * 0.45, between(42, 56));
+  let roofs = "";
+  let flags = "";
+  const windows: [number, number][] = [];
+  for (const [tx, w, th, sh] of towers) {
+    walls += `M${tx - w / 2},10 V${-th} H${tx + w / 2} V10 Z `;
+    roofs += cone(tx, w, th, sh);
+    flags += pennant(tx, -th - sh, 6 + w * 0.18);
+    for (let wy = th - 14; wy > 22; wy -= between(14, 20)) windows.push([tx, wy]);
+  }
+  return { walls, roofs, flags, gate: true, windows };
+}
+
 export type CastleColors = { wall: string; shade: string; roof: string; gold: string; light?: string };
 
 /** One castle, as SVG shapes (place it with a transform on a parent group). `wallFill` can be a gradient url. */
-export function CastleArt({ design, colors, wallFill }: { design: CastleDesign; colors: CastleColors; wallFill?: string }) {
+export function CastleArt({ design, colors, wallFill, seed }: { design: CastleDesign; colors: CastleColors; wallFill?: string; seed?: number }) {
   if (design === "none") return null;
-  const s = SHAPES[design];
+  const s = seed ? generatedSpires(seed) : SHAPES[design];
   return (
     <g>
       <path d={s.flags} fill={colors.gold} stroke={colors.gold} strokeWidth=".6" strokeLinejoin="round" />

@@ -1,12 +1,13 @@
 "use client";
 
 import { GearIcon } from "@/components/ui/Icons";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { completeRiteAction, reorderRitesAction, skipHabitAction, tickAllRiteStepsAction, tickRiteStepAction, uncompleteRiteAction, unskipHabitAction } from "@/app/actions";
 import { useLocalDay } from "@/components/evening/evening-clock";
+import { nextOccurrence, repeatIsUp, repeatLabel } from "@/lib/habit-repeat";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
 import type { RiteView } from "@/components/evening/EveningRites";
 import { FocusMode, habitAsTask } from "@/components/one-thing/OneThing";
@@ -47,12 +48,28 @@ export function DailyHabits({
   const [look, setLook] = useState<HeaderLook>("togo");
   const [mark, setMark] = useState<HabitMark>("seedling");
   const [lookMenu, setLookMenu] = useState(false);
+  // A + before the title that adds a habit (chosen in the header's settings).
+  const [plusFirst, setPlusFirst] = useState(false);
+  const plusSpot = useRef<HTMLSpanElement>(null);
+  const headerBox = useRef<HTMLDivElement>(null);
+  const [plusAt, setPlusAt] = useState<{ left: number; top: number } | null>(null);
+  useEffect(() => {
+    const place = () => {
+      const a = plusSpot.current?.getBoundingClientRect();
+      const b = headerBox.current?.getBoundingClientRect();
+      setPlusAt(a && b ? { left: a.left - b.left, top: a.top - b.top } : null);
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [plusFirst, mark]);
   useEffect(() => {
     try {
       // "beads" and the garden were retired: they show "Still to tend" now.
       const v = localStorage.getItem(LOOK_KEY)?.replace(/^(beads|garden)$/, "togo");
       const m = localStorage.getItem(MARK_KEY);
       /* eslint-disable react-hooks/set-state-in-effect -- the saved choice is only readable after hydration */
+      setPlusFirst(localStorage.getItem(PLUS_KEY) === "1");
       if (v && LOOKS.some((l) => l.key === v)) setLook(v as HeaderLook);
       if (m && MARKS.some((x) => x.key === m)) setMark(m as HabitMark);
       /* eslint-enable react-hooks/set-state-in-effect */
@@ -138,18 +155,45 @@ export function DailyHabits({
   const ordered = (order ?? habits.map((h) => h.id)).map((id) => byId.get(id)).filter((h): h is RiteView => !!h);
   // Only habits that fall on today (weekday of the app day, 5:30am rollover).
   const weekday = day ? new Date(`${day}T12:00:00`).getDay() : null;
-  const dueOn = (h: RiteView, wd: number | null) => !h.days || h.days.length === 0 || wd === null || h.days.includes(wd);
   const doneSet = new Set(completions.map((c) => `${c.rite_id}|${c.day}`));
   const skipSet = new Set((skips ?? []).map((c) => `${c.rite_id}|${c.day}`));
+  const daysOf = (list: { rite_id: string; day: string }[] | null | undefined, id: string) => (list ?? []).filter((c) => c.rite_id === id).map((c) => c.day);
+  // A habit on an interval is up from its day until done or skipped; one on weekdays, on those days.
+  const dueOn = (h: RiteView, wd: number | null) => {
+    if (h.repeat) return !!day && repeatIsUp(h.repeat, day, daysOf(completions, h.id), daysOf(skips, h.id).filter((d) => d !== day));
+    return !h.days || h.days.length === 0 || wd === null || h.days.includes(wd);
+  };
   const done = (id: string) => optimistic[id] ?? doneSet.has(`${id}|${day}`);
   const tickSet = new Set(stepChecks.map((c) => `${c.rite_id}|${c.step_id}|${c.day}`));
   const ticked = (h: RiteView, stepId: string) => stepOpt[`${h.id}|${stepId}`] ?? (tickSet.has(`${h.id}|${stepId}|${day}`) || (done(h.id) && optimistic[h.id] === true));
   const subsOf = (h: RiteView) => h.steps ?? [];
   const skipped = (id: string) => skipOverride[id] ?? skipSet.has(`${id}|${day}`);
   const dueToday = ordered.filter((h) => dueOn(h, weekday));
-  const todays = dueToday.filter((h) => !skipped(h.id));
+  // Snoozed until tomorrow (kept in this browser).
+  const [snoozed, setSnoozed] = useState<Record<string, string>>({});
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- only readable after hydration
+      setSnoozed(JSON.parse(localStorage.getItem(SNOOZE_KEY) || "{}"));
+    } catch {}
+  }, []);
+  const isSnoozed = (id: string) => !!day && snoozed[id] === day;
+  function snooze(h: RiteView, on: boolean) {
+    if (!day) return;
+    setMenuFor(null);
+    const next = { ...Object.fromEntries(Object.entries(snoozed).filter(([, d]) => d === day)) };
+    if (on) next[h.id] = day;
+    else delete next[h.id];
+    setSnoozed(next);
+    try {
+      localStorage.setItem(SNOOZE_KEY, JSON.stringify(next));
+    } catch {}
+  }
+  const todays = dueToday.filter((h) => !skipped(h.id) && !isSnoozed(h.id));
   const skippedToday = dueToday.filter((h) => skipped(h.id));
-  const offToday = habits.length - dueToday.length;
+  const snoozedToday = dueToday.filter((h) => !skipped(h.id) && isSnoozed(h.id));
+  const notToday = ordered.filter((h) => !dueToday.includes(h));
+  const [showNotToday, setShowNotToday] = useState(false);
 
   /**
    * Days in a row this habit was done, counting only the days it's due.
@@ -157,7 +201,7 @@ export function DailyHabits({
    * yesterday. A missed or skipped day ends it.
    */
   function streak(h: RiteView): number {
-    if (!day) return 0;
+    if (!day || h.repeat) return 0;
     let n = 0;
     const d = new Date(`${day}T12:00:00`);
     for (let i = 0; i < 400; i++) {
@@ -264,7 +308,7 @@ export function DailyHabits({
 
   return (
     <section className="flex flex-col">
-      <div className="relative">
+      <div ref={headerBox} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -283,7 +327,9 @@ export function DailyHabits({
         }
       >
         <span className={`flex items-center gap-3 ${isAdventure ? "font-display text-[21px]" : "text-sm font-bold"}`} style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
-          <HabitIcon mark={mark} />
+          {/* A + (as the mark, or before the title) is its own button, laid over this spot. */}
+          {plusFirst || mark === "plus" ? <span ref={plusSpot} aria-hidden className="inline-block h-[30px] w-[30px]" /> : <HabitIcon mark={mark} />}
+          {plusFirst && mark !== "plus" && <HabitIcon mark={mark} />}
           Daily Habits
         </span>
         <HeaderAdornment look={look} habits={todays.map((h) => ({ title: h.title, done: done(h.id) }))} isAdventure={isAdventure} />
@@ -291,6 +337,7 @@ export function DailyHabits({
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
+      {(plusFirst || mark === "plus") && plusAt && <PlusOverTitle at={plusAt} onClick={() => setEditing("new")} isAdventure={isAdventure} />}
       {/* How the header shows the day's progress. */}
       <button
         type="button"
@@ -299,8 +346,8 @@ export function DailyHabits({
         aria-label="How the Daily Habits header looks"
         aria-expanded={lookMenu}
         title="Habit display settings"
-        // The app's one gear, on the header box's bottom-right corner (top-right while open, so the tray never covers it).
-        className={`absolute -right-1.5 z-[5] flex h-8 w-8 items-center justify-center rounded-full ${open ? "-top-2.5" : "-bottom-2.5"}`}
+        // The app's one gear, on the header's top-right corner.
+        className="absolute -right-1.5 -top-2.5 z-[5] flex h-8 w-8 items-center justify-center rounded-full"
         style={
           isAdventure
             ? { color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }
@@ -330,6 +377,20 @@ export function DailyHabits({
               </button>
             ))}
           </div>
+          <label className="relative z-[1] flex min-h-9 cursor-pointer items-center gap-2 px-1.5 pb-1 text-[13.5px]" style={{ color: "var(--t-ink)" }}>
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[var(--t-gold-deep)]"
+              checked={plusFirst}
+              onChange={(e) => {
+                setPlusFirst(e.target.checked);
+                try {
+                  localStorage.setItem(PLUS_KEY, e.target.checked ? "1" : "0");
+                } catch {}
+              }}
+            />
+            A + before the title, to add a habit
+          </label>
           <p className="relative z-[1] m-0 px-1.5 pb-0.5 text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--t-ink-soft)" }}>
             Header style
           </p>
@@ -557,9 +618,17 @@ export function DailyHabits({
                           className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5"
                           style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
                         >
-                          ⤼ Skip today
+                          {h.repeat ? "⤼ Skip this time" : "⤼ Skip today"}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => snooze(h, true)}
+                        className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5"
+                        style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
+                      >
+                        ☾ Snooze until tomorrow
+                      </button>
                     </div>
                   )}
                   {confirmSkip === h.id && (
@@ -638,18 +707,73 @@ export function DailyHabits({
               ))}
             </p>
           )}
+          {snoozedToday.length > 0 && (
+            <p className="m-0 px-2 pt-2 text-center text-[13.5px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.85 }}>
+              {snoozedToday.map((h, i) => (
+                <span key={h.id}>
+                  {i > 0 && " · "}
+                  {h.title} snoozed until tomorrow{" "}
+                  <button type="button" onClick={() => snooze(h, false)} className="underline">
+                    undo
+                  </button>
+                </span>
+              ))}
+            </p>
+          )}
+          {/* Habits not up today: still here to see and edit. */}
+          {notToday.length > 0 && (
+            <div className="mt-2 flex flex-col items-center gap-1.5">
+              <button type="button" onClick={() => setShowNotToday((v) => !v)} aria-expanded={showNotToday} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.85 }}>
+                Not today ({notToday.length})
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: showNotToday ? "rotate(90deg)" : undefined }}>
+                  <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {showNotToday && (
+                <ul className="reveal m-0 flex w-full list-none flex-col gap-1.5 p-0">
+                  {notToday.map((h) => (
+                    <li key={h.id}>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(h)}
+                        title="Edit habit"
+                        className={`flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-1.5 text-left opacity-80 hover:opacity-100 ${isAdventure ? "parchment" : ""}`}
+                        style={isAdventure ? { borderRadius: 16 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
+                      >
+                        <span className="relative z-[1] min-w-0 flex-1">
+                          <span className="block text-[15px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
+                            {h.title}
+                          </span>
+                          <span className="block text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                            {nextLabel(h, day)}
+                          </span>
+                        </span>
+                        <span aria-hidden className="relative z-[1] text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
+                          ✎
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
             <li>
               <button
                 type="button"
                 onClick={() => setEditing("new")}
-                className="habit-add flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-[14.5px]"
-                style={{ borderColor: isAdventure ? "rgba(217,180,95,.4)" : "var(--t-card-border)", color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}
+                className="habit-add hover-glow mx-auto flex h-10 items-center justify-center gap-2 rounded-full px-5 text-[14.5px]"
+                style={
+                  isAdventure
+                    ? { background: "linear-gradient(180deg, rgba(58,53,36,.85), rgba(34,31,21,.85))", border: "1px solid rgba(217,180,95,.45)", color: "var(--t-cream)", boxShadow: "inset 0 1px 0 rgba(255,235,180,.12)" }
+                    : { border: "1px solid var(--t-card-border)", background: "var(--t-card)", color: "var(--t-ink-soft)" }
+                }
               >
-                <span aria-hidden className="text-[18px] leading-none" style={{ color: "var(--t-gold)" }}>
+                <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full text-[14px] leading-none" style={{ border: "1.5px solid var(--t-gold)", color: "var(--t-gold)" }}>
                   +
                 </span>
-                {habits.length === 0 ? "Add a habit" : offToday > 0 ? `Add a habit · ${offToday} not due today` : "Add a habit"}
+                Add a habit
               </button>
             </li>
           </ul>
@@ -721,17 +845,54 @@ function FocusGlyph() {
   );
 }
 
-type HabitMark = "seedling" | "check" | "sun" | "leaf";
+type HabitMark = "seedling" | "check" | "sun" | "leaf" | "plus";
 const MARK_KEY = "habits-header-mark";
+const SNOOZE_KEY = "habit-snooze";
+
+/** When a habit not up today comes next: "Every year · next Mar 3" or "Mondays, Thursdays". */
+function nextLabel(h: RiteView, day: string | null) {
+  if (h.repeat && day) {
+    const next = nextOccurrence(h.repeat, day);
+    return `${repeatLabel(h.repeat)} · next ${new Date(`${next}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: next.slice(0, 4) !== day.slice(0, 4) ? "numeric" : undefined })}`;
+  }
+  return scheduleLabel(h) ?? "Not scheduled";
+}
+const PLUS_KEY = "habits-header-plus";
 const MARKS: { key: HabitMark; label: string }[] = [
   { key: "seedling", label: "A seedling" },
   { key: "check", label: "A turning checkmark" },
   { key: "sun", label: "A rising sun" },
   { key: "leaf", label: "A leaf" },
+  { key: "plus", label: "A plus (tap it to add a habit)" },
 ];
 
 /** The mark beside "Daily Habits": a seedling by default (more in its display settings). */
+/** The header's +: a little gilded button laid over the spot before the title. Adds a habit. */
+function PlusOverTitle({ at, onClick, isAdventure }: { at: { left: number; top: number }; onClick: () => void; isAdventure: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Add a habit"
+      title="Add a habit"
+      className="absolute z-[4] flex h-[30px] w-[30px] items-center justify-center rounded-full transition-transform hover:scale-110"
+      style={{ left: at.left, top: at.top, color: "var(--t-gold)", border: "1.5px solid var(--t-gold)", background: isAdventure ? "rgba(20,18,10,.4)" : "transparent" }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M12 6v12M6 12h12" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
 function HabitIcon({ mark = "seedling" }: { mark?: HabitMark }) {
+  if (mark === "plus")
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9" stroke="var(--t-gold)" strokeWidth="1.8" />
+        <path d="M12 7.5v9M7.5 12h9" stroke="var(--t-gold)" strokeWidth="2.2" strokeLinecap="round" />
+      </svg>
+    );
   if (mark === "check")
     return (
       // The loop turns clockwise, the way days come round.

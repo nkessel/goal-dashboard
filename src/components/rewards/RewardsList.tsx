@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Reward } from "@/lib/data/types";
-import { claimRewardAction, completeRewardAction, unclaimRewardAction, uncompleteRewardAction } from "@/app/actions";
+import { claimRewardAction, completeRewardAction, reorderRewardsAction, unclaimRewardAction, uncompleteRewardAction } from "@/app/actions";
 import { celebrateReward } from "@/components/celebration/RewardCelebration";
 import { RewardEditorDialog } from "./RewardEditorDialog";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
@@ -14,7 +17,46 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-  const available = rewards.filter((r) => r.status === "available");
+  const fromServer = rewards.filter((r) => r.status === "available");
+  // Dragged into a new order: kept here until the saved order comes back.
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [seenRewards, setSeenRewards] = useState(rewards);
+  if (seenRewards !== rewards) {
+    setSeenRewards(rewards);
+    setOrder(null);
+  }
+  const available = order ? (order.map((id) => fromServer.find((r) => r.id === id)).filter(Boolean) as Reward[]) : fromServer;
+  // A reward just added drops in from above to its place at the top.
+  const known = useRef<Set<string> | null>(null);
+  const [dropped, setDropped] = useState<string | null>(null);
+  useEffect(() => {
+    const ids = fromServer.map((r) => r.id);
+    if (known.current) {
+      const fresh = ids.find((id) => !known.current!.has(id));
+      if (fresh) setDropped(fresh);
+    }
+    known.current = new Set(ids);
+  }, [fromServer]);
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  function onDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const ids = available.map((r) => r.id);
+    const next = arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
+    setOrder(next);
+    startTransition(async () => {
+      try {
+        await reorderRewardsAction(next);
+      } catch {
+        setOrder(null);
+        setError("Couldn't save the new order.");
+      }
+    });
+  }
   const accepted = rewards.filter((r) => r.status === "claimed");
   const completed = rewards.filter((r) => r.status === "completed");
   const [paid, setPaid] = useState<{ id: string; text: string } | null>(null);
@@ -119,14 +161,17 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
         Add a reward
       </button>
 
+      <DndContext id="dnd-rewards" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext items={available.map((r) => r.id)} strategy={rectSortingStrategy}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {available.map((r) => {
           const cost = r.cost_coins ?? 0;
           const short = Math.max(0, cost - coins);
           return (
-            <div
+            <SortableReward
               key={r.id}
-              className={`reward-shimmer relative flex flex-col items-center gap-2 rounded-2xl px-4 pb-4 pt-5 text-center ${isAdventure ? "parchment parchment-framed" : ""}`}
+              id={r.id}
+              className={`reward-shimmer relative flex flex-col gap-2 rounded-2xl py-3 pl-8 pr-4 ${isAdventure ? "parchment parchment-framed" : ""} ${dropped === r.id ? "reward-drop" : ""}`}
               style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
             >
               {r.needs_review && (
@@ -134,16 +179,18 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
                   new
                 </span>
               )}
-              <button type="button" onClick={() => setEditing(r)} title="Edit reward" className="relative z-[1] flex flex-col items-center gap-2">
-                {portrait(r, 96)}
-                <span className="text-[19px] font-semibold leading-tight" style={{ color: "var(--t-ink)" }}>
-                  {r.title}
-                </span>
-                {r.description && (
-                  <span className="line-clamp-2 text-[14px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                    {r.description}
+              <button type="button" onClick={() => setEditing(r)} title="Edit reward" className="relative z-[1] flex items-center gap-3 text-left">
+                {portrait(r, 60)}
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[17.5px] font-semibold leading-tight" style={{ color: "var(--t-ink)" }}>
+                    {r.title}
                   </span>
-                )}
+                  {r.description && (
+                    <span className="line-clamp-2 text-[13.5px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+                      {r.description}
+                    </span>
+                  )}
+                </span>
               </button>
               {r.prereq_title && (
                 <span className="relative z-[1] text-[13px] italic" style={{ color: "var(--t-ink-soft)" }}>
@@ -174,7 +221,7 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
                   </button>
                 </div>
               ) : (
-              <div className="relative z-[1] mt-1 flex items-center gap-2">
+              <div className="relative z-[1] flex items-center justify-end gap-2">
                 {priceChip(cost)}
                 <button
                   type="button"
@@ -187,10 +234,12 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
                 </button>
               </div>
               )}
-            </div>
+            </SortableReward>
           );
         })}
       </div>
+      </SortableContext>
+      </DndContext>
 
       {available.length === 0 && (
         <p className={`rounded-2xl p-5 text-center text-[16px] italic ${isAdventure ? "parchment" : ""}`} style={{ color: "var(--t-ink-soft)" }}>
@@ -293,5 +342,29 @@ export function RewardsList({ rewards, coins, theme }: { rewards: Reward[]; coin
         <RewardEditorDialog reward={editing === "new" ? undefined : editing} theme={theme} onClose={() => setEditing(null)} />
       )}
     </>
+  );
+}
+
+/** A reward card that can be dragged by its bar to a new place in the chest. */
+function SortableReward({ id, className, style, children }: { id: string; className: string; style?: React.CSSProperties; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div ref={setNodeRef} className={className} style={{ ...style, transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 5 : undefined, boxShadow: isDragging ? "0 12px 28px rgba(0,0,0,.35)" : undefined }}>
+      <button
+        ref={setActivatorNodeRef}
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to move this reward"
+        title="Drag to move"
+        className="absolute inset-y-2 left-1.5 z-[2] flex w-5 cursor-grab touch-none items-center justify-center rounded-md active:cursor-grabbing hover:bg-black/[.05]"
+        style={{ color: "#a58c66" }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M5 8h14M5 12h14M5 16h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        </svg>
+      </button>
+      {children}
+    </div>
   );
 }
