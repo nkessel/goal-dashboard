@@ -2629,7 +2629,8 @@ input[type="time"]::-webkit-datetime-edit-hour-field:focus, input[type="time"]::
 
 /* Quests on the Adventure calendar: storybook cards with their creature. */
 .quest-card {
-  border-radius: 7px;
+  /* Soft, rounded corners (owner, Oct 31); tiny tasks a little less. */
+  border-radius: 18px;
   background: linear-gradient(180deg, #f8efd6, #ecdcb5);
   border: 1px solid #b0904f;
   box-shadow:
@@ -2833,3 +2834,24 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 .place-input:focus { border-bottom-color: #8a6116; box-shadow: 0 2px 0 rgba(217,180,95,.35); }
 .place-input::placeholder { color: var(--t-ink-soft); opacity: .6; font-weight: 400; font-style: italic; }
 .place-input:-webkit-autofill { -webkit-box-shadow: 0 0 0 40px transparent inset; transition: background-color 9999s; -webkit-text-fill-color: var(--t-ink); }
+/* Level bars: one smooth bar, filled from the bottom (no segments). */
+.level-track { background: rgba(70, 50, 20, 0.12); box-shadow: inset 0 1px 3px rgba(60, 40, 10, 0.28), 0 0 0 1px rgba(139, 112, 64, 0.35); }
+.level-fill { background: linear-gradient(0deg, #b8913f, #e2bf63 60%, #f8e3a0); box-shadow: 0 0 6px rgba(242, 210, 126, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.55); }
+
+.quest-card.tiny-quest { border-radius: 14px; }
+
+/* The steps tray: a scroll unrolled from under the card. */
+.steps-tray-adv {
+  background: linear-gradient(180deg, #efe1bd 0%, #f7eed6 22%, #f4e8cb 100%);
+  border: 1.5px solid #a88a3f;
+  border-top: 0;
+  border-radius: 0 0 20px 20px;
+  box-shadow: inset 0 10px 12px -8px rgba(60, 40, 10, 0.45), inset 0 0 0 4px rgba(255, 249, 232, 0.5), 0 6px 14px rgba(40, 25, 5, 0.3);
+}
+.steps-tray-adv::after { content: ""; position: absolute; inset: 6px 7px 7px; border: 1px dashed rgba(168, 138, 63, 0.38); border-top: 0; border-radius: 0 0 15px 15px; pointer-events: none; }
+.step-row { transition: background 0.15s; }
+@media (hover: hover) { .step-row:hover { background: rgba(217, 180, 95, 0.14); } }
+.step-row + .step-row, li + li > .step-row { border-top: 1px solid rgba(139, 112, 64, 0.13); }
+.step-row.step-next { background: linear-gradient(90deg, rgba(226, 187, 92, 0.3), rgba(226, 187, 92, 0.06)); box-shadow: inset 3px 0 0 #c99a3a; border-top-color: transparent; }
+.step-check { border-radius: 999px; transition: transform 0.15s, box-shadow 0.15s, background 0.2s; }
+.step-row:active .step-check { transform: scale(0.9); }

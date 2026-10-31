@@ -14,12 +14,15 @@ export function BoardQuestList({
   tasks,
   boardId,
   nextTaskId = null,
+  boardTitle = null,
   theme,
 }: {
   tasks: Task[];
   boardId?: string;
   /** The step chosen as this board's next action, if any. */
   nextTaskId?: string | null;
+  /** The board's name (courses pick their next step by the deadline coming up). */
+  boardTitle?: string | null;
   theme: "calm" | "adventure";
 }) {
   const isAdventure = theme === "adventure";
@@ -49,7 +52,7 @@ export function BoardQuestList({
   }
   // A quest linked here from another board wears that board's name.
   const linkTag = (t: Task) => (boardId && t.board_id && t.board_id !== boardId && t.home_board_title ? `↗ ${t.home_board_title}` : undefined);
-  const next = boardId ? (nextActionOf({ id: boardId, next_task_id: nextTaskId }, open) ?? open[0]) : open[0];
+  const next = boardId ? (nextActionOf({ id: boardId, title: boardTitle, next_task_id: nextTaskId }, open) ?? open[0]) : open[0];
   const foggy = open.length > 2 && !!next;
   const rest = foggy ? open.filter((t) => t.id !== next!.id) : open;
   const xpAhead = rest.reduce((n, t) => n + (t.xp_value ?? 0), 0);

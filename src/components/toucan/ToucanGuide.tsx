@@ -694,7 +694,8 @@ function NudgeNote({ text, actions, onClose }: { text: string; actions: NoteActi
     <div
       role="status"
       // The toucan himself flies in and says it: the bird on the left, his words in a bubble beside him.
-      className={`fixed z-[58] flex w-[min(380px,calc(100vw-24px))] cursor-grab touch-none items-end gap-1 ${place ? "" : "bottom-24 left-1/2 -translate-x-1/2"}`}
+      // Centred with margins, not a half-width translate: a half-pixel offset made the words shimmer while the bird moved.
+      className={`fixed z-[58] flex w-[min(380px,calc(100vw-24px))] cursor-grab touch-none items-end gap-1 ${place ? "" : "inset-x-0 bottom-24 mx-auto"}`}
       style={place ?? undefined}
       onPointerDown={(e) => {
         if ((e.target as HTMLElement).closest("button")) return;

@@ -93,7 +93,7 @@ export function BoardBody({
           </section>
         ) : null,
     },
-    { key: "quests", label: "Quests", hint: "The board's quests", keep: true, node: <BoardQuestList tasks={allTasks} boardId={board.id} nextTaskId={board.next_task_id ?? null} theme={theme} /> },
+    { key: "quests", label: "Quests", hint: "The board's quests", keep: true, node: <BoardQuestList tasks={allTasks} boardId={board.id} boardTitle={board.title} nextTaskId={board.next_task_id ?? null} theme={theme} /> },
   ];
 
   return (

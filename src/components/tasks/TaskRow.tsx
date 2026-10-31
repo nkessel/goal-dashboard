@@ -707,8 +707,13 @@ export function TaskRow({
               &#8635; {task.reschedule_count}
             </span>
           )}
-          {importanceCount > 0 && <IconRun src="/design/ui-trophy.svg" n={importanceCount} compact={compact} title={`Importance ${task.importance.toFixed(1)}`} />}
-          {urgencyCount > 0 && <IconRun src="/design/ui-flame-sm.png" n={urgencyCount} compact={compact} title={`Urgency ${(task.urgency ?? 0).toFixed(1)}`} />}
+          <ScaleRuns
+            compact={compact}
+            runs={[
+              ...(importanceCount > 0 ? [{ src: "/design/ui-trophy.svg", n: importanceCount, title: `Importance ${task.importance.toFixed(1)}` }] : []),
+              ...(urgencyCount > 0 ? [{ src: "/design/ui-flame-sm.png", n: urgencyCount, title: `Urgency ${(task.urgency ?? 0).toFixed(1)}` }] : []),
+            ]}
+          />
         </div>
       </div>
 
@@ -1004,21 +1009,39 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose }: { ti
 }
 
 /** A short run of trophies or flames, always on one row (they shrink a little rather than wrap). */
-function IconRun({ src, n, compact, title }: { src: string; n: number; compact: boolean; title: string }) {
+type Run = { src: string; n: number; title: string };
+/**
+ * Importance, urgency and the like on a card. As bars (the default): side by
+ * side, each one smooth bar filled to its level with its icon underneath. As
+ * icons: a row of icons per scale, stacked.
+ */
+function ScaleRuns({ runs, compact }: { runs: Run[]; compact: boolean }) {
   const style = useScaleStyle();
-  // As bars: the icon once, with a small five-step bar filled to the level.
+  if (!runs.length) return null;
   if (style === "bars")
     return (
-      <span className="flex items-center gap-[3px]" title={title}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public */}
-        <img src={src} alt="" width={14} height={14} className={`shrink-0 ${compact ? "h-[11px] w-[11px]" : "h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]"}`} />
-        <span aria-hidden className={`level-bar flex w-[7px] flex-col-reverse gap-px rounded-full p-px ${compact ? "h-[13px]" : "h-[15px]"}`}>
-          {[1, 2, 3, 4, 5].map((k) => (
-            <span key={k} className={`level-step block flex-1 rounded-full ${k <= n ? "level-on" : ""}`} style={{ ["--lv" as string]: k }} />
-          ))}
-        </span>
+      <span className="flex items-end gap-1.5">
+        {runs.map((r) => (
+          <span key={r.src} className="flex flex-col items-center gap-[3px]" title={r.title}>
+            <span aria-hidden className={`level-track relative block w-[6px] overflow-hidden rounded-full ${compact ? "h-[16px]" : "h-[20px]"}`}>
+              <span className="level-fill absolute inset-x-0 bottom-0 block rounded-full" style={{ height: `${Math.min(5, r.n) * 20}%` }} />
+            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public */}
+            <img src={r.src} alt="" width={14} height={14} className={`shrink-0 ${compact ? "h-[11px] w-[11px]" : "h-[12px] w-[12px] sm:h-[13px] sm:w-[13px]"}`} />
+          </span>
+        ))}
       </span>
     );
+  return (
+    <>
+      {runs.map((r) => (
+        <IconRun key={r.src} src={r.src} n={r.n} compact={compact} title={r.title} />
+      ))}
+    </>
+  );
+}
+
+function IconRun({ src, n, compact, title }: { src: string; n: number; compact: boolean; title: string }) {
   return (
     <span className={`flex flex-nowrap items-center ${compact ? "gap-px" : "gap-px sm:gap-[3px]"}`} title={title}>
       {Array.from({ length: n }).map((_, i) => (

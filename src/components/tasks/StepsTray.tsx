@@ -110,17 +110,17 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
           const isNext = st.key === nextKey;
           return (
             <li key={st.key}>
-              <label className={`step-row flex min-h-8 items-center gap-2.5 rounded-lg px-1 py-[3px] ${struck ? "" : "cursor-pointer"} ${isNext ? "step-next" : ""}`}>
+              <label className={`step-row flex min-h-9 items-center gap-2.5 rounded-xl px-2 py-1.5 ${struck ? "" : "cursor-pointer"} ${isNext ? "step-next" : ""}`}>
                 <input type="checkbox" checked={checked} disabled={struck} onChange={(e) => tick(st.key, e.target.checked)} className="peer sr-only" />
                 <span
                   aria-hidden
-                  className="flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-[6px] transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#8a6116]"
+                  className="step-check flex h-[22px] w-[22px] shrink-0 items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-[#8a6116]"
                   style={
                     checked
                       ? isAdventure
                         ? { background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 0 6px rgba(242,210,126,.5), inset 0 1px 0 rgba(255,255,255,.6)" }
                         : { border: "1.5px solid var(--t-good)", background: "var(--t-good)" }
-                      : { background: "rgba(255,250,238,.85)", border: `1.5px solid ${isAdventure ? "#b39a6a" : "var(--t-card-border)"}`, boxShadow: "inset 0 1px 2px rgba(0,0,0,.12)" }
+                      : { background: "radial-gradient(circle at 40% 35%, #fffaf0, #efe2c2)", border: `1.5px solid ${isAdventure ? "#b39a6a" : "var(--t-card-border)"}`, boxShadow: "inset 0 1px 2px rgba(0,0,0,.14), 0 1px 0 rgba(255,255,255,.7)" }
                   }
                 >
                   {checked && (
@@ -129,12 +129,12 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
                     </svg>
                   )}
                 </span>
-                <span className={`min-w-0 flex-1 text-[13.5px] leading-snug transition-opacity duration-300 ${checked || struck ? "line-through opacity-55" : ""}`} style={{ color: ink }}>
+                <span className={`min-w-0 flex-1 text-[14px] leading-snug transition-opacity duration-300 ${checked || struck ? "line-through opacity-55" : ""} ${isNext ? "font-semibold" : ""}`} style={{ color: ink }}>
                   {st.title}
                 </span>
                 {isNext && (
-                  <span className="shrink-0 rounded-full px-1.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#6b4a12", background: "rgba(226,187,92,.28)" }}>
-                    Next
+                  <span className="font-display shrink-0 rounded-full px-2 py-[1px] text-[11.5px]" style={{ color: "#2a1c10", background: "linear-gradient(180deg,#f8e3a0,#e2bf63 55%,#b8913f)", border: "1px solid #6b4a12", boxShadow: "inset 0 1px 0 rgba(255,250,230,.8)" }}>
+                    ✦ Next
                   </span>
                 )}
               </label>
@@ -147,23 +147,23 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
 
   return (
     <div
-      className={`steps-tray relative mx-2 rounded-b-2xl px-3 pb-2.5 pt-5 ${isAdventure ? "parchment" : ""}`}
+      className={`steps-tray relative mx-1.5 px-3 pb-3 pt-5 ${isAdventure ? "steps-tray-adv" : "rounded-b-2xl"}`}
       onClick={(e) => e.stopPropagation()}
       // A scroll unrolled from under the card: parchment, a gilded hairline inside the edge.
       style={
         isAdventure
-          ? { borderRadius: "0 0 16px 16px", border: "1.5px solid #a88a3f", borderTop: 0, boxShadow: "inset 0 7px 9px -6px rgba(60,40,10,.4), inset 0 0 0 3px rgba(255,248,226,.45), inset 0 0 0 4px rgba(168,138,63,.35)" }
+          ? undefined
           : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderTop: 0, boxShadow: "inset 0 6px 8px -6px rgba(60,40,10,.35)" }
       }
     >
       <div className="relative z-[1] flex flex-col">
         {steps && steps.length > 0 && (
           // How far along: a gilded bar that fills as you tick.
-          <div className="mb-1.5 flex items-center gap-2.5 px-1">
-            <span className={isAdventure ? "font-display text-[14.5px]" : "text-[12px] font-bold uppercase tracking-wide"} style={{ color: isAdventure ? "#6b4a12" : soft }}>
-              Steps
+          <div className="mb-2 flex items-center gap-2.5 px-2">
+            <span className={isAdventure ? "font-display text-[16px]" : "text-[12px] font-bold uppercase tracking-wide"} style={{ color: isAdventure ? "#6b4a12" : soft }}>
+              {isAdventure ? "❦ Steps" : "Steps"}
             </span>
-            <span className="relative h-[7px] flex-1 overflow-hidden rounded-full" style={{ background: "rgba(90,64,20,.16)", boxShadow: "inset 0 1px 2px rgba(0,0,0,.18)" }}>
+            <span className="relative h-[8px] flex-1 overflow-hidden rounded-full" style={{ background: "rgba(90,64,20,.14)", boxShadow: "inset 0 1px 2px rgba(0,0,0,.2), 0 1px 0 rgba(255,255,255,.6)" }}>
               <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#c99a3a,#f2d27e)", boxShadow: "0 0 6px rgba(242,210,126,.6)" }} />
             </span>
             <span className="text-[12px] tabular-nums" style={{ color: soft }}>

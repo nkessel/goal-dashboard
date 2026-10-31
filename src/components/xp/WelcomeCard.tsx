@@ -131,6 +131,25 @@ export function WelcomeCard({
   const [recent] = useState(() => !!lastCheckInAt && Date.now() - Date.parse(lastCheckInAt) < 3_600_000);
   // Ready: into the forest, through the mist, and out onto Today.
   const [leaving, setLeaving] = useState(false);
+  // The screen's height, held still while a phone keyboard is up (or a field has focus), so
+  // opening and closing it (the feedback box, a field here) never resizes or moves the card.
+  const [screenH, setScreenH] = useState<number | null>(null);
+  useEffect(() => {
+    const typing = () => {
+      const a = document.activeElement;
+      return document.documentElement.hasAttribute("data-kb") || a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && !["range", "checkbox", "radio", "button"].includes(a.type));
+    };
+    const measure = () => {
+      if (!typing()) setScreenH(window.innerHeight);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
+  }, []);
   const leave = () => {
     if (leaving) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return (onClose(), toToday?.());
@@ -242,7 +261,7 @@ export function WelcomeCard({
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
-    <div className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px))] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
+    <div style={screenH ? { height: screenH, bottom: "auto" } : undefined} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px))] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
       {/* Overscan: while a phone's keyboard opens or closes the screen briefly changes size; this keeps Today from peeking through above or below. */}
       <div aria-hidden className="pointer-events-none fixed inset-x-0 -bottom-[60vh] -top-[60vh] -z-[1]" style={{ background: "#1b2119" }} />
       {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
@@ -283,7 +302,7 @@ export function WelcomeCard({
             <GearIcon size={17} />
           )}
         </button>
-        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`}>
+        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`} style={screenH && !arranging ? { maxHeight: screenH - 88 } : undefined}>
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
           <div className="relative w-full px-8">
             {writing !== null ? (

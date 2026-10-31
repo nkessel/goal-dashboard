@@ -1,25 +1,47 @@
 /**
  * A project's next action: the one quest to do next on a board. You can
- * choose it; otherwise it's the open quest due next (past due only after
- * those), then the first in
- * the board's order. Priority views show this one step instead of the
- * whole project, so you focus on what's next rather than everything at once.
+ * choose it; otherwise:
+ *  - most boards: what's past due comes first (the oldest first), then what's
+ *    due soonest, then the board's own order;
+ *  - courses (owner, Oct 31): the one due next comes first (the soonest
+ *    upcoming deadline), then the most recently missed. A chosen step that's
+ *    past due gives way to one that's still coming up.
+ * Priority views show this one step instead of the whole project, so you
+ * focus on what's next rather than everything at once. (Owner wants to keep
+ * iterating on this; a per-board choice may come later.)
  */
 import { byDuePriority } from "./due-soon";
 
-type T = { id: string; board_id?: string | null; due_at?: string | null; sort_order?: number | null; created_at?: string; status?: string; needs_review?: boolean };
-type B = { id: string; next_task_id?: string | null; matrix_state?: string | null };
+type T = { id: string; title?: string; board_id?: string | null; due_at?: string | null; sort_order?: number | null; created_at?: string; status?: string; needs_review?: boolean };
+type B = { id: string; title?: string | null; next_task_id?: string | null; matrix_state?: string | null };
+
+/** A board that reads like a course: named so, or holding several "Week 3"-style quests. */
+export function isCourseBoard(board: B, open: T[]): boolean {
+  if (board.title && /\b(course|class|academy|curriculum|module)\b/i.test(board.title)) return true;
+  return open.filter((t) => t.title && /\b(week|module|lesson|session|unit)\s*\d+/i.test(t.title)).length >= 3;
+}
 
 export function nextActionOf<X extends T>(board: B, tasks: X[]): X | null {
   const open = tasks.filter((t) => t.board_id === board.id && t.status !== "completed" && !t.needs_review);
   if (!open.length) return null;
   const now = Date.now();
-  const due = open.filter((t) => t.due_at).sort(byDuePriority(now));
+  const ms = (t: X) => Date.parse(t.due_at!);
+  const dated = open.filter((t) => t.due_at && !Number.isNaN(ms(t)));
+  const past = dated.filter((t) => ms(t) < now);
+  const coming = dated.filter((t) => ms(t) >= now).sort((a, b) => ms(a) - ms(b));
+  const course = isCourseBoard(board, open);
   const chosen = board.next_task_id ? open.find((t) => t.id === board.next_task_id) : undefined;
-  // A chosen step that's past due gives way to one that's still coming up (the one due next).
-  const upcoming = due[0] && Date.parse(due[0].due_at!) >= now ? due[0] : undefined;
-  if (chosen && !(upcoming && chosen.due_at && Date.parse(chosen.due_at) < now)) return chosen;
-  if (due[0]) return due[0];
+  if (chosen && !(course && coming[0] && chosen.due_at && ms(chosen) < now)) return chosen;
+  if (course) {
+    if (coming[0]) return coming[0];
+    const recent = [...past].sort((a, b) => ms(b) - ms(a))[0];
+    if (recent) return recent;
+  } else {
+    const oldest = [...past].sort((a, b) => ms(a) - ms(b))[0];
+    if (oldest) return oldest;
+    const due = dated.sort(byDuePriority(now));
+    if (due[0]) return due[0];
+  }
   return [...open].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.created_at ?? "").localeCompare(b.created_at ?? ""))[0];
 }
 

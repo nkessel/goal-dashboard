@@ -114,7 +114,7 @@ function LevelBar({ item }: { item: ScaleItem }) {
         aria-valuemax={5}
         aria-valuenow={value}
         aria-orientation="vertical"
-        className="level-bar flex h-[96px] w-7 cursor-pointer touch-none select-none flex-col-reverse gap-[3px] rounded-full p-[3px] outline-offset-2"
+        className="level-track relative block h-[96px] w-5 cursor-pointer touch-none select-none rounded-full outline-offset-2"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           drag.current = { y: e.clientY, moved: false, start: value };
@@ -143,9 +143,8 @@ function LevelBar({ item }: { item: ScaleItem }) {
           }
         }}
       >
-        {[1, 2, 3, 4, 5].map((n) => (
-          <span key={n} className={`level-step block flex-1 rounded-full ${n <= value ? "level-on" : ""}`} style={{ ["--lv" as string]: n }} />
-        ))}
+        {/* One smooth bar filled to the level (no segments). */}
+        <span aria-hidden className="level-fill pointer-events-none absolute inset-x-[3px] bottom-[3px] block rounded-full transition-[height] duration-200" style={{ height: `calc(${value * 20}% - ${(value * 6) / 5}px)` }} />
       </div>
       {/* The icon at the bar's foot. */}
       {/* eslint-disable-next-line @next/next/no-img-element -- scale glyph */}
