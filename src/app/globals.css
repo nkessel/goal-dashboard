@@ -2864,3 +2864,13 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 .step-row.step-next { background: linear-gradient(90deg, rgba(226, 187, 92, 0.3), rgba(226, 187, 92, 0.06)); box-shadow: inset 3px 0 0 #c99a3a; border-top-color: transparent; }
 .step-check { border-radius: 999px; transition: transform 0.15s, box-shadow 0.15s, background 0.2s; }
 .step-row:active .step-check { transform: scale(0.9); }
+/* The welcome card's scroll bar: room kept for it always (so opening Due soon never narrows the card), slim and parchment-toned. */
+.welcome-scroll { scrollbar-width: thin; scrollbar-color: rgba(139, 112, 64, 0.5) transparent; }
+.welcome-scroll::-webkit-scrollbar { width: 8px; }
+.welcome-scroll::-webkit-scrollbar-thumb { background: rgba(139, 112, 64, 0.45); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+.welcome-scroll::-webkit-scrollbar-track { background: transparent; }
+/* A card joining a list (e.g. Due soon's reach widened): it opens its room and fades up into it. */
+.due-in { display: grid; animation: due-in 0.35s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes due-in { from { grid-template-rows: 0fr; opacity: 0; transform: translateY(-6px); } to { grid-template-rows: 1fr; opacity: 1; transform: none; } }
+.due-in > * { min-height: 0; }
+@media (prefers-reduced-motion: reduce) { .due-in { animation: none; } }

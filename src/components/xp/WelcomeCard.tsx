@@ -314,7 +314,7 @@ export function WelcomeCard({
         >
           <GearIcon size={17} />
         </button>
-        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`} style={screenH && !arranging ? { maxHeight: screenH - 88 } : undefined}>
+        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} w-[min(500px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-5 text-center [scrollbar-gutter:stable] welcome-scroll`} style={screenH && !arranging ? { maxHeight: screenH - 88 } : undefined}>
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
           <div className="relative w-full px-8">
             {/* The greeting itself is where you write: same font, size, wrapping and place (no box). */}

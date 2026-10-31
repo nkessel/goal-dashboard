@@ -31,8 +31,9 @@ export function DueSoonDrawer({ tasks, onOpenChange }: { tasks: Lite[]; onOpenCh
   const reach = dueWindowLabel(hours);
   const ink = "#5a4a30";
 
+  // The cards load quietly as soon as the button is on screen, so opening it shows them at once.
   useEffect(() => {
-    if (!open || cards) return;
+    if (cards || failed) return;
     let live = true;
     dueSoonCardsAction()
       .then((c) => live && setCards(c))
@@ -40,7 +41,7 @@ export function DueSoonDrawer({ tasks, onOpenChange }: { tasks: Lite[]; onOpenCh
     return () => {
       live = false;
     };
-  }, [open, cards]);
+  }, [cards, failed]);
   const toggle = () => {
     if (failed) (setFailed(false), setCards(null));
     setOpen(!open);
@@ -61,8 +62,14 @@ export function DueSoonDrawer({ tasks, onOpenChange }: { tasks: Lite[]; onOpenCh
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Due soon
-          <span className="tabular-nums opacity-80">({soon.length})</span>
+          {/* Reads as a sentence with the reach beside it: "3 quests due within | 3 days ▾". */}
+          {soon.length ? (
+            <span>
+              <span className="tabular-nums">{soon.length}</span> {soon.length === 1 ? "quest" : "quests"} due within
+            </span>
+          ) : (
+            "Nothing due within"
+          )}
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : undefined }}>
             <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -93,11 +100,14 @@ export function DueSoonDrawer({ tasks, onOpenChange }: { tasks: Lite[]; onOpenCh
               Nothing due in the next {reach}.
             </p>
           ) : shown ? (
-            <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-left">
+            <div className="flex flex-col gap-1 text-left">
+              {/* New ones (a wider reach) slide in; the rest stay put. Each card is its own one-item list (TaskRow is an <li>). */}
               {shown.map((t) => (
-                <TaskRow key={t.id} task={t} theme="adventure" categoryLabel={t.categoryLabel} compact />
+                <ul key={t.id} className="due-in m-0 list-none p-0">
+                  <TaskRow task={t} theme="adventure" categoryLabel={t.categoryLabel} compact />
+                </ul>
               ))}
-            </ul>
+            </div>
           ) : (
             <p className="m-0 py-2 text-center text-[14px]" style={{ color: ink }}>
               {failed ? "Couldn't load the cards. Try again in a moment." : "Opening…"}

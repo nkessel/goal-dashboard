@@ -31,7 +31,7 @@ const set = (patch: Partial<FxSettings>) => patchFx(patch);
 export function ArrangeAbove({ fx, castleHidden }: { fx: FxSettings; castleHidden: boolean }) {
   const h = backHours(fx);
   return (
-    <div className="parchment card-pop-in mb-3 flex w-[min(440px,94vw)] flex-col gap-2 rounded-2xl px-4 py-3 text-left shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="parchment card-pop-in mb-3 flex w-[min(500px,94vw)] flex-col gap-2 rounded-2xl px-4 py-3 text-left shadow-xl" onClick={(e) => e.stopPropagation()}>
       {/* One Done, at the bottom of the card (and the gear itself). */}
       <div className="relative z-[1] flex flex-wrap items-baseline gap-x-2">
         <span className="font-display whitespace-nowrap text-[17px]" style={{ color: GOLD }}>
