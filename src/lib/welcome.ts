@@ -131,7 +131,10 @@ export function greetingFor(fx: FxSettings, seed: string, hour = new Date().getH
   const off = new Set(fx.welcomeBackOff ?? []);
   const now = hour < 12 ? "morning" : hour < 17 ? "day" : "evening";
   const on = greetingPool(fx).filter((l) => !off.has(l) && (PART_OF_DAY.get(l) ?? now) === now);
-  return pickFor(seed, on.length ? on : BACK_GREETINGS);
+  // A greeting you liked counts twice, so it comes round more often.
+  const liked = new Set(fx.welcomeBackLiked ?? []);
+  const weighted = [...on, ...on.filter((l) => liked.has(l))];
+  return pickFor(seed, weighted.length ? weighted : BACK_GREETINGS);
 }
 
 /** Add a welcome back greeting of your own (it joins the ones that take turns), as a settings patch. */

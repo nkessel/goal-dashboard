@@ -93,6 +93,10 @@ export function WelcomeCard({
   // Thumbs down asks why; the speech bubble beside the thumbs takes any other note.
   const [lineWhy, setLineWhy] = useState<"down" | "note" | null>(null);
   const [lineSaid, setLineSaid] = useState<string | null>(null);
+  // The same for the greeting: thumbs, why, a note, and a word that it landed.
+  const [greetVerdict, setGreetVerdict] = useState<"like" | "dislike" | null>(null);
+  const [greetWhy, setGreetWhy] = useState<"down" | "note" | null>(null);
+  const [greetSaid, setGreetSaid] = useState<string | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
   // While arranging: the greeting's own options (from the ✎ beside it), and whether the castle is in view.
   const [greetingOpen, setGreetingOpen] = useState(false);
@@ -155,6 +159,19 @@ export function WelcomeCard({
     if (!t || t === greeting) return;
     setKeepAsk({ text: t, was: greeting, keep: true, retire: true });
     setGreeting(t);
+  }
+  // Thumbs on the greeting: liked ones come round more often; a thumbs down retires it (and asks why).
+  function voteGreeting(v: "like" | "dislike" | null) {
+    const now = loadFx();
+    const without = (xs?: string[]) => (xs ?? []).filter((x) => x !== greeting);
+    patchFx({
+      welcomeBackLiked: v === "like" ? [...without(now.welcomeBackLiked), greeting] : without(now.welcomeBackLiked),
+      welcomeBackOff: v === "dislike" ? [...without(now.welcomeBackOff), greeting] : without(now.welcomeBackOff),
+    });
+    const was = greetVerdict;
+    setGreetVerdict(v);
+    setGreetWhy(v === "dislike" ? "down" : null);
+    setGreetSaid(v === "like" ? "Saved: it'll greet you more often" : v === "dislike" ? "Got it: it won't greet you again" : was === "dislike" ? "It's back in the rotation" : "Taken back");
   }
   function settleGreeting() {
     if (!keepAsk) return;
@@ -479,6 +496,19 @@ export function WelcomeCard({
               )}
             </span>
           </div>
+          {writing === null && !arranging && (
+            <div className="-my-2 flex w-full flex-col items-center">
+              <span className="flex h-6 items-center gap-0.5 self-end">
+                <Confirm text={greetSaid} onDone={() => setGreetSaid(null)} />
+                <span className="flex items-center gap-0.5 opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100">
+                  <LineVote kind="like" on={greetVerdict === "like"} onClick={() => voteGreeting(greetVerdict === "like" ? null : "like")} />
+                  <LineVote kind="dislike" on={greetVerdict === "dislike"} onClick={() => voteGreeting(greetVerdict === "dislike" ? null : "dislike")} />
+                  <NoteButton on={greetWhy === "note"} onClick={() => setGreetWhy((w) => (w === "note" ? null : "note"))} />
+                </span>
+              </span>
+              {greetWhy && <WhyBox key={greetWhy} saying={greeting} source="Welcome greeting" down={greetWhy === "down"} onDone={(sent) => (setGreetWhy(null), sent && setGreetSaid("Thanks, your feedback was sent"))} />}
+            </div>
+          )}
           {keepAsk && (
             <div className="reveal flex w-full flex-col gap-1.5 rounded-xl px-3 py-2.5" style={{ border: "1px solid rgba(139,112,64,.45)", background: "rgba(255,250,238,.7)" }}>
               <GoldCheck checked={keepAsk.keep} onChange={(v) => setKeepAsk({ ...keepAsk, keep: v })}>

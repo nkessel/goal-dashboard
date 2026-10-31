@@ -41,6 +41,8 @@ export type FxSettings = {
   welcomeBackOwn?: boolean;
   /** Welcome back greetings switched off (built-in or your own). */
   welcomeBackOff?: string[];
+  /** Greetings you gave a thumbs up: they come round more often. */
+  welcomeBackLiked?: string[];
   /** Your own wise lines, one per line, mixed in with the built-in ones. */
   welcomeOwnLines?: string;
   /** Whether your own wise lines are used (unset: yes, if you wrote some). */
