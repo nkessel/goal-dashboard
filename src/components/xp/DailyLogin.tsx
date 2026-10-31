@@ -205,7 +205,10 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
           if (total !== null) {
             const after = xpToNextLevel(total, levelCap);
             const before = xpToNextLevel(Math.max(0, total - r.xpAwarded), levelCap);
-            if (after.xpForNextLevel) {
+            if (after.heldByBoss) {
+              fromPct = toPct = 100;
+              caption = `Level ${after.level} · ${total} XP · the boss guards level ${after.nextLevel}`;
+            } else if (after.xpForNextLevel) {
               toPct = Math.round((after.xpIntoLevel / after.xpForNextLevel) * 100);
               fromPct = before.level === after.level && before.xpForNextLevel ? Math.round((before.xpIntoLevel / before.xpForNextLevel) * 100) : 0;
               caption = `Level ${after.level} · ${after.xpIntoLevel} / ${after.xpForNextLevel} XP to level ${after.nextLevel}`;
@@ -251,8 +254,8 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     let caption = "";
     if (total != null) {
       const at = xpToNextLevel(total, levelCap);
-      pct = at.xpForNextLevel ? Math.round((at.xpIntoLevel / at.xpForNextLevel) * 100) : 100;
-      caption = at.xpForNextLevel ? `Level ${at.level} · ${at.xpIntoLevel} / ${at.xpForNextLevel} XP to level ${at.nextLevel}` : `Level ${at.level} · max level`;
+      pct = at.xpForNextLevel ? Math.min(100, Math.round((at.xpIntoLevel / at.xpForNextLevel) * 100)) : 100;
+      caption = at.heldByBoss ? `Level ${at.level} · ${total} XP · the boss guards level ${at.nextLevel}` : at.xpForNextLevel ? `Level ${at.level} · ${at.xpIntoLevel} / ${at.xpForNextLevel} XP to level ${at.nextLevel}` : `Level ${at.level} · max level`;
     }
     return { xp: 0, streak, coins: 0, fromPct: pct, toPct: pct, caption };
   })();
