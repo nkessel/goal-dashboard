@@ -642,6 +642,8 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
   const [said, setSaid] = useState<string | null>(null);
   // Talking with him in his own bubble (light: his words only, no buttons).
   const [answer, setAnswer] = useState("");
+  // The respond line's height as you see it (it grows a line at a time, never wider).
+  const [answerH, setAnswerH] = useState(REPLY_LINE);
   const [replying, setReplying] = useState(false);
   const [talk, setTalk] = useState<{ you: string; him: string; thinking: boolean; history: { role: "user" | "assistant"; content: string }[] } | null>(null);
   async function reply() {
@@ -655,6 +657,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
       setVotes(next);
     }
     setAnswer("");
+    setAnswerH(REPLY_LINE);
     setRate(false);
     setTalk({ you: q, him: "", thinking: true, history });
     try {
@@ -779,14 +782,14 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
           {!menu && !saying && (
             <span className="absolute left-2.5 right-2.5 top-[calc(100%-11px)] flex items-start gap-1">
               {!talk && !replying && !answer && prompts.length > 1 && (
-                <>
-                  <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-hang flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none opacity-0 transition-opacity group-hover/bubble:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-60">
+                <span className="bubble-coin opacity-0 transition-opacity duration-200 group-hover/bubble:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-60">
+                  <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-coin-half" data-side="l">
                     ‹
                   </button>
-                  <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="bubble-hang flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none opacity-0 transition-opacity group-hover/bubble:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-60">
+                  <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="bubble-coin-half" data-side="r">
                     ›
                   </button>
-                </>
+                </span>
               )}
               <span className="flex-1" />
               {talk && !talk.thinking && (
@@ -802,32 +805,42 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
                   void reply();
                 }}
               >
-                <textarea
-                  value={answer}
-                  rows={1}
-                  onChange={(e) => {
-                    setAnswer(e.target.value);
-                    // Grows taller line by line as you write; never wider.
-                    const t = e.currentTarget;
-                    t.style.height = "auto";
-                    t.style.height = `${Math.min(t.scrollHeight, 96)}px`;
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (answer.trim()) void reply();
-                    }
-                  }}
-                  onFocus={() => (setReplying(true), setRate(false))}
-                  onBlur={() => !answer && setReplying(false)}
-                  placeholder="Respond…"
-                  aria-label="Respond to the toucan"
-                  maxLength={400}
-                  className="bubble-hang reply-line block w-[min(160px,44vw)] resize-none overflow-hidden rounded-[10px] py-0 pl-2.5 pr-6 text-[16px] leading-[20px] outline-none"
-                  style={{ color: "#2a1c10", height: 20 }}
-                />
+                {/* 16px text drawn at 13px (iPhone doesn't zoom on focus), in a box sized to what you see. */}
+                <span className="reply-box bubble-hang relative block overflow-hidden rounded-[11px]" style={{ width: REPLY_W, height: answerH }}>
+                  <textarea
+                    value={answer}
+                    rows={1}
+                    onChange={(e) => {
+                      setAnswer(e.target.value);
+                      const t = e.currentTarget;
+                      t.style.height = "auto";
+                      setAnswerH(Math.min(Math.max(REPLY_LINE, Math.ceil(t.scrollHeight * REPLY_SCALE)), REPLY_MAX));
+                      t.style.height = "";
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (answer.trim()) void reply();
+                      }
+                      if (e.key === "Escape") {
+                        e.stopPropagation();
+                        setAnswer("");
+                        setAnswerH(REPLY_LINE);
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    onFocus={() => (setReplying(true), setRate(false))}
+                    onBlur={() => !answer && setReplying(false)}
+                    placeholder="Respond…"
+                    aria-label="Respond to the toucan"
+                    enterKeyHint="send"
+                    maxLength={400}
+                    className="reply-line absolute left-0 top-0 block resize-none bg-transparent py-[3px] pl-3 pr-9 text-[16px] leading-[20px] outline-none"
+                    style={{ color: "#2a1c10", width: REPLY_W / REPLY_SCALE, height: answerH / REPLY_SCALE, transform: `scale(${REPLY_SCALE})`, transformOrigin: "0 0", overflowY: answerH >= REPLY_MAX ? "auto" : "hidden" }}
+                  />
+                </span>
                 {answer.trim() && (
-                  <button type="submit" aria-label="Send" className="reveal absolute bottom-[2px] right-[2px] flex h-4 w-4 items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10" }}>
+                  <button type="submit" aria-label="Send" className="reply-send reveal absolute bottom-[1px] right-[1px] flex h-5 w-5 items-center justify-center rounded-full">
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden>
                       <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -947,6 +960,12 @@ const greetingSize = (t: string) => {
 
 
 /** A small round thumbs up or down for the day's wise line. */
+/** The toucan's respond line: 168px wide, one 22px line at rest, up to about four lines. */
+const REPLY_W = 168;
+const REPLY_SCALE = 0.8125;
+const REPLY_LINE = 22;
+const REPLY_MAX = 72;
+
 function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean; onClick: () => void }) {
   const like = kind === "like";
   return (

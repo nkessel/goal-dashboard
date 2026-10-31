@@ -2918,5 +2918,21 @@ html[data-welcome-open] .nav-loader-toucan { display: none; }
 @media (prefers-reduced-motion: reduce) { button:active, [role="button"]:active { scale: none !important; } }
 /* The toucan's respond line: one slim line that only grows downward as you write. */
 .reply-line::placeholder { color: #a08a5c; font-style: italic; opacity: 1; }
-.reply-line:hover, .reply-line:active { transform: none; scale: none; }
-.reply-line:focus { box-shadow: 0 0 0 1.5px #a88a3f, 0 2px 4px rgba(60, 40, 10, 0.25); }
+.reply-box:hover, .reply-box:active { transform: none; scale: none; }
+.reply-line:active { scale: none; }
+.reply-box:focus-within { box-shadow: 0 0 0 1.5px #a88a3f, 0 2px 4px rgba(60, 40, 10, 0.25); }
+.reply-box { background: linear-gradient(180deg, #fffdf6, #f8efd8); transition: height 160ms ease-out, box-shadow 0.12s; }
+.reply-send { background: radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f); color: #2a1c10; box-shadow: 0 0 0 1px #8a6116; }
+.reply-send::before { content: ""; position: absolute; inset: -6px; }
+/* ‹ › as one gilded coin split down the middle: each half its own button, and only the pressed half sinks. */
+.bubble-coin { position: relative; display: inline-flex; flex: none; width: 26px; height: 26px; border-radius: 999px; overflow: visible;
+  background: radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f); box-shadow: 0 0 0 1px #8a6116, inset 0 1px 0 rgba(255,255,255,.55), 0 2px 4px rgba(60,40,10,.3); }
+.bubble-coin::after { content: ""; position: absolute; left: 50%; top: 4px; bottom: 4px; width: 1px; background: rgba(90,60,10,.45); pointer-events: none; }
+.bubble-coin-half { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; font-weight: 700; color: #2a1c10; transition: box-shadow 90ms, transform 90ms; }
+.bubble-coin-half[data-side="l"] { border-radius: 999px 0 0 999px; padding-right: 1px; }
+.bubble-coin-half[data-side="r"] { border-radius: 0 999px 999px 0; padding-left: 1px; }
+.bubble-coin-half::before { content: ""; position: absolute; top: -4px; bottom: -4px; width: 22px; }
+.bubble-coin-half[data-side="l"]::before { right: 0; }
+.bubble-coin-half[data-side="r"]::before { left: 0; }
+.bubble-coin-half:hover { background: rgba(255, 246, 210, 0.35); }
+.bubble-coin-half:active { scale: none; box-shadow: inset 0 1px 3px rgba(60, 40, 10, 0.5); transform: translateY(0.5px); }
