@@ -117,6 +117,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 31: Courses: "next" is the one due next (owner): stand-ins like AR class homework follow the soonest upcoming assignment however far off, then the most recently missed (`dueNextOrder` in `lib/catch-up.ts`; it used to fall back to the oldest missed); a board's chosen next step gives way when it's past due and another is still coming up (`nextActionOf`).
+
 - Oct 31: iPhone fixes from the owner's screen recordings: the welcome screen keeps room for the toucan at the top and sizes by the visible screen (`dvh`), so its top is no longer cut off under the browser bar; a dark overscan layer behind it keeps Today from peeking through while the keyboard opens or closes; the feedback box's field is focused plainly (no off-screen focus trick in `KeyboardViewport`), which made the page behind it flash.
 
 - Oct 30 (night): Bring from home: the place ("to …") is an inked gold line on the parchment, no half-box or theme wash (`.place-input`, `bare-input`).

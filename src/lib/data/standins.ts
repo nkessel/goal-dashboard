@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { catchUpOrder, catchUpPlan } from "@/lib/catch-up";
+import { dueNextOrder } from "@/lib/catch-up";
 import type { Task } from "./types";
 
 export type StandIn = { id: string; title: string; due_at: string | null; next_step: string | null; board: string | null; board_id?: string | null };
@@ -8,7 +8,7 @@ export type StandIn = { id: string; title: string; due_at: string | null; next_s
 /**
  * A stand-in quest ("AR class homework") speaks for a board: it keeps its own
  * clear title, but takes the due date and priority of that board's current
- * assignment (what's coming up first, then the oldest missed one), and shows
+ * assignment (the one due next, then the most recently missed), and shows
  * which assignment and step that is. A due date set on the stand-in itself
  * wins over the borrowed one.
  */
@@ -43,7 +43,8 @@ export async function applyStandIns<T extends Task>(ownerId: string, tasks: T[])
   for (const t of standIns) {
     const scope = scopes.get(t.id)!;
     const mine: Cand[] = candidates.filter((c) => c.board_id && scope.has(c.board_id)).map((c) => ({ ...c, due_at: c.due_at ?? null, board: names.get(c.board_id!) ?? null }));
-    const first = catchUpOrder(catchUpPlan(mine, now))[0];
+    // The assignment due next (owner, Oct 31), not the oldest missed one.
+    const first = dueNextOrder(mine, now)[0];
     if (first) picks.set(t.id, first);
   }
   // The next step inside each current assignment.

@@ -39,6 +39,21 @@ export function catchUpOrder<T extends CourseItem>(plan: CatchUp<T>): T[] {
   return [...plan.ahead, ...plan.behind, ...plan.later, ...plan.undated];
 }
 
+/**
+ * "Next" in a course: the one due next (the soonest upcoming due date, however
+ * far off), then the most recently missed, then undated ones.
+ */
+export function dueNextOrder<T extends CourseItem>(items: T[], now = new Date()): T[] {
+  const t = now.getTime();
+  const ms = (i: T) => (i.due_at ? Date.parse(i.due_at) : NaN);
+  const dated = items.filter((i) => !Number.isNaN(ms(i)));
+  return [
+    ...dated.filter((i) => ms(i) >= t).sort((a, b) => ms(a) - ms(b)),
+    ...dated.filter((i) => ms(i) < t).sort((a, b) => ms(b) - ms(a)),
+    ...items.filter((i) => Number.isNaN(ms(i))),
+  ];
+}
+
 /** A board looks like a course when it holds several dated quests. */
 export function looksLikeCourse(dated: number) {
   return dated >= 3;

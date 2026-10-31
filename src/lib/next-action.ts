@@ -13,9 +13,12 @@ type B = { id: string; next_task_id?: string | null; matrix_state?: string | nul
 export function nextActionOf<X extends T>(board: B, tasks: X[]): X | null {
   const open = tasks.filter((t) => t.board_id === board.id && t.status !== "completed" && !t.needs_review);
   if (!open.length) return null;
+  const now = Date.now();
+  const due = open.filter((t) => t.due_at).sort(byDuePriority(now));
   const chosen = board.next_task_id ? open.find((t) => t.id === board.next_task_id) : undefined;
-  if (chosen) return chosen;
-  const due = open.filter((t) => t.due_at).sort(byDuePriority(Date.now()));
+  // A chosen step that's past due gives way to one that's still coming up (the one due next).
+  const upcoming = due[0] && Date.parse(due[0].due_at!) >= now ? due[0] : undefined;
+  if (chosen && !(upcoming && chosen.due_at && Date.parse(chosen.due_at) < now)) return chosen;
   if (due[0]) return due[0];
   return [...open].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.created_at ?? "").localeCompare(b.created_at ?? ""))[0];
 }
