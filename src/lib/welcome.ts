@@ -6,12 +6,13 @@
  */
 import type { FxSettings } from "./celebration-fx";
 
-export type WelcomeEl = "toucan" | "checkin" | "focus" | "streak" | "line" | "bar" | "reward" | "due";
+export type WelcomeEl = "toucan" | "checkin" | "focus" | "quests" | "streak" | "line" | "bar" | "reward" | "due";
 
 export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "toucan", label: "The toucan's greeting", hint: "The Great Toucan Spirit says hello in the check-in style you chose with him, and asks how you're arriving. Good if you like a warm voice to start with; leave it off for a quieter screen." },
   { key: "checkin", label: "Check-in", hint: "A gilded Check in button that opens energy, mood and anything else you track, right there (plus last night's sleep and wake times on the day's first visit). Your check-ins feed Insights and tell the toucan how you're doing." },
   { key: "focus", label: "Your top priority", hint: "Asks “What's your top priority?” with a box to answer in your own words. The app and the toucan keep it in mind, so his check-ins through the day, the week and the month come back to what really matters to you." },
+  { key: "quests", label: "Today's quests", hint: "A gilded “Choose today's quests” button that opens Due soon (at the top, within the reach you pick) and Today's Quests below: drag a due quest into today, or tap its +; drag today's into order; × takes one off." },
   { key: "streak", label: "Your streak", hint: "How many days in a row you've shown up. Day's first visit only. Motivating for some; leave it off if streaks feel like pressure." },
   { key: "line", label: "The day's wise line", hint: "One short encouragement, a different one each day. You can switch off any line you don't like, or add your own." },
   { key: "bar", label: "Your level bar", hint: "Your level, filling with the XP that arriving earned you. Day's first visit only." },
@@ -20,7 +21,7 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
 ];
 
 // "intention" was removed (owner, Oct 31); stored orders drop it.
-const DEFAULT_ORDER: WelcomeEl[] = ["toucan", "checkin", "focus", "streak", "line", "bar", "reward", "due"];
+const DEFAULT_ORDER: WelcomeEl[] = ["toucan", "checkin", "focus", "quests", "streak", "line", "bar", "reward", "due"];
 const DEFAULT_HIDE: WelcomeEl[] = ["toucan", "due"];
 const KEYS = new Set<string>(DEFAULT_ORDER);
 

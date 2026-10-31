@@ -20,6 +20,7 @@ import { GearIcon } from "@/components/ui/Icons";
 import { ArrangeAbove, ArrangeList, CastleEdit, EditButton, GoldCheck, GreetingOptions } from "./WelcomeArrange";
 import { MistScene } from "./MistScene";
 import { DueSoonDrawer } from "@/components/tasks/DueSoonDrawer";
+import { TodayPlanner } from "./TodayPlanner";
 import { castleOf } from "./CastleArt";
 
 export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
@@ -45,6 +46,7 @@ export function WelcomeCard({
   metrics,
   lastCheckInAt,
   due,
+  today = [],
   priority = null,
   fx: fxProp,
   onClose,
@@ -60,6 +62,8 @@ export function WelcomeCard({
   metrics: string[];
   lastCheckInAt: string | null;
   due: { id: string; title: string; due_at: string | null }[];
+  /** Today's Quests, in order (chosen right here). */
+  today?: { id: string; title: string; due_at: string | null }[];
   /** Your latest top priority (and the day it was for). */
   priority?: { text: string; others?: string[]; day: string } | null;
   fx: FxSettings;
@@ -272,6 +276,7 @@ export function WelcomeCard({
     ) : null,
     // A gilded button that opens into a drawer of the quests' cards.
     due: <DueSoonDrawer tasks={due} onOpenChange={setDrawerOpen} />,
+    quests: <TodayPlanner today={today} due={due} />,
   };
   const allEls = welcomeOrder(fx);
   const order = allEls.filter((el) => welcomeShows(fx, el) && parts[el]);

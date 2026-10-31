@@ -172,7 +172,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       open();
     };
     (async () => {
-      const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[], priority: null, streak: 0, totalXp: null as number | null }));
+      const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[], priority: null, streak: 0, totalXp: null as number | null, today: [] as { id: string; title: string; due_at: string | null }[] }));
       if (pending) {
         const ctx = await ctxP;
         if (!live) return;
@@ -255,6 +255,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       metrics={shown.ctx.metrics}
       lastCheckInAt={shown.ctx.lastCheckInAt}
       due={shown.ctx.tasks}
+      today={shown.ctx.today ?? []}
       priority={shown.ctx.priority}
       fx={fx}
       // Checked in: it stays until you say you're ready, even if you step away first.

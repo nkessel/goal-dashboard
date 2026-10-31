@@ -2870,9 +2870,8 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 .welcome-scroll::-webkit-scrollbar-thumb { background: rgba(139, 112, 64, 0.45); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
 .welcome-scroll::-webkit-scrollbar-track { background: transparent; }
 /* A card joining a list (e.g. Due soon's reach widened): it opens its room and fades up into it. */
-.due-in { display: grid; animation: due-in 0.35s cubic-bezier(.2,.8,.3,1) both; }
-@keyframes due-in { from { grid-template-rows: 0fr; opacity: 0; transform: translateY(-6px); } to { grid-template-rows: 1fr; opacity: 1; transform: none; } }
-.due-in > * { min-height: 0; }
+.due-in { animation: due-in 0.35s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes due-in { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .due-in { animation: none; } }
 /* One toucan at a time: the perched one steps away while the welcome screen (with its own) is open. */
 html[data-welcome-open] [data-perched-owl] { visibility: hidden; }

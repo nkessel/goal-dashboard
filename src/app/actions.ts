@@ -2155,7 +2155,10 @@ export async function welcomeContextAction() {
   const priority = (cleanPriorities((await readExtras(ownerId).catch(() => ({}) as Record<string, unknown>)).priorities)[0] as Priority | undefined) ?? null;
   // Where you stand (streak, XP), so the welcome screen can show them on every visit, not just the day's first.
   const me = await profilesData.getProfileById(ownerId).catch(() => null);
-  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })), suggestions, priority, streak: me?.streak_count ?? 0, totalXp: me?.total_xp ?? null };
+  // Today's Quests (pinned for today), in their order, for choosing the day's quests here.
+  const { data: pinned } = await supabaseAdmin().from("tasks").select("id, title, due_at").eq("owner_id", ownerId).eq("status", "open").eq("is_manual_priority", true).order("sort_order", { ascending: true }).limit(40);
+  const today = ((pinned ?? []) as { id: string; title: string; due_at: string | null }[]).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at }));
+  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })), suggestions, priority, streak: me?.streak_count ?? 0, totalXp: me?.total_xp ?? null, today };
 }
 
 type Priority = { text: string; others?: string[]; day: string; at: string };

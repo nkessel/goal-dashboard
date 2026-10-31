@@ -118,6 +118,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Oct 31: Welcome screen "Choose today's quests" (`xp/TodayPlanner.tsx`, new part `quests` after the top priority): a gilded button opens a tray with Due soon at its top (count + reach picker) and Today's Quests below; drag a due quest into today (or tap +), drag today's into order, × takes one off (`addToTopOfTodayAction` + `reorderTasksAction`, `toggleManualPriorityAction`). `welcomeContextAction` returns today's pinned quests. `.due-in` is a plain fade/slide (no grid), safe on any row.
+
 - Oct 31: Toucan "Not now…" is "Snooze…" everywhere; its choices show at once (follow-ups use `raise(..., { instant: true })`: no flight, no waiting on the perched bird) and closing them (× or Esc) goes back to the note (`onClose` through `toucan-nudge` to PerchedOwl and the fallback `NudgeNote`). One toucan at a time: the welcome screen sets `html[data-welcome-open]`; the perched toucan hides and his notes wait until it closes (`whenNoWelcome`, guard in `raise` and PerchedOwl). The welcome top priority starts empty every time (a fresh mind dump; saving still records it). The check-in button defaults to "Emotional check-in"; typing a space in a part's options no longer starts a drag (keys stop at the options).
 
 - Oct 31: Welcome screen 500px wide (its "when it opens" panel too) with room always kept for a slim scroll bar (`scrollbar-gutter: stable`, `.welcome-scroll`), so opening Due soon never narrows it. Due soon reads "3 quests due within | 3 days ▾", loads its cards as soon as the button shows (not on open), tighter gaps, and cards that join when the reach widens slide in (`.due-in`).
