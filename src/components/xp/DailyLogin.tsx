@@ -172,7 +172,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       open();
     };
     (async () => {
-      const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[], priority: null }));
+      const ctxP = welcomeContextAction().catch(() => ({ metrics: [] as string[], lastCheckInAt: null as string | null, tasks: [] as { id: string; title: string; due_at: string | null }[], suggestions: [] as { id: string; title: string; due_at: string | null }[], priority: null, streak: 0, totalXp: null as number | null }));
       if (pending) {
         const ctx = await ctxP;
         if (!live) return;
@@ -231,11 +231,26 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   const fx = loadFx();
   // A fresh greeting each time the screen opens (kept while it's open).
   const key = shown.seed ?? eveningDayKey();
+  // No XP just now (a later visit): still show your streak and how far you are into the level.
+  const standing: WelcomeAward | null = (() => {
+    if (shown.award) return shown.award;
+    const total = shown.ctx.totalXp;
+    const streak = shown.ctx.streak ?? 0;
+    if (total == null && !streak) return null;
+    let pct = 0;
+    let caption = "";
+    if (total != null) {
+      const at = xpToNextLevel(total, levelCap);
+      pct = at.xpForNextLevel ? Math.round((at.xpIntoLevel / at.xpForNextLevel) * 100) : 100;
+      caption = at.xpForNextLevel ? `Level ${at.level} · ${at.xpIntoLevel} / ${at.xpForNextLevel} XP to level ${at.nextLevel}` : `Level ${at.level} · max level`;
+    }
+    return { xp: 0, streak, coins: 0, fromPct: pct, toPct: pct, caption };
+  })();
   return (
     <WelcomeCard
       mode={shown.mode}
       heading={greetingFor(fx, key)}
-      award={shown.award}
+      award={standing}
       line={lineForDay(eveningDayKey(), ownLines(fx))}
       metrics={shown.ctx.metrics}
       lastCheckInAt={shown.ctx.lastCheckInAt}

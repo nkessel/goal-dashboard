@@ -15,8 +15,8 @@ import { eveningDayKey } from "@/components/evening/evening-clock";
 import { voice, windowOf } from "@/lib/toucan-style";
 import { useToucanStyle } from "@/lib/toucan-style-store";
 import { useEscape } from "@/lib/use-escape";
-import { addJournalEntryAction, setTopPriorityAction } from "@/app/actions";
-import { PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
+import { coachAction, setTopPriorityAction } from "@/app/actions";
+import { Digest, PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
 import { GearIcon } from "@/components/ui/Icons";
 import { ArrangeAbove, ArrangeList, CastleEdit, EditButton, GoldCheck, GreetingOptions } from "./WelcomeArrange";
 import { MistScene } from "./MistScene";
@@ -91,6 +91,21 @@ export function WelcomeCard({
   // The greeting is yours to rewrite: tap it, write your own, and choose whether to keep it.
   const [greeting, setGreeting] = useState(heading);
   const [writing, setWriting] = useState<string | null>(null);
+  const greetingRef = useRef<HTMLParagraphElement>(null);
+  // The next time this screen opens, he flies in again.
+  useEffect(() => () => resetToucanFlight(), []);
+  // Writing: the cursor goes to the end of the greeting itself.
+  useEffect(() => {
+    const el = greetingRef.current;
+    if (writing === null || !el || document.activeElement === el) return;
+    el.focus();
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+  }, [writing]);
   const [keepAsk, setKeepAsk] = useState<{ text: string; was: string; keep: boolean; retire: boolean } | null>(null);
   function finishWriting() {
     const t = (writing ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
@@ -181,7 +196,6 @@ export function WelcomeCard({
 
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
     focus: <TopPriority arranging={arranging} register={(f) => (savers.current.focus = f)} last={priority} question={fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} />,
-    intention: mode === "day" ? <Intention register={(f) => (savers.current.intention = f)} question={fx.welcomeIntentionQ?.trim() || "Today is about…"} hint={fx.welcomeIntentionHint?.trim() || "e.g. Steady and kind to myself"} /> : null,
     toucan: (
       <div className="flex w-full items-center gap-2.5 text-left">
         <ToucanArt size={40} />
@@ -270,7 +284,10 @@ export function WelcomeCard({
       {/* What isn't part of the card (when it opens, confetti) sits above it while arranging. */}
       {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} />}
       <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
-        {!arranging && <WelcomeToucan fx={fx} />}
+        {/* Kept (hidden) while arranging, so he doesn't fly in again each time. */}
+        <div className={arranging ? "invisible" : undefined}>
+          <WelcomeToucan fx={fx} />
+        </div>
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -292,31 +309,26 @@ export function WelcomeCard({
           aria-label={arranging ? "Done arranging" : "Welcome screen settings"}
           title={arranging ? "Done arranging" : "Welcome screen settings"}
           className="settings-gear absolute -right-2 -top-2 z-[2] flex h-[30px] w-[30px] items-center justify-center rounded-full"
-          style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: arranging ? "0 0 0 2px #f2d27e, 0 0 12px rgba(242,210,126,.7)" : "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
+          // While arranging it stays the gear, lit gold (pressed in); tap it again to finish.
+          style={arranging ? { color: "#2a1c10", background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", boxShadow: "0 0 0 1.5px #4a3913, 0 0 12px rgba(242,210,126,.75), inset 0 1px 2px rgba(60,40,10,.35)" } : { color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
         >
-          {arranging ? (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          ) : (
-            <GearIcon size={17} />
-          )}
+          <GearIcon size={17} />
         </button>
         <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} w-[min(440px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl px-5 pb-4 pt-5 text-center`} style={screenH && !arranging ? { maxHeight: screenH - 88 } : undefined}>
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
           <div className="relative w-full px-8">
-            {writing !== null ? (
-              <textarea
-                autoFocus
-                rows={1}
-                value={writing}
-                ref={(el) => {
-                  if (!el) return;
-                  el.style.height = "auto";
-                  el.style.height = `${el.scrollHeight}px`;
-                }}
-                onChange={(e) => setWriting(e.target.value.replace(/\n/g, " "))}
+            {/* The greeting itself is where you write: same font, size, wrapping and place (no box). */}
+            <span className="relative inline-block max-w-full">
+              <p
+                key={writing === null ? `show:${greeting}` : "writing"}
+                ref={greetingRef}
+                contentEditable={writing !== null}
+                suppressContentEditableWarning
+                role={writing !== null ? "textbox" : undefined}
+                aria-label={writing !== null ? "Your own greeting" : undefined}
+                onInput={(e) => setWriting((e.currentTarget.textContent ?? "").slice(0, 120))}
                 onKeyDown={(e) => {
+                  if (writing === null) return;
                   if (e.key === "Enter") {
                     e.preventDefault();
                     finishWriting();
@@ -327,29 +339,26 @@ export function WelcomeCard({
                     setWriting(null);
                   }
                 }}
-                onBlur={finishWriting}
-                maxLength={120}
-                aria-label="Your own greeting"
-                className="font-display m-0 block w-full resize-none overflow-hidden rounded-lg bg-transparent p-0 text-center leading-tight focus:outline-none"
-                style={{ color: "var(--t-ink)", fontSize: greetingSize(writing), boxShadow: "0 0 0 1.5px rgba(139,112,64,.45)", caretColor: "#8a6116" }}
-              />
-            ) : (
-              <p className="font-display m-0 leading-tight [text-wrap:balance]" style={{ color: "var(--t-ink)", fontSize: greetingSize(greeting) }}>
+                onBlur={() => writing !== null && finishWriting()}
+                className={`font-display m-0 leading-tight outline-none [text-wrap:balance] ${writing !== null ? "cursor-text" : ""}`}
+                style={{ color: "var(--t-ink)", fontSize: greetingSize(writing ?? greeting), caretColor: "#8a6116", ...(writing !== null ? { textDecoration: "underline dotted rgba(139,112,64,.55)", textUnderlineOffset: 6 } : {}) }}
+              >
                 {greeting}
               </p>
-            )}
-            {writing === null && (
-              <span className={`absolute -top-1 right-0 transition-opacity ${arranging ? "" : "opacity-50 hover:opacity-100 focus-within:opacity-100"}`}>
-                <EditButton
-                  open={arranging && greetingOpen}
-                  onClick={() => {
-                    setWriting(greeting);
-                    if (arranging) setGreetingOpen(true);
-                  }}
-                  label="Edit the greeting"
-                />
-              </span>
-            )}
+              {/* Its ✎, at the text's own upper right. */}
+              {writing === null && (
+                <span className={`absolute -right-7 -top-1.5 transition-opacity ${arranging ? "" : "opacity-50 hover:opacity-100 focus-within:opacity-100"}`}>
+                  <EditButton
+                    open={arranging && greetingOpen}
+                    onClick={() => {
+                      setWriting(greeting);
+                      if (arranging) setGreetingOpen(true);
+                    }}
+                    label="Edit the greeting"
+                  />
+                </span>
+              )}
+            </span>
           </div>
           {keepAsk && (
             <div className="reveal flex w-full flex-col gap-1.5 rounded-xl px-3 py-2.5" style={{ border: "1px solid rgba(139,112,64,.45)", background: "rgba(255,250,238,.7)" }}>
@@ -462,8 +471,14 @@ function readToucanAt(): { x: number; y: number } {
  * him anywhere (he remembers). His bubble's ‹ › step through what he could
  * ask, and its ⋯ gives your thumbs on a line.
  */
+/** He flies in once per visit; after that he's simply there. */
+let toucanLanded = false;
+function resetToucanFlight() {
+  toucanLanded = false;
+}
 function WelcomeToucan({ fx }: { fx: FxSettings }) {
-  const [landed, setLanded] = useState(false);
+  const [landed, setLanded] = useState(toucanLanded);
+  const [flyIn] = useState(!toucanLanded);
   const [menu, setMenu] = useState(false);
   const [saying, setSaying] = useState<string | null>(null);
   const [rewording, setRewording] = useState(false);
@@ -474,10 +489,28 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
   const ask = prompts[idx % prompts.length];
   const [rate, setRate] = useState(false);
   const [why, setWhy] = useState<"down" | "note" | null>(null);
+  // Talking with him in his own bubble (light: his words only, no buttons).
+  const [answer, setAnswer] = useState("");
+  const [talk, setTalk] = useState<{ you: string; him: string; thinking: boolean; history: { role: "user" | "assistant"; content: string }[] } | null>(null);
+  async function reply() {
+    const q = answer.trim();
+    if (!q || talk?.thinking) return;
+    const history = talk?.history ?? [{ role: "assistant" as const, content: ask }];
+    setAnswer("");
+    setRate(false);
+    setTalk({ you: q, him: "", thinking: true, history });
+    try {
+      const r = await coachAction(q, true, history);
+      setTalk({ you: q, him: r.reply, thinking: false, history: [...history, { role: "user" as const, content: q }, { role: "assistant" as const, content: r.reply }].slice(-10) });
+    } catch {
+      setTalk({ you: q, him: "I lost the thread for a moment. Try me again?", thinking: false, history });
+    }
+  }
   const [off, setOff] = useState(readToucanAt);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   useEffect(() => {
-    const t = setTimeout(() => setLanded(true), 2700);
+    if (toucanLanded) return;
+    const t = setTimeout(() => ((toucanLanded = true), setLanded(true)), 2700);
     return () => clearTimeout(t);
   }, []);
   const vote = (up: boolean) => {
@@ -487,10 +520,10 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
     setRate(false);
     if (up) patchFx({ welcomeToucanAsk: ask });
   };
-  const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
+  const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setIdx((i) => (i + d + prompts.length) % prompts.length));
   const item = "font-semibold underline underline-offset-2";
   return (
-    <div className="welcome-toucan absolute z-[3]" style={{ left: 8 + off.x, top: -47 + off.y }}>
+    <div className={`${flyIn ? "welcome-toucan" : ""} absolute z-[3]`} style={{ left: 8 + off.x, top: -47 + off.y }}>
       <button
         type="button"
         onClick={() => {
@@ -537,24 +570,64 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
         </span>
       </button>
       {landed && (
-        <div className={`toucan-bubble owl-say absolute left-[58px] -top-1 z-[5] ${why ? "w-[min(280px,72vw)]" : "w-max max-w-[min(250px,62vw)]"} rounded-2xl px-3 py-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
-          {/* On hover: ‹ › to step through what he could ask, and ⋯ for your thumbs. Always faintly there on touch screens. */}
-          {!menu && !saying && prompts.length > 1 && (
-            <>
-              <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-ctl absolute -left-7 top-1/2 flex h-7 w-6 -translate-y-1/2 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "#f6e6bb", textShadow: "0 1px 3px rgba(0,0,0,.6)" }}>
-                ‹
-              </button>
-              <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="bubble-ctl absolute -right-7 top-1/2 flex h-7 w-6 -translate-y-1/2 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "#f6e6bb", textShadow: "0 1px 3px rgba(0,0,0,.6)" }}>
-                ›
-              </button>
-            </>
-          )}
-          {!menu && !saying && (
-            <button type="button" onClick={() => setRate((v) => !v)} aria-label="Is this a good thing for him to ask?" aria-expanded={rate} className="bubble-ctl absolute -right-2 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full text-[13px] leading-none" style={{ background: "#fffaf0", border: "1px solid #b39a6a", color: "#6b5631" }}>
-              ⋯
+        <div className={`toucan-bubble owl-say absolute bottom-1 left-[58px] z-[5] ${why || talk ? "w-[min(290px,74vw)]" : "w-[min(250px,62vw)]"} rounded-2xl px-3 py-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+          {/* ✎ at the top right: rate what he asked, or say more about it. */}
+          {!menu && !saying && !talk && (
+            <button type="button" onClick={() => setRate((v) => !v)} aria-label="Rate or comment on what he asked" title="Rate or comment" aria-expanded={rate} className="absolute -right-2 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: rate ? "#f2e2b4" : "#fffaf0", border: "1px solid #b39a6a", color: "#8a6116" }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
+              </svg>
             </button>
           )}
-          <span className={!menu && !saying ? "block pr-2" : undefined}>{saying ?? (menu ? "How can I help?" : ask)}</span>
+          {talk ? (
+            // A light back-and-forth right here in his bubble: your words, then his.
+            <span className="flex flex-col gap-1.5">
+              {talk.you && (
+                <span className="self-end rounded-xl px-2 py-1 text-[13px]" style={{ background: "rgba(242,210,126,.55)", color: "#2a1c10" }}>
+                  {talk.you}
+                </span>
+              )}
+              <span className="text-[13.5px]">{talk.thinking ? <span className="italic opacity-70">…thinking</span> : <Digest text={talk.him} />}</span>
+            </span>
+          ) : (
+            <span className={!menu && !saying ? "block pr-2" : undefined}>{saying ?? (menu ? "How can I help?" : ask)}</span>
+          )}
+          {/* Under his words: step through what else he could ask, and answer him in a line. */}
+          {!menu && !saying && (
+            <span className="mt-1.5 flex items-center gap-1">
+              {!talk && prompts.length > 1 && (
+                <>
+                  <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: "#8a6116" }}>
+                    ‹
+                  </button>
+                  <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: "#8a6116" }}>
+                    ›
+                  </button>
+                </>
+              )}
+              <form
+                className="flex min-w-0 flex-1 items-center gap-1"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void reply();
+                }}
+              >
+                <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={talk ? "Say more…" : "Answer him…"} aria-label="Answer the toucan" maxLength={400} className="h-8 min-w-0 flex-1 rounded-full border-0 bg-transparent px-2 text-[16px] outline-none" style={{ boxShadow: "inset 0 -1px 0 rgba(139,112,64,.45)", color: "#2a1c10" }} />
+                {answer.trim() && (
+                  <button type="submit" aria-label="Send" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </form>
+              {talk && !talk.thinking && (
+                <button type="button" onClick={() => (talkToToucan(undefined, "talk"), setTalk(null))} title="Open the full conversation" className="shrink-0 text-[11.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                  More
+                </button>
+              )}
+            </span>
+          )}
           {rate && !menu && !saying && (
             <span className="fade-in mt-1.5 flex flex-col">
               <span className="flex items-center gap-1">
@@ -679,13 +752,10 @@ function TopPriority({ last, question, register, arranging = false }: { last: { 
   // Secondary priorities (important, not urgent): opened from the button under the box.
   const [othersOpen, setOthersOpen] = useState(false);
   const [others, setOthers] = useState<string[]>([""]);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const earlier = last && last.day !== today ? last : null;
   const filled = others.filter((o) => o.trim());
   const save = async (value: string, more: string[]) => {
     if (!value.trim()) return true;
-    setBusy(true);
     setError(null);
     try {
       const r = await setTopPriorityAction(value, more.filter((o) => o.trim()));
@@ -696,7 +766,6 @@ function TopPriority({ last, question, register, arranging = false }: { last: { 
       setError(e instanceof Error ? e.message : "Couldn't save that.");
       return false;
     } finally {
-      setBusy(false);
     }
   };
   // Saved by the screen's own button on the way out (no Save of its own).
@@ -838,75 +907,9 @@ function TopPriority({ last, question, register, arranging = false }: { last: { 
           </span>
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-2 empty:hidden">
-        {earlier && !text && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setText(earlier.text);
-              if (earlier.others?.length) {
-                setOthers([...earlier.others, ""]);
-                setOthersOpen(true);
-              }
-            }}
-            className="min-h-8 rounded-full px-3 text-left text-[13px] disabled:opacity-60"
-            style={{ border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.6)" }}
-          >
-            Same as before: &ldquo;{earlier.text.replace(/\n+/g, " · ")}&rdquo;
-          </button>
-        )}
-      </div>
       {error && (
         <p className="m-0 text-[12.5px]" style={{ color: "#a33" }}>
           {error}
-        </p>
-      )}
-    </form>
-  );
-}
-
-/** A line on what today is about, kept in the journal as an intention. */
-function Intention({ question, hint, register }: { question: string; hint: string; register: (save: () => Promise<boolean>) => void }) {
-  const [text, setText] = useState("");
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState(false);
-  const save = async () => {
-    if (saved || !text.trim()) return true;
-    setError(false);
-    try {
-      await addJournalEntryAction(text.trim(), null, "intention");
-      setSaved(true);
-      return true;
-    } catch {
-      // Keep the words so they can try again.
-      setError(true);
-      return false;
-    }
-  };
-  // Saved by the screen's own button on the way out.
-  useEffect(() => register(save));
-  if (saved)
-    return (
-      <p className="m-0 text-[15px] italic" style={{ color: "#3d5a1e" }}>
-        ✓ {question.replace(/(…|\.\.\.)\s*$/, "").trim()}: {text}
-      </p>
-    );
-  return (
-    <form
-      className="flex w-full flex-col gap-1.5 text-left"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save();
-      }}
-    >
-      <label className="text-[15px] font-semibold" style={{ color: "var(--t-ink)" }} htmlFor="welcome-intention">
-        {question}
-      </label>
-      <input id="welcome-intention" value={text} onChange={(e) => setText(e.target.value)} maxLength={200} placeholder={hint} className="h-10 w-full rounded-lg px-2.5 text-[16px]" style={FIELD} />
-      {error && (
-        <p className="m-0 text-[12.5px]" style={{ color: "#a33" }}>
-          Couldn&rsquo;t save that. Try again in a moment.
         </p>
       )}
     </form>
@@ -945,7 +948,6 @@ function CheckinPanel({ fx, mode, metrics, checkedIn, onSaved, onCollapse, submi
 
 /** What a part shows when there's nothing in it right now (while arranging). */
 const EMPTY: Partial<Record<WelcomeEl, string>> = {
-  intention: "Asks on the day's first visit.",
   streak: "Shows on the day's first visit, once you have a streak.",
   bar: "Shows on the day's first visit.",
   reward: "Shows on the day's first visit.",

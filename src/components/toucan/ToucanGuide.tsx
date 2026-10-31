@@ -1652,7 +1652,7 @@ function CatchUpPlanner({ onBack, onAsk }: { onBack: () => void; onAsk: (q: stri
  * (each its own line), quest titles in quotes stand out, and a long paragraph
  * is split at its sentences, one short line each.
  */
-function Digest({ text }: { text: string }) {
+export function Digest({ text }: { text: string }) {
   const lines = text
     .split(/\n+/)
     .map((l) => l.trim())

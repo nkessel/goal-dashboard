@@ -184,7 +184,7 @@ export function GreetingOptions({ fx }: { fx: FxSettings }) {
   );
 }
 
-const HAS_OPTIONS: WelcomeEl[] = ["checkin", "line", "focus", "intention"];
+const HAS_OPTIONS: WelcomeEl[] = ["checkin", "line", "focus"];
 
 /**
  * The card's parts while arranging: drag a part itself to move it; its hide
@@ -197,50 +197,63 @@ export function ArrangeList({ fx, order, parts, empty }: { fx: FxSettings; order
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-  const shown = order.filter((el) => welcomeShows(fx, el));
-  const hidden = order.filter((el) => !welcomeShows(fx, el));
+  // Hidden parts stay where they are (dimmed, eye closed); archived ones wait at the very bottom.
+  const archived = order.filter((el) => (fx.welcomeArchived ?? []).includes(el));
+  const active = order.filter((el) => !archived.includes(el));
+  const [archiveOpen, setArchiveOpen] = useState(false);
   function onDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const next = arrayMove(shown, shown.indexOf(active.id as WelcomeEl), shown.indexOf(over.id as WelcomeEl));
-    set({ welcomeOrder: [...next, ...hidden] });
+    const { active: a, over } = e;
+    if (!over || a.id === over.id) return;
+    const next = arrayMove(active, active.indexOf(a.id as WelcomeEl), active.indexOf(over.id as WelcomeEl));
+    set({ welcomeOrder: [...next, ...archived] });
   }
+  const archive = (el: WelcomeEl) => {
+    const hide = welcomeShows(fx, el) ? toggleEl(fx, el) : {};
+    set({ ...hide, welcomeArchived: [...new Set([...(fx.welcomeArchived ?? []), el])] });
+  };
+  const unarchive = (el: WelcomeEl) => set({ welcomeArchived: (fx.welcomeArchived ?? []).filter((x) => x !== el) });
   return (
     <div className="flex w-full flex-col gap-2">
       <DndContext id="dnd-welcome" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={shown} strategy={verticalListSortingStrategy}>
-          {shown.map((el) => (
-            <Part key={el} el={el} fx={fx} empty={empty[el]}>
+        <SortableContext items={active} strategy={verticalListSortingStrategy}>
+          {active.map((el) => (
+            <Part key={el} el={el} fx={fx} empty={empty[el]} onArchive={() => archive(el)}>
               {parts[el]}
             </Part>
           ))}
         </SortableContext>
       </DndContext>
-      {/* Hidden parts wait as chips: tap one to bring it back. */}
-      {hidden.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-          <span className="text-[12px] font-semibold" style={{ color: SOFT }}>
-            Hidden:
-          </span>
-          {hidden.map((el) => {
-            const meta = WELCOME_ELS.find((m) => m.key === el)!;
-            return (
-              <button key={el} type="button" onClick={() => set(toggleEl(fx, el))} title={meta.hint} aria-label={`Show ${meta.label}`} className="flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-semibold" style={{ ...CHIP, borderStyle: "dashed" }}>
-                <span aria-hidden className="text-[15px] leading-none">
-                  +
-                </span>
-                {meta.label}
-              </button>
-            );
-          })}
+      {/* Archived: out of the way, at the very bottom; tap one to bring it back (hidden, ready to show). */}
+      {archived.length > 0 && (
+        <div className="flex flex-col gap-1.5 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.25)" }}>
+          <button type="button" onClick={() => setArchiveOpen((v) => !v)} aria-expanded={archiveOpen} className="flex items-center gap-1.5 self-start text-[12px] font-semibold" style={{ color: SOFT }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: archiveOpen ? "rotate(90deg)" : undefined }}>
+              <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Archived ({archived.length})
+          </button>
+          {archiveOpen && (
+            <div className="reveal flex flex-wrap gap-1.5">
+              {archived.map((el) => {
+                const meta = WELCOME_ELS.find((m) => m.key === el)!;
+                return (
+                  <button key={el} type="button" onClick={() => unarchive(el)} title={`Bring back ${meta.label} (hidden)`} className="flex h-8 items-center gap-1 rounded-full px-3 text-[12.5px] font-semibold" style={{ ...CHIP, borderStyle: "dashed" }}>
+                    <span aria-hidden>↩</span>
+                    {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function Part({ el, fx, empty, children }: { el: WelcomeEl; fx: FxSettings; empty?: string; children: React.ReactNode }) {
+function Part({ el, fx, empty, children, onArchive }: { el: WelcomeEl; fx: FxSettings; empty?: string; children: React.ReactNode; onArchive: () => void }) {
   const meta = WELCOME_ELS.find((m) => m.key === el)!;
+  const showing = welcomeShows(fx, el);
   const [open, setOpen] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: el });
   return (
@@ -255,42 +268,47 @@ function Part({ el, fx, empty, children }: { el: WelcomeEl; fx: FxSettings; empt
         transition,
         zIndex: isDragging ? 5 : undefined,
         border: "1.5px solid rgba(139,112,64,.4)",
-        background: isDragging ? "rgba(255,248,228,.97)" : "rgba(255,250,238,.4)",
+        background: isDragging ? "rgba(255,248,228,.97)" : showing ? "rgba(255,250,238,.4)" : "rgba(120,100,60,.06)",
+        borderStyle: showing ? "solid" : "dashed",
         boxShadow: isDragging ? "0 10px 24px rgba(0,0,0,.25)" : undefined,
       }}
     >
       {/* Its name, its ✎, and hide in the top-right corner. */}
-      <div className="flex min-h-8 items-center gap-1.5 pr-8">
+      <div className={`flex min-h-8 items-center gap-1.5 ${showing ? "pr-24" : "pr-36"}`}>
         <span className="min-w-0 truncate text-left text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }} title={meta.hint}>
           {meta.label}
         </span>
         {HAS_OPTIONS.includes(el) && <EditButton open={open} onClick={() => setOpen((v) => !v)} label={`Edit ${meta.label}`} />}
       </div>
-      <button
-        type="button"
-        onClick={() => set(toggleEl(fx, el))}
-        aria-label={`Hide ${meta.label}`}
-        title="Hide this part"
-        className="absolute right-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]"
-        style={{ color: SOFT }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
-          <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-        </svg>
-      </button>
+      {/* Showing or hidden, at a glance: the eye in the corner (open = showing, closed = hidden). Hidden ones can be archived. */}
+      <span className="absolute right-1.5 top-1.5 flex items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()}>
+        {!showing && (
+          <button type="button" onClick={onArchive} title="Archive it (out of the way, at the bottom)" aria-label={`Archive ${meta.label}`} className="flex h-8 items-center rounded-full px-2 text-[11.5px] underline underline-offset-2 hover:bg-black/[.06]" style={{ color: SOFT }}>
+            Archive
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => set(toggleEl(fx, el))}
+          aria-pressed={showing}
+          aria-label={showing ? `${meta.label}: showing. Hide it` : `${meta.label}: hidden. Show it`}
+          title={showing ? "Showing · tap to hide" : "Hidden · tap to show"}
+          className="flex h-8 items-center gap-1 rounded-full pl-2 pr-1.5 text-[11.5px] font-semibold hover:bg-black/[.06]"
+          style={{ color: showing ? GOLD : SOFT, background: showing ? "rgba(217,180,95,.18)" : "transparent" }}
+        >
+          {showing ? "Showing" : "Hidden"}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+            {showing ? <circle cx="12" cy="12" r="3" fill="currentColor" /> : <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />}
+          </svg>
+        </button>
+      </span>
       {open && el === "checkin" && <CheckinOptions fx={fx} />}
       {open && el === "line" && <LineOptions fx={fx} />}
       {open && el === "focus" && <QuestionOptions fx={fx} k="welcomeFocusQ" label="The question" fallback="What are your top priorities today?" />}
-      {open && el === "intention" && (
-        <>
-          <QuestionOptions fx={fx} k="welcomeIntentionQ" label="The question" fallback="Today is about…" />
-          <QuestionOptions fx={fx} k="welcomeIntentionHint" label="The example in its box" fallback="e.g. Steady and kind to myself" />
-        </>
-      )}
       {children ? (
         // The part as it looks (not live while arranging).
-        <div inert className="pointer-events-none flex w-full flex-col items-center">
+        <div inert className={`pointer-events-none flex w-full flex-col items-center ${showing ? "" : "opacity-40 grayscale"}`}>
           {children}
         </div>
       ) : (

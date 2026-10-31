@@ -27,6 +27,8 @@ export type FxSettings = {
   /** The welcome screen's parts, in order, and the ones hidden (see lib/welcome). */
   welcomeOrder?: string[];
   welcomeHide?: string[];
+  /** Welcome screen parts tucked away in the Archived list at the bottom of arranging (hidden too). */
+  welcomeArchived?: string[];
   /** The castle on the welcome screen's far hill (see CASTLE_DESIGNS). */
   welcomeCastle?: string;
   /** The generated spire castle's seed (Generate castle draws a new one). */

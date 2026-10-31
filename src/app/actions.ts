@@ -2153,7 +2153,9 @@ export async function welcomeContextAction() {
   const important = tasks.filter((t) => !dueSoon.includes(t) && (t.importance ?? 0) >= 4).sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0));
   const suggestions = [...dueSoon, ...important].slice(0, 4).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at }));
   const priority = (cleanPriorities((await readExtras(ownerId).catch(() => ({}) as Record<string, unknown>)).priorities)[0] as Priority | undefined) ?? null;
-  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })), suggestions, priority };
+  // Where you stand (streak, XP), so the welcome screen can show them on every visit, not just the day's first.
+  const me = await profilesData.getProfileById(ownerId).catch(() => null);
+  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })), suggestions, priority, streak: me?.streak_count ?? 0, totalXp: me?.total_xp ?? null };
 }
 
 type Priority = { text: string; others?: string[]; day: string; at: string };
