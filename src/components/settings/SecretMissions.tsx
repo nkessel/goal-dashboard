@@ -9,7 +9,7 @@ import { TaskRow } from "@/components/tasks/TaskRow";
 import type { TaskWithCategory } from "@/lib/data/tasks";
 import { cleanMissions, type Mission } from "@/lib/missions";
 import { useEscape } from "@/lib/use-escape";
-import { Fold } from "@/components/ui/Fold";
+import { Fold, useLingerValue } from "@/components/ui/Fold";
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 const XP_STEPS = [5, 10, 20, 30, 50, 75, 100];
@@ -28,6 +28,7 @@ export function SecretMissions({ initial, steps }: { initial: unknown; steps: Ta
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [card, setCard] = useState<TaskWithCategory | null>(null);
+  const shownCard = useLingerValue(card);
   const [, start] = useTransition();
   const lastSaved = useRef(missions);
   useEscape(() => setCard(null), !!card);
@@ -118,16 +119,16 @@ export function SecretMissions({ initial, steps }: { initial: unknown; steps: Ta
       )}
 
       {/* A step's full quest card: edit, schedule, break it down, everything. */}
-      {card &&
+      {shownCard.value &&
         createPortal(
-          <div className="fixed inset-0 z-[55] flex items-center justify-center p-4" onClick={() => setCard(null)}>
+          <div className={`fixed inset-0 z-[55] flex items-center justify-center p-4${shownCard.leaving ? " overlay-fade-out pointer-events-none" : ""}`} onClick={() => setCard(null)}>
             <div className="overlay-fade-in absolute inset-0" style={{ background: "rgba(8,6,20,.55)" }} />
             <div className="card-pop-in relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
               <button type="button" onClick={() => setCard(null)} aria-label="Close" className="absolute -top-11 right-0 flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none" style={{ background: "rgba(20,14,30,.7)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.5)" }}>
                 ×
               </button>
               <ul className="m-0 list-none p-0">
-                <TaskRow task={card} theme="adventure" categoryLabel={null} onEditorClose={() => router.refresh()} />
+                <TaskRow task={shownCard.value} theme="adventure" categoryLabel={null} onEditorClose={() => router.refresh()} />
               </ul>
             </div>
           </div>,

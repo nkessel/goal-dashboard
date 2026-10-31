@@ -33,6 +33,7 @@ import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { TaskScheduleControl } from "@/components/tasks/TaskScheduleControl";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE } from "@/lib/schedule-carry";
 import { fromFeedback } from "@/lib/from-feedback";
+import { useLingerValue } from "@/components/ui/Fold";
 
 type Folder = { name: string; open: boolean };
 
@@ -70,6 +71,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
   const [seenFolders, setSeenFolders] = useState(initialFolders);
   const [editing, setEditing] = useState<Task | null>(null);
   const [scheduling, setScheduling] = useState<Task | null>(null);
+  const sched = useLingerValue(scheduling);
   const [moving, setMoving] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [folderMenu, setFolderMenu] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -488,11 +490,11 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
       )}
       {editing && <EditTaskModal task={editing} theme={theme} onClose={() => setEditing(null)} />}
       {auto && <AutoScheduler tasks={flat(groups).map((id) => byId.get(id)!).filter(Boolean)} theme={theme} onClose={() => setAuto(false)} />}
-      {scheduling &&
+      {sched.value &&
         createPortal(
-          <div className="overlay-fade-in fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }} onClick={() => setScheduling(null)}>
+          <div className={`overlay-fade-in fixed inset-0 z-[60] flex items-center justify-center p-4${sched.leaving ? " overlay-fade-out pointer-events-none" : ""}`} style={{ background: "var(--t-overlay)" }} onClick={() => setScheduling(null)}>
             <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-              <TaskScheduleControl task={scheduling} theme={theme} startOpen onDone={() => setScheduling(null)} />
+              <TaskScheduleControl task={sched.value} theme={theme} startOpen onDone={() => setScheduling(null)} />
             </div>
           </div>,
           document.body

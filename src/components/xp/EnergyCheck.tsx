@@ -12,8 +12,7 @@ import { BoltIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
 import { eveningDayKey } from "@/components/evening/evening-clock";
-import { Fold } from "@/components/ui/Fold";
-import { useClosing } from "@/components/ui/Fold";
+import { Fold, useClosing } from "@/components/ui/Fold";
 
 type Takeoff = Awaited<ReturnType<typeof listTakeoffQuestsAction>>[number];
 

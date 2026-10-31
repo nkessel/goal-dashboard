@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { getStatsAction, setStatsAction } from "@/app/actions";
 import { DEFAULT_STATS, cleanStatName, statAbbr } from "@/lib/stats";
 import { useEscape } from "@/lib/use-escape";
+import { useLinger } from "@/components/ui/Fold";
 
 /**
  * Settings' half-width "Stats" tile: your character stats in order. Move
@@ -13,6 +14,7 @@ import { useEscape } from "@/lib/use-escape";
  */
 export function StatsTile({ isAdventure }: { isAdventure: boolean }) {
   const [open, setOpen] = useState(false);
+  const pop = useLinger(open);
   const [stats, setStats] = useState<string[] | null>(null);
   const [name, setName] = useState("");
   useEffect(() => {
@@ -62,9 +64,9 @@ export function StatsTile({ isAdventure }: { isAdventure: boolean }) {
           </span>
         </span>
       </button>
-      {open &&
+      {pop.shown &&
         createPortal(
-          <div className="overlay-fade-in fixed inset-0 z-[72] flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }} onClick={() => setOpen(false)}>
+          <div className={`overlay-fade-in fixed inset-0 z-[72] flex items-center justify-center p-4${pop.leaving ? " overlay-fade-out pointer-events-none" : ""}`} style={{ background: "var(--t-overlay)" }} onClick={() => setOpen(false)}>
             <div
               role="dialog"
               aria-modal="true"

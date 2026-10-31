@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
+import { useLinger } from "@/components/ui/Fold";
 
 export type BoardOption = { id: string; label: string };
 
@@ -29,6 +30,7 @@ export function BoardPicker({
   fieldStyle: React.CSSProperties;
 }) {
   const [open, setOpen] = useState(false);
+  const pop = useLinger(open);
   const [query, setQuery] = useState("");
   const [newName, setNewName] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -108,9 +110,9 @@ export function BoardPicker({
         </svg>
       </button>
 
-      {open &&
+      {pop.shown &&
         createPortal(
-          <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4" onClick={() => setOpen(false)}>
+          <div className={`fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4${pop.leaving ? " overlay-fade-out pointer-events-none" : ""}`} onClick={() => setOpen(false)}>
             <div className="overlay-fade-in absolute inset-0" style={{ background: "var(--t-overlay)" }} />
             <div
               role="dialog"

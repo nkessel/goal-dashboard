@@ -11,6 +11,7 @@ import {
 } from "@/app/actions";
 import { SAMPLE_AVATAR_PROMPTS, AVATAR_STYLE_OPTIONS, DEFAULT_AVATAR_STYLE } from "@/lib/avatar-prompts";
 import type { AvatarLibraryEntry } from "@/lib/data/types";
+import { useLingerValue } from "@/components/ui/Fold";
 
 /**
  * Avatar editor: generate an AI portrait (background on/off, an optional
@@ -49,6 +50,7 @@ export function AvatarBuilder({
   const [isPicking, startPicking] = useTransition();
   const [removed, setRemoved] = useState<Set<string>>(() => new Set());
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const removing = useLingerValue(confirmRemove);
 
   // Draws attention to the Generate button right after a sample prompt gets
   // auto-filled, since picking a sample no longer generates immediately —
@@ -344,10 +346,10 @@ export function AvatarBuilder({
             ))}
         </div>
       </div>
-      {confirmRemove &&
+      {removing.value &&
         createPortal(
           <div
-            className="overlay-fade-in fixed inset-0 z-[60] flex items-center justify-center p-4"
+            className={`overlay-fade-in fixed inset-0 z-[60] flex items-center justify-center p-4${removing.leaving ? " overlay-fade-out pointer-events-none" : ""}`}
             style={{ background: "var(--t-overlay)" }}
             onClick={() => setConfirmRemove(null)}
           >
@@ -361,7 +363,7 @@ export function AvatarBuilder({
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- library image */}
               <img
-                src={library.find((e) => e.id === confirmRemove)?.image_url}
+                src={library.find((e) => e.id === removing.value)?.image_url}
                 alt=""
                 className="h-16 w-16 rounded-full object-cover"
               />
@@ -383,7 +385,7 @@ export function AvatarBuilder({
                   onClick={() => {
                     const id = confirmRemove;
                     setConfirmRemove(null);
-                    removeFromLibrary(id);
+                    if (id) removeFromLibrary(id);
                   }}
                   className="h-10 flex-1 rounded-full text-sm font-semibold"
                   style={{ background: "var(--t-warn)", color: "#fff" }}

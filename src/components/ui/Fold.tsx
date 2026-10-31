@@ -59,3 +59,14 @@ export function useClosing(onClose: () => void, ms = 170) {
   }, [ms]);
   return { closing, close };
 }
+
+/**
+ * Like useLinger, for a popup opened by a value (the quest being scheduled, the
+ * card shown): keeps the last value on screen while it fades out.
+ */
+export function useLingerValue<T>(value: T | null | undefined, ms = 180) {
+  const [last, setLast] = useState(value ?? null);
+  if (value != null && value !== last) setLast(value);
+  const { shown, leaving } = useLinger(value != null, ms);
+  return { value: shown ? (value ?? last) : null, leaving };
+}

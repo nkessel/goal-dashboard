@@ -7,8 +7,7 @@ import type { Task } from "@/lib/data/types";
 import { applyAutoScheduleAction, saveSchedulerSettingsAction, schedulerContextAction } from "@/app/actions";
 import { SCHEDULER_DEFAULTS, clockOf, planSchedule, type Busy, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
 import { useEscape } from "@/lib/use-escape";
-import { Fold } from "@/components/ui/Fold";
-import { useClosing } from "@/components/ui/Fold";
+import { Fold, useClosing } from "@/components/ui/Fold";
 
 const LOCAL_KEY = "auto-schedule";
 const TIMES: { v: TimeOfDay; label: string; hint: string }[] = [
