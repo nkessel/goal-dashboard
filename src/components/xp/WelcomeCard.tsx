@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { NoteButton, WhyBox } from "@/components/toucan/SayingFeedback";
 import Link from "next/link";
 import { CoinIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
@@ -82,6 +83,8 @@ export function WelcomeCard({
   const [shown, setShown] = useState(0);
   // Your verdict on the day's wise line: liked lines come back often, disliked ones never.
   const [verdict, setVerdict] = useState<"like" | "dislike" | null>(() => (line && typeof window !== "undefined" && likedLines().has(line) ? "like" : null));
+  // Thumbs down asks why; the speech bubble beside the thumbs takes any other note.
+  const [lineWhy, setLineWhy] = useState<"down" | "note" | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
   // While arranging: the greeting's own options (from the ✎ beside it), and whether the castle is in view.
   const [greetingOpen, setGreetingOpen] = useState(false);
@@ -211,21 +214,18 @@ export function WelcomeCard({
     line: line ? (
       <div className="flex w-full flex-col items-center gap-0.5">
         {/* Quiet thumbs, always to the right of the line (at its bottom right when it wraps), the line still centred. */}
-        <div className="grid w-full grid-cols-[3.5rem_1fr_3.5rem] items-end gap-1">
+        <div className="grid w-full grid-cols-[5.25rem_1fr_5.25rem] items-end gap-1">
           <span aria-hidden />
           <p className={`m-0 text-[16px] leading-snug ${verdict === "dislike" ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
             {line}
           </p>
           <span className="flex items-center gap-0.5">
             <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"))} />
-            <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"))} />
+            <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"), setLineWhy(verdict === "dislike" ? null : "down"))} />
+            <NoteButton on={lineWhy === "note"} onClick={() => setLineWhy((w) => (w === "note" ? null : "note"))} />
           </span>
         </div>
-        {verdict && (
-          <span className="fade-in text-[12px] italic" style={{ color: "#6b5631" }}>
-            {verdict === "like" ? "It'll come back often." : "You won't see it again."}
-          </span>
-        )}
+        {lineWhy && <WhyBox key={lineWhy} saying={line} source="Wise line" down={lineWhy === "down"} onDone={() => setLineWhy(null)} />}
       </div>
     ) : null,
     bar: award ? (
@@ -473,6 +473,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
   const [idx, setIdx] = useState(0);
   const ask = prompts[idx % prompts.length];
   const [rate, setRate] = useState(false);
+  const [why, setWhy] = useState<"down" | "note" | null>(null);
   const [off, setOff] = useState(readToucanAt);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   useEffect(() => {
@@ -536,7 +537,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
         </span>
       </button>
       {landed && (
-        <div className="toucan-bubble owl-say absolute left-[58px] -top-1 z-[5] w-max max-w-[min(250px,62vw)] rounded-2xl px-3 py-2 text-left text-[13.5px] leading-snug" style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+        <div className={`toucan-bubble owl-say absolute left-[58px] -top-1 z-[5] ${why ? "w-[min(280px,72vw)]" : "w-max max-w-[min(250px,62vw)]"} rounded-2xl px-3 py-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
           {/* On hover: ‹ › to step through what he could ask, and ⋯ for your thumbs. Always faintly there on touch screens. */}
           {!menu && !saying && prompts.length > 1 && (
             <>
@@ -555,12 +556,25 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
           )}
           <span className={!menu && !saying ? "block pr-2" : undefined}>{saying ?? (menu ? "How can I help?" : ask)}</span>
           {rate && !menu && !saying && (
-            <span className="fade-in mt-1.5 flex items-center gap-1">
-              <LineVote kind="like" on={votes.liked.includes(ask)} onClick={() => vote(true)} />
-              <LineVote kind="dislike" on={false} onClick={() => vote(false)} />
-              <span className="text-[11.5px]" style={{ color: "#6b5631" }}>
-                👍 asks this first · 👎 never again
+            <span className="fade-in mt-1.5 flex flex-col">
+              <span className="flex items-center gap-1">
+                <LineVote kind="like" on={votes.liked.includes(ask)} onClick={() => vote(true)} />
+                <LineVote kind="dislike" on={why === "down"} onClick={() => setWhy(why === "down" ? null : "down")} />
+                <NoteButton on={why === "note"} onClick={() => setWhy(why === "note" ? null : "note")} />
               </span>
+              {why && (
+                <WhyBox
+                  key={why}
+                  saying={ask}
+                  source="Toucan's question"
+                  down={why === "down"}
+                  onDone={() => {
+                    // A thumbs down retires it once you've said why (or skipped).
+                    if (why === "down") vote(false);
+                    setWhy(null);
+                  }}
+                />
+              )}
             </span>
           )}
           {menu && !rewording && (

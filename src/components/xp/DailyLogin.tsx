@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { dailyCheckInAction, welcomeContextAction } from "@/app/actions";
 import { eveningDayKey } from "@/components/evening/evening-clock";
@@ -59,6 +59,12 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   const router = useRouter();
   const [shown, setShownRaw] = useState<Shown | null>(null);
   const setShown = (s: Shown | null) => setShownRaw(s && { ...s, seed: s.seed ?? `${Date.now()}:${Math.random()}` });
+  // The mist comes first, always: before this page paints (arriving by a link inside the app,
+  // where the page's own fog script doesn't run), fog it if the welcome screen is about to open.
+  // Every path below that ends without the screen lifts it again.
+  useLayoutEffect(() => {
+    if (welcomeDue()) fogOn(25_000);
+  }, []);
   // A snooze that ends while the app is still open brings it back then.
   // Settings changed (from its gear, say) show on the open screen straight away.
   const [, fxChanged] = useReducer((n: number) => n + 1, 0);

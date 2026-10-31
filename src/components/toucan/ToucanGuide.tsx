@@ -908,11 +908,18 @@ function GuideSheet({
             </p>
           </div>
           {!lite && (
-            <button type="button" onClick={() => setShowNotes((v) => !v)} aria-expanded={showNotes} title="What I remember" className="flex h-9 w-9 items-center justify-center rounded-full text-[16px] hover:bg-white/10">
+            <button type="button" onClick={() => {
+              setShowNotes((v) => !v);
+              scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
+            }} aria-expanded={showNotes} title="What I remember" className="flex h-9 w-9 items-center justify-center rounded-full text-[16px] hover:bg-white/10">
               🪶
             </button>
           )}
-          <button type="button" onClick={() => setShowLook((v) => !v)} aria-expanded={showLook} title="How I move" aria-label="How the toucan moves" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10" style={{ color: "rgba(232,255,248,.75)" }}>
+          <button type="button" onClick={() => {
+              setShowLook((v) => !v);
+              // Its panel sits at the top of the conversation: go up to it.
+              scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
+            }} aria-expanded={showLook} title="How I move" aria-label="How the toucan moves" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10" style={{ color: "rgba(232,255,248,.75)" }}>
             <GearIcon size={17} />
           </button>
           {/* Minimize keeps the conversation; the small toucan pill brings it back. */}
@@ -1081,7 +1088,7 @@ function GuideSheet({
               {msgs.map((m, i) => (
                 <div key={i} className={`flex flex-col gap-1.5 ${m.role === "user" ? "items-end" : "items-start"}`}>
                   <p className="m-0 max-w-[88%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-[14.5px] leading-snug" style={m.role === "user" ? { background: "rgba(242,210,126,.92)", color: "#2a1c10" } : { background: "rgba(140,240,220,.1)", border: "1px solid rgba(140,240,220,.25)" }}>
-                    {m.content}
+                    {m.role === "assistant" ? <Digest text={m.content} /> : m.content}
                   </p>
                   {m.remembered?.map((n) => (
                     <span key={n.id} className="text-[12px] italic" style={{ color: "rgba(140,240,220,.8)" }}>
@@ -1355,7 +1362,7 @@ function OfferCard({ action: a, onPlan, onPromise }: { action: CoachAction; onPl
   if (a.type === "plan")
     return (
       <Pill strong onClick={() => onPlan({ id: a.questId, title: a.quest, estimate: null, dueAt: null })}>
-        Plan “{a.quest.length > 30 ? `${a.quest.slice(0, 29)}…` : a.quest}”
+        Plan “{a.quest}”
       </Pill>
     );
   if (a.type === "start")
@@ -1637,6 +1644,52 @@ function CatchUpPlanner({ onBack, onAsk }: { onBack: () => void; onAsk: (q: stri
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The toucan's words, easy to take in at a glance: a list becomes bullets
+ * (each its own line), quest titles in quotes stand out, and a long paragraph
+ * is split at its sentences, one short line each.
+ */
+function Digest({ text }: { text: string }) {
+  const lines = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const items: { kind: "p" | "li"; text: string }[] = [];
+  for (const l of lines) {
+    const b = l.match(/^(?:[-•*]|\d+[.)])\s+(.*)$/);
+    if (b) items.push({ kind: "li", text: b[1] });
+    // A long paragraph: its sentences become short lines.
+    else if (l.length > 140) for (const sent of l.match(/[^.!?]+[.!?]+["”’)]?|[^.!?]+$/g) ?? [l]) items.push({ kind: "p", text: sent.trim() });
+    else items.push({ kind: "p", text: l });
+  }
+  const mark = (t: string) =>
+    t.split(/("[^"]+"|“[^”]+”)/g).map((part, i) =>
+      /^["“]/.test(part) ? (
+        <b key={i} className="font-semibold" style={{ color: "#f2d27e" }}>
+          {part.replace(/^["“]|["”]$/g, "")}
+        </b>
+      ) : (
+        part
+      )
+    );
+  return (
+    <span className="flex flex-col gap-1 whitespace-normal">
+      {items.map((it, i) =>
+        it.kind === "li" ? (
+          <span key={i} className="flex gap-1.5">
+            <span aria-hidden style={{ color: "rgba(140,240,220,.85)" }}>
+              ✦
+            </span>
+            <span>{mark(it.text)}</span>
+          </span>
+        ) : (
+          <span key={i}>{mark(it.text)}</span>
+        )
+      )}
+    </span>
   );
 }
 

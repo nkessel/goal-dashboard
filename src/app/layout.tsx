@@ -6,6 +6,7 @@ import { ScrollLock } from "@/components/ui/ScrollLock";
 import { ContextMenuBridge } from "@/components/ui/ContextMenuBridge";
 import { MenuLayoutStyles } from "@/components/settings/MenuLayoutSettings";
 import { SaveKeys } from "@/components/ui/SaveKeys";
+import { FOG_HEAD_SCRIPT } from "@/lib/welcome-fog";
 import { ClickTrail } from "@/components/ui/ClickTrail";
 import { LastScreen } from "@/components/ui/LastScreen";
 import "./globals.css";
@@ -72,6 +73,10 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${ebGaramond.variable} ${manrope.variable} ${naskh.variable} h-full antialiased`}
     >
+      <head>
+        {/* The welcome fog, set before the first paint (so Today never shows before the mist). */}
+        <script dangerouslySetInnerHTML={{ __html: FOG_HEAD_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <KeyboardViewport />
         <ScrollLock />
