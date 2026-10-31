@@ -73,7 +73,7 @@ export default async function InsightsPage() {
   const readings = [...energy.map((e) => ({ metric: "Energy", level: e.level, at: e.created_at })), ...chartChecks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at }))];
   const chartWins = [
     ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null })),
-    ...notes.map((n) => ({ kind: "note", at: n.created_at, xp: 0, title: n.body })),
+    ...notes.map((n) => ({ kind: "note", at: n.created_at, xp: 0, title: n.body, details: n.details ?? null, tone: n.tone ?? null })),
   ];
 
   return (
@@ -147,7 +147,7 @@ export default async function InsightsPage() {
                 <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
                   Events &amp; #tags <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— log anything, any time</span>
                 </h2>
-                <EventLog notes={notes.map((n) => ({ id: n.id, body: n.body, created_at: n.created_at }))} />
+                <EventLog notes={notes.map((n) => ({ id: n.id, body: n.body, created_at: n.created_at, details: n.details ?? null, tone: n.tone ?? null }))} />
               </section>
               ),
             },

@@ -125,7 +125,7 @@ export async function listCheckInsSince(ownerId: string, sinceISO: string): Prom
 // Write-in events and #tags beside a check-in
 // ---------------------------------------------------------------------------
 
-export type CheckNote = { id: string; body: string; tags: string[]; created_at: string };
+export type CheckNote = { id: string; body: string; tags: string[]; created_at: string; details?: string | null; tone?: number | null };
 
 /** "Slept badly #sleep #travel" → tags ["sleep", "travel"]; the text is kept whole. */
 export function tagsIn(text: string): string[] {
@@ -142,7 +142,7 @@ function tidyNote(text: string): string {
     .slice(0, 400);
 }
 
-export async function addCheckNote(ownerId: string, text: string, atISO?: string | null, allDay = false): Promise<CheckNote> {
+export async function addCheckNote(ownerId: string, text: string, atISO?: string | null, allDay = false, extra: { details?: string | null; tone?: number | null } = {}): Promise<CheckNote> {
   const body = tidyNote(text);
   if (!body) throw new Error("Write something first.");
   // Logged for another moment (earlier today, yesterday…): up to 90 days back, never in the future.
@@ -155,7 +155,7 @@ export async function addCheckNote(ownerId: string, text: string, atISO?: string
     if (t < Date.now() - 90 * 86_400_000) throw new Error("That's more than 90 days ago.");
     at = new Date(t).toISOString();
   }
-  const { data, error } = await supabaseAdmin().from("check_in_notes").insert({ owner_id: ownerId, body, tags: tagsIn(body), ...(at ? { created_at: at } : {}), ...(allDay ? { all_day: true } : {}) }).select("id, body, tags, created_at").single();
+  const { data, error } = await supabaseAdmin().from("check_in_notes").insert({ owner_id: ownerId, body, tags: tagsIn(body), ...(at ? { created_at: at } : {}), ...(allDay ? { all_day: true } : {}), ...(extra.details?.trim() ? { details: extra.details.trim().slice(0, 1000) } : {}), ...(extra.tone === -1 || extra.tone === 0 || extra.tone === 1 ? { tone: extra.tone } : {}) }).select("id, body, tags, created_at, details, tone").single();
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   return data as CheckNote;
 }
@@ -165,7 +165,7 @@ export async function deleteCheckNote(ownerId: string, id: string): Promise<void
 }
 
 export async function listCheckNotesSince(ownerId: string, sinceISO: string): Promise<CheckNote[]> {
-  const { data, error } = await supabaseAdmin().from("check_in_notes").select("id, body, tags, created_at").eq("owner_id", ownerId).gte("created_at", sinceISO).order("created_at", { ascending: true }).limit(1000);
+  const { data, error } = await supabaseAdmin().from("check_in_notes").select("id, body, tags, created_at, details, tone").eq("owner_id", ownerId).gte("created_at", sinceISO).order("created_at", { ascending: true }).limit(1000);
   if (error) return [];
   return (data ?? []) as CheckNote[];
 }

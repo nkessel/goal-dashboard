@@ -45,7 +45,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0075_ui_clicks.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0076_event_details_tone.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -117,6 +117,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Oct 31: Events (Insights › Events & #tags): a short title, optional details (shown on hover and in the event's popup) and how it felt: three coloured buttons − / ● / + (`check_in_notes.details`, `.tone` -1/0/1, migration 0076). On the chart a felt event is a coloured +/●/− button; hovering shows its title and details (SVG `<title>` and the day card). Logging goes through `logEventAction`, which returns the problem in words instead of throwing (the owner saw a bare "server error"; the real cause wasn't visible from here — likely a time check such as "That's in the future", now shown).
 
 - Oct 31: Welcome screen "Choose today's quests" (`xp/TodayPlanner.tsx`, new part `quests` after the top priority): a gilded button opens a tray with Due soon at its top (count + reach picker) and Today's Quests below; drag a due quest into today (or tap +), drag today's into order, × takes one off (`addToTopOfTodayAction` + `reorderTasksAction`, `toggleManualPriorityAction`). `welcomeContextAction` returns today's pinned quests. `.due-in` is a plain fade/slide (no grid), safe on any row.
 

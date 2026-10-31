@@ -2362,6 +2362,23 @@ export async function addCheckNoteAction(text: string, atISO?: string | null, al
   return note;
 }
 
+/**
+ * Log an event from Insights: a title (with any #tags), optional details shown
+ * on hover, and how it felt (-1, 0, 1). Returns the problem in words instead of
+ * throwing, so the page can say what went wrong (a thrown error shows only as
+ * a "server error" on the live site).
+ */
+export async function logEventAction(input: { title: string; details?: string | null; tone?: number | null; at?: string | null; allDay?: boolean }) {
+  try {
+    const ownerId = await requireProfileId();
+    const note = await energyData.addCheckNote(ownerId, String(input.title ?? ""), input.at ?? null, !!input.allDay, { details: input.details ?? null, tone: input.tone ?? null });
+    revalidatePath("/insights");
+    return { ok: true as const, note };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Couldn't log that." };
+  }
+}
+
 export async function deleteCheckNoteAction(id: string) {
   const ownerId = await requireProfileId();
   await energyData.deleteCheckNote(ownerId, id);

@@ -6,7 +6,11 @@ import { WeatherLocation } from "@/components/ui/WeatherLocation";
 import { fromFeedback } from "@/lib/from-feedback";
 
 type Reading = { metric: string; level: number; at: string };
-type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null };
+type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null; details?: string | null; tone?: number | null };
+/** An event's colour by how it felt (minus, neutral, plus); others keep their kind's colour. */
+const TONE_COLOR: Record<string, string> = { "-1": "#a33c2a", "0": "#7a6a4f", "1": "#3f7a2e" };
+const TONE_GLYPH: Record<string, string> = { "-1": "−", "0": "●", "1": "+" };
+const markColor = (w: WinLite, fallback: string) => (w.kind === "note" && w.tone != null ? (TONE_COLOR[String(w.tone)] ?? fallback) : fallback);
 
 /** Series colors, checked for contrast and color-blind separation on parchment. */
 const SERIES = ["#c4620f", "#2a6fb5", "#24875a", "#8a3fa0", "#c23a48", "#a0880a"];
@@ -595,9 +599,10 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
                   if (marks === "lines")
                     return (
                       <g key={`${ev.key}-${wi}`}>
-                        <line x1={px} x2={px} y1={T} y2={T + plotH} stroke={ev.color} strokeWidth="1.3" strokeDasharray="3 3" opacity=".75" />
+                        <title>{[w.title, w.details].filter(Boolean).join(" — ")}</title>
+                        <line x1={px} x2={px} y1={T} y2={T + plotH} stroke={markColor(w, ev.color)} strokeWidth="1.3" strokeDasharray="3 3" opacity=".75" />
                         <g transform={`translate(${px.toFixed(1)} ${T + 6 + li * 12})`}>
-                          <EventMark k={ev.key} color={ev.color} size={9} />
+                          <EventMark k={ev.key} color={markColor(w, ev.color)} size={9} />
                         </g>
                       </g>
                     );
@@ -611,8 +616,21 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
                   const avgV = near.length ? near.reduce((a, b) => a + b, 0) / near.length : 5.5;
                   return (
                     <g key={`${ev.key}-${wi}`} transform={`translate(${px.toFixed(1)} ${(y(avgV) - 1 - (wi % 3) * 3).toFixed(1)})`}>
-                      <circle r="7.5" fill="#fbf3df" stroke={ev.color} strokeWidth="1.2" opacity=".95" />
-                      <EventMark k={ev.key} color={ev.color} size={9} />
+                      {/* Hover: its title and details. A felt event is a coloured + / ● / − button. */}
+                      <title>{[w.title, w.details].filter(Boolean).join(" — ")}</title>
+                      {w.kind === "note" && w.tone != null ? (
+                        <>
+                          <circle r="8" fill={markColor(w, ev.color)} stroke="#fbf3df" strokeWidth="1.5" />
+                          <text y="4" textAnchor="middle" fontSize="12" fontWeight="700" fill="#fff">
+                            {TONE_GLYPH[String(w.tone)]}
+                          </text>
+                        </>
+                      ) : (
+                        <>
+                          <circle r="7.5" fill="#fbf3df" stroke={ev.color} strokeWidth="1.2" opacity=".95" />
+                          <EventMark k={ev.key} color={ev.color} size={9} />
+                        </>
+                      )}
                     </g>
                   );
                 })
@@ -683,7 +701,13 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
             )}
             {hoverEvents.slice(0, 4).map((w, i) => (
               <span key={i} className="truncate" style={{ color: INK_SOFT }}>
+                {w.kind === "note" && w.tone != null && (
+                  <b className="mr-1" style={{ color: TONE_COLOR[String(w.tone)] }}>
+                    {TONE_GLYPH[String(w.tone)]}
+                  </b>
+                )}
                 {EVENTS.find((e) => e.kinds.includes(w.kind))?.label.replace(/s?( &.*)?$/, "")}: {w.title ?? w.kind}
+                {w.details && <span className="block whitespace-normal text-[11.5px] opacity-80">{w.details}</span>}
               </span>
             ))}
             {hoverEvents.length > 4 && <span style={{ color: INK_SOFT }}>+{hoverEvents.length - 4} more</span>}

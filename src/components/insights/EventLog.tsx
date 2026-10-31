@@ -3,10 +3,18 @@
 import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addCheckNoteAction, deleteCheckNoteAction, updateCheckNoteAction } from "@/app/actions";
+import { deleteCheckNoteAction, logEventAction, updateCheckNoteAction } from "@/app/actions";
 import { DateField } from "@/components/ui/DateField";
 
-type Note = { id: string; body: string; created_at: string };
+type Note = { id: string; body: string; created_at: string; details?: string | null; tone?: number | null };
+
+/** How it felt: minus, neutral or plus, each its own colour (also on the Insights chart). */
+export const TONES = [
+  { v: -1, label: "−", name: "Hard / minus", color: "#a33c2a", bg: "rgba(163,60,42,.16)" },
+  { v: 0, label: "●", name: "Neutral", color: "#7a6a4f", bg: "rgba(122,106,79,.16)" },
+  { v: 1, label: "+", name: "Good / plus", color: "#3f7a2e", bg: "rgba(63,122,46,.16)" },
+] as const;
+export const toneOf = (t: number | null | undefined) => TONES.find((x) => x.v === t) ?? null;
 type When = "now" | "morning" | "yesterday" | "pick";
 
 const INK = "#3b2a14";
@@ -32,6 +40,9 @@ export function EventLog({ notes }: { notes: Note[] }) {
   const [pickDate, setPickDate] = useState(() => localInput(new Date()).slice(0, 10));
   const [pickTime, setPickTime] = useState(() => localInput(new Date()).slice(11, 16));
   const [allDay, setAllDay] = useState(false);
+  // A short title (what shows on the chart), details for hovering, and how it felt.
+  const [details, setDetails] = useState("");
+  const [tone, setTone] = useState<number | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   // Tapping a day on the chart opens this, set to that day.
   useEffect(() => {
@@ -99,9 +110,17 @@ export function EventLog({ notes }: { notes: Note[] }) {
     setError(null);
     startTransition(async () => {
       try {
-        if (words) await addCheckNoteAction(words, at, allDay);
-        for (const t of all) await addCheckNoteAction(`#${t}`, at, allDay);
+        if (words) {
+          const r = await logEventAction({ title: words, details, tone, at, allDay });
+          if (!r.ok) throw new Error(r.error);
+        }
+        for (const t of all) {
+          const r = await logEventAction({ title: `#${t}`, details: words ? null : details, tone: words ? null : tone, at, allDay });
+          if (!r.ok) throw new Error(r.error);
+        }
         setText("");
+        setDetails("");
+        setTone(null);
         setTags([]);
         setWhen("now");
         setAllDay(false);
@@ -170,13 +189,28 @@ export function EventLog({ notes }: { notes: Note[] }) {
                 if (e.key === "Escape") setOpen(false);
                 if (e.key === "Backspace" && !text && tags.length) setTags((t) => t.slice(0, -1));
               }}
-              maxLength={200}
-              placeholder={tags.length ? "more #tags, or what happened" : "What happened? e.g. Missed my medication #meds"}
-              aria-label="What happened, or #tags"
+              maxLength={120}
+              placeholder={tags.length ? "more #tags, or a short title" : "A short title, e.g. Missed my medication #meds"}
+              aria-label="The event's title, or #tags"
               className="bare-input h-8 min-w-[140px] flex-1 bg-transparent px-1 text-[16px] italic focus:outline-none"
               style={{ color: INK }}
             />
           </div>
+          {/* How it felt: three coloured buttons (tap again to clear). */}
+          <div role="radiogroup" aria-label="How it felt" className="flex items-center gap-1.5">
+            <span className="text-[13px] font-semibold" style={{ color: INK_SOFT }}>
+              Felt
+            </span>
+            {TONES.map((t) => {
+              const on = tone === t.v;
+              return (
+                <button key={t.v} type="button" role="radio" aria-checked={on} aria-label={t.name} title={t.name} onClick={() => setTone(on ? null : t.v)} className="flex h-8 w-10 items-center justify-center rounded-full text-[17px] font-bold leading-none transition-transform" style={{ color: on ? "#fff" : t.color, background: on ? t.color : t.bg, border: `1.5px solid ${t.color}`, transform: on ? "scale(1.06)" : undefined }}>
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={2} maxLength={1000} placeholder="Details (optional): shown when you hover over it" aria-label="Details" className="event-input resize-none rounded-xl px-2.5 py-1.5 text-[15px] leading-snug" style={{ color: INK }} />
           <div role="radiogroup" aria-label="When" className="flex flex-wrap items-center gap-1.5">
             <span className="text-[13px] font-semibold" style={{ color: INK_SOFT }}>
               When
@@ -241,8 +275,14 @@ export function EventLog({ notes }: { notes: Note[] }) {
                   className="flex h-7 max-w-[min(100%,240px)] items-center gap-1 rounded-full pl-2 pr-2.5 text-[13px]"
                   style={tag ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 } : { background: "rgba(255,250,235,.7)", border: "1px solid rgba(139,112,64,.4)", color: INK }}
                 >
-                  {!tag && <EventGlyph />}
-                  <span className="min-w-0 truncate">{body.split("\n")[0]}</span>
+                  {toneOf(n.tone) ? (
+                    <span aria-label={toneOf(n.tone)!.name} className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[11px] font-bold leading-none" style={{ background: toneOf(n.tone)!.color, color: "#fff" }}>
+                      {toneOf(n.tone)!.label}
+                    </span>
+                  ) : (
+                    !tag && <EventGlyph />
+                  )}
+                  <span className="min-w-0 truncate" title={n.details ?? undefined}>{body.split("\n")[0]}</span>
                 </button>
                 {openNote === n.id && (
                   <div role="dialog" aria-label="Event" className="card-pop-in absolute left-0 top-8 z-20 flex w-[min(300px,80vw)] flex-col gap-2 rounded-xl p-3" style={{ background: "#fbf3df", border: "1.5px solid #b39a6a", boxShadow: "0 10px 24px rgba(0,0,0,.25)" }}>
@@ -272,6 +312,11 @@ export function EventLog({ notes }: { notes: Note[] }) {
                       <div className="flex items-start gap-2">
                         <p className="m-0 min-w-0 flex-1 whitespace-pre-line text-[15px] leading-snug [overflow-wrap:anywhere]" style={{ color: INK }}>
                           {body}
+                          {n.details && (
+                            <span className="mt-1 block text-[13.5px]" style={{ color: INK_SOFT }}>
+                              {n.details}
+                            </span>
+                          )}
                         </p>
                         <button type="button" onClick={() => setEditingNote(n.id)} aria-label="Edit" title="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: INK_SOFT }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
