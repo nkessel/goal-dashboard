@@ -460,7 +460,7 @@ export function WelcomeCard({
                 }}
                 onBlur={() => writing !== null && finishWriting()}
                 className={`font-display m-0 leading-tight outline-none [text-wrap:balance] ${writing !== null ? "cursor-text" : ""}`}
-                style={{ color: "var(--t-ink)", fontSize: greetingSize(writing ?? greeting), caretColor: "#8a6116", ...(writing !== null ? { textDecoration: "underline dotted rgba(139,112,64,.55)", textUnderlineOffset: 6 } : {}) }}
+                style={{ color: "var(--t-ink)", fontSize: greetingSize(writing ?? greeting), caretColor: "#8a6116", outline: "none" }}
               >
                 {greeting}
               </p>
