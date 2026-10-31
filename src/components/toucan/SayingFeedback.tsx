@@ -5,7 +5,7 @@ import { useState } from "react";
 const REASONS = ["Not relevant to me", "Too pushy", "Wrong time of day", "Wording feels off", "Heard it too often"];
 
 /** A small speech-bubble button beside the thumbs: say more about this line. */
-export function NoteButton({ on, onClick, label = "Say more about this" }: { on: boolean; onClick: () => void; label?: string }) {
+export function NoteButton({ on, onClick, label = "Custom feedback", text = false }: { on: boolean; onClick: () => void; label?: string; /** Show its name beside the icon ("Custom feedback"). */ text?: boolean }) {
   return (
     <button
       type="button"
@@ -13,13 +13,14 @@ export function NoteButton({ on, onClick, label = "Say more about this" }: { on:
       aria-pressed={on}
       aria-label={label}
       title={label}
-      className={`relative flex h-7 w-7 items-center justify-center rounded-full transition-opacity before:absolute before:-inset-2 before:content-[''] hover:opacity-100 ${on ? "opacity-100" : "opacity-45"}`}
+      className={`relative flex h-7 items-center justify-center gap-1 rounded-full transition-opacity before:absolute before:-inset-2 before:content-[''] hover:opacity-100 ${text ? "px-2 text-[11.5px] font-semibold" : "w-7"} ${on ? "opacity-100" : text ? "opacity-75" : "opacity-45"}`}
       style={{ background: on ? "rgba(217,180,95,.25)" : "transparent" }}
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path d="M4 5.5h16v10H10l-4.5 3.5V15.5H4z" stroke="#8a6116" strokeWidth="1.8" strokeLinejoin="round" />
         <path d="M8 9.5h8M8 12.5h5" stroke="#8a6116" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
+      {text && <span style={{ color: "#8a6116" }}>Custom feedback</span>}
     </button>
   );
 }

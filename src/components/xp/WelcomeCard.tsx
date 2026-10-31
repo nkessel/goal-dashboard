@@ -10,9 +10,7 @@ import { EnergyCheck } from "./EnergyCheck";
 import { CheckinIcon } from "./CheckinIcon";
 import { likeLine, likedLines, lineForDay, retireLine } from "@/lib/greetings";
 import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
-import { addBackGreeting, readPromptVotes, toucanPrompts, welcomeOrder, welcomeShows, writePromptVotes, type PromptVotes, type WelcomeEl } from "@/lib/welcome";
-import { voice, windowOf } from "@/lib/toucan-style";
-import { useToucanStyle } from "@/lib/toucan-style-store";
+import { addBackGreeting, checkinLabel, readPromptVotes, toucanPrompts, welcomeOrder, welcomeShows, writePromptVotes, type PromptVotes, type WelcomeEl } from "@/lib/welcome";
 import { useEscape } from "@/lib/use-escape";
 import { coachAction, setTopPriorityAction } from "@/app/actions";
 import { Digest, PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
@@ -20,6 +18,7 @@ import { GearIcon } from "@/components/ui/Icons";
 import { ArrangeAbove, ArrangeList, CastleEdit, EditButton, GoldCheck, GreetingOptions } from "./WelcomeArrange";
 import { MistScene } from "./MistScene";
 import { DueSoonDrawer } from "@/components/tasks/DueSoonDrawer";
+import { SleepCheckIn } from "./SleepCheckIn";
 import { TodayPlanner } from "./TodayPlanner";
 import { castleOf } from "./CastleArt";
 
@@ -77,7 +76,6 @@ export function WelcomeCard({
   /** Opened from Settings to try it out: shows above the settings popup. */
   preview?: boolean;
 }) {
-  const style = useToucanStyle();
   // The settings as they are now: changed right here while arranging, or anywhere else.
   const [fx, setFx] = useState(fxProp);
   useEffect(() => subscribeFx(() => setFx(loadFx())), []);
@@ -138,7 +136,7 @@ export function WelcomeCard({
   // Complete check-in: saves whatever is entered in the check-in, then on into the forest.
   const submitCheckin = useRef<((after: () => void) => void) | null>(null);
   // The top priority and the intention save with it too: nothing typed here is lost on the way out.
-  const savers = useRef<Partial<Record<"focus" | "intention", () => Promise<boolean>>>>({});
+  const savers = useRef<Partial<Record<"focus" | "sleep", () => Promise<boolean>>>>({});
   const [finishing, setFinishing] = useState(false);
   const complete = async () => {
     if (finishing || leaving) return;
@@ -205,30 +203,31 @@ export function WelcomeCard({
 
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
     focus: <TopPriority arranging={arranging} register={(f) => (savers.current.focus = f)} last={priority} question={fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} />,
-    toucan: (
-      <div className="flex w-full items-center gap-2.5 text-left">
-        <ToucanArt size={40} />
-        <p className="m-0 flex-1 text-[15px] italic leading-snug" style={{ color: "#3d2f18" }}>
-          {mode === "back" ? (style.tone === "direct" ? "Quick check-in?" : "How are you arriving?") : `${voice.greet(style, windowOf() ?? "morning")} How are you arriving today?`}
-        </p>
+    checkin: recent ? null : (
+      <div className="flex w-full flex-col items-center">
+        {/* The button stays; the check-in slides open beneath it (and closes the same way). */}
+        <button
+          type="button"
+          onClick={() => !arranging && setCheckinOpen((v) => !v)}
+          aria-expanded={checkinOpen}
+          className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]"
+          style={checkinStyleOf(fx).style}
+        >
+          <CheckinIcon icon={checkinIconOf(fx)} /> {checkedIn ? "Checked in ✓" : checkinLabel(fx)}
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ opacity: 0.8, transform: checkinOpen && !arranging ? "rotate(180deg)" : undefined }}>
+            <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        {!arranging && (
+          <div className="drawer-body w-full" data-open={checkinOpen ? "true" : "false"}>
+            <div className="drawer-inner" inert={!checkinOpen}>
+              <CheckinPanel fx={fx} metrics={metrics} submit={(f) => (submitCheckin.current = f)} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} />
+            </div>
+          </div>
+        )}
       </div>
     ),
-    checkin: (recent || checkinOpen) && !arranging ? (recent ? null : (
-      // Parchment like the rest of the card, its words in ink rather than cream (as in Insights).
-      <CheckinPanel fx={fx} mode={mode} metrics={metrics} checkedIn={checkedIn} submit={(f) => (submitCheckin.current = f)} onCollapse={() => setCheckinOpen(false)} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} />
-    )) : (
-      <button
-        type="button"
-        onClick={() => setCheckinOpen(true)}
-        className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]"
-        style={checkinStyleOf(fx).style}
-      >
-        <CheckinIcon icon={checkinIconOf(fx)} /> {fx.checkinText?.trim() || "Emotional check-in"}
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.8 }}>
-          <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-    ),
+    sleep: <SleepCheckIn register={(f) => (savers.current.sleep = f)} />,
     streak: award && award.streak > 0 ? (
       <p className="m-0 text-[14.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
         {award.streak > 1 ? `🔥 ${award.streak}-day streak — keep it going` : "Day one of a new streak"}
@@ -505,6 +504,12 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
     const q = answer.trim();
     if (!q || talk?.thinking) return;
     const history = talk?.history ?? [{ role: "assistant" as const, content: ask }];
+    // Answering him counts like a thumbs up: this is a question you respond to (remembered, not made the first one).
+    if (!talk && !votes.liked.includes(ask)) {
+      const next: PromptVotes = { liked: [...new Set([ask, ...votes.liked])].slice(0, 30), hidden: votes.hidden.filter((x) => x !== ask) };
+      writePromptVotes(next);
+      setVotes(next);
+    }
     setAnswer("");
     setRate(false);
     setTalk({ you: q, him: "", thinking: true, history });
@@ -579,10 +584,33 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
         </span>
       </button>
       {landed && (
-        <div className={`toucan-bubble owl-say absolute bottom-1 left-[58px] z-[5] ${why || talk || replying ? "w-[min(290px,74vw)]" : "w-max min-w-[150px] max-w-[min(250px,62vw)]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+        <div
+          // His bubble moves him too: drag it by its words (buttons and the reply line still work).
+          onPointerDown={(e) => {
+            if ((e.target as HTMLElement).closest("button, input, textarea, a, form")) return;
+            drag.current = { x: e.clientX, y: e.clientY, ox: off.x, oy: off.y, moved: false };
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            const d = drag.current;
+            if (!d) return;
+            if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+            d.moved = true;
+            setOff({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y });
+          }}
+          onPointerUp={() => {
+            if (drag.current?.moved) {
+              try {
+                window.localStorage.setItem(TOUCAN_AT, JSON.stringify(off));
+              } catch {}
+            }
+            drag.current = null;
+          }}
+          className={`group/bubble toucan-bubble owl-say absolute bottom-1 left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,74vw)]" : replying ? "w-[min(260px,68vw)]" : "w-max min-w-[180px] max-w-[min(250px,62vw)]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
           {/* ✎ at the top right: rate what he asked, or say more about it. */}
-          {!menu && !saying && !talk && (
-            <button type="button" onClick={() => setRate((v) => !v)} aria-label="Rate or comment on what he asked" title="Rate or comment" aria-expanded={rate} className="absolute -right-2 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: rate ? "#f2e2b4" : "#fffaf0", border: "1px solid #b39a6a", color: "#8a6116" }}>
+          {/* Hidden while you're answering him (an answer already says it's a good question). */}
+          {!menu && !saying && !talk && !replying && (
+            <button type="button" onClick={() => setRate((v) => !v)} aria-label="Rate or comment on what he asked" title="Rate or comment" aria-expanded={rate} className={`absolute -right-2 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full${rate ? "" : " opacity-0 transition-opacity group-hover/bubble:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-60"}`} style={{ background: rate ? "#f2e2b4" : "#fffaf0", border: "1px solid #b39a6a", color: "#8a6116" }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
               </svg>
@@ -601,32 +629,15 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
           ) : (
             <span className={!menu && !saying ? "block pr-2" : undefined}>{saying ?? (menu ? "How can I help?" : ask)}</span>
           )}
-          {/* Replying: a slim line inside the bubble (opened from the Reply tab hanging under it). */}
-          {!menu && !saying && (replying || talk) && (
-            <form
-              className="reply-field reveal mt-1.5 flex h-7 min-w-0 items-center rounded-full pl-2.5 pr-0.5"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void reply();
-              }}
-            >
-              <input autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={talk ? "Say more…" : "Reply…"} aria-label="Reply to the toucan" maxLength={400} className="h-full min-w-0 flex-1 border-0 bg-transparent text-[16px] italic outline-none placeholder:not-italic placeholder:opacity-60" style={{ color: "#2a1c10" }} />
-              <button type="submit" disabled={!answer.trim()} aria-label="Send" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-35" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1px solid #4a3913", color: "#2a1c10" }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </form>
-          )}
           {/* Hanging from the bubble's lower edge (not part of his words): ‹ › for something else he could ask, and Reply. */}
           {!menu && !saying && (
             <span className="absolute -bottom-3 left-2.5 right-2.5 flex items-center gap-1">
               {!talk && prompts.length > 1 && (
                 <>
-                  <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-hang flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none">
+                  <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-hang flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none opacity-0 transition-opacity group-hover/bubble:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-60">
                     ‹
                   </button>
-                  <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="bubble-hang flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none">
+                  <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="bubble-hang flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none opacity-0 transition-opacity group-hover/bubble:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-60">
                     ›
                   </button>
                 </>
@@ -637,14 +648,32 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
                   More
                 </button>
               )}
-              {!replying && !talk && (
-                <button type="button" onClick={() => (setReplying(true), setRate(false))} className="bubble-hang flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-semibold">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M10 6L4 12l6 6M4.5 12H15a5 5 0 0 1 5 5v1" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Reply
-                </button>
-              )}
+              {/* A blank line to answer him in, hanging under his words; it widens as you type. */}
+              <form
+                className="flex items-center"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void reply();
+                }}
+              >
+                <input
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  onFocus={() => (setReplying(true), setRate(false))}
+                  onBlur={() => !answer && setReplying(false)}
+                  aria-label="Reply to the toucan"
+                  maxLength={400}
+                  className={`bubble-hang h-6 rounded-full px-2.5 text-[16px] outline-none transition-[width] duration-300 ${replying || answer ? "w-[min(180px,46vw)]" : "w-[84px]"}`}
+                  style={{ color: "#2a1c10" }}
+                />
+                {answer.trim() && (
+                  <button type="submit" aria-label="Send" className="reveal -ml-6 flex h-5 w-5 items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10" }}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </form>
             </span>
           )}
           {rate && !menu && !saying && (
@@ -652,7 +681,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
               <span className="flex items-center gap-1">
                 <LineVote kind="like" on={votes.liked.includes(ask)} onClick={() => vote(true)} />
                 <LineVote kind="dislike" on={why === "down"} onClick={() => setWhy(why === "down" ? null : "down")} />
-                <NoteButton on={why === "note"} onClick={() => setWhy(why === "note" ? null : "note")} />
+                <NoteButton text on={why === "note"} onClick={() => setWhy(why === "note" ? null : "note")} />
               </span>
               {why && (
                 <WhyBox
@@ -935,33 +964,26 @@ function TopPriority({ question, register, arranging = false }: { last: { text: 
   );
 }
 
-/** The check-in, opened in place of its button. */
-function CheckinPanel({ fx, mode, metrics, checkedIn, onSaved, onCollapse, submit }: { fx: FxSettings; mode: "day" | "back"; metrics: string[]; checkedIn: boolean; onSaved: () => void; onCollapse: () => void; submit: (save: (after: () => void) => void) => void }) {
+/** The check-in, slid open under its button (sleep has its own part now). */
+function CheckinPanel({ fx, metrics, onSaved, submit }: { fx: FxSettings; metrics: string[]; onSaved: () => void; submit: (save: (after: () => void) => void) => void }) {
   return (
-      <div
-        className="w-full rounded-2xl px-2 py-2.5 text-left"
-        style={{
-          background: "linear-gradient(180deg, rgba(255,250,236,.75), rgba(240,226,190,.75))",
-          border: "1.5px solid rgba(139,112,64,.5)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,.6)",
-          ["--t-cream" as string]: "var(--t-ink)",
-          ["--ec-soft" as string]: "var(--t-ink-soft)",
-          ["--ec-chip" as string]: "rgba(120,90,40,.1)",
-          ["--ec-gold" as string]: "#8a6116",
-          ["--ec-line" as string]: "rgba(139,112,64,.45)",
-          ["--ec-value" as string]: "#5a3d12",
-          ["--ec-l" as string]: "30%",
-        }}
-      >
-        {/* Its title folds it back into the button. */}
-        <button type="button" onClick={onCollapse} aria-expanded className="mx-auto mb-1 flex items-center gap-1.5 font-display text-[17px]" style={{ color: "#8a6116" }}>
-          {checkedIn ? "Checked in ✓" : fx.checkinText?.trim() || "Emotional check-in"}
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: "rotate(180deg)" }}>
-            <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <EnergyCheck full={fx.welcomeMetrics !== false} noSleep={mode === "back" || fx.welcomeSleep === false} today={null} metrics={metrics} onSaved={onSaved} submit={submit} addNights simple />
-      </div>
+    <div
+      className="mt-2 w-full rounded-2xl px-2 py-2.5 text-left"
+      style={{
+        background: "linear-gradient(180deg, rgba(255,250,236,.75), rgba(240,226,190,.75))",
+        border: "1.5px solid rgba(139,112,64,.5)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,.6)",
+        ["--t-cream" as string]: "var(--t-ink)",
+        ["--ec-soft" as string]: "var(--t-ink-soft)",
+        ["--ec-chip" as string]: "rgba(120,90,40,.1)",
+        ["--ec-gold" as string]: "#8a6116",
+        ["--ec-line" as string]: "rgba(139,112,64,.45)",
+        ["--ec-value" as string]: "#5a3d12",
+        ["--ec-l" as string]: "30%",
+      }}
+    >
+      <EnergyCheck full={fx.welcomeMetrics !== false} noSleep today={null} metrics={metrics} onSaved={onSaved} submit={submit} simple />
+    </div>
   );
 }
 

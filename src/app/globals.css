@@ -2887,3 +2887,7 @@ html[data-welcome-open], html[data-welcome-open] body { background: #1b2119; }
 .bubble-hang { color: #8a6116; background: #fffaf0; box-shadow: 0 0 0 1px #c9a24a, 0 2px 4px rgba(60, 40, 10, 0.25); transition: transform 0.12s, background 0.12s; }
 .bubble-hang:hover { background: #f8ecc8; transform: translateY(-1px); }
 .bubble-hang:active { transform: scale(0.94); }
+/* One toucan at a time, loading included: while the loader's toucan flies, the perched one steps away;
+   over the welcome screen (with its own toucan) the loader's doesn't show. */
+html:has(.nav-loader-toucan) [data-perched-owl] { visibility: hidden; }
+html[data-welcome-open] .nav-loader-toucan { display: none; }

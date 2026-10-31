@@ -1,5 +1,6 @@
 "use client";
 
+import { checkinLabel } from "@/lib/welcome";
 import { useState } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -345,7 +346,7 @@ function CheckinOptions({ fx }: { fx: FxSettings }) {
           return (
             <button key={c.key} type="button" role="radio" aria-checked={on} aria-label={c.label} title={c.hint} onClick={() => set({ checkinStyle: c.key })} className="rounded-full p-0.5" style={{ boxShadow: on ? `0 0 0 2px ${GOLD}` : undefined }}>
               <span className="font-display flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px]" style={c.style}>
-                <CheckinIcon icon={checkinIconOf(fx)} /> {fx.checkinText?.trim() || "Emotional check-in"}
+                <CheckinIcon icon={checkinIconOf(fx)} /> {checkinLabel(fx)}
               </span>
             </button>
           );

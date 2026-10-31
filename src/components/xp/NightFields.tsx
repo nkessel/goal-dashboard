@@ -9,7 +9,6 @@ export type NightDraft = { bed: string; wake: string; effort: string[]; hindranc
 export const EMPTY_NIGHT: NightDraft = { bed: "", wake: "", effort: [], hindrances: [] };
 export const nightIsEmpty = (n: NightDraft) => !n.bed && !n.wake && !n.effort.length && !n.hindrances.length;
 
-const INK = "var(--t-cream)";
 const SOFT = "var(--ec-soft, rgba(239,230,204,.75))";
 
 /** "23:30" → "11:30 pm". */
@@ -37,7 +36,7 @@ const WAKE_TIMES = ["05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30
  * minutes to fine-tune, in 5-minute steps.
  */
 /** The app's time picker: a parchment token showing the time ("— : —" when unset) that opens the time dial. "spirit" suits the toucan's dark panels. */
-export function TimeToken({ value, onChange, label, icon, kind, compact = false, variant = "parchment" }: { value: string; onChange: (v: string) => void; label: string; icon?: React.ReactNode; kind: "bed" | "wake" | "any"; compact?: boolean; variant?: "parchment" | "spirit" }) {
+export function TimeToken({ value, onChange, label, icon, kind, compact = false, variant = "parchment", placeholder = "add time" }: { value: string; onChange: (v: string) => void; label: string; icon?: React.ReactNode; kind: "bed" | "wake" | "any"; compact?: boolean; variant?: "parchment" | "spirit"; /** Shown (softly, in words) while no time is set. */ placeholder?: string }) {
   const [openAt, setOpenAt] = useState<HTMLElement | null>(null);
   const open = !!openAt;
   return (
@@ -54,7 +53,7 @@ export function TimeToken({ value, onChange, label, icon, kind, compact = false,
       >
         {icon}
         <span className={`font-display tabular-nums ${compact ? "text-[14px]" : "text-[17px]"}`} style={{ opacity: value ? 1 : 0.55 }}>
-          {value ? clock12(value) : "— : —"}
+          {value ? clock12(value) : <span className="text-[0.82em] italic">{placeholder}</span>}
         </span>
       </button>
       {open && <TimeDial anchor={openAt} value={value} kind={kind} label={label} onPick={onChange} onClose={() => setOpenAt(null)} />}
@@ -195,8 +194,17 @@ const WheelIcon = () => (
  * tap on its time), how long that was, and the Wheel of Time, which opens the
  * Factors of sleep: yesterday's Right Effort and Hindrances, as chips.
  */
-export function NightFields({ value, onChange, effort, hindrances }: { value: NightDraft; onChange: (n: NightDraft) => void; effort: string[]; hindrances: string[] }) {
+export function NightFields({ value, onChange, effort, hindrances, onLists, day }: { value: NightDraft; onChange: (n: NightDraft) => void; effort: string[]; hindrances: string[]; /** Edit the two lists right here (saved to the Wheel of Time). */ onLists?: (lists: { effort: string[]; hindrances: string[] }) => void; /** This morning's app day (YYYY-MM-DD), to name the day each list is for. */ day?: string }) {
   const [open, setOpen] = useState(false);
+  const [editingLists, setEditingLists] = useState(false);
+  const [newEffort, setNewEffort] = useState("");
+  const [newHindrance, setNewHindrance] = useState("");
+  // The day before this morning: what Right Effort and the hindrances are logged for.
+  const yesterday = (() => {
+    if (!day) return "";
+    const [y, m, d] = day.split("-").map(Number);
+    return new Date(y, m - 1, d - 1).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  })();
   const factorsId = useId();
   const set = (patch: Partial<NightDraft>) => onChange({ ...value, ...patch });
   const toggleEffort = (name: string) => set({ effort: value.effort.includes(name) ? value.effort.filter((e) => e !== name) : [...value.effort, name] });
@@ -216,7 +224,7 @@ export function NightFields({ value, onChange, effort, hindrances }: { value: Ni
           <span className="text-[12px] font-semibold" style={{ color: SOFT }}>
             Slept
           </span>
-          <TimeToken value={value.bed} onChange={(v) => set({ bed: v })} label="Last night's sleep time" icon={<MoonIcon />} kind="bed" />
+          <TimeToken value={value.bed} onChange={(v) => set({ bed: v })} label="Last night's sleep time" icon={<MoonIcon />} kind="bed" placeholder="bedtime" />
         </span>
         <span aria-hidden className="mt-4 flex flex-col items-center text-[12px] tabular-nums" style={{ color: SOFT }}>
           <svg width="40" height="10" viewBox="0 0 40 10" fill="none">
@@ -228,7 +236,7 @@ export function NightFields({ value, onChange, effort, hindrances }: { value: Ni
           <span className="text-[12px] font-semibold" style={{ color: SOFT }}>
             Woke
           </span>
-          <TimeToken value={value.wake} onChange={(v) => set({ wake: v })} label="This morning's wake time" icon={<SunIcon />} kind="wake" />
+          <TimeToken value={value.wake} onChange={(v) => set({ wake: v })} label="This morning's wake time" icon={<SunIcon />} kind="wake" placeholder="wake time" />
         </span>
       </div>
       <button
@@ -239,43 +247,73 @@ export function NightFields({ value, onChange, effort, hindrances }: { value: Ni
         className="wheel-btn mx-auto flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold"
       >
         <WheelIcon />
-        Wheel of Time
+        Wheel of Time · factors of sleep
         {checked > 0 && !open && <span className="tabular-nums opacity-80">· {checked}</span>}
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(90deg)" : undefined }}>
           <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
-      {open && (
-        <div id={factorsId} className="reveal flex flex-col gap-2.5 pt-0.5">
-          <span className="font-display text-center text-[16px]" style={{ color: INK }}>
-            Factors of sleep
-          </span>
+      <div className="drawer-body" data-open={open ? "true" : "false"}>
+        <div id={factorsId} className="drawer-inner flex flex-col gap-2.5 pt-0.5" inert={!open}>
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--ec-gold, #f2d27e)" }}>
-              Right effort · yesterday
+            <span className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--ec-gold, #f2d27e)" }}>
+                Right effort · yesterday{yesterday ? ` (${yesterday})` : ""}
+              </span>
+              {/* Today's own right effort is logged on the Wheel of Time (a new tab, so this screen stays). */}
+              <a href="/insights#wheel-of-time" target="_blank" rel="noopener" className="ml-auto text-[11.5px] underline underline-offset-2" style={{ color: SOFT }}>
+                Add for today ↗
+              </a>
             </span>
             <div className="flex flex-wrap gap-1.5">
               {effort.map((name) => {
                 const on = value.effort.includes(name);
-                return (
+                return editingLists ? (
+                  <span key={name} className="factor-chip reveal">
+                    {name}
+                    <button type="button" onClick={() => onLists?.({ effort: effort.filter((x) => x !== name), hindrances })} aria-label={`Remove ${name}`} className="ml-0.5 text-[14px] leading-none opacity-70 hover:opacity-100">
+                      ×
+                    </button>
+                  </span>
+                ) : (
                   <button key={name} type="button" role="checkbox" aria-checked={on} onClick={() => toggleEffort(name)} className={`factor-chip ${on ? "factor-on" : ""}`}>
                     {on && <span aria-hidden>✓</span>}
                     {name}
                   </button>
                 );
               })}
+              {editingLists && (
+                <form
+                  className="reveal flex items-center gap-1"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const t = newEffort.trim().slice(0, 40);
+                    if (t && !effort.includes(t)) onLists?.({ effort: [...effort, t], hindrances });
+                    setNewEffort("");
+                  }}
+                >
+                  <input value={newEffort} onChange={(e) => setNewEffort(e.target.value)} placeholder="+ add one" aria-label="Add a right effort" className="factor-chip w-[120px] bg-transparent text-[16px] outline-none" />
+                </form>
+              )}
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] font-bold uppercase tracking-[.14em]" style={{ color: "#d58f78" }}>
-              Hindrances
+              Hindrances · last night{yesterday ? ` (${yesterday})` : ""}
             </span>
             <div className="flex flex-wrap items-center gap-1.5">
               {hindrances.map((name) => {
                 const on = hasHindrance(name);
                 const at = value.hindrances.find((h) => h.name === name)?.at ?? "";
-                return (
+                return editingLists ? (
+                  <span key={name} className="factor-chip factor-warn reveal">
+                    {name}
+                    <button type="button" onClick={() => onLists?.({ effort, hindrances: hindrances.filter((x) => x !== name) })} aria-label={`Remove ${name}`} className="ml-0.5 text-[14px] leading-none opacity-70 hover:opacity-100">
+                      ×
+                    </button>
+                  </span>
+                ) : (
                   <span key={name} className="flex items-center gap-1">
                     <button type="button" role="checkbox" aria-checked={on} onClick={() => toggleHindrance(name)} className={`factor-chip factor-warn ${on ? "factor-on" : ""}`}>
                       {on && <span aria-hidden>✓</span>}
@@ -287,11 +325,31 @@ export function NightFields({ value, onChange, effort, hindrances }: { value: Ni
               })}
             </div>
           </div>
-          <Link href="/insights#wheel-of-time" className="self-end text-[12px] underline underline-offset-2" style={{ color: SOFT }}>
-            Edit the lists
-          </Link>
+          {editingLists && (
+            <form
+              className="reveal flex items-center gap-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const t = newHindrance.trim().slice(0, 40);
+                if (t && !hindrances.includes(t)) onLists?.({ effort, hindrances: [...hindrances, t] });
+                setNewHindrance("");
+              }}
+            >
+              <input value={newHindrance} onChange={(e) => setNewHindrance(e.target.value)} placeholder="+ add a hindrance" aria-label="Add a hindrance" className="factor-chip factor-warn w-[150px] bg-transparent text-[16px] outline-none" />
+            </form>
+          )}
+          {/* The lists are edited right here (no trip to another page). */}
+          {onLists ? (
+            <button type="button" onClick={() => setEditingLists((v) => !v)} className="self-end text-[12px] underline underline-offset-2" style={{ color: SOFT }}>
+              {editingLists ? "Done editing" : "Edit the lists"}
+            </button>
+          ) : (
+            <Link href="/insights#wheel-of-time" className="self-end text-[12px] underline underline-offset-2" style={{ color: SOFT }}>
+              Edit the lists
+            </Link>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
