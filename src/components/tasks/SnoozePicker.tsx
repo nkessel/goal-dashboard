@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
+import { useClosing } from "@/components/ui/Fold";
 
 /** How long to snooze: a time it comes back (`until`), or "tomorrow" (to the top of tomorrow's plan). */
 export type SnoozeChoice = { tomorrow: true } | { until: Date; label: string };
@@ -17,7 +18,8 @@ const SOFT = "#6b5631";
  * 4 hours, or a time you pick). Other always has a way back; closing changes
  * nothing.
  */
-export function SnoozePicker({ title, onPick, onClose }: { title: string; onPick: (c: SnoozeChoice) => void; onClose: () => void }) {
+export function SnoozePicker({ title, onPick, onClose: closeNow }: { title: string; onPick: (c: SnoozeChoice) => void; onClose: () => void }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   const [other, setOther] = useState(false);
   const [at, setAt] = useState("");
   useEscape(() => (other ? setOther(false) : onClose()));
@@ -42,7 +44,7 @@ export function SnoozePicker({ title, onPick, onClose }: { title: string; onPick
   const pickedOk = !!picked && Number.isFinite(picked.getTime()) && picked.getTime() > clock();
 
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[80] flex items-center justify-center p-4" style={{ background: "var(--t-overlay, rgba(10,8,4,.55))" }} onClick={(e) => (e.stopPropagation(), onClose())} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.key !== "Escape" && e.stopPropagation()}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[80] flex items-center justify-center p-4`} style={{ background: "var(--t-overlay, rgba(10,8,4,.55))" }} onClick={(e) => (e.stopPropagation(), onClose())} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.key !== "Escape" && e.stopPropagation()}>
       <div
         role="dialog"
         aria-modal="true"

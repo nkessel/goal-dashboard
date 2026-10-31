@@ -13,6 +13,7 @@ import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 import { Fold } from "@/components/ui/Fold";
+import { useClosing } from "@/components/ui/Fold";
 
 type Takeoff = Awaited<ReturnType<typeof listTakeoffQuestsAction>>[number];
 
@@ -754,7 +755,8 @@ export function EnergyCheck({
 }
 
 /** Power-ups and light quests, each with "Add to today" (to the top of Today's Quests). */
-function TakeoffSheet({ onClose, onHide }: { onClose: () => void; onHide?: () => void }) {
+function TakeoffSheet({ onClose: closeNow, onHide }: { onClose: () => void; onHide?: () => void }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   useEscape(onClose);
   const [rows, setRows] = useState<Takeoff[] | null>(null);
   const [added, setAdded] = useState<Set<string>>(() => new Set());
@@ -807,7 +809,7 @@ function TakeoffSheet({ onClose, onHide }: { onClose: () => void; onHide?: () =>
   }
 
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[52] flex items-end justify-center sm:items-center sm:p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[52] flex items-end justify-center sm:items-center sm:p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

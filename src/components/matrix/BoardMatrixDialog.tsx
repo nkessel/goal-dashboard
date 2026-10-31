@@ -10,6 +10,7 @@ import { IconPicker } from "@/components/tasks/IconPicker";
 import { IconScale } from "@/components/tasks/QuestEditorDialog";
 import { BoardSeal } from "@/components/boards/BoardSeal";
 import { useEscape } from "@/lib/use-escape";
+import { useClosing } from "@/components/ui/Fold";
 
 /**
  * A board as one item on the Priority Matrix (e.g. a course instead of each
@@ -19,13 +20,14 @@ export function BoardMatrixDialog({
   board,
   openQuests,
   theme,
-  onClose,
+  onClose: closeNow,
 }: {
   board: Board;
   openQuests: number;
   theme: "calm" | "adventure";
   onClose: () => void;
 }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   useEscape(() => onClose());
   const isAdventure = theme === "adventure";
   const [title, setTitle] = useState(board.title);
@@ -79,7 +81,7 @@ export function BoardMatrixDialog({
   };
 
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[52] flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[52] flex items-center justify-center p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

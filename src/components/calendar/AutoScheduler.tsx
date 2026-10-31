@@ -8,6 +8,7 @@ import { applyAutoScheduleAction, saveSchedulerSettingsAction, schedulerContextA
 import { SCHEDULER_DEFAULTS, clockOf, planSchedule, type Busy, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
 import { useEscape } from "@/lib/use-escape";
 import { Fold } from "@/components/ui/Fold";
+import { useClosing } from "@/components/ui/Fold";
 
 const LOCAL_KEY = "auto-schedule";
 const TIMES: { v: TimeOfDay; label: string; hint: string }[] = [
@@ -50,7 +51,8 @@ const hm = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minut
  * list, in its order, gets the first free time that suits it. You see the
  * whole plan first, nudge it, then place it all at once.
  */
-export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme: "calm" | "adventure"; onClose: () => void }) {
+export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task[]; theme: "calm" | "adventure"; onClose: () => void }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   useEscape(() => onClose());
   const router = useRouter();
   const isAdventure = theme === "adventure";
@@ -154,7 +156,7 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
   const taskOf = new Map(tasks.map((t) => [t.id, t]));
 
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[62] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[62] flex items-end justify-center p-0 sm:items-center sm:p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

@@ -32,6 +32,7 @@ import { EditBoardModal } from "./EditBoardModal";
 import { BoardSeal } from "./BoardSeal";
 import { nextActionOf } from "@/lib/next-action";
 import { fromFeedback } from "@/lib/from-feedback";
+import { useClosing } from "@/components/ui/Fold";
 
 /** Where the Uncategorized card sits among the boards (it has no saved order of its own). */
 const LOOSE_KEY = "boards-loose-index";
@@ -665,7 +666,8 @@ function BoardMenu({
 }
 
 /** Pick the board to nest this one inside. */
-function NestPicker({ board, isAdventure, onClose, onPick }: { board: BoardWithStats; isAdventure: boolean; onClose: () => void; onPick: (parentId: string) => void }) {
+function NestPicker({ board, isAdventure, onClose: closeNow, onPick }: { board: BoardWithStats; isAdventure: boolean; onClose: () => void; onPick: (parentId: string) => void }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   const [options, setOptions] = useState<{ id: string; label: string }[] | null>(null);
   const [q, setQ] = useState("");
   useEffect(() => {
@@ -684,7 +686,7 @@ function NestPicker({ board, isAdventure, onClose, onPick }: { board: BoardWithS
   }, [onClose]);
   const shown = (options ?? []).filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase()));
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[70] flex items-center justify-center p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-label={`Nest ${board.title} into another board`}

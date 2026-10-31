@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { findQuestsAction, listQuestStepsAction, sequenceDetachAction, sequenceLinkAction, sequenceMoveAction, sequenceOfAction, stepsToSequenceAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 import type { SequenceItem } from "@/lib/data/sequences";
+import { useClosing } from "@/components/ui/Fold";
 
 type Waiting = { id: string; title: string; estimate_minutes: number | null };
 
@@ -254,7 +255,8 @@ export function QuestPicker({ exclude, onPick, autoFocus = false, placeholder = 
  * down, take them out, add quests before or after this one, or turn the
  * quest's steps into a sequence of quests (a project).
  */
-export function SequenceDialog({ taskId, title, isAdventure, onClose, onStepsMoved }: { taskId: string; title: string; isAdventure: boolean; onClose: () => void; onStepsMoved?: () => void }) {
+export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, onStepsMoved }: { taskId: string; title: string; isAdventure: boolean; onClose: () => void; onStepsMoved?: () => void }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   const router = useRouter();
   const [chain, setChain] = useState<SequenceItem[] | null>(null);
   const [where, setWhere] = useState<"before" | "after">("after");
@@ -281,7 +283,7 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose, onStepsMov
   const open = (chain ?? []).filter((c) => c.status === "open");
   const ink = "var(--t-ink-soft)";
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[72] flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[72] flex items-center justify-center p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

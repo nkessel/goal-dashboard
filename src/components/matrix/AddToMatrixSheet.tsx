@@ -7,6 +7,7 @@ import { addToMatrixAction } from "@/app/actions";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { BoardSeal } from "@/components/boards/BoardSeal";
 import { useEscape } from "@/lib/use-escape";
+import { useClosing } from "@/components/ui/Fold";
 
 /**
  * "+" in Not yet plotted: bring boards (plotted as one item) and quests that
@@ -17,7 +18,7 @@ export function AddToMatrixSheet({
   quests,
   openCountByBoard,
   theme,
-  onClose,
+  onClose: closeNow,
   onAdded,
 }: {
   /** Boards not on the matrix yet. */
@@ -29,6 +30,7 @@ export function AddToMatrixSheet({
   onClose: () => void;
   onAdded: () => void;
 }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   useEscape(() => onClose());
   const isAdventure = theme === "adventure";
   const [query, setQuery] = useState("");
@@ -76,7 +78,7 @@ export function AddToMatrixSheet({
   const soft = "var(--t-ink-soft)";
 
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[52] flex items-end justify-center sm:items-center sm:p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[52] flex items-end justify-center sm:items-center sm:p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

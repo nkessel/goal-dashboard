@@ -7,6 +7,7 @@ import { makeRefillQuestAction, paintInventoryItemAction, saveInventoryAction } 
 import { POCKETS, type BringList, type Inventory, type InventoryItem, type ItemStatus, type PocketKey } from "@/lib/inventory";
 import { CHECKIN_STYLES } from "@/lib/celebration-fx";
 import { useEscape } from "@/lib/use-escape";
+import { useClosing } from "@/components/ui/Fold";
 
 const STATUS: { v: ItemStatus; label: string; hint: string }[] = [
   { v: "full", label: "Stocked", hint: "Full and ready" },
@@ -567,7 +568,7 @@ async function shrink(f: File): Promise<File> {
 function ItemSheet({
   initial,
   isNew,
-  onClose,
+  onClose: closeNow,
   onSave,
   onRemove,
   onMove,
@@ -582,6 +583,7 @@ function ItemSheet({
   onMove: () => void;
   onQuest: () => void;
 }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   useEscape(onClose);
   const [item, setItem] = useState(initial);
   const [description, setDescription] = useState("");
@@ -631,7 +633,7 @@ function ItemSheet({
   }, [isNew]);
 
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[56] flex items-end justify-center overscroll-contain sm:items-center sm:p-4" style={{ background: "rgba(10,8,4,.3)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[56] flex items-end justify-center overscroll-contain sm:items-center sm:p-4`} style={{ background: "rgba(10,8,4,.3)" }} onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-label={isNew ? "Add an item" : item.name} onClick={(e) => e.stopPropagation()} className="sheet-up parchment parchment-framed flex max-h-[92svh] w-full max-w-md flex-col gap-3 overflow-y-auto overscroll-contain rounded-t-2xl p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:rounded-2xl">
         <div className="relative z-[1] flex items-start gap-3">
           <button

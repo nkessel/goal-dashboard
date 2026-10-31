@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { suggestSlotsAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
+import { useClosing } from "@/components/ui/Fold";
 
 type Slot = { start: string; end: string };
 
@@ -32,7 +33,7 @@ export function SlotPickerDialog({
   initial,
   isAdventure,
   onPick,
-  onClose,
+  onClose: closeNow,
 }: {
   durationMinutes: number;
   initial?: string;
@@ -40,6 +41,7 @@ export function SlotPickerDialog({
   onPick: (slot: Slot) => void;
   onClose: () => void;
 }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   useEscape(() => onClose());
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export function SlotPickerDialog({
 
   return createPortal(
     <div
-      className="overlay-fade-in fixed inset-0 z-[65] flex items-center justify-center p-4"
+      className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[65] flex items-center justify-center p-4`}
       style={{ background: "var(--t-overlay)" }}
       onClick={(e) => {
         e.stopPropagation();

@@ -23,6 +23,7 @@ import { openFocusMode } from "@/lib/focus-timer";
 import { coinsForXp } from "@/lib/coins";
 import { DateField } from "@/components/ui/DateField";
 import { useScaleStyle } from "@/components/ui/LevelScales";
+import { useClosing } from "@/components/ui/Fold";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
  * Kept as a plain helper (not inlined in the component) so the impure
@@ -935,7 +936,8 @@ function LockedRewardCard({ reward }: { reward: Task }) {
 }
 
 /** "Already completed": which day (and, if wanted, what time) it was done. */
-function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose }: { title: string; isAdventure: boolean; onPick: (when: Date) => void; onEdit: () => void; onClose: () => void }) {
+function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose: closeNow }: { title: string; isAdventure: boolean; onPick: (when: Date) => void; onEdit: () => void; onClose: () => void }) {
+  const { closing, close: onClose } = useClosing(closeNow);
   const pad = (n: number) => String(n).padStart(2, "0");
   const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const [now] = useState(() => new Date());
@@ -956,7 +958,7 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose }: { ti
     onPick(when);
   }
   return createPortal(
-    <div className="overlay-fade-in fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[60] flex items-center justify-center p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"

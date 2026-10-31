@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-31 (transitions sweep round 1; toucan respond line).
+- **Last updated:** 2026-10-31 (transitions sweep round 2: dialog exits; toucan bubble per UX teams).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** iOS: opening feedback made the page behind it flash/resize, and the welcome card's top was cut off (owner's screen recordings, Oct 31). Fix shipped Oct 31 (see Recently shipped); confirm with the owner on a phone.
 
@@ -117,6 +117,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Oct 31: Transitions sweep, round 2: dialogs fade out too. `useClosing(onClose)` in `ui/Fold.tsx` (stable `close`, plays `overlay-fade-out` then closes) now wraps 11 dialogs that used to vanish: snooze picker, early bonus popup, slot picker, sequence, auto-scheduler, add to matrix, board matrix, backpack item sheet, nest picker, the check-in sheet and TaskRow's popup. The big editors (quest, rite, reward, route modal, bottom sheet, create sheet, One Thing) already had exits. Still abrupt: DayPlanner, StatsTile, AvatarBuilder, ImportReview, SecretMissions/BossLine overlays, IconPicker, BoardPicker, SchedulingList's slot dialog.
 
 - Oct 31: Toucan bubble per the three UX teams (`docs/ux/2026-10-31-toucan-bubble.md`): ‹ › are one 26px gilded coin split by a hairline (`.bubble-coin`, each half a button, only the pressed half sinks); the respond line is 168×22, 16px text drawn at 13px (scale .8125 inside `.reply-box`, so iPhone doesn't zoom), grows down a line at a time to 72px, never wider; send is a 20px gilded coin; Enter/Send key sends, Esc clears.
 

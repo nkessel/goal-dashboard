@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * A fold that slides open and closed (the app's drawer), for any in-flow part
@@ -37,4 +37,25 @@ export function useLinger(open: boolean, ms = 180) {
     return () => clearTimeout(t);
   }, [open, ms]);
   return { shown: open || shown, leaving: !open && shown };
+}
+
+/**
+ * Lets a dialog fade out before it goes: `close()` plays `overlay-fade-out`
+ * (while `closing` is true) and then calls the real `onClose`.
+ */
+export function useClosing(onClose: () => void, ms = 170) {
+  const [closing, setClosing] = useState(false);
+  const latest = useRef(onClose);
+  useEffect(() => {
+    latest.current = onClose;
+  });
+  const busy = useRef(false);
+  // Stable, so effects that list it (Esc handlers) don't re-run each render.
+  const close = useCallback(() => {
+    if (busy.current) return;
+    busy.current = true;
+    setClosing(true);
+    setTimeout(() => latest.current(), ms);
+  }, [ms]);
+  return { closing, close };
 }
