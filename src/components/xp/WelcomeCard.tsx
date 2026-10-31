@@ -499,6 +499,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
   const [why, setWhy] = useState<"down" | "note" | null>(null);
   // Talking with him in his own bubble (light: his words only, no buttons).
   const [answer, setAnswer] = useState("");
+  const [replying, setReplying] = useState(false);
   const [talk, setTalk] = useState<{ you: string; him: string; thinking: boolean; history: { role: "user" | "assistant"; content: string }[] } | null>(null);
   async function reply() {
     const q = answer.trim();
@@ -518,7 +519,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   useEffect(() => {
     if (toucanLanded) return;
-    const t = setTimeout(() => ((toucanLanded = true), setLanded(true)), 2700);
+    const t = setTimeout(() => ((toucanLanded = true), setLanded(true)), 3150);
     return () => clearTimeout(t);
   }, []);
   const vote = (up: boolean) => {
@@ -528,7 +529,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
     setRate(false);
     if (up) patchFx({ welcomeToucanAsk: ask });
   };
-  const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setIdx((i) => (i + d + prompts.length) % prompts.length));
+  const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setReplying(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
   const item = "font-semibold underline underline-offset-2";
   return (
     <div className={`${flyIn ? "welcome-toucan" : ""} absolute z-[3]`} style={{ left: 8 + off.x, top: -47 + off.y }}>
@@ -578,7 +579,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
         </span>
       </button>
       {landed && (
-        <div className={`toucan-bubble owl-say absolute bottom-1 left-[58px] z-[5] ${why || talk ? "w-[min(290px,74vw)]" : "w-[min(250px,62vw)]"} rounded-2xl px-3 py-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+        <div className={`toucan-bubble owl-say absolute bottom-1 left-[58px] z-[5] ${why || talk || replying ? "w-[min(290px,74vw)]" : "w-max min-w-[150px] max-w-[min(250px,62vw)]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
           {/* ✎ at the top right: rate what he asked, or say more about it. */}
           {!menu && !saying && !talk && (
             <button type="button" onClick={() => setRate((v) => !v)} aria-label="Rate or comment on what he asked" title="Rate or comment" aria-expanded={rate} className="absolute -right-2 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: rate ? "#f2e2b4" : "#fffaf0", border: "1px solid #b39a6a", color: "#8a6116" }}>
@@ -600,36 +601,48 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
           ) : (
             <span className={!menu && !saying ? "block pr-2" : undefined}>{saying ?? (menu ? "How can I help?" : ask)}</span>
           )}
-          {/* Under his words: step through what else he could ask, and answer him in a line. */}
+          {/* Replying: a slim line inside the bubble (opened from the Reply tab hanging under it). */}
+          {!menu && !saying && (replying || talk) && (
+            <form
+              className="reply-field reveal mt-1.5 flex h-7 min-w-0 items-center rounded-full pl-2.5 pr-0.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void reply();
+              }}
+            >
+              <input autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={talk ? "Say more…" : "Reply…"} aria-label="Reply to the toucan" maxLength={400} className="h-full min-w-0 flex-1 border-0 bg-transparent text-[16px] italic outline-none placeholder:not-italic placeholder:opacity-60" style={{ color: "#2a1c10" }} />
+              <button type="submit" disabled={!answer.trim()} aria-label="Send" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-35" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1px solid #4a3913", color: "#2a1c10" }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </form>
+          )}
+          {/* Hanging from the bubble's lower edge (not part of his words): ‹ › for something else he could ask, and Reply. */}
           {!menu && !saying && (
-            <span className="mt-1.5 flex items-center gap-1">
+            <span className="absolute -bottom-3 left-2.5 right-2.5 flex items-center gap-1">
               {!talk && prompts.length > 1 && (
                 <>
-                  <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: "#8a6116" }}>
+                  <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-hang flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none">
                     ‹
                   </button>
-                  <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: "#8a6116" }}>
+                  <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="bubble-hang flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none">
                     ›
                   </button>
                 </>
               )}
-              <form
-                className="reply-field flex h-8 min-w-0 flex-1 items-center rounded-full pl-3 pr-0.5"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void reply();
-                }}
-              >
-                <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={talk ? "Say more…" : "Reply…"} aria-label="Reply to the toucan" maxLength={400} className="h-full min-w-0 flex-1 border-0 bg-transparent text-[16px] italic outline-none placeholder:not-italic placeholder:opacity-60" style={{ color: "#2a1c10" }} />
-                <button type="submit" disabled={!answer.trim()} aria-label="Send" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-35" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1px solid #4a3913", color: "#2a1c10" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </form>
+              <span className="flex-1" />
               {talk && !talk.thinking && (
-                <button type="button" onClick={() => (talkToToucan(undefined, "talk"), setTalk(null))} title="Open the full conversation" className="shrink-0 text-[11.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                <button type="button" onClick={() => (talkToToucan(undefined, "talk"), setTalk(null), setReplying(false))} title="Open the full conversation" className="bubble-hang flex h-6 items-center rounded-full px-2 text-[11.5px] font-semibold">
                   More
+                </button>
+              )}
+              {!replying && !talk && (
+                <button type="button" onClick={() => (setReplying(true), setRate(false))} className="bubble-hang flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-semibold">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M10 6L4 12l6 6M4.5 12H15a5 5 0 0 1 5 5v1" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Reply
                 </button>
               )}
             </span>
