@@ -1,8 +1,9 @@
 "use client";
 
+import { fogOn } from "@/lib/welcome-fog";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { NoteButton, WhyBox } from "@/components/toucan/SayingFeedback";
+import { Confirm, NoteButton, WhyBox } from "@/components/toucan/SayingFeedback";
 import Link from "next/link";
 import { CoinIcon } from "@/components/ui/Icons";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
@@ -53,6 +54,8 @@ export function WelcomeCard({
   onCheckedIn,
   onSnooze,
   preview = false,
+  startMinimized = false,
+  onMinimize,
 }: {
   mode: "day" | "back";
   heading: string;
@@ -75,6 +78,9 @@ export function WelcomeCard({
   onSnooze?: (ms: number) => void;
   /** Opened from Settings to try it out: shows above the settings popup. */
   preview?: boolean;
+  /** Tucked away as a small sun (or moon) bubble, to open again later. */
+  startMinimized?: boolean;
+  onMinimize?: (minimized: boolean) => void;
 }) {
   // The settings as they are now: changed right here while arranging, or anywhere else.
   const [fx, setFx] = useState(fxProp);
@@ -86,6 +92,7 @@ export function WelcomeCard({
   const [verdict, setVerdict] = useState<"like" | "dislike" | null>(() => (line && typeof window !== "undefined" && likedLines().has(line) ? "like" : null));
   // Thumbs down asks why; the speech bubble beside the thumbs takes any other note.
   const [lineWhy, setLineWhy] = useState<"down" | "note" | null>(null);
+  const [lineSaid, setLineSaid] = useState<string | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
   // While arranging: the greeting's own options (from the ✎ beside it), and whether the castle is in view.
   const [greetingOpen, setGreetingOpen] = useState(false);
@@ -95,12 +102,40 @@ export function WelcomeCard({
   const greetingRef = useRef<HTMLParagraphElement>(null);
   // The next time this screen opens, he flies in again.
   useEffect(() => () => resetToucanFlight(), []);
+  // Minimized: a small sun (or moon) bubble; the app is yours meanwhile.
+  const [min, setMin] = useState(startMinimized);
+  const [minimizing, setMinimizing] = useState(false);
+  function minimize(now = false) {
+    if (min || minimizing) return;
+    onMinimize?.(true);
+    if (now || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setMin(true);
+      return;
+    }
+    // Into the forest, and Today through the fog.
+    setMinimizing(true);
+    setTimeout(() => {
+      fogOn(1200);
+      setMin(true);
+      setMinimizing(false);
+    }, 1100);
+  }
+  function restore() {
+    onMinimize?.(false);
+    setMin(false);
+  }
+  // Where you've put it, and how wide (kept on this device).
+  const [at, setAt] = useState<{ x: number; y: number }>(() => readJson("welcome-card-at", { x: 0, y: 0 }));
+  const [cardW, setCardW] = useState<number>(() => readJson("welcome-card-w", 500));
+  const moving = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const sizing = useRef<{ x: number; w: number } | null>(null);
   // One toucan at a time: while this screen is open the perched one and his notes wait (see PerchedOwl, ToucanGuide).
   useEffect(() => {
+    if (min) return;
     const e = document.documentElement;
     e.setAttribute("data-welcome-open", "");
     return () => e.removeAttribute("data-welcome-open");
-  }, []);
+  }, [min]);
   // Writing: the cursor goes to the end of the greeting itself.
   useEffect(() => {
     const el = greetingRef.current;
@@ -242,12 +277,14 @@ export function WelcomeCard({
             {line}
           </p>
           <span className="flex items-center gap-0.5">
-            <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"))} />
-            <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"), setLineWhy(verdict === "dislike" ? null : "down"))} />
+            <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"), setLineSaid(verdict === "like" ? "Taken back" : "Saved: it'll come back more often"))} />
+            <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"), setLineWhy(verdict === "dislike" ? null : "down"), setLineSaid(verdict === "dislike" ? "It's back in the rotation" : "Got it: it won't come back"))} />
             <NoteButton on={lineWhy === "note"} onClick={() => setLineWhy((w) => (w === "note" ? null : "note"))} />
           </span>
         </div>
-        {lineWhy && <WhyBox key={lineWhy} saying={line} source="Wise line" down={lineWhy === "down"} onDone={() => setLineWhy(null)} />}
+        {/* Every press says it landed. */}
+        <Confirm text={lineSaid} onDone={() => setLineSaid(null)} />
+        {lineWhy && <WhyBox key={lineWhy} saying={line} source="Wise line" down={lineWhy === "down"} onDone={(sent) => (setLineWhy(null), sent && setLineSaid("Thanks, your feedback was sent"))} />}
       </div>
     ) : null,
     bar: award ? (
@@ -283,18 +320,38 @@ export function WelcomeCard({
   const snoozable = !!onSnooze && !checkedIn && order.includes("checkin");
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
+  if (min)
+    return createPortal(
+      // The screen tucked away: a small bubble (a sun on the day's first visit, a lantern-moon later) that opens it again.
+      <button type="button" onClick={restore} aria-label={mode === "day" ? "Open the morning check-in" : "Open the check-in"} title={mode === "day" ? "Morning check-in" : "Check-in"} className="welcome-min fixed bottom-[calc(env(safe-area-inset-bottom)+88px)] right-4 z-[47] flex h-14 w-14 items-center justify-center rounded-full">
+        {mode === "day" ? (
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="12" cy="12" r="4.6" fill="#f6c843" stroke="#a8761a" strokeWidth="1.2" />
+            {Array.from({ length: 8 }, (_, i) => (
+              <path key={i} d="M12 2.2v2.6" stroke="#d99a1e" strokeWidth="1.8" strokeLinecap="round" transform={`rotate(${i * 45} 12 12)`} />
+            ))}
+          </svg>
+        ) : (
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z" fill="#f2e2a8" stroke="#a8893f" strokeWidth="1.3" strokeLinejoin="round" />
+          </svg>
+        )}
+      </button>,
+      document.body
+    );
   return createPortal(
     <div data-welcome-root data-kb-plain style={screenH ? { height: screenH, bottom: "auto" } : undefined} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px))] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
       {/* Overscan: while a phone's keyboard opens or closes the screen briefly changes size; this keeps Today from peeking through above or below. */}
       <div aria-hidden className="pointer-events-none fixed inset-x-0 -bottom-[60vh] -top-[60vh] -z-[1]" style={{ background: "#1b2119" }} />
       {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
-      <MistScene leaving={leaving} castle={castleOf(fx.welcomeCastle)} castleSeed={fx.welcomeCastleSeed} castleSlot={arranging ? <CastleEdit fx={fx} /> : null} onCastleVisible={setCastleSeen} />
-      <div className="relative flex max-h-full flex-col items-center">
+      <MistScene leaving={leaving || minimizing} castle={castleOf(fx.welcomeCastle)} castleSeed={fx.welcomeCastleSeed} castleSlot={arranging ? <CastleEdit fx={fx} /> : null} onCastleVisible={setCastleSeen} />
+      {/* Moved where you put it (drag its heading). */}
+      <div className="relative flex max-h-full flex-col items-center" style={at.x || at.y ? { transform: `translate(${at.x}px, ${at.y}px)` } : undefined}>
       {/* What isn't part of the card (when it opens, confetti) sits above it while arranging. */}
       {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} />}
-      <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
+      <div className={`${leaving || minimizing ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
         {/* Kept mounted (and visible) while arranging, so he doesn't fly in again each time. */}
-        <WelcomeToucan fx={fx} />
+        <WelcomeToucan fx={fx} onAway={() => minimize(true)} />
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -308,6 +365,21 @@ export function WelcomeCard({
         )}
         {/* A soft light around the card, where the mist has thinned. */}
         <span aria-hidden className="pointer-events-none absolute -inset-12" style={{ background: "radial-gradient(ellipse at center, rgba(255,250,240,.5), rgba(255,250,240,0) 70%)" }} />
+        {/* Minimize: tuck it into a small sun bubble and go on into the app; tap the sun to come back. */}
+        {!arranging && !preview && (
+          <button
+            type="button"
+            onClick={() => minimize()}
+            aria-label="Minimize the check-in"
+            title="Minimize (comes back from the sun bubble)"
+            className="settings-gear absolute -top-2 right-7 z-[2] flex h-[30px] w-[30px] items-center justify-center rounded-full"
+            style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M5 17h14" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
         {/* The gear: settings in context (each part's controls right where it sits). */}
         <button
           type="button"
@@ -321,9 +393,49 @@ export function WelcomeCard({
         >
           <GearIcon size={17} />
         </button>
-        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} w-[min(500px,94vw)] flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-5 text-center [scrollbar-gutter:stable] welcome-scroll`} style={screenH && !arranging ? { maxHeight: screenH - 88 } : undefined}>
+        {/* Resize from the lower-right corner (it stays centred, so it grows both ways). */}
+        {!arranging && (
+          <span
+            aria-hidden
+            className="absolute -bottom-1 -right-1 z-[3] h-6 w-6 cursor-nwse-resize touch-none"
+            onPointerDown={(e) => {
+              sizing.current = { x: e.clientX, w: cardW };
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              const d = sizing.current;
+              if (!d) return;
+              setCardW(Math.round(Math.max(340, Math.min(Math.min(900, window.innerWidth - 24), d.w + (e.clientX - d.x) * 2))));
+            }}
+            onPointerUp={() => {
+              if (sizing.current) writeJson("welcome-card-w", cardW);
+              sizing.current = null;
+            }}
+          />
+        )}
+        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-5 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH && !arranging ? { maxHeight: screenH - 88 } : {}) }}>
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
-          <div className="relative w-full px-8">
+          <div
+            className={`relative w-full px-8 ${writing === null ? "cursor-grab" : ""}`}
+            // Drag the heading to move the whole screen (a tap still writes the greeting); a double-click puts it back.
+            onPointerDown={(e) => {
+              if (writing !== null || (e.target as HTMLElement).closest("button, input, textarea, [contenteditable='true']")) return;
+              moving.current = { x: e.clientX, y: e.clientY, ox: at.x, oy: at.y, moved: false };
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              const d = moving.current;
+              if (!d) return;
+              if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+              d.moved = true;
+              setAt({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y });
+            }}
+            onPointerUp={() => {
+              if (moving.current?.moved) writeJson("welcome-card-at", at);
+              moving.current = null;
+            }}
+            onDoubleClick={() => (setAt({ x: 0, y: 0 }), writeJson("welcome-card-at", { x: 0, y: 0 }))}
+          >
             {/* The greeting itself is where you write: same font, size, wrapping and place (no box). */}
             <span className="relative inline-block max-w-full">
               <p
@@ -483,7 +595,7 @@ let toucanLanded = false;
 function resetToucanFlight() {
   toucanLanded = false;
 }
-function WelcomeToucan({ fx }: { fx: FxSettings }) {
+function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in the app (his settings): the screen tucks itself away first. */ onAway: () => void }) {
   const [landed, setLanded] = useState(toucanLanded);
   const [flyIn] = useState(!toucanLanded);
   const [menu, setMenu] = useState(false);
@@ -496,6 +608,8 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
   const ask = prompts[idx % prompts.length];
   const [rate, setRate] = useState(false);
   const [why, setWhy] = useState<"down" | "note" | null>(null);
+  // What his bubble says after a press (so you know it landed).
+  const [said, setSaid] = useState<string | null>(null);
   // Talking with him in his own bubble (light: his words only, no buttons).
   const [answer, setAnswer] = useState("");
   const [replying, setReplying] = useState(false);
@@ -533,6 +647,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
     setVotes(next);
     setRate(false);
     if (up) patchFx({ welcomeToucanAsk: ask });
+    setSaid(up ? "Got it: I'll ask this first" : "Got it: I won't ask that again");
   };
   const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setReplying(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
   const item = "font-semibold underline underline-offset-2";
@@ -629,6 +744,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
           ) : (
             <span className={!menu && !saying ? "block pr-2" : undefined}>{saying ?? (menu ? "How can I help?" : ask)}</span>
           )}
+          <Confirm text={said} onDone={() => setSaid(null)} />
           {/* Hanging from the bubble's lower edge (not part of his words): ‹ › for something else he could ask, and Reply. */}
           {!menu && !saying && (
             <span className="absolute -bottom-3 left-2.5 right-2.5 flex items-center gap-1">
@@ -689,10 +805,11 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
                   saying={ask}
                   source="Toucan's question"
                   down={why === "down"}
-                  onDone={() => {
+                  onDone={(sent) => {
                     // A thumbs down retires it once you've said why (or skipped).
                     if (why === "down") vote(false);
                     setWhy(null);
+                    if (sent) setSaid("Thanks, your feedback was sent");
                   }}
                 />
               )}
@@ -712,7 +829,7 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
               <button type="button" onClick={() => (setRewording(true), setWords(ask))} className="underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
                 Change what I ask first
               </button>
-              <Link href="/settings?open=toucan-spirit" className="underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+              <Link href="/settings?open=toucan-spirit" onClick={onAway} className="underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
                 Toucan settings
               </Link>
             </span>
@@ -763,6 +880,22 @@ const GILT = { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 
 const PILL = { border: "1.5px solid #b39a6a", color: "#3d2f18", background: "rgba(255,250,238,.7)" } as const;
 
 /** The greeting's size: full for a short one, a little smaller as it grows (it may wrap onto a second line). */
+function readJson<T>(k: string, fallback: T): T {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(k) ?? "null") as T | null;
+    return v ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeJson(k: string, v: unknown) {
+  try {
+    window.localStorage.setItem(k, JSON.stringify(v));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 const greetingSize = (t: string) => {
   const n = t.trim().length;
   return n <= 26 ? 25 : n <= 40 ? 23 : n <= 60 ? 21 : 19;
@@ -982,6 +1115,9 @@ function CheckinPanel({ fx, metrics, onSaved, submit }: { fx: FxSettings; metric
         ["--ec-l" as string]: "30%",
       }}
     >
+      <p className="m-0 mb-1.5 text-center text-[14.5px] italic" style={{ color: "#5a4420" }}>
+        How are you arriving today?
+      </p>
       <EnergyCheck full={fx.welcomeMetrics !== false} noSleep today={null} metrics={metrics} onSaved={onSaved} submit={submit} simple />
     </div>
   );

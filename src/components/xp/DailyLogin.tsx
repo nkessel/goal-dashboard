@@ -21,7 +21,7 @@ const PENDING_KEY = "welcome-pending";
  * stepped away from it (to the toucan, or another page), so it stays until you
  * say you're ready. `away`: the page you left it on, where it comes back.
  */
-type Pending = { day: string; mode: "day" | "back"; at: number; until?: number; kept?: boolean; away?: string };
+type Pending = { day: string; mode: "day" | "back"; at: number; until?: number; kept?: boolean; away?: string; /** Tucked away as a sun bubble: shown that way on any page until opened. */ min?: boolean };
 function readPending(today: string): Pending | null {
   try {
     const p = JSON.parse(window.localStorage.getItem(PENDING_KEY) || "null") as Pending | null;
@@ -45,7 +45,7 @@ function stampBack() {
   } catch {}
 }
 
-type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<ReturnType<typeof welcomeContextAction>>; seed?: string };
+type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<ReturnType<typeof welcomeContextAction>>; seed?: string; min?: boolean };
 
 /**
  * The welcome screen. On the day's first visit it records the daily check-in
@@ -81,7 +81,8 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     return () => {
       if (!isOpen.current) return;
       const p = readPending(eveningDayKey());
-      if (p) setPending({ ...p, kept: true, away: here });
+      // Tucked away as the sun bubble: it follows you to every page instead.
+      if (p) setPending(p.min ? { ...p, kept: true, away: undefined } : { ...p, kept: true, away: here });
     };
   }, []);
 
@@ -147,6 +148,15 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     } catch {}
     // Snoozed: nothing until the snooze is over (on a later visit, or right then if the app's still open).
     // Left on another page: it waits for you there.
+    if (pending?.min) {
+      liftFog();
+      welcomeContextAction()
+        .then((ctx) => live && setShown({ mode: pending.mode, award: null, ctx, min: true }))
+        .catch(() => {});
+      return () => {
+        live = false;
+      };
+    }
     if (pending?.away && pending.away !== window.location.pathname) return liftFog();
     if (pending?.until && Date.now() < pending.until) {
       liftFog();
@@ -256,6 +266,11 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       lastCheckInAt={shown.ctx.lastCheckInAt}
       due={shown.ctx.tasks}
       today={shown.ctx.today ?? []}
+      startMinimized={!!shown.min}
+      onMinimize={(m) => {
+        const today = eveningDayKey();
+        setPending({ ...(readPending(today) ?? { day: today, mode: shown.mode, at: Date.now() }), kept: true, away: undefined, min: m });
+      }}
       priority={shown.ctx.priority}
       fx={fx}
       // Checked in: it stays until you say you're ready, even if you step away first.

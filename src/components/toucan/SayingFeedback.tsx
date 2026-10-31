@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const REASONS = ["Not relevant to me", "Too pushy", "Wrong time of day", "Wording feels off", "Heard it too often"];
 
@@ -97,5 +97,26 @@ export function WhyBox({ saying, source, down, onDone }: { saying: string; sourc
         </button>
       </span>
     </div>
+  );
+}
+
+/**
+ * A short confirmation that a press landed ("✓ Saved"), fading in and out on
+ * its own. Shows whenever `text` changes to something; `onDone` clears it.
+ */
+export function Confirm({ text, onDone, ms = 2600 }: { text: string | null; onDone: () => void; ms?: number }) {
+  const [shown, setShown] = useState(text);
+  if (text !== shown) setShown(text);
+  useEffect(() => {
+    if (!text) return;
+    const t = setTimeout(onDone, ms);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restart only when the words change
+  }, [text]);
+  if (!shown) return null;
+  return (
+    <span role="status" key={shown} className="confirm-pop block text-[12px] italic" style={{ color: "#4f6a2e" }}>
+      ✓ {shown}
+    </span>
   );
 }

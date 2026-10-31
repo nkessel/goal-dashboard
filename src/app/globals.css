@@ -2891,3 +2891,12 @@ html[data-welcome-open], html[data-welcome-open] body { background: #1b2119; }
    over the welcome screen (with its own toucan) the loader's doesn't show. */
 html:has(.nav-loader-toucan) [data-perched-owl] { visibility: hidden; }
 html[data-welcome-open] .nav-loader-toucan { display: none; }
+/* A confirmation that a press landed: in, a moment, out. */
+.confirm-pop { animation: confirm-pop 2.6s ease both; }
+@keyframes confirm-pop { 0% { opacity: 0; transform: translateY(3px); } 12%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+/* The welcome screen tucked away: a small gilded sun (or moon) bubble that pops in and breathes. */
+.welcome-min { background: radial-gradient(circle at 35% 30%, #fff8dc, #f2dc9a 55%, #d2ad57); box-shadow: 0 0 0 1.5px #8a6116, 0 6px 16px rgba(0, 0, 0, 0.35), 0 0 22px rgba(246, 200, 67, 0.45); animation: welcome-min-in 0.45s cubic-bezier(.2,.9,.3,1.3) both, welcome-min-glow 3.2s ease-in-out 0.5s infinite; }
+.welcome-min:hover { transform: scale(1.06); }
+@keyframes welcome-min-in { from { opacity: 0; transform: scale(0.3) translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes welcome-min-glow { 0%, 100% { box-shadow: 0 0 0 1.5px #8a6116, 0 6px 16px rgba(0,0,0,.35), 0 0 18px rgba(246,200,67,.35); } 50% { box-shadow: 0 0 0 1.5px #8a6116, 0 6px 16px rgba(0,0,0,.35), 0 0 30px rgba(246,200,67,.65); } }
+@media (prefers-reduced-motion: reduce) { .welcome-min { animation: none; } }
