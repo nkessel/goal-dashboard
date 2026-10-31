@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { callForSupportAction } from "@/app/actions";
+import { Fold } from "@/components/ui/Fold";
 
 const KINDS = [
   { key: "encouragement", label: "Encouragement", hint: "A kind word to keep going" },
@@ -53,8 +54,8 @@ export function SupportCall({ partySize, isAdventure }: { partySize: number; isA
           <span aria-hidden>🔔</span> Call for support
         </button>
       </div>
-      {open && (
-        <div className="reveal relative z-[1] flex flex-col gap-2 pt-1">
+      <Fold open={!!open}>
+        <div className="relative z-[1] flex flex-col gap-2 pt-1">
           <div role="radiogroup" aria-label="What you need" className="grid grid-cols-3 gap-1.5">
             {KINDS.map((k) => {
               const on = k.key === kind;
@@ -94,7 +95,7 @@ export function SupportCall({ partySize, isAdventure }: { partySize: number; isA
             {pending ? "Sending…" : "Send to my party"}
           </button>
         </div>
-      )}
+      </Fold>
     </section>
   );
 }

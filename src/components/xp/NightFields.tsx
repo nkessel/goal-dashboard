@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Hindrance } from "@/lib/wheel-of-time";
+import { Fold } from "@/components/ui/Fold";
 
 export type NightDraft = { bed: string; wake: string; effort: string[]; hindrances: Hindrance[] };
 export const EMPTY_NIGHT: NightDraft = { bed: "", wake: "", effort: [], hindrances: [] };
@@ -283,7 +284,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day 
                   </button>
                 );
               })}
-              {editingLists && (
+              <Fold open={!!editingLists}>
                 <form
                   className="reveal flex items-center gap-1"
                   onSubmit={(e) => {
@@ -295,7 +296,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day 
                 >
                   <input value={newEffort} onChange={(e) => setNewEffort(e.target.value)} placeholder="+ add one" aria-label="Add a right effort" className="factor-chip w-[120px] bg-transparent text-[16px] outline-none" />
                 </form>
-              )}
+              </Fold>
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -325,7 +326,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day 
               })}
             </div>
           </div>
-          {editingLists && (
+          <Fold open={!!editingLists}>
             <form
               className="reveal flex items-center gap-1"
               onSubmit={(e) => {
@@ -337,7 +338,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day 
             >
               <input value={newHindrance} onChange={(e) => setNewHindrance(e.target.value)} placeholder="+ add a hindrance" aria-label="Add a hindrance" className="factor-chip factor-warn w-[150px] bg-transparent text-[16px] outline-none" />
             </form>
-          )}
+          </Fold>
           {/* The lists are edited right here (no trip to another page). */}
           {onLists ? (
             <button type="button" onClick={() => setEditingLists((v) => !v)} className="self-end text-[12px] underline underline-offset-2" style={{ color: SOFT }}>

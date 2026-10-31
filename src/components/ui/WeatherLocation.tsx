@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { WEATHER_EVENT, WEATHER_KEY } from "@/lib/use-weather";
 import { saveWeatherPlaceAction } from "@/app/actions";
 import { fromFeedback } from "@/lib/from-feedback";
+import { useLinger } from "@/components/ui/Fold";
 
 type Place = { name: string; region: string; lat: number; lon: number };
 
@@ -44,6 +45,7 @@ export function useWeatherPlaceName(): string | null | undefined {
  */
 export function WeatherLocation({ dark = false, label = "Show weather", up = false }: { dark?: boolean; label?: string; up?: boolean }) {
   const [open, setOpen] = useState(false);
+  const pop = useLinger(open);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Place[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -110,11 +112,11 @@ export function WeatherLocation({ dark = false, label = "Show weather", up = fal
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="underline underline-offset-2" style={{ color: ink }}>
         {label}
       </button>
-      {open && (
+      {pop.shown && (
         <div
           role="dialog"
           aria-label="Where should the forecast be for?"
-          className={`pop absolute z-[40] flex ${up ? "bottom-full right-0 mb-1.5" : "left-0 top-full mt-1.5"} w-[min(290px,calc(100vw-32px))] flex-col gap-2 p-3 ${dark ? "" : "parchment"}`}
+          className={`pop absolute z-[40] flex ${up ? "bottom-full right-0 mb-1.5" : "left-0 top-full mt-1.5"} w-[min(290px,calc(100vw-32px))] flex-col gap-2 p-3 ${dark ? "" : "parchment"}${pop.leaving ? " pop-leave" : ""}`}
           style={{
             borderRadius: 12,
             boxShadow: "0 12px 28px rgba(0,0,0,.35)",

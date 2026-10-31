@@ -7,6 +7,7 @@ import type { Task } from "@/lib/data/types";
 import { applyAutoScheduleAction, saveSchedulerSettingsAction, schedulerContextAction } from "@/app/actions";
 import { SCHEDULER_DEFAULTS, clockOf, planSchedule, type Busy, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
 import { useEscape } from "@/lib/use-escape";
+import { Fold } from "@/components/ui/Fold";
 
 const LOCAL_KEY = "auto-schedule";
 const TIMES: { v: TimeOfDay; label: string; hint: string }[] = [
@@ -216,8 +217,8 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
                 Busy calendars ({calendars.length - [...fyi].filter((id) => calendars.some((c) => c.id === id)).length} of {calendars.length}) {showCals ? "▾" : "▸"}
               </button>
             )}
-            {showCals && (
-              <ul className="fade-in m-0 flex w-full list-none flex-col gap-0.5 p-0">
+            <Fold open={!!showCals}>
+              <ul className="m-0 flex w-full list-none flex-col gap-0.5 p-0">
                 <li className="text-[12px]" style={{ color: soft }}>
                   Ticked calendars block time. Untick the ones that are just so you know (community events, other people&rsquo;s).
                 </li>
@@ -231,7 +232,7 @@ export function AutoScheduler({ tasks, theme, onClose }: { tasks: Task[]; theme:
                   </li>
                 ))}
               </ul>
-            )}
+            </Fold>
           </div>
         )}
 

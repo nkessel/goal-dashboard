@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDisplayLevelAction } from "@/app/actions";
 import { fromFeedback } from "@/lib/from-feedback";
+import { useLinger } from "@/components/ui/Fold";
 
 /**
  * The level badge for someone holding an honorary level: tap it to set your
@@ -12,6 +13,7 @@ import { fromFeedback } from "@/lib/from-feedback";
 export function HonoraryLevel({ level, children }: { level: number; children: React.ReactNode }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const pop = useLinger(open);
   const [value, setValue] = useState(level);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -45,11 +47,11 @@ export function HonoraryLevel({ level, children }: { level: number; children: Re
       <button type="button" onClick={() => (setValue(level), setOpen((o) => !o))} aria-expanded={open} title="Honorary level — tap to change it (1–99)">
         {children}
       </button>
-      {open && (
+      {pop.shown && (
         <div
           role="dialog"
           aria-label="Set your level"
-          className="fade-in parchment absolute left-1/2 top-full z-[40] mt-2 flex w-[230px] -translate-x-1/2 flex-col gap-2 p-3"
+          className={`fade-in parchment absolute left-1/2 top-full z-[40] mt-2 flex w-[230px] -translate-x-1/2 flex-col gap-2 p-3${pop.leaving ? " pop-leave" : ""}`}
           style={{ borderRadius: 14, border: "1.5px solid #b39a6a", boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}
         >
           <p className="font-display relative z-[1] m-0 text-center text-[16px]" style={{ color: "var(--t-ink)" }}>

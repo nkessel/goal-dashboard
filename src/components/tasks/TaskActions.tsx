@@ -6,11 +6,13 @@ import {
   completeTaskAction,
   toggleManualPriorityAction,
 } from "@/app/actions";
+import { useLinger } from "@/components/ui/Fold";
 
 export function TaskActions({ task, theme = "calm" }: { task: Task; theme?: "calm" | "adventure" }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const pop = useLinger(showConfirm);
   const [completedAt, setCompletedAt] = useState(() => toLocalDatetimeValue(new Date()));
   const isAdventure = theme === "adventure";
 
@@ -89,9 +91,9 @@ export function TaskActions({ task, theme = "calm" }: { task: Task; theme?: "cal
         </p>
       )}
 
-      {showConfirm && (
+      {pop.shown && (
         <div
-          className="flex w-56 flex-col gap-2 rounded-lg p-2.5 text-xs"
+          className={`flex w-56 flex-col gap-2 rounded-lg p-2.5 text-xs${pop.leaving ? " pop-leave" : ""}`}
           style={{
             background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
             border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,

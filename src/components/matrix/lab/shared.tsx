@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FACTORS, MAX_WEIGHT, PRESETS, type FactorKey, type Scored, type Weighable, type Weights } from "@/lib/priority";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
+import { Fold } from "@/components/ui/Fold";
 
 export type LabTask = Weighable & { description?: string | null };
 
@@ -70,7 +71,7 @@ export function WeightsPanel({
           })}
         </div>
       </div>
-      {open && (
+      <Fold open={!!open}>
         <div className="relative z-[1] mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
           {shown.map((f) => (
             <label key={f.key} className="flex items-center gap-2.5 text-[14px]" style={{ color: "var(--t-ink)" }} title={f.about}>
@@ -93,7 +94,7 @@ export function WeightsPanel({
             </label>
           ))}
         </div>
-      )}
+      </Fold>
     </Panel>
   );
 }

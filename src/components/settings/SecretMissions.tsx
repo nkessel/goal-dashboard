@@ -9,6 +9,7 @@ import { TaskRow } from "@/components/tasks/TaskRow";
 import type { TaskWithCategory } from "@/lib/data/tasks";
 import { cleanMissions, type Mission } from "@/lib/missions";
 import { useEscape } from "@/lib/use-escape";
+import { Fold } from "@/components/ui/Fold";
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 const XP_STEPS = [5, 10, 20, 30, 50, 75, 100];
@@ -286,8 +287,8 @@ function MissionCard({
         </svg>
       </button>
 
-      {open && (
-        <div className="reveal flex flex-col gap-2 px-3.5 pb-3.5">
+      <Fold open={!!open}>
+        <div className="flex flex-col gap-2 px-3.5 pb-3.5">
           {total > 0 && (
             <div className="h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(70,50,20,.15)" }}>
               <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${(done / total) * 100}%`, background: "linear-gradient(90deg,#d9b45f,#f2d27e)" }} />
@@ -520,7 +521,7 @@ function MissionCard({
             )}
           </div>
         </div>
-      )}
+      </Fold>
     </div>
   );
 }

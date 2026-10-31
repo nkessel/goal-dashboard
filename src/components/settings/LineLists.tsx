@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ROTATION, likeLine, likedLines, retireLine, retiredLines, rotationFor } from "@/lib/greetings";
+import { Fold } from "@/components/ui/Fold";
 
 /**
  * The wise lines in rotation: like one to see it more, × to delete it (the
@@ -44,8 +45,8 @@ export function WiseLines({ own, alwaysOpen = false, extra, ownBox }: { own: str
         </div>
       )}
       {open && ownBox}
-      {open && (
-        <div className="reveal flex flex-col gap-1 rounded-xl p-1.5" style={{ border: "1px solid var(--t-card-border)" }}>
+      <Fold open={!!open}>
+        <div className="flex flex-col gap-1 rounded-xl p-1.5" style={{ border: "1px solid var(--t-card-border)" }}>
           <p className="m-0 px-1.5 text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
             {ROTATION} lines take turns, and a few new ones join each week. ♡ brings one back often; × deletes it and the next one waiting takes its place.
           </p>
@@ -71,7 +72,7 @@ export function WiseLines({ own, alwaysOpen = false, extra, ownBox }: { own: str
             </details>
           )}
         </div>
-      )}
+      </Fold>
     </div>
   );
 }
@@ -99,8 +100,8 @@ export function PhraseList({ title, lines, isOn, onToggle, retired = false }: { 
       >
         {title} <span style={{ color: "var(--t-ink-soft)" }}>{open ? "▾" : `▸ ${count} of ${lines.length} on`}</span>
       </button>
-      {open && (
-        <ul className="reveal m-0 flex max-h-[320px] list-none flex-col gap-0.5 overflow-y-auto rounded-xl p-1.5" style={{ border: "1px solid var(--t-card-border)" }}>
+      <Fold open={!!open}>
+        <ul className="m-0 flex max-h-[320px] list-none flex-col gap-0.5 overflow-y-auto rounded-xl p-1.5" style={{ border: "1px solid var(--t-card-border)" }}>
           {lines.map((l) => (
             <li key={l}>
               <label className="flex min-h-9 cursor-pointer items-start gap-2.5 rounded-lg px-1.5 py-1 text-[14px] leading-snug hover:bg-black/[.04]" style={{ opacity: on(l) ? 1 : 0.6 }}>
@@ -110,7 +111,7 @@ export function PhraseList({ title, lines, isOn, onToggle, retired = false }: { 
             </li>
           ))}
         </ul>
-      )}
+      </Fold>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getStatsAction, setStatsAction } from "@/app/actions";
 import { DEFAULT_STATS, cleanStatName, setShare, statAbbr, type StatSplit } from "@/lib/stats";
+import { Fold } from "@/components/ui/Fold";
 
 /**
  * "Stats" under a quest's XP reward: slide a share of the XP to each
@@ -108,7 +109,7 @@ export function StatSplitEditor({
       </button>
       )}
 
-      {open && (
+      <Fold open={!!open}>
         <div
           className="reveal flex flex-col gap-1.5 rounded-xl px-3 py-2.5"
           // One dark, even panel; the text inside turns light to match.
@@ -175,7 +176,7 @@ export function StatSplitEditor({
             </svg>
           </button>
         </div>
-      )}
+      </Fold>
     </div>
   );
 }

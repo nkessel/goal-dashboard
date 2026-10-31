@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-31 (welcome screen move/resize/minimize to a sun bubble; press confirmations).
+- **Last updated:** 2026-10-31 (transitions sweep round 1; toucan respond line).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** iOS: opening feedback made the page behind it flash/resize, and the welcome card's top was cut off (owner's screen recordings, Oct 31). Fix shipped Oct 31 (see Recently shipped); confirm with the owner on a phone.
 
@@ -117,6 +117,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Oct 31: Transitions sweep, round 1: `ui/Fold.tsx` — `<Fold open>` (a drawer that mounts on first open, slides open *and* closed, and leaves the layout when shut via `display` allow-discrete) replaces `{x && <div className="reveal">}` folds in 14 places (check-in more/add, night list editing, Wheel of Time editing, Not today habits, wise-line lists, secret missions, support call, stat split, toucan look/notes, priority lab, calendar list); `useLinger(open)` + `.pop-leave` lets popups fade out (weather place, refill badge, honorary level, castle edit, delete confirm). Every button gives a little under the finger (`scale` on :active, global). Toucan respond line: fixed width (no resize on tap), "Respond…", slimmer (20px), grows downward line by line (Enter sends, Shift+Enter new line); ‹ › hide while answering. Next: dialogs' exits (`EditTaskModal`, sheets), FeedbackDock left as is.
 
 - Oct 31: Welcome screen can be moved (drag its heading; double-click resets), resized (corner handle, 340–900px) and minimized (– beside the gear): it dives into the forest, Today comes through the fog, and it waits as a glowing sun bubble bottom right (a moon outside the morning) that opens it again, on any page (`Pending.min` in DailyLogin; fog scripts skip while minimized). Toucan settings in his menu minimizes first, so the page it opens is usable. "How are you arriving today?" sits inside the Emotional check-in. Every vote and note on the toucan and the wise line shows a short confirmation (`Confirm` in `toucan/SayingFeedback.tsx`, `.confirm-pop`); the note button reads "Custom feedback"; replying hides ✎ and counts as a like. The nav loader never shows a second toucan.
 

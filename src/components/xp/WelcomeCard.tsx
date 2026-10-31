@@ -721,7 +721,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
             }
             drag.current = null;
           }}
-          className={`group/bubble toucan-bubble owl-say absolute bottom-1 left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,74vw)]" : replying ? "w-[min(260px,68vw)]" : "w-max min-w-[180px] max-w-[min(250px,62vw)]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+          className={`group/bubble toucan-bubble owl-say absolute bottom-1 left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,74vw)]" : "w-max min-w-[180px] max-w-[min(250px,62vw)]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
           {/* ✎ at the top right: rate what he asked, or say more about it. */}
           {/* Hidden while you're answering him (an answer already says it's a good question). */}
           {!menu && !saying && !talk && !replying && (
@@ -747,8 +747,8 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
           <Confirm text={said} onDone={() => setSaid(null)} />
           {/* Hanging from the bubble's lower edge (not part of his words): ‹ › for something else he could ask, and Reply. */}
           {!menu && !saying && (
-            <span className="absolute -bottom-3 left-2.5 right-2.5 flex items-center gap-1">
-              {!talk && prompts.length > 1 && (
+            <span className="absolute left-2.5 right-2.5 top-[calc(100%-11px)] flex items-start gap-1">
+              {!talk && !replying && !answer && prompts.length > 1 && (
                 <>
                   <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-hang flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none opacity-0 transition-opacity group-hover/bubble:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-60">
                     ‹
@@ -766,24 +766,38 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
               )}
               {/* A blank line to answer him in, hanging under his words; it widens as you type. */}
               <form
-                className="flex items-center"
+                className="relative flex items-end"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void reply();
                 }}
               >
-                <input
+                <textarea
                   value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
+                  rows={1}
+                  onChange={(e) => {
+                    setAnswer(e.target.value);
+                    // Grows taller line by line as you write; never wider.
+                    const t = e.currentTarget;
+                    t.style.height = "auto";
+                    t.style.height = `${Math.min(t.scrollHeight, 96)}px`;
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (answer.trim()) void reply();
+                    }
+                  }}
                   onFocus={() => (setReplying(true), setRate(false))}
                   onBlur={() => !answer && setReplying(false)}
-                  aria-label="Reply to the toucan"
+                  placeholder="Respond…"
+                  aria-label="Respond to the toucan"
                   maxLength={400}
-                  className={`bubble-hang h-6 rounded-full px-2.5 text-[16px] outline-none transition-[width] duration-300 ${replying || answer ? "w-[min(180px,46vw)]" : "w-[84px]"}`}
-                  style={{ color: "#2a1c10" }}
+                  className="bubble-hang reply-line block w-[min(160px,44vw)] resize-none overflow-hidden rounded-[10px] py-0 pl-2.5 pr-6 text-[16px] leading-[20px] outline-none"
+                  style={{ color: "#2a1c10", height: 20 }}
                 />
                 {answer.trim() && (
-                  <button type="submit" aria-label="Send" className="reveal -ml-6 flex h-5 w-5 items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10" }}>
+                  <button type="submit" aria-label="Send" className="reveal absolute bottom-[2px] right-[2px] flex h-4 w-4 items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10" }}>
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden>
                       <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { rateSparkAction } from "@/app/actions";
 import { Panel, Portrait, type LabTask } from "./shared";
+import { Fold } from "@/components/ui/Fold";
 
 type SparkTask = LabTask & { interest?: number | null; novelty?: number | null; challenge?: number | null };
 type Dim = "interest" | "novelty" | "challenge" | "urgency";
@@ -101,7 +102,7 @@ export function SparkMap<T extends SparkTask>({ tasks, isAdventure, onOpen }: { 
             <b>Low on {weakest.label.toLowerCase()}.</b> {weakest.hook}
           </p>
         )}
-        {open && (
+        <Fold open={!!open}>
           <div className="flex flex-col gap-1.5">
             {DIMS.filter((d) => d.key !== "urgency").map((d) => (
               <div key={d.key} role="radiogroup" aria-label={d.label} className="flex items-center gap-2">
@@ -129,7 +130,7 @@ export function SparkMap<T extends SparkTask>({ tasks, isAdventure, onOpen }: { 
               Urgency comes from the quest itself ({v.urgency ?? 0} of 5).
             </p>
           </div>
-        )}
+        </Fold>
       </li>
     );
   };

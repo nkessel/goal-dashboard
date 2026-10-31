@@ -16,6 +16,7 @@ import { coinsForXp } from "@/lib/coins";
 import { fromFeedback } from "@/lib/from-feedback";
 import { defaultCleaning, normalizeCleaning, todaysPicks } from "@/lib/cleaning";
 import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
+import { Fold } from "@/components/ui/Fold";
 
 /**
  * Daily habits: small repeating quests on the day side (stored like evening
@@ -755,8 +756,8 @@ export function DailyHabits({
                   <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              {showNotToday && (
-                <ul className="reveal m-0 flex w-full list-none flex-col gap-1.5 p-0">
+              <Fold open={!!showNotToday}>
+                <ul className="m-0 flex w-full list-none flex-col gap-1.5 p-0">
                   {notToday.map((h) => (
                     <li key={h.id}>
                       <button
@@ -781,7 +782,7 @@ export function DailyHabits({
                     </li>
                   ))}
                 </ul>
-              )}
+              </Fold>
             </div>
           )}
           <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">

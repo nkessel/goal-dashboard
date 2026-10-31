@@ -10,6 +10,7 @@ import { WELCOME_ELS, addBackGreeting, backHours, backOwnOn, greetingPool, ownGr
 import { CastleArt } from "./CastleArt";
 import { CheckinIcon } from "./CheckinIcon";
 import { OwnWordsPill, PhraseList, WiseLines } from "@/components/settings/LineLists";
+import { useLinger } from "@/components/ui/Fold";
 
 /*
  * Settings in context (the app-wide pattern; see docs/HANDOFF.md, Product
@@ -97,11 +98,12 @@ function CastleChoices({ fx }: { fx: FxSettings }) {
 /** The ✎ that sits right beside the castle, with its choices. */
 export function CastleEdit({ fx }: { fx: FxSettings }) {
   const [open, setOpen] = useState(false);
+  const pop = useLinger(open);
   return (
     <div className="pointer-events-auto relative" onClick={(e) => e.stopPropagation()}>
       <EditButton open={open} onClick={() => setOpen((v) => !v)} label="Change the castle" />
-      {open && (
-        <div className="parchment card-pop-in absolute bottom-10 right-0 z-10 w-max rounded-xl p-2 shadow-xl">
+      {pop.shown && (
+        <div className={`parchment card-pop-in absolute bottom-10 right-0 z-10 w-max rounded-xl p-2 shadow-xl${pop.leaving ? " pop-leave" : ""}`}>
           <div className="relative z-[1]">
             <CastleChoices fx={fx} />
           </div>

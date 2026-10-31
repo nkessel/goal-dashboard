@@ -12,6 +12,7 @@ import { BoltIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
 import { eveningDayKey } from "@/components/evening/evening-clock";
+import { Fold } from "@/components/ui/Fold";
 
 type Takeoff = Awaited<ReturnType<typeof listTakeoffQuestsAction>>[number];
 
@@ -497,8 +498,8 @@ export function EnergyCheck({
               </button>}
             </div>
 
-            {expanded && (
-              <div id="checkin-more" className="reveal flex flex-col gap-1.5 pb-0.5">
+            <Fold open={!!expanded}>
+              <div id="checkin-more" className="flex flex-col gap-1.5 pb-0.5">
                 {rows.map((m) => {
                   const set = vals[m] !== undefined;
                   const v = vals[m] ?? 5.5;
@@ -559,8 +560,8 @@ export function EnergyCheck({
                   </div>
                 )}
 
-                {adding && (
-                  <div className="reveal flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }}>
+                <Fold open={!!adding}>
+                  <div className="flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }}>
                     <div className="flex items-center gap-1.5">
                       <input
                         autoFocus
@@ -599,7 +600,7 @@ export function EnergyCheck({
                       </div>
                     )}
                   </div>
-                )}
+                </Fold>
 
                 {noteChips}
                 {noteInput}
@@ -662,7 +663,7 @@ export function EnergyCheck({
                   )}
                 </div>
               </div>
-            )}
+            </Fold>
             {!expanded && noteChips}
             {!expanded && noteInput}
             {mounted && savedAt && saved !== null && (

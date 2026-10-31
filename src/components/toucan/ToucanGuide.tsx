@@ -48,6 +48,7 @@ import { useEscape } from "@/lib/use-escape";
 import { ToucanQuiz } from "./ToucanQuiz";
 import { dailyBudget, polish, voice, windowOf } from "@/lib/toucan-style";
 import { storeStyle, useToucanStyle } from "@/lib/toucan-style-store";
+import { Fold } from "@/components/ui/Fold";
 
 type PlanTarget = { id: string; title: string; estimate: number | null; dueAt: string | null };
 type Msg = { role: "user" | "assistant"; content: string; actions?: (CoachAction & { auto?: boolean })[]; remembered?: CoachNote[] };
@@ -997,7 +998,7 @@ function GuideSheet({
         </header>
 
         <div ref={scroller} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-3">
-          {showLook && (
+          <Fold open={!!showLook}>
             <div className="flex flex-col gap-1.5 rounded-2xl p-3" style={{ background: "rgba(140,240,220,.07)", border: "1px solid rgba(140,240,220,.25)" }}>
               <span className="text-[12px] font-bold uppercase tracking-[.14em]" style={{ color: "rgba(140,240,220,.8)" }}>
                 When I share wisdom, I…
@@ -1039,8 +1040,8 @@ function GuideSheet({
                 style={{ color: "rgba(140,240,220,.9)", border: "1px solid rgba(140,240,220,.3)" }}
               />
             </div>
-          )}
-          {showNotes && (
+          </Fold>
+          <Fold open={!!showNotes}>
             <div className="flex flex-col gap-1.5 rounded-2xl p-3" style={{ background: "rgba(140,240,220,.07)", border: "1px solid rgba(140,240,220,.25)" }}>
               <span className="text-[12px] font-bold uppercase tracking-[.14em]" style={{ color: "rgba(140,240,220,.8)" }}>
                 What I remember about you
@@ -1081,7 +1082,7 @@ function GuideSheet({
                 </button>
               )}
             </div>
-          )}
+          </Fold>
 
           {plan ? (
             <PlanIt key={plan.id} quest={plan} onDone={() => setPlan(null)} />

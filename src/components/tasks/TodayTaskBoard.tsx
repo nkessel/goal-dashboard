@@ -31,6 +31,7 @@ import { readTodayLayout, saveTodayLayout, serverTodayLayout, subscribeTodayLayo
 import { DEFAULT_DUE_HOURS, dueWindowLabel, saveDueHours } from "@/lib/due-soon";
 import { DueWindowPicker } from "./DueWindowPicker";
 import { settleOptimisticQuests, takeOptimisticFailure, useOptimisticQuests, type OptimisticQuest } from "@/lib/optimistic-quests";
+import { Fold } from "@/components/ui/Fold";
 
 /** A just-created quest, drawn like the rest while it saves (blank checkbox until its portrait is ready). */
 function asTask(q: OptimisticQuest): TaskWithCategory {
@@ -250,11 +251,11 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
       <div className="drawer-body" data-open={open ? "true" : "false"}>
         <div className="drawer-inner -mx-2 px-2">
           <div className="quest-tray mt-2.5 rounded-2xl px-2 pb-3 pt-3" style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }} inert={!open}>
-            {editing && (
+            <Fold open={!!editing}>
               <p className="m-0 mb-2 text-center text-[12.5px]" style={{ color: ink, opacity: 0.85 }}>
                 × takes a quest out of Due soon for good (it stays on its board).
               </p>
-            )}
+            </Fold>
             {!shown.length && (
               <p className="m-0 px-1 text-center text-[13.5px]" style={{ color: ink, opacity: 0.85 }}>
                 Nothing due in the next {reach}.

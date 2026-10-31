@@ -7,6 +7,7 @@ import { NightFields, EMPTY_NIGHT, nightIsEmpty, type NightDraft } from "@/compo
 import { StoneWheel, WHEEL_STEP } from "@/components/insights/StoneWheel";
 import { DateField } from "@/components/ui/DateField";
 import { MAX_WEIGHT, weightOf, clockFromNight, minutesLabel, nightMinutes, prettyTime, recentAverages, shiftDay, turnings, wheelTurns, type NightLog, type WheelState } from "@/lib/wheel-of-time";
+import { Fold } from "@/components/ui/Fold";
 
 const CREAM = "#efe6cc";
 const SOFT = "rgba(239,230,204,.7)";
@@ -309,15 +310,15 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
         <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing} className="mx-auto h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(217,180,95,.6)" }}>
           {editing ? "Done" : "⚙ Edit what's on the wheel"}
         </button>
-        {editing && (
-          <div className="reveal grid gap-2 sm:grid-cols-2">
+        <Fold open={!!editing}>
+          <div className="grid gap-2 sm:grid-cols-2">
             <ListEditor title="Right Effort" color={GOLD} items={state.effort} weights={state.weights} onChange={(effort) => saveSettings({ effort })} onWeight={(name, w) => saveSettings({ weights: { ...state.weights, [name]: w } })} />
             <ListEditor title="Hindrances" color={ROSE} items={state.hindrances} weights={state.weights} onChange={(hindrances) => saveSettings({ hindrances })} onWeight={(name, w) => saveSettings({ weights: { ...state.weights, [name]: w } })} />
             <span className="text-[12px] sm:col-span-2" style={{ color: SOFT }}>
               The number beside each is how many turns one press gives the wheel. Changing it re-turns the wheel for every night it was logged. Nights already logged keep what was checked, even if you rename or remove something here.
             </span>
           </div>
-        )}
+        </Fold>
         <span className="text-center text-[11.5px]" style={{ color: SOFT }}>
           Each press is saved to {pressDay === "today" ? "tonight" : "last night"}, so the patterns below learn from it. Press again to take it back.
         </span>

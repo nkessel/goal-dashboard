@@ -7,6 +7,7 @@ import { saveInventoryAction } from "@/app/actions";
 import type { Inventory } from "@/lib/inventory";
 import { BackpackIcon } from "./BackpackIcon";
 import { fromFeedback } from "@/lib/from-feedback";
+import { useLinger } from "@/components/ui/Fold";
 
 /**
  * Beside your portrait on Today when something in the backpack has run out:
@@ -16,6 +17,7 @@ export function RefillBadge({ inventory }: { inventory: Inventory }) {
   const router = useRouter();
   const [inv, setInv] = useState(inventory);
   const [open, setOpen] = useState(false);
+  const pop = useLinger(open);
   const [, start] = useTransition();
   const box = useRef<HTMLDivElement>(null);
   const items = inv.items.filter((i) => i.status === "empty");
@@ -55,8 +57,8 @@ export function RefillBadge({ inventory }: { inventory: Inventory }) {
           {items.length}
         </span>
       </button>
-      {open && (
-        <div role="dialog" aria-label="Needs refilling" className="card-pop-in parchment absolute left-1/2 top-9 flex w-[240px] -translate-x-1/2 flex-col gap-1 p-2.5" style={{ borderRadius: 14, boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}>
+      {pop.shown && (
+        <div role="dialog" aria-label="Needs refilling" className={`card-pop-in parchment absolute left-1/2 top-9 flex w-[240px] -translate-x-1/2 flex-col gap-1 p-2.5${pop.leaving ? " pop-leave" : ""}`} style={{ borderRadius: 14, boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}>
           <span className="relative z-[1] px-1 text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
             Needs refilling
           </span>
