@@ -111,6 +111,12 @@ export function KeyboardViewport() {
     // browser has no reason to pan; the transform is gone a frame later.
     const focusSteady = (el: HTMLElement) => {
       pin();
+      // The feedback box places itself above the keyboard (data-kb-self); the off-screen
+      // trick below made iPhones flash the page behind it, so it's focused plainly.
+      if (el.closest("[data-feedback-root]")) {
+        if (document.activeElement !== el) el.focus({ preventScroll: true });
+        return;
+      }
       const prev = el.style.transform;
       el.style.transform = "translateY(-2000px)";
       if (document.activeElement !== el) el.focus({ preventScroll: true });

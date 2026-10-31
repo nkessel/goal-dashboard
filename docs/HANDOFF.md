@@ -4,7 +4,7 @@
 
 - **Last updated:** 2026-10-30 night (Bring from home place field as an inked line; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** as of 2026-10-30 22:00 UTC: opening feedback on /settings/inventory reloads the page behind it (iOS; cause not found from the cloud, needs a device repro).
+- **Pending in-app feedback:** iOS: opening feedback made the page behind it flash/resize, and the welcome card's top was cut off (owner's screen recordings, Oct 31). Fix shipped Oct 31 (see Recently shipped); confirm with the owner on a phone.
 
 ---
 
@@ -19,9 +19,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 | 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. See the header list. |
 | 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
 
-**Open questions for the owner** (ask when relevant, don't block on them):
-- "Allow editing of quests here" on Tomorrow's Quests: tapping a name already opens the editor. Do they want editing in place?
-- "No need to display mist items here on this screen" (Oct 22, /boards): unclear what it refers to.
+**Open questions for the owner:** none (the Oct 22 notes were settled by the owner, Oct 31).
 
 **Known not possible:** reordering the iPhone photo menu (library, camera, files, Drive). iOS draws it, not the app.
 
@@ -118,6 +116,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Oct 31: iPhone fixes from the owner's screen recordings: the welcome screen keeps room for the toucan at the top and sizes by the visible screen (`dvh`), so its top is no longer cut off under the browser bar; a dark overscan layer behind it keeps Today from peeking through while the keyboard opens or closes; the feedback box's field is focused plainly (no off-screen focus trick in `KeyboardViewport`), which made the page behind it flash.
 
 - Oct 30 (night): Bring from home: the place ("to …") is an inked gold line on the parchment, no half-box or theme wash (`.place-input`, `bare-input`).
 
