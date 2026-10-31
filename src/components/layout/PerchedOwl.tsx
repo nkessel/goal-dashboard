@@ -332,6 +332,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   }
   function speakBrief(text: string, ms: number | null, actions: { label: string; run: () => void; secret?: boolean }[] | null = null) {
     if (sayTimer.current) clearTimeout(sayTimer.current);
+    sayClose.current = null;
     setSayActions(actions ? { for: text, list: actions } : null);
     setSay(text);
     if (ms) sayTimer.current = setTimeout(() => setSay(null), ms);
@@ -352,6 +353,9 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
       if (e.key !== "Escape") return;
       if (sayTimer.current) clearTimeout(sayTimer.current);
       setSay(null);
+      const back = sayClose.current;
+      sayClose.current = null;
+      back?.();
     };
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", esc);
@@ -514,6 +518,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   }
   // The guide asks it to raise something (a quest slipping): it says so, with buttons.
   const speakRef = useRef(speakBrief);
+  const sayClose = useRef<(() => void) | null>(null);
   const shownRef = useRef(false);
   useEffect(() => {
     speakRef.current = speakBrief;
@@ -521,10 +526,14 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   });
   useEffect(() => {
     const h = (e: Event) => {
-      const d = (e as CustomEvent<{ text: string; actions: { label: string; run: () => void }[] }>).detail;
+      const d = (e as CustomEvent<{ text: string; actions: { label: string; run: () => void }[]; onClose?: () => void }>).detail;
       if (!d || !pos.current || !shownRef.current) return;
+      // The welcome screen has its own toucan: one at a time (the guide tries again once it's closed).
+      if (document.documentElement.hasAttribute("data-welcome-open")) return;
       e.preventDefault();
       speakRef.current(d.text, 16000, d.actions);
+      // Closing it (× or Esc) can lead back to what came before (the snooze choices go back to the note).
+      sayClose.current = d.onClose ?? null;
     };
     window.addEventListener("toucan-nudge", h);
     return () => window.removeEventListener("toucan-nudge", h);
@@ -619,7 +628,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
 
   if (!mounted || caged || (hiding && !hidingHere)) return null;
   return createPortal(
-    <>
+    <div data-perched-owl className="contents">
       <div ref={sparks} aria-hidden className="pointer-events-none fixed inset-0 z-[44]" />
       <button
         ref={box}
@@ -799,6 +808,9 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
                 onClick={() => {
                   if (sayTimer.current) clearTimeout(sayTimer.current);
                   setSay(null);
+                  const back = sayClose.current;
+                  sayClose.current = null;
+                  back?.();
                 }}
                 aria-label="Close"
                 title="Close"
@@ -866,7 +878,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
           </div>
         </div>
       )}
-    </>,
+    </div>,
     document.body
   );
 }

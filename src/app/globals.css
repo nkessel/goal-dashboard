@@ -2874,3 +2874,5 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 @keyframes due-in { from { grid-template-rows: 0fr; opacity: 0; transform: translateY(-6px); } to { grid-template-rows: 1fr; opacity: 1; transform: none; } }
 .due-in > * { min-height: 0; }
 @media (prefers-reduced-motion: reduce) { .due-in { animation: none; } }
+/* One toucan at a time: the perched one steps away while the welcome screen (with its own) is open. */
+html[data-welcome-open] [data-perched-owl] { visibility: hidden; }

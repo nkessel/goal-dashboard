@@ -121,6 +121,17 @@ export function useToucanMode(): GuideMode {
 }
 
 /** Opens the toucan's guide sheet (optionally straight to planning one quest, or to the coursework catch-up). */
+/** Runs it now, or once the welcome screen (which has its own toucan) has closed: one toucan at a time. */
+function whenNoWelcome(fn: () => void) {
+  const open = () => document.documentElement.hasAttribute("data-welcome-open");
+  if (!open()) return fn();
+  const t = setInterval(() => {
+    if (open()) return;
+    clearInterval(t);
+    setTimeout(fn, 1500);
+  }, 1000);
+}
+
 export function talkToToucan(plan?: PlanTarget, mode: Mode = "talk", say?: string) {
   window.dispatchEvent(new CustomEvent("toucan-talk", { detail: { plan, mode, say } }));
 }
@@ -151,7 +162,7 @@ export function ToucanGuide() {
   }, []);
   const [open, setOpen] = useState<{ plan: PlanTarget | null; mode: Mode; say?: string; n?: number } | null>(null);
   const [minimized, setMinimized] = useState(false);
-  const [fallback, setFallback] = useState<{ text: string; actions: NoteAction[] } | null>(null);
+  const [fallback, setFallback] = useState<{ text: string; actions: NoteAction[]; instant?: boolean; onClose?: () => void } | null>(null);
   // Pick a time: where the time goes, and the choices to come back to if you close it.
   const [pickTime, setPickTime] = useState<{ at: (when: number) => void; back?: () => void } | null>(null);
   const router = useRouter();
@@ -169,9 +180,28 @@ export function ToucanGuide() {
 
   // Say something with buttons; if the toucan isn't on screen (caged, hiding), a small note instead.
   // The bird may still be settling onto the page: try again for a few seconds before leaving a note.
-  const raise = (text: string, actions: NoteAction[], note = true) => {
-    const send = () => !window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text, actions } }));
+  /**
+   * Has the toucan say something with buttons. `instant`: a follow-up to what he just said
+   * (the snooze choices): it shows at once, no flight and no waiting for the perched bird.
+   * `onClose`: closing it (× or Esc) goes back there instead of dropping the choice.
+   */
+  const raise = (text: string, actions: NoteAction[], note = true, opts: { instant?: boolean; onClose?: () => void } = {}) => {
+    const send = () => !window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text, actions, onClose: opts.onClose } }));
+    // One toucan at a time: while the welcome screen (with its own toucan) is open, wait for it to close.
+    const welcomeOpen = () => document.documentElement.hasAttribute("data-welcome-open");
+    if (welcomeOpen()) {
+      const wait = setInterval(() => {
+        if (welcomeOpen()) return;
+        clearInterval(wait);
+        setTimeout(() => raiseRef.current(text, actions, note, opts), 1500);
+      }, 1000);
+      return false;
+    }
     if (send()) return true;
+    if (opts.instant) {
+      setFallback({ text, actions, instant: true, onClose: opts.onClose });
+      return false;
+    }
     let tries = 0;
     const retry = () => {
       if (send()) return;
@@ -196,21 +226,28 @@ export function ToucanGuide() {
     snoozeFor(n),
   ];
   const snoozeFor = (n: SnoozeNote): NoteAction => ({
-    label: "Not now…",
+    label: "Snooze…",
     run: () => {
       const at = (when: number) => {
         writeSnoozed([...readSnoozed().filter((x) => x.text !== n.text), { ...n, until: when }]);
         if (n.taskId) void snoozeToucanAction(n.taskId, Math.max(0.01, (when - Date.now()) / 86_400_000)).catch(() => {});
       };
       const inHours = (h: number) => at(Date.now() + h * 3_600_000);
+      // Closing the choices goes back to what he said, with its buttons.
+      const back = () => raiseRef.current(n.text, actionsRef.current(n), true, { instant: true });
       const ask = () =>
-        raiseRef.current("When should I bring it back?", [
-          { label: "15 min", run: () => inHours(0.25) },
-          { label: "30 min", run: () => inHours(0.5) },
-          { label: "1 hour", run: () => inHours(1) },
-          { label: "Other…", run: () => setPickTime({ at, back: ask }) },
-          { label: "Skip it", run: () => void (n.taskId && snoozeToucanAction(n.taskId, 1).catch(() => {})) },
-        ]);
+        raiseRef.current(
+          "When should I bring it back?",
+          [
+            { label: "15 min", run: () => inHours(0.25) },
+            { label: "30 min", run: () => inHours(0.5) },
+            { label: "1 hour", run: () => inHours(1) },
+            { label: "Other…", run: () => setPickTime({ at, back: ask }) },
+            { label: "Skip it", run: () => void (n.taskId && snoozeToucanAction(n.taskId, 1).catch(() => {})) },
+          ],
+          true,
+          { instant: true, onClose: back }
+        );
       ask();
     },
   });
@@ -488,7 +525,7 @@ export function ToucanGuide() {
         const ms = Date.parse(p.due) - Date.now();
         if (ms < -5 * 60_000 || ms > 12 * 3_600_000) continue;
         timers.push(
-          setTimeout(() => {
+          setTimeout(() => whenNoWelcome(() => {
             const unseen = window.dispatchEvent(
               new CustomEvent("toucan-nudge", {
                 cancelable: true,
@@ -497,16 +534,28 @@ export function ToucanGuide() {
                   actions: [
                     { label: "Begin", run: () => void beginPromise(p) },
                     {
-                      label: "Not now…",
+                      label: "Snooze…",
                       run: () => {
                         const push = (minutes: number) => void coachPromiseAction({ push: { id: p.id, minutes } }).then(arm).catch(() => {});
-                        const ask = () =>
-                          raiseRef.current("When should I bring it back?", [
-                            { label: "15 min", run: () => push(15) },
-                            { label: "30 min", run: () => push(30) },
-                            { label: "1 hour", run: () => push(60) },
-                            { label: "Other…", run: () => setPickTime({ at: (when: number) => push(Math.max(1, Math.round((when - Date.now()) / 60_000))), back: ask }) },
-                          ]);
+                        // Closing the choices goes back to the reminder itself.
+                        const back = () =>
+                          raiseRef.current(`It's time: “${p.text}”. Shall we begin together?`, [
+                            { label: "Begin", run: () => void beginPromise(p) },
+                            { label: "Snooze…", run: () => ask() },
+                            { label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: p.id, status: "kept" } }).catch(() => {}) },
+                          ], true, { instant: true });
+                        const ask = (): boolean =>
+                          raiseRef.current(
+                            "When should I bring it back?",
+                            [
+                              { label: "15 min", run: () => push(15) },
+                              { label: "30 min", run: () => push(30) },
+                              { label: "1 hour", run: () => push(60) },
+                              { label: "Other…", run: () => setPickTime({ at: (when: number) => push(Math.max(1, Math.round((when - Date.now()) / 60_000))), back: ask }) },
+                            ],
+                            true,
+                            { instant: true, onClose: back }
+                          );
                         ask();
                       },
                     },
@@ -516,7 +565,7 @@ export function ToucanGuide() {
               })
             );
             if (unseen) talkToToucan(undefined, "talk");
-          }, Math.max(0, ms))
+          }), Math.max(0, ms))
         );
       }
       // "Next time": when the event starts, the toucan says so.
@@ -524,7 +573,7 @@ export function ToucanGuide() {
         const ms = Date.parse(n.event.start) - Date.now();
         if (ms <= 0 || ms > 12 * 3_600_000) continue;
         timers.push(
-          setTimeout(() => {
+          setTimeout(() => whenNoWelcome(() => {
             const unseen = window.dispatchEvent(
               new CustomEvent("toucan-nudge", {
                 cancelable: true,
@@ -538,7 +587,7 @@ export function ToucanGuide() {
               })
             );
             if (unseen) talkToToucan(undefined, "talk");
-          }, ms)
+          }), ms)
         );
       }
     };
@@ -568,7 +617,19 @@ export function ToucanGuide() {
           }}
         />
       )}
-      {fallback && <NudgeNote text={fallback.text} actions={fallback.actions} onClose={() => setFallback(null)} />}
+      {fallback && (
+        <NudgeNote
+          text={fallback.text}
+          actions={fallback.actions}
+          instant={fallback.instant}
+          onDismiss={() => setFallback(null)}
+          onClose={() => {
+            const back = fallback.onClose;
+            setFallback(null);
+            back?.();
+          }}
+        />
+      )}
       {quiz && <ToucanQuiz onClose={() => setQuiz(false)} />}
       {open && (mode !== "simple" || open.mode === "catchup" || open.plan) && (
         <GuideSheet
@@ -675,7 +736,7 @@ function PickTime({ onPick, onClose }: { onPick: (when: number) => void; onClose
   );
 }
 
-function NudgeNote({ text, actions, onClose }: { text: string; actions: NoteAction[]; onClose: () => void }) {
+function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { text: string; actions: NoteAction[]; onClose: () => void; onDismiss: () => void; instant?: boolean }) {
   useEscape(onClose);
   // Drag it anywhere by its body; it remembers where you put it.
   const [at, setAt] = useState<{ x: number; y: number } | null>(() => {
@@ -720,11 +781,11 @@ function NudgeNote({ text, actions, onClose }: { text: string; actions: NoteActi
         }
       }}
     >
-      <span className="nudge-bird shrink-0" aria-hidden style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,.45))" }}>
+      <span className={`${instant ? "" : "nudge-bird"} shrink-0`} aria-hidden style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,.45))" }}>
         <ToucanArt size={58} />
       </span>
       <div
-        className="nudge-bubble relative mb-6 flex min-w-0 flex-1 flex-col gap-2 rounded-2xl p-3 pr-8"
+        className={`${instant ? "" : "nudge-bubble"} relative mb-6 flex min-w-0 flex-1 flex-col gap-2 rounded-2xl p-3 pr-8`}
         style={{ background: "linear-gradient(180deg, rgba(14,38,40,.96), rgba(8,22,26,.98))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.3), 0 10px 28px rgba(0,0,0,.5)" }}
       >
         {/* The bubble's tail points back at his bill. */}
@@ -739,7 +800,7 @@ function NudgeNote({ text, actions, onClose }: { text: string; actions: NoteActi
               key={a.label}
               type="button"
               onClick={() => {
-                onClose();
+                onDismiss();
                 a.run();
               }}
               className="h-8 rounded-full px-3 text-[12.5px]"
@@ -1073,7 +1134,7 @@ function GuideSheet({
                               setNudges((ns) => ns?.filter((x) => x.id !== n.id) ?? null);
                             }}
                           >
-                            Not now
+                            Snooze
                           </Pill>
                         </span>
                       </div>

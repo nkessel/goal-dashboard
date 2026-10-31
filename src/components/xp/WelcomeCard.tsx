@@ -11,7 +11,6 @@ import { CheckinIcon } from "./CheckinIcon";
 import { likeLine, likedLines, lineForDay, retireLine } from "@/lib/greetings";
 import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
 import { addBackGreeting, readPromptVotes, toucanPrompts, welcomeOrder, welcomeShows, writePromptVotes, type PromptVotes, type WelcomeEl } from "@/lib/welcome";
-import { eveningDayKey } from "@/components/evening/evening-clock";
 import { voice, windowOf } from "@/lib/toucan-style";
 import { useToucanStyle } from "@/lib/toucan-style-store";
 import { useEscape } from "@/lib/use-escape";
@@ -94,6 +93,12 @@ export function WelcomeCard({
   const greetingRef = useRef<HTMLParagraphElement>(null);
   // The next time this screen opens, he flies in again.
   useEffect(() => () => resetToucanFlight(), []);
+  // One toucan at a time: while this screen is open the perched one and his notes wait (see PerchedOwl, ToucanGuide).
+  useEffect(() => {
+    const e = document.documentElement;
+    e.setAttribute("data-welcome-open", "");
+    return () => e.removeAttribute("data-welcome-open");
+  }, []);
   // Writing: the cursor goes to the end of the greeting itself.
   useEffect(() => {
     const el = greetingRef.current;
@@ -214,7 +219,7 @@ export function WelcomeCard({
         className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]"
         style={checkinStyleOf(fx).style}
       >
-        <CheckinIcon icon={checkinIconOf(fx)} /> {fx.checkinText?.trim() || "Check in"}
+        <CheckinIcon icon={checkinIconOf(fx)} /> {fx.checkinText?.trim() || "Emotional check-in"}
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ opacity: 0.8 }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -744,9 +749,9 @@ function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean
 const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };
 
 /** Your top priorities, in your own words: saved for the day, and kept in mind by the app and the toucan. */
-function TopPriority({ last, question, register, arranging = false }: { last: { text: string; others?: string[]; day: string } | null; question: string; register: (save: () => Promise<boolean>) => void; arranging?: boolean }) {
-  const [today] = useState(() => eveningDayKey());
-  const [saved, setSaved] = useState<{ text: string; others: string[] } | null>(last && last.day === today ? { text: last.text, others: last.others ?? [] } : null);
+function TopPriority({ question, register, arranging = false }: { last: { text: string; others?: string[]; day: string } | null; question: string; register: (save: () => Promise<boolean>) => void; arranging?: boolean }) {
+  // A fresh mind dump every time (owner, Oct 31): nothing carries over into the box.
+  const [saved, setSaved] = useState<{ text: string; others: string[] } | null>(null);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
   // Secondary priorities (important, not urgent): opened from the button under the box.
@@ -936,7 +941,7 @@ function CheckinPanel({ fx, mode, metrics, checkedIn, onSaved, onCollapse, submi
       >
         {/* Its title folds it back into the button. */}
         <button type="button" onClick={onCollapse} aria-expanded className="mx-auto mb-1 flex items-center gap-1.5 font-display text-[17px]" style={{ color: "#8a6116" }}>
-          {checkedIn ? "Checked in ✓" : "Check in"}
+          {checkedIn ? "Checked in ✓" : fx.checkinText?.trim() || "Emotional check-in"}
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: "rotate(180deg)" }}>
             <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>

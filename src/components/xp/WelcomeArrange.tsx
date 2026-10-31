@@ -303,9 +303,12 @@ function Part({ el, fx, empty, children, onArchive }: { el: WelcomeEl; fx: FxSet
           </svg>
         </button>
       </span>
+      {/* Typing in a part's options: keys stay in the field (Space mustn't pick the part up to drag it). */}
+      <div className="contents" onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
       {open && el === "checkin" && <CheckinOptions fx={fx} />}
       {open && el === "line" && <LineOptions fx={fx} />}
       {open && el === "focus" && <QuestionOptions fx={fx} k="welcomeFocusQ" label="The question" fallback="What are your top priorities today?" />}
+      </div>
       {children ? (
         // The part as it looks (not live while arranging).
         <div inert className={`pointer-events-none flex w-full flex-col items-center ${showing ? "" : "opacity-40 grayscale"}`}>
@@ -342,7 +345,7 @@ function CheckinOptions({ fx }: { fx: FxSettings }) {
           return (
             <button key={c.key} type="button" role="radio" aria-checked={on} aria-label={c.label} title={c.hint} onClick={() => set({ checkinStyle: c.key })} className="rounded-full p-0.5" style={{ boxShadow: on ? `0 0 0 2px ${GOLD}` : undefined }}>
               <span className="font-display flex h-8 items-center gap-1 rounded-full px-3 text-[13.5px]" style={c.style}>
-                <CheckinIcon icon={checkinIconOf(fx)} /> {fx.checkinText?.trim() || "Check in"}
+                <CheckinIcon icon={checkinIconOf(fx)} /> {fx.checkinText?.trim() || "Emotional check-in"}
               </span>
             </button>
           );
@@ -350,7 +353,7 @@ function CheckinOptions({ fx }: { fx: FxSettings }) {
       </div>
       <label className="flex flex-col gap-1 text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }}>
         Its words
-        <input value={fx.checkinText ?? ""} onChange={(e) => set({ checkinText: e.target.value.slice(0, 40) })} placeholder="Check in" className="h-9 rounded-lg border px-2.5 text-[16px] font-normal normal-case tracking-normal" style={FIELD} />
+        <input value={fx.checkinText ?? ""} onChange={(e) => set({ checkinText: e.target.value.slice(0, 40) })} placeholder="Emotional check-in" className="h-9 rounded-lg border px-2.5 text-[16px] font-normal normal-case tracking-normal" style={FIELD} />
       </label>
       <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }}>
         Its icon
