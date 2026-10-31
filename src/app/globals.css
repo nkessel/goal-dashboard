@@ -2875,3 +2875,10 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 @media (prefers-reduced-motion: reduce) { .due-in { animation: none; } }
 /* One toucan at a time: the perched one steps away while the welcome screen (with its own) is open. */
 html[data-welcome-open] [data-perched-owl] { visibility: hidden; }
+/* While the welcome screen is open, the page behind it isn't drawn at all, so nothing of Today can
+   show through while a phone keyboard opens or closes (dialogs and the feedback box are portals, unaffected). */
+html[data-welcome-open] [data-app-shell] { visibility: hidden; }
+html[data-welcome-open], html[data-welcome-open] body { background: #1b2119; }
+/* The reply line in the toucan's bubble: a soft parchment pill with a gilded edge. */
+.reply-field { background: linear-gradient(180deg, #fffdf6, #f5ead0); box-shadow: inset 0 1px 2px rgba(60, 40, 10, 0.18), 0 0 0 1px rgba(168, 138, 63, 0.55); }
+.reply-field:focus-within { box-shadow: inset 0 1px 2px rgba(60, 40, 10, 0.18), 0 0 0 1.5px #a88a3f, 0 0 0 4px rgba(226, 187, 92, 0.25); }

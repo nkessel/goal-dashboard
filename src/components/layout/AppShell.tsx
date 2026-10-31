@@ -69,7 +69,7 @@ export async function AppShell({
     : "max-w-md sm:max-w-lg md:max-w-xl";
 
   return (
-    <div data-theme={theme} data-palette={palette} className="flex min-h-screen flex-col items-center">
+    <div data-app-shell data-theme={theme} data-palette={palette} className="flex min-h-screen flex-col items-center">
       {/* Before anything paints: fog, if the day's welcome screen is about to come through it. */}
       {profileId && <script dangerouslySetInnerHTML={{ __html: FOG_SHELL_SCRIPT }} />}
       <ThemeOnBody theme={theme} palette={palette ?? null} />

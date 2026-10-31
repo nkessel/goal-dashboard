@@ -285,7 +285,7 @@ export function WelcomeCard({
   const confetti = fx.welcomeConfetti !== false && mode === "day";
 
   return createPortal(
-    <div style={screenH ? { height: screenH, bottom: "auto" } : undefined} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px))] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
+    <div data-welcome-root data-kb-plain style={screenH ? { height: screenH, bottom: "auto" } : undefined} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px))] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
       {/* Overscan: while a phone's keyboard opens or closes the screen briefly changes size; this keeps Today from peeking through above or below. */}
       <div aria-hidden className="pointer-events-none fixed inset-x-0 -bottom-[60vh] -top-[60vh] -z-[1]" style={{ background: "#1b2119" }} />
       {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
@@ -294,10 +294,8 @@ export function WelcomeCard({
       {/* What isn't part of the card (when it opens, confetti) sits above it while arranging. */}
       {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} />}
       <div className={`${leaving ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
-        {/* Kept (hidden) while arranging, so he doesn't fly in again each time. */}
-        <div className={arranging ? "invisible" : undefined}>
-          <WelcomeToucan fx={fx} />
-        </div>
+        {/* Kept mounted (and visible) while arranging, so he doesn't fly in again each time. */}
+        <WelcomeToucan fx={fx} />
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -616,20 +614,18 @@ function WelcomeToucan({ fx }: { fx: FxSettings }) {
                 </>
               )}
               <form
-                className="flex min-w-0 flex-1 items-center gap-1"
+                className="reply-field flex h-8 min-w-0 flex-1 items-center rounded-full pl-3 pr-0.5"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void reply();
                 }}
               >
-                <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={talk ? "Say more…" : "Answer him…"} aria-label="Answer the toucan" maxLength={400} className="h-8 min-w-0 flex-1 rounded-full border-0 bg-transparent px-2 text-[16px] outline-none" style={{ boxShadow: "inset 0 -1px 0 rgba(139,112,64,.45)", color: "#2a1c10" }} />
-                {answer.trim() && (
-                  <button type="submit" aria-label="Send" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                )}
+                <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={talk ? "Say more…" : "Reply…"} aria-label="Reply to the toucan" maxLength={400} className="h-full min-w-0 flex-1 border-0 bg-transparent text-[16px] italic outline-none placeholder:not-italic placeholder:opacity-60" style={{ color: "#2a1c10" }} />
+                <button type="submit" disabled={!answer.trim()} aria-label="Send" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-35" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1px solid #4a3913", color: "#2a1c10" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
               </form>
               {talk && !talk.thinking && (
                 <button type="button" onClick={() => (talkToToucan(undefined, "talk"), setTalk(null))} title="Open the full conversation" className="shrink-0 text-[11.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
