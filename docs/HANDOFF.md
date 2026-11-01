@@ -120,6 +120,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 1: Today loads in one wave: its ~8 queued database waits (promote → tasks → rites → imports → plan sessions → chapter → habits) now run together; only the task lists wait on `promoteQueuedQuests` (`src/app/page.tsx`). Other pages still to check for the same chains.
 - Nov 1: Private files on quests and import cards (migration 0082): bytes in `attachments` (RLS on, no policies), refs in `tasks.attachments` / `import_cards.attachments` (`lib/file-refs.ts`); served only to the owner at `/api/attachments/<id>`, added via POST `/api/attachments` (4 MB cap; `ui/AddFile.tsx`, "📎 Add a file" on import cards and in the quest editor); 📎 chips on quest cards (`ui/FileChips.tsx`); a card's files go with it onto the quest on import. The public repo must never hold these files.
 - Nov 1: Typing in the feedback box holds the page behind still (`KeyboardViewport` pins it as it does for popups, and lets go once the keyboard is down), so Today no longer jumps as the keyboard closes. Needs a real-iPhone check.
 - Nov 1: The welcome toucan hops aside (animated) when dropped onto the card's buttons or fields (`clearOfControls` in `WelcomeCard.tsx`: nearest clear spot, up first).

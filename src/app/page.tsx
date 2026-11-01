@@ -88,45 +88,76 @@ export default async function Home() {
     );
   }
 
-  // A new day: last evening's plan moves into Today's Quests first.
-  await promoteQueuedQuests(session.user.id).catch(() => false);
-  const [openTasks, completedTasks, profile, questsComplete, xpThisWeek, friendIds] = await Promise.all([
-    listOpenTasksForOwnerWithCategory(session.user.id),
-    listCompletedTasksForOwner(session.user.id, 40),
-    getProfileById(session.user.id),
-    countCompletedTasksForOwner(session.user.id),
-    getWeeklyXpEarned(session.user.id, currentWeekStart()),
-    listFriendIds(session.user.id),
-  ]);
-  // A two-day window; VictoriesToday narrows it to the viewer's own local day.
-  const [recentClaims, rites, riteCompletions, tomorrowRows, boss, bossesEnabled, lastEnergy, checkMetrics, lastReadings, recentNotes] = await Promise.all([
-    listClaimedSince(session.user.id, daysAgoISO(2)).catch(() => []),
-    listRites(session.user.id).catch(() => null),
-    listRiteCompletions(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => []),
-    listTomorrowQueue(session.user.id).catch(() => null),
-    getActiveBoss(session.user.id),
-    bossesTableExists(),
-    latestEnergy(session.user.id),
-    getCheckMetrics(session.user.id).catch(() => []),
-    latestCheckIns(session.user.id, daysAgoISO(2)).catch(() => ({})),
-    listCheckNotesSince(session.user.id, daysAgoISO(2)).catch(() => []),
-  ]);
-  const importsWaiting = await countWaitingImportCards(session.user.id).catch(() => 0);
+  // Everything loads at once (each wait used to queue behind the last, which made Today slow to open).
+  // Only what last evening's plan changes waits for it to move into Today's Quests first.
+  const uid = session.user.id;
+  const promoted = promoteQueuedQuests(uid).catch(() => false);
+  const profileP = getProfileById(uid);
+  const ritesP = listRites(uid).catch(() => null);
   // Sunday/Monday: nudge toward the weekly ritual; the first days of a month, the monthly one.
   const dayKey = appDayKey();
   const dow = new Date(`${dayKey}T12:00:00Z`).getUTCDay();
   const dom = Number(dayKey.slice(8, 10));
   const nudgeKind: "week" | "month" | null = dom <= 3 ? "month" : dow === 0 || dow === 1 ? "week" : null;
-  const nudgeSession = nudgeKind ? await getPlanSession(session.user.id, nudgeKind).catch(() => null) : null;
-  // The check-in with Mom: on Tuesdays (or once a walk left it half done), then midweek on Fri/Sat.
-  const pair = await getPlanSession(session.user.id, "pair").catch(() => null);
+  const dayHabitsP = ritesP.then((rs) => rs?.filter((r) => r.slot === "day") ?? []);
+  const lookBack = dayHabitsP.then((hs) => daysAgoISO(hs.some((h) => cleanRepeat(h.repeat)) ? 800 : 120).slice(0, 10));
+  const [
+    [openTasks, completedTasks, questsComplete, tomorrowRows],
+    profile,
+    xpThisWeek,
+    friendIds,
+    [recentClaims, rites, riteCompletions, boss, bossesEnabled, lastEnergy, checkMetrics, lastReadings, recentNotes],
+    importsWaiting,
+    nudgeSession,
+    pair,
+    chapter,
+    lastPair,
+    [habitHistory, habitSkips, journal, projectBoards, stepChecks],
+  ] = await Promise.all([
+    promoted.then(() =>
+      Promise.all([
+        listOpenTasksForOwnerWithCategory(uid),
+        listCompletedTasksForOwner(uid, 40),
+        countCompletedTasksForOwner(uid),
+        listTomorrowQueue(uid).catch(() => null),
+      ])
+    ),
+    profileP,
+    getWeeklyXpEarned(uid, currentWeekStart()),
+    listFriendIds(uid),
+    // A two-day window; VictoriesToday narrows it to the viewer's own local day.
+    Promise.all([
+      listClaimedSince(uid, daysAgoISO(2)).catch(() => []),
+      ritesP,
+      listRiteCompletions(uid, daysAgoISO(2).slice(0, 10)).catch(() => []),
+      getActiveBoss(uid),
+      bossesTableExists(),
+      latestEnergy(uid),
+      getCheckMetrics(uid).catch(() => []),
+      latestCheckIns(uid, daysAgoISO(2)).catch(() => ({})),
+      listCheckNotesSince(uid, daysAgoISO(2)).catch(() => []),
+    ]),
+    countWaitingImportCards(uid).catch(() => 0),
+    nudgeKind ? getPlanSession(uid, nudgeKind).catch(() => null) : Promise.resolve(null),
+    // The check-in with Mom: on Tuesdays (or once a walk left it half done), then midweek on Fri/Sat.
+    getPlanSession(uid, "pair").catch(() => null),
+    // This week's big rocks, told as a chapter.
+    profileP.then((pr) => getWeekChapter(uid, pr?.created_at ?? null)).catch(() => null),
+    lastPairSession(uid).catch(() => null),
+    // Habit streaks look back a few months; skips end a streak. Journal entries join today's victories.
+    Promise.all([
+      Promise.all([dayHabitsP, lookBack]).then(([hs, from]) => (hs.length ? listCompletionsFor(uid, hs.map((h) => h.id), from) : [])),
+      lookBack.then((from) => listHabitSkips(uid, from)),
+      listJournalEntries(uid, 150).catch(() => null),
+      listBoardsForOwner(uid).catch(() => []),
+      dayHabitsP.then((hs) => (hs.some((h) => cleanRiteSteps(h.steps).length) ? listRiteStepChecks(uid, daysAgoISO(2).slice(0, 10)).catch(() => null) : [])),
+    ]),
+  ]);
   // Streak slips (Insights) never show in Today's check-in.
   const slipChecks = (profile?.life_wheel?.streaks ?? []).map((d) => slipMatcher(d.word));
   const isSlip = (body: string) => slipChecks.some((f) => f(body));
-  // This week's big rocks, told as a chapter.
-  const chapter = await getWeekChapter(session.user.id, profile?.created_at ?? null).catch(() => null);
   const pairData = (pair?.data ?? {}) as { walkedAt?: string | null; partner?: string; mid?: { doneAt?: string | null } };
-  const hadPair = pair || (await lastPairSession(session.user.id).catch(() => null));
+  const hadPair = pair || lastPair;
   const pairNudge: "week" | "mid" | null = !hadPair ? null : !pair?.completed_at ? (dow === 2 || pairData.walkedAt ? "week" : null) : (dow === 5 || dow === 6) && !pairData.mid?.doneAt ? "mid" : null;
   const planNudge = pairNudge ? (
     <PlanNudge kind={pairNudge === "mid" ? "pair-mid" : "pair"} started={!!pairData.walkedAt} partner={pairData.partner || "Mom"} />
@@ -144,14 +175,6 @@ export default async function Home() {
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
   const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, window_to: r.window_to ?? null, kind: r.kind ?? null, icon_key: r.icon_source ? r.icon_key : null, icon_source: r.icon_source ?? null, coin_value: r.coin_value ?? null, estimate_minutes: r.estimate_minutes ?? null, steps: cleanRiteSteps(r.steps), repeat: cleanRepeat(r.repeat) });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
-  // Habit streaks look back a few months; skips end a streak. Journal entries join today's victories.
-  const [habitHistory, habitSkips, journal, projectBoards, stepChecks] = await Promise.all([
-    habits?.length ? listCompletionsFor(session.user.id, habits.map((h) => h.id), daysAgoISO(habits.some((h) => h.repeat) ? 800 : 120).slice(0, 10)) : Promise.resolve([]),
-    listHabitSkips(session.user.id, daysAgoISO(habits?.some((h) => h.repeat) ? 800 : 120).slice(0, 10)),
-    listJournalEntries(session.user.id, 150).catch(() => null),
-    listBoardsForOwner(session.user.id).catch(() => []),
-    habits?.some((h) => h.steps.length) ? listRiteStepChecks(session.user.id, daysAgoISO(2).slice(0, 10)).catch(() => null) : Promise.resolve([]),
-  ]);
   const eveningRites = rites?.filter((r) => r.slot !== "day").map(riteView) ?? null;
   // Imports wait for approval before they show here at all; quests taken off
   // the Today screen live only on their boards.
