@@ -6,7 +6,7 @@ import { FileChips } from "@/components/ui/FileChips";
 import { AddFile } from "@/components/ui/AddFile";
 import type { FileRef } from "@/lib/file-refs";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { decideImportCardAction, editImportCardAction, importCardAction, markImportCardImportedAction } from "@/app/actions";
@@ -150,7 +150,24 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
   const matches = (c: ImportCard) => !words.length || words.every((w) => [c.title, c.description ?? "", ...c.steps, c.source_text ?? ""].join(" ").toLowerCase().includes(w));
   const visible = queue.filter((c) => kinds.has(c.kind) && matches(c));
   // One card at a time, or the whole list (each row keeps its buttons).
-  const [view, setView] = useState<"one" | "list">("one");
+  const [view, setViewState] = useState<"one" | "list">("one");
+  // Remembered: the list stays the list (after adding a card too).
+  const setView = (v: "one" | "list") => {
+    setViewState(v);
+    try {
+      window.localStorage.setItem("import-view", v);
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the saved choice is only readable in the browser
+      if (window.localStorage.getItem("import-view") === "list" && !focus) setViewState("list");
+    } catch {
+      /* storage unavailable */
+    }
+  }, [focus]);
   // The card being worked on (picked from the list, or the next in line).
   const [focusId, setFocusId] = useState<string | null>(focus);
   const card = visible.find((c) => c.id === focusId) ?? visible[0] ?? null;
@@ -325,6 +342,82 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
   const isAdventure = theme === "adventure";
   const frame: React.CSSProperties = { border: "1.5px solid #a88a3f", boxShadow: "0 10px 30px rgba(0,0,0,.35)", color: "#2a1c10", background: "linear-gradient(180deg,#fbf3df,#f1e3c0)" };
 
+  // The import flow for the card being added (shown in place of its row in List view).
+  const flowNode =
+    draft && card ? (
+        <div key={`${card.id}-${mode}`} className="card-pop-in parchment flex flex-col gap-3 rounded-3xl p-4" style={frame}>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => (mode === "guided" && stepAt > 0 ? setStepAt(stepAt - 1) : setMode("card"))} aria-label="Back" className="-ml-1 flex h-8 w-8 items-center justify-center rounded-full text-[20px]" style={{ color: "#6b5631" }}>
+              ‹
+            </button>
+            <span className="min-w-0 flex-1 truncate font-display text-[17px]">{draft.title}</span>
+            {mode === "guided" && (
+              <span className="flex shrink-0 items-center gap-1" aria-hidden>
+                {steps.map((s, i) => (
+                  <span key={s} className="h-1.5 rounded-full transition-all" style={{ width: i === stepAt ? 16 : 6, background: i <= stepAt ? "#b8913f" : "rgba(139,112,64,.3)" }} />
+                ))}
+              </span>
+            )}
+          </div>
+
+          {mode === "guided" ? (
+            <div key={step} className="reveal flex flex-col gap-3">
+              {step === "board" && <BoardStep boards={boards} hint={card.board_hint} value={draft.boardId} onPick={(boardId) => advance({ boardId })} />}
+              {step === "plan" && <PlanStep draft={draft} noted={card.due_on} onChange={patch} onDone={() => advance()} />}
+              {step === "matters" && <MattersStep value={draft.importance} onPick={(importance) => advance({ importance })} />}
+              {step === "often" && <OftenStep draft={draft} hint={card.repeat_text} onChange={patch} onDone={() => advance()} />}
+              {step === "time" && <TimeStep value={draft.minutes} hint={card.repeat_text} onPick={(minutes) => advance({ minutes })} />}
+              {step === "review" && <Review draft={draft} boards={boards} onChange={patch} onJump={jump} />}
+              <div className="flex items-center gap-3 pt-1">
+                {step !== "review" ? (
+                  <button type="button" onClick={() => advance()} className="h-9 rounded-full px-3 text-[13.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                    Skip this
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <span className="flex-1" />
+                {step === "review" && (
+                  <button type="button" onClick={save} disabled={saving} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116", opacity: saving ? 0.7 : 1 }}>
+                    {saving ? "Adding…" : addLabel(draft)}
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <AllAtOnce draft={draft} boards={boards} hint={card} onChange={patch} />
+          )}
+
+          {error && (
+            <p role="alert" className="m-0 text-[13px]" style={{ color: "var(--t-warn, #a33)" }}>
+              {error}
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-2.5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
+            {mode === "guided" ? (
+              <button type="button" onClick={() => setMode("all")} className="text-[13.5px] font-semibold underline underline-offset-2" style={{ color: GOLD }}>
+                Fill it all in myself
+              </button>
+            ) : (
+              <>
+                <button type="button" onClick={() => (setStepAt(0), setMode("guided"))} className="text-[13.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                  Step by step instead
+                </button>
+                {draft.kind !== "habit" && (
+                  <button type="button" onClick={() => setEditor(true)} className="text-[13.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                    Open the full quest editor
+                  </button>
+                )}
+                <span className="flex-1" />
+                <button type="button" onClick={save} disabled={saving} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116", opacity: saving ? 0.7 : 1 }}>
+                  {saving ? "Adding…" : addLabel(draft)}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+    ) : null;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -424,83 +517,12 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
             </Link>
           )}
         </div>
-      ) : mode === "card" && view === "list" ? (
-        <ListView cards={visible} frame={frame} onQuick={(c, u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l }, c)} onEdit={(c, p) => rename(c.id, p)} onRetag={(c, k) => retag(k, c.id)} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
+      ) : view === "list" ? (
+        <ListView cards={visible} frame={frame} active={mode !== "card" && card ? { id: card.id, node: flowNode } : null} onQuick={(c, u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l }, c)} onEdit={(c, p) => rename(c.id, p)} onRetag={(c, k) => retag(k, c.id)} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
       ) : mode === "card" ? (
         <CardView key={card.id} card={card} frame={frame} onQuick={(u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l })} onRetag={retag} onEdit={(p) => rename(card.id, p)} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
       ) : draft ? (
-        <div key={`${card.id}-${mode}`} className="card-pop-in parchment flex flex-col gap-3 rounded-3xl p-4" style={frame}>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => (mode === "guided" && stepAt > 0 ? setStepAt(stepAt - 1) : setMode("card"))} aria-label="Back" className="-ml-1 flex h-8 w-8 items-center justify-center rounded-full text-[20px]" style={{ color: "#6b5631" }}>
-              ‹
-            </button>
-            <span className="min-w-0 flex-1 truncate font-display text-[17px]">{draft.title}</span>
-            {mode === "guided" && (
-              <span className="flex shrink-0 items-center gap-1" aria-hidden>
-                {steps.map((s, i) => (
-                  <span key={s} className="h-1.5 rounded-full transition-all" style={{ width: i === stepAt ? 16 : 6, background: i <= stepAt ? "#b8913f" : "rgba(139,112,64,.3)" }} />
-                ))}
-              </span>
-            )}
-          </div>
-
-          {mode === "guided" ? (
-            <div key={step} className="reveal flex flex-col gap-3">
-              {step === "board" && <BoardStep boards={boards} hint={card.board_hint} value={draft.boardId} onPick={(boardId) => advance({ boardId })} />}
-              {step === "plan" && <PlanStep draft={draft} noted={card.due_on} onChange={patch} onDone={() => advance()} />}
-              {step === "matters" && <MattersStep value={draft.importance} onPick={(importance) => advance({ importance })} />}
-              {step === "often" && <OftenStep draft={draft} hint={card.repeat_text} onChange={patch} onDone={() => advance()} />}
-              {step === "time" && <TimeStep value={draft.minutes} hint={card.repeat_text} onPick={(minutes) => advance({ minutes })} />}
-              {step === "review" && <Review draft={draft} boards={boards} onChange={patch} onJump={jump} />}
-              <div className="flex items-center gap-3 pt-1">
-                {step !== "review" ? (
-                  <button type="button" onClick={() => advance()} className="h-9 rounded-full px-3 text-[13.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
-                    Skip this
-                  </button>
-                ) : (
-                  <span />
-                )}
-                <span className="flex-1" />
-                {step === "review" && (
-                  <button type="button" onClick={save} disabled={saving} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116", opacity: saving ? 0.7 : 1 }}>
-                    {saving ? "Adding…" : addLabel(draft)}
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <AllAtOnce draft={draft} boards={boards} hint={card} onChange={patch} />
-          )}
-
-          {error && (
-            <p role="alert" className="m-0 text-[13px]" style={{ color: "var(--t-warn, #a33)" }}>
-              {error}
-            </p>
-          )}
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-2.5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
-            {mode === "guided" ? (
-              <button type="button" onClick={() => setMode("all")} className="text-[13.5px] font-semibold underline underline-offset-2" style={{ color: GOLD }}>
-                Fill it all in myself
-              </button>
-            ) : (
-              <>
-                <button type="button" onClick={() => (setStepAt(0), setMode("guided"))} className="text-[13.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
-                  Step by step instead
-                </button>
-                {draft.kind !== "habit" && (
-                  <button type="button" onClick={() => setEditor(true)} className="text-[13.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
-                    Open the full quest editor
-                  </button>
-                )}
-                <span className="flex-1" />
-                <button type="button" onClick={save} disabled={saving} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116", opacity: saving ? 0.7 : 1 }}>
-                  {saving ? "Adding…" : addLabel(draft)}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+        flowNode
       ) : null}
 
       {card && toSchedule.length > 0 && mode === "card" && (
@@ -763,11 +785,15 @@ function KindPicker({ open, kind, onPick }: { open: boolean; kind: Kind; onPick:
 }
 
 /** All of them at once: each row shows what it is and keeps Skip, Snooze… and Import. */
-function ListView({ cards, frame, onEdit, onQuick, onRetag, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; onQuick: (c: ImportCard, until: Date, label: string) => void; onEdit: (c: ImportCard, p: { title: string; description: string }) => void; onRetag: (c: ImportCard, k: Kind) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
+function ListView({ cards, frame, active, onEdit, onQuick, onRetag, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; /** The card being added: its import flow shows in its row's place. */ active: { id: string; node: React.ReactNode } | null; onQuick: (c: ImportCard, until: Date, label: string) => void; onEdit: (c: ImportCard, p: { title: string; description: string }) => void; onRetag: (c: ImportCard, k: Kind) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
   return (
     <ul className="card-pop-in parchment m-0 flex list-none flex-col rounded-3xl p-1.5" style={frame}>
       {cards.map((c, i) => (
+        active?.id === c.id ? (
+          <li key={c.id} className="list-none p-1">{active.node}</li>
+        ) : (
         <ListRow key={c.id} card={c} first={i === 0} onQuick={(u, l) => onQuick(c, u, l)} onEdit={(p) => onEdit(c, p)} onRetag={(k) => onRetag(c, k)} onImport={() => onImport(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
+        )
       ))}
     </ul>
   );

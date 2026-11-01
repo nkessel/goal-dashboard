@@ -149,6 +149,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
 - Nov 1: Three PDFs (MA claim form, subway performer application blank + filled) uploaded into `attachments` through a temporary token-gated function (owner approved); `cleanups.ts` puts them on their import cards on the next load.
+- Nov 1: Imports List view stays the list: adding a card opens its steps in that row's place (`flowNode` passed to `ListView` as `active`), and the view is remembered (`import-view` in localStorage). Checked with a Playwright run of add, Not now › Tomorrow, Archive, Delete, ✎ edit and Other… from List view: none left the list.
 - Nov 1: Import review: "How much it matters" picks inline under the chips (was its own screen).
 - Nov 1: Imports: Skip and Snooze… are one "Not now…" button that opens a row in place: Tomorrow, Next week, Next month, Other… (the full picker), Archive (was Skip; the bottom list is now "Archived"), Delete (asks once more). `LaterRow` in `ImportTriage.tsx`.
 - Nov 1: Imports: a ✎ on each card (one by one and list) edits its name and notes (`editImportCardAction`; retagging is saved too now); the Import button says what it does ("Add as quest ✦", "Add as habit ✦", "Add to chest ✦"…); quests, buy lists and rituals ask "Plan it within" first; new kind "💞 Ritual of connection" (migration 0083; imports as a quest for now; tracking is next).
