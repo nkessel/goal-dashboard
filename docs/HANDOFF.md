@@ -120,6 +120,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 1: One-time cleanups run from the app (`lib/data/cleanups.ts`, called in AppShell's `after()`, each recorded in `life_wheel.cleanups`): the first removes the owner's 557 duplicate 'Sleep quality' check_ins from Nov 1 14:48–14:56 UTC (owner approved), keeping the earliest.
+
 - Nov 1: Screen changes wait less: AppShell awaits only the profile and level cap; unread count and missing portraits stream in (`Suspense`), the imports notification sync runs in `after()`. The old screen dims less while the next loads (opacity .7, 6% slide). Today's Check in button folds away as the check-in slides open (`Fold`, `TodayCheckIn`). Full list of the recordings' issues: `/mnt/project-files/display-review/2026-11-01-recordings.md` (Claude project files).
 
 - Nov 1: Recordings pass: the welcome screen's Sleep part and Top priority returned their saver from `useEffect` (so React ran it as the cleanup on every render): Sleep quality was saved 558 times in 6 minutes (Insights listed them) and the priority re-saved on every keystroke; fixed with braces. The welcome card glides up when the keyboard would cover a low field (the toucan's respond line; `kbLift`). The 557 duplicate check_ins rows (metric 'Sleep quality', Nov 1 14:48–14:55 UTC) are still in the database, waiting on the owner's OK to delete.

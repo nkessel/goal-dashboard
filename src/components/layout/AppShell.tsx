@@ -14,6 +14,7 @@ import { FOG_SHELL_SCRIPT } from "@/lib/welcome-fog";
 import { QuestCelebrationHost } from "@/components/celebration/QuestCelebrationHost";
 import { defaultPortraitFor } from "@/components/settings/Avatar";
 import { countImports, countMissingPortraits } from "@/lib/data/rewards";
+import { runCleanups } from "@/lib/data/cleanups";
 import { PortraitPainter } from "@/components/imports/PortraitPainter";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BackToToday } from "@/components/layout/BackToToday";
@@ -59,6 +60,8 @@ export async function AppShell({
   ]);
   // Imports waiting to be sorted show up as a notification (no popup, no badge on the avatar).
   if (profileId) after(() => countImports(profileId).then((i) => syncImportsNotification(profileId, i.quests + i.rewards)).catch(() => {}));
+  // One-time cleanups the owner approved (each records itself as done).
+  if (profileId) after(() => runCleanups(profileId).catch(() => {}));
   const theme = profile?.theme === "adventure" ? "adventure" : "calm";
   const rawPalette = (profile?.life_wheel as { palette?: unknown } | null | undefined)?.palette;
   const palette = isPalette(rawPalette) && rawPalette !== "forest" ? rawPalette : undefined;
