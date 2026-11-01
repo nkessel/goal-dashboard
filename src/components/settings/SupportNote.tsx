@@ -47,3 +47,28 @@ export function SupportNote({ support = "" }: { support?: string }) {
       </label>
   );
 }
+
+/** In the Guild Hall: a "How to support me" button that opens the note right there. */
+export function SupportButton({ support = "", isAdventure }: { support?: string; isAdventure: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="hover-glow flex h-10 items-center gap-1.5 rounded-full px-5 text-[15px] font-semibold"
+        style={isAdventure ? { background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", color: "#2a1c10", border: "1px solid #8a6116" } : { background: "var(--t-accent)", color: "#fff" }}
+      >
+        <span aria-hidden>💛</span> How to support me
+      </button>
+      <div className="drawer-body w-full" data-open={open ? "true" : "false"}>
+        <div className="drawer-inner" inert={!open}>
+          <div className={`rounded-2xl p-4 ${isAdventure ? "parchment" : ""}`} style={{ ["--t-ink" as string]: "#2a1c10", ["--t-ink-soft" as string]: "#6b5a3a", ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }) }}>
+            <SupportNote support={support} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

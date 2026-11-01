@@ -6,7 +6,7 @@ import { cleanFileRefs, type FileRef } from "@/lib/file-refs";
 export type ImportCard = {
   id: string;
   created_at: string;
-  kind: "quest" | "habit" | "schedule" | "reward" | "project" | "shopping" | "done";
+  kind: "quest" | "habit" | "schedule" | "reward" | "project" | "shopping" | "done" | "ritual";
   title: string;
   description: string | null;
   steps: string[];
@@ -85,6 +85,17 @@ export async function setImportCardStatus(
     .eq("owner_id", ownerId)
     .eq("id", id);
   if (error) throw new Error(`Couldn't update that card: ${error.message}`);
+}
+
+/** Change a card before sorting it: its name, notes or kind. */
+export async function editImportCard(ownerId: string, id: string, patch: { title?: string; description?: string | null; kind?: ImportCard["kind"] }): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.description !== undefined) row.description = patch.description;
+  if (patch.kind !== undefined) row.kind = patch.kind;
+  if (!Object.keys(row).length) return;
+  const { error } = await supabaseAdmin().from("import_cards").update(row).eq("owner_id", ownerId).eq("id", id);
+  if (error) throw new Error("Couldn't save that change.");
 }
 
 export async function deleteImportCard(ownerId: string, id: string): Promise<void> {

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { FriendDirectory } from "@/components/social/FriendDirectory";
 import { FriendRequests } from "@/components/social/FriendRequests";
 import { InviteLinkBox } from "@/components/social/InviteLinkBox";
+import { SupportButton } from "@/components/settings/SupportNote";
 import { PartyWeekBoard } from "@/components/social/PartyView";
 import { partyWeek } from "@/lib/data/activity";
 import { currentWeekStart } from "@/lib/data/xp";
@@ -155,6 +156,8 @@ export default async function FeedPage() {
             };
           })}
         />
+
+        <SupportButton support={String((profile?.life_wheel as { support?: unknown } | null)?.support ?? "")} isAdventure={isAdventure} />
 
         <SupportCall partySize={friendIds.length} isAdventure={isAdventure} />
 

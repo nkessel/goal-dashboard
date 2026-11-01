@@ -3791,6 +3791,19 @@ export async function decideImportCardAction(id: string, choice: { kind: "snooze
 }
 
 /** The card became a quest some other way (the full quest editor): mark it imported. */
+export async function editImportCardAction(id: string, patch: { title?: string; description?: string | null; kind?: importCardsData.ImportCard["kind"] }) {
+  const ownerId = await requireProfileId();
+  const KINDS = ["quest", "habit", "schedule", "reward", "project", "shopping", "done", "ritual"];
+  const title = patch.title === undefined ? undefined : patch.title.replace(/\s+/g, " ").trim().slice(0, 200);
+  if (title === "") throw new Error("Give it a name.");
+  await importCardsData.editImportCard(ownerId, id, {
+    title,
+    description: patch.description === undefined ? undefined : (patch.description ?? "").trim().slice(0, 2000) || null,
+    kind: patch.kind && KINDS.includes(patch.kind) ? patch.kind : undefined,
+  });
+  revalidatePath("/import");
+}
+
 export async function markImportCardImportedAction(id: string, taskId: string | null) {
   const ownerId = await requireProfileId();
   await importCardsData.setImportCardStatus(ownerId, id, { status: "imported", task_id: taskId });

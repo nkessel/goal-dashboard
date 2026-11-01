@@ -7,7 +7,7 @@ import type { FileRef } from "@/lib/file-refs";
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { decideImportCardAction, importCardAction, markImportCardImportedAction } from "@/app/actions";
+import { decideImportCardAction, editImportCardAction, importCardAction, markImportCardImportedAction } from "@/app/actions";
 import type { ImportCard } from "@/lib/data/import-cards";
 import { useEscape } from "@/lib/use-escape";
 import { DateField } from "@/components/ui/DateField";
@@ -33,10 +33,11 @@ const KINDS: { key: Kind; label: string; icon: string }[] = [
   { key: "habit", label: "Habits", icon: "🌱" },
   { key: "project", label: "Projects", icon: "🗺" },
   { key: "shopping", label: "To buy", icon: "🛒" },
+  { key: "ritual", label: "Ritual of connection", icon: "💞" },
   { key: "reward", label: "Rewards", icon: "🎁" },
   { key: "done", label: "Already done", icon: "✓" },
 ];
-const KIND_ONE: Record<Kind, string> = { quest: "⚔ Quest", schedule: "📅 To schedule", habit: "🌱 Habit", project: "🗺 Project", shopping: "🛒 To buy", reward: "🎁 Reward", done: "✓ Already done" };
+const KIND_ONE: Record<Kind, string> = { quest: "⚔ Quest", schedule: "📅 To schedule", habit: "🌱 Habit", project: "🗺 Project", shopping: "🛒 To buy", ritual: "💞 Ritual of connection", reward: "🎁 Reward", done: "✓ Already done" };
 /** What Import makes of each kind. */
 const SERVER_KIND = (k: Kind): "quest" | "habit" | "done" | "project" | "reward" => (k === "habit" || k === "done" || k === "project" || k === "reward" ? k : "quest");
 type Draft = {
@@ -155,7 +156,8 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
   // Steps added from the review ("+ Plan it within…").
   const [extra, setExtra] = useState<Step[]>([]);
 
-  const base: Step[] = draft?.kind === "habit" ? ["often", "time"] : draft?.kind === "schedule" ? ["plan", "board"] : draft?.kind === "reward" ? [] : ["board"];
+  // "How soon" is asked up front for anything to do (quests and buy lists too, not only "to schedule").
+  const base: Step[] = draft?.kind === "habit" ? ["often", "time"] : draft?.kind === "schedule" || draft?.kind === "quest" || draft?.kind === "shopping" || draft?.kind === "ritual" ? ["plan", "board"] : draft?.kind === "reward" ? [] : ["board"];
   const steps: Step[] = [...base, ...extra.filter((x) => !base.includes(x)), "review"];
   const step = steps[Math.min(stepAt, steps.length - 1)];
   function jump(s: Step) {
@@ -167,6 +169,12 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
   function retag(kind: Kind, id = card?.id) {
     if (!id) return;
     setQueue((q) => q.map((c) => (c.id === id ? { ...c, kind } : c)));
+    editImportCardAction(id, { kind }).catch(() => null);
+  }
+  // ✎ on a card: its name and notes, kept before you sort it.
+  function rename(id: string, patch: { title: string; description: string }) {
+    setQueue((q) => q.map((c) => (c.id === id ? { ...c, title: patch.title.trim() || c.title, description: patch.description.trim() || null } : c)));
+    editImportCardAction(id, { title: patch.title, description: patch.description }).catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't save that change."));
   }
 
   useEscape(() => (mode === "guided" && stepAt > 0 ? setStepAt(stepAt - 1) : setMode("card")), mode !== "card" && !snoozing && !editor);
@@ -415,9 +423,9 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
           )}
         </div>
       ) : mode === "card" && view === "list" ? (
-        <ListView cards={visible} frame={frame} onRetag={(c, k) => retag(k, c.id)} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
+        <ListView cards={visible} frame={frame} onEdit={(c, p) => rename(c.id, p)} onRetag={(c, k) => retag(k, c.id)} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
       ) : mode === "card" ? (
-        <CardView key={card.id} card={card} frame={frame} onRetag={retag} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
+        <CardView key={card.id} card={card} frame={frame} onRetag={retag} onEdit={(p) => rename(card.id, p)} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
       ) : draft ? (
         <div key={`${card.id}-${mode}`} className="card-pop-in parchment flex flex-col gap-3 rounded-3xl p-4" style={frame}>
           <div className="flex items-center gap-2">
@@ -531,9 +539,10 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
   );
 }
 
-function CardView({ card, frame, onRetag, onImport, onSnooze, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
+function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
   const [source, setSource] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [editing, setEditing] = useState(false);
   // Files added here (shown at once; they're kept on the card and go with it onto the quest).
   const [added, setAdded] = useState<{ card: string; files: FileRef[] }>({ card: card.id, files: [] });
   const files = [...(card.attachments ?? []), ...(added.card === card.id ? added.files.filter((f) => !card.attachments?.some((a) => a.id === f.id)) : [])];
@@ -555,8 +564,15 @@ function CardView({ card, frame, onRetag, onImport, onSnooze, onSkip, menu, setM
           </button>
         </div>
       )}
-      <h2 className="m-0 font-display text-[23px] leading-tight [overflow-wrap:anywhere]">{card.title}</h2>
-      {card.description && (
+      {editing ? (
+        <CardEdit card={card} onDone={(p) => (p && onEdit(p), setEditing(false))} />
+      ) : (
+        <h2 className="m-0 font-display text-[23px] leading-tight [overflow-wrap:anywhere]">
+          {card.title}
+          <EditPen open={false} onClick={() => setEditing(true)} />
+        </h2>
+      )}
+      {!editing && card.description && (
         <p className="m-0 whitespace-pre-wrap text-[14.5px] leading-snug [overflow-wrap:anywhere]" style={{ color: "#4a3a22" }}>
           {card.description}
         </p>
@@ -617,7 +633,52 @@ function CardView({ card, frame, onRetag, onImport, onSnooze, onSkip, menu, setM
   );
 }
 
-const importLabel = (k: Kind) => (k === "done" ? "Log as done ✓" : "Import ✦");
+// What the button does, in its own words (it used to say just "Import").
+const importLabel = (k: Kind) =>
+  k === "done" ? "Log as done ✓" : k === "habit" ? "Add as habit ✦" : k === "reward" ? "Add to chest ✦" : k === "project" ? "Make a board ✦" : k === "shopping" ? "Add buy list ✦" : k === "schedule" ? "Add to schedule ✦" : k === "ritual" ? "Add the ritual ✦" : "Add as quest ✦";
+
+/** ✎ beside a card's name: change its name and notes. */
+function EditPen({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-label="Edit the name and notes" title="Edit" aria-expanded={open} className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle" style={{ color: "#8a6116", background: open ? "rgba(217,180,95,.22)" : "transparent" }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
+function CardEdit({ card, onDone }: { card: ImportCard; onDone: (p: { title: string; description: string } | null) => void }) {
+  const [title, setTitle] = useState(card.title);
+  const [notes, setNotes] = useState(card.description ?? "");
+  const save = () => onDone(title.trim() ? { title, description: notes } : null);
+  return (
+    <div
+      className="reveal flex flex-col gap-1.5"
+      onKeyDown={(e) => {
+        if ((e.metaKey || e.ctrlKey) && (e.key === "Enter" || e.key === "s")) {
+          e.preventDefault();
+          save();
+        }
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onDone(null);
+        }
+      }}
+    >
+      <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Name" className="h-10 rounded-xl px-3 text-[16px] font-semibold outline-none" style={{ background: "rgba(255,250,238,.85)", border: "1px solid rgba(139,112,64,.45)", color: "#2a1c10" }} />
+      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes" aria-label="Notes" className="resize-y rounded-xl px-3 py-2 text-[16px] leading-snug outline-none" style={{ background: "rgba(255,250,238,.85)", border: "1px solid rgba(139,112,64,.45)", color: "#2a1c10" }} />
+      <div className="flex justify-end gap-1.5">
+        <button type="button" onClick={() => onDone(null)} className="h-8 rounded-full px-3 text-[13px]" style={{ color: "#7a6440" }}>
+          Cancel
+        </button>
+        <button type="button" onClick={save} className="h-8 rounded-full px-4 text-[13px] font-semibold" style={{ background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /** What a card is: tap to change it. */
 function KindBadge({ kind, open, onToggle, small = false }: { kind: Kind; open: boolean; onToggle: () => void; small?: boolean }) {
@@ -655,19 +716,20 @@ function KindPicker({ open, kind, onPick }: { open: boolean; kind: Kind; onPick:
 }
 
 /** All of them at once: each row shows what it is and keeps Skip, Snooze… and Import. */
-function ListView({ cards, frame, onRetag, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; onRetag: (c: ImportCard, k: Kind) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
+function ListView({ cards, frame, onEdit, onRetag, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; onEdit: (c: ImportCard, p: { title: string; description: string }) => void; onRetag: (c: ImportCard, k: Kind) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
   return (
     <ul className="card-pop-in parchment m-0 flex list-none flex-col rounded-3xl p-1.5" style={frame}>
       {cards.map((c, i) => (
-        <ListRow key={c.id} card={c} first={i === 0} onRetag={(k) => onRetag(c, k)} onImport={() => onImport(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
+        <ListRow key={c.id} card={c} first={i === 0} onEdit={(p) => onEdit(c, p)} onRetag={(k) => onRetag(c, k)} onImport={() => onImport(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
       ))}
     </ul>
   );
 }
 
-function ListRow({ card, first, onRetag, onImport, onSnooze, onSkip, onDelete }: { card: ImportCard; first: boolean; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
+function ListRow({ card, first, onEdit, onRetag, onImport, onSnooze, onSkip, onDelete }: { card: ImportCard; first: boolean; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
   const [picking, setPicking] = useState(false);
   const [more, setMore] = useState(false);
+  const [editing, setEditing] = useState(false);
   const small = { ...chip(false), minHeight: 32 };
   return (
     <li className="due-in flex flex-col gap-1 px-2.5 py-2" style={first ? undefined : { borderTop: "1px solid rgba(139,112,64,.22)" }} onContextMenu={(e) => (e.preventDefault(), setMore(true))}>
@@ -680,8 +742,10 @@ function ListRow({ card, first, onRetag, onImport, onSnooze, onSkip, onDelete }:
             </span>
           )}
         </span>
+        <EditPen open={editing} onClick={() => setEditing((v) => !v)} />
         <KindBadge kind={card.kind} open={picking} onToggle={() => setPicking((v) => !v)} small />
       </div>
+      {editing && <CardEdit card={card} onDone={(p) => (p && onEdit(p), setEditing(false))} />}
       <FileChips files={card.attachments} />
       <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
       <div className="flex items-center gap-1.5">
@@ -1162,4 +1226,4 @@ function PlanStep({ draft, noted, onChange, onDone }: { draft: Draft; noted: str
   );
 }
 
-const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind === "reward" ? "Add to the Treasure Chest" : d.kind === "project" ? "Make it a board" : d.kind === "done" ? "Log as done ✓" : d.kind === "shopping" ? "Add the buy list" : d.kind === "schedule" || typeof d.planDays === "number" ? "Add to my list to schedule" : "Add the quest");
+const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind === "reward" ? "Add to the Treasure Chest" : d.kind === "project" ? "Make it a board" : d.kind === "done" ? "Log as done ✓" : d.kind === "shopping" ? "Add the buy list" : d.kind === "ritual" ? "Add the ritual" : d.kind === "schedule" || typeof d.planDays === "number" ? "Add to my list to schedule" : "Add the quest");

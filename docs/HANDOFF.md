@@ -35,13 +35,16 @@ Each item is the owner's own ask. Take them top to bottom; mark done here and mo
 5. **Online learning videos list**: 🎧 pill shipped Nov 1 (under a walk/drive/dog habit still to do, e.g. "Chester Care 🐶"; `LISTEN_HABIT` in `DailyHabits.tsx`, board found by title /learning videos|listen/). Later maybe: the calendar marks listening windows (commutes, dog walks) and suggests a video; dog walks should show on the calendar (owner, Nov 1). (Board "Online learning videos" made Nov 1, id ef1193ff-f30e-402e-bda0-758b7bc1859a, with the Facing Fragility quest off Today; links in quest descriptions are clickable now). Left: the reminder, once the owner picks one: a list (e.g. a board or a Settings › Lists entry) of videos for walks and car rides, seeded with https://spiraljourneyworkthatreconnects.org/facing-fragility/ ("Facing Fragility", Spiral Journey / Work That Reconnects). The owner needs reminding it exists: offer light options in a plain message and let them pick (e.g. the toucan mentions it when a walk/drive habit is checked, a weekly nudge, a welcome-screen pill, a + sheet shortcut). Don't overwhelm; no button walls.
 6. ~~Welcome-screen habit pills: Learn a language~~ shipped Nov 1 (`xp/LearnLanguage.tsx`, `lib/languages.ts`, `translatePhraseAction`). Next pill ideas welcome; add to `HABIT_PILLS`.
 7. **Quest Game note items** (owner picked these):
-   - ~~"How to support me" on the profile~~ shipped Nov 1 (on the profile card at the top of Settings, `settings/SupportNote.tsx`, `life_wheel.support`, shown on /friends/<id>).
+   - ~~"How to support me" on the profile~~ shipped Nov 1 (a "💛 How to support me" button in the Guild Hall /feed that opens the note in place, `SupportButton` in `settings/SupportNote.tsx`; the owner wants it in the party area, not Settings, `life_wheel.support`, shown on /friends/<id>).
    - Zoom in/out on boards with light animation; a single sub-quest fills the width.
    - Longer, smoother victory sparkles; the quest title fully visible on the victory screen. (Checked Nov 1: the title already wraps in full, `QuestComplete.tsx` h2 `break-words`; sparkles linger 6.5s after the bar fills. Ask the owner what still feels short before changing.)
    - A simpler XP burst for habits, rites and mini-quests.
    - A shimmering border on reward cards. (Already there: `.reward-shimmer` on Treasure Chest cards, two passes on load; maybe the owner wants it continuous or on the border only. Ask.)
    - Check the "+ board" chip on a Martin board quest (looks wrong; investigate).
-8. Then the rest of section 1 (arrange in context on remaining screens, UX synthesis polish).
+8. **Rituals of connection tracking** (owner, Nov 1): each ritual (e.g. couples covenant, wheel of consent) shows how long since it was last done and a log of when; also in Insights like Streaks. Light: no button walls. Plan: rituals as rites with `kind = 'ritual'` (kept off the daily habit list), an Insights section "Rituals of connection" with days-since, a "Did it ✓" and the history.
+9. **Message anyone in the party** (owner, Nov 1, later): the recipient gets an email notification with the whole message in it.
+10. **Calendar listening windows** (owner, Nov 1, later): the calendar spots commutes/dog walks and suggests a video from the learning list; dog walks show on the calendar.
+11. Then the rest of section 1 (arrange in context on remaining screens, UX synthesis polish).
 
 **Owner's working preferences:** short progress notes after each step; decisions asked in plain messages (no decision cards, no making them go to other screens); "make not overwhelming the user a design priority (and also not hindering the user with too many button walls) — balance is key". Personal task context may be in this file (owner OK), but never secrets: passwords, keys, ID numbers, medical or relationship notes. The repo is public: private files go in the `attachments` table, never in git.
 
@@ -71,7 +74,7 @@ Each item is the owner's own ask. Take them top to bottom; mark done here and mo
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0082_private_attachments.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0083_import_cards_ritual.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -145,8 +148,9 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
 - Nov 1: Three PDFs (MA claim form, subway performer application blank + filled) uploaded into `attachments` through a temporary token-gated function (owner approved); `cleanups.ts` puts them on their import cards on the next load.
+- Nov 1: Imports: a ✎ on each card (one by one and list) edits its name and notes (`editImportCardAction`; retagging is saved too now); the Import button says what it does ("Add as quest ✦", "Add as habit ✦", "Add to chest ✦"…); quests, buy lists and rituals ask "Plan it within" first; new kind "💞 Ritual of connection" (migration 0083; imports as a quest for now; tracking is next).
 - Nov 1: /import has a search box (title, notes, steps, source) and opens on one card with `/import?card=<id>` (or `?q=words`). Today's open check-in has a × to fold it back (note 0cb3e071). The welcome screen's pinned foot lines its parchment up with the card's (`alignFoot`; it showed as a different patch, note 9a91631f).
-- Nov 1: "How to support me": written on the profile card at the top of Settings (saves on blur; moved there from Privacy & Security at the owner's request), shown on your profile to your party. A daily habit "Learn a language 🗣" (owner's, rite 9e53e5be) with a "🗣 Practice a phrase" pill that opens the phrase tool in the habit list (`LanguagePractice`, matched by title).
+- Nov 1: "How to support me": a button in the Guild Hall (party page) that opens the note in place (saves on blur), shown on your profile to your party. A daily habit "Learn a language 🗣" (owner's, rite 9e53e5be) with a "🗣 Practice a phrase" pill that opens the phrase tool in the habit list (`LanguagePractice`, matched by title).
 - Nov 1: "🎧 Something to listen to" under walk, drive and dog habits on Today (until done), opening the Online learning videos board.
 - Nov 1: Welcome habit pills (welcome part `habits`, hidden until turned on in the welcome gear; ✎ picks pills; `welcomeHabitsOn`/`welcomeHabitPills`). First pill "🗣 Learn a language": phrase box + idea pills, language toggles (all on; Italian, Russian, German, Natick Algonquin*, Hebrew, Phoenician*, Portuguese, Spanish, French, Japanese, Mandarin, Arabic, Greek, Hindi; + adds with autocomplete; kept in localStorage `learn-language`), Learn lists the phrase in each with a pronunciation line (Workers AI), * = reconstructed/approximate, 🖨 Print opens a print sheet.
 - Nov 1: Web addresses in a quest card's description are links (`ui/Linked.tsx`). New board "Online learning videos" with its first video.
