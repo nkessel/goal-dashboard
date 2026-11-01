@@ -689,6 +689,31 @@ function resetToucanFlight() {
     /* storage unavailable */
   }
 }
+/** Where he can sit without covering a button or field of the card: the nearest shift
+ * (up first, then down, left, right) that clears every control under him. */
+function clearOfControls(wrap: HTMLElement, off: { x: number; y: number }): { x: number; y: number } {
+  const body = wrap.firstElementChild?.getBoundingClientRect();
+  const card = wrap.parentElement;
+  if (!body || !card) return off;
+  const controls = [...card.querySelectorAll<HTMLElement>("button, input, textarea, select, a, [role=button], [contenteditable=true]")]
+    .filter((el) => !wrap.contains(el))
+    .map((el) => el.getBoundingClientRect())
+    .filter((r) => r.width > 0 && r.height > 0);
+  const pad = 4;
+  const hits = (dx: number, dy: number) =>
+    controls.some((r) => body.left + dx < r.right + pad && body.right + dx > r.left - pad && body.top + dy < r.bottom + pad && body.bottom + dy > r.top - pad);
+  if (!hits(0, 0)) return off;
+  const vw = window.innerWidth;
+  const vh = window.visualViewport?.height ?? window.innerHeight;
+  for (let d = 8; d <= 480; d += 8) {
+    for (const [dx, dy] of [[0, -d], [0, d], [-d, 0], [d, 0]]) {
+      if (body.left + dx < 4 || body.right + dx > vw - 4 || body.top + dy < 4 || body.bottom + dy > vh - 4) continue;
+      if (!hits(dx, dy)) return { x: off.x + dx, y: off.y + dy };
+    }
+  }
+  return off;
+}
+
 function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in the app (his settings): the screen tucks itself away first. */ onAway: () => void }) {
   const [landed, setLanded] = useState(landedBefore);
   const [flyIn] = useState(() => !landedBefore());
@@ -735,6 +760,20 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
     }
   }
   const [off, setOff] = useState(readToucanAt);
+  // After a drop onto the card's buttons he hops aside (animated), so nothing is covered.
+  const [settling, setSettling] = useState(false);
+  const settle = (at: { x: number; y: number }) => {
+    const w = wrapRef.current;
+    const to = w ? clearOfControls(w, at) : at;
+    if (to.x !== at.x || to.y !== at.y) {
+      setSettling(true);
+      setOff(to);
+      setTimeout(() => setSettling(false), 300);
+    }
+    try {
+      window.localStorage.setItem(TOUCAN_AT, JSON.stringify(to));
+    } catch {}
+  };
   // Kept on screen: a spot saved on a wider window (or a bubble that grew) never runs him or his bubble off an edge.
   const wrapRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -790,7 +829,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
   const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setReplying(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
   const item = "font-semibold underline underline-offset-2";
   return (
-    <div ref={wrapRef} className={`${flyIn ? "welcome-toucan" : ""} absolute z-[3]`} style={{ left: 8 + off.x + nudge.x, top: -47 + off.y + nudge.y }}>
+    <div ref={wrapRef} className={`${flyIn ? "welcome-toucan" : ""} absolute z-[3]`} style={{ left: 8 + off.x + nudge.x, top: -47 + off.y + nudge.y, transition: settling ? "left 260ms cubic-bezier(.2,.8,.3,1), top 260ms cubic-bezier(.2,.8,.3,1)" : undefined }}>
       <button
         type="button"
         onClick={() => {
@@ -821,9 +860,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
         onPointerUp={() => {
           const d = drag.current;
           if (d?.moved) {
-            try {
-              window.localStorage.setItem(TOUCAN_AT, JSON.stringify(off));
-            } catch {}
+            settle(off);
             // Let this release's click pass without opening the menu.
             setTimeout(() => (drag.current = null), 0);
           } else drag.current = null;
@@ -854,11 +891,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
             setOff({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y });
           }}
           onPointerUp={() => {
-            if (drag.current?.moved) {
-              try {
-                window.localStorage.setItem(TOUCAN_AT, JSON.stringify(off));
-              } catch {}
-            }
+            if (drag.current?.moved) settle(off);
             drag.current = null;
           }}
           ref={bubbleRef}
