@@ -53,7 +53,11 @@ export function KeyboardViewport() {
         else root.removeAttribute("data-kb");
       }
       if (kb) reveal();
-      else releaseRoom();
+      else {
+        releaseRoom();
+        // The keyboard has settled down: a page held for the feedback box gets its scroll back.
+        if (pinned && !root.classList.contains("scroll-locked") && !feedbackHeld()) unpin();
+      }
     };
     const update = () => {
       window.clearTimeout(quiet);
@@ -77,6 +81,15 @@ export function KeyboardViewport() {
       return null;
     };
     const inPopup = (el: HTMLElement) => root.classList.contains("scroll-locked") && !!fixedLayer(el);
+    // The feedback box floats over any screen without locking it: typing there holds the page
+    // still too (else iPhone pans Today up to the box and drops it back as the keyboard closes).
+    const inFeedback = (el: HTMLElement) => !!el.closest("[data-feedback-root]");
+    const steadied = (el: HTMLElement) => inPopup(el) || inFeedback(el);
+    // Still typing in the feedback box, or its keyboard still on its way down.
+    const feedbackHeld = () => {
+      const a = document.activeElement;
+      return (a instanceof HTMLElement && inFeedback(a)) || kbUp();
+    };
 
     // ── Keep the page at the top while you type in a popup ──────────────────
     // (the way React Aria does it): the page behind is held in place by a
@@ -103,7 +116,7 @@ export function KeyboardViewport() {
     };
     // The popup closed: give the page its scroll position back.
     const lockWatch = new MutationObserver(() => {
-      if (!root.classList.contains("scroll-locked")) unpin();
+      if (!root.classList.contains("scroll-locked") && !feedbackHeld()) unpin();
     });
     lockWatch.observe(root, { attributes: true, attributeFilter: ["class"] });
 
@@ -132,7 +145,7 @@ export function KeyboardViewport() {
     };
     const onTouchEnd = (e: TouchEvent) => {
       const el = e.target;
-      if (!isTextField(el) || el === document.activeElement || !inPopup(el)) return;
+      if (!isTextField(el) || el === document.activeElement || !steadied(el)) return;
       if ((el as HTMLInputElement).disabled) return;
       const t = e.changedTouches[0];
       // A swipe that started on a field scrolls; it doesn't open the keyboard.
@@ -198,7 +211,7 @@ export function KeyboardViewport() {
       if (touch) {
         root.setAttribute("data-typing", "");
         // Moving between fields with the keyboard's arrows: same steadying as a tap.
-        if (inPopup(el)) focusSteady(el);
+        if (steadied(el)) focusSteady(el);
       }
       // Already up (moving between fields): bring the new one into sight now.
       if (kbUp()) window.setTimeout(reveal, 60);
@@ -207,6 +220,8 @@ export function KeyboardViewport() {
       // Moving straight to another field keeps the typing state.
       window.setTimeout(() => {
         if (!isTextField(document.activeElement)) root.removeAttribute("data-typing");
+        // No keyboard ever came up (or it's already down): let go of the page now.
+        if (pinned && !root.classList.contains("scroll-locked") && !feedbackHeld()) unpin();
       }, 60);
     };
 
