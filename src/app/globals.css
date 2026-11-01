@@ -1667,6 +1667,11 @@ html[data-kb] [data-feedback-hide] {
   pointer-events: none;
   transition: opacity 160ms ease, visibility 0s linear 160ms;
 }
+/* A popup open on a phone (quest editor, sheets): the feedback button shrinks and quiets so it
+   doesn't sit on the popup's own buttons (it covered the editor's Close). Still one tap away. */
+@media (pointer: coarse) {
+  html.scroll-locked [data-feedback-hide] { scale: 0.68; opacity: 0.55; }
+}
 /* The feedback box's scroll bar: slim and quiet. */
 .feedback-scroll { scrollbar-width: thin; scrollbar-color: rgba(139, 112, 64, 0.45) transparent; }
 

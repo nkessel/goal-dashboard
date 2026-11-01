@@ -2633,10 +2633,11 @@ export function QuestEditorDialog({
                 </svg>
               </button>
             )}
-            <div className="ml-auto flex items-center gap-2">
+            <div className="relative ml-auto flex items-center gap-2">
               {autosave ? (
                 <>
-                  <span className="text-[12.5px]" style={{ color: saveState === "error" ? "var(--t-warn)" : "var(--t-ink-soft)" }} aria-live="polite">
+                  {/* Floats just above the buttons: it used to take room in the row and push the footer onto two lines. */}
+                  <span className="pointer-events-none absolute bottom-full right-1 mb-0.5 whitespace-nowrap text-[11.5px] transition-opacity" style={{ color: saveState === "error" ? "var(--t-warn)" : "var(--t-ink-soft)" }} aria-live="polite">
                     {saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : ""}
                   </span>
                   {/* Complete in gold, then Done in green at the bottom right. */}

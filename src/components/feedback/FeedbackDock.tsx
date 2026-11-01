@@ -164,13 +164,18 @@ function useViewport(): Viewport | null {
 }
 
 /**
- * On a phone the box keeps one size whether or not the keyboard is up, and
- * its place is measured from the top of what you can see — so the keyboard
- * sliding in or out never moves or resizes it. Its top bar (with Submit)
- * always stays in sight; the rest may sit behind the keyboard if you drag it there.
+ * On a phone the box's place is measured from the top of what you can see.
+ * While the keyboard is up the whole box fits above it (shorter if it must,
+ * its writing scrolling), so Submit and what you type are never behind it.
  */
 function fitPhone(relY: number, h: number, vp: Viewport): Geom {
-  const hh = clamp(h, 170, Math.max(170, vp.innerH - 90));
+  let hh = clamp(h, 170, Math.max(170, vp.innerH - 90));
+  // Keyboard up: the whole box (writing and Submit) sits in the strip above it, its writing
+  // scrolling inside, instead of half of it hiding behind the keyboard.
+  if (vp.innerH - vp.h > 120) {
+    hh = Math.min(hh, Math.max(140, vp.h - 16));
+    return { x: vp.left + 8, w: vp.w - 16, h: hh, y: vp.top + clamp(relY, 8, Math.max(8, vp.h - hh - 8)) };
+  }
   return { x: vp.left + 8, w: vp.w - 16, h: hh, y: vp.top + clamp(relY, 8, Math.max(8, vp.h - 58)) };
 }
 
@@ -627,6 +632,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           aria-label="Feedback"
           data-feedback-root
           data-kb-self
+          // Its own "submitted" card takes over; a fading copy showed as a blank box (textareas don't copy their words).
+          data-no-ghost
           className="fixed z-[96]"
           style={{ left: shown.x, top: shown.y, width: shown.w, height: isSent ? "auto" : shown.h }}
           onKeyDown={(e) => {
