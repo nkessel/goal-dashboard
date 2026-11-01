@@ -64,6 +64,9 @@ export type FxSettings = {
   reflectQuestions?: string[];
   /** The welcome screen's reflection question shows (hidden unless turned on). */
   welcomeReflectOn?: boolean;
+  /** The welcome screen's habit pills show (hidden unless turned on), and which ones (unset = all). */
+  welcomeHabitsOn?: boolean;
+  welcomeHabitPills?: string[];
   /** The Check in button's own words (blank = "Check in"). */
   checkinText?: string;
   welcomeIntentionQ?: string;

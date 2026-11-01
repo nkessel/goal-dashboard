@@ -1,5 +1,7 @@
 "use client";
 
+import { HABIT_PILLS } from "@/components/xp/LearnLanguage";
+
 import { checkinLabel } from "@/lib/welcome";
 import { useState } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -188,7 +190,7 @@ export function GreetingOptions({ fx }: { fx: FxSettings }) {
   );
 }
 
-const HAS_OPTIONS: WelcomeEl[] = ["checkin", "line", "focus", "reflect"];
+const HAS_OPTIONS: WelcomeEl[] = ["checkin", "line", "focus", "reflect", "habits"];
 
 /**
  * The card's parts while arranging: drag a part itself to move it; its hide
@@ -311,6 +313,18 @@ function Part({ el, fx, empty, children, onArchive }: { el: WelcomeEl; fx: FxSet
       <div className="contents" onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
       {open && el === "checkin" && <CheckinOptions fx={fx} />}
       {open && el === "line" && <LineOptions fx={fx} />}
+      {open && el === "habits" && (
+        <div className="flex flex-wrap gap-3 py-1">
+          {HABIT_PILLS.map((p) => {
+            const pills = fx.welcomeHabitPills ?? HABIT_PILLS.map((x) => x.key);
+            return (
+              <GoldCheck key={p.key} checked={pills.includes(p.key)} onChange={(v) => set({ welcomeHabitPills: v ? [...pills, p.key] : pills.filter((k) => k !== p.key) })}>
+                {p.icon} {p.label}
+              </GoldCheck>
+            );
+          })}
+        </div>
+      )}
       {open && el === "reflect" && <ReflectionList list={reflectQuestions(fx)} onChange={(l) => set({ reflectQuestions: l })} />}
       {open && el === "focus" && <QuestionOptions fx={fx} k="welcomeFocusQ" label="The question" fallback="What are your top priorities today?" />}
       </div>

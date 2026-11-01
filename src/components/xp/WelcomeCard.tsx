@@ -1,5 +1,7 @@
 "use client";
 
+import { HabitPills, HABIT_PILLS } from "@/components/xp/LearnLanguage";
+
 import { fogOn } from "@/lib/welcome-fog";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -325,6 +327,7 @@ export function WelcomeCard({
       </p>
     ) : null,
     reflect: reflectQuestions(fx).length ? <ReflectLine questions={reflectQuestions(fx)} /> : null,
+    habits: <HabitPills pills={fx.welcomeHabitPills ?? HABIT_PILLS.map((p) => p.key)} />,
     line: line ? (
       <div className="flex w-full flex-col items-center gap-0.5">
         {/* Quiet thumbs, always to the right of the line (at its bottom right when it wraps), the line still centred. */}
@@ -1341,6 +1344,7 @@ const EMPTY: Partial<Record<WelcomeEl, string>> = {
   reward: "Shows on the day's first visit.",
   line: "A new line each day.",
   reflect: "Add a question with its ✎.",
+  habits: "Pick pills with its ✎.",
 };
 
 /** One of your reflection questions: the same one all day, ‹ › for another. */

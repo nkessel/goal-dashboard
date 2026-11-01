@@ -3912,3 +3912,56 @@ export async function saveOwnWordsAction(words: OwnWords) {
   const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, words: { ...((extras.words as object) ?? {}), ...clean } } }).eq("id", ownerId);
   if (error) throw new Error(error.message);
 }
+
+
+/** Learn a language: one phrase in each chosen language, with how to say it (non-Latin scripts get a transliteration). */
+export async function translatePhraseAction(phrase: string, languages: string[]): Promise<{ results: import("@/lib/languages").Translation[]; error?: string }> {
+  await requireProfileId();
+  const { approxNote } = await import("@/lib/languages");
+  const p = phrase.replace(/\s+/g, " ").trim().slice(0, 200);
+  const langs = [...new Set(languages.map((l) => l.replace(/\s+/g, " ").trim().slice(0, 40)).filter(Boolean))].slice(0, 24);
+  if (!p) return { results: [], error: "Write a phrase first." };
+  if (!langs.length) return { results: [], error: "Turn on at least one language." };
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+  if (!accountId || !apiToken) return { results: [], error: "Translation isn't set up yet." };
+  const system =
+    "You are a careful translator and language teacher. Translate the user's phrase into each listed language. " +
+    "Reply ONLY with JSON: an array of objects {\"language\": string, \"text\": string, \"say\": string}. " +
+    "\"text\" is the phrase in that language's own script. \"say\" is a simple English-letters pronunciation guide (always give it). " +
+    "For reconstructed or sparsely attested languages (e.g. Phoenician, Natick Algonquin / Massachusett), give your best reconstruction from known vocabulary; for Phoenician use Phoenician script if you can, else a Latin transliteration. Never refuse; keep the same order as the list.";
+  const user = `Phrase: "${p}"\nLanguages: ${langs.join(", ")}`;
+  let raw = "";
+  for (const model of ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct-fast"]) {
+    try {
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ max_tokens: 1800, temperature: 0.2, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+      });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const r = json?.result?.response;
+      raw = typeof r === "string" ? r.trim() : JSON.stringify(r ?? "");
+      if (raw) break;
+    } catch {
+      /* try the next model */
+    }
+  }
+  const m = raw.match(/\[[\s\S]*\]/);
+  let rows: { language?: unknown; text?: unknown; say?: unknown }[] = [];
+  try {
+    rows = m ? (JSON.parse(m[0]) as typeof rows) : [];
+  } catch {
+    rows = [];
+  }
+  if (!rows.length) return { results: [], error: "The words didn't come this time. Try again in a moment." };
+  const byLang = new Map(rows.map((r) => [String(r.language ?? "").toLowerCase(), r]));
+  const results = langs.map((l, i) => {
+    const r = byLang.get(l.toLowerCase()) ?? rows[i] ?? {};
+    const text = String(r.text ?? "").trim().slice(0, 300);
+    const say = String(r.say ?? "").trim().slice(0, 300);
+    return { language: l, text: text || "—", say: say && say !== text ? say : undefined, approx: approxNote(l) || undefined };
+  });
+  return { results };
+}

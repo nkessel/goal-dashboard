@@ -6,7 +6,7 @@
  */
 import type { FxSettings } from "./celebration-fx";
 
-export type WelcomeEl = "checkin" | "sleep" | "focus" | "quests" | "streak" | "line" | "reflect" | "bar" | "reward" | "due";
+export type WelcomeEl = "checkin" | "sleep" | "focus" | "quests" | "streak" | "line" | "reflect" | "habits" | "bar" | "reward" | "due";
 
 export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "checkin", label: "Check-in", hint: "A gilded Check in button that opens energy, mood and anything else you track, right there (plus last night's sleep and wake times on the day's first visit). Your check-ins feed Insights and tell the toucan how you're doing." },
@@ -16,6 +16,7 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "streak", label: "Your streak", hint: "How many days in a row you've shown up. Day's first visit only. Motivating for some; leave it off if streaks feel like pressure." },
   { key: "line", label: "The day's wise line", hint: "One short encouragement, a different one each day. You can switch off any line you don't like, or add your own." },
   { key: "reflect", label: "Reflection question", hint: "One of your own reflection questions, a different one each day (‹ › for another). Its ✎ adds, edits and reorders your list; the toucan asks from it too while it shows. Hidden unless you turn it on." },
+  { key: "habits", label: "Habit pills", hint: "Small habits you can do right here, as pills (the first: Learn a language, a phrase in every language you're learning, with a print view). Its ✎ picks which pills show. Hidden unless you turn it on." },
   { key: "bar", label: "Your level bar", hint: "Your level, filling with the XP that arriving earned you. Day's first visit only." },
   { key: "reward", label: "XP and coins", hint: "The XP and coins for showing up today, counted up as the screen opens. Day's first visit only." },
   { key: "due", label: "Due soon", hint: "A gilded button that says how many quests are due soon (the same reach you pick on Today, changeable here too) and opens into a drawer of their cards. Off by default to keep the screen calm." },
@@ -23,7 +24,7 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
 
 // "intention" was removed (owner, Oct 31); stored orders drop it.
 // "toucan" (a second, drawn toucan in the card) was removed: one toucan at a time (owner, Oct 31).
-const DEFAULT_ORDER: WelcomeEl[] = ["checkin", "sleep", "focus", "quests", "streak", "line", "reflect", "bar", "reward", "due"];
+const DEFAULT_ORDER: WelcomeEl[] = ["checkin", "sleep", "focus", "quests", "streak", "line", "reflect", "habits", "bar", "reward", "due"];
 const DEFAULT_HIDE: WelcomeEl[] = ["due"];
 const KEYS = new Set<string>(DEFAULT_ORDER);
 
@@ -40,6 +41,7 @@ export function welcomeShows(fx: FxSettings, el: WelcomeEl): boolean {
   if (el === "bar" && fx.welcomeBar === false) return false;
   // Hidden unless turned on (older saved hide lists don't know it).
   if (el === "reflect") return fx.welcomeReflectOn === true;
+  if (el === "habits") return fx.welcomeHabitsOn === true;
   return !(fx.welcomeHide ?? DEFAULT_HIDE).includes(el);
 }
 
@@ -47,6 +49,7 @@ export function welcomeShows(fx: FxSettings, el: WelcomeEl): boolean {
 export function toggleEl(fx: FxSettings, el: WelcomeEl): Partial<FxSettings> {
   const on = welcomeShows(fx, el);
   if (el === "reflect") return { welcomeReflectOn: !on };
+  if (el === "habits") return { welcomeHabitsOn: !on };
   const hide = new Set(fx.welcomeHide ?? DEFAULT_HIDE);
   if (on) hide.add(el);
   else hide.delete(el);
