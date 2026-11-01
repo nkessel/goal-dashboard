@@ -14,6 +14,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 
 | # | Work | State | Next step |
 |---|---|---|---|
+| 0 | **Import triage** (owner ask, Nov 1) | In progress | Table `import_cards` is live (migration 0077: kind, title, description, steps, repeat/repeat_text, due_on, minutes, board_hint, source_label/source_text, batch, status new/snoozed/imported/skipped). The notes-to-quests thread fills it. To build: a card-by-card screen (Import → guided steps: board, then urgency/due, then the rest, each skippable, with "Fill it all in myself" opening the quest editor; Snooze; Skip/Delete). |
 | 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
 | 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. Left: consistent capitalization, pinned editor footer. The UX teams can now read real click timings from `ui_clicks`. |
 | 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. See the header list. |
