@@ -3796,6 +3796,8 @@ export async function importCardAction(
     title: string;
     description?: string | null;
     steps?: string[];
+    /** To buy: items that go to the Treasure Chest as rewards instead. */
+    rewardItems?: string[];
     boardId?: string | null;
     /** Rewards: its cost in coins. */
     costCoins?: number | null;
@@ -3818,7 +3820,17 @@ export async function importCardAction(
   const steps = (input.steps ?? []).map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 20);
   const minutes = input.minutes && input.minutes > 0 ? Math.min(1440, Math.round(input.minutes)) : null;
   let made: { kind: "quest" | "habit" | "board" | "reward"; id: string };
-  if (input.kind === "reward") {
+  // To buy: the items marked as rewards go to the Treasure Chest first.
+  const rewardItems = (input.rewardItems ?? []).map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 20);
+  let firstReward: string | null = null;
+  for (const it of rewardItems) {
+    const rid = await createRewardAction({ title: it.slice(0, 200) }).catch(() => null);
+    firstReward ??= rid;
+  }
+  if (rewardItems.length && !steps.length && input.kind === "quest" && firstReward) {
+    // Every item was a reward: nothing left to buy.
+    made = { kind: "reward", id: firstReward };
+  } else if (input.kind === "reward") {
     const rid = await createRewardAction({ title, description: input.description ?? undefined, costCoins: input.costCoins ?? undefined });
     made = { kind: "reward", id: rid };
   } else if (input.kind === "project") {

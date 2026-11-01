@@ -44,6 +44,8 @@ type Draft = {
   title: string;
   description: string;
   steps: string[];
+  /** To buy: items to put in the Treasure Chest as rewards instead (taken out of the buy list). */
+  rewards?: string[];
   boardId: string | null | undefined;
   due: string | null | undefined;
   /** "Plan it within" this many days (0 = today); null = no need to schedule. */
@@ -279,7 +281,8 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
           kind: SERVER_KIND(d.kind),
           title: d.title,
           description: d.description.trim() || null,
-          steps: d.steps,
+          steps: d.kind === "shopping" ? d.steps.filter((x) => !d.rewards?.includes(x)) : d.steps,
+          rewardItems: d.kind === "shopping" ? d.steps.filter((x) => d.rewards?.includes(x)) : undefined,
           boardId: d.boardId ?? null,
           dueAt,
           planBy,
@@ -289,6 +292,13 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
           ...(d.kind === "habit" ? habitTiming : {}),
         });
         const board = boards.find((b) => b.id === d.boardId);
+        const nRewards = d.kind === "shopping" ? d.steps.filter((x) => d.rewards?.includes(x)).length : 0;
+        if (nRewards) {
+          say(`${nRewards === 1 ? "1 item is a reward" : `${nRewards} items are rewards`} in your Treasure Chest${nRewards < d.steps.length ? `; the rest is on “${d.title}”` : ""}`);
+          next();
+          router.refresh();
+          return;
+        }
         say(d.kind === "habit" ? `“${d.title}” is one of your habits now` : d.kind === "reward" ? `“${d.title}” is in your Treasure Chest` : d.kind === "project" ? `“${d.title}” is a board now${d.steps.length ? `, with ${d.steps.length} quests` : ""}` : d.kind === "done" ? `Logged “${d.title}” as done ✓` : planBy ? `“${d.title}” is on your list to schedule` : `Added “${d.title}”${board ? ` to ${board.title}` : ""}`);
         next();
         router.refresh();
@@ -844,19 +854,20 @@ function Review({ draft, boards, onChange, onJump }: { draft: Draft; boards: Boa
           </button>
         ))}
       </div>
-      <StepsList steps={draft.steps} onChange={(steps) => onChange({ steps })} kind={draft.kind} />
+      <StepsList steps={draft.steps} onChange={(steps) => onChange({ steps, rewards: draft.rewards?.filter((x) => steps.includes(x)) })} kind={draft.kind} rewards={draft.rewards ?? []} onRewards={(rewards) => onChange({ rewards })} />
     </>
   );
 }
 
-function StepsList({ steps, onChange, kind }: { steps: string[]; onChange: (s: string[]) => void; kind: Kind }) {
+function StepsList({ steps, onChange, kind, rewards = [], onRewards }: { steps: string[]; onChange: (s: string[]) => void; kind: Kind; /** To buy: items marked to become rewards. */ rewards?: string[]; onRewards?: (r: string[]) => void }) {
+  const buying = kind === "shopping" && !!onRewards;
   const [add, setAdd] = useState("");
   if (!steps.length && !add && kind === "habit") return null;
   return (
     <div className="flex flex-col gap-1">
       {steps.length > 0 && (
         <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }}>
-          {kind === "habit" ? "Sub-habits" : "Steps"}
+          {kind === "habit" ? "Sub-habits" : buying ? "Items · 🎁 makes one a reward" : "Steps"}
         </span>
       )}
       {steps.map((s, i) => (
@@ -865,6 +876,20 @@ function StepsList({ steps, onChange, kind }: { steps: string[]; onChange: (s: s
             ◆
           </span>
           <input value={s} onChange={(e) => onChange(steps.map((x, j) => (j === i ? e.target.value : x)))} aria-label={`Step ${i + 1}`} className="bare-input h-8 min-w-0 flex-1 bg-transparent px-1 text-[14.5px]" style={{ color: "#2a1c10", borderBottom: "1px solid rgba(139,112,64,.3)" }} />
+          {buying && (
+            // One tap: this item goes to the Treasure Chest as a reward instead of the buy list.
+            <button
+              type="button"
+              onClick={() => onRewards!(rewards.includes(s) ? rewards.filter((x) => x !== s) : [...rewards, s])}
+              aria-pressed={rewards.includes(s)}
+              aria-label={rewards.includes(s) ? `${s}: back to the buy list` : `Make ${s} a reward`}
+              title={rewards.includes(s) ? "A reward (tap to put it back on the list)" : "Make it a reward"}
+              className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[12px] font-semibold transition-colors"
+              style={rewards.includes(s) ? { background: "rgba(201,162,74,.22)", border: "1px solid #b8913f", color: "#6b4c12" } : { border: "1px dashed rgba(139,112,64,.4)", color: "#7a6440", opacity: 0.8 }}
+            >
+              🎁{rewards.includes(s) ? " Reward" : ""}
+            </button>
+          )}
           <button type="button" onClick={() => onChange(steps.filter((_, j) => j !== i))} aria-label={`Remove step ${i + 1}`} className="flex h-8 w-8 items-center justify-center rounded-full text-[16px] hover:bg-black/[.05]" style={{ color: "#7a6440" }}>
             ×
           </button>
@@ -883,8 +908,8 @@ function StepsList({ steps, onChange, kind }: { steps: string[]; onChange: (s: s
               setAdd("");
             }
           }}
-          placeholder="Add a step"
-          aria-label="Add a step"
+          placeholder={buying ? "Add an item" : "Add a step"}
+          aria-label={buying ? "Add an item" : "Add a step"}
           className="bare-input h-8 min-w-0 flex-1 bg-transparent px-1 text-[14.5px]"
           style={{ color: "#2a1c10" }}
         />
@@ -984,7 +1009,7 @@ function AllAtOnce({ draft, boards, hint, onChange }: { draft: Draft; boards: Bo
           <input value={draft.minutes && !TIMES.includes(draft.minutes) ? String(draft.minutes) : ""} onChange={(e) => onChange({ minutes: Number(e.target.value.replace(/\D/g, "").slice(0, 4)) || null })} inputMode="numeric" placeholder="min" aria-label="Minutes" className="h-8 w-16 rounded-full border px-2 text-center text-[14px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.75)", color: "#2a1c10" }} />
         </div>
       </Field>
-      <StepsList steps={draft.steps} onChange={(steps) => onChange({ steps })} kind={draft.kind} />
+      <StepsList steps={draft.steps} onChange={(steps) => onChange({ steps, rewards: draft.rewards?.filter((x) => steps.includes(x)) })} kind={draft.kind} rewards={draft.rewards ?? []} onRewards={(rewards) => onChange({ rewards })} />
     </div>
   );
 }
