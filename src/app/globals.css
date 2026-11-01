@@ -1650,15 +1650,24 @@ html {
 /* Keyboard up: nothing on the page moves or changes size. A field the
    keyboard covers is scrolled into sight inside its own popup instead. */
 /* While typing on a phone, the bottom bar and floating buttons step aside. */
+/* They fade (not blink) out of the way and back. */
+[data-hide-when-typing],
+[data-feedback-hide] {
+  transition: opacity 160ms ease, visibility 0s linear 0s, transform 150ms, scale 150ms, translate 150ms, background-color 0.16s, border-color 0.16s, color 0.16s, box-shadow 0.16s, filter 0.16s;
+}
 html[data-typing] [data-hide-when-typing],
 html[data-kb] [data-hide-when-typing] {
+  opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  transition: opacity 160ms ease, visibility 0s linear 160ms;
 }
 /* The feedback button stays available while typing; it only steps aside while the keyboard is actually up. */
 html[data-kb] [data-feedback-hide] {
+  opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  transition: opacity 160ms ease, visibility 0s linear 160ms;
 }
 /* The feedback box's scroll bar: slim and quiet. */
 .feedback-scroll { scrollbar-width: thin; scrollbar-color: rgba(139, 112, 64, 0.45) transparent; }

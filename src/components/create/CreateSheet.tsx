@@ -142,14 +142,11 @@ export function CreateSheet({
         }}
         className={`create-sheet fixed inset-x-0 z-[49] mx-auto flex w-[calc(100%-16px)] max-w-md flex-col ${leaving ? "create-sheet-out" : "create-sheet-in"}`}
         style={{
-          ...(keyboard
-            ? // Keyboard up: move up to the top of what's visible but keep the sheet's size
-              // (it may run on behind the keyboard; the editor scrolls up to what's hidden).
-              { top: keyboard.top + 6, height: keyboard.sheetHeight, bottom: "auto" }
-            : {
-                bottom: "calc(5rem + 66px + env(safe-area-inset-bottom))",
-                maxHeight: "calc(100dvh - 5rem - 66px - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
-              }),
+          bottom: "calc(5rem + 66px + env(safe-area-inset-bottom))",
+          maxHeight: "calc(100dvh - 5rem - 66px - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+          // Keyboard up: the sheet glides up just enough to clear it (never resized, never jumps).
+          translate: keyboard?.lift ? `0 ${-keyboard.lift}px` : undefined,
+          transition: "translate 260ms cubic-bezier(.2,.8,.2,1)",
         }}
       >
         <div
@@ -558,15 +555,15 @@ function ScrollGlyph() {
 }
 
 /**
- * On phones, where the on-screen keyboard leaves room (null while it's down):
- * the top of the visible area, and the sheet's height, which stays what it
- * was before the keyboard came up (never squeezed into the strip above it),
- * plus how much of it the keyboard hides. A keyboard that drops for a
- * moment (moving between fields) doesn't move the sheet, and nothing moves
- * while the sheet is closing.
+ * On phones, while the on-screen keyboard is up (null while it's down): how far
+ * the sheet glides up to clear it, and how much of it the keyboard still hides
+ * (when the sheet is taller than what's left). The sheet keeps its size and its
+ * place in the layout; it only moves (`translate`, animated), so nothing jumps
+ * or resizes. A keyboard that drops for a moment (moving between fields)
+ * doesn't move it, and nothing moves while the sheet is closing.
  */
-function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leaving: boolean): { top: number; sheetHeight: number; hidden: number } | null {
-  const [vp, setVp] = useState<{ top: number; sheetHeight: number; hidden: number } | null>(null);
+function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leaving: boolean): { lift: number; hidden: number } | null {
+  const [vp, setVp] = useState<{ lift: number; hidden: number } | null>(null);
   const frozen = useRef(leaving);
   useEffect(() => {
     frozen.current = leaving;
@@ -574,34 +571,26 @@ function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leav
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    let rest = 0;
-    let restTop = 0;
     let closing = 0;
     let raf = 0;
     const update = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        if (frozen.current) return;
+        if (frozen.current || !sheet.current) return;
         const open = vv.height < window.innerHeight - 120;
         if (open) {
           clearTimeout(closing);
           closing = 0;
-          if (!rest) {
-            rest = sheet.current?.offsetHeight ?? 0;
-            restTop = sheet.current?.offsetTop ?? 0; // (layout position, not mid-animation)
-          }
-          // Stay exactly where it is when its top half is still in sight (nothing jumps);
-          // only move up when the keyboard would cover most of it.
-          const stay = restTop >= vv.offsetTop + 6 && restTop < vv.offsetTop + vv.height * 0.35;
-          const top = stay ? restTop : vv.offsetTop + 6;
-          const visible = vv.offsetTop + vv.height - top - 6;
-          const room = window.innerHeight - top - 12;
-          const sheetHeight = Math.round(Math.min(room, Math.max(visible, rest, 420)));
-          setVp({ top: top - 6, sheetHeight, hidden: Math.max(0, sheetHeight - visible) });
+          // Its layout place (offsetTop ignores the translate).
+          const top = sheet.current.offsetTop;
+          const bottom = top + sheet.current.offsetHeight;
+          const visTop = vv.offsetTop + 6;
+          const visBottom = vv.offsetTop + vv.height - 6;
+          const lift = Math.round(Math.max(0, Math.min(bottom - visBottom, top - visTop)));
+          setVp({ lift, hidden: Math.max(0, Math.round(bottom - lift - visBottom)) });
         } else if (!closing) {
           closing = window.setTimeout(() => {
             closing = 0;
-            rest = 0;
             setVp(null);
           }, 220);
         }
