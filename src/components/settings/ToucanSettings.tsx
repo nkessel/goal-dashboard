@@ -9,6 +9,7 @@ import { LINE_GROUPS, setRetiredLines } from "@/lib/toucan-lines";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { openStyleQuiz, useToucanStyle } from "@/lib/toucan-style-store";
 import { clockWord, voice } from "@/lib/toucan-style";
+import { Fold } from "@/components/ui/Fold";
 
 export type ToucanMode = "simple" | "lite" | "full";
 export const TOUCAN_MODES: { key: ToucanMode; label: string; hint: string }[] = [
@@ -162,8 +163,8 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
                 {on}/{g.lines.length} on
               </span>
             </button>
-            {isOpen && (
-              <ul className="reveal m-0 flex list-none flex-col gap-0.5 px-2 pb-2">
+            <Fold open={!!isOpen}>
+              <ul className="m-0 flex list-none flex-col gap-0.5 px-2 pb-2">
                 {g.lines.map((l) => (
                   <li key={l}>
                     <label className="flex min-h-10 items-start gap-2.5 rounded-lg px-1.5 py-1.5 text-[14px] leading-snug hover:bg-black/[.04]">
@@ -173,7 +174,7 @@ export function ToucanSettings({ initialMode, initialRetired }: { initialMode: T
                   </li>
                 ))}
               </ul>
-            )}
+            </Fold>
           </div>
         );
       })}

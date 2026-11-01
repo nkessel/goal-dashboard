@@ -471,7 +471,12 @@ export function EnergyCheck({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {editing ? (
           <>
-            {wheel && !noSleep && <NightFields value={night} onChange={setNight} effort={wheel.effort} hindrances={wheel.hindrances} />}
+            {/* Last night arrives a moment after the page: it slides in rather than shoving everything down. */}
+            {!noSleep && (
+              <Fold open={!!wheel}>
+                <NightFields value={night} onChange={setNight} effort={wheel?.effort ?? []} hindrances={wheel?.hindrances ?? []} />
+              </Fold>
+            )}
             <div className="flex items-center gap-2">
               {/* The welcome screen's check-in is always open, so no caret there. */}
               {!(simple && full) && caret}

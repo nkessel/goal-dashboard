@@ -250,7 +250,7 @@ export function CreateSheet({
         )}
         </div>
         {/* A small tail pointing down at the + it came from. */}
-        {!keyboard && !pinToToday && stage !== "choose" && <span ref={tailRef} aria-hidden className="-mt-[7px] block h-3 w-3 shrink-0 rotate-45 self-start" style={{ background: isAdventure ? "#e4cfa3" : "var(--t-card)", borderRight: "2px solid #c7a96f", borderBottom: "2px solid #c7a96f" }} />}
+        {!pinToToday && stage !== "choose" && <span ref={tailRef} aria-hidden className="-mt-[7px] block h-3 w-3 shrink-0 rotate-45 self-start transition-opacity" style={{ opacity: keyboard ? 0 : 1,  background: isAdventure ? "#e4cfa3" : "var(--t-card)", borderRight: "2px solid #c7a96f", borderBottom: "2px solid #c7a96f" }} />}
       </div>
     </>,
     document.body

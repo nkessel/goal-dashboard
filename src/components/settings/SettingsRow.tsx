@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useReportOpen } from "./ReorderableSections";
+import { Fold } from "@/components/ui/Fold";
 
 /**
  * One expandable row in the Settings list (matches the mockup's cream
@@ -104,13 +105,16 @@ export function SettingsRow({
           </span>
         )}
       </button>
-      {open && !disabled && children && (
-        <div
-          className="flex flex-col gap-2 px-4 pb-4 pt-1"
-          style={{ borderTop: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}` }}
-        >
-          {children}
-        </div>
+      {!disabled && children && (
+        // Slides open and closed (it used to snap).
+        <Fold open={open}>
+          <div
+            className="flex flex-col gap-2 px-4 pb-4 pt-1"
+            style={{ borderTop: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}` }}
+          >
+            {children}
+          </div>
+        </Fold>
       )}
     </div>
   );

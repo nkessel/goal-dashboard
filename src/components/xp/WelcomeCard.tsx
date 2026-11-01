@@ -22,6 +22,7 @@ import { DueSoonDrawer } from "@/components/tasks/DueSoonDrawer";
 import { SleepCheckIn } from "./SleepCheckIn";
 import { TodayPlanner } from "./TodayPlanner";
 import { castleOf } from "./CastleArt";
+import { Fold } from "@/components/ui/Fold";
 
 export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
 
@@ -340,7 +341,7 @@ export function WelcomeCard({
   if (min)
     return createPortal(
       // The screen tucked away: a small bubble (a sun on the day's first visit, a lantern-moon later) that opens it again.
-      <button type="button" onClick={restore} aria-label={mode === "day" ? "Open the morning check-in" : "Open the check-in"} title={mode === "day" ? "Morning check-in" : "Check-in"} className="welcome-min fixed bottom-[calc(env(safe-area-inset-bottom)+88px)] right-4 z-[47] flex h-14 w-14 items-center justify-center rounded-full">
+      <button type="button" onClick={restore} aria-label={mode === "day" ? "Open the morning check-in" : "Open the check-in"} title={mode === "day" ? "Morning check-in" : "Check-in"} className="welcome-min fixed bottom-[calc(env(safe-area-inset-bottom)+144px)] right-3.5 z-[47] flex h-14 w-14 items-center justify-center rounded-full">
         {mode === "day" ? (
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden>
             <circle cx="12" cy="12" r="4.6" fill="#f6c843" stroke="#a8761a" strokeWidth="1.2" />
@@ -1120,8 +1121,8 @@ function TopPriority({ question, register, arranging = false }: { last: { text: 
           Other priorities{filled.length && !othersOpen ? ` (${filled.length})` : ""}
         </button>
       </div>
-      {othersOpen && (
-        <div className="reveal mx-auto flex w-[65%] min-w-[220px] flex-col items-center gap-1">
+      <Fold open={!!othersOpen}>
+        <div className="mx-auto flex w-[65%] min-w-[220px] flex-col items-center gap-1">
           {others.map((o, i) => (
             <div key={i} className="flex w-full items-center gap-1">
               <input
@@ -1153,7 +1154,7 @@ function TopPriority({ question, register, arranging = false }: { last: { text: 
             <b>Secondary Priorities</b> · important, not urgent. Add a due date or anything else the toucan should know, and he&rsquo;ll bring them up when there&rsquo;s space.
           </span>
         </div>
-      )}
+      </Fold>
       {error && (
         <p className="m-0 text-[12.5px]" style={{ color: "#a33" }}>
           {error}

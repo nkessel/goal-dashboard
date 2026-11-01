@@ -10,7 +10,7 @@ import { WELCOME_ELS, addBackGreeting, backHours, backOwnOn, greetingPool, ownGr
 import { CastleArt } from "./CastleArt";
 import { CheckinIcon } from "./CheckinIcon";
 import { OwnWordsPill, PhraseList, WiseLines } from "@/components/settings/LineLists";
-import { useLinger } from "@/components/ui/Fold";
+import { Fold, useLinger } from "@/components/ui/Fold";
 
 /*
  * Settings in context (the app-wide pattern; see docs/HANDOFF.md, Product
@@ -235,8 +235,8 @@ export function ArrangeList({ fx, order, parts, empty }: { fx: FxSettings; order
             </svg>
             Archived ({archived.length})
           </button>
-          {archiveOpen && (
-            <div className="reveal flex flex-wrap gap-1.5">
+          <Fold open={!!archiveOpen}>
+            <div className="flex flex-wrap gap-1.5">
               {archived.map((el) => {
                 const meta = WELCOME_ELS.find((m) => m.key === el)!;
                 return (
@@ -247,7 +247,7 @@ export function ArrangeList({ fx, order, parts, empty }: { fx: FxSettings; order
                 );
               })}
             </div>
-          )}
+          </Fold>
         </div>
       )}
     </div>

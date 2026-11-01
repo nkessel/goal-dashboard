@@ -7,6 +7,7 @@ import { SwipeActions } from "@/components/ui/SwipeActions";
 import type { AppNotification } from "@/lib/data/types";
 import { ImportReview } from "@/components/imports/ImportReview";
 import { fromFeedback } from "@/lib/from-feedback";
+import { Fold } from "@/components/ui/Fold";
 
 type Item = AppNotification & { icon: string };
 
@@ -366,7 +367,7 @@ export function NotificationList({
             </span>
           </div>
         </div>
-        {open && <ul className="reveal ml-[52px] flex flex-col">{c.map((n, i) => renderRow(n, i === 0))}</ul>}
+        <Fold open={open}><ul className="ml-[52px] flex flex-col">{c.map((n, i) => renderRow(n, i === 0))}</ul></Fold>
       </li>
     );
   }

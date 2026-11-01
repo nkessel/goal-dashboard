@@ -12,6 +12,7 @@ import { lineForDay } from "@/lib/greetings";
 import { WELCOME_ELS, backHours, backOwnOn, greetingFor, greetingPool, moveEl, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
 import { OwnWordsPill, PhraseList, WiseLines } from "./LineLists";
+import { Fold as Slide } from "@/components/ui/Fold";
 
 type NumKey = "dens" | "vel" | "reach" | "size" | "embers" | "fill";
 
@@ -451,7 +452,7 @@ function Fold({ title, hint, children }: { title: string; hint: string; children
           {hint}
         </span>
       </button>
-      {open && <div className="reveal flex flex-col gap-2 px-3 pb-3">{children}</div>}
+      <Slide open={open}><div className="flex flex-col gap-2 px-3 pb-3">{children}</div></Slide>
     </div>
   );
 }
