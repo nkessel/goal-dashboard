@@ -7,6 +7,7 @@ import { ContextMenuBridge } from "@/components/ui/ContextMenuBridge";
 import { MenuLayoutStyles } from "@/components/settings/MenuLayoutSettings";
 import { SaveKeys } from "@/components/ui/SaveKeys";
 import { FOG_HEAD_SCRIPT } from "@/lib/welcome-fog";
+import { ExitGhosts } from "@/components/ui/ExitGhosts";
 import { ClickTrail } from "@/components/ui/ClickTrail";
 import { LastScreen } from "@/components/ui/LastScreen";
 import "./globals.css";
@@ -84,6 +85,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
         <MenuLayoutStyles />
         <SaveKeys />
         <ClickTrail />
+        <ExitGhosts />
         <LastScreen />
         <ViewTransitionProvider>
           {children}

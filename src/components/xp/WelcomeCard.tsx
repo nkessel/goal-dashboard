@@ -357,7 +357,7 @@ export function WelcomeCard({
       document.body
     );
   return createPortal(
-    <div data-welcome-root data-kb-plain style={screenH ? { height: screenH, bottom: "auto" } : undefined} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-center justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px))] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
+    <div data-welcome-root data-kb-plain data-no-ghost style={screenH ? { height: screenH, bottom: "auto" } : undefined} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-start justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px),9dvh)] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
       {/* Overscan: while a phone's keyboard opens or closes the screen briefly changes size; this keeps Today from peeking through above or below. */}
       <div aria-hidden className="pointer-events-none fixed inset-x-0 -bottom-[60vh] -top-[60vh] -z-[1]" style={{ background: "#1b2119" }} />
       {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
@@ -534,6 +534,8 @@ export function WelcomeCard({
               </div>
             ))
           )}
+          {/* The way on stays in reach: pinned to the card's foot while the rest scrolls. */}
+          <div className="welcome-foot sticky -bottom-4 z-[3] -mb-4 flex w-full justify-center pb-4 pt-2">
           {arranging ? (
             <button type="button" onClick={() => setArranging(false)} className="mt-1 h-10 rounded-full px-6 text-[14px] font-bold" style={GILT}>
               Done
@@ -592,6 +594,7 @@ export function WelcomeCard({
               </button>
             </div>
           )}
+          </div>
         </div>
       </div>
       </div>

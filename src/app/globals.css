@@ -2936,3 +2936,6 @@ html[data-welcome-open] .nav-loader-toucan { display: none; }
 .bubble-coin-half[data-side="r"]::before { left: 0; }
 .bubble-coin-half:hover { background: rgba(255, 246, 210, 0.35); }
 .bubble-coin-half:active { scale: none; box-shadow: inset 0 1px 3px rgba(60, 40, 10, 0.5); transform: translateY(0.5px); }
+/* The welcome card's foot (Snooze / Complete check-in): pinned while the card scrolls, on the card's own parchment. */
+.welcome-foot { background: linear-gradient(to bottom, transparent, var(--t-card, #fffaf0) 10px); }
+[data-theme="adventure"] .welcome-foot { background: #ecdab4 url(/design/tex-parchment-2.jpg) repeat; background-size: 384px 384px; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 8px); mask-image: linear-gradient(to bottom, transparent, #000 8px); }
