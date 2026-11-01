@@ -47,7 +47,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0081_import_cards_more_kinds.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0082_private_attachments.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -120,6 +120,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 1: Private files on quests and import cards (migration 0082): bytes in `attachments` (RLS on, no policies), refs in `tasks.attachments` / `import_cards.attachments` (`lib/file-refs.ts`); served only to the owner at `/api/attachments/<id>`, added via POST `/api/attachments` (4 MB cap; `ui/AddFile.tsx`, "📎 Add a file" on import cards and in the quest editor); 📎 chips on quest cards (`ui/FileChips.tsx`); a card's files go with it onto the quest on import. The public repo must never hold these files.
 - Nov 1: Typing in the feedback box holds the page behind still (`KeyboardViewport` pins it as it does for popups, and lets go once the keyboard is down), so Today no longer jumps as the keyboard closes. Needs a real-iPhone check.
 - Nov 1: The welcome toucan hops aside (animated) when dropped onto the card's buttons or fields (`clearOfControls` in `WelcomeCard.tsx`: nearest clear spot, up first).
 - Nov 1: One-time cleanups run from the app (`lib/data/cleanups.ts`, called in AppShell's `after()`, each recorded in `life_wheel.cleanups`): the first removes the owner's 557 duplicate 'Sleep quality' check_ins from Nov 1 14:48–14:56 UTC (owner approved), keeping the earliest.

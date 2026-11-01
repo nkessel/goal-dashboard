@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { cleanFileRefs, type FileRef } from "@/lib/file-refs";
 
 /** Something waiting to be sorted into the app: imported, snoozed or skipped, one card at a time. */
 export type ImportCard = {
@@ -21,13 +22,15 @@ export type ImportCard = {
   snoozed_until: string | null;
   sort: number;
   plan_within_days: number | null;
+  /** Private files kept with it (they go with it onto the quest). */
+  attachments?: FileRef[];
 };
 
-const COLS = "id, created_at, kind, title, description, steps, repeat, repeat_text, due_on, minutes, board_hint, source_label, source_text, batch, status, snoozed_until, sort, plan_within_days";
+const COLS = "id, created_at, kind, title, description, steps, repeat, repeat_text, due_on, minutes, board_hint, source_label, source_text, batch, status, snoozed_until, sort, plan_within_days, attachments";
 
 function clean(row: Record<string, unknown>): ImportCard {
   const r = row as unknown as ImportCard;
-  return { ...r, steps: Array.isArray(row.steps) ? (row.steps as unknown[]).filter((s): s is string => typeof s === "string" && !!s.trim()).slice(0, 30) : [] };
+  return { ...r, attachments: cleanFileRefs(row.attachments), steps: Array.isArray(row.steps) ? (row.steps as unknown[]).filter((s): s is string => typeof s === "string" && !!s.trim()).slice(0, 30) : [] };
 }
 
 /** Cards to sort now: new ones, and snoozed ones whose time has come. Before migration 0077, none. */

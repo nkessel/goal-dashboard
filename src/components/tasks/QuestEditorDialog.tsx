@@ -1,5 +1,9 @@
 "use client";
 
+import { FileChips } from "@/components/ui/FileChips";
+import { AddFile } from "@/components/ui/AddFile";
+import type { FileRef } from "@/lib/file-refs";
+
 import { TimeToken } from "@/components/xp/NightFields";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { GearIcon } from "@/components/ui/Icons";
@@ -215,6 +219,7 @@ export function QuestEditorDialog({
 
   const [title, setTitle] = useState(task?.title ?? prefill?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? prefill?.description ?? "");
+  const [addedFiles, setAddedFiles] = useState<FileRef[]>([]);
   const [importance, setImportance] = useState(task ? Math.round(task.importance) : Math.round(prefill?.importance ?? 0));
   const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : Math.round(prefill?.urgency ?? 0));
   // Tiny tasks start at 15 XP.
@@ -2324,6 +2329,13 @@ export function QuestEditorDialog({
                 className="rounded-lg border px-2.5 py-1.5 text-[15px]"
                 style={fieldStyle}
               />
+              {/* Private files kept with it (a form to fill in): open in a tap, add more. */}
+              {task && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <FileChips files={[...(task.attachments ?? []), ...addedFiles]} />
+                  <AddFile taskId={task.id} onAdded={(f) => setAddedFiles((a) => [...a, f])} />
+                </div>
+              )}
             </div>
           </div>
 

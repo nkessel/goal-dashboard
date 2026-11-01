@@ -38,6 +38,8 @@ export type Goal = {
 
 export type Task = {
   id: string;
+  /** Private files kept with it: [{ id, name, size }] (migration 0082). */
+  attachments?: { id: string; name: string; size?: number }[] | null;
   owner_id: string;
   goal_id: string | null;
   title: string;

@@ -1,5 +1,7 @@
 "use client";
 
+import { FileChips } from "@/components/ui/FileChips";
+
 import { TimeToken } from "@/components/xp/NightFields";
 import { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
@@ -598,6 +600,7 @@ export function TaskRow({
               {task.description}
             </p>
           )}
+          <FileChips files={task.attachments} className="mt-1" />
           <div className={`${compact ? "mt-1" : "mt-1.5"} flex flex-wrap items-center gap-x-2.5 gap-y-1`} style={{ color: isAdventure ? "#3d3628" : metaColor, fontSize: compact ? 12.5 : 13.5 }}>
             {(task.due_at || (task.is_on_calendar && task.scheduled_start)) && (
               <span className="flex items-center gap-1.5" style={isOverdue ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>

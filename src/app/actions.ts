@@ -3824,9 +3824,13 @@ export async function importCardAction(
   } else if (input.kind === "project") {
     // A board of its own (inside the one you picked, if any), each step a quest on it.
     const board = await boardsData.createBoard(ownerId, { title, description: input.description ?? undefined, parentBoardId: input.boardId ?? null });
+    let first: string | null = null;
     for (const st of steps) {
-      await createQuestAction({ title: st.slice(0, 200), importance: 0, urgency: 0, xpValue: 20, boardId: board.id }).catch(() => null);
+      const q = await createQuestAction({ title: st.slice(0, 200), importance: 0, urgency: 0, xpValue: 20, boardId: board.id }).catch(() => null);
+      first ??= q;
     }
+    // Its files go with the first step.
+    if (first && card.attachments?.length) await supabaseAdmin().from("tasks").update({ attachments: card.attachments }).eq("owner_id", ownerId).eq("id", first);
     revalidatePath("/boards", "layout");
     made = { kind: "board", id: board.id };
   } else if (input.kind === "habit") {
@@ -3855,6 +3859,8 @@ export async function importCardAction(
       dueAt: input.dueAt ?? null,
     });
     if (steps.length) await stepsData.replaceSteps(taskId, ownerId, steps.map((s) => ({ title: s.slice(0, 200), done: false }))).catch(() => null);
+    // Files kept with the card (a form to fill in) stay handy on the quest.
+    if (card.attachments?.length) await supabaseAdmin().from("tasks").update({ attachments: card.attachments }).eq("owner_id", ownerId).eq("id", taskId);
     const planBy = input.planBy && Number.isFinite(Date.parse(input.planBy)) ? new Date(input.planBy).toISOString() : null;
     if (planBy) {
       await importCardsData.queueToSchedule(ownerId, taskId, planBy);

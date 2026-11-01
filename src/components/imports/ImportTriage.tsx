@@ -1,5 +1,9 @@
 "use client";
 
+import { FileChips } from "@/components/ui/FileChips";
+import { AddFile } from "@/components/ui/AddFile";
+import type { FileRef } from "@/lib/file-refs";
+
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -489,6 +493,9 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
 function CardView({ card, frame, onRetag, onImport, onSnooze, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
   const [source, setSource] = useState(false);
   const [picking, setPicking] = useState(false);
+  // Files added here (shown at once; they're kept on the card and go with it onto the quest).
+  const [added, setAdded] = useState<{ card: string; files: FileRef[] }>({ card: card.id, files: [] });
+  const files = [...(card.attachments ?? []), ...(added.card === card.id ? added.files.filter((f) => !card.attachments?.some((a) => a.id === f.id)) : [])];
   const facts = [card.repeat_text, card.due_on ? `Due ${dayLabel(card.due_on)}` : null, card.minutes ? minutesLabel(card.minutes) : null, card.board_hint ? `Board: ${card.board_hint}` : null].filter(Boolean) as string[];
   return (
     <div className="card-pop-in parchment relative flex flex-col gap-2.5 rounded-3xl p-4" style={frame} onContextMenu={(e) => (e.preventDefault(), setMenu(true))}>
@@ -513,6 +520,10 @@ function CardView({ card, frame, onRetag, onImport, onSnooze, onSkip, menu, setM
           {card.description}
         </p>
       )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FileChips files={files} />
+        <AddFile cardId={card.id} onAdded={(f) => setAdded((a) => ({ card: card.id, files: [...(a.card === card.id ? a.files : []), f] }))} />
+      </div>
       {facts.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {facts.map((f) => (
@@ -630,6 +641,7 @@ function ListRow({ card, first, onRetag, onImport, onSnooze, onSkip, onDelete }:
         </span>
         <KindBadge kind={card.kind} open={picking} onToggle={() => setPicking((v) => !v)} small />
       </div>
+      <FileChips files={card.attachments} />
       <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
       <div className="flex items-center gap-1.5">
         <button type="button" onClick={onSkip} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={small}>
