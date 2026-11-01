@@ -62,6 +62,9 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
   const [calendars, setCalendars] = useState<{ id: string; name: string; color: string | null; writable: boolean; primary: boolean }[]>([]);
   const [showCals, setShowCals] = useState(false);
   const [showMeals, setShowMeals] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  // The block you tapped: its options open under the day.
+  const [picked, setPicked] = useState<string | null>(null);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<number | null>(null);
@@ -209,15 +212,23 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
               ✨ Auto-schedule
             </h3>
             <p className="m-0 text-[13.5px] leading-snug" style={{ color: soft }}>
-              Your list, in order, placed into free time{google ? " around your Google calendars" : ""}. Look it over, nudge anything, then place it all.
+              A plan for your list, in your free time{google ? " (around your Google calendars)" : ""}. Tap a gold block to change it.
             </p>
           </div>
+          {/* The finer settings (hours, daily limit, essentials, calendars) wait behind the gear. */}
+          <button type="button" onClick={() => setShowSettings((v) => !v)} aria-expanded={showSettings} aria-label="Settings" title="Settings" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: soft, background: showSettings ? "rgba(217,180,95,.22)" : undefined }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+              <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: soft }}>
             ×
           </button>
         </div>
 
         {settings && (
+          <Fold open={showSettings} className="relative z-[1]">
           <div className="relative z-[1] mx-4 mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3 py-2 text-[13.5px]" style={{ background: isAdventure ? "rgba(120,90,40,.1)" : "var(--t-bg)", color: ink }}>
             <label className="flex items-center gap-1.5">
               <span style={{ color: soft }}>Between</span>
@@ -320,6 +331,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
               </ul>
             </Fold>
           </div>
+          </Fold>
         )}
 
         <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-3">
@@ -350,65 +362,59 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
               <h4 className={`m-0 ${isAdventure ? "font-display text-[16px]" : "text-[13.5px] font-bold uppercase tracking-wide"}`} style={{ color: isAdventure ? "#6b4f1d" : soft }}>
                 {g.label}
               </h4>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {g.rows.map((p) => {
+              <DayStrip
+                day={g.rows[0].start}
+                rows={g.rows}
+                busy={(blocking ?? []).map((x) => ({ start: new Date(x.start).getTime(), end: new Date(x.end).getTime() }))}
+                holds={holdsFor(g.rows[0].start)}
+                from={settings?.dayStart ?? 8 * 60}
+                to={settings?.dayEnd ?? 21 * 60}
+                picked={picked}
+                onPick={(id) => setPicked((x) => (x === id ? null : id))}
+                isAdventure={isAdventure}
+              />
+              <ul className="m-0 flex list-none flex-col p-0">
+                {g.rows.map((p, i) => {
                   const t = taskOf.get(p.id);
                   const pref = settings?.prefs[p.id] ?? "any";
+                  const open = picked === p.id;
                   return (
-                    <li key={p.id} className="fade-in flex flex-col gap-1 rounded-xl px-3 py-2" style={{ background: isAdventure ? "rgba(255,250,238,.55)" : "var(--t-bg)", border: "1px solid rgba(139,112,64,.25)" }}>
-                      <span className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 text-[13px] font-semibold tabular-nums" style={{ color: isAdventure ? "#6b4f1d" : "var(--t-accent)" }}>
-                          {hm(p.start)} – {hm(p.end)}
+                    <li key={p.id} className="fade-in flex flex-col">
+                      <button type="button" onClick={() => setPicked(open ? null : p.id)} aria-expanded={open} className="flex min-h-8 items-center gap-2 rounded-lg px-1.5 text-left" style={{ background: open ? "rgba(217,180,95,.18)" : undefined }}>
+                        <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}>
+                          {i + 1}
                         </span>
-                        <button type="button" onClick={() => setSkipped((s) => new Set(s).add(p.id))} aria-label={`Leave ${p.title} out of this plan`} title="Leave it out this time" className="-my-1 -mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: soft }}>
-                          ×
-                        </button>
-                      </span>
-                      <span className="text-[15px] font-semibold leading-snug" style={{ color: ink }}>
-                        {p.title}
-                        {p.late && (
-                          <span className="ml-1.5 whitespace-nowrap text-[12px] font-bold" style={{ color: "var(--t-warn)" }}>
-                            after its due date
+                        <span className="w-[86px] shrink-0 text-[12.5px] tabular-nums" style={{ color: soft }}>
+                          {hm(p.start)}–{hm(p.end)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold" style={{ color: ink }}>
+                          {p.title}
+                        </span>
+                        {p.late && <span className="shrink-0 text-[11.5px] font-bold" style={{ color: "var(--t-warn)" }}>late</span>}
+                      </button>
+                      <Fold open={open}>
+                        <span className="flex flex-wrap items-center gap-1 py-1 pl-8">
+                          <span role="radiogroup" aria-label={`When for ${p.title}`} className="flex rounded-full p-0.5" style={{ background: "rgba(120,90,40,.12)" }}>
+                            {TIMES.map((o) => (
+                              <button key={o.v} type="button" role="radio" aria-checked={pref === o.v} title={o.hint} onClick={() => setPref(p.id, o.v)} className="h-7 rounded-full px-2 text-[12px] font-semibold" style={pref === o.v ? { background: gold, color: isAdventure ? "#2a1c10" : "#fff" } : { color: soft }}>
+                                {o.label}
+                              </button>
+                            ))}
                           </span>
-                        )}
-                        {p.split && (
-                          <span className="ml-1.5 whitespace-nowrap text-[12px]" style={{ color: soft }}>
-                            first {Math.round((p.end.getTime() - p.start.getTime()) / 3_600_000)}h of {Math.round(((t?.estimate_minutes ?? 0) / 60) * 10) / 10}h
-                          </span>
-                        )}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="mr-1 text-[12px]" style={{ color: soft }}>
-                          Best time
+                          <button type="button" onClick={() => (setSkipped((x) => new Set(x).add(p.id)), setPicked(null))} className="h-7 rounded-full px-2.5 text-[12px]" style={{ color: soft }}>
+                            Leave it out
+                          </button>
+                          {p.split && t?.estimate_minutes ? (
+                            <span className="text-[11.5px]" style={{ color: soft }}>
+                              first part of {Math.round((t.estimate_minutes / 60) * 10) / 10}h
+                            </span>
+                          ) : null}
                         </span>
-                        <span role="radiogroup" aria-label={`When for ${p.title}`} className="flex rounded-full p-0.5" style={{ background: "rgba(120,90,40,.12)" }}>
-                          {TIMES.map((o) => (
-                            <button
-                              key={o.v}
-                              type="button"
-                              role="radio"
-                              aria-checked={pref === o.v}
-                              title={o.hint}
-                              onClick={() => setPref(p.id, o.v)}
-                              className="h-7 rounded-full px-2 text-[12px] font-semibold"
-                              style={pref === o.v ? { background: gold, color: isAdventure ? "#2a1c10" : "#fff" } : { color: soft }}
-                            >
-                              {o.label}
-                            </button>
-                          ))}
-                        </span>
-                      </span>
+                      </Fold>
                     </li>
                   );
                 })}
               </ul>
-              {holdsFor(g.rows[0].start).map((h) => (
-                <p key={h.key} className="m-0 flex items-center gap-1.5 rounded-lg px-3 py-1 text-[12.5px] italic" style={{ color: soft, border: "1px dashed rgba(139,112,64,.35)", opacity: 0.85 }}>
-                  <span aria-hidden>{MEAL_ICONS[h.key]}</span>
-                  {MEAL_NAMES[h.key]}: {h.minutes < 60 ? `${h.minutes} min` : h.minutes === 60 ? "an hour" : `${h.minutes / 60} hr`} kept free, {hm(new Date(h.from))}–{hm(new Date(h.to))}
-                  {h.at !== null ? ` (now at ${hm(new Date(h.at))})` : " (crowded out by events already there)"}
-                </p>
-              ))}
             </section>
           ))}
           {plan && plan.unplaced.length > 0 && (
@@ -453,21 +459,15 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
               <button type="button" onClick={onClose} className="h-11 rounded-full px-4 text-[14.5px] underline" style={{ color: soft }}>
                 Not now
               </button>
-              {!oneByOne && !!plan?.placed.length && (
-                <button type="button" onClick={apply} disabled={applying} className="ml-auto h-11 rounded-full px-3 text-[14px] underline underline-offset-2" style={{ color: soft }}>
-                  {applying ? "Placing…" : `Place all ${plan.placed.length + fixed.length}`}
-                </button>
-              )}
               {!oneByOne ? (
-                <button
-                  type="button"
-                  onClick={() => (setFixed([]), setOneByOne(true))}
-                  disabled={!plan?.placed.length}
-                  className={`hover-glow h-11 rounded-full px-5 text-[15px] font-bold disabled:opacity-50 ${plan?.placed.length ? "" : "ml-auto"}`}
-                  style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}
-                >
-                  One by one ›
-                </button>
+                <>
+                  <button type="button" onClick={() => (setFixed([]), setOneByOne(true))} disabled={!plan?.placed.length} className="ml-auto h-11 rounded-full px-3 text-[14px] underline underline-offset-2 disabled:opacity-50" style={{ color: soft }}>
+                    One by one
+                  </button>
+                  <button type="button" onClick={apply} disabled={applying || !plan?.placed.length} className="hover-glow h-11 rounded-full px-5 text-[15px] font-bold disabled:opacity-50" style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}>
+                    {applying ? "Placing…" : `Place all ${(plan?.placed.length ?? 0) + fixed.length}`}
+                  </button>
+                </>
               ) : (
                 <>
                   <button type="button" onClick={() => setOneByOne(false)} className="h-11 rounded-full px-3 text-[14px] underline underline-offset-2" style={{ color: soft }}>
@@ -490,6 +490,62 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
       </div>
     </div>,
     document.body
+  );
+}
+
+/** One day as a strip: your busy time (grey), essentials kept free (dashed), and each placed quest (a gold, numbered block). */
+function DayStrip({ day, rows, busy, holds, from, to, picked, onPick, isAdventure }: { day: Date; rows: Placed[]; busy: { start: number; end: number }[]; holds: Hold[]; from: number; to: number; picked: string | null; onPick: (id: string) => void; isAdventure: boolean }) {
+  const d0 = new Date(day);
+  d0.setHours(0, 0, 0, 0);
+  const t0 = d0.getTime() + from * 60_000;
+  const span = Math.max(60, to - from) * 60_000;
+  const pos = (a: number, b: number) => {
+    const l = Math.max(0, Math.min(1, (a - t0) / span));
+    const r = Math.max(0, Math.min(1, (b - t0) / span));
+    return { left: `${l * 100}%`, width: `${Math.max(0, r - l) * 100}%` };
+  };
+  const hours: number[] = [];
+  for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) hours.push(m);
+  const label = (m: number) => {
+    const h = Math.floor(m / 60) % 24;
+    return h === 0 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`;
+  };
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="relative h-9 overflow-hidden rounded-lg" style={{ background: isAdventure ? "rgba(255,250,238,.6)" : "var(--t-bg)", border: "1px solid rgba(139,112,64,.3)" }}>
+        {hours.map((m) => (
+          <span key={m} aria-hidden className="absolute inset-y-0 w-px" style={{ left: `${((m - from) / (to - from)) * 100}%`, background: "rgba(139,112,64,.15)" }} />
+        ))}
+        {busy.filter((b) => b.end > t0 && b.start < t0 + span).map((b, i) => (
+          <span key={`b${i}`} aria-hidden className="absolute inset-y-1 rounded" style={{ ...pos(b.start, b.end), background: "rgba(90,80,60,.28)" }} />
+        ))}
+        {holds.filter((h) => h.at !== null).map((h) => (
+          <span key={h.key} aria-hidden title={MEAL_NAMES[h.key]} className="absolute inset-y-1.5 flex items-center justify-center rounded text-[10px]" style={{ ...pos(h.at!, h.at! + h.minutes * 60_000), border: "1px dashed rgba(139,112,64,.55)" }}>
+            {MEAL_ICONS[h.key]}
+          </span>
+        ))}
+        {rows.map((p, i) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onPick(p.id)}
+            aria-label={`${p.title}, tap for options`}
+            title={p.title}
+            className="absolute inset-y-0.5 flex items-center justify-center overflow-hidden rounded-md text-[11px] font-bold"
+            style={{ ...pos(p.start.getTime(), p.end.getTime()), minWidth: 14, background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", color: "#2a1c10", border: picked === p.id ? "2px solid #6b4f1d" : "1px solid #8a6116" }}
+          >
+            {i + 1}
+          </button>
+        ))}
+      </div>
+      <div className="relative h-3.5 text-[10px] tabular-nums" aria-hidden style={{ color: "rgba(107,79,29,.7)" }}>
+        {hours.filter((m, i) => i % 2 === 0 && m - from >= (to - from) * 0.03 && to - m >= (to - from) * 0.03).map((m) => (
+          <span key={m} className="absolute -translate-x-1/2" style={{ left: `${((m - from) / (to - from)) * 100}%` }}>
+            {label(m)}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

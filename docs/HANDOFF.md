@@ -148,6 +148,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 1: Auto-schedule is simpler and visual (owner: "too complicated", "show the calendar slots"): each day is a strip (busy grey, essentials dashed with icons, your quests as gold numbered blocks; `DayStrip` in `AutoScheduler.tsx`) with a short numbered list under it; tap a block or row for AM/PM/Eve/Any and Leave it out inline; one gold "Place all N", a quiet "One by one"; every setting behind the gear (folded).
 - Nov 1: Three PDFs (MA claim form, subway performer application blank + filled) uploaded into `attachments` through a temporary token-gated function (owner approved); `cleanups.ts` puts them on their import cards on the next load.
 - Nov 1: Import board picker: type to find a board (matches as you type, Enter picks the first), a short list (chosen, suggested, then a few) one per line, "+ New board “…”" makes one on the spot (`createBoardQuickAction`), "No board"; the same picker in "Fill it all in myself".
 - Nov 1: Imports List view stays the list: adding a card opens its steps in that row's place (`flowNode` passed to `ListView` as `active`), and the view is remembered (`import-view` in localStorage). Checked with a Playwright run of add, Not now › Tomorrow, Archive, Delete, ✎ edit and Other… from List view: none left the list.
