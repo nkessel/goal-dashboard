@@ -4,11 +4,12 @@
  * Daily Habits and Additional Quests live in one board (cards drag between
  * them), so they stay together, in the order they have among themselves.
  */
-export type TodayPart = "stats" | "plan" | "chapter" | "due" | "today" | "habits" | "other" | "evening" | "add" | "victories";
+export type TodayPart = "stats" | "plan" | "imports" | "chapter" | "due" | "today" | "habits" | "other" | "evening" | "add" | "victories";
 
 export const TODAY_PARTS: { key: TodayPart; label: string; hint: string }[] = [
   { key: "stats", label: "Your level and XP", hint: "Level, XP, coins and streak" },
   { key: "plan", label: "Planning nudge", hint: "The evening prompt or a nudge to plan" },
+  { key: "imports", label: "Imports to sort", hint: "Shows when something you brought in is waiting" },
   { key: "chapter", label: "This week's chapter", hint: "The week's story, when there is one" },
   { key: "due", label: "Due soon", hint: "Quests due within your reach" },
   { key: "today", label: "Today's Quests", hint: "Your pinned quests for today" },
@@ -21,7 +22,7 @@ export const TODAY_PARTS: { key: TodayPart; label: string; hint: string }[] = [
 export const BOARD_PARTS: TodayPart[] = ["due", "today", "habits", "other"];
 
 export type TodayLayout = { order: TodayPart[]; hidden: TodayPart[] };
-export const DEFAULT_TODAY_LAYOUT: TodayLayout = { order: ["stats", "plan", "chapter", "due", "habits", "today", "other", "evening", "add", "victories"], hidden: [] };
+export const DEFAULT_TODAY_LAYOUT: TodayLayout = { order: ["stats", "plan", "imports", "chapter", "due", "habits", "today", "other", "evening", "add", "victories"], hidden: [] };
 
 const KEY = "today-layout";
 const EVENT = "today-layout";

@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-10-31 (transitions sweep round 2: dialog exits; toucan bubble per UX teams).
+- **Last updated:** 2026-11-01 (import triage screen at /import; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** iOS: opening feedback made the page behind it flash/resize, and the welcome card's top was cut off (owner's screen recordings, Oct 31). Fix shipped Oct 31 (see Recently shipped); confirm with the owner on a phone.
 
@@ -14,7 +14,8 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 
 | # | Work | State | Next step |
 |---|---|---|---|
-| 0 | **Import triage** (owner ask, Nov 1) | In progress | Table `import_cards` is live (migration 0077: kind, title, description, steps, repeat/repeat_text, due_on, minutes, board_hint, source_label/source_text, batch, status new/snoozed/imported/skipped). The notes-to-quests thread fills it. To build: a card-by-card screen (Import → guided steps: board, then urgency/due, then the rest, each skippable, with "Fill it all in myself" opening the quest editor; Snooze; Skip/Delete). |
+| 0 | **Import scheduling** (owner ask, Nov 1) | In progress | Next: a "Plan it within" step (today / 3 days / 1 week / 2 weeks / this month / Custom…, urgency and due date optional) feeding an ordered list to schedule; review the list once, then auto-schedule as tentative calendar blocks accepted one by one. Floating meal holds (lunch 11–3, dinner 5–8, 1 hr each; breakfast off by default, one-tap per day; ranges in Settings) kept free, shown faintly; gym as a real daily block. |
+| 0b | **Import triage** (shipped Nov 1) | Done | Table `import_cards` is live (migration 0077: kind, title, description, steps, repeat/repeat_text, due_on, minutes, board_hint, source_label/source_text, batch, status new/snoozed/imported/skipped). The notes-to-quests thread fills it. To build: a card-by-card screen (Import → guided steps: board, then urgency/due, then the rest, each skippable, with "Fill it all in myself" opening the quest editor; Snooze; Skip/Delete). |
 | 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
 | 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. Left: consistent capitalization, pinned editor footer. The UX teams can now read real click timings from `ui_clicks`. |
 | 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. See the header list. |
@@ -119,6 +120,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 1: Import triage at `/import` (`imports/ImportTriage.tsx`, `lib/data/import-cards.ts`, table `import_cards`, migration 0077): one card at a time, Import ✦ / Snooze… / Skip (Delete for good under ⋯, Undo on a toast); Import asks one small question at a time (board with the note's suggestion first, when, how much it matters; habits: how often incl. certain days, how long), each skippable, then a review (name, steps editable); "Fill it all in myself" shows every field at once and can open the full quest editor; Set aside list brings skipped/snoozed back. A "N things to sort" link shows on Today (new arrangeable part `imports`) and in Settings.
 
 - Nov 1: Keyboard + lag pass, round 3: the + sheet's keyboard lift is worked out once from where it sat (`rest`) and its height is held while typing (the room added under its fields used to grow it, so it overshot 80px above the screen and snapped 140px on close); the nav loader's toucan no longer flaps all day invisibly (10 infinite animations paused while idle) and no longer hides the perched toucan (`html:has(.nav-loader-toucan)` was always true); phone-heavy animations moved to transform/opacity (notification badge ring, toucan Talk glow, evening stars and sparkles), the + sheet backdrop blur dropped; `ExitGhosts` also fades plain full-screen layers whose children are the popup (icon picker, boss gate); `Fold eager` (Insights' Last night renders while shut, so opening is only the slide); the toucan nods when you answer him (`.tc-nod`) and the ‹ › coin tips toward the pressed half; while the welcome screen is up, everything under it pauses its animations. Keyboard simulation now clean on: welcome (respond, top priority, other priorities, tag/event, hopping between them), + sheet (quest, check-in, journal), feedback box, toucan chat, Treasure Chest reward editor, Bring from home; interactions on Today paint the next frame in ~25ms with no long tasks (desktop CPU).
 

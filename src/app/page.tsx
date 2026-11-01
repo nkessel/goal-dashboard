@@ -3,6 +3,8 @@ import { auth, signIn } from "@/auth";
 import { DUE_HOURS_COOKIE, byDuePriority, inDueWindow, parseDueHours } from "@/lib/due-soon";
 import { LowLightToggle } from "@/components/evening/LowLightToggle";
 import { TodayArrange } from "@/components/today/TodayArrange";
+import { ImportsWaiting } from "@/components/imports/ImportsWaiting";
+import { countWaitingImportCards } from "@/lib/data/import-cards";
 import { RefreshAt } from "@/components/today/RefreshAt";
 import { AppShell } from "@/components/layout/AppShell";
 import { TodayTaskBoard } from "@/components/tasks/TodayTaskBoard";
@@ -109,6 +111,7 @@ export default async function Home() {
     latestCheckIns(session.user.id, daysAgoISO(2)).catch(() => ({})),
     listCheckNotesSince(session.user.id, daysAgoISO(2)).catch(() => []),
   ]);
+  const importsWaiting = await countWaitingImportCards(session.user.id).catch(() => 0);
   // Sunday/Monday: nudge toward the weekly ritual; the first days of a month, the monthly one.
   const dayKey = appDayKey();
   const dow = new Date(`${dayKey}T12:00:00Z`).getUTCDay();
@@ -205,6 +208,7 @@ export default async function Home() {
             parts={{
               stats,
               plan: <EveningPromptOr>{planNudge}</EveningPromptOr>,
+              imports: importsWaiting > 0 ? <ImportsWaiting count={importsWaiting} /> : null,
               chapter: chapter ? <WeekChapter chapter={chapter} theme={profile?.theme ?? "adventure"} /> : null,
               evening: <BeginEveningButton />,
               add: (

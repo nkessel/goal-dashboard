@@ -14,6 +14,8 @@ import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
 import { countImports } from "@/lib/data/rewards";
+import { countWaitingImportCards } from "@/lib/data/import-cards";
+import { ImportsWaiting } from "@/components/imports/ImportsWaiting";
 import { Avatar } from "@/components/settings/Avatar";
 import { ThemeToggle } from "@/components/settings/ThemeToggle";
 import { ToucanLookSettings, ToucanSettings } from "@/components/settings/ToucanSettings";
@@ -43,13 +45,14 @@ const ICON_STROKE = { strokeWidth: 1.6, fill: "none" as const };
 
 /** Everything in Settings below its title — shared by the Settings page and the slide-out menu. */
 export async function SettingsContent({ userId, open }: { userId: string; open?: string }) {
-  const [session, profile, imports, admin, missionSteps, cap] = await Promise.all([
+  const [session, profile, imports, admin, missionSteps, cap, importCards] = await Promise.all([
     auth(),
     getProfileById(userId),
     countImports(userId).catch(() => ({ quests: 0, rewards: 0 })),
     isAdmin(userId),
     listMissionSteps(userId).catch(() => []),
     levelCap(userId).catch(() => 10),
+    countWaitingImportCards(userId).catch(() => 0),
   ]);
   const newFeedback = admin ? await countUnreviewed() : 0;
   if (!profile) notFound();
@@ -136,6 +139,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
         </section>
 
         <ImportsInboxRow quests={imports.quests} rewards={imports.rewards} theme={profile.theme} />
+        <ImportsWaiting count={importCards} />
 
         {admin && (
           <Link

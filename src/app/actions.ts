@@ -26,6 +26,7 @@ import * as sharingData from "@/lib/data/sharing";
 import * as partyData from "@/lib/data/party";
 import * as bossesData from "@/lib/data/bosses";
 import * as energyData from "@/lib/data/energy";
+import * as importCardsData from "@/lib/data/import-cards";
 import { computeLevelForXp } from "@/lib/levels";
 import { byDuePriority } from "@/lib/due-soon";
 import * as xp from "@/lib/data/xp";
@@ -3748,4 +3749,94 @@ function cleanRepeatInput(r: unknown) {
   const unit = u.unit === "day" || u.unit === "week" || u.unit === "month" || u.unit === "year" ? u.unit : null;
   const from = typeof u.from === "string" && /^\d{4}-\d{2}-\d{2}$/.test(u.from) ? u.from : null;
   return every >= 1 && every <= 999 && unit && from ? { every, unit: unit as "day" | "week" | "month" | "year", from } : null;
+}
+
+// ---- Import cards: sort things in one at a time (import, snooze, skip) ----
+
+export async function listImportCardsAction(): Promise<{ waiting: importCardsData.ImportCard[]; setAside: importCardsData.ImportCard[] }> {
+  const ownerId = await requireProfileId();
+  const now = new Date().toISOString();
+  const [waiting, setAside] = await Promise.all([importCardsData.listWaitingImportCards(ownerId, now), importCardsData.listSetAsideImportCards(ownerId, now)]);
+  return { waiting, setAside };
+}
+
+/** Snooze until a time, skip (kept, can come back), bring back, or delete for good. */
+export async function decideImportCardAction(id: string, choice: { kind: "snooze"; until: string } | { kind: "skip" } | { kind: "restore" } | { kind: "delete" }) {
+  const ownerId = await requireProfileId();
+  if (choice.kind === "delete") await importCardsData.deleteImportCard(ownerId, id);
+  else if (choice.kind === "snooze") {
+    const t = Date.parse(choice.until);
+    if (!Number.isFinite(t)) throw new Error("Pick a time to snooze it until.");
+    await importCardsData.setImportCardStatus(ownerId, id, { status: "snoozed", snoozed_until: new Date(t).toISOString() });
+  } else await importCardsData.setImportCardStatus(ownerId, id, { status: choice.kind === "skip" ? "skipped" : "new" });
+  revalidatePath("/");
+  revalidatePath("/import");
+}
+
+/** The card became a quest some other way (the full quest editor): mark it imported. */
+export async function markImportCardImportedAction(id: string, taskId: string | null) {
+  const ownerId = await requireProfileId();
+  await importCardsData.setImportCardStatus(ownerId, id, { status: "imported", task_id: taskId });
+  revalidatePath("/");
+  revalidatePath("/import");
+}
+
+/** Import a card with what the guided steps gathered (anything skipped is left out). */
+export async function importCardAction(
+  id: string,
+  input: {
+    kind: "quest" | "habit";
+    title: string;
+    description?: string | null;
+    steps?: string[];
+    boardId?: string | null;
+    dueAt?: string | null;
+    importance?: number | null;
+    urgency?: number | null;
+    minutes?: number | null;
+    /** Habits: weekdays (0 = Sunday), or an interval. Neither = every day. */
+    days?: number[] | null;
+    repeat?: { every: number; unit: "day" | "week" | "month" | "year"; from: string } | null;
+  }
+): Promise<{ kind: "quest" | "habit"; id: string }> {
+  const ownerId = await requireProfileId();
+  const card = await importCardsData.getImportCard(ownerId, id);
+  if (!card) throw new Error("That card is gone.");
+  const title = input.title.replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!title) throw new Error("Give it a name first.");
+  const steps = (input.steps ?? []).map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 20);
+  const minutes = input.minutes && input.minutes > 0 ? Math.min(1440, Math.round(input.minutes)) : null;
+  let made: { kind: "quest" | "habit"; id: string };
+  if (input.kind === "habit") {
+    const days = input.days?.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) ?? null;
+    const riteId = await createRiteAction({
+      title,
+      description: input.description ?? undefined,
+      isCore: false,
+      slot: "day",
+      days: days?.length ? [...new Set(days)].sort() : null,
+      estimateMinutes: minutes,
+      repeat: input.repeat ?? null,
+    });
+    if (steps.length) await ritesData.setRiteSteps(ownerId, riteId, steps.map((s, i) => ({ id: `s${i + 1}`, title: s.slice(0, 120) }))).catch(() => null);
+    made = { kind: "habit", id: riteId };
+  } else {
+    const xpValue = Math.min(150, 20 + (minutes ? Math.round(minutes / 10) * 5 : 0));
+    const taskId = await createQuestAction({
+      title,
+      description: input.description ?? undefined,
+      importance: input.importance ?? 0,
+      urgency: input.urgency ?? 0,
+      xpValue,
+      estimateMinutes: minutes,
+      boardId: input.boardId ?? null,
+      dueAt: input.dueAt ?? null,
+    });
+    if (steps.length) await stepsData.replaceSteps(taskId, ownerId, steps.map((s) => ({ title: s.slice(0, 200), done: false }))).catch(() => null);
+    made = { kind: "quest", id: taskId };
+  }
+  await importCardsData.setImportCardStatus(ownerId, id, { status: "imported", task_id: made.kind === "quest" ? made.id : null });
+  revalidatePath("/");
+  revalidatePath("/import");
+  return made;
 }
