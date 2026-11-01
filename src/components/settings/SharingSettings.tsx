@@ -1,13 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveSupportNoteAction, setShareSettingsAction } from "@/app/actions";
+import { setShareSettingsAction } from "@/app/actions";
 import { SHARE_SCREENS, shares, type ShareKey, type ShareSettings } from "@/lib/sharing";
 
 /** "What your party can see": one switch per screen. Today is on by default. */
-export function SharingSettings({ initial, theme, support = "" }: { initial: ShareSettings; theme: "calm" | "adventure"; /** "How to support me", shown on your profile. */ support?: string }) {
-  const [note, setNote] = useState(support);
-  const [noteSaved, setNoteSaved] = useState<"" | "saving" | "saved">("");
+export function SharingSettings({ initial, theme }: { initial: ShareSettings; theme: "calm" | "adventure" }) {
   const [s, setS] = useState<ShareSettings>(initial);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -28,36 +26,6 @@ export function SharingSettings({ initial, theme, support = "" }: { initial: Sha
   }
   return (
     <div className="flex flex-col gap-1">
-      <label className="mb-2 flex flex-col gap-1">
-        <span className="flex items-center gap-2 text-sm font-medium" style={{ color: "var(--t-ink)" }}>
-          How to support me
-          {noteSaved && <span className="text-xs font-normal" style={{ color: "var(--t-ink-soft)" }}>{noteSaved === "saving" ? "Saving…" : "Saved ✓"}</span>}
-        </span>
-        <span className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
-          A few words your party sees on your profile: what helps, what doesn&rsquo;t.
-        </span>
-        <textarea
-          value={note}
-          onChange={(e) => (setNote(e.target.value.slice(0, 600)), setNoteSaved(""))}
-          onBlur={() => {
-            if (note.trim() === support.trim() && !noteSaved) return;
-            setNoteSaved("saving");
-            startTransition(async () => {
-              try {
-                await saveSupportNoteAction(note);
-                setNoteSaved("saved");
-              } catch (e) {
-                setNoteSaved("");
-                setError(e instanceof Error ? e.message : "Couldn't save that.");
-              }
-            });
-          }}
-          rows={3}
-          placeholder="e.g. Check in on me midweek. Body doubling helps. Ask about my music."
-          className="w-full resize-y rounded-lg border px-2.5 py-1.5 text-[16px] leading-snug"
-          style={{ background: "rgba(255,250,238,.6)", borderColor: "rgba(139,112,64,.35)", color: "var(--t-ink)" }}
-        />
-      </label>
       <p className="m-0 text-sm font-medium" style={{ color: "var(--t-ink)" }}>
         What your party can see
       </p>

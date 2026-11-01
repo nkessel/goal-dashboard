@@ -24,6 +24,7 @@ import { PalettePicker } from "@/components/settings/PalettePicker";
 import { isPalette, type PaletteKey } from "@/lib/palettes";
 import { ExportDataButton } from "@/components/settings/ExportDataButton";
 import { PrivacyToggle } from "@/components/settings/PrivacyToggle";
+import { SupportNote } from "@/components/settings/SupportNote";
 import { SharingSettings } from "@/components/settings/SharingSettings";
 import { PartyViewSettings } from "@/components/social/PartyView";
 import { NotificationPrefs } from "@/components/settings/NotificationPrefs";
@@ -135,6 +136,10 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             >
               {nextLevel ? `${xpIntoLevel} / ${xpForNextLevel} XP` : `${profile.total_xp} XP · Max level`}
             </div>
+          </div>
+          {/* Shown to your party on your profile. */}
+          <div id="support" className="mt-1 w-full max-w-md">
+            <SupportNote support={String((profile.life_wheel as { support?: unknown } | null)?.support ?? "")} />
           </div>
         </section>
 
@@ -517,7 +522,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             }
           >
             <div className="flex flex-col gap-4">
-              <SharingSettings initial={profile.share_settings ?? {}} theme={profile.theme} support={String((profile.life_wheel as { support?: unknown } | null)?.support ?? "")} />
+              <SharingSettings initial={profile.share_settings ?? {}} theme={profile.theme} />
               <div className="pt-3" style={{ borderTop: "1px solid var(--t-card-border)" }}>
                 <PrivacyToggle initialIsPublic={profile.is_public} theme={profile.theme} />
               </div>

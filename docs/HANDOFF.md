@@ -3,7 +3,7 @@
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
 - **Last updated:** 2026-11-01 evening (recordings fixes done except per-page lag; private file attachments; full next-up queue in "Next up, in order" below).
-- **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
+- **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** ~35 notes queued (query in section 3). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
 
 ---
@@ -35,7 +35,7 @@ Each item is the owner's own ask. Take them top to bottom; mark done here and mo
 5. **Online learning videos list**: 🎧 pill shipped Nov 1 (under a walk/drive/dog habit still to do, e.g. "Chester Care 🐶"; `LISTEN_HABIT` in `DailyHabits.tsx`, board found by title /learning videos|listen/). Later maybe: the calendar marks listening windows (commutes, dog walks) and suggests a video; dog walks should show on the calendar (owner, Nov 1). (Board "Online learning videos" made Nov 1, id ef1193ff-f30e-402e-bda0-758b7bc1859a, with the Facing Fragility quest off Today; links in quest descriptions are clickable now). Left: the reminder, once the owner picks one: a list (e.g. a board or a Settings › Lists entry) of videos for walks and car rides, seeded with https://spiraljourneyworkthatreconnects.org/facing-fragility/ ("Facing Fragility", Spiral Journey / Work That Reconnects). The owner needs reminding it exists: offer light options in a plain message and let them pick (e.g. the toucan mentions it when a walk/drive habit is checked, a weekly nudge, a welcome-screen pill, a + sheet shortcut). Don't overwhelm; no button walls.
 6. ~~Welcome-screen habit pills: Learn a language~~ shipped Nov 1 (`xp/LearnLanguage.tsx`, `lib/languages.ts`, `translatePhraseAction`). Next pill ideas welcome; add to `HABIT_PILLS`.
 7. **Quest Game note items** (owner picked these):
-   - ~~"How to support me" on the profile~~ shipped Nov 1 (Settings › sharing, `life_wheel.support`, shown on /friends/<id>).
+   - ~~"How to support me" on the profile~~ shipped Nov 1 (on the profile card at the top of Settings, `settings/SupportNote.tsx`, `life_wheel.support`, shown on /friends/<id>).
    - Zoom in/out on boards with light animation; a single sub-quest fills the width.
    - Longer, smoother victory sparkles; the quest title fully visible on the victory screen. (Checked Nov 1: the title already wraps in full, `QuestComplete.tsx` h2 `break-words`; sparkles linger 6.5s after the bar fills. Ask the owner what still feels short before changing.)
    - A simpler XP burst for habits, rites and mini-quests.
@@ -146,7 +146,7 @@ Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
 - Nov 1: Three PDFs (MA claim form, subway performer application blank + filled) uploaded into `attachments` through a temporary token-gated function (owner approved); `cleanups.ts` puts them on their import cards on the next load.
 - Nov 1: /import has a search box (title, notes, steps, source) and opens on one card with `/import?card=<id>` (or `?q=words`). Today's open check-in has a × to fold it back (note 0cb3e071). The welcome screen's pinned foot lines its parchment up with the card's (`alignFoot`; it showed as a different patch, note 9a91631f).
-- Nov 1: "How to support me": written in Settings (above What your party can see, saves on blur), shown on your profile to your party. A daily habit "Learn a language 🗣" (owner's, rite 9e53e5be) with a "🗣 Practice a phrase" pill that opens the phrase tool in the habit list (`LanguagePractice`, matched by title).
+- Nov 1: "How to support me": written on the profile card at the top of Settings (saves on blur; moved there from Privacy & Security at the owner's request), shown on your profile to your party. A daily habit "Learn a language 🗣" (owner's, rite 9e53e5be) with a "🗣 Practice a phrase" pill that opens the phrase tool in the habit list (`LanguagePractice`, matched by title).
 - Nov 1: "🎧 Something to listen to" under walk, drive and dog habits on Today (until done), opening the Online learning videos board.
 - Nov 1: Welcome habit pills (welcome part `habits`, hidden until turned on in the welcome gear; ✎ picks pills; `welcomeHabitsOn`/`welcomeHabitPills`). First pill "🗣 Learn a language": phrase box + idea pills, language toggles (all on; Italian, Russian, German, Natick Algonquin*, Hebrew, Phoenician*, Portuguese, Spanish, French, Japanese, Mandarin, Arabic, Greek, Hindi; + adds with autocomplete; kept in localStorage `learn-language`), Learn lists the phrase in each with a pronunciation line (Workers AI), * = reconstructed/approximate, 🖨 Print opens a print sheet.
 - Nov 1: Web addresses in a quest card's description are links (`ui/Linked.tsx`). New board "Online learning videos" with its first video.
