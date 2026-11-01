@@ -1,5 +1,7 @@
 "use client";
 
+import { Fold } from "@/components/ui/Fold";
+
 import { FileChips } from "@/components/ui/FileChips";
 import { AddFile } from "@/components/ui/AddFile";
 import type { FileRef } from "@/lib/file-refs";
@@ -234,7 +236,7 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
     decideImportCardAction(c.id, choice.kind === "snooze" ? { kind: "snooze", until: choice.until } : { kind: "skip" })
       .then(() => setAsideList((a) => [{ ...c, status: choice.kind === "snooze" ? "snoozed" : "skipped" }, ...a]))
       .catch((e) => setError(e instanceof Error ? e.message : "Couldn't save that."));
-    say(choice.kind === "snooze" ? `Snoozed ${choice.label}` : `Skipped “${c.title}”`, restore);
+    say(choice.kind === "snooze" ? `Snoozed ${choice.label}` : `Archived “${c.title}”`, restore);
   }
 
   function snoozeTo(choice: SnoozeChoice) {
@@ -423,9 +425,9 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
           )}
         </div>
       ) : mode === "card" && view === "list" ? (
-        <ListView cards={visible} frame={frame} onEdit={(c, p) => rename(c.id, p)} onRetag={(c, k) => retag(k, c.id)} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
+        <ListView cards={visible} frame={frame} onQuick={(c, u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l }, c)} onEdit={(c, p) => rename(c.id, p)} onRetag={(c, k) => retag(k, c.id)} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
       ) : mode === "card" ? (
-        <CardView key={card.id} card={card} frame={frame} onRetag={retag} onEdit={(p) => rename(card.id, p)} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
+        <CardView key={card.id} card={card} frame={frame} onQuick={(u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l })} onRetag={retag} onEdit={(p) => rename(card.id, p)} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
       ) : draft ? (
         <div key={`${card.id}-${mode}`} className="card-pop-in parchment flex flex-col gap-3 rounded-3xl p-4" style={frame}>
           <div className="flex items-center gap-2">
@@ -539,10 +541,11 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
   );
 }
 
-function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
+function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onQuick, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
   const [source, setSource] = useState(false);
   const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [later, setLater] = useState(false);
   // Files added here (shown at once; they're kept on the card and go with it onto the quest).
   const [added, setAdded] = useState<{ card: string; files: FileRef[] }>({ card: card.id, files: [] });
   const files = [...(card.attachments ?? []), ...(added.card === card.id ? added.files.filter((f) => !card.attachments?.some((a) => a.id === f.id)) : [])];
@@ -618,17 +621,15 @@ function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onSkip, me
         </div>
       )}
       <div className="mt-1 flex items-center gap-2">
-        <button type="button" onClick={onSkip} className="h-10 rounded-full px-4 text-[14px] font-semibold" style={chip(false)}>
-          Skip
-        </button>
-        <button type="button" onClick={onSnooze} className="h-10 rounded-full px-4 text-[14px] font-semibold" style={chip(false)}>
-          Snooze…
+        <button type="button" onClick={() => setLater((v) => !v)} aria-expanded={later} className="h-10 rounded-full px-4 text-[14px] font-semibold" style={chip(later)}>
+          Not now…
         </button>
         <span className="flex-1" />
         <button type="button" onClick={onImport} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
           {importLabel(card.kind)}
         </button>
       </div>
+      <LaterRow open={later} done={card.kind === "done"} onSnooze={onSnooze} onSkip={onSkip} onDelete={onDelete} onQuick={onQuick} />
     </div>
   );
 }
@@ -636,6 +637,52 @@ function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onSkip, me
 // What the button does, in its own words (it used to say just "Import").
 const importLabel = (k: Kind) =>
   k === "done" ? "Log as done ✓" : k === "habit" ? "Add as habit ✦" : k === "reward" ? "Add to chest ✦" : k === "project" ? "Make a board ✦" : k === "shopping" ? "Add buy list ✦" : k === "schedule" ? "Add to schedule ✦" : k === "ritual" ? "Add the ritual ✦" : "Add as quest ✦";
+
+/** "Not now…": snooze it (quick picks here, Other… for the full picker), archive it, or delete it. */
+function LaterRow({ open, small = false, done, onSnooze, onSkip, onDelete, onQuick }: { open: boolean; small?: boolean; done: boolean; onSnooze: () => void; onSkip: () => void; onDelete: () => void; onQuick: (until: Date, label: string) => void }) {
+  const [sure, setSure] = useState(false);
+  const h = small ? "h-8 px-3 text-[13px]" : "h-9 px-3.5 text-[13.5px]";
+  const at = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    d.setHours(8, 0, 0, 0);
+    return d;
+  };
+  return (
+    <Fold open={open}>
+      <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+        {!done && (
+          <>
+            <button type="button" onClick={() => onQuick(at(1), "until tomorrow")} className={`${h} rounded-full font-semibold`} style={chip(false)}>
+              Tomorrow
+            </button>
+            <button type="button" onClick={() => onQuick(at(7), "for a week")} className={`${h} rounded-full font-semibold`} style={chip(false)}>
+              Next week
+            </button>
+            <button type="button" onClick={() => onQuick(at(30), "for a month")} className={`${h} rounded-full font-semibold`} style={chip(false)}>
+              Next month
+            </button>
+            <button type="button" onClick={onSnooze} className={`${h} rounded-full font-semibold`} style={chip(false)}>
+              Other…
+            </button>
+          </>
+        )}
+        <button type="button" onClick={onSkip} title="Into the Archived list at the bottom (bring it back any time)" className={`${h} rounded-full font-semibold`} style={chip(false)}>
+          Archive
+        </button>
+        {sure ? (
+          <button type="button" onClick={onDelete} className={`reveal ${h} rounded-full font-semibold`} style={{ color: "#fff", background: "#8b2c1a", border: "1px solid #6b1f12" }}>
+            Delete for good
+          </button>
+        ) : (
+          <button type="button" onClick={() => setSure(true)} className={`${h} rounded-full`} style={{ color: "#8b2c1a" }}>
+            Delete
+          </button>
+        )}
+      </div>
+    </Fold>
+  );
+}
 
 /** ✎ beside a card's name: change its name and notes. */
 function EditPen({ open, onClick }: { open: boolean; onClick: () => void }) {
@@ -716,17 +763,17 @@ function KindPicker({ open, kind, onPick }: { open: boolean; kind: Kind; onPick:
 }
 
 /** All of them at once: each row shows what it is and keeps Skip, Snooze… and Import. */
-function ListView({ cards, frame, onEdit, onRetag, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; onEdit: (c: ImportCard, p: { title: string; description: string }) => void; onRetag: (c: ImportCard, k: Kind) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
+function ListView({ cards, frame, onEdit, onQuick, onRetag, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; onQuick: (c: ImportCard, until: Date, label: string) => void; onEdit: (c: ImportCard, p: { title: string; description: string }) => void; onRetag: (c: ImportCard, k: Kind) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
   return (
     <ul className="card-pop-in parchment m-0 flex list-none flex-col rounded-3xl p-1.5" style={frame}>
       {cards.map((c, i) => (
-        <ListRow key={c.id} card={c} first={i === 0} onEdit={(p) => onEdit(c, p)} onRetag={(k) => onRetag(c, k)} onImport={() => onImport(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
+        <ListRow key={c.id} card={c} first={i === 0} onQuick={(u, l) => onQuick(c, u, l)} onEdit={(p) => onEdit(c, p)} onRetag={(k) => onRetag(c, k)} onImport={() => onImport(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
       ))}
     </ul>
   );
 }
 
-function ListRow({ card, first, onEdit, onRetag, onImport, onSnooze, onSkip, onDelete }: { card: ImportCard; first: boolean; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
+function ListRow({ card, first, onEdit, onRetag, onImport, onSnooze, onQuick, onSkip, onDelete }: { card: ImportCard; first: boolean; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
   const [picking, setPicking] = useState(false);
   const [more, setMore] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -749,28 +796,15 @@ function ListRow({ card, first, onEdit, onRetag, onImport, onSnooze, onSkip, onD
       <FileChips files={card.attachments} />
       <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
       <div className="flex items-center gap-1.5">
-        <button type="button" onClick={onSkip} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={small}>
-          Skip
+        <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ ...small, ...(more ? chip(true) : {}) }}>
+          Not now…
         </button>
-        {card.kind !== "done" && (
-          <button type="button" onClick={onSnooze} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={small}>
-            Snooze…
-          </button>
-        )}
-        {more ? (
-          <button type="button" onClick={onDelete} className="reveal h-8 rounded-full px-3 text-[13px]" style={{ color: "#8b2c1a" }}>
-            Delete for good
-          </button>
-        ) : (
-          <button type="button" onClick={() => setMore(true)} aria-label="More choices" className="flex h-8 w-8 items-center justify-center rounded-full text-[16px] hover:bg-black/[.06]" style={{ color: "#6b5631" }}>
-            ⋯
-          </button>
-        )}
         <span className="flex-1" />
         <button type="button" onClick={onImport} className="h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
           {importLabel(card.kind)}
         </button>
       </div>
+      <LaterRow open={more} small done={card.kind === "done"} onSnooze={onSnooze} onSkip={onSkip} onDelete={onDelete} onQuick={onQuick} />
     </li>
   );
 }
@@ -1117,7 +1151,7 @@ function SetAside({ cards, onBack, isAdventure }: { cards: ImportCard[]; onBack:
         <span aria-hidden className="inline-block transition-transform" style={{ transform: open ? "rotate(90deg)" : undefined }}>
           ›
         </span>
-        Set aside ({cards.length})
+        Archived ({cards.length})
       </button>
       <div className="drawer-body" data-open={open || undefined}>
         <div className="drawer-inner">
