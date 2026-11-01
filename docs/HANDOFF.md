@@ -47,7 +47,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0080_rite_window.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0081_import_cards_more_kinds.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -119,6 +119,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 1: Imports: a One by one | List switch (list rows keep Skip, Snooze…, ⋯ Delete and Import); more kinds (`import_cards.kind` adds `project`, `shopping`, `reward`, `done`, migration 0081): Project makes a board (inside the picked one) with a quest per step, To buy is a quest with its items as steps, Reward goes to the Treasure Chest, Already done is "Log as done ✓" (quest created and completed, no questions). The kind badge opens a row of kinds to retag; filter chips stay quiet until you narrow them.
 
 - Nov 1: Gym 🏋️ habit (owner's): daily, 1 hour, floats 7–10 AM (`rites.window_to`, migration 0080; `habitBlocksOn(habits, day, busy)` takes the first free stretch in the window; habit editor › Time › "+ window"; card reads "7 AM–10 AM"). My reflection questions (`reflectQuestions`, welcome part `reflect`, hidden unless `welcomeReflectOn`; ✎ edits/drag-reorders via `settings/ReflectionList.tsx`, also in Settings › Welcome Screen; the toucan asks from them while it shows; seeded with the owner's 9–5 question). Own wise lines and reflection questions now live on the account (`life_wheel.words`, `getOwnWordsAction`/`saveOwnWordsAction`, `settings/OwnWordsSync.tsx` in AppShell: first meeting merges browser + account, then the account wins).
 

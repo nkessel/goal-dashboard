@@ -3791,11 +3791,14 @@ export async function markImportCardImportedAction(id: string, taskId: string | 
 export async function importCardAction(
   id: string,
   input: {
-    kind: "quest" | "habit";
+    /** "done": a quest logged as already done (XP, nothing left open); "project": a board with a quest per step; "reward": into the Treasure Chest. */
+    kind: "quest" | "habit" | "done" | "project" | "reward";
     title: string;
     description?: string | null;
     steps?: string[];
     boardId?: string | null;
+    /** Rewards: its cost in coins. */
+    costCoins?: number | null;
     dueAt?: string | null;
     /** "Plan it within…": onto the list to schedule, to be planned by then. */
     planBy?: string | null;
@@ -3806,7 +3809,7 @@ export async function importCardAction(
     days?: number[] | null;
     repeat?: { every: number; unit: "day" | "week" | "month" | "year"; from: string } | null;
   }
-): Promise<{ kind: "quest" | "habit"; id: string }> {
+): Promise<{ kind: "quest" | "habit" | "board" | "reward"; id: string }> {
   const ownerId = await requireProfileId();
   const card = await importCardsData.getImportCard(ownerId, id);
   if (!card) throw new Error("That card is gone.");
@@ -3814,8 +3817,19 @@ export async function importCardAction(
   if (!title) throw new Error("Give it a name first.");
   const steps = (input.steps ?? []).map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 20);
   const minutes = input.minutes && input.minutes > 0 ? Math.min(1440, Math.round(input.minutes)) : null;
-  let made: { kind: "quest" | "habit"; id: string };
-  if (input.kind === "habit") {
+  let made: { kind: "quest" | "habit" | "board" | "reward"; id: string };
+  if (input.kind === "reward") {
+    const rid = await createRewardAction({ title, description: input.description ?? undefined, costCoins: input.costCoins ?? undefined });
+    made = { kind: "reward", id: rid };
+  } else if (input.kind === "project") {
+    // A board of its own (inside the one you picked, if any), each step a quest on it.
+    const board = await boardsData.createBoard(ownerId, { title, description: input.description ?? undefined, parentBoardId: input.boardId ?? null });
+    for (const st of steps) {
+      await createQuestAction({ title: st.slice(0, 200), importance: 0, urgency: 0, xpValue: 20, boardId: board.id }).catch(() => null);
+    }
+    revalidatePath("/boards", "layout");
+    made = { kind: "board", id: board.id };
+  } else if (input.kind === "habit") {
     const days = input.days?.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) ?? null;
     const riteId = await createRiteAction({
       title,
@@ -3846,6 +3860,8 @@ export async function importCardAction(
       await importCardsData.queueToSchedule(ownerId, taskId, planBy);
       revalidatePath("/calendar");
     }
+    // Already done: it counts (XP and all), and nothing is left open.
+    if (input.kind === "done") await finishTask(ownerId, taskId).catch(() => null);
     made = { kind: "quest", id: taskId };
   }
   await importCardsData.setImportCardStatus(ownerId, id, { status: "imported", task_id: made.kind === "quest" ? made.id : null });

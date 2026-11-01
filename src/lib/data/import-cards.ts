@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 export type ImportCard = {
   id: string;
   created_at: string;
-  kind: "quest" | "habit" | "schedule";
+  kind: "quest" | "habit" | "schedule" | "reward" | "project" | "shopping" | "done";
   title: string;
   description: string | null;
   steps: string[];

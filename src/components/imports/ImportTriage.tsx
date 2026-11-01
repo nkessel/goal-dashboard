@@ -22,13 +22,19 @@ import type { Task } from "@/lib/data/types";
 
 type BoardOpt = { id: string; title: string; color: string | null };
 type Step = "board" | "plan" | "matters" | "often" | "time" | "review";
-type Kind = "quest" | "schedule" | "habit";
+type Kind = ImportCard["kind"];
 const KINDS: { key: Kind; label: string; icon: string }[] = [
   { key: "quest", label: "Quests", icon: "⚔" },
   { key: "schedule", label: "To schedule", icon: "📅" },
   { key: "habit", label: "Habits", icon: "🌱" },
+  { key: "project", label: "Projects", icon: "🗺" },
+  { key: "shopping", label: "To buy", icon: "🛒" },
+  { key: "reward", label: "Rewards", icon: "🎁" },
+  { key: "done", label: "Already done", icon: "✓" },
 ];
-const KIND_ONE: Record<Kind, string> = { quest: "⚔ Quest", schedule: "📅 To schedule", habit: "🌱 Habit" };
+const KIND_ONE: Record<Kind, string> = { quest: "⚔ Quest", schedule: "📅 To schedule", habit: "🌱 Habit", project: "🗺 Project", shopping: "🛒 To buy", reward: "🎁 Reward", done: "✓ Already done" };
+/** What Import makes of each kind. */
+const SERVER_KIND = (k: Kind): "quest" | "habit" | "done" | "project" | "reward" => (k === "habit" || k === "done" || k === "project" || k === "reward" ? k : "quest");
 type Draft = {
   kind: Kind;
   title: string;
@@ -119,7 +125,8 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
   const [mode, setMode] = useState<"card" | "guided" | "all">("card");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [stepAt, setStepAt] = useState(0);
-  const [snoozing, setSnoozing] = useState(false);
+  const [snoozing, setSnoozingFor] = useState<ImportCard | null>(null);
+  const setSnoozing = (on: boolean, c: ImportCard | null = card) => setSnoozingFor(on ? c : null);
   const [menu, setMenu] = useState(false);
   const [editor, setEditor] = useState(false);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
@@ -129,12 +136,16 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
   // Which kinds this session sorts (all, unless you narrow it).
   const [kinds, setKinds] = useState<Set<Kind>>(() => new Set(KINDS.map((k) => k.key)));
   const visible = queue.filter((c) => kinds.has(c.kind));
-  const card = visible[0] ?? null;
+  // One card at a time, or the whole list (each row keeps its buttons).
+  const [view, setView] = useState<"one" | "list">("one");
+  // The card being worked on (picked from the list, or the next in line).
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const card = visible.find((c) => c.id === focusId) ?? visible[0] ?? null;
   const [scheduling, setScheduling] = useState(false);
   // Steps added from the review ("+ Plan it within…").
   const [extra, setExtra] = useState<Step[]>([]);
 
-  const base: Step[] = draft?.kind === "habit" ? ["often", "time"] : draft?.kind === "schedule" ? ["plan", "board"] : ["board"];
+  const base: Step[] = draft?.kind === "habit" ? ["often", "time"] : draft?.kind === "schedule" ? ["plan", "board"] : draft?.kind === "reward" ? [] : ["board"];
   const steps: Step[] = [...base, ...extra.filter((x) => !base.includes(x)), "review"];
   const step = steps[Math.min(stepAt, steps.length - 1)];
   function jump(s: Step) {
@@ -143,9 +154,9 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
     setExtra((e) => [...e, s]);
     setStepAt(steps.length - 1);
   }
-  function retag(kind: Kind) {
-    if (!card) return;
-    setQueue((q) => q.map((c) => (c.id === card.id ? { ...c, kind } : c)));
+  function retag(kind: Kind, id = card?.id) {
+    if (!id) return;
+    setQueue((q) => q.map((c) => (c.id === id ? { ...c, kind } : c)));
   }
 
   useEscape(() => (mode === "guided" && stepAt > 0 ? setStepAt(stepAt - 1) : setMode("card")), mode !== "card" && !snoozing && !editor);
@@ -155,8 +166,8 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
     setToast({ text, undo });
     toastTimer.current = setTimeout(() => setToast(null), 5000);
   }
-  function next() {
-    const id = card?.id;
+  function next(id = card?.id) {
+    setFocusId(null);
     setQueue((q) => q.filter((c) => c.id !== id));
     setExtra([]);
     setMode("card");
@@ -168,10 +179,11 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
     setQueue((q) => [c, ...q.filter((x) => x.id !== c.id)]);
     setAsideList((a) => a.filter((x) => x.id !== c.id));
   }
-  function begin(all: boolean) {
-    if (!card) return;
-    const d = draftFor(card);
-    setDraft({ ...d, boardId: findBoard(boards, card.board_hint)?.id });
+  function begin(all: boolean, c: ImportCard | null = card) {
+    if (!c) return;
+    setFocusId(c.id);
+    const d = draftFor(c);
+    setDraft({ ...d, boardId: findBoard(boards, c.board_hint)?.id });
     setStepAt(0);
     setExtra([]);
     setMode(all ? "all" : "guided");
@@ -182,10 +194,10 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
     setStepAt((i) => Math.min(i + 1, steps.length - 1));
   };
 
-  function decide(choice: { kind: "snooze"; until: string; label: string } | { kind: "skip" } | { kind: "delete" }) {
-    if (!card) return;
-    const c = card;
-    next();
+  function decide(choice: { kind: "snooze"; until: string; label: string } | { kind: "skip" } | { kind: "delete" }, target: ImportCard | null = card) {
+    if (!target) return;
+    const c = target;
+    next(c.id);
     if (choice.kind === "delete") {
       // Deleted for good after a moment, unless undone.
       const t = setTimeout(() => decideImportCardAction(c.id, { kind: "delete" }).catch(() => null), 5200);
@@ -208,13 +220,29 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
   }
 
   function snoozeTo(choice: SnoozeChoice) {
+    const target = snoozing;
     setSnoozing(false);
     if ("tomorrow" in choice) {
       const d = now();
       d.setDate(d.getDate() + 1);
       d.setHours(8, 0, 0, 0);
-      decide({ kind: "snooze", until: d.toISOString(), label: "until tomorrow" });
-    } else decide({ kind: "snooze", until: choice.until.toISOString(), label: choice.label });
+      decide({ kind: "snooze", until: d.toISOString(), label: "until tomorrow" }, target);
+    } else decide({ kind: "snooze", until: choice.until.toISOString(), label: choice.label }, target);
+  }
+
+  /** Already done: logged at once (XP, nothing left open), no questions. */
+  function logDone(c: ImportCard) {
+    next(c.id);
+    start(async () => {
+      try {
+        await importCardAction(c.id, { kind: "done", title: c.title, description: c.description, steps: [] });
+        say(`Logged “${c.title}” as done ✓`);
+        router.refresh();
+      } catch (e) {
+        putBack(c);
+        setError(e instanceof Error ? e.message : "Couldn't log that.");
+      }
+    });
   }
 
   function save() {
@@ -244,7 +272,7 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
       try {
         setError(null);
         await importCardAction(card.id, {
-          kind: d.kind === "habit" ? "habit" : "quest",
+          kind: SERVER_KIND(d.kind),
           title: d.title,
           description: d.description.trim() || null,
           steps: d.steps,
@@ -257,7 +285,7 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
           ...(d.kind === "habit" ? habitTiming : {}),
         });
         const board = boards.find((b) => b.id === d.boardId);
-        say(d.kind === "habit" ? `“${d.title}” is one of your habits now` : planBy ? `“${d.title}” is on your list to schedule` : `Added “${d.title}”${board ? ` to ${board.title}` : ""}`);
+        say(d.kind === "habit" ? `“${d.title}” is one of your habits now` : d.kind === "reward" ? `“${d.title}” is in your Treasure Chest` : d.kind === "project" ? `“${d.title}” is a board now${d.steps.length ? `, with ${d.steps.length} quests` : ""}` : d.kind === "done" ? `Logged “${d.title}” as done ✓` : planBy ? `“${d.title}” is on your list to schedule` : `Added “${d.title}”${board ? ` to ${board.title}` : ""}`);
         next();
         router.refresh();
       } catch (e) {
@@ -271,13 +299,24 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-baseline gap-2">
-        <h1 className="m-0 font-display text-[26px]" style={{ color: isAdventure ? "#f2d27e" : INK }}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <h1 className="m-0 whitespace-nowrap font-display text-[24px]" style={{ color: isAdventure ? "#f2d27e" : INK }}>
           Sort your imports
         </h1>
         {visible.length > 0 && (
           <span className="text-[13.5px]" style={{ color: isAdventure ? "rgba(242,226,180,.8)" : SOFT }}>
             {visible.length === 1 ? "the last one" : `${visible.length} to sort`}
+          </span>
+        )}
+        <span className="flex-1" />
+        {visible.length > 1 && mode === "card" && (
+          // One by one, or all of them in a list: one switch.
+          <span className="flex shrink-0 rounded-full p-0.5" role="group" aria-label="How to see them" style={{ background: "rgba(255,250,238,.18)", border: "1px solid rgba(217,180,95,.45)" }}>
+            {(["one", "list"] as const).map((v) => (
+              <button key={v} type="button" aria-pressed={view === v} onClick={() => (setView(v), setFocusId(null))} className="h-7 rounded-full px-3 text-[12.5px] font-semibold transition-colors" style={view === v ? { background: "radial-gradient(circle at 35% 25%, #fff0bd, #e2bb5c 70%, #c9a04a)", color: "#2a1c10" } : { color: isAdventure ? "#f2e2b4" : SOFT }}>
+                {v === "one" ? "One by one" : "List"}
+              </button>
+            ))}
           </span>
         )}
       </div>
@@ -298,7 +337,8 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
                   return nx;
                 })}
                 className="h-8 rounded-full px-3 text-[13px] font-semibold transition-opacity"
-                style={{ ...chip(on), minHeight: 32, opacity: on ? 1 : 0.6 }}
+                // All showing: quiet chips (nothing to light up); narrowed: the chosen ones glow.
+                style={{ ...chip(on && kinds.size < KINDS.length && queue.some((c) => !kinds.has(c.kind))), minHeight: 32, opacity: on ? 1 : 0.55 }}
               >
                 {k.icon} {k.label} <span className="font-normal tabular-nums opacity-70">{n}</span>
               </button>
@@ -329,8 +369,10 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
             </Link>
           )}
         </div>
+      ) : mode === "card" && view === "list" ? (
+        <ListView cards={visible} frame={frame} onRetag={(c, k) => retag(k, c.id)} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
       ) : mode === "card" ? (
-        <CardView key={card.id} card={card} frame={frame} onRetag={retag} onImport={() => begin(false)} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
+        <CardView key={card.id} card={card} frame={frame} onRetag={retag} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
       ) : draft ? (
         <div key={`${card.id}-${mode}`} className="card-pop-in parchment flex flex-col gap-3 rounded-3xl p-4" style={frame}>
           <div className="flex items-center gap-2">
@@ -414,7 +456,7 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
       {scheduling && <AutoScheduler tasks={toSchedule} theme={theme} onClose={() => setScheduling(false)} />}
       {aside.length > 0 && <SetAside cards={aside} onBack={(c) => (putBack(c), decideImportCardAction(c.id, { kind: "restore" }).catch(() => null))} isAdventure={isAdventure} />}
 
-      {snoozing && card && <SnoozePicker title={card.title} onPick={snoozeTo} onClose={() => setSnoozing(false)} />}
+      {snoozing && <SnoozePicker title={snoozing.title} onPick={snoozeTo} onClose={() => setSnoozing(false)} />}
       {editor && card && draft && (
         <QuestEditorDialog
           mode={{ kind: "create", boardId: draft.boardId ?? null, prefill: { title: draft.title, description: draft.description, estimateMinutes: draft.minutes ?? null, importance: draft.importance ?? undefined } }}
@@ -446,23 +488,15 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
 
 function CardView({ card, frame, onRetag, onImport, onSnooze, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
   const [source, setSource] = useState(false);
+  const [picking, setPicking] = useState(false);
   const facts = [card.repeat_text, card.due_on ? `Due ${dayLabel(card.due_on)}` : null, card.minutes ? minutesLabel(card.minutes) : null, card.board_hint ? `Board: ${card.board_hint}` : null].filter(Boolean) as string[];
   return (
     <div className="card-pop-in parchment relative flex flex-col gap-2.5 rounded-3xl p-4" style={frame} onContextMenu={(e) => (e.preventDefault(), setMenu(true))}>
       <div className="flex items-center gap-2 pr-9">
         {/* One tap retags it: quest, to schedule, habit. */}
-        <button
-          type="button"
-          onClick={() => onRetag(KINDS[(KINDS.findIndex((k) => k.key === card.kind) + 1) % KINDS.length].key)}
-          title="Tap to change what it is"
-          aria-label={`${KIND_ONE[card.kind]}. Tap to change`}
-          className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[12px] font-bold uppercase tracking-[.08em]"
-          style={{ background: "rgba(217,180,95,.25)", color: GOLD, border: "1px solid rgba(139,112,64,.4)" }}
-        >
-          {KIND_ONE[card.kind]}
-          <span aria-hidden className="text-[10px] opacity-70">⇄</span>
-        </button>
+        <KindBadge kind={card.kind} open={picking} onToggle={() => setPicking((v) => !v)} />
       </div>
+      <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
       <button type="button" onClick={() => setMenu(!menu)} aria-label="More choices" aria-expanded={menu} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/[.06]" style={{ color: "#6b5631" }}>
         ⋯
       </button>
@@ -524,10 +558,103 @@ function CardView({ card, frame, onRetag, onImport, onSnooze, onSkip, menu, setM
         </button>
         <span className="flex-1" />
         <button type="button" onClick={onImport} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
-          Import ✦
+          {importLabel(card.kind)}
         </button>
       </div>
     </div>
+  );
+}
+
+const importLabel = (k: Kind) => (k === "done" ? "Log as done ✓" : "Import ✦");
+
+/** What a card is: tap to change it. */
+function KindBadge({ kind, open, onToggle, small = false }: { kind: Kind; open: boolean; onToggle: () => void; small?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      title="Tap to change what it is"
+      aria-label={`${KIND_ONE[kind]}. Tap to change`}
+      className={`flex shrink-0 items-center gap-1 rounded-full font-bold uppercase tracking-[.08em] ${small ? "h-6 px-2 text-[10.5px]" : "h-7 px-2.5 text-[12px]"}`}
+      style={{ background: open ? "rgba(217,180,95,.45)" : "rgba(217,180,95,.25)", color: GOLD, border: "1px solid rgba(139,112,64,.4)" }}
+    >
+      {KIND_ONE[kind]}
+      <span aria-hidden className="text-[10px] opacity-70">▾</span>
+    </button>
+  );
+}
+
+/** The kinds, in a row that slides open under the badge. */
+function KindPicker({ open, kind, onPick }: { open: boolean; kind: Kind; onPick: (k: Kind) => void }) {
+  return (
+    <div className="drawer-body" data-open={open || undefined}>
+      <div className="drawer-inner">
+        <div className="flex flex-wrap gap-1.5 pb-1">
+          {KINDS.map((k) => (
+            <button key={k.key} type="button" aria-pressed={k.key === kind} onClick={() => onPick(k.key)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ ...chip(k.key === kind), minHeight: 32 }}>
+              {KIND_ONE[k.key]}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** All of them at once: each row shows what it is and keeps Skip, Snooze… and Import. */
+function ListView({ cards, frame, onRetag, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; onRetag: (c: ImportCard, k: Kind) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
+  return (
+    <ul className="card-pop-in parchment m-0 flex list-none flex-col rounded-3xl p-1.5" style={frame}>
+      {cards.map((c, i) => (
+        <ListRow key={c.id} card={c} first={i === 0} onRetag={(k) => onRetag(c, k)} onImport={() => onImport(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
+      ))}
+    </ul>
+  );
+}
+
+function ListRow({ card, first, onRetag, onImport, onSnooze, onSkip, onDelete }: { card: ImportCard; first: boolean; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
+  const [picking, setPicking] = useState(false);
+  const [more, setMore] = useState(false);
+  const small = { ...chip(false), minHeight: 32 };
+  return (
+    <li className="due-in flex flex-col gap-1 px-2.5 py-2" style={first ? undefined : { borderTop: "1px solid rgba(139,112,64,.22)" }} onContextMenu={(e) => (e.preventDefault(), setMore(true))}>
+      <div className="flex items-start gap-2">
+        <span className="min-w-0 flex-1 pt-0.5 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">
+          {card.title}
+          {card.steps.length > 0 && (
+            <span className="ml-1.5 text-[12px] font-normal" style={{ color: "#7a6440" }}>
+              · {card.steps.length} {card.kind === "shopping" ? "items" : "steps"}
+            </span>
+          )}
+        </span>
+        <KindBadge kind={card.kind} open={picking} onToggle={() => setPicking((v) => !v)} small />
+      </div>
+      <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
+      <div className="flex items-center gap-1.5">
+        <button type="button" onClick={onSkip} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={small}>
+          Skip
+        </button>
+        {card.kind !== "done" && (
+          <button type="button" onClick={onSnooze} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={small}>
+            Snooze…
+          </button>
+        )}
+        {more ? (
+          <button type="button" onClick={onDelete} className="reveal h-8 rounded-full px-3 text-[13px]" style={{ color: "#8b2c1a" }}>
+            Delete for good
+          </button>
+        ) : (
+          <button type="button" onClick={() => setMore(true)} aria-label="More choices" className="flex h-8 w-8 items-center justify-center rounded-full text-[16px] hover:bg-black/[.06]" style={{ color: "#6b5631" }}>
+            ⋯
+          </button>
+        )}
+        <span className="flex-1" />
+        <button type="button" onClick={onImport} className="h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+          {importLabel(card.kind)}
+        </button>
+      </div>
+    </li>
   );
 }
 
@@ -681,7 +808,9 @@ function oftenLabel(d: Draft) {
 function Review({ draft, boards, onChange, onJump }: { draft: Draft; boards: BoardOpt[]; onChange: (p: Partial<Draft>) => void; onJump: (s: Step) => void }) {
   const board = boards.find((b) => b.id === draft.boardId);
   const facts: { step: Step; text: string }[] =
-    draft.kind === "habit"
+    draft.kind === "reward"
+      ? []
+      : draft.kind === "habit"
       ? [
           { step: "often", text: oftenLabel(draft) },
           { step: "time", text: draft.minutes ? minutesLabel(draft.minutes) : "Any length" },
@@ -767,7 +896,7 @@ function AllAtOnce({ draft, boards, hint, onChange }: { draft: Draft; boards: Bo
   const small = (on: boolean) => ({ ...chip(on), minHeight: 32 });
   return (
     <div className="reveal flex flex-col gap-3">
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         {KINDS.map((k) => (
           <button key={k.key} type="button" aria-pressed={draft.kind === k.key} onClick={() => onChange({ kind: k.key })} className="rounded-full px-3 text-[13px] font-semibold" style={small(draft.kind === k.key)}>
             {KIND_ONE[k.key]}
@@ -965,4 +1094,4 @@ function PlanStep({ draft, noted, onChange, onDone }: { draft: Draft; noted: str
   );
 }
 
-const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind === "schedule" || typeof d.planDays === "number" ? "Add to my list to schedule" : "Add the quest");
+const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind === "reward" ? "Add to the Treasure Chest" : d.kind === "project" ? "Make it a board" : d.kind === "done" ? "Log as done ✓" : d.kind === "shopping" ? "Add the buy list" : d.kind === "schedule" || typeof d.planDays === "number" ? "Add to my list to schedule" : "Add the quest");
