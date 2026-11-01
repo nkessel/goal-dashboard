@@ -37,9 +37,9 @@ Each item is the owner's own ask. Take them top to bottom; mark done here and mo
 7. **Quest Game note items** (owner picked these):
    - A "How to support me" section on the profile.
    - Zoom in/out on boards with light animation; a single sub-quest fills the width.
-   - Longer, smoother victory sparkles; the quest title fully visible on the victory screen.
+   - Longer, smoother victory sparkles; the quest title fully visible on the victory screen. (Checked Nov 1: the title already wraps in full, `QuestComplete.tsx` h2 `break-words`; sparkles linger 6.5s after the bar fills. Ask the owner what still feels short before changing.)
    - A simpler XP burst for habits, rites and mini-quests.
-   - A shimmering border on reward cards.
+   - A shimmering border on reward cards. (Already there: `.reward-shimmer` on Treasure Chest cards, two passes on load; maybe the owner wants it continuous or on the border only. Ask.)
    - Check the "+ board" chip on a Martin board quest (looks wrong; investigate).
 8. Then the rest of section 1 (arrange in context on remaining screens, UX synthesis polish).
 
