@@ -419,7 +419,7 @@ export function EnergyCheck({
             if (e.key === "Backspace" && !noteText && pendingTags.length) setPendingTags((t) => t.slice(0, -1));
           }}
           maxLength={200}
-          placeholder={pendingTags.length ? "more #tags, or what happened" : "What happened? #tags become pills"}
+          placeholder=""
           aria-label="Event or #tags"
           className="bare-input h-7 min-w-[120px] flex-1 bg-transparent px-1 text-[15px] focus:outline-none"
           style={{ color: "#2a1c10" }}
@@ -545,12 +545,11 @@ export function EnergyCheck({
                       <button
                         type="button"
                         onClick={() => setAdding(true)}
-                        className="hover-glow flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[19px] leading-none"
-                        style={{ border: "1.5px solid rgba(217,180,95,.75)", color: "var(--t-gold)", background: "rgba(242,210,126,.08)" }}
+                        className="hover-glow flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
+                        style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
                         title="Add a new check-in metric"
-                        aria-label="Add a new check-in metric"
                       >
-                        +
+                        <span aria-hidden style={{ color: "var(--t-gold)" }}>+</span> metric
                       </button>
                     )}
                     <button

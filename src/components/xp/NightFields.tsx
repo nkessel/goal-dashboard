@@ -95,7 +95,8 @@ function TimeDial({ anchor, value, kind, label, onPick, onClose }: { anchor: HTM
     };
   }, [anchor, onClose]);
   const chips = kind === "bed" ? BED_TIMES : kind === "wake" ? WAKE_TIMES : [];
-  const step = (dh: number, dm: number) => set(h + dh + Math.floor((m + dm) / 60), (m + dm + 60) % 60);
+  // Minutes wrap on their own (below 0 goes to 55) and never move the hour.
+  const step = (dh: number, dm: number) => set(h + dh, (m + dm + 60) % 60);
   const arrow = (dir: 1 | -1, onClick: () => void, aria: string) => (
     <button type="button" onClick={onClick} aria-label={aria} className="time-dial-step flex h-7 w-9 items-center justify-center rounded-full">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: dir < 0 ? "rotate(180deg)" : undefined }}>

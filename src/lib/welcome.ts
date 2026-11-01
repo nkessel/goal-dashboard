@@ -150,7 +150,7 @@ export function addBackGreeting(fx: FxSettings, line: string): Partial<FxSetting
 }
 
 /** What the toucan asks first as he lands on the welcome screen (tap him to change it). */
-export const TOUCAN_ASK = "Shall we plan your day together?";
+export const TOUCAN_ASK = "What would make today feel good?";
 export const toucanAsk = (fx: FxSettings) => fx.welcomeToucanAsk?.trim() || TOUCAN_ASK;
 
 /** Other things he can open with: ‹ › on his bubble steps through them, and your thumbs keep the best. */

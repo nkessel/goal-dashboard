@@ -557,6 +557,17 @@ export function TodayTaskBoard({
                     </h2>
                   </div>
                 )}
+                {/* A new quest straight into Today's Quests. */}
+                <button
+                  type="button"
+                  onClick={() => setAdding(true)}
+                  aria-label="Add a quest to Today's Quests"
+                  title="Add a quest to Today"
+                  className="hover-glow absolute right-0.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[20px] leading-none"
+                  style={{ border: "1.5px solid rgba(217,180,95,.7)", color: "var(--t-gold)", background: "rgba(242,210,126,.08)" }}
+                >
+                  +
+                </button>
                 </div>
                 {adding && <CreateSheet kinds={["quest"]} initial="quest" pinToToday theme={theme} onClose={() => setAdding(false)} />}
 

@@ -5,7 +5,6 @@ import { saveCheckInAction, saveNightAction, setWheelOfTimeAction, wheelOfTimeAc
 import { EMPTY_NIGHT, NightFields, MoonIcon, SunIcon, TimeToken, type NightDraft } from "./NightFields";
 import { DateField } from "@/components/ui/DateField";
 import { eveningDayKey } from "@/components/evening/evening-clock";
-import { shiftDay } from "@/lib/wheel-of-time";
 
 const GILT = { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } as const;
 const SOFT = "#6b5631";
@@ -97,10 +96,6 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
         setError(e instanceof Error ? e.message : "Couldn't save the lists.");
       });
   }
-  function addNight() {
-    const earliest = others.reduce((m, n) => (n.day < m ? n.day : m), today);
-    setOthers((o) => [...o, { id: (o.at(-1)?.id ?? 0) + 1, day: shiftDay(earliest, -1), bed: "", wake: "" }]);
-  }
   const summary = [night.bed || night.wake ? "times" : "", quality ? FACES[quality - 1].label.toLowerCase() : ""].filter(Boolean).join(" · ");
 
   return (
@@ -162,9 +157,6 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
                 </button>
               </div>
             ))}
-            <button type="button" onClick={addNight} className="self-center text-[12.5px] underline underline-offset-2" style={{ color: SOFT }}>
-              + Another night
-            </button>
             {error && (
               <p className="m-0 text-[12.5px]" style={{ color: "#a33" }}>
                 {error}

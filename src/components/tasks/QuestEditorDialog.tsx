@@ -2270,12 +2270,6 @@ export function QuestEditorDialog({
                     onPromptChange={setArtPrompt}
                   />
                   {/* Opt in: paint a portrait once it's saved. Otherwise it stays the empty check box, ready to tick. */}
-                  {!draftIcon && !doingNow && (
-                    <label className="flex cursor-pointer items-center gap-1 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }} title="Paint a portrait for this quest from its title once it's saved">
-                      <input type="checkbox" checked={!noPortrait} onChange={(e) => setNoPortrait(!e.target.checked)} className="h-3.5 w-3.5" style={{ accentColor: "#7a5f2a" }} />
-                      Paint a portrait
-                    </label>
-                  )}
                   {/* Tiny lives here, in one place, for new and existing quests alike. */}
                   {!doingNow && (
                     <label className="flex cursor-pointer items-center gap-1 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }} title="Tiny tasks show half height on Today, with just a check box unless they have a portrait">
@@ -2662,7 +2656,7 @@ export function QuestEditorDialog({
                       className="hover-glow flex h-10 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-[14.5px] font-semibold disabled:cursor-default disabled:opacity-45"
                       style={{ background: "rgba(255,250,238,.5)", color: "#5a3d12", border: "1.5px solid #b39a6a" }}
                     >
-                      ✓ {isAdventure ? "Complete" : "Complete"}
+                      ✓ Complete {noun}
                     </button>
                   )}
                   <button
@@ -2671,7 +2665,7 @@ export function QuestEditorDialog({
                     className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold"
                     style={{ background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)" }}
                   >
-                    Close
+                    Save
                   </button>
                 </>
               ) : (

@@ -13,7 +13,7 @@ export const DAILY_LINES = [
   "The streak isn't the goal. You are.",
   "Heroes aren't made in a day. They're made daily.",
   "One more day of choosing your own adventure.",
-  "Momentum loves company. Welcome back to it.",
+  "Momentum loves company.",
   "The door was open. You walked through. Well done.",
   "Doing it imperfectly beats waiting to do it perfectly.",
   "Return, and the road rises to meet you.",
