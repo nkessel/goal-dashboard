@@ -226,3 +226,26 @@ export function HabitPills({ pills }: { pills: string[] }) {
     </div>
   );
 }
+
+/** Under a "learn a language" habit: a pill that opens the phrase tool right there. */
+export function LanguagePractice() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="ml-11 mt-0.5 flex flex-col gap-1.5 pr-2" onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold"
+        style={{ background: "rgba(201,162,74,.14)", border: "1px solid rgba(160,120,40,.45)", color: "#6b4c12" }}
+      >
+        <span aria-hidden>🗣</span> {open ? "Close the phrases" : "Practice a phrase"}
+      </button>
+      <Fold open={open}>
+        <div className="pb-1">
+          <LearnLanguage />
+        </div>
+      </Fold>
+    </div>
+  );
+}

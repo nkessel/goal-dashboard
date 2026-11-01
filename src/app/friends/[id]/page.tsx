@@ -85,6 +85,23 @@ export default async function FriendProfilePage({ params, searchParams }: { para
           <CharacterStats order={stats} xp={friend.stat_xp ?? {}} />
         </section>
 
+        {/* In their own words: how to support them. */}
+        {(() => {
+          const support = String((friend.life_wheel as { support?: unknown } | null)?.support ?? "").trim();
+          return support ? (
+            <section className={card} style={cardStyle}>
+              <span className="relative z-[1] flex flex-col gap-1">
+                <span className={`${isAdventure ? "font-display text-[18px]" : "text-[16px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
+                  How to support {first}
+                </span>
+                <span className="whitespace-pre-wrap text-[15px] leading-snug" style={{ color: "var(--t-ink)" }}>
+                  {support}
+                </span>
+              </span>
+            </section>
+          ) : null;
+        })()}
+
         {/* The screens they share */}
         {open.length === 0 ? (
           <p className={card} style={cardStyle}>

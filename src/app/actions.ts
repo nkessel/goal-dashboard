@@ -2440,6 +2440,17 @@ export async function setShareSettingsAction(patch: Record<string, boolean>) {
   return next;
 }
 
+/** "How to support me": a few lines your party sees on your profile (kept in life_wheel.support). */
+export async function saveSupportNoteAction(text: string) {
+  const ownerId = await requireProfileId();
+  const clean = text.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 600);
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, support: clean } }).eq("id", ownerId);
+  if (error) throw new Error("Couldn't save that.");
+  revalidatePath("/friends", "layout");
+  return clean;
+}
+
 export async function setTaskPrivateAction(taskId: string, isPrivate: boolean) {
   const ownerId = await requireProfileId();
   await sharingData.setTaskPrivate(ownerId, taskId, isPrivate);

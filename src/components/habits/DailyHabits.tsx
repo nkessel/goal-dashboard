@@ -16,6 +16,7 @@ import { coinsForXp } from "@/lib/coins";
 import { fromFeedback } from "@/lib/from-feedback";
 import { defaultCleaning, normalizeCleaning, todaysPicks } from "@/lib/cleaning";
 import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
+import { LanguagePractice } from "@/components/xp/LearnLanguage";
 import { Fold } from "@/components/ui/Fold";
 
 /**
@@ -720,6 +721,7 @@ export function DailyHabits({
                     })}
                   </ul>
                 )}
+                {/learn(ing)? (a )?language|language practice/i.test(h.title) && <LanguagePractice />}
                 {listenHref && !d && LISTEN_HABIT.test(h.title) && (
                   <a href={listenHref} onPointerDown={(e) => e.stopPropagation()} className="due-in ml-11 mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold no-underline" style={{ background: "rgba(201,162,74,.14)", border: "1px solid rgba(160,120,40,.45)", color: "#6b4c12" }}>
                     <span aria-hidden>🎧</span> Something to listen to
