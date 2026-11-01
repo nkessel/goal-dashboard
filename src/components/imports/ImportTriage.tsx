@@ -958,6 +958,8 @@ function oftenLabel(d: Draft) {
 
 function Review({ draft, boards, onChange, onJump }: { draft: Draft; boards: BoardOpt[]; onChange: (p: Partial<Draft>) => void; onJump: (s: Step) => void }) {
   const board = boards.find((b) => b.id === draft.boardId);
+  // "How much it matters" picks right here (no separate screen for three choices).
+  const [matters, setMatters] = useState(false);
   const facts: { step: Step; text: string }[] =
     draft.kind === "reward"
       ? []
@@ -978,11 +980,20 @@ function Review({ draft, boards, onChange, onJump }: { draft: Draft; boards: Boa
       <input value={draft.title} onChange={(e) => onChange({ title: e.target.value })} aria-label="Name" maxLength={200} className="h-11 rounded-xl border px-3 font-display text-[18px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.75)", color: "#2a1c10" }} />
       <div className="flex flex-wrap gap-1.5">
         {facts.map((f) => (
-          <button key={f.step} type="button" onClick={() => onJump(f.step)} className="rounded-full px-3 py-1.5 text-[13px]" style={{ background: "rgba(255,250,238,.7)", border: "1px solid #c8b38a", color: "#4a3a22" }}>
+          <button key={f.step} type="button" onClick={() => (f.step === "matters" ? setMatters((v) => !v) : onJump(f.step))} aria-expanded={f.step === "matters" ? matters : undefined} className="rounded-full px-3 py-1.5 text-[13px]" style={{ background: f.step === "matters" && matters ? "rgba(217,180,95,.25)" : "rgba(255,250,238,.7)", border: "1px solid #c8b38a", color: "#4a3a22" }}>
             {f.text}
           </button>
         ))}
       </div>
+      <Fold open={matters}>
+        <div className="flex flex-wrap gap-1.5">
+          {MATTERS.map((m) => (
+            <button key={m.label} type="button" aria-pressed={draft.importance === m.value} onClick={() => (onChange({ importance: draft.importance === m.value ? null : m.value }), setMatters(false))} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={chip(draft.importance === m.value)}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </Fold>
       <StepsList steps={draft.steps} onChange={(steps) => onChange({ steps, rewards: draft.rewards?.filter((x) => steps.includes(x)) })} kind={draft.kind} rewards={draft.rewards ?? []} onRewards={(rewards) => onChange({ rewards })} />
     </>
   );
