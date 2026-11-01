@@ -8,10 +8,17 @@ import { DayView } from "./DayView";
 import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
 import { fromFeedback } from "@/lib/from-feedback";
+import type { SchedulerSettings } from "@/lib/auto-schedule";
+import type { TimedHabit } from "@/lib/timed-habits";
+
+export type DailyLayer = { settings: Partial<SchedulerSettings> | null; habits: TimedHabit[] };
 
 const KEY = "calendar-layers";
-type Layers = { hidden: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean };
-const DEFAULTS: Layers = { hidden: [], quests: true, done: true, allDay: true, portraits: false };
+/** How daily essentials (meal time, wind-down…) and habits with a set time look. */
+export type EssentialsLook = "dashed" | "soft" | "line" | "hidden";
+export type HabitLook = "quest" | "dashed" | "hidden";
+type Layers = { hidden: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook };
+const DEFAULTS: Layers = { hidden: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "quest" };
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("storage", cb);
@@ -59,7 +66,10 @@ export function CalendarLayers({
   dateKey,
   nDays,
   toSchedule = 0,
+  daily,
 }: {
+  /** Daily essentials kept free and habits with a set time, drawn on the time grid. */
+  daily?: DailyLayer;
   /** Quests waiting on the scheduling list (the badge on its calendar button). */
   toSchedule?: number;
   dateKey: string;
@@ -238,6 +248,27 @@ export function CalendarLayers({
             {row("Quests as portrait cards", layers.portraits, () => set({ portraits: !layers.portraits }))}
             {row("Finished quests", layers.done, () => set({ done: !layers.done }))}
             {row("All-day events", layers.allDay, () => set({ allDay: !layers.allDay }))}
+            <LookPicker
+              label="Meals, wind-down & tidy"
+              value={layers.essentials}
+              options={[
+                ["dashed", "Dashed"],
+                ["soft", "Soft"],
+                ["line", "A line"],
+                ["hidden", "Hide"],
+              ]}
+              onPick={(v) => set({ essentials: v as EssentialsLook })}
+            />
+            <LookPicker
+              label="Habits with a time (Gym…)"
+              value={layers.habits}
+              options={[
+                ["quest", "Like quests"],
+                ["dashed", "Dashed"],
+                ["hidden", "Hide"],
+              ]}
+              onPick={(v) => set({ habits: v as HabitLook })}
+            />
             {calendars.length === 0 && (
               <p className="m-0 px-2 py-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
                 Connect Google Calendar to see your other calendars here.
@@ -247,9 +278,34 @@ export function CalendarLayers({
         )}
       </div>
 
-      {view === "day" && <DayView dateKey={dayKeys[0]} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} />}
-      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={dayKeys} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} />}
+      {view === "day" && <DayView dateKey={dayKeys[0]} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
+      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={dayKeys} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
       {view === "month" && <MonthView monthKey={monthKey} todayKey={todayKey} tasks={shownTasks} events={shownEvents} theme={theme} />}
+    </div>
+  );
+}
+
+function LookPicker({ label, value, options, onPick }: { label: string; value: string; options: [string, string][]; onPick: (v: string) => void }) {
+  return (
+    <div className="flex flex-col gap-1 px-2 py-1.5">
+      <span className="text-[13.5px]" style={{ color: "var(--t-ink)" }}>
+        {label}
+      </span>
+      <span role="radiogroup" aria-label={label} className="flex flex-wrap gap-1">
+        {options.map(([v, l]) => (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={value === v}
+            onClick={() => onPick(v)}
+            className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold"
+            style={value === v ? { background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" } : { border: "1px solid rgba(139,112,64,.45)", color: "var(--t-ink)" }}
+          >
+            {l}
+          </button>
+        ))}
+      </span>
     </div>
   );
 }

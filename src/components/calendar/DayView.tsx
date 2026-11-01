@@ -5,6 +5,7 @@ import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { addDays, formatDateParam, isSameDay, parseDateParam, startOfWeek } from "@/lib/calendar-dates";
 import { WeekView, useNowMinute } from "./WeekView";
+import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
 
 /** One day: a strip to hop between this week's days, then that day's time grid. */
 export function DayView({
@@ -13,7 +14,13 @@ export function DayView({
   events = [],
   theme = "calm",
   portraits = false,
+  daily,
+  essentials,
+  habitLook,
 }: {
+  daily?: DailyLayer;
+  essentials?: EssentialsLook;
+  habitLook?: HabitLook;
   dateKey: string;
   tasks: Task[];
   events?: GoogleCalendarEvent[];
@@ -59,7 +66,7 @@ export function DayView({
           );
         })}
       </div>
-      <WeekView dayKeys={[dateKey]} tasks={tasks} events={events} theme={theme} portraits={portraits} />
+      <WeekView dayKeys={[dateKey]} tasks={tasks} events={events} theme={theme} portraits={portraits} daily={daily} essentials={essentials} habitLook={habitLook} />
     </div>
   );
 }

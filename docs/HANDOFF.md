@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-01 (import triage screen at /import; see Recently shipped).
+- **Last updated:** 2026-11-01 (import scheduling, daily essentials on the calendar; see Recently shipped).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
 - **Pending in-app feedback:** iOS: opening feedback made the page behind it flash/resize, and the welcome card's top was cut off (owner's screen recordings, Oct 31). Fix shipped Oct 31 (see Recently shipped); confirm with the owner on a phone.
 
@@ -14,8 +14,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 
 | # | Work | State | Next step |
 |---|---|---|---|
-| 0 | **Import scheduling** (owner ask, Nov 1) | In progress | Next: a "Plan it within" step (today / 3 days / 1 week / 2 weeks / this month / Custom…, urgency and due date optional) feeding an ordered list to schedule; review the list once, then auto-schedule as tentative calendar blocks accepted one by one. Floating meal holds (lunch 11–3, dinner 5–8, 1 hr each; breakfast off by default, one-tap per day; ranges in Settings) kept free, shown faintly; gym as a real daily block. |
-| 0b | **Import triage** (shipped Nov 1) | Done | Table `import_cards` is live (migration 0077: kind, title, description, steps, repeat/repeat_text, due_on, minutes, board_hint, source_label/source_text, batch, status new/snoozed/imported/skipped). The notes-to-quests thread fills it. To build: a card-by-card screen (Import → guided steps: board, then urgency/due, then the rest, each skippable, with "Fill it all in myself" opening the quest editor; Snooze; Skip/Delete). |
+| 0 | **Import scheduling: follow-ups** | Ready | Shipped Nov 1 (below). Left: a one-tap "Breakfast today" on Today/check-in only matters if breakfast is turned off; essentials' ideal times aren't editable yet (only ranges and lengths, in Auto-schedule › Daily essentials); accepted placements go straight on the calendar (no separate tentative state in the database). |
 | 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
 | 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. Left: consistent capitalization, pinned editor footer. The UX teams can now read real click timings from `ui_clicks`. |
 | 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. See the header list. |
@@ -120,6 +119,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 1: Import scheduling. Cards have a kind (Quest, To schedule, Habit; `import_cards.kind` now allows `schedule`, plus `plan_within_days`, migration 0079); chips at the top of /import pick which kinds to sort; a tap on a card's kind retags it. Steps are lighter: quests ask the board, then review ("+ Plan it within…" and "+ How much it matters" as optional chips); To schedule asks Plan it within (Today, 3 days, 1 week, 2 weeks, This month, Custom… with days, due date, urgency), then board. Planned ones get `tasks.plan_by` (migration 0078) and join the scheduling list in plan-by order (`queueToSchedule`); "Schedule these (n)" opens Auto-schedule. Auto-schedule: plan-by is a soft deadline (horizon stretches to reach it, up to 62 days); "One by one ›" shows each placement as a tentative card (Looks good / Another time / Leave it out; accepted ones hold their time), then places the accepted ones. Daily essentials kept free (`meals` in scheduler settings, `MEAL_DEFAULTS` in `lib/auto-schedule.ts`): breakfast 30m 7–10, lunch 1h 11–3, wind-down 25m 2:30–6 (ideal 4), dinner 1h 5–8, clean-up & breakfast prep 30m 6–10; a quest may not crowd one out; editable under Auto-schedule › Daily essentials. Habits with a time (Gym) block the scheduler and show on the calendar like quests (`lib/timed-habits.ts`, `DailyBlocks` in `WeekView.tsx`); essentials show quietly where there's room. Calendar gear › Display: essentials Dashed / Soft / A line / Hide; timed habits Like quests / Dashed / Hide.
 
 - Nov 1: Import triage at `/import` (`imports/ImportTriage.tsx`, `lib/data/import-cards.ts`, table `import_cards`, migration 0077): one card at a time, Import ✦ / Snooze… / Skip (Delete for good under ⋯, Undo on a toast); Import asks one small question at a time (board with the note's suggestion first, when, how much it matters; habits: how often incl. certain days, how long), each skippable, then a review (name, steps editable); "Fill it all in myself" shows every field at once and can open the full quest editor; Set aside list brings skipped/snoozed back. A "N things to sort" link shows on Today (new arrangeable part `imports`) and in Settings.
 

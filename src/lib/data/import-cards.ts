@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 export type ImportCard = {
   id: string;
   created_at: string;
-  kind: "quest" | "habit";
+  kind: "quest" | "habit" | "schedule";
   title: string;
   description: string | null;
   steps: string[];
@@ -20,9 +20,10 @@ export type ImportCard = {
   status: "new" | "snoozed" | "imported" | "skipped";
   snoozed_until: string | null;
   sort: number;
+  plan_within_days: number | null;
 };
 
-const COLS = "id, created_at, kind, title, description, steps, repeat, repeat_text, due_on, minutes, board_hint, source_label, source_text, batch, status, snoozed_until, sort";
+const COLS = "id, created_at, kind, title, description, steps, repeat, repeat_text, due_on, minutes, board_hint, source_label, source_text, batch, status, snoozed_until, sort, plan_within_days";
 
 function clean(row: Record<string, unknown>): ImportCard {
   const r = row as unknown as ImportCard;
@@ -86,4 +87,23 @@ export async function setImportCardStatus(
 export async function deleteImportCard(ownerId: string, id: string): Promise<void> {
   const { error } = await supabaseAdmin().from("import_cards").delete().eq("owner_id", ownerId).eq("id", id);
   if (error) throw new Error(`Couldn't delete that card: ${error.message}`);
+}
+
+/**
+ * "Plan it within…": set the quest's plan-by and put it on the scheduling
+ * list, ahead of anything due to be planned later (or with no plan-by).
+ */
+export async function queueToSchedule(ownerId: string, taskId: string, planBy: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { error } = await db.from("tasks").update({ plan_by: planBy, schedule_folder: null }).eq("owner_id", ownerId).eq("id", taskId);
+  if (error) throw new Error(`Couldn't add it to your list to schedule: ${error.message}`);
+  const { listSchedulingList, setSchedulingOrder } = await import("./scheduling");
+  const all = (await listSchedulingList(ownerId)).filter((t) => t.id !== taskId);
+  const loose = all.filter((t) => !t.schedule_folder);
+  const filed = all.filter((t) => t.schedule_folder).map((t) => t.id);
+  let at = loose.findIndex((t) => !t.plan_by || t.plan_by > planBy);
+  if (at < 0) at = loose.length;
+  const ids = loose.map((t) => t.id);
+  ids.splice(at, 0, taskId);
+  await setSchedulingOrder(ownerId, [...ids, ...filed]);
 }

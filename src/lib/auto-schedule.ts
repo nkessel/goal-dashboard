@@ -24,7 +24,62 @@ export type SchedulerSettings = {
   prefs: Record<string, TimeOfDay>;
   /** Calendars whose events don't block time ("just so you know"). Unset = the ones you can't edit. */
   fyi?: string[];
+  /** Meal time kept free: an hour that floats inside each range (never booked, just never crowded out). */
+  meals?: Meals;
+  /** Days ("YYYY-MM-DD") that also keep breakfast free, when breakfast is off by default. */
+  breakfastDays?: string[];
 };
+
+/** Daily essentials kept free: meals, the wind-down, the after-dinner tidy. */
+export type MealKey = "breakfast" | "lunch" | "dinner" | "winddown" | "tidy";
+/** `ideal` (minutes after midnight): where it would best go; the hold leans toward it. */
+export type Meal = { on: boolean; from: number; to: number; minutes: number; ideal?: number };
+export type Meals = Record<MealKey, Meal>;
+export const MEAL_DEFAULTS: Meals = {
+  breakfast: { on: true, from: 7 * 60, to: 10 * 60, minutes: 30, ideal: 8 * 60 },
+  lunch: { on: true, from: 11 * 60, to: 15 * 60, minutes: 60, ideal: 12 * 60 },
+  winddown: { on: true, from: 14 * 60 + 30, to: 18 * 60, minutes: 25, ideal: 16 * 60 },
+  dinner: { on: true, from: 17 * 60, to: 20 * 60, minutes: 60, ideal: 18 * 60 },
+  tidy: { on: true, from: 18 * 60, to: 22 * 60, minutes: 30, ideal: 19 * 60 + 30 },
+};
+export const MEAL_NAMES: Record<MealKey, string> = { breakfast: "Breakfast", lunch: "Lunch", winddown: "Wind-down", dinner: "Dinner", tidy: "Clean up & breakfast prep" };
+export const MEAL_ICONS: Record<MealKey, string> = { breakfast: "🍳", lunch: "🍽", winddown: "🕯", dinner: "🍲", tidy: "🧽" };
+const pad2 = (n: number) => String(n).padStart(2, "0");
+export const localDayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+/** The meals kept free on a day: each one's range on that day, in ms. */
+export function mealsOn(day: Date, s: SchedulerSettings): { key: MealKey; from: number; to: number; minutes: number; ideal: number | null }[] {
+  const saved = (s.meals ?? {}) as Partial<Meals>;
+  const k = localDayKey(day);
+  return (Object.keys(MEAL_DEFAULTS) as MealKey[])
+    .map((key) => [key, { ...MEAL_DEFAULTS[key], ...(saved[key] ?? {}) }] as const)
+    .filter(([key, m]) => m.on || (key === "breakfast" && (s.breakfastDays ?? []).includes(k)))
+    .map(([key, m]) => ({ key, from: at(day, m.from).getTime(), to: at(day, m.to).getTime(), minutes: Math.max(15, m.minutes), ideal: m.ideal != null ? at(day, m.ideal).getTime() : null }));
+}
+
+/** Where a hold would sit: the free stretch closest to its ideal time (or the first one), or null when crowded out. */
+export function holdAt(from: number, to: number, minutes: number, busy: Busy[], ideal: number | null): number | null {
+  if (ideal === null) return freeStretch(from, to, minutes, busy);
+  const need = minutes * 60_000;
+  let best: number | null = null;
+  for (let a = from; a + need <= to; a += STEP * 60_000) {
+    if (busy.some((b) => b.start < a + need && b.end > a)) continue;
+    if (best === null || Math.abs(a - ideal) < Math.abs(best - ideal)) best = a;
+  }
+  return best;
+}
+
+/** The first free stretch of `minutes` inside [from, to], or null when the range is crowded out. */
+export function freeStretch(from: number, to: number, minutes: number, busy: Busy[]): number | null {
+  const need = minutes * 60_000;
+  const inside = busy.filter((b) => b.start < to && b.end > from).sort((a, b) => a.start - b.start);
+  let cursor = from;
+  for (const b of inside) {
+    if (b.start - cursor >= need) return cursor;
+    cursor = Math.max(cursor, b.end);
+  }
+  return to - cursor >= need ? cursor : null;
+}
 
 export const SCHEDULER_DEFAULTS: SchedulerSettings = {
   dayStart: 9 * 60,
@@ -40,6 +95,8 @@ export type PlanItem = {
   id: string;
   title: string;
   minutes: number | null;
+  /** Plan it by then (from "Plan it within…"): a soft deadline. */
+  planBy?: string | null;
   /** 0–5: how much it takes out of you (hard quests go early in the day). */
   effort?: number | null;
   dueAt?: string | null;
@@ -59,6 +116,9 @@ export type Placement = {
 };
 
 export type PlanResult = { placed: Placement[]; unplaced: { id: string; title: string; why: string }[] };
+
+/** Times a quest shouldn't go ("Another time"), by quest id. */
+export type Avoid = Record<string, Busy[]>;
 
 const STEP = 15;
 const MAX_SITTING = 180;
@@ -83,8 +143,11 @@ const at = (day: Date, minutes: number) => {
  * Place each item into the first free stretch that suits it.
  * `now` is when planning starts; nothing lands in the past.
  */
-export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: SchedulerSettings, now = new Date()): PlanResult {
+export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: SchedulerSettings, now = new Date(), avoid: Avoid = {}): PlanResult {
   const s = { ...SCHEDULER_DEFAULTS, ...settings };
+  // Look far enough ahead to reach the latest "plan it by".
+  const furthest = Math.max(0, ...items.map((i) => (i.planBy ? Math.ceil((Date.parse(i.planBy) - now.getTime()) / 86_400_000) : 0)));
+  s.horizon = Math.min(62, Math.max(s.horizon, furthest + 1));
   const busy: Busy[] = busyIn.map((b) => ({ start: b.start - s.buffer * 60_000, end: b.end + s.buffer * 60_000 }));
   const used = new Map<string, number>(); // day key -> minutes placed
   const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -97,8 +160,21 @@ export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: Schedu
   // Deadlines first (due next first, past due after), then the rest in the list's order.
   const horizonEnd = now.getTime() + s.horizon * 86_400_000;
   const byDue = byDuePriority(now.getTime());
-  const dueSoon = (i: PlanItem) => (i.dueAt ? new Date(i.dueAt).getTime() <= horizonEnd : false);
-  const ordered = [...items.filter(dueSoon).sort((a, b) => byDue({ due_at: a.dueAt }, { due_at: b.dueAt })), ...items.filter((i) => !dueSoon(i))];
+  const deadline = (i: PlanItem) => {
+    const d = [i.dueAt, i.planBy].filter(Boolean).map((x) => Date.parse(x!)).filter(Number.isFinite);
+    return d.length ? new Date(Math.min(...d)).toISOString() : null;
+  };
+  const dueSoon = (i: PlanItem) => {
+    const d = deadline(i);
+    return d ? new Date(d).getTime() <= horizonEnd : false;
+  };
+  const ordered = [...items.filter(dueSoon).sort((a, b) => byDue({ due_at: deadline(a) }, { due_at: deadline(b) })), ...items.filter((i) => !dueSoon(i))];
+  // A quest may not crowd out a meal: each meal's range keeps a free stretch.
+  const mealsFine = (a: number, b: number) => {
+    const day = new Date(a);
+    const trial = [...busy, { start: a, end: b }];
+    return mealsOn(day, s).every((m) => m.to <= a || m.from >= b || freeStretch(m.from, m.to, m.minutes, trial) !== null);
+  };
 
   for (const item of ordered) {
     const want = Math.max(STEP, Math.ceil((item.minutes ?? 30) / STEP) * STEP);
@@ -106,7 +182,9 @@ export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: Schedu
     const pref = s.prefs[item.id] ?? "any";
     // Hard quests, with no preference, look in the morning first.
     const tries: TimeOfDay[] = pref === "any" && (item.effort ?? 0) >= 4 ? ["morning", "any"] : [pref];
-    const due = item.dueAt ? new Date(item.dueAt).getTime() : null;
+    const dl = deadline(item);
+    const due = dl ? new Date(dl).getTime() : null;
+    const notHere = avoid[item.id] ?? [];
 
     const search = (beforeDue: boolean, capped = true): Placement | null => {
       for (const p of tries) {
@@ -123,7 +201,7 @@ export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: Schedu
             const b = a + minutes * 60_000;
             if (a < earliest) continue;
             if (beforeDue && due !== null && b > due) return null;
-            if (!free(a, b)) continue;
+            if (!free(a, b) || !mealsFine(a, b) || notHere.some((x) => x.start < b && x.end > a)) continue;
             return { id: item.id, title: item.title, start: new Date(a), end: new Date(b), split: want > MAX_SITTING || undefined };
           }
         }
@@ -139,7 +217,7 @@ export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: Schedu
       if (spot) spot.late = true;
     }
     if (!spot) {
-      unplaced.push({ id: item.id, title: item.title, why: pref === "any" ? "No free time in the next two weeks" : `No free ${pref} in the next two weeks` });
+      unplaced.push({ id: item.id, title: item.title, why: pref === "any" ? `No free time in the next ${s.horizon} days` : `No free ${pref} in the next ${s.horizon} days` });
       continue;
     }
     placed.push(spot);

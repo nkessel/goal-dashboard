@@ -22,6 +22,9 @@ import { CalendarAddPopup } from "./CalendarAddPopup";
 import { CalendarItemMenu, type MenuTarget } from "./CalendarItemMenu";
 import { CalendarTaskChip, getTaskDisplayWindow } from "./CalendarTaskChip";
 import { GoogleEventChip } from "./GoogleEventChip";
+import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
+import { SCHEDULER_DEFAULTS, holdAt, mealsOn, MEAL_ICONS, MEAL_NAMES } from "@/lib/auto-schedule";
+import { habitBlocksOn } from "@/lib/timed-habits";
 
 /** Hour height: condensed by default; drag the times on the left to zoom. */
 const DEFAULT_HOUR_PX = 36;
@@ -49,7 +52,13 @@ export function WeekView({
   events = [],
   theme = "calm",
   portraits = false,
+  daily,
+  essentials = "dashed",
+  habitLook = "quest",
 }: {
+  daily?: DailyLayer;
+  essentials?: EssentialsLook;
+  habitLook?: HabitLook;
   /** Show quests as portrait cards (art above the title). */
   portraits?: boolean;
   /** The columns to show (YYYY-MM-DD, read in the viewer's own time zone) — 7 for a week, 1 for a day. */
@@ -839,6 +848,17 @@ export function WeekView({
           const showNow = nowTop !== null && nowTop > 0 && nowTop < gridMinutes;
           return (
             <div key={`col-${dayIndex}`} className="pointer-events-none relative" style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}` }}>
+              {daily && (
+                <DailyBlocks
+                  day={day}
+                  daily={daily}
+                  essentials={essentials}
+                  habitLook={habitLook}
+                  busy={dayItems.map((it) => ({ start: it.start.getTime(), end: it.end.getTime() }))}
+                  topOf={(d) => (offset(d, day) / 60) * HOUR_PX}
+                  isAdventure={isAdventure}
+                />
+              )}
               {dayItems.map((it) => {
                 const l = lanes.get(it.key) ?? { lane: 0, count: 1 };
                 const height = ((it.bottom - it.top) / 60) * HOUR_PX - 2;
@@ -938,5 +958,73 @@ function TodayCrest() {
         </linearGradient>
       </defs>
     </svg>
+  );
+}
+
+/**
+ * A day's essentials (meal time, wind-down, the after-dinner tidy) where there's
+ * room for them, quieter than quests; and habits with a set time (Gym at 7),
+ * which look like quests unless you choose otherwise.
+ */
+function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventure }: { day: Date; daily: DailyLayer; essentials: EssentialsLook; habitLook: HabitLook; busy: { start: number; end: number }[]; topOf: (d: Date) => number; isAdventure: boolean }) {
+  const habits = habitLook === "hidden" ? [] : habitBlocksOn(daily.habits, day);
+  const taken = [...busy, ...habitBlocksOn(daily.habits, day)];
+  const holds =
+    essentials === "hidden"
+      ? []
+      : mealsOn(day, { ...SCHEDULER_DEFAULTS, ...(daily.settings ?? {}) }).flatMap((m) => {
+          const at = holdAt(m.from, m.to, m.minutes, taken, m.ideal);
+          if (at === null) return [];
+          taken.push({ start: at, end: at + m.minutes * 60_000 });
+          return [{ ...m, at }];
+        });
+  // The grid is parchment in every theme: a soft brown ink reads on it.
+  const ink = isAdventure ? "#6b5631" : "var(--t-ink-soft)";
+  return (
+    <>
+      {holds.map((h) => {
+        const top = topOf(new Date(h.at));
+        const height = Math.max(16, topOf(new Date(h.at + h.minutes * 60_000)) - top - 2);
+        const look: React.CSSProperties =
+          essentials === "soft"
+            ? { background: "rgba(168,138,63,.16)", borderRadius: 6 }
+            : essentials === "line"
+              ? { borderLeft: "3px solid rgba(139,112,64,.55)" }
+              : { border: "1.5px dashed rgba(139,112,64,.6)", borderRadius: 6 };
+        return (
+          <div key={h.key} title={`${MEAL_NAMES[h.key]}: kept free (floats as things are planned)`} className="absolute inset-x-0.5 overflow-hidden px-1.5 py-0.5 text-[11px] italic leading-tight" style={{ top: top + 1, height, color: ink, opacity: 0.9, zIndex: 0, ...look }}>
+            <span aria-hidden>{MEAL_ICONS[h.key]}</span> {MEAL_NAMES[h.key]}
+          </div>
+        );
+      })}
+      {habits.map((b) => {
+        const top = topOf(new Date(b.start));
+        const height = Math.max(18, topOf(new Date(b.end)) - top - 2);
+        const time = new Date(b.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+        const quest = habitLook === "quest";
+        return (
+          <div
+            key={b.habit.id}
+            className="absolute inset-x-0.5 flex items-start gap-1 overflow-hidden px-1.5 py-0.5 text-[11.5px] leading-tight"
+            style={{
+              top: top + 1,
+              height,
+              zIndex: 1,
+              borderRadius: 6,
+              color: quest ? "#2a1c10" : ink,
+              ...(quest
+                ? { background: "linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1px solid #a88a3f", boxShadow: "0 1px 3px rgba(0,0,0,.25)" }
+                : { border: "1.5px dashed rgba(80,120,60,.7)", background: "rgba(120,160,90,.08)" }),
+            }}
+          >
+            <span aria-hidden>🌱</span>
+            <span className="min-w-0">
+              <b className="block truncate">{b.habit.title}</b>
+              {height >= 30 && <span className="opacity-70">{time}</span>}
+            </span>
+          </div>
+        );
+      })}
+    </>
   );
 }

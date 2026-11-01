@@ -9,6 +9,8 @@ import { useEscape } from "@/lib/use-escape";
 import { DateField } from "@/components/ui/DateField";
 import { SnoozePicker, type SnoozeChoice } from "@/components/tasks/SnoozePicker";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { AutoScheduler } from "@/components/calendar/AutoScheduler";
+import type { Task } from "@/lib/data/types";
 
 /*
  * Sorting imports, one card at a time: Import, Snooze or Skip. Import walks
@@ -19,14 +21,24 @@ import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
  */
 
 type BoardOpt = { id: string; title: string; color: string | null };
-type Step = "board" | "when" | "matters" | "often" | "time" | "review";
+type Step = "board" | "plan" | "matters" | "often" | "time" | "review";
+type Kind = "quest" | "schedule" | "habit";
+const KINDS: { key: Kind; label: string; icon: string }[] = [
+  { key: "quest", label: "Quests", icon: "⚔" },
+  { key: "schedule", label: "To schedule", icon: "📅" },
+  { key: "habit", label: "Habits", icon: "🌱" },
+];
+const KIND_ONE: Record<Kind, string> = { quest: "⚔ Quest", schedule: "📅 To schedule", habit: "🌱 Habit" };
 type Draft = {
-  kind: "quest" | "habit";
+  kind: Kind;
   title: string;
   description: string;
   steps: string[];
   boardId: string | null | undefined;
   due: string | null | undefined;
+  /** "Plan it within" this many days (0 = today); null = no need to schedule. */
+  planDays: number | null | undefined;
+  urgency: number | null | undefined;
   importance: number | null | undefined;
   minutes: number | null | undefined;
   /** Habits: "daily", "weekdays", "days" (pick weekdays) or an interval. */
@@ -83,6 +95,8 @@ function draftFor(card: ImportCard): Draft {
     steps: card.steps,
     boardId: undefined,
     due: card.due_on ?? undefined,
+    planDays: card.kind === "schedule" ? (card.plan_within_days ?? undefined) : undefined,
+    urgency: undefined,
     importance: undefined,
     minutes: card.minutes ?? undefined,
     often,
@@ -98,7 +112,7 @@ const chip = (on: boolean, big = false): React.CSSProperties => ({
   minHeight: big ? 44 : 36,
 });
 
-export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: ImportCard[]; setAside: ImportCard[]; boards: BoardOpt[]; theme: "calm" | "adventure" }) {
+export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: { waiting: ImportCard[]; setAside: ImportCard[]; boards: BoardOpt[]; theme: "calm" | "adventure"; toSchedule: Task[] }) {
   const router = useRouter();
   const [queue, setQueue] = useState(waiting);
   const [aside, setAsideList] = useState(setAside);
@@ -112,10 +126,27 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
   const [error, setError] = useState<string | null>(null);
   const [saving, start] = useTransition();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const card = queue[0] ?? null;
+  // Which kinds this session sorts (all, unless you narrow it).
+  const [kinds, setKinds] = useState<Set<Kind>>(() => new Set(KINDS.map((k) => k.key)));
+  const visible = queue.filter((c) => kinds.has(c.kind));
+  const card = visible[0] ?? null;
+  const [scheduling, setScheduling] = useState(false);
+  // Steps added from the review ("+ Plan it within…").
+  const [extra, setExtra] = useState<Step[]>([]);
 
-  const steps: Step[] = draft?.kind === "habit" ? ["often", "time", "review"] : ["board", "when", "matters", "review"];
+  const base: Step[] = draft?.kind === "habit" ? ["often", "time"] : draft?.kind === "schedule" ? ["plan", "board"] : ["board"];
+  const steps: Step[] = [...base, ...extra.filter((x) => !base.includes(x)), "review"];
   const step = steps[Math.min(stepAt, steps.length - 1)];
+  function jump(s: Step) {
+    const at = steps.indexOf(s);
+    if (at >= 0) return setStepAt(at);
+    setExtra((e) => [...e, s]);
+    setStepAt(steps.length - 1);
+  }
+  function retag(kind: Kind) {
+    if (!card) return;
+    setQueue((q) => q.map((c) => (c.id === card.id ? { ...c, kind } : c)));
+  }
 
   useEscape(() => (mode === "guided" && stepAt > 0 ? setStepAt(stepAt - 1) : setMode("card")), mode !== "card" && !snoozing && !editor);
 
@@ -125,7 +156,9 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
     toastTimer.current = setTimeout(() => setToast(null), 5000);
   }
   function next() {
-    setQueue((q) => q.slice(1));
+    const id = card?.id;
+    setQueue((q) => q.filter((c) => c.id !== id));
+    setExtra([]);
     setMode("card");
     setDraft(null);
     setStepAt(0);
@@ -140,6 +173,7 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
     const d = draftFor(card);
     setDraft({ ...d, boardId: findBoard(boards, card.board_hint)?.id });
     setStepAt(0);
+    setExtra([]);
     setMode(all ? "all" : "guided");
   }
   const patch = (p: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...p } : d));
@@ -189,7 +223,10 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
     const due = d.due || null;
     const dueAt = due ? new Date(`${due}T23:59`).toISOString() : null;
     const daysOut = due ? Math.round((new Date(`${due}T12:00`).getTime() - new Date(`${inDays(0)}T12:00`).getTime()) / 86_400_000) : null;
-    const urgency = daysOut === null ? null : daysOut <= 0 ? 5 : daysOut === 1 ? 4 : daysOut <= 7 ? 3 : 2;
+    const soonest = [daysOut, d.planDays ?? null].filter((x): x is number => x !== null);
+    const near = soonest.length ? Math.min(...soonest) : null;
+    const urgency = d.urgency ?? (near === null ? null : near <= 0 ? 5 : near === 1 ? 4 : near <= 7 ? 3 : 2);
+    const planBy = d.kind !== "habit" && typeof d.planDays === "number" ? new Date(`${inDays(d.planDays)}T23:59`).toISOString() : null;
     const from = inDays(0);
     const habitTiming =
       d.often === "weekdays"
@@ -207,19 +244,20 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
       try {
         setError(null);
         await importCardAction(card.id, {
-          kind: d.kind,
+          kind: d.kind === "habit" ? "habit" : "quest",
           title: d.title,
           description: d.description.trim() || null,
           steps: d.steps,
           boardId: d.boardId ?? null,
           dueAt,
+          planBy,
           importance: d.importance ?? null,
           urgency,
           minutes: d.minutes ?? null,
           ...(d.kind === "habit" ? habitTiming : {}),
         });
         const board = boards.find((b) => b.id === d.boardId);
-        say(d.kind === "habit" ? `“${d.title}” is one of your habits now` : `Added “${d.title}”${board ? ` to ${board.title}` : ""}`);
+        say(d.kind === "habit" ? `“${d.title}” is one of your habits now` : planBy ? `“${d.title}” is on your list to schedule` : `Added “${d.title}”${board ? ` to ${board.title}` : ""}`);
         next();
         router.refresh();
       } catch (e) {
@@ -237,12 +275,37 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
         <h1 className="m-0 font-display text-[26px]" style={{ color: isAdventure ? "#f2d27e" : INK }}>
           Sort your imports
         </h1>
-        {queue.length > 0 && (
+        {visible.length > 0 && (
           <span className="text-[13.5px]" style={{ color: isAdventure ? "rgba(242,226,180,.8)" : SOFT }}>
-            {queue.length === 1 ? "the last one" : `${queue.length} to sort`}
+            {visible.length === 1 ? "the last one" : `${visible.length} to sort`}
           </span>
         )}
       </div>
+      {new Set(queue.map((c) => c.kind)).size > 1 && (
+        <div className="-mt-2 flex flex-wrap gap-1.5" role="group" aria-label="What to sort now">
+          {KINDS.filter((k) => queue.some((c) => c.kind === k.key)).map((k) => {
+            const on = kinds.has(k.key);
+            const n = queue.filter((c) => c.kind === k.key).length;
+            return (
+              <button
+                key={k.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setKinds((prev) => {
+                  const nx = new Set(prev);
+                  if (on && nx.size > 1) nx.delete(k.key);
+                  else nx.add(k.key);
+                  return nx;
+                })}
+                className="h-8 rounded-full px-3 text-[13px] font-semibold transition-opacity"
+                style={{ ...chip(on), minHeight: 32, opacity: on ? 1 : 0.6 }}
+              >
+                {k.icon} {k.label} <span className="font-normal tabular-nums opacity-70">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {!card ? (
         <div className="card-pop-in parchment flex flex-col items-center gap-2 rounded-3xl px-5 py-8 text-center" style={frame}>
@@ -251,12 +314,23 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
           <p className="m-0 text-[14px]" style={{ color: "#6b5631" }}>
             Everything you brought in has found its place.
           </p>
-          <Link href="/" className="mt-2 flex h-10 items-center rounded-full px-5 text-[14.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
-            Back to Today
-          </Link>
+          {toSchedule.length > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+              <button type="button" onClick={() => setScheduling(true)} className="flex h-11 items-center rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+                Schedule these ({toSchedule.length})
+              </button>
+              <Link href="/" className="text-[14px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                Back to Today
+              </Link>
+            </div>
+          ) : (
+            <Link href="/" className="mt-2 flex h-10 items-center rounded-full px-5 text-[14.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+              Back to Today
+            </Link>
+          )}
         </div>
       ) : mode === "card" ? (
-        <CardView key={card.id} card={card} frame={frame} onImport={() => begin(false)} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
+        <CardView key={card.id} card={card} frame={frame} onRetag={retag} onImport={() => begin(false)} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
       ) : draft ? (
         <div key={`${card.id}-${mode}`} className="card-pop-in parchment flex flex-col gap-3 rounded-3xl p-4" style={frame}>
           <div className="flex items-center gap-2">
@@ -276,11 +350,11 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
           {mode === "guided" ? (
             <div key={step} className="reveal flex flex-col gap-3">
               {step === "board" && <BoardStep boards={boards} hint={card.board_hint} value={draft.boardId} onPick={(boardId) => advance({ boardId })} />}
-              {step === "when" && <WhenStep noted={card.due_on} value={draft.due} onPick={(due) => advance({ due })} />}
+              {step === "plan" && <PlanStep draft={draft} noted={card.due_on} onChange={patch} onDone={() => advance()} />}
               {step === "matters" && <MattersStep value={draft.importance} onPick={(importance) => advance({ importance })} />}
               {step === "often" && <OftenStep draft={draft} hint={card.repeat_text} onChange={patch} onDone={() => advance()} />}
               {step === "time" && <TimeStep value={draft.minutes} hint={card.repeat_text} onPick={(minutes) => advance({ minutes })} />}
-              {step === "review" && <Review draft={draft} boards={boards} onChange={patch} onJump={(s) => setStepAt(steps.indexOf(s))} />}
+              {step === "review" && <Review draft={draft} boards={boards} onChange={patch} onJump={jump} />}
               <div className="flex items-center gap-3 pt-1">
                 {step !== "review" ? (
                   <button type="button" onClick={() => advance()} className="h-9 rounded-full px-3 text-[13.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
@@ -292,7 +366,7 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
                 <span className="flex-1" />
                 {step === "review" && (
                   <button type="button" onClick={save} disabled={saving} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116", opacity: saving ? 0.7 : 1 }}>
-                    {saving ? "Adding…" : draft.kind === "habit" ? "Add the habit" : "Add the quest"}
+                    {saving ? "Adding…" : addLabel(draft)}
                   </button>
                 )}
               </div>
@@ -317,14 +391,14 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
                 <button type="button" onClick={() => (setStepAt(0), setMode("guided"))} className="text-[13.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
                   Step by step instead
                 </button>
-                {draft.kind === "quest" && (
+                {draft.kind !== "habit" && (
                   <button type="button" onClick={() => setEditor(true)} className="text-[13.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
                     Open the full quest editor
                   </button>
                 )}
                 <span className="flex-1" />
                 <button type="button" onClick={save} disabled={saving} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116", opacity: saving ? 0.7 : 1 }}>
-                  {saving ? "Adding…" : draft.kind === "habit" ? "Add the habit" : "Add the quest"}
+                  {saving ? "Adding…" : addLabel(draft)}
                 </button>
               </>
             )}
@@ -332,6 +406,12 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
         </div>
       ) : null}
 
+      {card && toSchedule.length > 0 && mode === "card" && (
+        <button type="button" onClick={() => setScheduling(true)} className="self-start text-[13.5px] underline underline-offset-2" style={{ color: isAdventure ? "rgba(242,226,180,.85)" : SOFT }}>
+          📅 Schedule what&rsquo;s on the list ({toSchedule.length})
+        </button>
+      )}
+      {scheduling && <AutoScheduler tasks={toSchedule} theme={theme} onClose={() => setScheduling(false)} />}
       {aside.length > 0 && <SetAside cards={aside} onBack={(c) => (putBack(c), decideImportCardAction(c.id, { kind: "restore" }).catch(() => null))} isAdventure={isAdventure} />}
 
       {snoozing && card && <SnoozePicker title={card.title} onPick={snoozeTo} onClose={() => setSnoozing(false)} />}
@@ -364,15 +444,24 @@ export function ImportTriage({ waiting, setAside, boards, theme }: { waiting: Im
   );
 }
 
-function CardView({ card, frame, onImport, onSnooze, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
+function CardView({ card, frame, onRetag, onImport, onSnooze, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
   const [source, setSource] = useState(false);
   const facts = [card.repeat_text, card.due_on ? `Due ${dayLabel(card.due_on)}` : null, card.minutes ? minutesLabel(card.minutes) : null, card.board_hint ? `Board: ${card.board_hint}` : null].filter(Boolean) as string[];
   return (
     <div className="card-pop-in parchment relative flex flex-col gap-2.5 rounded-3xl p-4" style={frame} onContextMenu={(e) => (e.preventDefault(), setMenu(true))}>
       <div className="flex items-center gap-2 pr-9">
-        <span className="rounded-full px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-[.08em]" style={{ background: "rgba(217,180,95,.25)", color: GOLD, border: "1px solid rgba(139,112,64,.4)" }}>
-          {card.kind === "habit" ? "🌱 Habit" : "⚔ Quest"}
-        </span>
+        {/* One tap retags it: quest, to schedule, habit. */}
+        <button
+          type="button"
+          onClick={() => onRetag(KINDS[(KINDS.findIndex((k) => k.key === card.kind) + 1) % KINDS.length].key)}
+          title="Tap to change what it is"
+          aria-label={`${KIND_ONE[card.kind]}. Tap to change`}
+          className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[12px] font-bold uppercase tracking-[.08em]"
+          style={{ background: "rgba(217,180,95,.25)", color: GOLD, border: "1px solid rgba(139,112,64,.4)" }}
+        >
+          {KIND_ONE[card.kind]}
+          <span aria-hidden className="text-[10px] opacity-70">⇄</span>
+        </button>
       </div>
       <button type="button" onClick={() => setMenu(!menu)} aria-label="More choices" aria-expanded={menu} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/[.06]" style={{ color: "#6b5631" }}>
         ⋯
@@ -493,45 +582,6 @@ function BoardStep({ boards, hint, value, onPick }: { boards: BoardOpt[]; hint: 
   );
 }
 
-function WhenStep({ noted, value, onPick }: { noted: string | null; value: string | null | undefined; onPick: (d: string | null) => void }) {
-  const [picking, setPicking] = useState(false);
-  const options: { label: string; day: string }[] = [
-    { label: "Today", day: inDays(0) },
-    { label: "Tomorrow", day: inDays(1) },
-    { label: "This weekend", day: nextDow(6) },
-    { label: "Next week", day: nextDow(1) },
-    { label: "In 2 weeks", day: inDays(14) },
-  ];
-  return (
-    <>
-      <Question hint="A due date keeps it in view as it comes near.">When should it be done by?</Question>
-      <Choices>
-        {noted && (
-          <Choice on={value === noted} onClick={() => onPick(noted)} note="as noted">
-            {dayLabel(noted)}
-          </Choice>
-        )}
-        {options.map((o) => (
-          <Choice key={o.label} on={value === o.day && value !== noted} onClick={() => onPick(o.day)}>
-            {o.label}
-          </Choice>
-        ))}
-        <Choice on={picking} onClick={() => setPicking(true)}>
-          Pick a day…
-        </Choice>
-        <Choice on={value === null} onClick={() => onPick(null)}>
-          No due date
-        </Choice>
-      </Choices>
-      {picking && (
-        <div className="reveal">
-          <DateField value={value ?? ""} min={inDays(0)} onChange={(d) => d && onPick(d)} ariaLabel="Due date" className="h-10 rounded-xl px-3 text-[15px]" />
-        </div>
-      )}
-    </>
-  );
-}
-
 const MATTERS: { label: string; value: number }[] = [
   { label: "A little", value: 2 },
   { label: "Quite a bit", value: 3 },
@@ -637,9 +687,10 @@ function Review({ draft, boards, onChange, onJump }: { draft: Draft; boards: Boa
           { step: "time", text: draft.minutes ? minutesLabel(draft.minutes) : "Any length" },
         ]
       : [
+          ...(draft.kind === "schedule" ? [{ step: "plan" as Step, text: planLabel(draft) }] : []),
           { step: "board", text: board ? board.title : "No board" },
-          { step: "when", text: draft.due ? `Due ${dayLabel(draft.due)}` : "No due date" },
-          { step: "matters", text: MATTERS.find((m) => m.value === draft.importance)?.label.replace(/^./, (c) => `Matters ${c.toLowerCase()}`) ?? "Matters: not said" },
+          ...(draft.kind !== "schedule" ? [{ step: "plan" as Step, text: typeof draft.planDays === "number" || draft.due ? planLabel(draft) : "+ Plan it within…" }] : []),
+          { step: "matters", text: MATTERS.find((m) => m.value === draft.importance)?.label.replace(/^./, (c) => `Matters ${c.toLowerCase()}`) ?? "+ How much it matters" },
         ];
   return (
     <>
@@ -657,7 +708,7 @@ function Review({ draft, boards, onChange, onJump }: { draft: Draft; boards: Boa
   );
 }
 
-function StepsList({ steps, onChange, kind }: { steps: string[]; onChange: (s: string[]) => void; kind: "quest" | "habit" }) {
+function StepsList({ steps, onChange, kind }: { steps: string[]; onChange: (s: string[]) => void; kind: Kind }) {
   const [add, setAdd] = useState("");
   if (!steps.length && !add && kind === "habit") return null;
   return (
@@ -717,15 +768,15 @@ function AllAtOnce({ draft, boards, hint, onChange }: { draft: Draft; boards: Bo
   return (
     <div className="reveal flex flex-col gap-3">
       <div className="flex gap-1.5">
-        {(["quest", "habit"] as const).map((k) => (
-          <button key={k} type="button" aria-pressed={draft.kind === k} onClick={() => onChange({ kind: k })} className="rounded-full px-3 text-[13px] font-semibold" style={small(draft.kind === k)}>
-            {k === "habit" ? "🌱 Habit" : "⚔ Quest"}
+        {KINDS.map((k) => (
+          <button key={k.key} type="button" aria-pressed={draft.kind === k.key} onClick={() => onChange({ kind: k.key })} className="rounded-full px-3 text-[13px] font-semibold" style={small(draft.kind === k.key)}>
+            {KIND_ONE[k.key]}
           </button>
         ))}
       </div>
       <input value={draft.title} onChange={(e) => onChange({ title: e.target.value })} aria-label="Name" maxLength={200} className="h-11 rounded-xl border px-3 font-display text-[18px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.75)", color: "#2a1c10" }} />
       <textarea value={draft.description} onChange={(e) => onChange({ description: e.target.value })} aria-label="Notes" placeholder="Notes" rows={2} className="rounded-xl border px-3 py-2 text-[15px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.75)", color: "#2a1c10" }} />
-      {draft.kind === "quest" ? (
+      {draft.kind !== "habit" ? (
         <>
           <Field label="Board">
             <div className="flex flex-wrap gap-1.5">
@@ -736,7 +787,16 @@ function AllAtOnce({ draft, boards, hint, onChange }: { draft: Draft; boards: Bo
               ))}
             </div>
           </Field>
-          <Field label="Due">
+          <Field label="Plan it within">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {planOptions().map((o) => (
+                <button key={o.label} type="button" aria-pressed={draft.planDays === o.days} onClick={() => onChange({ planDays: draft.planDays === o.days ? null : o.days })} className="rounded-full px-3 text-[13px] font-semibold" style={small(draft.planDays === o.days)}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Due (optional)">
             <div className="flex flex-wrap items-center gap-1.5">
               {[
                 ["Today", inDays(0)],
@@ -820,3 +880,89 @@ function SetAside({ cards, onBack, isAdventure }: { cards: ImportCard[]; onBack:
     </div>
   );
 }
+
+const endOfMonthDays = () => {
+  const d = now();
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return Math.round((new Date(keyOf(last) + "T12:00").getTime() - new Date(keyOf(d) + "T12:00").getTime()) / 86_400_000);
+};
+const planOptions = (): { label: string; days: number }[] => [
+  { label: "Today", days: 0 },
+  { label: "3 days", days: 3 },
+  { label: "1 week", days: 7 },
+  { label: "2 weeks", days: 14 },
+  { label: "This month", days: Math.max(1, endOfMonthDays()) },
+];
+function planLabel(d: Draft) {
+  const parts: string[] = [];
+  if (typeof d.planDays === "number") {
+    const o = planOptions().find((x) => x.days === d.planDays);
+    parts.push(d.planDays === 0 ? "Plan it today" : o ? `Plan within ${o.label.toLowerCase()}` : `Plan within ${d.planDays} days`);
+  } else parts.push("Not on the schedule list");
+  if (d.due) parts.push(`due ${dayLabel(d.due)}`);
+  return parts.join(", ");
+}
+
+const URGENCY: { label: string; value: number }[] = [
+  { label: "Can wait", value: 2 },
+  { label: "Soonish", value: 3 },
+  { label: "Pressing", value: 5 },
+];
+
+/** When to plan it by: a few clear choices, and Custom… for days, a due date and urgency. */
+function PlanStep({ draft, noted, onChange, onDone }: { draft: Draft; noted: string | null; onChange: (p: Partial<Draft>) => void; onDone: () => void }) {
+  const [custom, setCustom] = useState(false);
+  const [days, setDays] = useState(typeof draft.planDays === "number" ? String(draft.planDays) : "");
+  const pick = (planDays: number | null) => (onChange({ planDays }), onDone());
+  return (
+    <>
+      <Question hint="It joins your list to schedule, soonest first, and the planner finds it a time.">When should it be planned within?</Question>
+      <Choices>
+        {planOptions().map((o) => (
+          <Choice key={o.label} on={draft.planDays === o.days} onClick={() => pick(o.days)}>
+            {o.label}
+          </Choice>
+        ))}
+        <Choice on={custom} onClick={() => setCustom(!custom)}>
+          Custom…
+        </Choice>
+        <Choice on={draft.planDays === null} onClick={() => pick(null)}>
+          No need to schedule
+        </Choice>
+      </Choices>
+      <div className="drawer-body" data-open={custom || undefined}>
+        <div className="drawer-inner">
+          <div className="flex flex-col gap-2.5 rounded-2xl px-3 py-2.5" style={{ background: "rgba(255,250,238,.55)", border: "1px solid rgba(139,112,64,.3)" }}>
+            <label className="flex items-center gap-2 text-[14px]">
+              Within
+              <input value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, "").slice(0, 3))} inputMode="numeric" placeholder="45" aria-label="Days" className="h-9 w-16 rounded-lg border px-2 text-center text-[16px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.85)", color: "#2a1c10" }} />
+              days
+            </label>
+            <div className="flex flex-wrap items-center gap-2 text-[14px]">
+              Due by
+              <DateField value={draft.due ?? ""} min={inDays(0)} onChange={(d) => onChange({ due: d || null })} ariaLabel="Due date" placeholder={noted ? dayLabel(noted) : "No due date"} className="h-9 rounded-full px-3 text-[13.5px]" />
+              {draft.due && (
+                <button type="button" onClick={() => onChange({ due: null })} className="text-[12.5px] underline" style={{ color: "#6b5631" }}>
+                  clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 text-[14px]">
+              <span className="mr-1">How urgent</span>
+              {URGENCY.map((u) => (
+                <button key={u.label} type="button" aria-pressed={draft.urgency === u.value} onClick={() => onChange({ urgency: draft.urgency === u.value ? null : u.value })} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={chip(draft.urgency === u.value)}>
+                  {u.label}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => (onChange({ planDays: Number(days) > 0 ? Number(days) : draft.due ? undefined : null }), onDone())} className="h-9 self-end rounded-full px-5 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind === "schedule" || typeof d.planDays === "number" ? "Add to my list to schedule" : "Add the quest");

@@ -27,6 +27,8 @@ import * as partyData from "@/lib/data/party";
 import * as bossesData from "@/lib/data/bosses";
 import * as energyData from "@/lib/data/energy";
 import * as importCardsData from "@/lib/data/import-cards";
+import { timedHabitsFrom } from "@/lib/timed-habits";
+import { cleanRepeat } from "@/lib/habit-repeat";
 import { computeLevelForXp } from "@/lib/levels";
 import { byDuePriority } from "@/lib/due-soon";
 import * as xp from "@/lib/data/xp";
@@ -2834,6 +2836,8 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
     if (t.status !== "open" || !t.scheduled_start || !t.scheduled_end) continue;
     busy.push({ start: new Date(t.scheduled_start).getTime(), end: new Date(t.scheduled_end).getTime() });
   }
+  // Habits with a set time (Gym at 7) hold their time; the browser lays them out in local time.
+  const habits = timedHabitsFrom((await ritesData.listRites(profileId).catch(() => null)) ?? [], cleanRepeat);
   let google = false;
   if (accessToken) {
     try {
@@ -2850,7 +2854,7 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
       /* planning still works from the app's own calendar */
     }
   }
-  return { busy, google, calendars, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
+  return { busy, habits, google, calendars, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
 }
 
 /** Remember the scheduler's settings and time-of-day choices (on every device). */
@@ -3791,6 +3795,8 @@ export async function importCardAction(
     steps?: string[];
     boardId?: string | null;
     dueAt?: string | null;
+    /** "Plan it within…": onto the list to schedule, to be planned by then. */
+    planBy?: string | null;
     importance?: number | null;
     urgency?: number | null;
     minutes?: number | null;
@@ -3833,6 +3839,11 @@ export async function importCardAction(
       dueAt: input.dueAt ?? null,
     });
     if (steps.length) await stepsData.replaceSteps(taskId, ownerId, steps.map((s) => ({ title: s.slice(0, 200), done: false }))).catch(() => null);
+    const planBy = input.planBy && Number.isFinite(Date.parse(input.planBy)) ? new Date(input.planBy).toISOString() : null;
+    if (planBy) {
+      await importCardsData.queueToSchedule(ownerId, taskId, planBy);
+      revalidatePath("/calendar");
+    }
     made = { kind: "quest", id: taskId };
   }
   await importCardsData.setImportCardStatus(ownerId, id, { status: "imported", task_id: made.kind === "quest" ? made.id : null });

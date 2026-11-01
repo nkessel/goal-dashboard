@@ -142,6 +142,8 @@ export type Task = {
   early_bonus_per_day?: number | null;
   /** Off Today until then (a short snooze). */
   snoozed_until?: string | null;
+  /** Put on the calendar by then (a soft deadline for the auto-scheduler). */
+  plan_by?: string | null;
   /** Matrix screen placement: 'unplotted' / 'later' lots, or 'hidden' (off the matrix). */
   matrix_state?: "unplotted" | "later" | "hidden" | null;
   /** A tiny task: quick (5 min by default), drawn half height with just a check box. */

@@ -5,8 +5,9 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { applyAutoScheduleAction, saveSchedulerSettingsAction, schedulerContextAction } from "@/app/actions";
-import { SCHEDULER_DEFAULTS, clockOf, planSchedule, type Busy, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
+import { MEAL_DEFAULTS, MEAL_ICONS, MEAL_NAMES, SCHEDULER_DEFAULTS, clockOf, holdAt, localDayKey, mealsOn, planSchedule, type Avoid, type Busy, type MealKey, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
 import { useEscape } from "@/lib/use-escape";
+import { habitBlocksOn } from "@/lib/timed-habits";
 import { Fold, useClosing } from "@/components/ui/Fold";
 
 const LOCAL_KEY = "auto-schedule";
@@ -60,6 +61,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
   const [google, setGoogle] = useState(true);
   const [calendars, setCalendars] = useState<{ id: string; name: string; color: string | null; writable: boolean; primary: boolean }[]>([]);
   const [showCals, setShowCals] = useState(false);
+  const [showMeals, setShowMeals] = useState(false);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<number | null>(null);
@@ -69,12 +71,17 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
 
   useEffect(() => {
     let live = true;
+    // Far enough to reach the latest "plan it by" (up to two months).
+    const furthest = Math.max(0, ...tasks.map((t) => (t.plan_by ? Math.ceil((Date.parse(t.plan_by) - now.getTime()) / 86_400_000) : 0)));
     const to = new Date(now);
-    to.setDate(to.getDate() + SCHEDULER_DEFAULTS.horizon + 1);
+    to.setDate(to.getDate() + Math.min(62, Math.max(SCHEDULER_DEFAULTS.horizon, furthest + 1)) + 1);
     schedulerContextAction(now.toISOString(), to.toISOString(), hiddenCalendars())
       .then((ctx) => {
         if (!live) return;
-        setBusy(ctx.busy);
+        // Habits with a set time (Gym at 7) hold their time on each day they fall on.
+        const habitBusy: Busy[] = [];
+        for (let d = new Date(now); d <= to; d = new Date(d.getTime() + 86_400_000)) habitBusy.push(...habitBlocksOn(ctx.habits ?? [], d).map((b) => ({ start: b.start, end: b.end })));
+        setBusy([...ctx.busy, ...habitBusy]);
         setCalendars(ctx.calendars ?? []);
         setGoogle(ctx.google);
         setSettings({ ...SCHEDULER_DEFAULTS, ...(readLocal() ?? {}), ...((ctx.settings as Partial<SchedulerSettings> | null) ?? {}) });
@@ -83,6 +90,8 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
     return () => {
       live = false;
     };
+    // Read once, when the planner opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now]);
 
   // Saved a moment after the last change (here and on your account).
@@ -108,13 +117,42 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
       tasks
         .filter((t) => !(t.is_on_calendar && t.scheduled_start && new Date(t.scheduled_start) > now))
         .filter((t) => !skipped.has(t.id))
-        .map((t) => ({ id: t.id, title: t.title, minutes: t.estimate_minutes, effort: t.effort ?? null, dueAt: t.due_at ?? null })),
+        .map((t) => ({ id: t.id, title: t.title, minutes: t.estimate_minutes, effort: t.effort ?? null, dueAt: t.due_at ?? null, planBy: t.plan_by ?? null })),
     [tasks, skipped, now]
   );
   // Calendars that only inform (subscriptions, other people's) don't block time unless you say so.
   const fyi = useMemo(() => new Set(settings?.fyi ?? calendars.filter((c) => !c.writable && !c.primary).map((c) => c.id)), [settings?.fyi, calendars]);
   const blocking = useMemo(() => busy?.filter((b) => !b.cal || !fyi.has(b.cal)) ?? null, [busy, fyi]);
-  const plan = useMemo(() => (settings && blocking ? planSchedule(items, blocking, settings, now) : null), [items, blocking, settings, now]);
+  // "Another time": spots a quest shouldn't take again.
+  const [avoid, setAvoid] = useState<Avoid>({});
+  // One by one: each placement in time order; an accepted one keeps its time while the rest are planned around it.
+  const [oneByOne, setOneByOne] = useState(false);
+  const [fixed, setFixed] = useState<Placed[]>([]);
+  const plan = useMemo(() => {
+    if (!settings || !blocking) return null;
+    const held = new Set(fixed.map((f) => f.id));
+    return planSchedule(items.filter((i) => !held.has(i.id)), [...blocking, ...fixed.map((f) => ({ start: f.start.getTime(), end: f.end.getTime() }))], settings, now, avoid);
+  }, [items, blocking, settings, now, avoid, fixed]);
+  const current = useMemo(() => [...(plan?.placed ?? [])].sort((a, b) => a.start.getTime() - b.start.getTime())[0] ?? null, [plan]);
+  const meals = Object.fromEntries((Object.keys(MEAL_DEFAULTS) as MealKey[]).map((k) => [k, { ...MEAL_DEFAULTS[k], ...((settings?.meals as Partial<Record<MealKey, object>> | undefined)?.[k] ?? {}) }])) as typeof MEAL_DEFAULTS;
+  function setMeal(key: MealKey, patch: Partial<(typeof meals)[MealKey]>) {
+    change({ meals: { ...meals, [key]: { ...meals[key], ...patch } } });
+  }
+  const todayKey = localDayKey(now);
+  const breakfastToday = (settings?.breakfastDays ?? []).includes(todayKey);
+  function toggleBreakfastToday() {
+    const days = (settings?.breakfastDays ?? []).filter((d) => d >= todayKey);
+    change({ breakfastDays: breakfastToday ? days.filter((d) => d !== todayKey) : [...days, todayKey] });
+  }
+  // Where each day's meal hour would fall now, shown faintly among the day's quests.
+  const holdsFor = (day: Date) => {
+    if (!settings || !blocking) return [];
+    const placedBusy = [...fixed, ...(plan?.placed ?? [])].map((p) => ({ start: p.start.getTime(), end: p.end.getTime() }));
+    return mealsOn(day, settings).map((m) => {
+      const at = holdAt(m.from, m.to, m.minutes, [...blocking, ...placedBusy], m.ideal);
+      return { key: m.key, from: m.from, to: m.to, at, minutes: m.minutes };
+    });
+  };
   function toggleFyi(id: string) {
     const next = new Set(fyi);
     if (next.has(id)) next.delete(id);
@@ -123,21 +161,22 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
   }
   const byDay = useMemo(() => {
     const groups: { label: string; rows: NonNullable<typeof plan>["placed"] }[] = [];
-    for (const p of [...(plan?.placed ?? [])].sort((a, b) => a.start.getTime() - b.start.getTime())) {
+    for (const p of [...fixed, ...(plan?.placed ?? [])].sort((a, b) => a.start.getTime() - b.start.getTime())) {
       const label = dayLabel(p.start);
       const g = groups[groups.length - 1];
       if (g && g.label === label) g.rows.push(p);
       else groups.push({ label, rows: [p] });
     }
     return groups;
-  }, [plan]);
+  }, [plan, fixed]);
 
   function apply() {
-    if (!plan?.placed.length) return;
+    const chosen = oneByOne ? fixed : [...fixed, ...(plan?.placed ?? [])];
+    if (!chosen.length) return;
     setError(null);
     startApplying(async () => {
       try {
-        const res = await applyAutoScheduleAction(plan.placed.map((p) => ({ taskId: p.id, startISO: p.start.toISOString(), endISO: p.end.toISOString() })));
+        const res = await applyAutoScheduleAction(chosen.map((p) => ({ taskId: p.id, startISO: p.start.toISOString(), endISO: p.end.toISOString() })));
         setDone(res.done);
         router.refresh();
         setTimeout(onClose, 1600);
@@ -213,6 +252,52 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
               <input type="checkbox" checked={settings.skipWeekends} onChange={(e) => change({ skipWeekends: e.target.checked })} className="h-4 w-4" />
               Keep weekends free
             </label>
+            <button type="button" onClick={() => setShowMeals((v) => !v)} aria-expanded={showMeals} className="min-h-9 text-[13px] underline underline-offset-2" style={{ color: ink }}>
+              Daily essentials kept free {showMeals ? "▾" : "▸"}
+            </button>
+            {!meals.breakfast.on && (
+              <button type="button" onClick={toggleBreakfastToday} aria-pressed={breakfastToday} className="h-8 rounded-full px-3 text-[12.5px] font-semibold" style={breakfastToday ? { background: gold, color: isAdventure ? "#2a1c10" : "#fff" } : { border: "1px solid #b39a6a", color: ink }}>
+                {breakfastToday ? "✓ Breakfast today" : "+ Breakfast today"}
+              </button>
+            )}
+            <Fold open={showMeals}>
+              <div className="flex w-full flex-col gap-1">
+                <span className="text-[12px]" style={{ color: soft }}>
+                  Never booked: the planner just leaves a free stretch somewhere in each range, so a meal can float to wherever there&rsquo;s room.
+                </span>
+                {(Object.keys(MEAL_DEFAULTS) as MealKey[]).map((k) => (
+                  <div key={k} className="flex flex-wrap items-center gap-1.5">
+                    <label className="flex min-h-9 w-full items-center gap-2 sm:w-[190px]">
+                      <input type="checkbox" checked={meals[k].on} onChange={(e) => setMeal(k, { on: e.target.checked })} className="h-4 w-4" />
+                      {MEAL_NAMES[k]}
+                    </label>
+                    <select aria-label={`${MEAL_NAMES[k]} length`} value={meals[k].minutes} onChange={(e) => setMeal(k, { minutes: Number(e.target.value) })} className={select} style={selectStyle} disabled={!meals[k].on && k !== "breakfast"}>
+                      {[15, 20, 25, 30, 45, 60, 90].map((m) => (
+                        <option key={m} value={m}>
+                          {m < 60 ? `${m} min` : `${m / 60} hr`}
+                        </option>
+                      ))}
+                    </select>
+                    <span style={{ color: soft }}>between</span>
+                    <select aria-label={`${MEAL_NAMES[k]} earliest`} value={meals[k].from} onChange={(e) => setMeal(k, { from: Math.min(Number(e.target.value), meals[k].to - 30) })} className={select} style={selectStyle}>
+                      {HOURS.map((m) => (
+                        <option key={m} value={m}>
+                          {clockOf(m)}
+                        </option>
+                      ))}
+                    </select>
+                    <span style={{ color: soft }}>and</span>
+                    <select aria-label={`${MEAL_NAMES[k]} latest`} value={meals[k].to} onChange={(e) => setMeal(k, { to: Math.max(Number(e.target.value), meals[k].from + 30) })} className={select} style={selectStyle}>
+                      {HOURS.map((m) => (
+                        <option key={m} value={m}>
+                          {clockOf(m)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </Fold>
             {calendars.length > 1 && (
               <button type="button" onClick={() => setShowCals((v) => !v)} aria-expanded={showCals} className="min-h-9 text-[13px] underline underline-offset-2" style={{ color: ink }}>
                 Busy calendars ({calendars.length - [...fyi].filter((id) => calendars.some((c) => c.id === id)).length} of {calendars.length}) {showCals ? "▾" : "▸"}
@@ -248,7 +333,19 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
               Everything on the list already has a time. 🎉
             </p>
           )}
-          {byDay.map((g) => (
+          {oneByOne && (
+            <OneByOne
+              current={current}
+              accepted={[...fixed].sort((a, b) => a.start.getTime() - b.start.getTime())}
+              holds={current ? holdsFor(current.start) : []}
+              isAdventure={isAdventure}
+              onAccept={() => current && setFixed((f) => [...f, current])}
+              onAnother={() => current && setAvoid((v) => ({ ...v, [current.id]: [...(v[current.id] ?? []), { start: current.start.getTime(), end: current.end.getTime() }] }))}
+              onLeave={() => current && setSkipped((x) => new Set(x).add(current.id))}
+              onUndo={(id) => setFixed((f) => f.filter((x) => x.id !== id))}
+            />
+          )}
+          {!oneByOne && byDay.map((g) => (
             <section key={g.label} className="flex flex-col gap-1">
               <h4 className={`m-0 ${isAdventure ? "font-display text-[16px]" : "text-[13.5px] font-bold uppercase tracking-wide"}`} style={{ color: isAdventure ? "#6b4f1d" : soft }}>
                 {g.label}
@@ -305,6 +402,13 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
                   );
                 })}
               </ul>
+              {holdsFor(g.rows[0].start).map((h) => (
+                <p key={h.key} className="m-0 flex items-center gap-1.5 rounded-lg px-3 py-1 text-[12.5px] italic" style={{ color: soft, border: "1px dashed rgba(139,112,64,.35)", opacity: 0.85 }}>
+                  <span aria-hidden>{MEAL_ICONS[h.key]}</span>
+                  {MEAL_NAMES[h.key]}: {h.minutes < 60 ? `${h.minutes} min` : h.minutes === 60 ? "an hour" : `${h.minutes / 60} hr`} kept free, {hm(new Date(h.from))}–{hm(new Date(h.to))}
+                  {h.at !== null ? ` (now at ${hm(new Date(h.at))})` : " (crowded out by events already there)"}
+                </p>
+              ))}
             </section>
           ))}
           {plan && plan.unplaced.length > 0 && (
@@ -349,20 +453,112 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
               <button type="button" onClick={onClose} className="h-11 rounded-full px-4 text-[14.5px] underline" style={{ color: soft }}>
                 Not now
               </button>
-              <button
-                type="button"
-                onClick={apply}
-                disabled={applying || !plan?.placed.length}
-                className="hover-glow ml-auto h-11 rounded-full px-6 text-[15px] font-bold disabled:opacity-50"
-                style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}
-              >
-                {applying ? "Placing…" : plan?.placed.length ? `Place ${plan.placed.length} on the calendar` : "Place on the calendar"}
-              </button>
+              {!oneByOne && !!plan?.placed.length && (
+                <button type="button" onClick={apply} disabled={applying} className="ml-auto h-11 rounded-full px-3 text-[14px] underline underline-offset-2" style={{ color: soft }}>
+                  {applying ? "Placing…" : `Place all ${plan.placed.length + fixed.length}`}
+                </button>
+              )}
+              {!oneByOne ? (
+                <button
+                  type="button"
+                  onClick={() => (setFixed([]), setOneByOne(true))}
+                  disabled={!plan?.placed.length}
+                  className={`hover-glow h-11 rounded-full px-5 text-[15px] font-bold disabled:opacity-50 ${plan?.placed.length ? "" : "ml-auto"}`}
+                  style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}
+                >
+                  One by one ›
+                </button>
+              ) : (
+                <>
+                  <button type="button" onClick={() => setOneByOne(false)} className="h-11 rounded-full px-3 text-[14px] underline underline-offset-2" style={{ color: soft }}>
+                    See the whole plan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={apply}
+                    disabled={applying || fixed.length === 0 || !!current}
+                    className="hover-glow ml-auto h-11 rounded-full px-5 text-[15px] font-bold disabled:opacity-50"
+                    style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}
+                  >
+                    {applying ? "Placing…" : `Place ${fixed.length} on the calendar`}
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
       </div>
     </div>,
     document.body
+  );
+}
+
+type Hold = { key: MealKey; from: number; to: number; at: number | null; minutes: number };
+type Placed = { id: string; title: string; start: Date; end: Date; late?: boolean };
+
+/** One placement at a time: it looks good, another time, or leave it out. Nothing is placed until the end. */
+function OneByOne({ current, accepted, holds, isAdventure, onAccept, onAnother, onLeave, onUndo }: { current: Placed | null; accepted: Placed[]; holds: Hold[]; isAdventure: boolean; onAccept: () => void; onAnother: () => void; onLeave: () => void; onUndo: (id: string) => void }) {
+  const ink = "var(--t-ink)";
+  const soft = "var(--t-ink-soft)";
+  const gold = isAdventure ? "var(--t-gold)" : "var(--t-accent)";
+  return (
+    <div className="flex flex-col gap-3">
+      {current ? (
+        <div key={`${current.id}-${current.start.getTime()}`} className="card-pop-in flex flex-col gap-2 rounded-2xl px-4 py-3" style={{ background: isAdventure ? "rgba(255,250,238,.7)" : "var(--t-bg)", border: "1.5px dashed #b8913f" }}>
+          <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: isAdventure ? "#8a6116" : soft }}>
+            Tentative
+          </span>
+          <span className={`${isAdventure ? "font-display text-[20px]" : "text-[17px] font-bold"} leading-snug`} style={{ color: ink }}>
+            {current.title}
+          </span>
+          <span className="text-[15px] font-semibold tabular-nums" style={{ color: isAdventure ? "#6b4f1d" : "var(--t-accent)" }}>
+            {dayLabel(current.start)}, {hm(current.start)} – {hm(current.end)}
+            {current.late && (
+              <span className="ml-1.5 text-[12px] font-bold" style={{ color: "var(--t-warn)" }}>
+                later than hoped
+              </span>
+            )}
+          </span>
+          {holds.length > 0 && (
+            <span className="text-[12.5px] italic" style={{ color: soft }}>
+              {holds.map((h) => `${MEAL_ICONS[h.key]} ${MEAL_NAMES[h.key]}${h.at !== null ? ` ${hm(new Date(h.at))}` : ": crowded out"}`).join(" · ")}
+            </span>
+          )}
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={onAccept} className="hover-glow h-10 rounded-full px-5 text-[14.5px] font-bold" style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}>
+              Looks good ✓
+            </button>
+            <button type="button" onClick={onAnother} className="h-10 rounded-full px-4 text-[14px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: ink }}>
+              Another time
+            </button>
+            <button type="button" onClick={onLeave} className="h-10 rounded-full px-3 text-[13.5px] underline underline-offset-2" style={{ color: soft }}>
+              Leave it out
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="card-pop-in m-0 py-3 text-center text-[15px]" style={{ color: ink }}>
+          {accepted.length ? "All looked over. Place them when you're ready." : "Nothing left to look over."}
+        </p>
+      )}
+      {accepted.length > 0 && (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {accepted.map((p) => (
+            <li key={p.id} className="flex items-center gap-2 text-[13.5px]" style={{ color: ink }}>
+              <span aria-hidden style={{ color: "#3f6a2c" }}>
+                ✓
+              </span>
+              <span className="min-w-0 flex-1 truncate">{p.title}</span>
+              <span className="shrink-0 tabular-nums" style={{ color: soft }}>
+                {dayLabel(p.start).replace(/day,.*/, "day")} {hm(p.start)}
+              </span>
+              <button type="button" onClick={() => onUndo(p.id)} aria-label={`Look at ${p.title} again`} className="flex h-8 w-8 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: soft }}>
+                ↺
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

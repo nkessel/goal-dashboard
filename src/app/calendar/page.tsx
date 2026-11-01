@@ -12,6 +12,9 @@ import { getProfileById } from "@/lib/data/profiles";
 import { listCalendarTasksForOwner } from "@/lib/data/tasks";
 import { listEventsAllCalendars, type GoogleCalendarEvent, type GoogleCalendarInfo } from "@/lib/google-calendar";
 import { CalendarLayers } from "@/components/calendar/CalendarLayers";
+import { listRites } from "@/lib/data/rites";
+import { timedHabitsFrom } from "@/lib/timed-habits";
+import { cleanRepeat } from "@/lib/habit-repeat";
 import { CalendarSlide, SlideLink } from "@/components/calendar/CalendarNav";
 import { SchedulingDrawer } from "@/components/calendar/SchedulingList";
 import { getSchedulingFolders, listSchedulingList } from "@/lib/data/scheduling";
@@ -67,7 +70,9 @@ export default async function CalendarPage({
   const date = parseDateParam(dateParam ?? todayKey());
   const today = parseDateParam(todayKey());
 
-  const profile = await getProfileById(session.user.id);
+  const [profile, rites] = await Promise.all([getProfileById(session.user.id), listRites(session.user.id).catch(() => null)]);
+  // Meal time, wind-down and tidy kept free, and habits with a set time, drawn on the grid.
+  const daily = { settings: ((profile as { scheduler?: Record<string, unknown> | null } | null)?.scheduler ?? null), habits: timedHabitsFrom(rites ?? [], cleanRepeat) };
   // "With Mom" planning is only on the owner's profile.
   const withMom = await isAdmin(session.user.id).catch(() => false);
   const theme = profile?.theme ?? "adventure";
@@ -334,6 +339,7 @@ export default async function CalendarPage({
                 dateKey={formatDateParam(date)}
                 nDays={view === "day" ? 1 : view === "3day" || view === "days" ? nDays : view === "month" ? 7 : 7}
                 toSchedule={toSchedule.length}
+                daily={daily}
               />
               </CalendarSlide>
                 </>
