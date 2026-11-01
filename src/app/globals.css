@@ -2960,3 +2960,5 @@ html[data-welcome-open] .nav-loader-toucan { display: none; }
 .bubble-coin:has(.bubble-coin-half[data-side="r"]:active) { rotate: 8deg; transition: rotate 60ms; }
 .bubble-coin:not(:has(:active)) { transition: rotate 200ms cubic-bezier(.2,.9,.3,1.3); }
 @media (prefers-reduced-motion: reduce) { .tc-nod { animation: none !important; } .bubble-coin { rotate: none !important; } }
+/* While the welcome screen covers everything, what's under it (and the hidden perched toucan) rests instead of animating unseen. */
+html[data-welcome-open] [data-app-shell] *, html[data-welcome-open] [data-perched-owl] * { animation-play-state: paused !important; }
