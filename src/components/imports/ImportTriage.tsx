@@ -644,7 +644,7 @@ function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onQuick, o
       )}
       <div className="mt-1 flex items-center gap-2">
         <button type="button" onClick={() => setLater((v) => !v)} aria-expanded={later} className="h-10 rounded-full px-4 text-[14px] font-semibold" style={chip(later)}>
-          Not now…
+          Snooze…
         </button>
         <span className="flex-1" />
         <button type="button" onClick={onImport} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
@@ -658,9 +658,9 @@ function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onQuick, o
 
 // What the button does, in its own words (it used to say just "Import").
 const importLabel = (k: Kind) =>
-  k === "done" ? "Log as done ✓" : k === "habit" ? "Add as habit ✦" : k === "reward" ? "Add to chest ✦" : k === "project" ? "Make a board ✦" : k === "shopping" ? "Add buy list ✦" : k === "schedule" ? "Add to schedule ✦" : k === "ritual" ? "Add the ritual ✦" : "Add as quest ✦";
+  k === "done" ? "Log as done ✓" : k === "habit" ? "Import as habit ✦" : k === "reward" ? "Import as reward ✦" : k === "project" ? "Import as board ✦" : k === "shopping" ? "Import as buy list ✦" : k === "schedule" ? "Import to schedule ✦" : k === "ritual" ? "Import as ritual ✦" : "Import as quest ✦";
 
-/** "Not now…": snooze it (quick picks here, Other… for the full picker), archive it, or delete it. */
+/** "Snooze…": snooze it (quick picks here, Other… for the full picker), archive it, or delete it. */
 function LaterRow({ open, small = false, done, onSnooze, onSkip, onDelete, onQuick }: { open: boolean; small?: boolean; done: boolean; onSnooze: () => void; onSkip: () => void; onDelete: () => void; onQuick: (until: Date, label: string) => void }) {
   const [sure, setSure] = useState(false);
   const h = small ? "h-8 px-3 text-[13px]" : "h-9 px-3.5 text-[13.5px]";
@@ -690,15 +690,24 @@ function LaterRow({ open, small = false, done, onSnooze, onSkip, onDelete, onQui
           </>
         )}
         <button type="button" onClick={onSkip} title="Into the Archived list at the bottom (bring it back any time)" className={`${h} rounded-full font-semibold`} style={chip(false)}>
-          Archive
+          Archive (keep for later)
         </button>
         {sure ? (
-          <button type="button" onClick={onDelete} className={`reveal ${h} rounded-full font-semibold`} style={{ color: "#fff", background: "#8b2c1a", border: "1px solid #6b1f12" }}>
-            Delete for good
-          </button>
+          // Asked once more, right here.
+          <span className="reveal flex items-center gap-1.5">
+            <span className="text-[12.5px]" style={{ color: "#8b2c1a" }}>
+              Delete this card for good?
+            </span>
+            <button type="button" onClick={onDelete} className={`${h} rounded-full font-semibold`} style={{ color: "#fff", background: "#8b2c1a", border: "1px solid #6b1f12" }}>
+              Yes, delete
+            </button>
+            <button type="button" onClick={() => setSure(false)} className={`${h} rounded-full`} style={{ color: "#6b5631" }}>
+              Keep it
+            </button>
+          </span>
         ) : (
           <button type="button" onClick={() => setSure(true)} className={`${h} rounded-full`} style={{ color: "#8b2c1a" }}>
-            Delete
+            Delete card
           </button>
         )}
       </div>
@@ -823,7 +832,7 @@ function ListRow({ card, first, onEdit, onRetag, onImport, onSnooze, onQuick, on
       <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
       <div className="flex items-center gap-1.5">
         <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ ...small, ...(more ? chip(true) : {}) }}>
-          Not now…
+          Snooze…
         </button>
         <span className="flex-1" />
         <button type="button" onClick={onImport} className="h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
