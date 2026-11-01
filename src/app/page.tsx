@@ -175,6 +175,8 @@ export default async function Home() {
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
   const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, window_to: r.window_to ?? null, kind: r.kind ?? null, icon_key: r.icon_source ? r.icon_key : null, icon_source: r.icon_source ?? null, coin_value: r.coin_value ?? null, estimate_minutes: r.estimate_minutes ?? null, steps: cleanRiteSteps(r.steps), repeat: cleanRepeat(r.repeat) });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
+  // Your videos to listen to (a board named like "Online learning videos"): offered under walk and drive habits.
+  const listenBoard = (projectBoards as { id: string; title: string }[]).find((b) => /learning videos|listen/i.test(b.title)) ?? null;
   const eveningRites = rites?.filter((r) => r.slot !== "day").map(riteView) ?? null;
   // Imports wait for approval before they show here at all; quests taken off
   // the Today screen live only on their boards.
@@ -262,7 +264,7 @@ export default async function Home() {
                   theme={theme}
                   between={
                     habits && rites?.some((r) => "slot" in r) ? (
-                      <DailyHabits habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} />
+                      <DailyHabits listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} />
                     ) : null
                   }
                 />

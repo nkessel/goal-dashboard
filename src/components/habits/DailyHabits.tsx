@@ -24,6 +24,9 @@ import { Fold } from "@/components/ui/Fold";
  * its avatar is a checkbox unless it has a portrait. The ⋯ menu opens focus
  * mode (with a timer) or skips it for today. Collapsible, open by default.
  */
+// Habits you can listen along to (walks, drives, the dog).
+const LISTEN_HABIT = /\b(walk|walking|drive|driving|dog|commute|car ride|errands?|hike)\b|🐶|🐕/iu;
+
 export function DailyHabits({
   habits,
   completions,
@@ -31,7 +34,10 @@ export function DailyHabits({
   stepChecks = [],
   cleaning: cleaningRaw = null,
   theme,
+  listenHref = null,
 }: {
+  /** Your list of videos to listen to (a board): a 🎧 pill under a walk, drive or dog-walk habit that's still to do. */
+  listenHref?: string | null;
   /** The mess check-in (spaces, laundry, chores) shown under the cleaning habit. */
   cleaning?: unknown;
   /** Sub-habit ticks for the last couple of days. */
@@ -713,6 +719,11 @@ export function DailyHabits({
                       );
                     })}
                   </ul>
+                )}
+                {listenHref && !d && LISTEN_HABIT.test(h.title) && (
+                  <a href={listenHref} onPointerDown={(e) => e.stopPropagation()} className="due-in ml-11 mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold no-underline" style={{ background: "rgba(201,162,74,.14)", border: "1px solid rgba(160,120,40,.45)", color: "#6b4c12" }}>
+                    <span aria-hidden>🎧</span> Something to listen to
+                  </a>
                 )}
                 {cleaning && day && h.id === cleanId && <CleaningCheckIn key={day} initial={cleaning} day={day} habitDone={d} isAdventure={isAdventure} open={cleanOpen} />}
                 </SortableHabit>
