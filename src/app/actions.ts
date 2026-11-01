@@ -93,6 +93,16 @@ export async function createBoardAction(formData: FormData) {
   if (parentBoardId) revalidatePath(`/boards/${parentBoardId}`);
 }
 
+/** A new board from a picker (typed name): returns it so the picker can choose it at once. */
+export async function createBoardQuickAction(title: string): Promise<{ id: string; title: string; color: string | null }> {
+  const ownerId = await requireProfileId();
+  const t = title.replace(/\s+/g, " ").trim().slice(0, 80);
+  if (!t) throw new Error("Give the board a name.");
+  const b = await boardsData.createBoard(ownerId, { title: t });
+  revalidatePath("/boards");
+  return { id: b.id, title: b.title, color: (b as { color?: string | null }).color ?? null };
+}
+
 /** Edits an existing board's own fields (title/description/color). */
 export async function updateBoardAction(
   boardId: string,

@@ -9,7 +9,7 @@ import type { FileRef } from "@/lib/file-refs";
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { decideImportCardAction, editImportCardAction, importCardAction, markImportCardImportedAction } from "@/app/actions";
+import { createBoardQuickAction, decideImportCardAction, editImportCardAction, importCardAction, markImportCardImportedAction } from "@/app/actions";
 import type { ImportCard } from "@/lib/data/import-cards";
 import { useEscape } from "@/lib/use-escape";
 import { DateField } from "@/components/ui/DateField";
@@ -127,8 +127,10 @@ const chip = (on: boolean, big = false): React.CSSProperties => ({
   minHeight: big ? 44 : 36,
 });
 
-export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, focus = null, query: initialQuery = "" }: { waiting: ImportCard[]; setAside: ImportCard[]; boards: BoardOpt[]; theme: "calm" | "adventure"; toSchedule: Task[]; /** /import?card=<id>: open on that card. */ focus?: string | null; /** /import?q=…: start with a search. */ query?: string }) {
+export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSchedule, focus = null, query: initialQuery = "" }: { waiting: ImportCard[]; setAside: ImportCard[]; boards: BoardOpt[]; theme: "calm" | "adventure"; toSchedule: Task[]; /** /import?card=<id>: open on that card. */ focus?: string | null; /** /import?q=…: start with a search. */ query?: string }) {
   const router = useRouter();
+  // Boards (a new one made from the picker joins at once).
+  const [boards, setBoards] = useState(boardsIn);
   const [queue, setQueue] = useState(waiting);
   const [aside, setAsideList] = useState(setAside);
   const [mode, setMode] = useState<"card" | "guided" | "all">("card");
@@ -362,7 +364,7 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
 
           {mode === "guided" ? (
             <div key={step} className="reveal flex flex-col gap-3">
-              {step === "board" && <BoardStep boards={boards} hint={card.board_hint} value={draft.boardId} onPick={(boardId) => advance({ boardId })} />}
+              {step === "board" && <BoardStep boards={boards} hint={card.board_hint} value={draft.boardId} onPick={(boardId) => advance({ boardId })} onCreate={(b) => (setBoards((x) => [...x, b]), advance({ boardId: b.id }))} />}
               {step === "plan" && <PlanStep draft={draft} noted={card.due_on} onChange={patch} onDone={() => advance()} />}
               {step === "matters" && <MattersStep value={draft.importance} onPick={(importance) => advance({ importance })} />}
               {step === "often" && <OftenStep draft={draft} hint={card.repeat_text} onChange={patch} onDone={() => advance()} />}
@@ -696,7 +698,7 @@ function LaterRow({ open, small = false, done, onSnooze, onSkip, onDelete, onQui
           // Asked once more, right here.
           <span className="reveal flex items-center gap-1.5">
             <span className="text-[12.5px]" style={{ color: "#8b2c1a" }}>
-              Delete this card for good?
+              Delete this item for good?
             </span>
             <button type="button" onClick={onDelete} className={`${h} rounded-full font-semibold`} style={{ color: "#fff", background: "#8b2c1a", border: "1px solid #6b1f12" }}>
               Yes, delete
@@ -707,7 +709,7 @@ function LaterRow({ open, small = false, done, onSnooze, onSkip, onDelete, onQui
           </span>
         ) : (
           <button type="button" onClick={() => setSure(true)} className={`${h} rounded-full`} style={{ color: "#8b2c1a" }}>
-            Delete card
+            Delete item
           </button>
         )}
       </div>
@@ -874,23 +876,81 @@ function Choice({ on, onClick, children, note }: { on: boolean; onClick: () => v
   );
 }
 
-function BoardStep({ boards, hint, value, onPick }: { boards: BoardOpt[]; hint: string | null; value: string | null | undefined; onPick: (id: string | null) => void }) {
+function BoardStep({ boards, hint, value, onPick, onCreate, bare = false }: { boards: BoardOpt[]; hint: string | null; value: string | null | undefined; onPick: (id: string | null) => void; onCreate?: (b: BoardOpt) => void; /** Inside another form: no question, no autofocus, and the chosen board stays listed. */ bare?: boolean }) {
   const suggested = findBoard(boards, hint);
-  const ordered = suggested ? [suggested, ...boards.filter((b) => b.id !== suggested.id)] : boards;
+  const [q, setQ] = useState(hint && !suggested ? hint : "");
+  const [making, setMaking] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = words.length ? boards.filter((b) => words.every((w) => b.title.toLowerCase().includes(w))) : [];
+  // Typing: the matches. Not typing: the suggested one and a few others, one per line.
+  const chosen = boards.find((b) => b.id === value);
+  const shown = words.length ? hits.slice(0, 8) : [...new Map([...(chosen ? [chosen] : []), ...(suggested ? [suggested] : []), ...boards].map((b) => [b.id, b])).values()].slice(0, 5);
+  const exact = boards.some((b) => b.title.toLowerCase() === q.trim().toLowerCase());
+  async function create() {
+    if (making) return;
+    setMaking(true);
+    setErr(null);
+    try {
+      onCreate?.(await createBoardQuickAction(q));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't make that board.");
+      setMaking(false);
+    }
+  }
+  const row = "flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-[15px]";
   return (
     <>
-      <Question hint={hint && !suggested ? `The note suggests “${hint}”, which isn't a board yet.` : undefined}>Which board does it belong on?</Question>
-      <Choices>
-        {ordered.map((b) => (
-          <Choice key={b.id} on={value === b.id} onClick={() => onPick(b.id)} note={b.id === suggested?.id ? "suggested" : undefined}>
-            {b.color && <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: b.color }} />}
-            {b.title}
-          </Choice>
+      {!bare && <Question>Which board does it belong on?</Question>}
+      <input
+        autoFocus={!bare}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          if (hits[0]) onPick(hits[0].id);
+          else if (q.trim()) create();
+        }}
+        placeholder={`Type a board (${boards.length} boards)…`}
+        aria-label="Find a board"
+        className="h-11 rounded-xl px-3 text-[16px] outline-none"
+        style={{ background: "rgba(255,250,238,.85)", border: "1px solid #b39a6a", color: "#2a1c10" }}
+      />
+      <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+        {shown.map((b) => (
+          <li key={b.id}>
+            <button type="button" onClick={() => onPick(b.id)} className={row} style={{ background: value === b.id ? "rgba(217,180,95,.25)" : "transparent", color: "#2a1c10" }}>
+              <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: b.color ?? "#c8b38a" }} />
+              <span className="min-w-0 flex-1 truncate">{b.title}</span>
+              {b.id === suggested?.id && (
+                <span className="text-[12px] italic" style={{ color: "#7a6440" }}>
+                  suggested
+                </span>
+              )}
+            </button>
+          </li>
         ))}
-        <Choice on={value === null} onClick={() => onPick(null)}>
-          No board
-        </Choice>
-      </Choices>
+        {onCreate && q.trim() && !exact && (
+          <li>
+            <button type="button" onClick={create} disabled={making} className={row} style={{ color: "#6b4c12" }}>
+              <span aria-hidden className="w-2.5 text-center">+</span>
+              <span className="min-w-0 flex-1 truncate">{making ? "Making it…" : <>New board “{q.trim()}”</>}</span>
+            </button>
+          </li>
+        )}
+        <li>
+          <button type="button" onClick={() => onPick(null)} className={row} style={{ color: "#7a6440", background: value === null ? "rgba(217,180,95,.25)" : "transparent" }}>
+            <span aria-hidden className="w-2.5 text-center">–</span>
+            No board
+          </button>
+        </li>
+      </ul>
+      {err && (
+        <p className="m-0 text-[12.5px]" style={{ color: "#8b2c1a" }}>
+          {err}
+        </p>
+      )}
     </>
   );
 }
@@ -1120,13 +1180,7 @@ function AllAtOnce({ draft, boards, hint, onChange }: { draft: Draft; boards: Bo
       {draft.kind !== "habit" ? (
         <>
           <Field label="Board">
-            <div className="flex flex-wrap gap-1.5">
-              {boards.map((b) => (
-                <button key={b.id} type="button" aria-pressed={draft.boardId === b.id} onClick={() => onChange({ boardId: draft.boardId === b.id ? null : b.id })} className="rounded-full px-3 text-[13px] font-semibold" style={small(draft.boardId === b.id)}>
-                  {b.title}
-                </button>
-              ))}
-            </div>
+            <BoardStep bare boards={boards} hint={null} value={draft.boardId} onPick={(boardId) => onChange({ boardId })} />
           </Field>
           <Field label="Plan it within">
             <div className="flex flex-wrap items-center gap-1.5">
