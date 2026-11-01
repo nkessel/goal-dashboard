@@ -18,7 +18,7 @@ const SOFT = "#6b5631";
  * 4 hours, or a time you pick). Other always has a way back; closing changes
  * nothing.
  */
-export function SnoozePicker({ title, onPick, onClose: closeNow }: { title: string; onPick: (c: SnoozeChoice) => void; onClose: () => void }) {
+export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = "top of tomorrow's plan" }: { title: string; onPick: (c: SnoozeChoice) => void; onClose: () => void; /** What Tomorrow does here (imports: back on the list). */ tomorrowHint?: string }) {
   const { closing, close: onClose } = useClosing(closeNow);
   const [other, setOther] = useState(false);
   const [at, setAt] = useState("");
@@ -71,7 +71,7 @@ export function SnoozePicker({ title, onPick, onClose: closeNow }: { title: stri
           <div key="main" className="reveal flex flex-col gap-1">
             {choice("30 minutes", () => onPick(inMin(30, "for 30 minutes")), hm(new Date(clock() + 30 * 60_000)))}
             {choice("2 hours", () => onPick(inMin(120, "for 2 hours")), hm(new Date(clock() + 120 * 60_000)))}
-            {choice("Tomorrow", () => onPick({ tomorrow: true }), "top of tomorrow's plan")}
+            {choice("Tomorrow", () => onPick({ tomorrow: true }), tomorrowHint)}
             {choice("Other…", () => setOther(true))}
           </div>
         ) : (

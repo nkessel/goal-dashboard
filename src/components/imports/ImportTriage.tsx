@@ -511,7 +511,7 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, foc
       {scheduling && <AutoScheduler tasks={toSchedule} theme={theme} onClose={() => setScheduling(false)} />}
       {aside.length > 0 && <SetAside cards={aside} onBack={(c) => (putBack(c), decideImportCardAction(c.id, { kind: "restore" }).catch(() => null))} isAdventure={isAdventure} />}
 
-      {snoozing && <SnoozePicker title={snoozing.title} onPick={snoozeTo} onClose={() => setSnoozing(false)} />}
+      {snoozing && <SnoozePicker title={snoozing.title} tomorrowHint="back on this list tomorrow" onPick={snoozeTo} onClose={() => setSnoozing(false)} />}
       {editor && card && draft && (
         <QuestEditorDialog
           mode={{ kind: "create", boardId: draft.boardId ?? null, prefill: { title: draft.title, description: draft.description, estimateMinutes: draft.minutes ?? null, importance: draft.importance ?? undefined } }}
