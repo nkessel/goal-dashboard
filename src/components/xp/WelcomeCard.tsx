@@ -103,6 +103,9 @@ export function WelcomeCard({
   const [greetingOpen, setGreetingOpen] = useState(false);
   // The greeting is yours to rewrite: tap it, write your own, and choose whether to keep it.
   const [greeting, setGreeting] = useState(heading);
+  // "Good morning!" before it (unless it already speaks of the time of day). Shown only, never saved into the line.
+  const [hour] = useState(() => new Date().getHours());
+  const hello = /\b(good|morning|afternoon|evening|night|dawn|dusk)\b/i.test(greeting) ? "" : hour < 5 ? "Good evening! " : hour < 12 ? "Good morning! " : hour < 17 ? "Good afternoon! " : "Good evening! ";
   const [writing, setWriting] = useState<string | null>(null);
   const greetingRef = useRef<HTMLParagraphElement>(null);
   // The next time this screen opens, he flies in again.
@@ -514,8 +517,9 @@ export function WelcomeCard({
                 }}
                 onBlur={() => writing !== null && finishWriting()}
                 className={`font-display m-0 leading-tight outline-none [text-wrap:balance] ${writing !== null ? "cursor-text" : ""}`}
-                style={{ color: "var(--t-ink)", fontSize: greetingSize(writing ?? greeting), caretColor: "#8a6116", outline: "none" }}
+                style={{ color: "var(--t-ink)", fontSize: greetingSize(writing ?? hello + greeting), caretColor: "#8a6116", outline: "none" }}
               >
+                {writing === null && hello}
                 {greeting}
               </p>
               {/* Its ✎, at the text's own upper right. */}

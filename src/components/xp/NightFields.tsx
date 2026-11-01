@@ -249,7 +249,8 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day 
         className="wheel-btn mx-auto flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold"
       >
         <WheelIcon />
-        Wheel of Time · factors of sleep
+        {/* Says once which day the lists are for (not in every section). */}
+        Factors of sleep · {yesterday || "yesterday"}
         {checked > 0 && !open && <span className="tabular-nums opacity-80">· {checked}</span>}
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(90deg)" : undefined }}>
           <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
@@ -261,7 +262,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day 
           <div className="flex flex-col gap-1.5">
             <span className="flex items-center gap-2">
               <span className="text-[11px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--ec-gold, #f2d27e)" }}>
-                Right effort · yesterday{yesterday ? ` (${yesterday})` : ""}
+                Right effort
               </span>
               {/* Today's own right effort is logged on the Wheel of Time (a new tab, so this screen stays). */}
               <a href="/insights#wheel-of-time" target="_blank" rel="noopener" className="ml-auto text-[11.5px] underline underline-offset-2" style={{ color: SOFT }}>
@@ -302,7 +303,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day 
           </div>
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] font-bold uppercase tracking-[.14em]" style={{ color: "#d58f78" }}>
-              Hindrances · last night{yesterday ? ` (${yesterday})` : ""}
+              Hindrances
             </span>
             <div className="flex flex-wrap items-center gap-1.5">
               {hindrances.map((name) => {
