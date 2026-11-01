@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { countUnread, syncImportsNotification } from "@/lib/data/notifications";
 import { getProfileById } from "@/lib/data/profiles";
 import { levelCap } from "@/lib/data/bosses";
@@ -49,17 +50,15 @@ export async function AppShell({
    */
   wide?: boolean;
 }) {
-  // Everything at once, so opening a screen never waits on one query after another.
-  const importsP = profileId ? countImports(profileId) : Promise.resolve({ quests: 0, rewards: 0 });
-  const [profile, , missingPortraits, unreadCount, cap] = await Promise.all([
+  // Only what the shell needs to draw waits (the profile for the theme, the level cap);
+  // the rest streams in behind it or runs after the response, so screens open sooner.
+  const [profile, cap] = await Promise.all([
     profileId ? getProfileById(profileId) : Promise.resolve(null),
-    // Imports waiting to be sorted show up as a notification (no popup, no badge on the avatar).
-    profileId ? importsP.then((i) => syncImportsNotification(profileId, i.quests + i.rewards)).catch(() => {}) : Promise.resolve(),
-    profileId ? countMissingPortraits(profileId).catch(() => 0) : Promise.resolve(0),
-    profileId ? countUnread(profileId) : Promise.resolve(0),
     // An undefeated boss holds the level shown in celebrations, however much XP there is.
     profileId ? levelCap(profileId).catch(() => 10) : Promise.resolve(10),
   ]);
+  // Imports waiting to be sorted show up as a notification (no popup, no badge on the avatar).
+  if (profileId) after(() => countImports(profileId).then((i) => syncImportsNotification(profileId, i.quests + i.rewards)).catch(() => {}));
   const theme = profile?.theme === "adventure" ? "adventure" : "calm";
   const rawPalette = (profile?.life_wheel as { palette?: unknown } | null | undefined)?.palette;
   const palette = isPalette(rawPalette) && rawPalette !== "forest" ? rawPalette : undefined;
@@ -77,7 +76,11 @@ export async function AppShell({
       {profileId && <SettingsDefaultsSeed />}
       {profileId && <DailyLogin levelCap={cap} />}
       {profileId && <OwnWordsSync />}
-      {profileId && missingPortraits > 0 && <PortraitPainter missing={missingPortraits} />}
+      {profileId && (
+        <Suspense fallback={null}>
+          <MissingPortraits profileId={profileId} />
+        </Suspense>
+      )}
       {profileId && profile && (
         <QuestCelebrationHost
           avatarSrc={profile.avatar_image_url ?? defaultPortraitFor(profile.id)}
@@ -95,7 +98,9 @@ export async function AppShell({
           )}
           <span className="flex-1" />
           {profileId && (
-            <NotificationsButton unreadCount={unreadCount} isAdventure={isAdventure} iconColor={iconColor} />
+            <Suspense fallback={<NotificationsButton unreadCount={0} isAdventure={isAdventure} iconColor={iconColor} />}>
+              <Notifications profileId={profileId} isAdventure={isAdventure} iconColor={iconColor} />
+            </Suspense>
           )}
           {/* Room for the menu button, which floats (below) so it stays put as the page scrolls. */}
           {profileId && profile && <span aria-hidden className="h-10 w-10 shrink-0" />}
@@ -121,4 +126,14 @@ export async function AppShell({
       {profileId && <NotificationPreview />}
     </div>
   );
+}
+
+async function MissingPortraits({ profileId }: { profileId: string }) {
+  const missing = await countMissingPortraits(profileId).catch(() => 0);
+  return missing > 0 ? <PortraitPainter missing={missing} /> : null;
+}
+
+async function Notifications({ profileId, isAdventure, iconColor }: { profileId: string; isAdventure: boolean; iconColor: string }) {
+  const unreadCount = await countUnread(profileId).catch(() => 0);
+  return <NotificationsButton unreadCount={unreadCount} isAdventure={isAdventure} iconColor={iconColor} />;
 }
