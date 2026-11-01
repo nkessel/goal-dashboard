@@ -104,6 +104,27 @@ export function WelcomeCard({
   // While arranging: the greeting's own options (from the ✎ beside it), and whether the castle is in view.
   const [greetingOpen, setGreetingOpen] = useState(false);
   // The greeting is yours to rewrite: tap it, write your own, and choose whether to keep it.
+  // The pinned foot's parchment lines up with the card's own (it showed as a different patch of paper).
+  const cardRef = useRef<HTMLDivElement>(null);
+  const footRef = useRef<HTMLDivElement>(null);
+  const alignFoot = () => {
+    const c = cardRef.current;
+    const f = footRef.current;
+    if (!c || !f) return;
+    const cr = c.getBoundingClientRect();
+    const fr = f.getBoundingClientRect();
+    f.style.backgroundPosition = `${Math.round(cr.left + c.clientLeft - fr.left)}px ${Math.round(cr.top + c.clientTop - fr.top)}px`;
+  };
+  useLayoutEffect(() => {
+    alignFoot();
+    window.addEventListener("resize", alignFoot);
+    const ro = new ResizeObserver(alignFoot);
+    if (cardRef.current) ro.observe(cardRef.current);
+    return () => {
+      window.removeEventListener("resize", alignFoot);
+      ro.disconnect();
+    };
+  });
   const [greeting, setGreeting] = useState(heading);
   // "Good morning!" before it (unless it already speaks of the time of day). Shown only, never saved into the line.
   const [hour] = useState(() => new Date().getHours());
@@ -473,7 +494,7 @@ export function WelcomeCard({
             }}
           />
         )}
-        <div className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-5 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH && !arranging ? { maxHeight: screenH - 88 } : {}) }}>
+        <div ref={cardRef} onScroll={alignFoot} className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-5 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH && !arranging ? { maxHeight: screenH - 88 } : {}) }}>
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
           <div
             className={`relative w-full px-8 ${writing === null ? "cursor-grab" : ""}`}
@@ -579,7 +600,7 @@ export function WelcomeCard({
             ))
           )}
           {/* The way on stays in reach: pinned to the card's foot while the rest scrolls. */}
-          <div className="welcome-foot sticky -bottom-4 z-[3] -mb-4 flex w-full justify-center pb-4 pt-2">
+          <div ref={footRef} className="welcome-foot sticky -bottom-4 z-[3] -mb-4 flex w-full justify-center pb-4 pt-2">
           {arranging ? (
             <button type="button" onClick={() => setArranging(false)} className="mt-1 h-10 rounded-full px-6 text-[14px] font-bold" style={GILT}>
               Done

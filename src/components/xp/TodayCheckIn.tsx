@@ -28,7 +28,13 @@ export function TodayCheckIn(props: React.ComponentProps<typeof EnergyCheck>) {
         </div>
       </Fold>
       <Fold open={open}>
-        <EnergyCheck {...props} />
+        <div className="relative">
+          <EnergyCheck {...props} />
+          {/* Not now: fold it back into the button. */}
+          <button type="button" onClick={() => setOpen(false)} aria-label="Close the check-in" title="Close" className="absolute -top-2 right-0 z-[2] flex h-7 w-7 items-center justify-center rounded-full text-[16px] leading-none" style={{ background: "rgba(20,26,19,.85)", border: "1px solid rgba(217,180,95,.6)", color: "var(--t-gold)" }}>
+            ×
+          </button>
+        </div>
       </Fold>
     </div>
   );

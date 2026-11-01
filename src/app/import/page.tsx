@@ -7,8 +7,9 @@ import { listSetAsideImportCards, listWaitingImportCards } from "@/lib/data/impo
 import { ImportTriage } from "@/components/imports/ImportTriage";
 import { listSchedulingList } from "@/lib/data/scheduling";
 
-export default async function ImportPage() {
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ card?: string; q?: string }> }) {
   const session = await requireSession();
+  const { card, q } = await searchParams;
   const [profile, waiting, setAside, boards, toSchedule] = await Promise.all([
     getProfileById(session.user.id),
     listWaitingImportCards(session.user.id),
@@ -19,7 +20,7 @@ export default async function ImportPage() {
   if (!profile) notFound();
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
-      <ImportTriage waiting={waiting} setAside={setAside} boards={boards.map((b) => ({ id: b.id, title: b.title, color: b.color }))} theme={profile.theme === "adventure" ? "adventure" : "calm"} toSchedule={toSchedule} />
+      <ImportTriage waiting={waiting} setAside={setAside} boards={boards.map((b) => ({ id: b.id, title: b.title, color: b.color }))} theme={profile.theme === "adventure" ? "adventure" : "calm"} toSchedule={toSchedule} focus={card ?? null} query={q ?? ""} />
     </AppShell>
   );
 }

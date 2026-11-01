@@ -124,7 +124,7 @@ const chip = (on: boolean, big = false): React.CSSProperties => ({
   minHeight: big ? 44 : 36,
 });
 
-export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: { waiting: ImportCard[]; setAside: ImportCard[]; boards: BoardOpt[]; theme: "calm" | "adventure"; toSchedule: Task[] }) {
+export function ImportTriage({ waiting, setAside, boards, theme, toSchedule, focus = null, query: initialQuery = "" }: { waiting: ImportCard[]; setAside: ImportCard[]; boards: BoardOpt[]; theme: "calm" | "adventure"; toSchedule: Task[]; /** /import?card=<id>: open on that card. */ focus?: string | null; /** /import?q=…: start with a search. */ query?: string }) {
   const router = useRouter();
   const [queue, setQueue] = useState(waiting);
   const [aside, setAsideList] = useState(setAside);
@@ -141,11 +141,15 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Which kinds this session sorts (all, unless you narrow it).
   const [kinds, setKinds] = useState<Set<Kind>>(() => new Set(KINDS.map((k) => k.key)));
-  const visible = queue.filter((c) => kinds.has(c.kind));
+  // Find one: words from its title, notes or steps.
+  const [query, setQuery] = useState(initialQuery);
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (c: ImportCard) => !words.length || words.every((w) => [c.title, c.description ?? "", ...c.steps, c.source_text ?? ""].join(" ").toLowerCase().includes(w));
+  const visible = queue.filter((c) => kinds.has(c.kind) && matches(c));
   // One card at a time, or the whole list (each row keeps its buttons).
   const [view, setView] = useState<"one" | "list">("one");
   // The card being worked on (picked from the list, or the next in line).
-  const [focusId, setFocusId] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(focus);
   const card = visible.find((c) => c.id === focusId) ?? visible[0] ?? null;
   const [scheduling, setScheduling] = useState(false);
   // Steps added from the review ("+ Plan it within…").
@@ -361,7 +365,34 @@ export function ImportTriage({ waiting, setAside, boards, theme, toSchedule }: {
         </div>
       )}
 
-      {!card ? (
+      {queue.length > 1 && mode === "card" && (
+        <div className="-mt-1 flex items-center gap-2 rounded-full px-3" style={{ background: "rgba(255,250,238,.9)", border: "1px solid rgba(160,120,40,.5)" }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "#7a6440" }}>
+            <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2.2" />
+            <path d="M16 16l4.5 4.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+          </svg>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => (setQuery(e.target.value), setFocusId(null))}
+            placeholder={`Find one of ${queue.length}…`}
+            aria-label="Find a card"
+            className="bare-input h-9 min-w-0 flex-1 bg-transparent text-[16px] outline-none"
+            style={{ color: "#2a1c10" }}
+          />
+          {query && (
+            <span className="shrink-0 text-[12.5px] tabular-nums" style={{ color: "#7a6440" }}>
+              {visible.length}
+            </span>
+          )}
+        </div>
+      )}
+
+      {!card && words.length ? (
+        <p className="m-0 text-center text-[14px] italic" style={{ color: isAdventure ? "#f2e2b4" : SOFT }}>
+          Nothing matches “{query.trim()}”.
+        </p>
+      ) : !card ? (
         <div className="card-pop-in parchment flex flex-col items-center gap-2 rounded-3xl px-5 py-8 text-center" style={frame}>
           <span aria-hidden className="text-[34px]">✦</span>
           <h2 className="m-0 font-display text-[22px]">All sorted</h2>
