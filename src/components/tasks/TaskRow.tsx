@@ -1,6 +1,7 @@
 "use client";
 
 import { FileChips } from "@/components/ui/FileChips";
+import { Linked } from "@/components/ui/Linked";
 
 import { TimeToken } from "@/components/xp/NightFields";
 import { useRef, useState, useTransition } from "react";
@@ -597,7 +598,7 @@ export function TaskRow({
           )}
           {task.description && !compact && (
             <p dir="auto" className={`user-text line-clamp-2 break-words text-[12.5px] leading-snug sm:text-[13px]`} style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
-              {task.description}
+              <Linked text={task.description} />
             </p>
           )}
           <FileChips files={task.attachments} className="mt-1" />
