@@ -7,8 +7,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * that used to appear with `{open && …}` and vanish at once. Its contents
  * mount on first open and stay, so closing animates too.
  */
-export function Fold({ open, children, className = "", innerClassName = "" }: { open: boolean; children: React.ReactNode; className?: string; innerClassName?: string }) {
-  const [seen, setSeen] = useState(open);
+export function Fold({ open, children, className = "", innerClassName = "", eager = false }: { open: boolean; children: React.ReactNode; className?: string; innerClassName?: string; /** Render the contents while still shut, so opening is only the slide (no heavy first frame). */ eager?: boolean }) {
+  const [seen, setSeen] = useState(open || eager);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- mount the contents the first time it opens, then keep them so it can slide closed
   useEffect(() => void (open && !seen && setSeen(true)), [open, seen]);
   return (

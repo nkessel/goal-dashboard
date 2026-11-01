@@ -22,7 +22,9 @@ export function ExitGhosts() {
         if (!parent.isConnected) continue;
         m.removedNodes.forEach((n) => {
           if (!(n instanceof HTMLElement) || n.dataset.ghost || n.dataset.noGhost !== undefined) return;
-          if (!n.matches(POPUP) || ALREADY_LEAVING.test(n.className)) return;
+          // A popup itself, or a plain full-screen layer whose own children are the popup and its backdrop.
+          const popup = n.matches(POPUP) || !!n.querySelector(':scope > .overlay-fade-in, :scope > .card-pop-in, :scope > [role="dialog"], :scope > [role="alertdialog"]');
+          if (!popup || ALREADY_LEAVING.test(n.className)) return;
           // Something in it was already playing its own exit (a dive, a fade-out): leave it be.
           if (n.querySelector('[class*="-out"],[class*="leav"],[class*="closing"],[class*="exit"],[data-no-ghost]')) return;
           const ghost = n.cloneNode(true) as HTMLElement;

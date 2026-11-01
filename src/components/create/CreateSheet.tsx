@@ -121,7 +121,7 @@ export function CreateSheet({
     <>
       <div
         className={`fixed inset-0 z-[48] ${leaving ? "overlay-fade-out" : "overlay-fade-in"}`}
-        style={{ background: "rgba(8,6,3,.55)", backdropFilter: "blur(1.5px)" }}
+        style={{ background: "rgba(8,6,3,.6)" }}
         onClick={requestClose}
         aria-hidden
       />
@@ -146,6 +146,7 @@ export function CreateSheet({
           maxHeight: "calc(100dvh - 5rem - 66px - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
           // Keyboard up: the sheet glides up just enough to clear it (never resized, never jumps).
           translate: keyboard?.lift ? `0 ${-keyboard.lift}px` : undefined,
+          ...(keyboard ? { height: keyboard.height } : {}),
           transition: "translate 260ms cubic-bezier(.2,.8,.2,1)",
         }}
       >
@@ -562,8 +563,8 @@ function ScrollGlyph() {
  * or resizes. A keyboard that drops for a moment (moving between fields)
  * doesn't move it, and nothing moves while the sheet is closing.
  */
-function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leaving: boolean): { lift: number; hidden: number } | null {
-  const [vp, setVp] = useState<{ lift: number; hidden: number } | null>(null);
+function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leaving: boolean): { lift: number; hidden: number; height: number } | null {
+  const [vp, setVp] = useState<{ lift: number; hidden: number; height: number } | null>(null);
   const frozen = useRef(leaving);
   useEffect(() => {
     frozen.current = leaving;
@@ -573,6 +574,10 @@ function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leav
     if (!vv) return;
     let closing = 0;
     let raf = 0;
+    // Where the sheet sat when the keyboard came up. Everything is worked out from this,
+    // and the sheet's height is held to it, so the room added below its fields (or a
+    // field that grows) can't move it while the keyboard is up.
+    let rest: { top: number; h: number } | null = null;
     const update = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
@@ -582,15 +587,17 @@ function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leav
           clearTimeout(closing);
           closing = 0;
           // Its layout place (offsetTop ignores the translate).
-          const top = sheet.current.offsetTop;
-          const bottom = top + sheet.current.offsetHeight;
+          rest ??= { top: sheet.current.offsetTop, h: sheet.current.offsetHeight };
+          const bottom = rest.top + rest.h;
           const visTop = vv.offsetTop + 6;
           const visBottom = vv.offsetTop + vv.height - 6;
-          const lift = Math.round(Math.max(0, Math.min(bottom - visBottom, top - visTop)));
-          setVp({ lift, hidden: Math.max(0, Math.round(bottom - lift - visBottom)) });
+          const lift = Math.round(Math.max(0, Math.min(bottom - visBottom, rest.top - visTop)));
+          const next = { lift, hidden: Math.max(0, Math.round(bottom - lift - visBottom)), height: rest.h };
+          setVp((v) => (v && v.lift === next.lift && v.hidden === next.hidden && v.height === next.height ? v : next));
         } else if (!closing) {
           closing = window.setTimeout(() => {
             closing = 0;
+            rest = null;
             setVp(null);
           }, 220);
         }

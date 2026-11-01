@@ -473,7 +473,7 @@ export function EnergyCheck({
           <>
             {/* Last night arrives a moment after the page: it slides in rather than shoving everything down. */}
             {!noSleep && (
-              <Fold open={!!wheel}>
+              <Fold open={!!wheel} eager>
                 <NightFields value={night} onChange={setNight} effort={wheel?.effort ?? []} hindrances={wheel?.hindrances ?? []} />
               </Fold>
             )}

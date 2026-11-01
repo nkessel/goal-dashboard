@@ -648,11 +648,14 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
   const [answer, setAnswer] = useState("");
   // The respond line's height as you see it (it grows a line at a time, never wider).
   const [answerH, setAnswerH] = useState(REPLY_LINE);
+  const [nods, setNods] = useState(0);
   const [replying, setReplying] = useState(false);
   const [talk, setTalk] = useState<{ you: string; him: string; thinking: boolean; history: { role: "user" | "assistant"; content: string }[] } | null>(null);
   async function reply() {
     const q = answer.trim();
     if (!q || talk?.thinking) return;
+    // He nods: your words landed.
+    setNods((n) => n + 1);
     const history = talk?.history ?? [{ role: "assistant" as const, content: ask }];
     // Answering him counts like a thumbs up: this is a question you respond to (remembered, not made the first one).
     if (!talk && !votes.liked.includes(ask)) {
@@ -731,8 +734,10 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
         aria-expanded={menu}
         className={`owl-body block touch-none ${landed ? "owl-perched cursor-grab" : "pointer-events-none"}`}
       >
-        <span className="owl-idle block">
-          <ToucanArt flying={!landed} size={58} />
+        <span key={nods} className={nods ? "tc-nod block" : "block"}>
+          <span className="owl-idle block">
+            <ToucanArt flying={!landed} size={58} />
+          </span>
         </span>
       </button>
       {landed && (
