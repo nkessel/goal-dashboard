@@ -720,7 +720,7 @@ function LaterRow({ open, small = false, done, onSnooze, onSkip, onDelete, onQui
 /** ✎ beside a card's name: change its name and notes. */
 function EditPen({ open, onClick }: { open: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-label="Edit the name and notes" title="Edit" aria-expanded={open} className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle" style={{ color: "#8a6116", background: open ? "rgba(217,180,95,.22)" : "transparent" }}>
+    <button type="button" onClick={onClick} aria-label="Edit the name and notes" title="Edit" aria-expanded={open} className="-my-1 ml-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle" style={{ color: "#8a6116", background: open ? "rgba(217,180,95,.22)" : "transparent" }}>
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
       </svg>
@@ -825,8 +825,9 @@ function ListRow({ card, first, onEdit, onRetag, onImport, onSnooze, onQuick, on
               · {card.steps.length} {card.kind === "shopping" ? "items" : "steps"}
             </span>
           )}
+          {/* ✎ right by the words. */}
+          <EditPen open={editing} onClick={() => setEditing((v) => !v)} />
         </span>
-        <EditPen open={editing} onClick={() => setEditing((v) => !v)} />
         <KindBadge kind={card.kind} open={picking} onToggle={() => setPicking((v) => !v)} small />
       </div>
       {editing && <CardEdit card={card} onDone={(p) => (p && onEdit(p), setEditing(false))} />}
