@@ -212,6 +212,41 @@ export function WelcomeCard({
   // The screen's height, held still while a phone keyboard is up (or a field has focus), so
   // opening and closing it (the feedback box, a field here) never resizes or moves the card.
   const [screenH, setScreenH] = useState<number | null>(null);
+  // Keyboard up over a field low on the card (the toucan's respond line, say): the card glides
+  // up just enough to show it, and back down when the keyboard goes.
+  const [kbLift, setKbLift] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let raf = 0;
+    const check = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const a = document.activeElement as HTMLElement | null;
+        const inside = !!a?.closest("[data-welcome-root]") && (a instanceof HTMLTextAreaElement || a instanceof HTMLInputElement || !!a?.isContentEditable);
+        if (!inside || window.innerHeight - vv.height < 120) return setKbLift(0);
+        setKbLift((cur) => {
+          const r = a!.getBoundingClientRect();
+          // Where it would sit without the lift.
+          const bottom = r.bottom + cur;
+          const top = r.top + cur;
+          const need = bottom - (vv.offsetTop + vv.height - 14);
+          return Math.max(0, Math.round(Math.min(need, top - vv.offsetTop - 60)));
+        });
+      });
+    };
+    vv.addEventListener("resize", check);
+    vv.addEventListener("scroll", check);
+    document.addEventListener("focusin", check);
+    document.addEventListener("focusout", check);
+    return () => {
+      cancelAnimationFrame(raf);
+      vv.removeEventListener("resize", check);
+      vv.removeEventListener("scroll", check);
+      document.removeEventListener("focusin", check);
+      document.removeEventListener("focusout", check);
+    };
+  }, []);
   useEffect(() => {
     const typing = () => {
       const a = document.activeElement;
@@ -359,7 +394,7 @@ export function WelcomeCard({
       document.body
     );
   return createPortal(
-    <div data-welcome-root data-kb-plain data-no-ghost style={screenH ? { height: screenH, bottom: "auto" } : undefined} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-start justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px),9dvh)] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
+    <div data-welcome-root data-kb-plain data-no-ghost style={{ ...(screenH ? { height: screenH, bottom: "auto" } : {}), translate: kbLift ? `0 ${-kbLift}px` : undefined, transition: "translate 240ms cubic-bezier(.2,.8,.2,1)" }} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-start justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px),9dvh)] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
       {/* Overscan: while a phone's keyboard opens or closes the screen briefly changes size; this keeps Today from peeking through above or below. */}
       <div aria-hidden className="pointer-events-none fixed inset-x-0 -bottom-[60vh] -top-[60vh] -z-[1]" style={{ background: "#1b2119" }} />
       {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
@@ -1086,7 +1121,10 @@ function TopPriority({ question, register, arranging = false }: { last: { text: 
     }
   };
   // Saved by the screen's own button on the way out (no Save of its own).
-  useEffect(() => register(() => (saved && !editing ? Promise.resolve(true) : save(text, filled))));
+  // Braces: returning the saver would make it the effect's cleanup, run on every render.
+  useEffect(() => {
+    register(() => (saved && !editing ? Promise.resolve(true) : save(text, filled)));
+  });
   const edit = () => {
     if (!saved) return;
     setText(saved.text);

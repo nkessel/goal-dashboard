@@ -69,7 +69,9 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
   const touched = JSON.stringify(night) !== base;
   const filled = others.filter((n) => n.day && (n.bed || n.wake));
   // Saved by the welcome screen's own button, with everything else on it.
-  useEffect(() =>
+  // (Braces matter: an effect's return value is its cleanup, and returning the saver made React
+  // call it on every render, saving "Sleep quality" hundreds of times.)
+  useEffect(() => {
     register(async () => {
       if (!touched && quality === null && !filled.length) return true;
       setError(null);
@@ -82,8 +84,8 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
         setError(e instanceof Error ? e.message : "Couldn't save your sleep.");
         return false;
       }
-    })
-  );
+    });
+  });
 
   function saveLists(next: { effort: string[]; hindrances: string[] }) {
     const before = lists;
