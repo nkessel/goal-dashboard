@@ -60,6 +60,10 @@ export type FxSettings = {
   welcomeFocusQ?: string;
   /** What the toucan asks first on the welcome screen. */
   welcomeToucanAsk?: string;
+  /** Your own reflection questions (the first was the owner's, Nov 1). Unset = the starter list. */
+  reflectQuestions?: string[];
+  /** The welcome screen's reflection question shows (hidden unless turned on). */
+  welcomeReflectOn?: boolean;
   /** The Check in button's own words (blank = "Check in"). */
   checkinText?: string;
   welcomeIntentionQ?: string;

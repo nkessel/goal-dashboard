@@ -6,7 +6,8 @@ import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, us
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CHECKIN_ICONS, CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, type FxSettings } from "@/lib/celebration-fx";
-import { WELCOME_ELS, addBackGreeting, backHours, backOwnOn, greetingPool, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeShows, type WelcomeEl } from "@/lib/welcome";
+import { ReflectionList } from "@/components/settings/ReflectionList";
+import { WELCOME_ELS, reflectQuestions, addBackGreeting, backHours, backOwnOn, greetingPool, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeShows, type WelcomeEl } from "@/lib/welcome";
 import { CastleArt } from "./CastleArt";
 import { CheckinIcon } from "./CheckinIcon";
 import { OwnWordsPill, PhraseList, WiseLines } from "@/components/settings/LineLists";
@@ -187,7 +188,7 @@ export function GreetingOptions({ fx }: { fx: FxSettings }) {
   );
 }
 
-const HAS_OPTIONS: WelcomeEl[] = ["checkin", "line", "focus"];
+const HAS_OPTIONS: WelcomeEl[] = ["checkin", "line", "focus", "reflect"];
 
 /**
  * The card's parts while arranging: drag a part itself to move it; its hide
@@ -310,6 +311,7 @@ function Part({ el, fx, empty, children, onArchive }: { el: WelcomeEl; fx: FxSet
       <div className="contents" onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
       {open && el === "checkin" && <CheckinOptions fx={fx} />}
       {open && el === "line" && <LineOptions fx={fx} />}
+      {open && el === "reflect" && <ReflectionList list={reflectQuestions(fx)} onChange={(l) => set({ reflectQuestions: l })} />}
       {open && el === "focus" && <QuestionOptions fx={fx} k="welcomeFocusQ" label="The question" fallback="What are your top priorities today?" />}
       </div>
       {children ? (

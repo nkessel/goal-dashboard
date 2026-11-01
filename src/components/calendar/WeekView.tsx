@@ -967,8 +967,9 @@ function TodayCrest() {
  * which look like quests unless you choose otherwise.
  */
 function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventure }: { day: Date; daily: DailyLayer; essentials: EssentialsLook; habitLook: HabitLook; busy: { start: number; end: number }[]; topOf: (d: Date) => number; isAdventure: boolean }) {
-  const habits = habitLook === "hidden" ? [] : habitBlocksOn(daily.habits, day);
-  const taken = [...busy, ...habitBlocksOn(daily.habits, day)];
+  const placed = habitBlocksOn(daily.habits, day, busy);
+  const habits = habitLook === "hidden" ? [] : placed;
+  const taken = [...busy, ...placed];
   const holds =
     essentials === "hidden"
       ? []

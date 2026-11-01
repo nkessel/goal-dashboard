@@ -47,7 +47,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0076_event_details_tone.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0080_rite_window.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -119,6 +119,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 1: Gym 🏋️ habit (owner's): daily, 1 hour, floats 7–10 AM (`rites.window_to`, migration 0080; `habitBlocksOn(habits, day, busy)` takes the first free stretch in the window; habit editor › Time › "+ window"; card reads "7 AM–10 AM"). My reflection questions (`reflectQuestions`, welcome part `reflect`, hidden unless `welcomeReflectOn`; ✎ edits/drag-reorders via `settings/ReflectionList.tsx`, also in Settings › Welcome Screen; the toucan asks from them while it shows; seeded with the owner's 9–5 question). Own wise lines and reflection questions now live on the account (`life_wheel.words`, `getOwnWordsAction`/`saveOwnWordsAction`, `settings/OwnWordsSync.tsx` in AppShell: first meeting merges browser + account, then the account wins).
 
 - Nov 1: Display fixes from the owner's recordings, batch 1: the + button is portalled to `document.body` (it sat inside `<main>`, which slides/fades on every screen change, so it vanished between screens) and doesn't re-rise between screens; the + sheet with the iOS keyboard fits whole in the strip above it (height capped to the visible area, body scrolls) and follows iPhone's panning instantly instead of animating after it (it jumped and clipped top/bottom); the open feedback note comes back after the photo picker reloads the page (`feedback-open` in sessionStorage) and the welcome toucan doesn't fly in again (`welcome-toucan-landed`); the welcome toucan and his bubble/menu are nudged back on screen (never off an edge); Settings shows one "to sort" entry (cards first, the older inbox once they're sorted). Round 2 (two more recordings): the feedback box fits whole above the keyboard on phones (Submit and the writing were behind it; `fitPhone`), and leaves no blank ghost box after Submit (`data-no-ghost`); the quest editor's "Saving…" floats above its buttons (it pushed the footer onto two lines, so the editor jumped on every autosave); with a popup open on a phone the feedback button shrinks and quiets (it sat on the editor's Close).
 

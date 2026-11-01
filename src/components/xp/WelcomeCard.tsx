@@ -11,7 +11,7 @@ import { EnergyCheck } from "./EnergyCheck";
 import { CheckinIcon } from "./CheckinIcon";
 import { likeLine, likedLines, lineForDay, retireLine } from "@/lib/greetings";
 import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
-import { addBackGreeting, checkinLabel, readPromptVotes, toucanPrompts, welcomeOrder, welcomeShows, writePromptVotes, type PromptVotes, type WelcomeEl } from "@/lib/welcome";
+import { addBackGreeting, checkinLabel, pickFor, readPromptVotes, reflectQuestions, toucanPrompts, welcomeOrder, welcomeShows, writePromptVotes, type PromptVotes, type WelcomeEl } from "@/lib/welcome";
 import { useEscape } from "@/lib/use-escape";
 import { coachAction, setTopPriorityAction } from "@/app/actions";
 import { Digest, PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
@@ -286,6 +286,7 @@ export function WelcomeCard({
         {award.streak > 1 ? `🔥 ${award.streak}-day streak — keep it going` : "Day one of a new streak"}
       </p>
     ) : null,
+    reflect: reflectQuestions(fx).length ? <ReflectLine questions={reflectQuestions(fx)} /> : null,
     line: line ? (
       <div className="flex w-full flex-col items-center gap-0.5">
         {/* Quiet thumbs, always to the right of the line (at its bottom right when it wraps), the line still centred. */}
@@ -1264,4 +1265,34 @@ const EMPTY: Partial<Record<WelcomeEl, string>> = {
   bar: "Shows on the day's first visit.",
   reward: "Shows on the day's first visit.",
   line: "A new line each day.",
+  reflect: "Add a question with its ✎.",
 };
+
+/** One of your reflection questions: the same one all day, ‹ › for another. */
+function ReflectLine({ questions }: { questions: string[] }) {
+  const [start] = useState(() => questions.indexOf(pickFor(new Date().toDateString(), questions)));
+  const [i, setI] = useState(0);
+  const q = questions[(((start + i) % questions.length) + questions.length) % questions.length];
+  return (
+    <div className="flex w-full flex-col items-center gap-1">
+      <span className="text-[11px] font-bold uppercase tracking-[.1em]" style={{ color: "#8a6116" }}>
+        To reflect on
+      </span>
+      <div className="flex w-full items-center justify-center gap-1.5">
+        {questions.length > 1 && (
+          <button type="button" onClick={() => setI((n) => n - 1)} aria-label="Another question" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "#8a6116" }}>
+            ‹
+          </button>
+        )}
+        <p key={q} className="due-in m-0 font-display text-[16.5px] italic leading-snug" style={{ color: "var(--t-ink)" }}>
+          {q}
+        </p>
+        {questions.length > 1 && (
+          <button type="button" onClick={() => setI((n) => n + 1)} aria-label="Next question" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "#8a6116" }}>
+            ›
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

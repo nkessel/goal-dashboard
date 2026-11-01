@@ -9,7 +9,8 @@ import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { WelcomeCard } from "@/components/xp/WelcomeCard";
 import { welcomeContextAction } from "@/app/actions";
 import { lineForDay } from "@/lib/greetings";
-import { WELCOME_ELS, backHours, backOwnOn, greetingFor, greetingPool, moveEl, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
+import { ReflectionList } from "./ReflectionList";
+import { WELCOME_ELS, reflectQuestions, backHours, backOwnOn, greetingFor, greetingPool, moveEl, ownGreetings, ownLines, ownLinesOn, toggleEl, welcomeOrder, welcomeShows } from "@/lib/welcome";
 import { QuestComplete } from "@/components/celebration/QuestComplete";
 import { OwnWordsPill, PhraseList, WiseLines } from "./LineLists";
 import { Fold as Slide } from "@/components/ui/Fold";
@@ -236,6 +237,15 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
           </div>
         </FoldGroup>
         )}
+        <FoldGroup title="My reflection questions">
+          <div className="flex flex-col gap-2">
+            <label className="flex min-h-9 items-center gap-2.5 text-sm">
+              <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.welcomeReflectOn === true} onChange={() => update({ welcomeReflectOn: fx.welcomeReflectOn !== true })} />
+              Show one on the welcome screen (the toucan asks from them too)
+            </label>
+            <ReflectionList list={reflectQuestions(fx)} onChange={(l) => update({ reflectQuestions: l })} />
+          </div>
+        </FoldGroup>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => openWelcome("day")} className={playBtn} style={playStyle}>
             <Play /> Preview: first visit

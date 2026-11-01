@@ -854,10 +854,12 @@ function scheduleLabel(h: RiteView): string | null {
   if (h.days && h.days.length > 0 && h.days.length < 7) {
     parts.push(h.days.length === 1 ? PLURAL_DAYS[h.days[0]] : h.days.map((d) => DAY_NAMES[d]).join(", "));
   }
-  if (h.due_time) {
-    const [hh, mm] = h.due_time.split(":").map(Number);
-    parts.push(`by ${((hh + 11) % 12) + 1}:${String(mm).padStart(2, "0")} ${hh < 12 ? "AM" : "PM"}`);
-  }
+  const clock = (t: string) => {
+    const [hh, mm] = t.split(":").map(Number);
+    return `${((hh + 11) % 12) + 1}${mm ? `:${String(mm).padStart(2, "0")}` : ""} ${hh < 12 ? "AM" : "PM"}`;
+  };
+  if (h.due_time && h.window_to) parts.push(`${clock(h.due_time)}–${clock(h.window_to)}`);
+  else if (h.due_time) parts.push(`by ${clock(h.due_time)}`);
   return parts.length ? parts.join(" · ") : null;
 }
 

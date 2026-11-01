@@ -6,7 +6,7 @@
  */
 import type { FxSettings } from "./celebration-fx";
 
-export type WelcomeEl = "checkin" | "sleep" | "focus" | "quests" | "streak" | "line" | "bar" | "reward" | "due";
+export type WelcomeEl = "checkin" | "sleep" | "focus" | "quests" | "streak" | "line" | "reflect" | "bar" | "reward" | "due";
 
 export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "checkin", label: "Check-in", hint: "A gilded Check in button that opens energy, mood and anything else you track, right there (plus last night's sleep and wake times on the day's first visit). Your check-ins feed Insights and tell the toucan how you're doing." },
@@ -15,6 +15,7 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "quests", label: "Today's quests", hint: "A gilded “Choose today's quests” button that opens Due soon (at the top, within the reach you pick) and Today's Quests below: drag a due quest into today, or tap its +; drag today's into order; × takes one off." },
   { key: "streak", label: "Your streak", hint: "How many days in a row you've shown up. Day's first visit only. Motivating for some; leave it off if streaks feel like pressure." },
   { key: "line", label: "The day's wise line", hint: "One short encouragement, a different one each day. You can switch off any line you don't like, or add your own." },
+  { key: "reflect", label: "Reflection question", hint: "One of your own reflection questions, a different one each day (‹ › for another). Its ✎ adds, edits and reorders your list; the toucan asks from it too while it shows. Hidden unless you turn it on." },
   { key: "bar", label: "Your level bar", hint: "Your level, filling with the XP that arriving earned you. Day's first visit only." },
   { key: "reward", label: "XP and coins", hint: "The XP and coins for showing up today, counted up as the screen opens. Day's first visit only." },
   { key: "due", label: "Due soon", hint: "A gilded button that says how many quests are due soon (the same reach you pick on Today, changeable here too) and opens into a drawer of their cards. Off by default to keep the screen calm." },
@@ -22,7 +23,7 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
 
 // "intention" was removed (owner, Oct 31); stored orders drop it.
 // "toucan" (a second, drawn toucan in the card) was removed: one toucan at a time (owner, Oct 31).
-const DEFAULT_ORDER: WelcomeEl[] = ["checkin", "sleep", "focus", "quests", "streak", "line", "bar", "reward", "due"];
+const DEFAULT_ORDER: WelcomeEl[] = ["checkin", "sleep", "focus", "quests", "streak", "line", "reflect", "bar", "reward", "due"];
 const DEFAULT_HIDE: WelcomeEl[] = ["due"];
 const KEYS = new Set<string>(DEFAULT_ORDER);
 
@@ -37,12 +38,15 @@ export function welcomeShows(fx: FxSettings, el: WelcomeEl): boolean {
   if (el === "line" && fx.welcomeLine === false) return false;
   if (el === "streak" && fx.welcomeStreak === false) return false;
   if (el === "bar" && fx.welcomeBar === false) return false;
+  // Hidden unless turned on (older saved hide lists don't know it).
+  if (el === "reflect") return fx.welcomeReflectOn === true;
   return !(fx.welcomeHide ?? DEFAULT_HIDE).includes(el);
 }
 
 /** Show or hide a part, as a settings patch. */
 export function toggleEl(fx: FxSettings, el: WelcomeEl): Partial<FxSettings> {
   const on = welcomeShows(fx, el);
+  if (el === "reflect") return { welcomeReflectOn: !on };
   const hide = new Set(fx.welcomeHide ?? DEFAULT_HIDE);
   if (on) hide.add(el);
   else hide.delete(el);
@@ -176,10 +180,16 @@ export function writePromptVotes(v: PromptVotes) {
 }
 /** The prompts he cycles through: yours first, then liked ones, then the rest; ones you thumbed down never. */
 export function toucanPrompts(fx: FxSettings, votes: PromptVotes): string[] {
-  const all = [...new Set([toucanAsk(fx), ...votes.liked, ...TOUCAN_PROMPTS])];
+  // Your reflection questions join his while their part shows on the welcome screen.
+  const reflect = welcomeShows(fx, "reflect") ? reflectQuestions(fx) : [];
+  const all = [...new Set([toucanAsk(fx), ...votes.liked, ...reflect, ...TOUCAN_PROMPTS])];
   const kept = all.filter((p) => !votes.hidden.includes(p));
   return kept.length ? kept : [toucanAsk(fx)];
 }
+
+/** Your reflection questions, in your order. */
+export const REFLECT_SEED = ["What do I do with this supreme gift of not having to work 9–5?"];
+export const reflectQuestions = (fx: FxSettings) => (Array.isArray(fx.reflectQuestions) ? fx.reflectQuestions.filter((q) => typeof q === "string" && q.trim()) : REFLECT_SEED);
 
 /** The check-in button's words ("Emotional" alone, typed before spaces worked there, reads "Emotional check-in"). */
 export function checkinLabel(fx: FxSettings): string {

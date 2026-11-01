@@ -80,7 +80,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
         if (!live) return;
         // Habits with a set time (Gym at 7) hold their time on each day they fall on.
         const habitBusy: Busy[] = [];
-        for (let d = new Date(now); d <= to; d = new Date(d.getTime() + 86_400_000)) habitBusy.push(...habitBlocksOn(ctx.habits ?? [], d).map((b) => ({ start: b.start, end: b.end })));
+        for (let d = new Date(now); d <= to; d = new Date(d.getTime() + 86_400_000)) habitBusy.push(...habitBlocksOn(ctx.habits ?? [], d, ctx.busy).map((b) => ({ start: b.start, end: b.end })));
         setBusy([...ctx.busy, ...habitBusy]);
         setCalendars(ctx.calendars ?? []);
         setGoogle(ctx.google);

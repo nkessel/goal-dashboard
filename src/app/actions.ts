@@ -1603,6 +1603,7 @@ export async function createRiteAction(input: { title: string; description?: str
     iconSource: input.iconSource,
     coinValue: input.coinValue,
     estimateMinutes: input.estimateMinutes,
+    windowTo: input.windowTo,
     ...(input.repeat !== undefined ? { repeat: cleanRepeatInput(input.repeat) } : {}),
   });
   revalidatePath("/");
@@ -1623,6 +1624,7 @@ export async function updateRiteAction(riteId: string, input: { title?: string; 
     iconSource: input.iconSource,
     coinValue: input.coinValue,
     estimateMinutes: input.estimateMinutes,
+    windowTo: input.windowTo,
     ...(input.repeat !== undefined ? { repeat: cleanRepeatInput(input.repeat) } : {}),
   });
   revalidatePath("/");
@@ -3850,4 +3852,29 @@ export async function importCardAction(
   revalidatePath("/");
   revalidatePath("/import");
   return made;
+}
+
+/**
+ * Your own words, kept on your account (so every device has them): the wise lines
+ * you wrote for the welcome screen and your reflection questions, with whether each shows.
+ * Stored in `life_wheel.words`.
+ */
+export type OwnWords = { lines?: string; linesOn?: boolean; reflect?: string[]; reflectOn?: boolean; at?: number };
+export async function getOwnWordsAction(): Promise<OwnWords | null> {
+  const ownerId = await requireProfileId();
+  const w = (await readExtras(ownerId)).words;
+  return w && typeof w === "object" ? (w as OwnWords) : null;
+}
+export async function saveOwnWordsAction(words: OwnWords) {
+  const ownerId = await requireProfileId();
+  const clean: OwnWords = {
+    lines: typeof words.lines === "string" ? words.lines.slice(0, 2400) : undefined,
+    linesOn: typeof words.linesOn === "boolean" ? words.linesOn : undefined,
+    reflect: Array.isArray(words.reflect) ? words.reflect.filter((q) => typeof q === "string").map((q) => q.slice(0, 300)).slice(0, 60) : undefined,
+    reflectOn: typeof words.reflectOn === "boolean" ? words.reflectOn : undefined,
+    at: Date.now(),
+  };
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, words: { ...((extras.words as object) ?? {}), ...clean } } }).eq("id", ownerId);
+  if (error) throw new Error(error.message);
 }

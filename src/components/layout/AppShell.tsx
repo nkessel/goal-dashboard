@@ -8,6 +8,7 @@ import { ThemeOnBody } from "@/components/layout/ThemeOnBody";
 import { SettingsDefaultsSeed } from "@/components/settings/SettingsDefaultsSeed";
 import { NotificationsButton } from "@/components/layout/NotificationsButton";
 import { DailyLogin } from "@/components/xp/DailyLogin";
+import { OwnWordsSync } from "@/components/settings/OwnWordsSync";
 import { FOG_SHELL_SCRIPT } from "@/lib/welcome-fog";
 import { QuestCelebrationHost } from "@/components/celebration/QuestCelebrationHost";
 import { defaultPortraitFor } from "@/components/settings/Avatar";
@@ -75,6 +76,7 @@ export async function AppShell({
       <ThemeOnBody theme={theme} palette={palette ?? null} />
       {profileId && <SettingsDefaultsSeed />}
       {profileId && <DailyLogin levelCap={cap} />}
+      {profileId && <OwnWordsSync />}
       {profileId && missingPortraits > 0 && <PortraitPainter missing={missingPortraits} />}
       {profileId && profile && (
         <QuestCelebrationHost

@@ -16,6 +16,8 @@ export type Rite = {
   days?: number[] | null;
   /** Due by this time of day ("17:30"), if any. */
   due_time?: string | null;
+  /** With due_time, a window it floats in ("10:00"). */
+  window_to?: string | null;
   /** A special evening rite with its own content: "wins" or "tomorrow"; null for ordinary rites. */
   kind?: string | null;
   /** Habits: where `icon_key`'s picture came from; null = the plain checkbox. */
@@ -295,6 +297,8 @@ export type HabitExtras = {
   iconSource?: "library" | "ai" | null;
   coinValue?: number | null;
   estimateMinutes?: number | null;
+  /** End of a time window ("10:00"): it floats from its time until then on the calendar. */
+  windowTo?: string | null;
 };
 
 function habitExtrasPatch(input: HabitExtras) {
@@ -306,6 +310,7 @@ function habitExtrasPatch(input: HabitExtras) {
   }
   if (input.coinValue !== undefined) out.coin_value = input.coinValue === null ? null : Math.max(0, Math.min(1000, Math.round(input.coinValue)));
   if (input.repeat !== undefined) out.repeat = input.repeat;
+  if (input.windowTo !== undefined) out.window_to = input.windowTo && /^[0-2][0-9]:[0-5][0-9]$/.test(input.windowTo) ? input.windowTo : null;
   if (input.estimateMinutes !== undefined) out.estimate_minutes = input.estimateMinutes && input.estimateMinutes > 0 ? Math.min(600, Math.round(input.estimateMinutes)) : null;
   return out;
 }

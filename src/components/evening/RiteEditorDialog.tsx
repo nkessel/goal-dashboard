@@ -46,6 +46,8 @@ export function RiteEditorDialog({
   const [isCore, setIsCore] = useState(rite?.is_core ?? defaultCore);
   const [days, setDays] = useState<number[]>(rite?.days ?? [0, 1, 2, 3, 4, 5, 6]);
   const [dueTime, setDueTime] = useState(rite?.due_time ?? "");
+  // A window instead of a deadline: it floats from dueTime until windowTo on the calendar (Gym 7–10).
+  const [windowTo, setWindowTo] = useState(rite?.window_to ?? "");
   const [icon, setIcon] = useState<{ url: string; source: "library" | "ai" } | null>(rite?.icon_key && rite.icon_source ? { url: rite.icon_key, source: rite.icon_source } : null);
   const [coinValue, setCoinValue] = useState<number | null>(rite?.coin_value ?? null);
   const [minutes, setMinutes] = useState<number | null>(rite?.estimate_minutes ?? null);
@@ -86,7 +88,7 @@ export function RiteEditorDialog({
       try {
         if (isHabit && !repeat && days.length === 0) throw new Error("Pick at least one day.");
         const picture = { iconKey: icon?.url ?? null, iconSource: icon?.source ?? null };
-        const schedule = isHabit ? { days: repeat ? null : days.length === 7 ? null : days, repeat, dueTime: dueTime || null, ...picture, coinValue, estimateMinutes: minutes } : picture;
+        const schedule = isHabit ? { days: repeat ? null : days.length === 7 ? null : days, repeat, dueTime: dueTime || null, windowTo: dueTime && windowTo ? windowTo : null, ...picture, coinValue, estimateMinutes: minutes } : picture;
         const pending = subText.trim() ? [...subs, { id: Math.random().toString(36).slice(2, 10), title: subText.trim() }] : subs;
         if (rite) {
           await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
@@ -413,14 +415,24 @@ export function RiteEditorDialog({
           <div data-mi="due" className="relative z-[1] flex flex-col gap-2">
             <button type="button" onClick={() => setDueOpen((o) => !o)} aria-expanded={dueOpen} className="flex items-center gap-1.5 self-start text-[14.5px] font-semibold">
               <Caret open={dueOpen} />
-              Due by
-              {!dueOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{dueTime || "any time"}</span>}
+              {windowTo ? "Time" : "Due by"}
+              {!dueOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{dueTime ? (windowTo ? `${dueTime}–${windowTo}` : dueTime) : "any time"}</span>}
             </button>
             {dueOpen && (
             <label className="reveal flex items-center gap-2 pl-4 text-[14.5px] font-semibold">
-              <TimeToken value={dueTime} onChange={setDueTime} label="Due by (optional)" kind="any" compact />
+              <TimeToken value={dueTime} onChange={setDueTime} label={windowTo ? "From" : "Due by (optional)"} kind="any" compact />
+              {dueTime && (windowTo ? (
+                <>
+                  <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>to</span>
+                  <TimeToken value={windowTo} onChange={setWindowTo} label="Until" kind="any" compact />
+                </>
+              ) : (
+                <button type="button" onClick={() => setWindowTo(nextHour(dueTime, 3))} title="Any time in a window: the calendar finds it a free hour inside" className="text-[13px] font-normal underline" style={{ color: "var(--t-ink-soft)" }}>
+                  + window
+                </button>
+              ))}
               {dueTime ? (
-                <button type="button" onClick={() => setDueTime("")} className="text-[13px] font-normal underline" style={{ color: "var(--t-ink-soft)" }}>
+                <button type="button" onClick={() => (setDueTime(""), setWindowTo(""))} className="text-[13px] font-normal underline" style={{ color: "var(--t-ink-soft)" }}>
                   clear
                 </button>
               ) : (
@@ -599,4 +611,12 @@ function HabitGlyph() {
       <path d="M8.5 12.4l2.4 2.4 4.6-5" stroke="#4f7d38" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
+}
+
+/** "07:00" plus some hours ("10:00"), kept within the day. */
+function nextHour(t: string, hours: number) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(t);
+  if (!m) return "";
+  const h = Math.min(23, Number(m[1]) + hours);
+  return `${String(h).padStart(2, "0")}:${m[2]}`;
 }

@@ -49,6 +49,8 @@ export type RiteView = {
   days?: number[] | null;
   /** Habits: due by this time ("17:30"). */
   due_time?: string | null;
+  /** Habits: with due_time, a window it floats in until this time ("10:00"). */
+  window_to?: string | null;
   /** Special evening rites with their own content: "wins" or "tomorrow". */
   kind?: string | null;
   /** Habits: a picked portrait (null = the plain checkbox). */
