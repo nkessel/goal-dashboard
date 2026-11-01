@@ -23,49 +23,57 @@ import { cleanWheel } from "@/lib/wheel-of-time";
 export default async function InsightsPage() {
   const session = await requireSession();
   const since = new Date(Date.now() - 92 * 86_400_000).toISOString();
-  const [profile, energy, checks, metrics, wins, notes] = await Promise.all([
-    getProfileById(session.user.id),
-    listEnergySince(session.user.id, since),
-    listCheckInsSince(session.user.id, since),
-    getCheckMetrics(session.user.id),
-    listWinsSince(session.user.id, since),
-    listCheckNotesSince(session.user.id, since),
+  // Everything at once (these used to wait one after another).
+  const uid = session.user.id;
+  const profileP = getProfileById(uid);
+  const habitRowsP = listRites(uid).catch(() => null).then((rs) => (rs ?? []).filter((r) => r.slot === "day"));
+  const since120 = new Date(Date.now() - 120 * 86_400_000).toISOString().slice(0, 10);
+  const yearAgo = new Date(Date.now() - 365 * 86_400_000).toISOString();
+  const [profile, energy, checks, metrics, wins, notes, yearNotes, habitRows, [habitDone, habitSkipped], boards, tagAreas] = await Promise.all([
+    profileP,
+    listEnergySince(uid, since),
+    listCheckInsSince(uid, since),
+    getCheckMetrics(uid),
+    listWinsSince(uid, since),
+    listCheckNotesSince(uid, since),
+    // Streaks look back a year for slips.
+    profileP.then((pr) => (pr?.life_wheel?.streaks?.length ? listCheckNotesSince(uid, yearAgo) : [])),
+    habitRowsP,
+    habitRowsP.then(async (rows): Promise<[{ rite_id: string; day: string }[], { rite_id: string; day: string }[]]> => {
+      if (!rows.length) return [[], []];
+      const [d, k] = await Promise.all([listCompletionsFor(uid, rows.map((h) => h.id), since120).catch(() => []), listHabitSkips(uid, since120).catch(() => [])]);
+      return [d as { rite_id: string; day: string }[], (k ?? []) as { rite_id: string; day: string }[]];
+    }),
+    listBoardsForOwner(uid).catch(() => []),
+    // Tags you use on several quests join the wheel too (as #tag).
+    (async () => {
+      const { supabaseAdmin } = await import("@/lib/supabase/server");
+      const { data } = await supabaseAdmin().from("tasks").select("tags").eq("owner_id", uid).not("tags", "eq", "{}").limit(1000);
+      const n = new Map<string, number>();
+      for (const r of (data ?? []) as { tags: string[] | null }[]) for (const t of r.tags ?? []) n.set(t, (n.get(t) ?? 0) + 1);
+      return [...n.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([t]) => `#${t}`);
+    })().catch(() => [] as string[]),
   ]);
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
-  // Streaks look back a year for slips; their events stay out of the check-in's chips.
+  // Streak events stay out of the check-in's chips.
   const streakDefs = profile?.life_wheel?.streaks ?? [];
-  const yearNotes = streakDefs.length ? await listCheckNotesSince(session.user.id, new Date(Date.now() - 365 * 86_400_000).toISOString()) : [];
   const slipChecks = streakDefs.map((d) => slipMatcher(d.word));
   const isSlip = (body: string) => slipChecks.some((f) => f(body));
   const streakNotes = yearNotes.filter((n) => isSlip(n.body)).map((n) => ({ id: n.id, body: n.body, created_at: n.created_at }));
   // Habits join the streaks (counted on the days they're due).
-  const rites = await listRites(session.user.id).catch(() => null);
-  const habitRows = (rites ?? []).filter((r) => r.slot === "day");
-  const since120 = new Date(Date.now() - 120 * 86_400_000).toISOString().slice(0, 10);
-  const [habitDone, habitSkipped] = habitRows.length
-    ? await Promise.all([listCompletionsFor(session.user.id, habitRows.map((h) => h.id), since120).catch(() => []), listHabitSkips(session.user.id, since120).catch(() => [])])
-    : [[], []];
   const habitStreaks = habitRows.map((h) => ({
     id: h.id,
     title: h.title,
     days: (h.days as number[] | null) ?? null,
     icon: h.icon_source ? (h.icon_key ?? null) : null,
     done: habitDone.filter((c) => c.rite_id === h.id).map((c) => c.day),
-    skipped: ((habitSkipped ?? []) as { rite_id: string; day: string }[]).filter((c) => c.rite_id === h.id).map((c) => c.day),
+    skipped: habitSkipped.filter((c) => c.rite_id === h.id).map((c) => c.day),
   }));
   // The life wheel's readings are kept apart from the chart's metrics.
   const WHEEL = "◎ ";
   // The wheel's areas are your top-level boards.
-  const boardAreas = wheelAreasFrom(await listBoardsForOwner(session.user.id).catch(() => []));
-  // Tags you use on several quests join the wheel too (as #tag).
-  const tagAreas = await (async () => {
-    const { supabaseAdmin } = await import("@/lib/supabase/server");
-    const { data } = await supabaseAdmin().from("tasks").select("tags").eq("owner_id", session.user.id).not("tags", "eq", "{}").limit(1000);
-    const n = new Map<string, number>();
-    for (const r of (data ?? []) as { tags: string[] | null }[]) for (const t of r.tags ?? []) n.set(t, (n.get(t) ?? 0) + 1);
-    return [...n.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([t]) => `#${t}`);
-  })().catch(() => [] as string[]);
+  const boardAreas = wheelAreasFrom(boards);
   const wheelTopics = (boardAreas.length >= 3 ? [...boardAreas, ...tagAreas] : profile?.life_wheel?.topics?.length ? profile.life_wheel.topics : DEFAULT_WHEEL).slice(0, 12);
   const wheelLast: Record<string, { level: number; at: string }> = {};
   for (const c of checks) if (c.metric.startsWith(WHEEL)) wheelLast[c.metric.slice(WHEEL.length)] = { level: c.level, at: c.created_at };

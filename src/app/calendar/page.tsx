@@ -70,11 +70,10 @@ export default async function CalendarPage({
   const date = parseDateParam(dateParam ?? todayKey());
   const today = parseDateParam(todayKey());
 
-  const [profile, rites] = await Promise.all([getProfileById(session.user.id), listRites(session.user.id).catch(() => null)]);
+  // "With Mom" planning is only on the owner's profile.
+  const [profile, rites, withMom] = await Promise.all([getProfileById(session.user.id), listRites(session.user.id).catch(() => null), isAdmin(session.user.id).catch(() => false)]);
   // Meal time, wind-down and tidy kept free, and habits with a set time, drawn on the grid.
   const daily = { settings: ((profile as { scheduler?: Record<string, unknown> | null } | null)?.scheduler ?? null), habits: timedHabitsFrom(rites ?? [], cleanRepeat) };
-  // "With Mom" planning is only on the owner's profile.
-  const withMom = await isAdmin(session.user.id).catch(() => false);
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
 
@@ -129,10 +128,13 @@ export default async function CalendarPage({
   // viewer's time zone aren't cut off (the views place items by local day).
   rangeStart = addDays(rangeStart, -1);
   rangeEnd = addDays(rangeEnd, 1);
-  const [tasks, toSchedule, scheduleFolders] = await Promise.all([
+  // Google's appointments load alongside the quests (not after them).
+  const googleP = session.googleAccessToken ? listEventsAllCalendars(session.googleAccessToken, rangeStart, rangeEnd).catch((err) => (console.warn("Failed to load Google Calendar events:", err), null)) : Promise.resolve(null);
+  const [tasks, toSchedule, scheduleFolders, googleAll] = await Promise.all([
     listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
     listSchedulingList(session.user.id),
     getSchedulingFolders(session.user.id),
+    googleP,
   ]);
   const todayHref = `/calendar?view=${view}&date=${formatDateParam(today)}`;
 
@@ -142,17 +144,10 @@ export default async function CalendarPage({
   // means no appointments show up this load.
   let events: GoogleCalendarEvent[] = [];
   let calendars: GoogleCalendarInfo[] = [];
-  if (session.googleAccessToken) {
-    try {
-      const importedEventIds = new Set(
-        tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id))
-      );
-      const all = await listEventsAllCalendars(session.googleAccessToken, rangeStart, rangeEnd);
-      calendars = all.calendars;
-      events = all.events.filter((e) => !importedEventIds.has(e.id));
-    } catch (err) {
-      console.warn("Failed to load Google Calendar events:", err);
-    }
+  if (googleAll) {
+    const importedEventIds = new Set(tasks.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)));
+    calendars = googleAll.calendars;
+    events = googleAll.events.filter((e) => !importedEventIds.has(e.id));
   }
 
   return (
