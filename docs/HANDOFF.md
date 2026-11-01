@@ -2,9 +2,9 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-01 (display fixes from the owner's screen recordings, batch 1; see Recently shipped).
+- **Last updated:** 2026-11-01 evening (recordings fixes done except per-page lag; private file attachments; full next-up queue in "Next up, in order" below).
 - **Live app:** https://tinyquest.win (also https://goal-dashboard-kappa.vercel.app)
-- **Pending in-app feedback:** iOS: opening feedback made the page behind it flash/resize, and the welcome card's top was cut off (owner's screen recordings, Oct 31). Fix shipped Oct 31 (see Recently shipped); confirm with the owner on a phone.
+- **Pending in-app feedback:** ~35 notes queued (query in section 3). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
 
 ---
 
@@ -17,9 +17,39 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 | 0 | **Import scheduling: follow-ups** | Ready | Shipped Nov 1 (below). Left: a one-tap "Breakfast today" on Today/check-in only matters if breakfast is turned off; essentials' ideal times aren't editable yet (only ranges and lengths, in Auto-schedule › Daily essentials); accepted placements go straight on the calendar (no separate tentative state in the database). |
 | 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
 | 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. Left: consistent capitalization, pinned editor footer. The UX teams can now read real click timings from `ui_clicks`. |
-| 2 | **Ship pending in-app feedback + owner's Nov 1 screen recordings** | In progress | Batch 1 shipped (below). Left from the recordings: page-change lag beyond the shell (each page's own queries; measure with a signed-in session), Then ~35 queued notes. Then the owner's Nov 1 asks: per-item "make it a reward" inside To buy cards, an Online learning videos list (seed https://spiraljourneyworkthatreconnects.org/facing-fragility/, offer reminder ideas), welcome-screen habit pills starting with "Learn a language" (phrase box, language toggles incl. Italian, Russian, German, Natick Algonquin, Hebrew, Phoenician, Portuguese, Spanish, French + ~5, add with autocomplete, Learn lists translations, print view; flag Phoenician/Algonquin as approximate), and the Quest Game note items (toucan, sleep check-in, XP ±, time fields…). |
+| 2 | **Owner's queue (Nov 1)** | In progress | Work through "Next up, in order" right below this table, top to bottom. |
 | 2b | **Smoothness audit follow-ups** | Ready | Audit method: in the signed-in browser pane, a layout-shift + DOM observer script opens every toggle and fakes the keyboard by overriding `visualViewport.height` (Oct 31 night). Left: a real-iPhone keyboard pass (the simulation can't show iOS panning); (Insights' Last night and the remaining exits were done Nov 1.) |
 | 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
+
+### Next up, in order (owner's queue as of Nov 1 evening)
+
+Each item is the owner's own ask. Take them top to bottom; mark done here and move to Recently shipped.
+
+1. **Check two one-time cleanups ran** (`src/lib/data/cleanups.ts`, run from AppShell's `after()` on the owner's next page load, each recorded in `profiles.life_wheel.cleanups`):
+   - `sleep-quality-dupes-2026-11-01`: should leave **1** 'Sleep quality' row in `check_ins` for 2026-11-01 (there were 558). Check: `select count(*) from check_ins where owner_id='42ed6196-bfb0-474d-96a9-1a6cd6807b8b' and metric='Sleep quality' and created_at::date='2026-11-01';`
+   - `forms-on-cards-2026-11-01`: puts the uploaded PDFs on import cards "Claim unclaimed MA money from the Treasurer" (1 file) and "Apply for subway performer permit" (blank + filled). Check `select title, attachments from import_cards where id in ('13b3a450-7045-40d6-b27a-0298aa225349','d23f2e67-fd71-4301-b42c-a36fe5d0aef7');`
+   - **Drop the temporary upload function** if it still exists (it was token-gated; the drop was waiting on a connector approval): `drop function if exists public.tmp_handoff_attachment(text,text,text,text);` Verify: `select count(*) from pg_proc where proname='tmp_handoff_attachment';` → 0.
+2. **Page-change lag, the rest:** Today now loads in one wave (`src/app/page.tsx`). Do the same for the other pages' serial `await` chains (boards, board page, calendar, Insights, Treasure Chest, Settings, /import): put independent queries in one `Promise.all`, stream slow extras with `Suspense`. Measure with a signed-in session if possible.
+3. **Queued in-app feedback notes** (~35; query in section 3). Ship in batches, then mark `auto_shipped_at`.
+4. **To buy cards: per-item "make it a reward"** in import review (`components/imports/ImportTriage.tsx`): each item of a `shopping` card gets a small "✦ Reward" toggle; on import, toggled items become Treasure Chest rewards (`createRewardAction`, default 3 coins) and the rest stay as steps of the To buy quest.
+5. **Online learning videos list**: a list (e.g. a board or a Settings › Lists entry) of videos for walks and car rides, seeded with https://spiraljourneyworkthatreconnects.org/facing-fragility/ ("Facing Fragility", Spiral Journey / Work That Reconnects). The owner needs reminding it exists: offer light options in a plain message and let them pick (e.g. the toucan mentions it when a walk/drive habit is checked, a weekly nudge, a welcome-screen pill, a + sheet shortcut). Don't overwhelm; no button walls.
+6. **Welcome-screen habit pills** (added through the welcome screen's arrange/settings, hidden until chosen). First pill: **"Learn a language"**:
+   - A blank phrase box with pills of phrase ideas (greetings, thank you, where is…, I'd like…, etc.).
+   - Language toggles, all on by default: Italian, Russian, German, Natick Algonquin (Wampanoag/Massachusett), Hebrew, Phoenician, Portuguese, Spanish, French, plus ~5 more (e.g. Japanese, Mandarin, Arabic, Greek, Hindi).
+   - "+" adds a language from a list with autocomplete.
+   - "Learn" lists the phrase in every chosen language (AI via Cloudflare Workers AI, `lib` AI helper), with transliteration for non-Latin scripts.
+   - A print view.
+   - Flag **Phoenician** and **Natick Algonquin** as approximate / reconstructed.
+7. **Quest Game note items** (owner picked these):
+   - A "How to support me" section on the profile.
+   - Zoom in/out on boards with light animation; a single sub-quest fills the width.
+   - Longer, smoother victory sparkles; the quest title fully visible on the victory screen.
+   - A simpler XP burst for habits, rites and mini-quests.
+   - A shimmering border on reward cards.
+   - Check the "+ board" chip on a Martin board quest (looks wrong; investigate).
+8. Then the rest of section 1 (arrange in context on remaining screens, UX synthesis polish).
+
+**Owner's working preferences:** short progress notes after each step; decisions asked in plain messages (no decision cards, no making them go to other screens); "make not overwhelming the user a design priority (and also not hindering the user with too many button walls) — balance is key". Personal task context may be in this file (owner OK), but never secrets: passwords, keys, ID numbers, medical or relationship notes. The repo is public: private files go in the `attachments` table, never in git.
 
 **Open questions for the owner:** none (the Oct 22 notes were settled by the owner, Oct 31).
 
@@ -120,6 +150,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 1: Three PDFs (MA claim form, subway performer application blank + filled) uploaded into `attachments` through a temporary token-gated function (owner approved); `cleanups.ts` puts them on their import cards on the next load.
 - Nov 1: Today loads in one wave: its ~8 queued database waits (promote → tasks → rites → imports → plan sessions → chapter → habits) now run together; only the task lists wait on `promoteQueuedQuests` (`src/app/page.tsx`). Other pages still to check for the same chains.
 - Nov 1: Private files on quests and import cards (migration 0082): bytes in `attachments` (RLS on, no policies), refs in `tasks.attachments` / `import_cards.attachments` (`lib/file-refs.ts`); served only to the owner at `/api/attachments/<id>`, added via POST `/api/attachments` (4 MB cap; `ui/AddFile.tsx`, "📎 Add a file" on import cards and in the quest editor); 📎 chips on quest cards (`ui/FileChips.tsx`); a card's files go with it onto the quest on import. The public repo must never hold these files.
 - Nov 1: Typing in the feedback box holds the page behind still (`KeyboardViewport` pins it as it does for popups, and lets go once the keyboard is down), so Today no longer jumps as the keyboard closes. Needs a real-iPhone check.
