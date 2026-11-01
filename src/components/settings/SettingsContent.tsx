@@ -138,8 +138,8 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </div>
         </section>
 
-        <ImportsInboxRow quests={imports.quests} rewards={imports.rewards} theme={profile.theme} />
-        <ImportsWaiting count={importCards} />
+        {/* One "to sort" entry at a time: the cards first, the older inbox once they're sorted. */}
+        {importCards > 0 ? <ImportsWaiting count={importCards} /> : <ImportsInboxRow quests={imports.quests} rewards={imports.rewards} theme={profile.theme} />}
 
         {admin && (
           <Link

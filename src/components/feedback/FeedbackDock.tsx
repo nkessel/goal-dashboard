@@ -63,6 +63,7 @@ type Pos = { x: number; y: number };
 type Viewport = { left: number; top: number; w: number; h: number; innerW: number; innerH: number };
 
 const DRAFTS_KEY = "feedback-drafts";
+const OPEN_KEY = "feedback-open";
 const LEGACY_DRAFT_KEY = "feedback-draft";
 const BUTTON_KEY = "feedback-button-pos";
 const PANEL_KEY = "feedback-panel";
@@ -274,6 +275,17 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       writeJson(LEGACY_DRAFT_KEY, null);
     }
     /* eslint-disable react-hooks/set-state-in-effect -- browser storage is only readable after hydration */
+    // The note that was open when the page went away (iPhone's photo picker can reload the page): open it again.
+    let reopen: { id: string; page?: string; context?: string; at: number } | null = null;
+    try {
+      reopen = JSON.parse(window.sessionStorage.getItem(OPEN_KEY) ?? "null");
+    } catch {
+      /* storage unavailable */
+    }
+    if (reopen && Date.now() - reopen.at < 20 * 60_000) {
+      if (!saved.some((d) => d.id === reopen.id && !d.deleted)) saved.push({ id: reopen.id, body: "", kind: "feedback", page: reopen.page, context: reopen.context, shot: null, updatedAt: Date.now() });
+      setOpenId(reopen.id);
+    }
     setDrafts(mergeDrafts([], saved));
     // Drafts kept on your account (from another tab or device) join in.
     fetch("/api/feedback/drafts")
@@ -319,6 +331,16 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   }, []);
 
   const open = drafts.find((d) => d.id === openId && (!d.deleted || sent?.id === d.id)) ?? null;
+  // Remember which note is open for this tab, so a reload (the photo picker on iPhone) brings it back.
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      if (open && !open.deleted) window.sessionStorage.setItem(OPEN_KEY, JSON.stringify({ id: open.id, page: open.page, context: open.context, at: Date.now() }));
+      else window.sessionStorage.removeItem(OPEN_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+  }, [open, loaded]);
   const waiting = drafts.filter((d) => d.id !== openId && !d.deleted && hasContent(d));
   // The screen height when this note opened: Safari's bars coming and going while you scroll mustn't resize the box.
   const [baseH, setBaseH] = useState<{ id: string; h: number } | null>(null);

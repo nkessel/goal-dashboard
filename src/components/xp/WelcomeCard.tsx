@@ -1,7 +1,7 @@
 "use client";
 
 import { fogOn } from "@/lib/welcome-fog";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Confirm, NoteButton, WhyBox } from "@/components/toucan/SayingFeedback";
 import Link from "next/link";
@@ -626,12 +626,36 @@ function readToucanAt(): { x: number; y: number } {
  */
 /** He flies in once per visit; after that he's simply there. */
 let toucanLanded = false;
+// Kept for this tab too: iPhone's photo picker can reload the page, and he shouldn't fly in again then.
+const LANDED_KEY = "welcome-toucan-landed";
+function landedBefore(): boolean {
+  if (toucanLanded || typeof window === "undefined") return toucanLanded;
+  try {
+    const at = Number(window.sessionStorage.getItem(LANDED_KEY));
+    return at > 0 && Date.now() - at < 30 * 60_000;
+  } catch {
+    return false;
+  }
+}
+function markLanded() {
+  toucanLanded = true;
+  try {
+    window.sessionStorage.setItem(LANDED_KEY, String(Date.now()));
+  } catch {
+    /* storage unavailable */
+  }
+}
 function resetToucanFlight() {
   toucanLanded = false;
+  try {
+    window.sessionStorage.removeItem(LANDED_KEY);
+  } catch {
+    /* storage unavailable */
+  }
 }
 function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in the app (his settings): the screen tucks itself away first. */ onAway: () => void }) {
-  const [landed, setLanded] = useState(toucanLanded);
-  const [flyIn] = useState(!toucanLanded);
+  const [landed, setLanded] = useState(landedBefore);
+  const [flyIn] = useState(() => !landedBefore());
   const [menu, setMenu] = useState(false);
   const [saying, setSaying] = useState<string | null>(null);
   const [rewording, setRewording] = useState(false);
@@ -675,10 +699,48 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
     }
   }
   const [off, setOff] = useState(readToucanAt);
+  // Kept on screen: a spot saved on a wider window (or a bubble that grew) never runs him or his bubble off an edge.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const [nudge, setNudge] = useState({ x: 0, y: 0 });
+  const nudgeRef = useRef(nudge);
+  useLayoutEffect(() => {
+    const fit = () => {
+      const w = wrapRef.current;
+      if (!w || !landed) return;
+      const n = nudgeRef.current;
+      const body = w.firstElementChild?.getBoundingClientRect();
+      const bub = bubbleRef.current?.getBoundingClientRect();
+      if (!body) return;
+      const m = 6;
+      const vw = window.innerWidth;
+      const vh = window.visualViewport?.height ?? window.innerHeight;
+      // Where they'd sit without the nudge.
+      const left = body.left - n.x;
+      const top = Math.min(body.top, bub?.top ?? body.top) - n.y;
+      const right = Math.max(body.right, bub?.right ?? 0) - n.x;
+      const bottom = Math.max(body.bottom, bub?.bottom ?? 0) - n.y;
+      const x = Math.max(m - left, Math.min(0, vw - m - right));
+      const y = Math.max(m - top, Math.min(0, vh - m - bottom));
+      const next = { x: Math.round(x), y: Math.round(y) };
+      if (next.x !== n.x || next.y !== n.y) {
+        nudgeRef.current = next;
+        setNudge(next);
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    if (bubbleRef.current) ro.observe(bubbleRef.current);
+    window.addEventListener("resize", fit);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  });
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   useEffect(() => {
-    if (toucanLanded) return;
-    const t = setTimeout(() => ((toucanLanded = true), setLanded(true)), 3150);
+    if (landedBefore()) return;
+    const t = setTimeout(() => (markLanded(), setLanded(true)), 3150);
     return () => clearTimeout(t);
   }, []);
   const vote = (up: boolean) => {
@@ -692,7 +754,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
   const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setReplying(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
   const item = "font-semibold underline underline-offset-2";
   return (
-    <div className={`${flyIn ? "welcome-toucan" : ""} absolute z-[3]`} style={{ left: 8 + off.x, top: -47 + off.y }}>
+    <div ref={wrapRef} className={`${flyIn ? "welcome-toucan" : ""} absolute z-[3]`} style={{ left: 8 + off.x + nudge.x, top: -47 + off.y + nudge.y }}>
       <button
         type="button"
         onClick={() => {
@@ -763,6 +825,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
             }
             drag.current = null;
           }}
+          ref={bubbleRef}
           className={`group/bubble toucan-bubble owl-say absolute bottom-1 left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,74vw)]" : "w-max min-w-[180px] max-w-[min(250px,62vw)]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
           {/* ✎ at the top right: rate what he asked, or say more about it. */}
           {/* Hidden while you're answering him (an answer already says it's a good question). */}

@@ -147,7 +147,7 @@ export function CreateSheet({
           // Keyboard up: the sheet glides up just enough to clear it (never resized, never jumps).
           translate: keyboard?.lift ? `0 ${-keyboard.lift}px` : undefined,
           ...(keyboard ? { height: keyboard.height } : {}),
-          transition: "translate 260ms cubic-bezier(.2,.8,.2,1)",
+          transition: keyboard && !keyboard.glide ? "none" : "translate 260ms cubic-bezier(.2,.8,.2,1), height 260ms cubic-bezier(.2,.8,.2,1)",
         }}
       >
         <div
@@ -557,14 +557,14 @@ function ScrollGlyph() {
 
 /**
  * On phones, while the on-screen keyboard is up (null while it's down): how far
- * the sheet glides up to clear it, and how much of it the keyboard still hides
- * (when the sheet is taller than what's left). The sheet keeps its size and its
- * place in the layout; it only moves (`translate`, animated), so nothing jumps
- * or resizes. A keyboard that drops for a moment (moving between fields)
- * doesn't move it, and nothing moves while the sheet is closing.
+ * the sheet moves up and how tall it may be so all of it sits in the strip above
+ * the keyboard (its body scrolls; nothing is hidden under the keyboard or cut off
+ * at the top). It glides when the keyboard opens and follows iPhone's panning
+ * instantly, so on screen it holds still. A keyboard that drops for a moment
+ * (moving between fields) doesn't move it, and nothing moves while it's closing.
  */
-function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leaving: boolean): { lift: number; hidden: number; height: number } | null {
-  const [vp, setVp] = useState<{ lift: number; hidden: number; height: number } | null>(null);
+function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leaving: boolean): { lift: number; hidden: number; height: number; glide: boolean } | null {
+  const [vp, setVp] = useState<{ lift: number; hidden: number; height: number; glide: boolean } | null>(null);
   const frozen = useRef(leaving);
   useEffect(() => {
     frozen.current = leaving;
@@ -574,10 +574,9 @@ function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leav
     if (!vv) return;
     let closing = 0;
     let raf = 0;
-    // Where the sheet sat when the keyboard came up. Everything is worked out from this,
-    // and the sheet's height is held to it, so the room added below its fields (or a
-    // field that grows) can't move it while the keyboard is up.
+    // Where the sheet sat when the keyboard came up (layout place; offsetTop ignores the translate).
     let rest: { top: number; h: number } | null = null;
+    let lastH = 0;
     const update = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
@@ -586,18 +585,26 @@ function useKeyboardViewport(sheet: React.RefObject<HTMLDivElement | null>, leav
         if (open) {
           clearTimeout(closing);
           closing = 0;
-          // Its layout place (offsetTop ignores the translate).
+          const first = !rest;
           rest ??= { top: sheet.current.offsetTop, h: sheet.current.offsetHeight };
-          const bottom = rest.top + rest.h;
-          const visTop = vv.offsetTop + 6;
-          const visBottom = vv.offsetTop + vv.height - 6;
-          const lift = Math.round(Math.max(0, Math.min(bottom - visBottom, rest.top - visTop)));
-          const next = { lift, hidden: Math.max(0, Math.round(bottom - lift - visBottom)), height: rest.h };
-          setVp((v) => (v && v.lift === next.lift && v.hidden === next.hidden && v.height === next.height ? v : next));
+          // The whole sheet fits in the strip above the keyboard: never taller than it
+          // (its own body scrolls), bottom just above the keyboard or where it already was.
+          // iPhone pans the visible area inside the page (vv.offsetTop); the sheet follows that
+          // pan at once, so on screen it stays still instead of chasing it with an animation.
+          const height = Math.min(rest.h, Math.floor(vv.height - 12));
+          const restBottom = rest.top + rest.h;
+          const screenBottom = Math.min(restBottom, vv.height - 6);
+          const lift = Math.round(restBottom - (screenBottom + vv.offsetTop));
+          // Glide only when the keyboard itself comes up or changes height, not on pans.
+          const glide = first || Math.abs(vv.height - lastH) > 24;
+          lastH = vv.height;
+          const next = { lift, hidden: 0, height, glide };
+          setVp((v) => (v && v.lift === next.lift && v.height === next.height ? v : next));
         } else if (!closing) {
           closing = window.setTimeout(() => {
             closing = 0;
             rest = null;
+            lastH = 0;
             setVp(null);
           }, 220);
         }

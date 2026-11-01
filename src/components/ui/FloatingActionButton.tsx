@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { readFabStyle, subscribeFx, type FabStyle } from "@/lib/celebration-fx";
 
 /**
@@ -30,6 +31,11 @@ export function FloatingActionButton({
   const look = useSyncExternalStore(subscribeFx, readFabStyle, () => "seal" as const);
   const skin = isAdventure ? FAB_SKINS[look] : null;
   const wrapRef = useRef<HTMLDivElement>(null);
+  // On document.body, so a screen change (which slides and fades the page's <main>) never carries it off.
+  const mounted = useSyncExternalStore(noSub, () => true, () => false);
+  // Moving between screens: the + stays put instead of rising again.
+  const [rise] = useState(() => typeof window === "undefined" || readNow() - lastFabSeen > 1500);
+  useEffect(() => () => void (lastFabSeen = readNow()), []);
 
   // Pinch-zoom: keep the button at the same spot and size on screen instead
   // of letting it drift with the zoomed page.
@@ -63,7 +69,8 @@ export function FloatingActionButton({
     };
   }, []);
 
-  return (
+  if (!mounted) return null;
+  return createPortal(
     <div
       ref={wrapRef}
       data-hide-when-typing
@@ -79,7 +86,7 @@ export function FloatingActionButton({
         aria-label={label}
         title={label}
         // An enamelled seal in a gilded, notched bezel: the gold plus is the one bright thing.
-        className="fab-ring hover-glow fab-rise pointer-events-auto relative flex h-14 w-14 touch-manipulation select-none items-center justify-center rounded-full p-[4px] transition-transform duration-100 hover:scale-105 active:scale-95"
+        className={`fab-ring hover-glow ${rise ? "fab-rise" : ""} pointer-events-auto relative flex h-14 w-14 touch-manipulation select-none items-center justify-center rounded-full p-[4px] transition-transform duration-100 hover:scale-105 active:scale-95`}
         style={skin ? skin.ring : { background: "var(--t-card)", boxShadow: "0 0 0 1px var(--t-card-border), 0 6px 16px rgba(0,0,0,.22)" }}
       >
         {skin?.notches && (
@@ -123,9 +130,15 @@ export function FloatingActionButton({
           </svg>
         </span>
       </button>
-    </div>
+    </div>,
+    document.body
   );
 }
+
+const noSub = () => () => {};
+// When the last + left the screen (a new screen's + then appears without rising).
+let lastFabSeen = 0;
+const readNow = () => Date.now();
 
 const GILT_RING = "conic-gradient(from 200deg, #fff1c2, #c9a24e 12%, #7a5c22 26%, #e2bf68 40%, #fff6d6 50%, #a8812e 64%, #f4dc94 78%, #8a6c2c 90%, #fff1c2)";
 const GILT_PLUS = ["#fff6d6", "#f2d27e", "#c9a24e"];
