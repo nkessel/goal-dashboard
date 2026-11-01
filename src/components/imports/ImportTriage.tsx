@@ -41,7 +41,7 @@ const KINDS: { key: Kind; label: string; icon: string }[] = [
 ];
 const KIND_ONE: Record<Kind, string> = { quest: "⚔ Quest", schedule: "📅 To schedule", habit: "🌱 Habit", project: "🗺 Project", shopping: "🛒 To buy", ritual: "💞 Ritual of connection", reward: "🎁 Reward", done: "✓ Already done" };
 /** What Import makes of each kind. */
-const SERVER_KIND = (k: Kind): "quest" | "habit" | "done" | "project" | "reward" => (k === "habit" || k === "done" || k === "project" || k === "reward" ? k : "quest");
+const SERVER_KIND = (k: Kind): "quest" | "habit" | "done" | "project" | "reward" | "ritual" => (k === "habit" || k === "done" || k === "project" || k === "reward" || k === "ritual" ? k : "quest");
 type Draft = {
   kind: Kind;
   title: string;
@@ -178,7 +178,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
   const [extra, setExtra] = useState<Step[]>([]);
 
   // "How soon" is asked up front for anything to do (quests and buy lists too, not only "to schedule").
-  const base: Step[] = draft?.kind === "habit" ? ["often", "time"] : draft?.kind === "schedule" || draft?.kind === "quest" || draft?.kind === "shopping" || draft?.kind === "ritual" ? ["plan", "board"] : draft?.kind === "reward" ? [] : ["board"];
+  const base: Step[] = draft?.kind === "habit" ? ["often", "time"] : draft?.kind === "schedule" || draft?.kind === "quest" || draft?.kind === "shopping" ? ["plan", "board"] : draft?.kind === "ritual" ? ["plan"] : draft?.kind === "reward" ? [] : ["board"];
   const steps: Step[] = [...base, ...extra.filter((x) => !base.includes(x)), "review"];
   const step = steps[Math.min(stepAt, steps.length - 1)];
   function jump(s: Step) {
@@ -332,7 +332,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           router.refresh();
           return;
         }
-        say(d.kind === "habit" ? `“${d.title}” is one of your habits now` : d.kind === "reward" ? `“${d.title}” is in your Treasure Chest` : d.kind === "project" ? `“${d.title}” is a board now${d.steps.length ? `, with ${d.steps.length} quests` : ""}` : d.kind === "done" ? `Logged “${d.title}” as done ✓` : planBy ? `“${d.title}” is on your list to schedule` : `Added “${d.title}”${board ? ` to ${board.title}` : ""}`);
+        say(d.kind === "ritual" ? `“${d.title}” is one of your rituals of connection (Insights keeps how long since)${planBy ? ", and on your list to schedule" : ""}` : d.kind === "habit" ? `“${d.title}” is one of your habits now` : d.kind === "reward" ? `“${d.title}” is in your Treasure Chest` : d.kind === "project" ? `“${d.title}” is a board now${d.steps.length ? `, with ${d.steps.length} quests` : ""}` : d.kind === "done" ? `Logged “${d.title}” as done ✓` : planBy ? `“${d.title}” is on your list to schedule` : `Added “${d.title}”${board ? ` to ${board.title}` : ""}`);
         next();
         router.refresh();
       } catch (e) {

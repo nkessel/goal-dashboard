@@ -41,7 +41,7 @@ Each item is the owner's own ask. Take them top to bottom; mark done here and mo
    - A simpler XP burst for habits, rites and mini-quests.
    - A shimmering border on reward cards. (Already there: `.reward-shimmer` on Treasure Chest cards, two passes on load; maybe the owner wants it continuous or on the border only. Ask.)
    - Check the "+ board" chip on a Martin board quest (looks wrong; investigate).
-8. **Rituals of connection tracking** (owner, Nov 1): each ritual (e.g. couples covenant, wheel of consent) shows how long since it was last done and a log of when; also in Insights like Streaks. Light: no button walls. Plan: rituals as rites with `kind = 'ritual'` (kept off the daily habit list), an Insights section "Rituals of connection" with days-since, a "Did it ✓" and the history.
+8. ~~Rituals of connection tracking~~ shipped Nov 1 (owner, Nov 1): each ritual (e.g. couples covenant, wheel of consent) shows how long since it was last done and a log of when; also in Insights like Streaks. Light: no button walls. Plan: rituals as rites with `kind = 'ritual'` (kept off the daily habit list), an Insights section "Rituals of connection" with days-since, a "Did it ✓" and the history.
 9. **Message anyone in the party** (owner, Nov 1, later): the recipient gets an email notification with the whole message in it.
 10. **Calendar listening windows** (owner, Nov 1, later): the calendar spots commutes/dog walks and suggests a video from the learning list; dog walks show on the calendar.
 11. Then the rest of section 1 (arrange in context on remaining screens, UX synthesis polish).
@@ -148,6 +148,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 1: Rituals of connection: Insights section (arrangeable part `rituals`, `insights/Rituals.tsx`): each ritual shows how long since ("12 days ago · 2 times"), "Did it ✓" logs today; tapping it opens name, note, another day, the dates done (× to remove) and Remove ritual. Stored in `life_wheel.rituals` (`lib/rituals.ts`, `saveRitualsAction`). Importing a 💞 card adds it there (one step: Plan it within; planned also puts a quest on the list to schedule). The owner's 6 ritual cards are still on /import.
 - Nov 1: Auto-schedule is simpler and visual (owner: "too complicated", "show the calendar slots"): each day is a strip (busy grey, essentials dashed with icons, your quests as gold numbered blocks; `DayStrip` in `AutoScheduler.tsx`) with a short numbered list under it; tap a block or row for AM/PM/Eve/Any and Leave it out inline; one gold "Place all N", a quiet "One by one"; every setting behind the gear (folded).
 - Nov 1: Three PDFs (MA claim form, subway performer application blank + filled) uploaded into `attachments` through a temporary token-gated function (owner approved); `cleanups.ts` puts them on their import cards on the next load.
 - Nov 1: Import board picker: type to find a board (matches as you type, Enter picks the first), a short list (chosen, suggested, then a few) one per line, "+ New board “…”" makes one on the spot (`createBoardQuickAction`), "No board"; the same picker in "Fill it all in myself".

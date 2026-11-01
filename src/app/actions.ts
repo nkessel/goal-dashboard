@@ -2936,6 +2936,31 @@ export async function saveStreaksAction(list: { id: string; name: string; word: 
   return clean;
 }
 
+/** Rituals of connection: the whole list (names, notes and the days each was done). */
+export async function saveRitualsAction(list: import("@/lib/rituals").Ritual[]) {
+  const ownerId = await requireProfileId();
+  const { cleanRituals } = await import("@/lib/rituals");
+  const clean = cleanRituals(list);
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, rituals: clean } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  revalidatePath("/insights");
+  return clean;
+}
+
+async function addRitual(ownerId: string, title: string, note: string | null) {
+  const { cleanRituals } = await import("@/lib/rituals");
+  const extras = await readExtras(ownerId);
+  const list = cleanRituals(extras.rituals);
+  const same = list.find((r) => r.title.toLowerCase() === title.toLowerCase());
+  if (same) return same.id;
+  const id = `r${Math.random().toString(36).slice(2, 10)}`;
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, rituals: [...list, { id, title, note, log: [] }] } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  revalidatePath("/insights");
+  return id;
+}
+
 /** A slip: logged as an event with the streak's #word, so the count starts again from then. */
 export async function logSlipAction(word: string, atISO?: string | null) {
   const ownerId = await requireProfileId();
@@ -3826,7 +3851,7 @@ export async function importCardAction(
   id: string,
   input: {
     /** "done": a quest logged as already done (XP, nothing left open); "project": a board with a quest per step; "reward": into the Treasure Chest. */
-    kind: "quest" | "habit" | "done" | "project" | "reward";
+    kind: "quest" | "habit" | "done" | "project" | "reward" | "ritual";
     title: string;
     description?: string | null;
     steps?: string[];
@@ -3845,7 +3870,7 @@ export async function importCardAction(
     days?: number[] | null;
     repeat?: { every: number; unit: "day" | "week" | "month" | "year"; from: string } | null;
   }
-): Promise<{ kind: "quest" | "habit" | "board" | "reward"; id: string }> {
+): Promise<{ kind: "quest" | "habit" | "board" | "reward" | "ritual"; id: string }> {
   const ownerId = await requireProfileId();
   const card = await importCardsData.getImportCard(ownerId, id);
   if (!card) throw new Error("That card is gone.");
@@ -3853,7 +3878,10 @@ export async function importCardAction(
   if (!title) throw new Error("Give it a name first.");
   const steps = (input.steps ?? []).map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 20);
   const minutes = input.minutes && input.minutes > 0 ? Math.min(1440, Math.round(input.minutes)) : null;
-  let made: { kind: "quest" | "habit" | "board" | "reward"; id: string };
+  let made: { kind: "quest" | "habit" | "board" | "reward" | "ritual"; id: string };
+  // A ritual of connection joins your rituals (Insights keeps how long since each).
+  // Planned ("Plan it within…"), it also goes on the list to schedule, as a quest.
+  const ritualId = input.kind === "ritual" ? await addRitual(ownerId, title, input.description?.trim() || null) : null;
   // To buy: the items marked as rewards go to the Treasure Chest first.
   const rewardItems = (input.rewardItems ?? []).map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 20);
   let firstReward: string | null = null;
@@ -3861,7 +3889,9 @@ export async function importCardAction(
     const rid = await createRewardAction({ title: it.slice(0, 200) }).catch(() => null);
     firstReward ??= rid;
   }
-  if (rewardItems.length && !steps.length && input.kind === "quest" && firstReward) {
+  if (ritualId && !input.planBy) {
+    made = { kind: "ritual", id: ritualId };
+  } else if (rewardItems.length && !steps.length && input.kind === "quest" && firstReward) {
     // Every item was a reward: nothing left to buy.
     made = { kind: "reward", id: firstReward };
   } else if (input.kind === "reward") {

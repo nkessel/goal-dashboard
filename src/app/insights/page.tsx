@@ -15,6 +15,8 @@ import { EventLog } from "@/components/insights/EventLog";
 import { DEFAULT_WHEEL, LifeWheel } from "@/components/insights/LifeWheel";
 import { listWinsSince } from "@/lib/data/wins";
 import { Streaks } from "@/components/insights/Streaks";
+import { Rituals } from "@/components/insights/Rituals";
+import { cleanRituals } from "@/lib/rituals";
 import { slipMatcher } from "@/lib/streaks";
 import { listRites, listCompletionsFor, listHabitSkips } from "@/lib/data/rites";
 import { WheelOfTime } from "@/components/insights/WheelOfTime";
@@ -173,6 +175,23 @@ export default async function InsightsPage() {
                   Streaks <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— habits you keep, and what you keep away from · just for you</span>
                 </h2>
                 <Streaks initial={streakDefs} notes={streakNotes} habits={habitStreaks} />
+              </section>
+              ),
+            },
+            {
+              key: "rituals",
+              label: "Rituals of connection",
+              hint: "How long since each, and when you did them",
+              node: (
+              <section
+                aria-label="Rituals of connection"
+                className="flex flex-col gap-2 rounded-2xl px-4 py-3.5"
+                style={{ background: "linear-gradient(180deg, #f6ecd2, #ecdcb4)", border: "1.5px solid rgba(139,112,64,.45)", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}
+              >
+                <h2 className={`m-0 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "#3b2a14" }}>
+                  Rituals of connection <span className="text-[13px] font-normal" style={{ color: "#6b5631" }}>— how long it&rsquo;s been</span>
+                </h2>
+                <Rituals initial={cleanRituals((profile?.life_wheel as Record<string, unknown> | null | undefined)?.rituals)} today={appDayKey()} />
               </section>
               ),
             },
