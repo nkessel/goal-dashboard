@@ -17,6 +17,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 | 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
 | 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. Left: consistent capitalization, pinned editor footer. The UX teams can now read real click timings from `ui_clicks`. |
 | 2 | **Ship pending in-app feedback** | Ready | Run the loop in section 3. See the header list. |
+| 2b | **Smoothness audit follow-ups** | Ready | Audit method: in the signed-in browser pane, a layout-shift + DOM observer script opens every toggle and fakes the keyboard by overriding `visualViewport.height` (Oct 31 night). Left: a real-iPhone keyboard pass (the simulation can't show iOS panning); Insights' Last night still lands in one heavy frame before sliding; DayPlanner, ImportReview, BossLine, IconPicker exits by hand. |
 | 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
 
 **Open questions for the owner:** none (the Oct 22 notes were settled by the owner, Oct 31).
