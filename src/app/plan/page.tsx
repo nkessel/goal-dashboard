@@ -21,12 +21,19 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const { mode, mid } = await searchParams;
   const ownerId = session.user.id;
   // Planning with Mom is only on the owner's profile.
-  const owner = await isAdmin(ownerId).catch(() => false);
-  const kind: PlanKind = mode === "month" ? "month" : mode === "mom" && owner ? "pair" : "week";
+  // Everything loads in one wave (only "with Mom" waits to know it's the owner first).
+  const ownerP = isAdmin(ownerId).catch(() => false);
+  const kind: PlanKind = mode === "month" ? "month" : mode === "mom" && (await ownerP) ? "pair" : "week";
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const end = new Date(start.getTime() + 8 * 86_400_000);
-  const [profile, draft, back, open, toSchedule, folders, calTasks, boards, checks, followUp] = await Promise.all([
+  // Google events (best-effort), the boards for the wheel and the last session with Mom start alongside.
+  const eventsP: Promise<GoogleCalendarEvent[]> = auth()
+    .then((s) => (s?.googleAccessToken ? listEventsAllCalendars(s.googleAccessToken, new Date(start.getTime() - 86_400_000), end).then((r) => r.events) : []))
+    .catch(() => []);
+  const areaBoardsP = listBoardsForOwner(ownerId).catch(() => []);
+  const lastP = kind === "pair" ? lastPairSession(ownerId).catch(() => null) : Promise.resolve(null);
+  const [[profile, draft, back, open, toSchedule, folders, calTasks, boards, checks, followUp], owner, allEvents, areaBoards, last] = await Promise.all([Promise.all([
     getProfileById(ownerId),
     getPlanSession(ownerId, kind).catch(() => null),
     lookBack(ownerId, kind),
@@ -37,26 +44,17 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
     kind === "month" ? listBoardsWithStatsForOwner(ownerId).catch(() => []) : Promise.resolve([]),
     listCheckInsSince(ownerId, new Date(Date.now() - 92 * 86_400_000).toISOString()).catch(() => []),
     kind === "pair" ? Promise.resolve(null) : focusFollowUp(ownerId, kind).catch(() => null),
-  ]);
-  let events: GoogleCalendarEvent[] = [];
-  const s = await auth();
-  if (s?.googleAccessToken) {
-    try {
-      const ids = new Set(calTasks.map((t) => t.google_calendar_event_id).filter(Boolean));
-      events = (await listEventsAllCalendars(s.googleAccessToken, new Date(start.getTime() - 86_400_000), end)).events.filter((e) => !ids.has(e.id));
-    } catch {
-      /* calendar is best-effort */
-    }
-  }
+  ]), ownerP, eventsP, areaBoardsP, lastP]);
+  const ids = new Set(calTasks.map((t) => t.google_calendar_event_id).filter(Boolean));
+  const events = allEvents.filter((e) => !ids.has(e.id));
   const live = open.filter((t) => !t.needs_review && !t.reward_id);
   const review = questsToReview(live);
-  const boardAreas = wheelAreasFrom(await listBoardsForOwner(session.user.id).catch(() => []));
+  const boardAreas = wheelAreasFrom(areaBoards);
   const wheelLast: Record<string, { level: number; at: string }> = {};
   for (const c of checks) if (c.metric.startsWith("◎ ")) wheelLast[c.metric.slice(2)] = { level: c.level, at: c.created_at };
   const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
   if (kind === "pair") {
-    const last = await lastPairSession(ownerId).catch(() => null);
     return (
       <AppShell userLabel={session.user.email ?? ""} profileId={ownerId} wide>
         <PairRitual

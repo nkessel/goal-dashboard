@@ -34,20 +34,33 @@ export default async function FeedPage() {
   const session = await requireSession();
   const profileId = session.user.id;
 
-  const [directory, friendshipMap, incoming, friendIds, invite, profile] = await Promise.all([
+  // One wave: each list starts as soon as what it needs has arrived (no queue of waits).
+  const friendIdsP = listFriendIds(profileId);
+  const incomingP = listIncomingRequests(profileId);
+  const sharedP = listSharedBoards(profileId);
+  const forumsP = Promise.all((["party", "community", "ideas"] as const).map((sc) => listThreads(sc, profileId)));
+  const feedP = friendIdsP.then((ids) => listFeed([profileId, ...ids], 30));
+  const [directory, friendshipMap, incoming, friendIds, invite, profile, champion, shared, week, weekPeople, adders, forums, forumPeople, incomingProfiles, feed, allProfiles, cap] = await Promise.all([
     listDirectory(profileId),
     getFriendshipMap(profileId),
-    listIncomingRequests(profileId),
-    listFriendIds(profileId),
+    incomingP,
+    friendIdsP,
     getOrCreateInviteLink(profileId),
     getProfileById(profileId),
+    getChampion(),
+    sharedP,
+    friendIdsP.then((ids) => partyWeek([profileId, ...ids], currentWeekStart())).catch(() => []),
+    friendIdsP.then((ids) => getProfilesByIds(ids)),
+    sharedP.then((sh) => getProfilesByIds([...new Set(sh.flatMap((b) => b.quests.map((q) => q.added_by).filter((x): x is string => !!x)))])),
+    forumsP,
+    forumsP.then((fs) => getProfilesByIds([...new Set(fs.flatMap((f) => f.threads).map((t) => t.author_id).filter((x): x is string => !!x))])),
+    incomingP.then((inc) => getProfilesByIds(inc.map((f) => f.requester_id))),
+    feedP,
+    feedP.then((fd) => getProfilesByIds([...fd.map((f) => f.owner_id), ...fd.flatMap((f) => f.comments.map((c) => c.profile_id))])),
+    levelCap(profileId).catch(() => 10),
   ]);
-
-  const [champion, shared, week] = await Promise.all([getChampion(), listSharedBoards(profileId), partyWeek([profileId, ...friendIds], currentWeekStart()).catch(() => [])]);
-  const weekPeople = await getProfilesByIds(friendIds);
   // eslint-disable-next-line react-hooks/purity -- a server render's "now"
   const now = Date.now();
-  const adders = await getProfilesByIds([...new Set(shared.flatMap((b) => b.quests.map((q) => q.added_by).filter((x): x is string => !!x)))]);
   const sharedViews = shared.map((b) => ({
     id: b.board.id,
     title: b.board.title,
@@ -55,22 +68,14 @@ export default async function FeedPage() {
     ownerName: b.owner.name?.split(" ")[0] ?? "A party member",
     quests: b.quests.map((q) => ({ id: q.id, title: q.title, xp: q.xp_value, addedBy: q.added_by ? (adders.get(q.added_by)?.name?.split(" ")[0] ?? null) : null })),
   }));
-  const forums = await Promise.all((["party", "community", "ideas"] as const).map((sc) => listThreads(sc, profileId)));
   const threads = forums.flatMap((f) => f.threads);
-  const forumPeople = await getProfilesByIds([...new Set(threads.map((t) => t.author_id).filter((x): x is string => !!x))]);
   const forumAuthors: Record<string, AuthorView> = Object.fromEntries(
     [...forumPeople.values()].map((p) => [p.id, { id: p.id, name: p.name ?? "Adventurer", level: shownLevel(p), avatar_color: p.avatar_color, avatar_image_url: p.avatar_image_url, champion: p.id === champion?.id }])
   );
 
-  const incomingProfiles = await getProfilesByIds(incoming.map((f) => f.requester_id));
   const incomingWithProfiles = incoming
     .map((friendship) => ({ friendship, profile: incomingProfiles.get(friendship.requester_id)! }))
     .filter((r) => r.profile);
-
-  const feed = await listFeed([profileId, ...friendIds], 30);
-  const authorIds = feed.map((f) => f.owner_id);
-  const commentAuthorIds = feed.flatMap((f) => f.comments.map((c) => c.profile_id));
-  const allProfiles = await getProfilesByIds([...authorIds, ...commentAuthorIds]);
 
   const directoryRows = directory.map((p) => ({
     profile: p,
@@ -79,7 +84,7 @@ export default async function FeedPage() {
 
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
-  const level = profile ? xpToNextLevel(profile.total_xp, await levelCap(session.user.id).catch(() => 10)).level : 1;
+  const level = profile ? xpToNextLevel(profile.total_xp, cap).level : 1;
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>

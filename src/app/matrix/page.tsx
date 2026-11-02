@@ -26,19 +26,20 @@ export default async function MatrixPage({
   const plotIds = typeof sp.plot === "string" ? sp.plot.split(",").filter(Boolean) : undefined;
   const confirmImports = sp.review === "1";
 
-  const [boards, rawTasks, completedTasks, profile, energy] = await Promise.all([
+  // One wave: the steps join the open quests as soon as those arrive, alongside the rest.
+  const [boards, tasks, completedTasks, profile, energy, cap] = await Promise.all([
     listBoardsForOwner(session.user.id),
-    listOpenTasksWithBoardForOwner(session.user.id),
+    // Steps (counts and the next one to do) feed the Finish line and Start-friction views.
+    listOpenTasksWithBoardForOwner(session.user.id).then((raw) => attachNextSteps(raw, session.user.id).catch(() => raw)),
     listCompletedTasksForOwner(session.user.id, 10),
     getProfileById(session.user.id),
     listEnergySince(session.user.id, new Date(Date.now() - 30 * 86_400_000).toISOString()),
+    levelCap(session.user.id).catch(() => 10),
   ]);
-  // Steps (counts and the next one to do) feed the Finish line and Start-friction views.
-  const tasks = await attachNextSteps(rawTasks, session.user.id).catch(() => rawTasks);
 
   const theme = profile?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
-  const level = profile ? xpToNextLevel(profile.total_xp, await levelCap(session.user.id).catch(() => 10)).level : 1;
+  const level = profile ? xpToNextLevel(profile.total_xp, cap).level : 1;
   const victoriesStyle = {
     background: isAdventure ? "var(--t-panel-2)" : "var(--t-card)",
     border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
