@@ -25,14 +25,22 @@ import type { Task } from "@/lib/data/types";
  */
 export default async function FriendProfilePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const session = await requireSession();
-  const { id } = await params;
-  const { tab: tabParam } = await searchParams;
-  const [me, found] = await Promise.all([getProfileById(session.user.id), getProfileById(id)]);
+  const [{ id }, { tab: tabParam }] = await Promise.all([params, searchParams]);
+  // One wave: whether they're in your party, what they share and their standing all load together
+  // (shown only to party members; nothing here leaves the server unless it is).
+  const [me, found, member, share, champion, stats, cap] = await Promise.all([
+    getProfileById(session.user.id),
+    getProfileById(id),
+    isPartyMember(session.user.id, id),
+    getShareSettings(id),
+    getChampion(),
+    getStats(id),
+    levelCap(id).catch(() => 10),
+  ]);
   if (!found) notFound();
   const friend = found!;
   const theme = me?.theme ?? "adventure";
   const isAdventure = theme === "adventure";
-  const member = await isPartyMember(session.user.id, id);
 
   const card = `relative flex flex-col gap-3 rounded-2xl px-4 py-4 ${isAdventure ? "parchment parchment-framed" : ""}`;
   const cardStyle = isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" };
@@ -53,10 +61,8 @@ export default async function FriendProfilePage({ params, searchParams }: { para
     );
   }
 
-  const share = await getShareSettings(id);
   const open = SHARE_SCREENS.filter((s) => shares(share, s.key));
   const tab: ShareKey | null = open.find((s) => s.key === tabParam)?.key ?? open[0]?.key ?? null;
-  const [champion, stats, cap] = await Promise.all([getChampion(), getStats(id), levelCap(id).catch(() => 10)]);
   const lv = xpToNextLevel(friend.total_xp, cap);
   const first = friend.name?.split(" ")[0] ?? "They";
 
@@ -195,11 +201,11 @@ async function visibleQuests(ownerId: string) {
 }
 
 async function TodayView({ ownerId, first, card, cardStyle, h2 }: ViewProps) {
-  const quests = await visibleQuests(ownerId);
+  const since = new Date(Date.now() - 20 * 3600_000).toISOString();
+  const [quests, allWins] = await Promise.all([visibleQuests(ownerId), listWinsSince(ownerId, since, { hidePrivate: true })]);
   const today = quests.filter((t) => t.is_manual_priority);
   const more = quests.filter((t) => !t.is_manual_priority && t.in_additional !== false);
-  const since = new Date(Date.now() - 20 * 3600_000).toISOString();
-  const wins = (await listWinsSince(ownerId, since, { hidePrivate: true })).filter((w) => w.kind === "quest" || w.kind === "habit" || w.kind === "rite");
+  const wins = allWins.filter((w) => w.kind === "quest" || w.kind === "habit" || w.kind === "rite");
   return (
     <>
       <section className={card} style={cardStyle}>

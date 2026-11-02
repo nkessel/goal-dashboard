@@ -43,3 +43,6 @@ scripts/.xp-module.mjs
 scripts/.email-module.mjs
 scripts/.test-session*.json
 dev.log
+
+# Local preview harness pages (mock props, never shipped)
+/src/app/dev-preview/
