@@ -51,7 +51,7 @@ const hm = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minut
  * list, in its order, gets the first free time that suits it. You see the
  * whole plan first, nudge it, then place it all at once.
  */
-export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task[]; theme: "calm" | "adventure"; onClose: () => void }) {
+export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks: Task[]; theme: "calm" | "adventure"; onClose: () => void; /** Plan just this one day (the evening's "plan tomorrow"): everything goes on it. */ day?: Date }) {
   const { closing, close: onClose } = useClosing(closeNow);
   useEscape(() => onClose());
   const router = useRouter();
@@ -69,15 +69,20 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<number | null>(null);
   const [applying, startApplying] = useTransition();
-  // Planning starts from the moment the planner opens.
-  const [now] = useState(() => new Date());
+  // Planning starts from the moment the planner opens (or the start of the one day being planned).
+  const [now] = useState(() => {
+    if (!day) return new Date();
+    const d = new Date(day);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() > Date.now() ? d : new Date();
+  });
 
   useEffect(() => {
     let live = true;
     // Far enough to reach the latest "plan it by" (up to two months).
     const furthest = Math.max(0, ...tasks.map((t) => (t.plan_by ? Math.ceil((Date.parse(t.plan_by) - now.getTime()) / 86_400_000) : 0)));
     const to = new Date(now);
-    to.setDate(to.getDate() + Math.min(62, Math.max(SCHEDULER_DEFAULTS.horizon, furthest + 1)) + 1);
+    to.setDate(to.getDate() + (day ? 1 : Math.min(62, Math.max(SCHEDULER_DEFAULTS.horizon, furthest + 1)) + 1));
     schedulerContextAction(now.toISOString(), to.toISOString(), hiddenCalendars())
       .then((ctx) => {
         if (!live) return;
@@ -134,8 +139,10 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
   const plan = useMemo(() => {
     if (!settings || !blocking) return null;
     const held = new Set(fixed.map((f) => f.id));
-    return planSchedule(items.filter((i) => !held.has(i.id)), [...blocking, ...fixed.map((f) => ({ start: f.start.getTime(), end: f.end.getTime() }))], settings, now, avoid);
-  }, [items, blocking, settings, now, avoid, fixed]);
+    // One day: all of it goes on that day (no daily cap, weekends too).
+    const eff = day ? { ...settings, horizon: 1, maxPerDay: Math.max(settings.maxPerDay, 16 * 60), skipWeekends: false } : settings;
+    return planSchedule(items.filter((i) => !held.has(i.id)), [...blocking, ...fixed.map((f) => ({ start: f.start.getTime(), end: f.end.getTime() }))], eff, now, avoid);
+  }, [items, blocking, settings, now, avoid, fixed, day]);
   const current = useMemo(() => [...(plan?.placed ?? [])].sort((a, b) => a.start.getTime() - b.start.getTime())[0] ?? null, [plan]);
   const meals = Object.fromEntries((Object.keys(MEAL_DEFAULTS) as MealKey[]).map((k) => [k, { ...MEAL_DEFAULTS[k], ...((settings?.meals as Partial<Record<MealKey, object>> | undefined)?.[k] ?? {}) }])) as typeof MEAL_DEFAULTS;
   function setMeal(key: MealKey, patch: Partial<(typeof meals)[MealKey]>) {
@@ -209,7 +216,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow }: { tasks: Task
         <div className="relative z-[1] flex items-start gap-2 px-4 pb-2 pt-3.5">
           <div className="min-w-0 flex-1">
             <h3 className={`m-0 ${isAdventure ? "font-display text-[21px]" : "text-[17px] font-bold"}`} style={{ color: ink }}>
-              ✨ Auto-schedule
+              ✨ Auto-schedule{day ? ` ${dayLabel(now).toLowerCase() === "tomorrow" ? "tomorrow" : dayLabel(now)}` : ""}
             </h3>
             <p className="m-0 text-[13.5px] leading-snug" style={{ color: soft }}>
               A plan for your list, in your free time{google ? " (around your Google calendars)" : ""}. Tap a gold block to change it.

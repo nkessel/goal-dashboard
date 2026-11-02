@@ -483,7 +483,8 @@ export function EveningRites({
         </span>
         {menuFor === r.id && !overlay && (
           <div data-rite-menu data-menu="rite" role="menu" className="card-pop-in absolute right-2 top-full z-20 mt-1 flex flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12, minWidth: 190 }}>
-            {!special && (
+            {/* Every rite can be renamed, the special ones (Plan tomorrow's day…) too. */}
+            {(
               <button
                 type="button"
                 role="menuitem"

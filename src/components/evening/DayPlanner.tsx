@@ -19,6 +19,7 @@ import {
 } from "@/app/actions";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { fromFeedback } from "@/lib/from-feedback";
+import { AutoScheduler } from "@/components/calendar/AutoScheduler";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 type Carry =
@@ -112,6 +113,7 @@ const N = {
 export function DayPlanner({
   day,
   chosen,
+  theme,
   onHide,
 }: {
   /** This evening's day key. */
@@ -130,6 +132,8 @@ export function DayPlanner({
   const [menu, setMenu] = useState<string | null>(null);
   const [editingQuick, setEditingQuick] = useState(false);
   const [planning, setPlanning] = useState(true);
+  // "Auto-schedule tomorrow": every quest still to place, onto tomorrow only.
+  const [auto, setAuto] = useState(false);
   const [mealsOpen, setMealsOpen] = useState(false);
   const [xpFor, setXpFor] = useState<string | null>(null);
   const [height, setHeight] = useState(DEFAULT_HEIGHT);
@@ -683,12 +687,34 @@ export function DayPlanner({
         </svg>
       </button>
 
+      {auto && (
+        <AutoScheduler
+          tasks={toPlace}
+          theme={theme ?? "adventure"}
+          day={new Date(`${tomorrow}T12:00:00`)}
+          onClose={() => {
+            setAuto(false);
+            void load();
+          }}
+        />
+      )}
       {planning && (
         <div className="flex flex-col gap-2" onClick={() => setXpFor(null)}>
           {toPlace.length > 0 && (
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-              <li className="text-[12px] font-semibold uppercase tracking-[.12em]" style={{ color: N.faint }}>
-                Tomorrow&rsquo;s quests · tap one, then a time
+              <li className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 text-[12px] font-semibold uppercase tracking-[.12em]" style={{ color: N.faint }}>
+                  Tomorrow&rsquo;s quests · tap one, then a time
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => (e.stopPropagation(), setAuto(true))}
+                  title="Place all of tomorrow's quests in tomorrow's free time"
+                  className="hover-glow h-8 shrink-0 rounded-full px-3 text-[12.5px] font-bold"
+                  style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10" }}
+                >
+                  ✨ Auto-schedule all
+                </button>
               </li>
               {toPlace.map((t) => {
                 const on = carry?.kind === "quest" && carry.id === t.id;
