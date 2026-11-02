@@ -24,6 +24,18 @@ export const FLOWS = [
       await h.check("shown");
       await h.toggle(/emotional check-in/i, "emotional check-in");
       await h.toggle(/^sleep/i, "sleep");
+      // Sleep and wake on one line; each opens its time ruler right under it (no popup, no keyboard).
+      await h.tap(/^sleep/i, "sleep open", { expectMove: true });
+      await h.tap(/last night.s sleep time:/i, "bedtime ruler", { optional: true, expectMove: true });
+      await h.check("bedtime ruler");
+      await h.tap(/this morning.s wake time:/i, "wake ruler", { optional: true });
+      await h.check("wake ruler");
+      await h.tap((p) => p.getByRole("button", { name: /^type$/i }).first(), "type a time", { optional: true });
+      await h.check("typing a time");
+      await esc(h);
+      await h.tap((p) => p.getByRole("button", { name: /^done$/i }).first(), "ruler done", { optional: true, expectMove: true });
+      await h.tap(/^sleep/i, "sleep close", { expectMove: true });
+      await h.toggle(/^habits/i, "habits");
       await h.typeIn((p) => p.getByPlaceholder(/most important/i).first(), "top priority");
       await h.toggle(/other priorities/i, "other priorities");
       await h.toggle(/choose today.s quests/i, "choose today's quests");
@@ -39,10 +51,14 @@ export const FLOWS = [
       await h.tap(/^the toucan:/i, "toucan menu", { optional: true });
       await h.check("toucan menu");
       await esc(h);
+      await h.tap(/close what he.s saying/i, "close his saying", { optional: true, expectMove: true });
+      await h.check("toucan bubble closed");
       await h.page.evaluate(() => localStorage.removeItem("welcome-toucan-at"));
       await h.goto("/", { welcome: true, name: "welcome" });
       await h.tap(/welcome screen settings/i, "arrange welcome", { expectMove: true }); // the "when it opens" panel appears above
       await h.check("arranging");
+      await h.tap(/^edit habits/i, "arrange: habit options", { optional: true, expectMove: true });
+      await h.check("arranging: habit options");
       await h.tap(/done arranging/i, "done arranging", { expectMove: true });
       await h.tap(/complete check-in/i, "complete check-in", { expectMove: true }); // the card dives away
       await h.settle(2500);

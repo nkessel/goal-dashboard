@@ -248,7 +248,18 @@ function pressOrDrag(
  * it). Minimize a draft to start another; with drafts waiting, the button
  * asks whether to continue one or start fresh. Shortcut: F (when not typing).
  */
+/** Whether the welcome screen is up (html[data-welcome-open]). */
+function subscribeWelcome(cb: () => void) {
+  const mo = new MutationObserver(cb);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-welcome-open"] });
+  return () => mo.disconnect();
+}
+const welcomeOpenNow = () => document.documentElement.hasAttribute("data-welcome-open");
+
 export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" }) {
+  // While the welcome screen is up the button waits in the sky at the top right, off the card's controls
+  // (its own spot comes back on the other screens; owner's recordings, Nov 2).
+  const welcomeUp = useSyncExternalStore(subscribeWelcome, welcomeOpenNow, () => false);
   const isAdventure = theme === "adventure";
   const vp = useViewport();
   const [loaded, setLoaded] = useState(false);
@@ -490,7 +501,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   // ---- The round button: tap to start (or continue) feedback, drag to put it anywhere.
   const defaultPos: Pos = { x: vp.innerW - BTN - 12, y: vp.innerH - BTN - 92 };
   const placeBtn = (p: Pos): Pos => ({ x: clamp(p.x, 6, vp.innerW - BTN - 6), y: clamp(p.y, 6, vp.innerH - BTN - 6) });
-  const btnPos = placeBtn(dragPos ?? parked ?? pos ?? defaultPos);
+  const btnPos = welcomeUp && !dragPos ? { x: vp.innerW - BTN - 10, y: 10 } : placeBtn(dragPos ?? parked ?? pos ?? defaultPos);
 
   function onBtnDown(e: React.PointerEvent<HTMLButtonElement>) {
     const start = btnPos;
@@ -572,6 +583,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         type="button"
         data-feedback-hide
         data-feedback-root
+        data-feedback-btn
         onPointerDown={onBtnDown}
         onClick={() => {
           if (justDragged.current) return;

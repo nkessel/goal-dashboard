@@ -17,6 +17,28 @@ export const CALENDAR_AUTH_PARAMS = {
   include_granted_scopes: "true",
 };
 
+/**
+ * Fresh Google tokens, kept in this server's memory. Server components and actions can't write the
+ * refreshed token back into the cookie, so once the first hour passed every page and every action
+ * called Google before touching the database (~a few hundred ms each). Now one refresh serves all of
+ * them until it expires, and calls at the same moment share one request.
+ */
+const freshTokens = new Map<string, { accessToken: string; accessTokenExpires: number; refreshToken: string }>();
+const refreshing = new Map<string, Promise<{ accessToken: string; accessTokenExpires: number; refreshToken: string }>>();
+async function cachedGoogleRefresh(refreshToken: string) {
+  const hit = freshTokens.get(refreshToken);
+  if (hit && Date.now() < hit.accessTokenExpires - 60_000) return hit;
+  let p = refreshing.get(refreshToken);
+  if (!p) {
+    p = refreshGoogleAccessToken(refreshToken).finally(() => refreshing.delete(refreshToken));
+    refreshing.set(refreshToken, p);
+  }
+  const fresh = await p;
+  freshTokens.set(refreshToken, fresh);
+  if (freshTokens.size > 200) freshTokens.delete(freshTokens.keys().next().value!);
+  return fresh;
+}
+
 async function refreshGoogleAccessToken(refreshToken: string) {
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -107,7 +129,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const expiresAt = token.accessTokenExpires ?? 0;
       if (token.refreshToken && Date.now() > expiresAt - 60_000) {
         try {
-          const refreshed = await refreshGoogleAccessToken(token.refreshToken);
+          const refreshed = await cachedGoogleRefresh(token.refreshToken);
           token.accessToken = refreshed.accessToken;
           token.accessTokenExpires = refreshed.accessTokenExpires;
           token.refreshToken = refreshed.refreshToken;

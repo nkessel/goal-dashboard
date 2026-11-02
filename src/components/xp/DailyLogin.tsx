@@ -220,8 +220,8 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
         const ctx = await ctxP;
         if (!live) return;
         markBack();
+        // (No refresh here: Today re-rendering under the welcome screen only slowed it; it refreshes on close.)
         setShown({ mode: "day", award, ctx });
-        if (award) router.refresh();
         return;
       }
       // Welcome back: a few hours since your last check-in (and since this screen last came up).

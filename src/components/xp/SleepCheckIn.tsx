@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { saveCheckInAction, saveNightAction, setWheelOfTimeAction, wheelOfTimeAction } from "@/app/actions";
-import { EMPTY_NIGHT, NightFields, MoonIcon, SunIcon, TimeToken, type NightDraft } from "./NightFields";
+import { EMPTY_NIGHT, NightFields, MoonIcon, SunIcon, TimeToken, clock12, type NightDraft } from "./NightFields";
+import { Fold } from "@/components/ui/Fold";
 import { DateField } from "@/components/ui/DateField";
 import { eveningDayKey } from "@/components/evening/evening-clock";
 
@@ -66,25 +67,49 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
   }, []);
 
   const touched = JSON.stringify(night) !== base;
+  // The quality already saved (so the screen's own button doesn't save it twice).
+  const [savedQuality, setSavedQuality] = useState<number | null>(null);
+  const qualityNew = quality !== null && quality !== savedQuality;
   const filled = others.filter((n) => n.day && (n.bed || n.wake));
+  const dirty = touched || qualityNew || filled.length > 0;
+  async function save() {
+    if (!dirty) return true;
+    setError(null);
+    try {
+      for (const n of filled) await saveNightAction({ day: n.day, bed: n.bed || null, wake: n.wake || null, effort: [], hindrances: [], keep: true });
+      if (touched) await saveNightAction({ bed: night.bed || null, wake: night.wake || null, effort: night.effort, hindrances: night.hindrances });
+      if (qualityNew) await saveCheckInAction(null, [{ metric: "Sleep quality", level: quality * 2 }]);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save your sleep.");
+      return false;
+    }
+  }
   // Saved by the welcome screen's own button, with everything else on it.
   // (Braces matter: an effect's return value is its cleanup, and returning the saver made React
   // call it on every render, saving "Sleep quality" hundreds of times.)
   useEffect(() => {
-    register(async () => {
-      if (!touched && quality === null && !filled.length) return true;
-      setError(null);
-      try {
-        for (const n of filled) await saveNightAction({ day: n.day, bed: n.bed || null, wake: n.wake || null, effort: [], hindrances: [], keep: true });
-        if (touched) await saveNightAction({ bed: night.bed || null, wake: night.wake || null, effort: night.effort, hindrances: night.hindrances });
-        if (quality !== null) await saveCheckInAction(null, [{ metric: "Sleep quality", level: quality * 2 }]);
-        return true;
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't save your sleep.");
-        return false;
-      }
-    });
+    register(save);
   });
+  // Its own Save, bottom right (owner's note): saves now, folds the part, and its button says ✓.
+  const [saving, setSaving] = useState(false);
+  async function saveNow() {
+    if (saving) return;
+    setSaving(true);
+    const ok = await save();
+    setSaving(false);
+    if (!ok) return;
+    if (touched) {
+      setBase(JSON.stringify(night));
+      if (night.bed || night.wake) setLogged(true);
+    }
+    if (qualityNew) setSavedQuality(quality);
+    if (filled.length) setOthers([]);
+    setQualityOpen(false);
+    setOpen(false);
+    setStamp((n) => n + 1);
+  }
+  const [stamp, setStamp] = useState(0);
 
   function saveLists(next: { effort: string[]; hindrances: string[] }) {
     const before = lists;
@@ -96,14 +121,17 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
         setError(e instanceof Error ? e.message : "Couldn't save the lists.");
       });
   }
-  const summary = [night.bed || night.wake ? "times" : "", quality ? FACES[quality - 1].label.toLowerCase() : ""].filter(Boolean).join(" · ");
+  // Folded, the button says what's in it: "10:45 → 6:00 · Good" (owner's note).
+  const hm = (t: string) => clock12(t).replace(/ (am|pm)$/, "");
+  const times = night.bed && night.wake ? `${hm(night.bed)} → ${hm(night.wake)}` : night.bed ? `🌙 ${hm(night.bed)}` : night.wake ? `☀ ${hm(night.wake)}` : "";
+  const summary = [times, quality ? FACES[quality - 1].label : ""].filter(Boolean).join(" · ");
 
   return (
     <div className="flex w-full flex-col items-center">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]" style={GILT}>
+      <button key={stamp} type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className={`font-display flex h-10 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-5 text-[16px] ${stamp ? "sleep-stamp" : ""}`} style={GILT}>
         <MoonIcon />
-        Sleep{logged && !touched ? " ✓" : ""}
-        {summary && !open && <span className="text-[12.5px] opacity-75">· {summary}</span>}
+        Sleep{logged && !dirty ? " ✓" : ""}
+        {summary && !open && <span className="truncate font-sans text-[12.5px] font-semibold tabular-nums opacity-80">· {summary}</span>}
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ transform: open ? "rotate(180deg)" : undefined }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -112,7 +140,7 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
         <div className="drawer-inner" inert={!open}>
           <div className="mt-2 flex w-full flex-col gap-2 text-left" style={{ ["--t-cream" as string]: "var(--t-ink)", ["--ec-soft" as string]: "var(--t-ink-soft)", ["--ec-gold" as string]: "#8a6116" }}>
             {lists ? (
-              <NightFields value={night} onChange={setNight} effort={lists.effort} hindrances={lists.hindrances} onLists={saveLists} day={today} />
+              <NightFields value={night} onChange={setNight} effort={lists.effort} hindrances={lists.hindrances} onLists={saveLists} day={today} heading={false} />
             ) : (
               <p className="m-0 text-center text-[13px] italic" style={{ color: SOFT }}>
                 Opening…
@@ -162,6 +190,14 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
                 {error}
               </p>
             )}
+            {/* Save, bottom right, once there's something to save. */}
+            <Fold open={dirty}>
+              <div className="flex justify-end pt-0.5">
+                <button type="button" onClick={saveNow} disabled={saving} className="flex h-8 items-center gap-1 rounded-full px-4 text-[13px] font-bold disabled:opacity-70" style={GILT}>
+                  {saving ? "Saving…" : "Save ✓"}
+                </button>
+              </div>
+            </Fold>
           </div>
         </div>
       </div>

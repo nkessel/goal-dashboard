@@ -16,7 +16,7 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "streak", label: "Your streak", hint: "How many days in a row you've shown up. Day's first visit only. Motivating for some; leave it off if streaks feel like pressure." },
   { key: "line", label: "The day's wise line", hint: "One short encouragement, a different one each day. You can switch off any line you don't like, or add your own." },
   { key: "reflect", label: "Reflection question", hint: "One of your own reflection questions, a different one each day (‹ › for another). Its ✎ adds, edits and reorders your list; the toucan asks from it too while it shows. Hidden unless you turn it on." },
-  { key: "habits", label: "Habit pills", hint: "Small habits you can do right here, as pills (the first: Learn a language, a phrase in every language you're learning, with a print view). Its ✎ picks which pills show. Hidden unless you turn it on." },
+  { key: "habits", label: "Habits", hint: "A gilded Habits button that opens today's habits you picked, as buttons: tap one when it's done. Its ✎ (or a long press) picks which habits show and adds new ones; Learn a language's phrase tool sits there too." },
   { key: "bar", label: "Your level bar", hint: "Your level, filling with the XP that arriving earned you. Day's first visit only." },
   { key: "reward", label: "XP and coins", hint: "The XP and coins for showing up today, counted up as the screen opens. Day's first visit only." },
   { key: "due", label: "Due soon", hint: "A gilded button that says how many quests are due soon (the same reach you pick on Today, changeable here too) and opens into a drawer of their cards. Off by default to keep the screen calm." },
@@ -41,7 +41,7 @@ export function welcomeShows(fx: FxSettings, el: WelcomeEl): boolean {
   if (el === "bar" && fx.welcomeBar === false) return false;
   // Hidden unless turned on (older saved hide lists don't know it).
   if (el === "reflect") return fx.welcomeReflectOn === true;
-  if (el === "habits") return fx.welcomeHabitsOn === true;
+  if (el === "habits") return fx.welcomeHabitsOn !== false;
   return !(fx.welcomeHide ?? DEFAULT_HIDE).includes(el);
 }
 

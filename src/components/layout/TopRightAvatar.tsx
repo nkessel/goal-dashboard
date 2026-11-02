@@ -22,11 +22,17 @@ export function TopRightAvatar({
   const router = useRouter();
   // Preload Settings (and the avatar editor) so opening it is instant;
   // re-preload whenever that copy goes stale.
+  // Once, after the first screen is done (it used to re-fetch both after every save anywhere in the app,
+  // and right at startup, which slowed the app's opening).
   useEffect(() => {
-    const load = (href: string): void =>
-      router.prefetch(href, { kind: "full", onInvalidate: () => load(href) } as Parameters<typeof router.prefetch>[1]);
-    load("/settings");
-    load("/settings/avatar");
+    let t = 0;
+    const later = () => {
+      const busy = document.documentElement.hasAttribute("data-welcome-open") || document.documentElement.hasAttribute("data-fog");
+      if (busy) return void (t = window.setTimeout(later, 1500));
+      router.prefetch("/settings", { kind: "full" } as Parameters<typeof router.prefetch>[1]);
+    };
+    t = window.setTimeout(later, 4000);
+    return () => window.clearTimeout(t);
   }, [router]);
   if (pathname.startsWith("/settings")) return <CloseSettingsButton isAdventure={isAdventure} size={40} />;
   return (

@@ -1,9 +1,9 @@
 "use client";
 
-import { HABIT_PILLS } from "@/components/xp/LearnLanguage";
+import { HabitOptions } from "@/components/xp/WelcomeHabits";
 
 import { checkinLabel } from "@/lib/welcome";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -32,53 +32,54 @@ const PANEL = { border: "1px solid rgba(139,112,64,.4)", background: "rgba(255,2
 const FIELD = { borderColor: "#b39a6a", background: "rgba(255,250,238,.95)", color: "#2a1c10" } as const;
 const set = (patch: Partial<FxSettings>) => patchFx(patch);
 
-/** Above the welcome card: the choices that aren't part of the card itself. */
+/**
+ * The choices that aren't part of the card itself (when it opens, confetti, the castle):
+ * one folded line at the top of the card while arranging (it was a big panel above
+ * the card that pushed Done off a phone's screen; owner's recordings, Nov 2).
+ */
 export function ArrangeAbove({ fx, castleHidden }: { fx: FxSettings; castleHidden: boolean }) {
   const h = backHours(fx);
+  const [open, setOpen] = useState(false);
   return (
-    <div className="parchment card-pop-in mb-3 flex w-[min(500px,94vw)] flex-col gap-2 rounded-2xl px-4 py-3 text-left shadow-xl" onClick={(e) => e.stopPropagation()}>
-      {/* One Done, at the bottom of the card (and the gear itself). */}
-      <div className="relative z-[1] flex flex-wrap items-baseline gap-x-2">
-        <span className="font-display whitespace-nowrap text-[17px]" style={{ color: GOLD }}>
-          Welcome screen
+    <div className="flex w-full flex-col rounded-xl text-left" style={PANEL} onClick={(e) => e.stopPropagation()}>
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex min-h-9 w-full items-center gap-1.5 px-2.5 text-[12.5px]" style={{ color: INK }}>
+        <span className="font-bold uppercase tracking-[.1em]" style={{ color: GOLD }}>
+          Opens
         </span>
-        <span className="text-[12px]" style={{ color: SOFT }}>
-          Drag parts to move them; ✎ for more
-        </span>
-      </div>
-      {/* When it opens, as one line: 0 hours = only the day's first visit. Confetti sits beside the title. */}
-      <div className="relative z-[1] flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: GOLD }}>
-            When it opens
-          </span>
-          <button type="button" role="switch" aria-checked={fx.welcomeConfetti !== false} onClick={() => set({ welcomeConfetti: fx.welcomeConfetti === false })} title="Confetti on the day's first visit" className="ml-auto flex h-7 items-center gap-1 rounded-full px-2.5 text-[12px] font-semibold" style={fx.welcomeConfetti !== false ? CHIP_ON : CHIP}>
+        <span className="min-w-0 flex-1 truncate">{h ? `First visit, then after ${h} ${h === 1 ? "hr" : "hrs"} away` : "First visit of the day only"}{fx.welcomeConfetti !== false ? " · 🎉" : ""}</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: open ? "rotate(180deg)" : undefined }}>
+          <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <Fold open={open}>
+        <div className="flex flex-col gap-2 px-2.5 pb-2.5">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px]" style={{ color: INK }}>
+            <span>{h ? "First visit of the day, then again after" : "Only the day's first visit"}</span>
+            <span className="inline-flex h-8 items-center rounded-full" style={CHIP}>
+              <button type="button" onClick={() => set({ welcomeBackHours: Math.max(0, h - 1) })} disabled={h <= 0} aria-label="Fewer hours (0 = first visit only)" className="flex h-8 w-7 items-center justify-center rounded-l-full text-[16px] disabled:opacity-30">
+                −
+              </button>
+              <span className="font-display min-w-[58px] text-center text-[14.5px] tabular-nums">{h ? `${h} ${h === 1 ? "hr" : "hrs"}` : "never"}</span>
+              <button type="button" onClick={() => set({ welcomeBackHours: Math.min(12, h + 1) })} disabled={h >= 12} aria-label="More hours" className="flex h-8 w-7 items-center justify-center rounded-r-full text-[16px] disabled:opacity-30">
+                +
+              </button>
+            </span>
+            {h > 0 && <span>away</span>}
+          </div>
+          <button type="button" role="switch" aria-checked={fx.welcomeConfetti !== false} onClick={() => set({ welcomeConfetti: fx.welcomeConfetti === false })} title="Confetti on the day's first visit" className="flex h-8 items-center gap-1 self-start rounded-full px-2.5 text-[12.5px] font-semibold" style={fx.welcomeConfetti !== false ? CHIP_ON : CHIP}>
             🎉 Confetti {fx.welcomeConfetti !== false ? "on" : "off"}
           </button>
+          {/* On a narrow screen the castle is off to the side, out of view; its choice comes up here instead. */}
+          {castleHidden && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[13px] font-semibold" style={{ color: INK }}>
+                The castle on the far hill
+              </span>
+              <CastleChoices fx={fx} />
+            </div>
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[14px]" style={{ color: INK }}>
-          <span>{h ? "First visit of the day, then again after" : "Only the day's first visit"}</span>
-          <span className="inline-flex h-8 items-center rounded-full" style={CHIP}>
-            <button type="button" onClick={() => set({ welcomeBackHours: Math.max(0, h - 1) })} disabled={h <= 0} aria-label="Fewer hours (0 = first visit only)" className="flex h-8 w-7 items-center justify-center rounded-l-full text-[16px] disabled:opacity-30">
-              −
-            </button>
-            <span className="font-display min-w-[58px] text-center text-[14.5px] tabular-nums">{h ? `${h} ${h === 1 ? "hr" : "hrs"}` : "never"}</span>
-            <button type="button" onClick={() => set({ welcomeBackHours: Math.min(12, h + 1) })} disabled={h >= 12} aria-label="More hours" className="flex h-8 w-7 items-center justify-center rounded-r-full text-[16px] disabled:opacity-30">
-              +
-            </button>
-          </span>
-          {h > 0 && <span>away</span>}
-        </div>
-      </div>
-      {/* On a narrow screen the castle is off to the side, out of view; its choice comes up here instead. */}
-      {castleHidden && (
-        <div className="relative z-[1] flex flex-col gap-1">
-          <span className="text-[13px] font-semibold" style={{ color: INK }}>
-            The castle on the far hill
-          </span>
-          <CastleChoices fx={fx} />
-        </div>
-      )}
+      </Fold>
     </div>
   );
 }
@@ -197,10 +198,11 @@ const HAS_OPTIONS: WelcomeEl[] = ["checkin", "line", "focus", "reflect", "habits
  * button sits in its top-right corner; its ✎ opens its finer options. Hidden
  * parts wait at the end, faded, to be shown again.
  */
-export function ArrangeList({ fx, order, parts, empty }: { fx: FxSettings; order: WelcomeEl[]; parts: Partial<Record<WelcomeEl, React.ReactNode>>; empty: Partial<Record<WelcomeEl, string>> }) {
+export function ArrangeList({ fx, order, parts, empty, focusEl }: { fx: FxSettings; order: WelcomeEl[]; parts: Partial<Record<WelcomeEl, React.ReactNode>>; empty: Partial<Record<WelcomeEl, string>>; /** Opened by a long press on this part: its options start open. */ focusEl?: WelcomeEl | null }) {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
+    // A finger holds a moment before a part lifts, so scrolling the list never grabs one.
+    useSensor(TouchSensor, { activationConstraint: { delay: 280, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   // Hidden parts stay where they are (dimmed, eye closed); archived ones wait at the very bottom.
@@ -219,11 +221,18 @@ export function ArrangeList({ fx, order, parts, empty }: { fx: FxSettings; order
   };
   const unarchive = (el: WelcomeEl) => set({ welcomeArchived: (fx.welcomeArchived ?? []).filter((x) => x !== el) });
   return (
-    <div className="flex w-full flex-col gap-2">
-      <DndContext id="dnd-welcome" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    <div className="flex w-full flex-col gap-1.5">
+      <DndContext
+        id="dnd-welcome"
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={onDragEnd}
+        // Only the card scrolls while dragging, gently, near its edges (the page behind never does).
+        autoScroll={{ threshold: { x: 0, y: 0.12 }, acceleration: 5, canScroll: (el) => el.hasAttribute("data-welcome-card") }}
+      >
         <SortableContext items={active} strategy={verticalListSortingStrategy}>
           {active.map((el) => (
-            <Part key={el} el={el} fx={fx} empty={empty[el]} onArchive={() => archive(el)}>
+            <Part key={el} el={el} fx={fx} empty={empty[el]} onArchive={() => archive(el)} startOpen={el === focusEl}>
               {parts[el]}
             </Part>
           ))}
@@ -257,88 +266,101 @@ export function ArrangeList({ fx, order, parts, empty }: { fx: FxSettings; order
   );
 }
 
-function Part({ el, fx, empty, children, onArchive }: { el: WelcomeEl; fx: FxSettings; empty?: string; children: React.ReactNode; onArchive: () => void }) {
+/** What each part is, in a few words (compact rows while arranging). */
+const SHORT: Record<WelcomeEl, string> = {
+  checkin: "energy, mood and more",
+  sleep: "last night, factors, quality",
+  focus: "your own words",
+  quests: "due soon and today's",
+  streak: "days in a row",
+  line: "a wise line a day",
+  reflect: "your own questions",
+  habits: "the ones you pick",
+  bar: "level and XP",
+  reward: "XP and coins",
+  due: "quests due soon",
+};
+
+/**
+ * One part while arranging: a slim row (its name, a few words, ✎, the eye), so the
+ * whole list fits on a phone and a drag never has far to go. Press and hold (or drag
+ * with a mouse) to move it; a tap opens its options right under it.
+ */
+function Part({ el, fx, empty, children, onArchive, startOpen = false }: { el: WelcomeEl; fx: FxSettings; empty?: string; children: React.ReactNode; onArchive: () => void; startOpen?: boolean }) {
   const meta = WELCOME_ELS.find((m) => m.key === el)!;
   const showing = welcomeShows(fx, el);
-  const [open, setOpen] = useState(false);
+  const hasOptions = HAS_OPTIONS.includes(el);
+  const [open, setOpen] = useState(startOpen && hasOptions);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: el });
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  // Opened by a long press on the part itself: bring it into view.
+  useEffect(() => {
+    if (startOpen) rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [startOpen]);
   return (
-    // The whole part drags (no drag bar): press and move it up or down.
     <div
-      ref={setNodeRef}
+      ref={(n) => {
+        setNodeRef(n);
+        rowRef.current = n;
+      }}
       {...attributes}
       {...listeners}
-      className={`relative flex w-full touch-manipulation flex-col gap-1.5 rounded-xl px-2.5 py-2 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+      data-arrange-part={el}
+      className={`arrange-row relative flex w-full flex-col rounded-xl ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 5 : undefined,
         border: "1.5px solid rgba(139,112,64,.4)",
-        background: isDragging ? "rgba(255,248,228,.97)" : showing ? "rgba(255,250,238,.4)" : "rgba(120,100,60,.06)",
+        background: isDragging ? "rgba(255,248,228,.97)" : showing ? "rgba(255,250,238,.45)" : "rgba(120,100,60,.05)",
         borderStyle: showing ? "solid" : "dashed",
         boxShadow: isDragging ? "0 10px 24px rgba(0,0,0,.25)" : undefined,
       }}
     >
-      {/* Its name, its ✎, and hide in the top-right corner. */}
-      <div className={`flex min-h-8 items-center gap-1.5 ${showing ? "pr-24" : "pr-36"}`}>
-        <span className="min-w-0 truncate text-left text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }} title={meta.hint}>
-          {meta.label}
+      {/* Its name and a few words (a tap opens its options), its ✎, and the eye on the right. */}
+      <div className="flex h-9 items-center gap-1 pl-2.5 pr-1" onClick={hasOptions ? () => setOpen((v) => !v) : undefined} title={meta.hint}>
+        <span className={`flex min-w-0 flex-1 items-baseline gap-1.5 text-left ${showing ? "" : "opacity-55"}`}>
+          <span className="shrink-0 text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }}>
+            {meta.label}
+          </span>
+          <span className="min-w-0 truncate text-[12px] italic" style={{ color: SOFT }}>
+            {children ? SHORT[el] : (empty ?? SHORT[el])}
+          </span>
         </span>
-        {HAS_OPTIONS.includes(el) && <EditButton open={open} onClick={() => setOpen((v) => !v)} label={`Edit ${meta.label}`} />}
-      </div>
-      {/* Showing or hidden, at a glance: the eye in the corner (open = showing, closed = hidden). Hidden ones can be archived. */}
-      <span className="absolute right-1.5 top-1.5 flex items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()}>
-        {!showing && (
-          <button type="button" onClick={onArchive} title="Archive it (out of the way, at the bottom)" aria-label={`Archive ${meta.label}`} className="flex h-8 items-center rounded-full px-2 text-[11.5px] underline underline-offset-2 hover:bg-black/[.06]" style={{ color: SOFT }}>
-            Archive
+        <span className="flex shrink-0 items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+          {hasOptions && <EditButton open={open} onClick={() => setOpen((v) => !v)} label={`Edit ${meta.label}`} />}
+          {!showing && (
+            <button type="button" onClick={onArchive} title="Archive it (out of the way, at the bottom)" aria-label={`Archive ${meta.label}`} className="flex h-8 items-center rounded-full px-1.5 text-[11.5px] underline underline-offset-2 hover:bg-black/[.06]" style={{ color: SOFT }}>
+              Archive
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => set(toggleEl(fx, el))}
+            aria-pressed={showing}
+            aria-label={showing ? `${meta.label}: showing. Hide it` : `${meta.label}: hidden. Show it`}
+            title={showing ? "Showing · tap to hide" : "Hidden · tap to show"}
+            className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]"
+            style={{ color: showing ? GOLD : SOFT, background: showing ? "rgba(217,180,95,.18)" : "transparent" }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+              {showing ? <circle cx="12" cy="12" r="3" fill="currentColor" /> : <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />}
+            </svg>
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => set(toggleEl(fx, el))}
-          aria-pressed={showing}
-          aria-label={showing ? `${meta.label}: showing. Hide it` : `${meta.label}: hidden. Show it`}
-          title={showing ? "Showing · tap to hide" : "Hidden · tap to show"}
-          className="flex h-8 items-center gap-1 rounded-full pl-2 pr-1.5 text-[11.5px] font-semibold hover:bg-black/[.06]"
-          style={{ color: showing ? GOLD : SOFT, background: showing ? "rgba(217,180,95,.18)" : "transparent" }}
-        >
-          {showing ? "Showing" : "Hidden"}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
-            {showing ? <circle cx="12" cy="12" r="3" fill="currentColor" /> : <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />}
-          </svg>
-        </button>
-      </span>
-      {/* Typing in a part's options: keys stay in the field (Space mustn't pick the part up to drag it). */}
-      <div className="contents" onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-      {open && el === "checkin" && <CheckinOptions fx={fx} />}
-      {open && el === "line" && <LineOptions fx={fx} />}
-      {open && el === "habits" && (
-        <div className="flex flex-wrap gap-3 py-1">
-          {HABIT_PILLS.map((p) => {
-            const pills = fx.welcomeHabitPills ?? HABIT_PILLS.map((x) => x.key);
-            return (
-              <GoldCheck key={p.key} checked={pills.includes(p.key)} onChange={(v) => set({ welcomeHabitPills: v ? [...pills, p.key] : pills.filter((k) => k !== p.key) })}>
-                {p.icon} {p.label}
-              </GoldCheck>
-            );
-          })}
-        </div>
-      )}
-      {open && el === "reflect" && <ReflectionList list={reflectQuestions(fx)} onChange={(l) => set({ reflectQuestions: l })} />}
-      {open && el === "focus" && <QuestionOptions fx={fx} k="welcomeFocusQ" label="The question" fallback="What are your top priorities today?" />}
+        </span>
       </div>
-      {children ? (
-        // The part as it looks (not live while arranging). A tap on it opens its options, like its ✎.
-        <div onClick={HAS_OPTIONS.includes(el) ? () => setOpen((v) => !v) : undefined} title={HAS_OPTIONS.includes(el) ? `Edit ${meta.label}` : undefined} className="w-full">
-          <div inert className={`pointer-events-none flex w-full flex-col items-center ${showing ? "" : "opacity-40 grayscale"}`}>
-            {children}
+      {/* Its options slide open under it. Typing there: keys stay in the field (Space mustn't pick the part up). */}
+      {hasOptions && (
+        <Fold open={open}>
+          <div className="flex flex-col gap-1.5 px-2.5 pb-2" onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+            {el === "checkin" && <CheckinOptions fx={fx} />}
+            {el === "line" && <LineOptions fx={fx} />}
+            {el === "habits" && <HabitOptions fx={fx} />}
+            {el === "reflect" && <ReflectionList list={reflectQuestions(fx)} onChange={(l) => set({ reflectQuestions: l })} />}
+            {el === "focus" && <QuestionOptions fx={fx} k="welcomeFocusQ" label="The question" fallback="What are your top priorities today?" />}
           </div>
-        </div>
-      ) : (
-        <p className="m-0 text-left text-[12.5px] italic" style={{ color: SOFT }}>
-          {empty ?? "Shows when there's something to show."}
-        </p>
+        </Fold>
       )}
     </div>
   );

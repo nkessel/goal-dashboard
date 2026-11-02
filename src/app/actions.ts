@@ -28,7 +28,7 @@ import * as bossesData from "@/lib/data/bosses";
 import * as energyData from "@/lib/data/energy";
 import * as importCardsData from "@/lib/data/import-cards";
 import { timedHabitsFrom } from "@/lib/timed-habits";
-import { cleanRepeat } from "@/lib/habit-repeat";
+import { cleanRepeat, repeatIsUp } from "@/lib/habit-repeat";
 import { computeLevelForXp } from "@/lib/levels";
 import { byDuePriority } from "@/lib/due-soon";
 import * as xp from "@/lib/data/xp";
@@ -995,7 +995,8 @@ export async function dailyCheckInAction(tzOffsetMinutes?: number): Promise<xp.C
   const ownerId = await requireProfileId();
   const offset = Number.isFinite(tzOffsetMinutes) ? Math.max(-840, Math.min(840, Math.round(tzOffsetMinutes!))) : 0;
   const result = await xp.dailyCheckIn(ownerId, offset);
-  revalidatePath("/");
+  // No revalidatePath here: it made this action send back all of Today, re-rendered, while the welcome
+  // screen (which waits on it) was opening. The screen refreshes Today when it closes.
   return result;
 }
 
@@ -2161,22 +2162,27 @@ export async function setWheelOfTimeAction(input: { effort?: string[]; hindrance
 /** What the welcome screen needs: your check-in metrics, when you last checked in, and what's due soon. */
 export async function welcomeContextAction() {
   const ownerId = await requireProfileId();
-  const [metrics, last, tasks] = await Promise.all([energyData.getCheckMetrics(ownerId).catch(() => []), energyData.latestEnergy(ownerId), guideTasks(ownerId).catch(() => [])]);
+  // Everything at once (it was five waits in a row; the welcome screen waits on this).
+  const db = supabaseAdmin();
+  const [metrics, last, tasks, extras, me, { data: pinned }, { data: looks }, { data: boardRows }] = await Promise.all([
+    energyData.getCheckMetrics(ownerId).catch(() => []),
+    energyData.latestEnergy(ownerId),
+    guideTasks(ownerId).catch(() => []),
+    readExtras(ownerId).catch(() => ({}) as Record<string, unknown>),
+    // Where you stand (streak, XP), so the welcome screen can show them on every visit, not just the day's first.
+    profilesData.getProfileById(ownerId).catch(() => null),
+    // Today's Quests (pinned for today), in their order, for choosing the day's quests here.
+    db.from("tasks").select("id, title, due_at").eq("owner_id", ownerId).eq("status", "open").eq("is_manual_priority", true).order("sort_order", { ascending: true }).limit(40),
+    // Portrait, XP and board for each, so choosing the day's quests shows them like their cards.
+    db.from("tasks").select("id, icon_key, icon_source, xp_value, board_id").eq("owner_id", ownerId).eq("status", "open"),
+    db.from("boards").select("id, title").eq("owner_id", ownerId),
+  ]);
   // Candidates for today's main quest: what's due in the next two days, then what matters most.
   const soon = Date.now() + 2 * 86_400_000;
   const dueSoon = tasks.filter((t) => t.due_at && Date.parse(t.due_at) <= soon).sort(byDuePriority(Date.now()));
   const important = tasks.filter((t) => !dueSoon.includes(t) && (t.importance ?? 0) >= 4).sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0));
   const suggestions = [...dueSoon, ...important].slice(0, 4).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at }));
-  const priority = (cleanPriorities((await readExtras(ownerId).catch(() => ({}) as Record<string, unknown>)).priorities)[0] as Priority | undefined) ?? null;
-  // Where you stand (streak, XP), so the welcome screen can show them on every visit, not just the day's first.
-  const me = await profilesData.getProfileById(ownerId).catch(() => null);
-  // Today's Quests (pinned for today), in their order, for choosing the day's quests here.
-  const { data: pinned } = await supabaseAdmin().from("tasks").select("id, title, due_at").eq("owner_id", ownerId).eq("status", "open").eq("is_manual_priority", true).order("sort_order", { ascending: true }).limit(40);
-  // Portrait, XP and board for each, so choosing the day's quests shows them like their cards.
-  const [{ data: looks }, { data: boardRows }] = await Promise.all([
-    supabaseAdmin().from("tasks").select("id, icon_key, icon_source, xp_value, board_id").eq("owner_id", ownerId).eq("status", "open"),
-    supabaseAdmin().from("boards").select("id, title").eq("owner_id", ownerId),
-  ]);
+  const priority = (cleanPriorities(extras.priorities)[0] as Priority | undefined) ?? null;
   const boardName = new Map(((boardRows ?? []) as { id: string; title: string }[]).map((b) => [b.id, b.title]));
   const lookOf = new Map(
     ((looks ?? []) as { id: string; icon_key: string | null; icon_source: string | null; xp_value: number | null; board_id: string | null }[]).map((t) => [
@@ -2187,6 +2193,25 @@ export async function welcomeContextAction() {
   const card = (t: { id: string; title: string; due_at: string | null }) => ({ id: t.id, title: t.title, due_at: t.due_at, ...lookOf.get(t.id) });
   const today = ((pinned ?? []) as { id: string; title: string; due_at: string | null }[]).map(card);
   return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map(card), suggestions, priority, streak: me?.streak_count ?? 0, totalXp: me?.total_xp ?? null, today };
+}
+
+/**
+ * Your daily habits for the welcome screen's Habits part: each one that falls on `day`
+ * (weekdays, or a repeat that's up), and whether it's done that day.
+ */
+export async function welcomeHabitsAction(day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rites = ((await ritesData.listRites(ownerId).catch(() => null)) ?? []).filter((r) => r.slot === "day" && r.kind !== "ritual");
+  const since = new Date(Date.parse(`${day}T12:00:00Z`) - 400 * 86_400_000).toISOString().slice(0, 10);
+  const [done, skips] = await Promise.all([ritesData.listCompletionsFor(ownerId, rites.map((r) => r.id), since).catch(() => []), ritesData.listHabitSkips(ownerId, since).catch(() => [])]);
+  const daysOf = (list: { rite_id: string; day: string }[] | null, id: string) => (list ?? []).filter((c) => c.rite_id === id).map((c) => c.day);
+  const wd = new Date(`${day}T12:00:00`).getDay();
+  return rites.map((r) => {
+    const repeat = cleanRepeat(r.repeat);
+    const today = repeat ? repeatIsUp(repeat, day, daysOf(done, r.id), daysOf(skips, r.id).filter((d) => d !== day)) : !r.days || r.days.length === 0 || r.days.includes(wd);
+    return { id: r.id, title: r.title, xp: r.xp_value ?? 0, today, done: daysOf(done, r.id).includes(day) };
+  });
 }
 
 type Priority = { text: string; others?: string[]; day: string; at: string };

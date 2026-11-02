@@ -133,6 +133,30 @@ function whenNoWelcome(fn: () => void) {
   }, 1000);
 }
 
+/**
+ * One look at what the toucan should watch for, shared: three parts of him asked for it separately
+ * on every arrival (and on every return to the tab), and server actions run one at a time, so each
+ * one held up whatever you tapped. It also waits until the welcome screen and its fog are gone
+ * (his notes can't show before then anyway), so the first screen opens first.
+ */
+const watchCache = new Map<string, { at: number; p: Promise<Awaited<ReturnType<typeof toucanWatchAction>> | null> }>();
+function sharedWatch(opts: { guesses?: boolean } = {}) {
+  const key = opts.guesses === false ? "plain" : "guesses";
+  const hit = watchCache.get(key);
+  if (hit && Date.now() - hit.at < 20_000) return hit.p;
+  const p = new Promise<void>((done) => {
+    const busy = () => document.documentElement.hasAttribute("data-welcome-open") || document.documentElement.hasAttribute("data-fog");
+    if (!busy()) return done();
+    const t = setInterval(() => {
+      if (busy()) return;
+      clearInterval(t);
+      done();
+    }, 1000);
+  }).then(() => toucanWatchAction(opts).catch(() => null));
+  watchCache.set(key, { at: Date.now(), p });
+  return p;
+}
+
 export function talkToToucan(plan?: PlanTarget, mode: Mode = "talk", say?: string) {
   window.dispatchEvent(new CustomEvent("toucan-talk", { detail: { plan, mode, say } }));
 }
@@ -295,7 +319,7 @@ export function ToucanGuide() {
   useEffect(() => {
     if (pathname !== "/") return;
     const t = setTimeout(async () => {
-      const watch = await toucanWatchAction({ guesses: mode !== "simple" }).catch(() => null);
+      const watch = await sharedWatch({ guesses: mode !== "simple" });
       if (!watch) return;
       const st = styleRef.current;
       const day = todayKey();
@@ -463,7 +487,7 @@ export function ToucanGuide() {
     let timers: ReturnType<typeof setTimeout>[] = [];
     let live = true;
     const arm = async () => {
-      const w = await toucanWatchAction().catch(() => null);
+      const w = await sharedWatch();
       if (!live || !w) return;
       timers.forEach(clearTimeout);
       timers = [];
@@ -517,7 +541,7 @@ export function ToucanGuide() {
     let timers: ReturnType<typeof setTimeout>[] = [];
     let live = true;
     const arm = async () => {
-      const w = await toucanWatchAction().catch(() => null);
+      const w = await sharedWatch();
       if (!live || !w) return;
       timers.forEach(clearTimeout);
       timers = [];

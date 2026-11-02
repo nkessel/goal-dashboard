@@ -18,7 +18,9 @@ export function SettingsDefaultsSeed() {
     } catch {
       return;
     }
-    appDefaultsAction()
+    // After the first screen has what it needs: server actions run one at a time, and this one used to go
+    // first, so the welcome screen waited behind it.
+    const go = () => appDefaultsAction()
       .then((defaults) => {
         for (const [key, value] of Object.entries(defaults)) {
           try {
@@ -32,6 +34,8 @@ export function SettingsDefaultsSeed() {
         }
       })
       .catch(() => {});
+    const t = window.setTimeout(go, 4000);
+    return () => window.clearTimeout(t);
   }, []);
   return null;
 }

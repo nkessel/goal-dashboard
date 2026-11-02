@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Hindrance } from "@/lib/wheel-of-time";
-import { Fold } from "@/components/ui/Fold";
+import { Fold, useLingerValue } from "@/components/ui/Fold";
+import { TimeRuler } from "./TimeRuler";
 
 export type NightDraft = { bed: string; wake: string; effort: string[]; hindrances: Hindrance[] };
 export const EMPTY_NIGHT: NightDraft = { bed: "", wake: "", effort: [], hindrances: [] };
@@ -25,7 +26,7 @@ function slept(bed: string, wake: string) {
   const [wh, wm] = wake.split(":").map(Number);
   let mins = wh * 60 + wm - (bh * 60 + bm);
   if (mins <= 0) mins += 24 * 60;
-  return mins > 0 && mins < 20 * 60 ? `${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} m` : ""}` : null;
+  return mins > 0 && mins < 20 * 60 ? `${Math.floor(mins / 60)}h${mins % 60 ? ` ${mins % 60}m` : ""}` : null;
 }
 
 const BED_TIMES = ["21:30", "22:00", "22:30", "23:00", "23:30", "00:00", "00:30", "01:00", "01:30", "02:00"];
@@ -37,27 +38,37 @@ const WAKE_TIMES = ["05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30
  * minutes to fine-tune, in 5-minute steps or typed in.
  */
 /** The app's time picker: a parchment token showing the time ("— : —" when unset) that opens the time dial. "spirit" suits the toucan's dark panels. */
-export function TimeToken({ value, onChange, label, icon, kind, compact = false, variant = "parchment", placeholder = "add time" }: { value: string; onChange: (v: string) => void; label: string; icon?: React.ReactNode; kind: "bed" | "wake" | "any"; compact?: boolean; variant?: "parchment" | "spirit"; /** Shown (softly, in words) while no time is set. */ placeholder?: string }) {
+export function TimeToken({ value, onChange, label, icon, kind, compact = false, variant = "parchment", placeholder = "add time", active, onToggle }: { value: string; onChange: (v: string) => void; label: string; icon?: React.ReactNode; kind: "bed" | "wake" | "any"; compact?: boolean; variant?: "parchment" | "spirit"; /** Shown (softly, in words) while no time is set. */ placeholder?: string; /** Inline mode: the token only toggles a ruler its owner shows in place (no popup dial). */ active?: boolean; onToggle?: () => void }) {
   const [openAt, setOpenAt] = useState<HTMLElement | null>(null);
-  const open = !!openAt;
+  const inline = !!onToggle;
+  const open = inline ? !!active : !!openAt;
+  const shown = value ? clock12(value) : "";
   return (
     <>
       <button
         type="button"
         onClick={(e) => {
+          if (inline) return onToggle!();
           const el = e.currentTarget;
           setOpenAt((v) => (v ? null : el));
         }}
-        aria-label={`${label}: ${value ? clock12(value) : "not set"}. Change`}
+        aria-label={`${label}: ${shown || "not set"}. Change`}
         aria-expanded={open}
-        className={`${variant === "spirit" ? "time-token time-token-spirit" : "time-token"} flex shrink-0 items-center gap-1.5 rounded-full ${compact ? "h-9 px-3" : "h-10 px-3.5"}`}
+        className={`${variant === "spirit" ? "time-token time-token-spirit" : "time-token"} flex shrink-0 items-center gap-1.5 rounded-full ${inline ? "h-9 min-w-[100px] justify-center px-2.5" : compact ? "h-9 px-3" : "h-10 px-3.5"}`}
       >
         {icon}
-        <span className={`font-display tabular-nums ${compact ? "text-[14px]" : "text-[17px]"}`} style={{ opacity: value ? 1 : 0.55 }}>
-          {value ? clock12(value) : <span className="text-[0.82em] italic">{placeholder}</span>}
+        <span className={`font-display whitespace-nowrap tabular-nums ${compact || inline ? "text-[15px]" : "text-[17px]"}`} style={{ opacity: value ? 1 : 0.55 }}>
+          {value ? (
+            <>
+              {shown.replace(/ (am|pm)$/, "")}
+              <span className="ml-[3px] text-[11px]">{shown.slice(-2)}</span>
+            </>
+          ) : (
+            <span className="text-[0.86em] italic">{placeholder}</span>
+          )}
         </span>
       </button>
-      {open && <TimeDial anchor={openAt} value={value} kind={kind} label={label} onPick={onChange} onClose={() => setOpenAt(null)} />}
+      {!inline && open && <TimeDial anchor={openAt} value={value} kind={kind} label={label} onPick={onChange} onClose={() => setOpenAt(null)} />}
     </>
   );
 }
@@ -68,6 +79,9 @@ function TimeDial({ anchor, value, kind, label, onPick, onClose }: { anchor: HTM
   const fallback = kind === "bed" ? "23:00" : kind === "wake" ? "07:00" : "12:00";
   const [h, m] = (value || fallback).split(":").map(Number);
   const set = (hh: number, mm: number) => onPick(`${String(((hh % 24) + 24) % 24).padStart(2, "0")}:${String(((mm % 60) + 60) % 60).padStart(2, "0")}`);
+  // What's being typed in the hour or minutes (null: show the time itself).
+  const [hText, setHText] = useState<string | null>(null);
+  const [mText, setMText] = useState<string | null>(null);
   useEffect(() => {
     const place = () => {
       const r = anchor?.getBoundingClientRect();
@@ -78,6 +92,14 @@ function TimeDial({ anchor, value, kind, label, onPick, onClose }: { anchor: HTM
       setPos({ left: Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)), top: below ? r.bottom + 6 : Math.max(8, r.top - hgt - 6) });
     };
     place();
+    // Placed once; again only for a new width. The keyboard shrinks Chrome's height on iPhone, and
+    // re-placing then threw the dial to the top of the screen and back (Nov 2 recording).
+    let lastW = window.innerWidth;
+    const resized = () => {
+      if (window.innerWidth === lastW) return;
+      lastW = window.innerWidth;
+      place();
+    };
     const down = (e: PointerEvent) => !box.current?.contains(e.target as Node) && !anchor?.contains(e.target as Node) && onClose();
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "Enter") {
@@ -85,11 +107,11 @@ function TimeDial({ anchor, value, kind, label, onPick, onClose }: { anchor: HTM
         onClose();
       }
     };
-    window.addEventListener("resize", place);
+    window.addEventListener("resize", resized);
     document.addEventListener("pointerdown", down, true);
     window.addEventListener("keydown", key, true);
     return () => {
-      window.removeEventListener("resize", place);
+      window.removeEventListener("resize", resized);
       document.removeEventListener("pointerdown", down, true);
       window.removeEventListener("keydown", key, true);
     };
@@ -121,20 +143,22 @@ function TimeDial({ anchor, value, kind, label, onPick, onClose }: { anchor: HTM
         <div className="flex flex-col items-center">
           {arrow(1, () => step(1, 0), "One hour later")}
           {/* Tap the number to type it. */}
+          {/* Controlled (not re-keyed per value): re-keying rebuilt the field mid-typing, which dropped the keyboard. */}
           <input
             type="text"
             inputMode="numeric"
             maxLength={2}
-            key={`h${h}`}
-            defaultValue={((h + 11) % 12) + 1}
-            onFocus={(e) => e.currentTarget.select()}
+            value={hText ?? String(((h + 11) % 12) + 1)}
+            onFocus={(e) => (setHText(e.currentTarget.value), e.currentTarget.select())}
             onChange={(e) => {
+              setHText(e.target.value);
               const v = parseInt(e.target.value, 10);
               if (v >= 1 && v <= 12 && (e.target.value.length === 2 || v > 1)) set((v % 12) + (h >= 12 ? 12 : 0), m);
             }}
             onBlur={(e) => {
               const v = parseInt(e.target.value, 10);
               if (v >= 1 && v <= 12) set((v % 12) + (h >= 12 ? 12 : 0), m);
+              setHText(null);
             }}
             aria-label="Hour"
             className="time-dial-num font-display w-12 rounded-lg bg-transparent text-center text-[30px] leading-tight tabular-nums focus:bg-white/60 focus:outline-none"
@@ -151,16 +175,17 @@ function TimeDial({ anchor, value, kind, label, onPick, onClose }: { anchor: HTM
             type="text"
             inputMode="numeric"
             maxLength={2}
-            key={`m${m}`}
-            defaultValue={String(m).padStart(2, "0")}
-            onFocus={(e) => e.currentTarget.select()}
+            value={mText ?? String(m).padStart(2, "0")}
+            onFocus={(e) => (setMText(e.currentTarget.value), e.currentTarget.select())}
             onChange={(e) => {
+              setMText(e.target.value);
               const v = parseInt(e.target.value, 10);
               if (e.target.value.length === 2 && v >= 0 && v <= 59) set(h, v);
             }}
             onBlur={(e) => {
               const v = parseInt(e.target.value, 10);
               if (v >= 0 && v <= 59) set(h, v);
+              setMText(null);
             }}
             aria-label="Minutes"
             className="time-dial-num font-display w-12 rounded-lg bg-transparent text-center text-[30px] leading-tight tabular-nums focus:bg-white/60 focus:outline-none"
@@ -229,8 +254,21 @@ const WheelIcon = () => (
  * tap on its time), how long that was, and the Wheel of Time, which opens the
  * Factors of sleep: yesterday's Right Effort and Hindrances, as chips.
  */
-export function NightFields({ value, onChange, effort, hindrances, onLists, day }: { value: NightDraft; onChange: (n: NightDraft) => void; effort: string[]; hindrances: string[]; /** Edit the two lists right here (saved to the Wheel of Time). */ onLists?: (lists: { effort: string[]; hindrances: string[] }) => void; /** This morning's app day (YYYY-MM-DD), to name the day each list is for. */ day?: string }) {
+export function NightFields({ value, onChange, effort, hindrances, onLists, day, heading = true }: { value: NightDraft; onChange: (n: NightDraft) => void; effort: string[]; hindrances: string[]; /** Edit the two lists right here (saved to the Wheel of Time). */ onLists?: (lists: { effort: string[]; hindrances: string[] }) => void; /** This morning's app day (YYYY-MM-DD), to name the day each list is for. */ day?: string; /** The "Last night" title (the welcome screen's Sleep button already says it). */ heading?: boolean }) {
   const [open, setOpen] = useState(false);
+  // Which time's ruler is open under the line (kept a moment while it slides shut).
+  const [editing, setEditing] = useState<"bed" | "wake" | null>(null);
+  const ruler = useLingerValue(editing, 340);
+  const cardRef = useRef<HTMLDivElement>(null);
+  // A tap anywhere outside this card folds the ruler away.
+  useEffect(() => {
+    if (!editing) return;
+    const down = (e: PointerEvent) => {
+      if (!cardRef.current?.contains(e.target as Node)) setEditing(null);
+    };
+    document.addEventListener("pointerdown", down, true);
+    return () => document.removeEventListener("pointerdown", down, true);
+  }, [editing]);
   const [editingLists, setEditingLists] = useState(false);
   const [newEffort, setNewEffort] = useState("");
   const [newHindrance, setNewHindrance] = useState("");
@@ -250,30 +288,39 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day 
   const hours = slept(value.bed, value.wake);
 
   return (
-    <div className="night-card flex flex-col gap-2 rounded-2xl px-3 pb-2.5 pt-2">
-      <span className="text-center text-[11.5px] font-bold uppercase tracking-[.18em]" style={{ color: "var(--ec-gold, #f2d27e)" }}>
-        Last night
-      </span>
-      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
-        <span className="flex flex-col items-center gap-0.5">
-          <span className="text-[12px] font-semibold" style={{ color: SOFT }}>
-            Slept
-          </span>
-          <TimeToken value={value.bed} onChange={(v) => set({ bed: v })} label="Last night's sleep time" icon={<MoonIcon />} kind="bed" placeholder="bedtime" />
+    <div ref={cardRef} className={`night-card flex flex-col gap-2 rounded-2xl px-3 pb-2.5 ${heading ? "pt-2" : "pt-2.5"}`}>
+      {heading && (
+        <span className="text-center text-[11.5px] font-bold uppercase tracking-[.18em]" style={{ color: "var(--ec-gold, #f2d27e)" }}>
+          Last night
         </span>
-        <span aria-hidden className="mt-4 flex flex-col items-center text-[12px] tabular-nums" style={{ color: SOFT }}>
-          <svg width="40" height="10" viewBox="0 0 40 10" fill="none">
-            <path d="M1 5h36M33 1.5L37.5 5 33 8.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" opacity=".7" />
+      )}
+      {/* One line: bedtime → how long → wake time. Tapping a time opens its ruler right under the line. */}
+      <div className="flex items-center gap-1.5">
+        <TimeToken value={value.bed} onChange={(v) => set({ bed: v })} label="Last night's sleep time" icon={<MoonIcon />} kind="bed" placeholder="bedtime" active={editing === "bed"} onToggle={() => setEditing((e) => (e === "bed" ? null : "bed"))} />
+        <span aria-hidden className="night-span flex min-w-[48px] flex-1 flex-col items-center">
+          <span className="h-[15px] text-[11.5px] font-semibold leading-[15px] tabular-nums">{hours ?? ""}</span>
+          <svg width="100%" height="8" viewBox="0 0 100 8" preserveAspectRatio="none" fill="none" className="opacity-70">
+            <path d="M1 4h97" stroke="currentColor" strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeDasharray={value.bed && value.wake ? undefined : "3 3"} />
           </svg>
-          {hours ?? ""}
         </span>
-        <span className="flex flex-col items-center gap-0.5">
-          <span className="text-[12px] font-semibold" style={{ color: SOFT }}>
-            Woke
-          </span>
-          <TimeToken value={value.wake} onChange={(v) => set({ wake: v })} label="This morning's wake time" icon={<SunIcon />} kind="wake" placeholder="wake time" />
-        </span>
+        <svg aria-hidden width="7" height="10" viewBox="0 0 7 10" fill="none" className="night-span -ml-1.5 mt-[15px] shrink-0 opacity-70">
+          <path d="M1 1l4.5 4L1 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <TimeToken value={value.wake} onChange={(v) => set({ wake: v })} label="This morning's wake time" icon={<SunIcon />} kind="wake" placeholder="wake time" active={editing === "wake"} onToggle={() => setEditing((e) => (e === "wake" ? null : "wake"))} />
       </div>
+      <Fold open={!!editing}>
+        {ruler.value && (
+          <div key={ruler.value} className="fade-in">
+            <TimeRuler
+              kind={ruler.value}
+              value={ruler.value === "bed" ? value.bed : value.wake}
+              onChange={(v) => set(ruler.value === "bed" ? { bed: v } : { wake: v })}
+              onDone={() => setEditing(null)}
+              label={ruler.value === "bed" ? "Last night's sleep time" : "This morning's wake time"}
+            />
+          </div>
+        )}
+      </Fold>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

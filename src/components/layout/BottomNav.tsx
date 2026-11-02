@@ -4,8 +4,8 @@ import { PerchedOwl } from "./PerchedOwl";
 import { useEveningMode } from "@/components/evening/evening-clock";
 import { ToucanGuide } from "@/components/toucan/ToucanGuide";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { useViewTransitionNavigate } from "@/components/ui/ViewTransitionProvider";
 
 type Theme = "calm" | "adventure";
@@ -96,6 +96,19 @@ function onTab(item: { href: string; also?: string[] }, pathname: string) {
 
 export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme; name?: string | null; toucan?: unknown }) {
   const pathname = usePathname();
+  const router = useRouter();
+  // The other tabs load ahead of time, but only once the first screen (and the welcome screen over it) is
+  // done: fetching four whole screens right at startup slowed the app's opening on phones (owner, Nov 2).
+  useEffect(() => {
+    let t = 0;
+    const later = () => {
+      const busy = document.documentElement.hasAttribute("data-welcome-open") || document.documentElement.hasAttribute("data-fog");
+      if (busy) return void (t = window.setTimeout(later, 1500));
+      for (const it of ITEMS) if (it.href !== pathname) router.prefetch(it.href, { kind: "full" } as Parameters<typeof router.prefetch>[1]);
+    };
+    t = window.setTimeout(later, 2500);
+    return () => window.clearTimeout(t);
+  }, [router, pathname]);
   const navigateWithTransition = useViewTransitionNavigate();
   const evening = useEveningMode();
   const isAdventure = theme === "adventure";
@@ -266,7 +279,9 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
               )}
               <Link
                 href={item.href}
-                prefetch={true}
+                prefetch={false}
+                // A finger landing on a tab starts its screen loading before the tap ends.
+                onPointerDown={() => router.prefetch(item.href)}
                 onClick={(e) => navigate(e, item.href)}
                 ref={(el) => {
                   itemRefs.current[i] = el;

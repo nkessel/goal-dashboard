@@ -1097,10 +1097,12 @@ html[data-evening] [data-theme="adventure"] {
    A veil of mist parts, the ridges rise far to near, and the card comes
    into view out of it. The mist between the ridges keeps drifting. Only
    transform and opacity move, each on its own layer, so it stays smooth. */
-.mist-emerge { animation: mist-emerge 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.5s both; will-change: transform, opacity; }
+/* Short and without a scale: a long scaled rise moved every part (and what was placed beside them)
+   for two seconds after opening (owner's recordings, Nov 2). */
+.mist-emerge { animation: mist-emerge 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.35s both; }
 @keyframes mist-emerge {
-  0% { opacity: 0; transform: translateY(18px) scale(0.97); }
-  60% { opacity: 1; }
+  0% { opacity: 0; transform: translateY(12px); }
+  70% { opacity: 1; }
   100% { opacity: 1; transform: none; }
 }
 .mist-veil-wash { animation: mist-fade 1.6s ease-out 0.1s both; will-change: opacity; }
@@ -1670,8 +1672,12 @@ html[data-kb] [data-feedback-hide] {
 /* A popup open on a phone (quest editor, sheets): the feedback button shrinks and quiets so it
    doesn't sit on the popup's own buttons (it covered the editor's Close). Still one tap away. */
 @media (pointer: coarse) {
-  html.scroll-locked [data-feedback-hide] { scale: 0.68; opacity: 0.55; }
+  html.scroll-locked:not([data-welcome-open]) [data-feedback-hide] { scale: 0.68; opacity: 0.55; }
 }
+/* The welcome screen isn't a popup over buttons: there the feedback button sits full size in the
+   sky at the top right (FeedbackDock), clear of the card. While only the mist is up (before the
+   welcome screen or Today shows) it waits out of sight, so it never floats over the fog alone. */
+html[data-fog]:not([data-welcome-open]) [data-feedback-hide] { opacity: 0; visibility: hidden; pointer-events: none; }
 /* The feedback box's scroll bar: slim and quiet. */
 .feedback-scroll { scrollbar-width: thin; scrollbar-color: rgba(139, 112, 64, 0.45) transparent; }
 
@@ -2985,4 +2991,61 @@ html[data-welcome-open] [data-app-shell] *, html[data-welcome-open] [data-perche
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+/* Welcome screen › Habits: each habit a parchment pill that turns gold with a check when done. */
+.welcome-habit { color: #3d2f18; background: rgba(255, 250, 238, 0.82); box-shadow: inset 0 0 0 1.5px #b39a6a; transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease; }
+.welcome-habit-check { box-shadow: inset 0 0 0 1.5px #a88a3f; color: #2a1c10; transition: background-color 160ms ease; }
+.welcome-habit[data-done="true"] { background: radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 60%, #b8963f); box-shadow: inset 0 0 0 1.5px #4a3913; }
+.welcome-habit[data-done="true"] .welcome-habit-check { background: #fff6dc; animation: habit-tick 260ms cubic-bezier(.2,.9,.3,1.4) both; }
+@keyframes habit-tick { from { transform: scale(.5); } to { transform: scale(1); } }
+.welcome-habit-pick { color: #6b5631; box-shadow: inset 0 0 0 1px rgba(139, 112, 64, 0.5); }
+.welcome-habit-pick[data-on="true"] { color: #2a1c10; background: rgba(217, 180, 95, 0.35); box-shadow: inset 0 0 0 1.5px #a88a3f; }
+/* Welcome toucan, Nov 2 (owner's notes + three UX teams):
+   - ‹ › one 30px gilded coin under his feet, mirrored SVG chevrons; each half a 22×44 tap area.
+   - × in the bubble's top-right corner (22px, 40px tap area).
+   - The respond line: gold when idle, off-white while typing. */
+.bubble-coin { width: 30px; height: 30px; z-index: 6; }
+.bubble-coin-half::before { top: -7px; bottom: -7px; width: 24px; }
+.bubble-coin-half svg { transition: translate 90ms; }
+.bubble-coin-half[data-side="l"]:active svg { translate: -1.5px 0; }
+.bubble-coin-half[data-side="r"]:active svg { translate: 1.5px 0; }
+.bubble-x { color: #8a6116; background: #fffaf0; box-shadow: 0 0 0 1px #c9a24a; z-index: 2; }
+.bubble-x::before { content: ""; position: absolute; inset: -9px; }
+.bubble-x:hover { background: #f8ecc8; }
+.reply-box { background: radial-gradient(circle at 35% 30%, #f6dc8e, #e2c26c 60%, #c9a24a); box-shadow: 0 0 0 1.5px #8a6116, 0 2px 5px rgba(60, 40, 10, 0.3); transition: background 140ms ease, box-shadow 140ms ease, height 160ms ease-out; }
+.reply-box .reply-line::placeholder { color: #4a3913; }
+.reply-box:focus-within { background: #fffdf6; box-shadow: 0 0 0 1.5px #a88a3f, 0 2px 5px rgba(60, 40, 10, 0.25); }
+.reply-box:focus-within .reply-line::placeholder { color: #a08a5c; }
+
+/* Arranging the welcome screen: a press-and-hold lifts a row; it must not select its text or open
+   iPhone's callout (either cancels the drag), and a vertical swipe still scrolls the card. */
+.arrange-row { touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.arrange-row input, .arrange-row textarea, .arrange-row [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+
+/* ---------- Time ruler (xp/TimeRuler.tsx): ticks every 5 minutes under a fixed gold needle ---------- */
+.time-ruler { position: relative; height: 46px; border-radius: 12px; background: linear-gradient(180deg, rgba(255, 250, 238, 0.7), rgba(242, 227, 191, 0.55)); box-shadow: inset 0 0 0 1px rgba(139, 112, 64, 0.35), inset 0 2px 4px rgba(60, 40, 10, 0.08); }
+.time-ruler-scroll { height: 100%; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; touch-action: pan-x; scrollbar-width: none; cursor: grab; outline: none; border-radius: 12px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent); mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent); }
+.time-ruler-scroll::-webkit-scrollbar { display: none; }
+.time-ruler-scroll:focus-visible { box-shadow: inset 0 0 0 2px rgba(217, 180, 95, 0.9); }
+.time-ruler-track { display: flex; height: 100%; width: max-content; padding-inline: calc(50% - 6px); }
+.tr-tick { position: relative; flex: 0 0 12px; height: 100%; scroll-snap-align: center; }
+.tr-tick::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 1.5px; height: 8px; translate: -50% 0; border-radius: 1px; background: rgba(107, 86, 49, 0.42); }
+.tr-tick[data-k="half"]::after { height: 13px; background: rgba(107, 86, 49, 0.6); }
+.tr-tick[data-k="hour"]::after { height: 19px; width: 2px; background: #8a6116; }
+.tr-label { position: absolute; top: 3px; left: 50%; translate: -50% 0; white-space: nowrap; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: #6b5631; pointer-events: none; }
+.time-ruler-needle { position: absolute; left: 50%; top: 15px; bottom: 3px; width: 2.5px; translate: -50% 0; border-radius: 2px; pointer-events: none; background: linear-gradient(#f6dc8e, #a88a3f); box-shadow: 0 0 0 0.5px #4a3913, 0 0 7px rgba(217, 180, 95, 0.85); transition: opacity 0.2s; }
+.time-ruler-needle::before { content: ""; position: absolute; left: 50%; top: -6px; translate: -50% 0; border: 5px solid transparent; border-top-color: #a88a3f; border-bottom-width: 0; }
+.time-ruler[data-unset="true"] .time-ruler-needle { opacity: 0.45; }
+.time-ruler-type { color: #2a1c10; background: #fffdf6; border: 1.5px solid #b39a6a; }
+.time-ruler-type:focus { border-color: #8a6116; box-shadow: 0 0 0 3px rgba(217, 180, 95, 0.35); }
+/* The sleep row's middle: a thin arrow that stretches, the time slept on it. */
+.night-span { color: var(--ec-soft, #6b5631); }
+/* The Sleep button, once its own Save went through: a small stamp. */
+.sleep-stamp { animation: sleep-stamp 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes sleep-stamp { 0% { scale: 1.1; } 100% { scale: 1; } }
+/* Phones: a line's ✎ and thumbs show once you tap its words (computers: always, quietly). */
+.touch-tools[data-show="true"] { animation: ui-fade 0.18s ease-out both; }
+@media (hover: none) and (pointer: coarse) {
+  .touch-tools[data-show="false"] { display: none; }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { HabitPills, HABIT_PILLS } from "@/components/xp/LearnLanguage";
+import { WelcomeHabits } from "@/components/xp/WelcomeHabits";
 
 import { fogOn } from "@/lib/welcome-fog";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -15,6 +15,7 @@ import { likeLine, likedLines, lineForDay, retireLine } from "@/lib/greetings";
 import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
 import { addBackGreeting, checkinLabel, pickFor, readPromptVotes, reflectQuestions, toucanPrompts, welcomeOrder, welcomeShows, writePromptVotes, type PromptVotes, type WelcomeEl } from "@/lib/welcome";
 import { useEscape } from "@/lib/use-escape";
+import { useLongPress } from "@/lib/use-long-press";
 import { coachAction, setTopPriorityAction } from "@/app/actions";
 import { Digest, PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
 import { GearIcon } from "@/components/ui/Icons";
@@ -90,7 +91,8 @@ export function WelcomeCard({
   useEffect(() => subscribeFx(() => setFx(loadFx())), []);
   // The gear arranges the screen in place: each part gets its own controls where it sits.
   const [arranging, setArranging] = useState(false);
-  const [shown, setShown] = useState(0);
+  // A long press on a part (phones) arranges the screen with that part's options open.
+  const [holdEl, setHoldEl] = useState<WelcomeEl | null>(null);
   // Your verdict on the day's wise line: liked lines come back often, disliked ones never.
   const [verdict, setVerdict] = useState<"like" | "dislike" | null>(() => (line && typeof window !== "undefined" && likedLines().has(line) ? "like" : null));
   // Thumbs down asks why; the speech bubble beside the thumbs takes any other note.
@@ -100,6 +102,10 @@ export function WelcomeCard({
   const [greetVerdict, setGreetVerdict] = useState<"like" | "dislike" | null>(null);
   const [greetWhy, setGreetWhy] = useState<"down" | "note" | null>(null);
   const [greetSaid, setGreetSaid] = useState<string | null>(null);
+  // Phones: the greeting's and the wise line's ✎ and thumbs wait until you tap the words (no tools always showing).
+  const [greetTools, setGreetTools] = useState(false);
+  const [lineTools, setLineTools] = useState(false);
+  const movedRef = useRef(false);
   const [checkedIn, setCheckedIn] = useState(false);
   // While arranging: the greeting's own options (from the ✎ beside it), and whether the castle is in view.
   const [greetingOpen, setGreetingOpen] = useState(false);
@@ -119,6 +125,7 @@ export function WelcomeCard({
       f.style.backgroundPosition = `${Math.round(cr.left + c.clientLeft - fr.left)}px ${Math.round(cr.top + c.clientTop - fr.top)}px`;
     }
   };
+  // Once (it re-ran on every render, measuring the card each time, during the mist's opening).
   useLayoutEffect(() => {
     alignFoot();
     window.addEventListener("resize", alignFoot);
@@ -128,7 +135,7 @@ export function WelcomeCard({
       window.removeEventListener("resize", alignFoot);
       ro.disconnect();
     };
-  });
+  }, []);
   const [greeting, setGreeting] = useState(heading);
   // "Good morning!" before it (unless it already speaks of the time of day). Shown only, never saved into the line.
   const [hour] = useState(() => new Date().getHours());
@@ -165,9 +172,13 @@ export function WelcomeCard({
   const moving = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   // Never off the screen: a spot (or width) kept from a wider window, or a drag too far, comes back in.
   useLayoutEffect(() => {
+    // Only a new width counts: the keyboard (and Chrome's toolbar) change the height alone, and the
+    // card's spot mustn't be pulled up for good while a field has focus.
+    let lastW = -1;
     const fitIn = () => {
       const c = cardRef.current;
-      if (!c || moving.current) return;
+      if (!c || moving.current || window.innerWidth === lastW) return;
+      lastW = window.innerWidth;
       const w = c.offsetWidth;
       const maxX = Math.max(0, (window.innerWidth - w) / 2 - 16);
       const maxY = Math.max(0, window.innerHeight * 0.4);
@@ -272,7 +283,9 @@ export function WelcomeCard({
       raf = requestAnimationFrame(() => {
         const a = document.activeElement as HTMLElement | null;
         const inside = !!a?.closest("[data-welcome-root]") && (a instanceof HTMLTextAreaElement || a instanceof HTMLInputElement || !!a?.isContentEditable);
-        if (!inside || window.innerHeight - vv.height < 120) return setKbLift(0);
+        // Against the held height: Chrome on iPhone shrinks innerHeight with the keyboard, so innerHeight alone never shows it.
+        const base = Math.max(window.innerHeight, screenRef.current?.h ?? 0);
+        if (!inside || base - vv.height < 120) return setKbLift(0);
         setKbLift((cur) => {
           const r = a!.getBoundingClientRect();
           // Where it would sit without the lift.
@@ -295,13 +308,21 @@ export function WelcomeCard({
       document.removeEventListener("focusout", check);
     };
   }, []);
-  useEffect(() => {
+  // Measured before the first paint, then again only when the screen's width changes (a turn of the phone):
+  // iPhone's toolbars and keyboard change its height while you scroll or type, and the card must not follow
+  // (that was the bounce while scrolling and the dark band as the keyboard went down; owner's recordings, Nov 2).
+  const screenRef = useRef<{ w: number; h: number } | null>(null);
+  useLayoutEffect(() => {
     const typing = () => {
       const a = document.activeElement;
       return document.documentElement.hasAttribute("data-kb") || a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && !["range", "checkbox", "radio", "button"].includes(a.type));
     };
     const measure = () => {
-      if (!typing()) setScreenH(window.innerHeight);
+      const w = window.innerWidth;
+      const prev = screenRef.current;
+      if (prev && (prev.w === w || typing())) return;
+      screenRef.current = { w, h: window.innerHeight };
+      setScreenH(window.innerHeight);
     };
     measure();
     window.addEventListener("resize", measure);
@@ -324,13 +345,15 @@ export function WelcomeCard({
     if (arranging) setArranging(false);
   });
 
+  // The XP counts up by writing straight into its text (a state update each frame re-rendered the whole card).
+  const xpRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!award?.xp) return;
     const start = performance.now();
     let raf = 0;
     const tick = (now: number) => {
       const t = Math.min(1, (now - start - 350) / 700);
-      setShown(Math.round(Math.max(0, t) * award.xp));
+      if (xpRef.current) xpRef.current.textContent = `+${Math.round(Math.max(0, t) * award.xp)} XP`;
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -370,13 +393,13 @@ export function WelcomeCard({
       </p>
     ) : null,
     reflect: reflectQuestions(fx).length ? <ReflectLine questions={reflectQuestions(fx)} /> : null,
-    habits: <HabitPills pills={fx.welcomeHabitPills ?? HABIT_PILLS.map((p) => p.key)} />,
+    habits: <WelcomeHabits fx={fx} />,
     line: line ? (
       <div className="flex w-full flex-col items-center gap-0.5">
         {/* Quiet thumbs right after the line's last word (no reserved columns, so it never wraps for nothing). */}
-        <p className={`m-0 text-center text-[16px] leading-snug [text-wrap:pretty] ${verdict === "dislike" ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
+        <p onClick={(e) => !(e.target as HTMLElement).closest("button") && setLineTools((v) => !v)} className={`m-0 text-center text-[16px] leading-snug [text-wrap:pretty] ${verdict === "dislike" ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
           {line}
-          <span className="ml-1 inline-flex items-center gap-0.5 whitespace-nowrap align-middle no-underline" style={{ textDecoration: "none" }}>
+          <span data-show={lineTools || !!lineWhy ? "true" : "false"} className="touch-tools ml-1 inline-flex items-center gap-0.5 whitespace-nowrap align-middle no-underline" style={{ textDecoration: "none" }}>
             <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"), setLineSaid(verdict === "like" ? "Taken back" : "Saved: it'll come back more often"))} />
             <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"), setLineWhy(verdict === "dislike" ? null : "down"), setLineSaid(verdict === "dislike" ? "It's back in the rotation" : "Got it: it won't come back"))} />
             <NoteButton on={lineWhy === "note"} onClick={() => setLineWhy((w) => (w === "note" ? null : "note"))} />
@@ -400,8 +423,8 @@ export function WelcomeCard({
     // One compact line: XP, then coins beside it.
     reward: award && award.xp > 0 ? (
       <p className="m-0 flex items-baseline justify-center gap-2.5 tabular-nums">
-        <span className="pc-xp text-[26px] font-bold leading-none" style={{ color: "var(--t-xp)" }}>
-          +{shown} XP
+        <span ref={xpRef} className="pc-xp text-[26px] font-bold leading-none tabular-nums" style={{ color: "var(--t-xp)" }}>
+          +0 XP
         </span>
         {award.coins > 0 && (
           <span className="flex items-center gap-1 text-[14px]" style={{ color: "#5a4a30" }}>
@@ -440,18 +463,16 @@ export function WelcomeCard({
       document.body
     );
   return createPortal(
-    <div data-welcome-root data-kb-plain data-no-ghost style={{ ...(screenH ? { height: screenH, bottom: "auto" } : {}), translate: kbLift ? `0 ${-kbLift}px` : undefined, transition: "translate 240ms cubic-bezier(.2,.8,.2,1)", "--wtop": "max(92px, calc(env(safe-area-inset-top) + 84px), 12dvh)" } as React.CSSProperties} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-start justify-center px-3 pb-3 pt-[var(--wtop)] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
+    <div data-welcome-root data-kb-plain data-no-ghost style={{ ...(screenH ? { height: screenH, bottom: "auto" } : {}), translate: kbLift ? `0 ${-kbLift}px` : undefined, transition: "translate 240ms cubic-bezier(.2,.8,.2,1)", "--wtop": "max(92px, calc(env(safe-area-inset-top) + 84px))" } as React.CSSProperties} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-start justify-center px-3 pb-3 pt-[var(--wtop)] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
       {/* Overscan: while a phone's keyboard opens or closes the screen briefly changes size; this keeps Today from peeking through above or below. */}
       <div aria-hidden className="pointer-events-none fixed inset-x-0 -bottom-[60vh] -top-[60vh] -z-[1]" style={{ background: "#1b2119" }} />
       {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
       <MistScene leaving={leaving || minimizing} castle={castleOf(fx.welcomeCastle)} castleSeed={fx.welcomeCastleSeed} castleSlot={arranging ? <CastleEdit fx={fx} /> : null} onCastleVisible={setCastleSeen} />
       {/* Moved where you put it (drag its heading). */}
       <div className="relative flex max-h-full flex-col items-center" style={at.x || at.y ? { transform: `translate(${at.x}px, ${at.y}px)` } : undefined}>
-      {/* What isn't part of the card (when it opens, confetti) sits above it while arranging. */}
-      {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} />}
       <div className={`${leaving || minimizing ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
         {/* Kept mounted (and visible) while arranging, so he doesn't fly in again each time. */}
-        <WelcomeToucan fx={fx} quiet={arranging} onAway={() => minimize(true)} />
+        <WelcomeToucan fx={fx} quiet={arranging} onAway={() => minimize(true)} onArrange={() => (setHoldEl(null), setArranging(true))} />
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -484,7 +505,7 @@ export function WelcomeCard({
         {/* The gear: settings in context (each part's controls right where it sits). */}
         <button
           type="button"
-          onClick={() => setArranging((v) => !v)}
+          onClick={() => (setHoldEl(null), setArranging((v) => !v))}
           aria-pressed={arranging}
           aria-label={arranging ? "Done arranging" : "Welcome screen settings"}
           title={arranging ? "Done arranging" : "Welcome screen settings"}
@@ -515,7 +536,7 @@ export function WelcomeCard({
             }}
           />
         )}
-        <div ref={cardRef} data-welcome-card onScroll={alignFoot} className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-var(--wtop)-12px)]"} flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-10 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH && !arranging ? { maxHeight: `calc(${screenH}px - var(--wtop) - 12px)` } : {}) }}>
+        <div ref={cardRef} data-welcome-card onScroll={alignFoot} className={`parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[calc(100svh-var(--wtop)-12px)] flex-col items-center gap-3 overflow-y-auto overscroll-none rounded-2xl pb-4 pl-5 pr-3 pt-10 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH ? { maxHeight: `calc(${screenH}px - var(--wtop) - 12px - ${Math.max(0, at.y)}px)` } : {}) }}>
           {/* The top band stays put while the card scrolls, so nothing slides under the toucan's perch or the corner buttons. */}
           <div ref={capRef} aria-hidden className="welcome-cap pointer-events-none sticky -top-10 z-[3] -mb-3 -ml-5 -mr-3 -mt-10 h-10 shrink-0 self-stretch" />
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
@@ -536,8 +557,13 @@ export function WelcomeCard({
               setAt({ x: Math.max(-half, Math.min(half, d.ox + e.clientX - d.x)), y: Math.max(0, Math.min(window.innerHeight * 0.4, d.oy + e.clientY - d.y)) });
             }}
             onPointerUp={() => {
+              movedRef.current = !!moving.current?.moved;
               if (moving.current?.moved) writeJson("welcome-card-at", at);
               moving.current = null;
+            }}
+            onClick={(e) => {
+              if (movedRef.current || writing !== null || (e.target as HTMLElement).closest("button")) return;
+              setGreetTools((v) => !v);
             }}
             onDoubleClick={() => (setAt({ x: 0, y: 0 }), writeJson("welcome-card-at", { x: 0, y: 0 }))}
           >
@@ -571,7 +597,7 @@ export function WelcomeCard({
                 {greeting}
                 {/* Its ✎ and quiet thumbs, right after the last word. */}
                 {writing === null && (
-                  <span contentEditable={false} className="ml-1 inline-flex items-center gap-0.5 whitespace-nowrap align-middle font-sans text-[16px]">
+                  <span contentEditable={false} data-show={arranging || greetTools ? "true" : "false"} className="touch-tools ml-1 inline-flex items-center gap-0.5 whitespace-nowrap align-middle font-sans text-[16px]">
                     <span className={`transition-opacity ${arranging ? "" : "opacity-50 hover:opacity-100 focus-within:opacity-100"}`}>
                       <EditButton
                         open={arranging && greetingOpen}
@@ -615,14 +641,16 @@ export function WelcomeCard({
               </div>
             </div>
           )}
+          {/* When it opens, confetti, the castle: one folded line at the top of the card (one scroller, so Done is always reachable). */}
+          {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} />}
           {arranging && greetingOpen && <GreetingOptions fx={fx} />}
           {arranging ? (
-            <ArrangeList fx={fx} order={allEls} parts={parts} empty={EMPTY} />
+            <ArrangeList fx={fx} order={allEls} parts={parts} empty={EMPTY} focusEl={holdEl} />
           ) : (
             order.map((el) => (
-              <div key={el} className="flex w-full flex-col items-center">
+              <PartHold key={el} onHold={() => (setHoldEl(el), setArranging(true))}>
                 {parts[el]}
-              </div>
+              </PartHold>
             ))
           )}
           {/* The way on stays in reach: pinned to the card's foot while the rest scrolls. */}
@@ -781,7 +809,8 @@ function clearSpot(
   const boxes = parts.map((p) => ({ left: p.left - at.x, top: p.top - at.y, right: p.right - at.x, bottom: p.bottom - at.y }));
   const cardBlock: Box = { left: card.left, top: card.top + PERCH_BAND, right: card.right, bottom: card.bottom };
   const corners: Box[] = [];
-  scope.querySelectorAll<HTMLElement>("[data-welcome-corner]").forEach((el) => {
+  // The corner buttons, and the feedback button (it waits in the sky at the top right while this screen is up).
+  [...scope.querySelectorAll<HTMLElement>("[data-welcome-corner]"), ...document.querySelectorAll<HTMLElement>("[data-feedback-btn]")].forEach((el) => {
     const r = el.getBoundingClientRect();
     if (r.width) corners.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
   });
@@ -847,7 +876,7 @@ function onScreen(wrap: HTMLElement, at: { x: number; y: number }): { x: number;
   };
 }
 
-function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** While the screen is being arranged his bubble rests (the panel above the card needs the room). */ quiet?: boolean; /** Going elsewhere in the app (his settings): the screen tucks itself away first. */ onAway: () => void }) {
+function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSettings; /** While the screen is being arranged his bubble rests (the panel above the card needs the room). */ quiet?: boolean; /** Going elsewhere in the app (his settings): the screen tucks itself away first. */ onAway: () => void; /** Arrange this screen (the same as its gear, or a long press on a part). */ onArrange: () => void }) {
   const [landed, setLanded] = useState(landedBefore);
   const [flyIn] = useState(() => !landedBefore());
   const [menu, setMenu] = useState(false);
@@ -898,10 +927,12 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
   // On a narrow phone the respond line is a little shorter, so it stays under his bubble (clear of the card's buttons).
   const replyW = Math.max(120, Math.min(REPLY_W, (typeof window === "undefined" ? 999 : window.innerWidth) - 240));
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const [fitTick, setFitTick] = useState(0);
   // After a drop he glides (animated) to the nearest spot clear of the card's words and buttons.
   const [settling, setSettling] = useState(false);
   const settle = (at: { x: number; y: number }) => {
     setSettling(true);
+    setFitTick((n) => n + 1);
     setTimeout(() => setSettling(false), 320);
     try {
       window.localStorage.setItem(TOUCAN_AT, JSON.stringify(at));
@@ -913,56 +944,50 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [nudge, setNudge] = useState({ x: 0, y: 0 });
   const nudgeRef = useRef(nudge);
-  const [, setSettleTick] = useState(0);
+  // Where he perches is worked out once (after he lands, after a drop, when the window changes size),
+  // never because his bubble grew or shrank: that moving was the jump when ✎ or his menu opened (owner, Nov 2).
   useLayoutEffect(() => {
     const fit = () => {
       const w = wrapRef.current;
       if (!w || !landed || drag.current?.moved) return;
-      // Answering him with the keyboard up: he holds still (the card glides instead).
-      const a = document.activeElement;
-      if (a instanceof HTMLTextAreaElement && w.contains(a)) return;
-      // Measured from where he is drawn now (a shift already asked for may not be on screen yet).
       const drawn = { x: Number(w.dataset.nx) || 0, y: Number(w.dataset.ny) || 0 };
       const n = nudgeRef.current;
       const home = { x: -off.x, y: -off.y };
-      // Best: he and his bubble both clear. A tall bubble (his menu, a long talk) may lie over the card,
-      // but never over the corner buttons if it can help it, and he himself never lands on the card.
-      // Tapping him opens his menu right where he is: he never hops for it (the menu itself slides onto the screen).
-      if (menu) {
-        const b = bubbleRef.current?.getBoundingClientRect();
-        if (b) {
-          const cur = Number(bubbleRef.current!.dataset.dx) || 0;
-          const left = b.left - cur;
-          const right = b.right - cur;
-          const dx = Math.round(Math.max(6 - left, Math.min(0, window.innerWidth - 6 - right)));
-          if (Math.abs(dx - cur) > 1) setMenuDx(dx);
-        }
-        return;
-      }
-      if (menuDx) setMenuDx(0);
-      const next = clearSpot(w, drawn, home) ?? clearSpot(w, drawn, home, "corners") ?? clearSpot(w, drawn, home, "none") ?? onScreen(w, drawn);
+      const next = clearSpot(w, drawn, home, "none") ?? onScreen(w, drawn);
       if (Math.abs(next.x - n.x) > 1 || Math.abs(next.y - n.y) > 1) {
         nudgeRef.current = next;
         setNudge(next);
       }
     };
     fit();
-    const ro = new ResizeObserver(fit);
-    if (bubbleRef.current) ro.observe(bubbleRef.current);
-    const card = wrapRef.current?.parentElement?.querySelector("[data-welcome-card]");
-    if (card) {
-      ro.observe(card);
-      if (card.firstElementChild) for (const c of card.children) ro.observe(c);
-    }
-    window.addEventListener("resize", fit);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", fit);
+    // A new width only: the keyboard and Chrome's toolbar change the height alone, and re-placing him
+    // then dropped him onto the card (Nov 2 recording).
+    let lastW = window.innerWidth;
+    const resized = () => {
+      if (window.innerWidth === lastW) return;
+      lastW = window.innerWidth;
+      fit();
     };
-  });
+    window.addEventListener("resize", resized);
+    return () => window.removeEventListener("resize", resized);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on landing, a drop (fitTick) or a window resize
+  }, [landed, fitTick]);
+  // His menu slides sideways onto the screen if it would run off it (he stays put).
+  useLayoutEffect(() => {
+    if (!menu) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- back in place once his menu closes (measured layout)
+      if (menuDx) setMenuDx(0);
+      return;
+    }
+    const b = bubbleRef.current?.getBoundingClientRect();
+    if (!b) return;
+    const cur = Number(bubbleRef.current!.dataset.dx) || 0;
+    const dx = Math.round(Math.max(6 - (b.left - cur), Math.min(0, window.innerWidth - 6 - (b.right - cur))));
+    if (Math.abs(dx - cur) > 1) setMenuDx(dx);
+  }, [menu, menuDx]);
   // Once the card has come out of the mist (it rises while it emerges), look again.
   useEffect(() => {
-    const t = setTimeout(() => setSettleTick((n) => n + 1), 2300);
+    const t = setTimeout(() => setFitTick((n) => n + 1), 2300);
     return () => clearTimeout(t);
   }, [landed]);
   useEffect(() => {
@@ -979,13 +1004,29 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
     setSaid(up ? "Got it: I'll ask this first" : "Got it: I won't ask that again");
   };
   const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setReplying(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
-  const item = "font-semibold underline underline-offset-2";
+  const item = "flex h-8 w-full items-center rounded-lg px-1.5 text-left font-semibold hover:bg-black/[.05]";
+  // His saying can be closed for this visit (×); tapping him brings it back.
+  const [closed, setClosed] = useState(false);
+  // Rating what he asked: a long press or right-click on his bubble (no ✎ on show; owner, Nov 2).
+  const rateHold = useLongPress(() => {
+    if (menu || saying || talk) return;
+    setRate(true);
+    navigator.vibrate?.(8);
+  });
+  const resting = !menu && !saying && !talk && !rate;
+  const showBubble = landed && !quiet && (!closed || menu);
+  const showCoin = showBubble && resting && !replying && !answer && prompts.length > 1;
   return (
     <div ref={wrapRef} data-nx={nudge.x} data-ny={nudge.y} className={`${flyIn ? "welcome-toucan" : ""} absolute z-[5]`} style={{ left: 8 + off.x + nudge.x, top: -47 + off.y + nudge.y, transition: settling ? "left 260ms cubic-bezier(.2,.8,.3,1), top 260ms cubic-bezier(.2,.8,.3,1)" : undefined }}>
       <button
         type="button"
         onClick={() => {
           if (drag.current?.moved || !landed) return;
+          // Closed bubble: a tap brings his saying back; otherwise his menu.
+          if (closed && !menu) {
+            setClosed(false);
+            return;
+          }
           setMenu((v) => !v);
           setSaying(null);
           setRewording(false);
@@ -1017,7 +1058,7 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
             setTimeout(() => (drag.current = null), 0);
           } else drag.current = null;
         }}
-        aria-label="The toucan: plan the day, talk, or a wise saying (drag to move him)"
+        aria-label={closed ? "The toucan: show what he's asking" : "The toucan: plan the day, talk, or a wise saying (drag to move him)"}
         aria-expanded={menu}
         className={`owl-body block touch-none ${landed ? "owl-perched cursor-grab" : "pointer-events-none"}`}
       >
@@ -1027,15 +1068,33 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
           </span>
         </span>
       </button>
-      {landed && !quiet && (
+      {/* ‹ › under him: one gilded coin, each half a button (mirrored chevrons, so it's truly symmetrical). */}
+      {showCoin && (
+        <span className="bubble-coin fade-in absolute left-[14px] top-[61px]">
+          <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-coin-half" data-side="l">
+            <svg width="9" height="12" viewBox="0 0 9 12" fill="none" aria-hidden>
+              <path d="M6.5 1.5 2 6l4.5 4.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="bubble-coin-half" data-side="r">
+            <svg width="9" height="12" viewBox="0 0 9 12" fill="none" aria-hidden style={{ transform: "scaleX(-1)" }}>
+              <path d="M6.5 1.5 2 6l4.5 4.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </span>
+      )}
+      {showBubble && (
         <div
+          {...rateHold.handlers}
           // His bubble moves him too: drag it by its words (buttons and the reply line still work).
           onPointerDown={(e) => {
+            rateHold.handlers.onPointerDown(e);
             if ((e.target as HTMLElement).closest("button, input, textarea, a, form")) return;
             drag.current = { x: e.clientX, y: e.clientY, ox: off.x, oy: off.y, moved: false };
             e.currentTarget.setPointerCapture(e.pointerId);
           }}
           onPointerMove={(e) => {
+            rateHold.handlers.onPointerMove(e);
             const d = drag.current;
             if (!d) return;
             if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
@@ -1043,22 +1102,38 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
             setOff({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y });
           }}
           onPointerUp={() => {
+            rateHold.handlers.onPointerUp();
             if (drag.current?.moved) settle(off);
             drag.current = null;
           }}
           ref={bubbleRef}
           data-dx={menu ? menuDx : 0}
-          // His menu hangs down from beside him (a tall list growing up would push him down onto the card).
-          className={`group/bubble toucan-bubble owl-say absolute ${menu ? "top-1" : "bottom-1"} left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,calc(100vw-188px))]" : "w-max min-w-[180px] max-w-[min(250px,calc(100vw-188px))]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)", translate: menu && menuDx ? `${menuDx}px 0` : undefined }}>
-          {/* ✎ at the top right: rate what he asked, or say more about it. */}
-          {/* Hidden while you're answering him (an answer already says it's a good question). */}
-          {!menu && !saying && !talk && !replying && (
-            <button type="button" onClick={() => setRate((v) => !v)} aria-label="Rate or comment on what he asked" title="Rate or comment" aria-expanded={rate} className={`absolute -right-2 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full${rate ? "" : " opacity-0 transition-opacity group-hover/bubble:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-60"}`} style={{ background: rate ? "#f2e2b4" : "#fffaf0", border: "1px solid #b39a6a", color: "#8a6116" }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )}
+          // A fixed width, so new words never make it wider or narrower; it grows only downward (his menu, a talk, the rating).
+          className={`toucan-bubble owl-say absolute top-1 left-[60px] cursor-grab select-none touch-none z-[5] w-[min(232px,calc(100vw-128px))] rounded-2xl pb-4 pl-3 pr-7 pt-2 text-left text-[13.5px] leading-snug [-webkit-touch-callout:none]`}
+          style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)", translate: menu && menuDx ? `${menuDx}px 0` : undefined }}
+        >
+          {/* × closes what he's saying for this visit (tap him to see it again); in his menu, it closes the menu. */}
+          <button
+            type="button"
+            onClick={() => {
+              if (menu) {
+                setMenu(false);
+                setRewording(false);
+                return;
+              }
+              if (saying) return setSaying(null);
+              if (talk) return (setTalk(null), setReplying(false));
+              if (rate) return (setRate(false), setWhy(null));
+              setClosed(true);
+            }}
+            aria-label={menu ? "Close his menu" : rate ? "Close the rating" : "Close what he's saying"}
+            title="Close"
+            className="bubble-x absolute right-1 top-1 flex h-[22px] w-[22px] items-center justify-center rounded-full"
+          >
+            <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden>
+              <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
           {talk ? (
             // A light back-and-forth right here in his bubble: your words, then his.
             <span className="flex flex-col gap-1.5">
@@ -1070,29 +1145,80 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
               <span className="text-[13.5px]">{talk.thinking ? <span className="italic opacity-70">…thinking</span> : <Digest text={talk.him} />}</span>
             </span>
           ) : (
-            <span className={!menu && !saying ? "block pr-2" : undefined}>{saying ?? (menu ? "How can I help?" : ask)}</span>
+            <span className={menu ? "font-display block text-[14px]" : "block"}>{saying ?? (menu ? "How can I help?" : ask)}</span>
           )}
           <Confirm text={said} onDone={() => setSaid(null)} />
-          {/* Hanging from the bubble's lower edge (not part of his words): ‹ › for something else he could ask, and Reply. */}
-          {!menu && !saying && (
-            <span className="absolute left-2.5 right-2.5 top-[calc(100%-11px)] flex items-start gap-1">
-              {!talk && !replying && !answer && prompts.length > 1 && (
-                <span className="bubble-coin opacity-0 transition-opacity duration-200 group-hover/bubble:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-60">
-                  <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-coin-half" data-side="l">
-                    ‹
-                  </button>
-                  <button type="button" onClick={() => step(1)} aria-label="Next thing he could ask" className="bubble-coin-half" data-side="r">
-                    ›
-                  </button>
-                </span>
+          {rate && !menu && !saying && (
+            <span className="fade-in mt-1.5 flex flex-col">
+              <span className="flex items-center gap-1">
+                <LineVote kind="like" on={votes.liked.includes(ask)} onClick={() => vote(true)} />
+                <LineVote kind="dislike" on={why === "down"} onClick={() => setWhy(why === "down" ? null : "down")} />
+                <NoteButton text on={why === "note"} onClick={() => setWhy(why === "note" ? null : "note")} />
+              </span>
+              {why && (
+                <WhyBox
+                  key={why}
+                  saying={ask}
+                  source="Toucan's question"
+                  down={why === "down"}
+                  onDone={(sent) => {
+                    // A thumbs down retires it once you've said why (or skipped).
+                    if (why === "down") vote(false);
+                    setWhy(null);
+                    if (sent) setSaid("Thanks, your feedback was sent");
+                  }}
+                />
               )}
-              <span className="flex-1" />
+            </span>
+          )}
+          {menu && !rewording && (
+            <span className="mt-1 flex flex-col">
+              <button type="button" onClick={() => (setMenu(false), talkToToucan(undefined, "talk", PLAN_DAY))} className={item}>
+                Plan my day
+              </button>
+              <button type="button" onClick={() => (setMenu(false), talkToToucan())} className={item}>
+                Talk to me
+              </button>
+              <button type="button" onClick={() => setSaying(lineForDay(`${Date.now()}`))} className={item}>
+                A wise saying
+              </button>
+              <button type="button" onClick={() => (setRewording(true), setWords(ask))} className={item} style={{ color: "var(--t-ink-soft)" }}>
+                Change what I ask first
+              </button>
+              <button type="button" onClick={() => (setMenu(false), onArrange())} className={item} style={{ color: "var(--t-ink-soft)" }}>
+                Arrange this screen
+              </button>
+              <Link href="/settings?open=toucan-spirit" onClick={onAway} className={item} style={{ color: "var(--t-ink-soft)" }}>
+                <GearIcon size={13} />
+                <span className="ml-1.5">Toucan settings</span>
+              </Link>
+            </span>
+          )}
+          {menu && rewording && (
+            <form
+              className="mt-1.5 flex gap-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                patchFx({ welcomeToucanAsk: words.trim().slice(0, 120) });
+                setRewording(false);
+                setMenu(false);
+                setIdx(0);
+              }}
+            >
+              <input autoFocus value={words} onChange={(e) => setWords(e.target.value)} maxLength={120} aria-label="What the toucan asks first" className="h-8 min-w-0 flex-1 rounded-full px-2.5 text-[16px]" style={FIELD} />
+              <button type="submit" className="h-8 shrink-0 rounded-full px-2.5 text-[12.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+                Save
+              </button>
+            </form>
+          )}
+          {/* The respond line: centred under his words, a quarter of it over the bubble's lower edge. */}
+          {!menu && !saying && (
+            <span className="absolute inset-x-0 top-[calc(100%-7px)] flex justify-center gap-1">
               {talk && !talk.thinking && (
-                <button type="button" onClick={() => (talkToToucan(undefined, "talk"), setTalk(null), setReplying(false))} title="Open the full conversation" className="bubble-hang flex h-6 items-center rounded-full px-2 text-[11.5px] font-semibold">
+                <button type="button" onClick={() => (talkToToucan(undefined, "talk"), setTalk(null), setReplying(false))} title="Open the full conversation" className="bubble-hang flex h-[26px] items-center rounded-full px-2 text-[11.5px] font-semibold">
                   More
                 </button>
               )}
-              {/* A blank line to answer him in, hanging under his words; it widens as you type. */}
               <form
                 className="relative flex items-end"
                 onSubmit={(e) => {
@@ -1101,7 +1227,7 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
                 }}
               >
                 {/* 16px text drawn at 13px (iPhone doesn't zoom on focus), in a box sized to what you see. */}
-                <span className="reply-box bubble-hang relative block overflow-hidden rounded-[11px]" style={{ width: replyW, height: answerH }}>
+                <span className="reply-box bubble-hang relative block overflow-hidden rounded-[13px]" style={{ width: replyW, height: answerH }}>
                   <textarea
                     value={answer}
                     rows={1}
@@ -1130,12 +1256,12 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
                     aria-label="Respond to the toucan"
                     enterKeyHint="send"
                     maxLength={400}
-                    className="reply-line absolute left-0 top-0 block resize-none bg-transparent py-[3px] pl-3 pr-9 text-[16px] leading-[20px] outline-none"
+                    className="reply-line absolute left-0 top-0 block resize-none bg-transparent py-[4px] pl-3.5 pr-9 text-[16px] leading-[20px] outline-none"
                     style={{ color: "#2a1c10", width: replyW / REPLY_SCALE, height: answerH / REPLY_SCALE, transform: `scale(${REPLY_SCALE})`, transformOrigin: "0 0", overflowY: answerH >= REPLY_MAX ? "auto" : "hidden" }}
                   />
                 </span>
                 {answer.trim() && (
-                  <button type="submit" aria-label="Send" className="reply-send reveal absolute bottom-[1px] right-[1px] flex h-5 w-5 items-center justify-center rounded-full">
+                  <button type="submit" aria-label="Send" className="reply-send reveal absolute bottom-[3px] right-[3px] flex h-5 w-5 items-center justify-center rounded-full">
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden>
                       <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -1143,65 +1269,6 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
                 )}
               </form>
             </span>
-          )}
-          {rate && !menu && !saying && (
-            <span className="fade-in mt-1.5 flex flex-col">
-              <span className="flex items-center gap-1">
-                <LineVote kind="like" on={votes.liked.includes(ask)} onClick={() => vote(true)} />
-                <LineVote kind="dislike" on={why === "down"} onClick={() => setWhy(why === "down" ? null : "down")} />
-                <NoteButton text on={why === "note"} onClick={() => setWhy(why === "note" ? null : "note")} />
-              </span>
-              {why && (
-                <WhyBox
-                  key={why}
-                  saying={ask}
-                  source="Toucan's question"
-                  down={why === "down"}
-                  onDone={(sent) => {
-                    // A thumbs down retires it once you've said why (or skipped).
-                    if (why === "down") vote(false);
-                    setWhy(null);
-                    if (sent) setSaid("Thanks, your feedback was sent");
-                  }}
-                />
-              )}
-            </span>
-          )}
-          {menu && !rewording && (
-            <span className="mt-1.5 flex flex-col items-start gap-1">
-              <button type="button" onClick={() => (setMenu(false), talkToToucan(undefined, "talk", PLAN_DAY))} className={item}>
-                Plan my day
-              </button>
-              <button type="button" onClick={() => (setMenu(false), talkToToucan())} className={item}>
-                Talk to me
-              </button>
-              <button type="button" onClick={() => setSaying(lineForDay(`${Date.now()}`))} className={item}>
-                Tell me a wise saying
-              </button>
-              <button type="button" onClick={() => (setRewording(true), setWords(ask))} className="underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
-                Change what I ask first
-              </button>
-              <Link href="/settings?open=toucan-spirit" onClick={onAway} className="underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
-                Toucan settings
-              </Link>
-            </span>
-          )}
-          {menu && rewording && (
-            <form
-              className="mt-1.5 flex gap-1"
-              onSubmit={(e) => {
-                e.preventDefault();
-                patchFx({ welcomeToucanAsk: words.trim().slice(0, 120) });
-                setRewording(false);
-                setMenu(false);
-                setIdx(0);
-              }}
-            >
-              <input autoFocus value={words} onChange={(e) => setWords(e.target.value)} maxLength={120} aria-label="What the toucan asks first" className="h-8 min-w-0 flex-1 rounded-full px-2.5 text-[16px]" style={FIELD} />
-              <button type="submit" className="h-8 shrink-0 rounded-full px-2.5 text-[12.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-                Save
-              </button>
-            </form>
           )}
         </div>
       )}
@@ -1256,10 +1323,10 @@ const greetingSize = (t: string) => {
 
 /** A small round thumbs up or down for the day's wise line. */
 /** The toucan's respond line: 168px wide, one 22px line at rest, up to about four lines. */
-const REPLY_W = 168;
+const REPLY_W = 184;
 const REPLY_SCALE = 0.8125;
-const REPLY_LINE = 22;
-const REPLY_MAX = 72;
+const REPLY_LINE = 26;
+const REPLY_MAX = 74;
 
 function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean; onClick: () => void }) {
   const like = kind === "like";
@@ -1484,6 +1551,41 @@ function CheckinPanel({ fx, metrics, onSaved, submit }: { fx: FxSettings; metric
   );
 }
 
+/**
+ * A part of the welcome screen as it shows: a steady press on it (phones), away from its
+ * fields, arranges the screen with this part's options open, instead of a ✎ on every part.
+ * The tap that ends a long press doesn't also press the button under the finger.
+ */
+function PartHold({ onHold, children }: { onHold: () => void; children: React.ReactNode }) {
+  const hold = useLongPress(() => {
+    navigator.vibrate?.(10);
+    onHold();
+  }, 550);
+  const field = (t: EventTarget) => !!(t as HTMLElement).closest?.("input, textarea, select, [contenteditable='true'], [data-no-hold]");
+  return (
+    <div
+      className="flex w-full flex-col items-center [-webkit-touch-callout:none]"
+      onPointerDown={(e) => {
+        // Touch only: a mouse has the gear (and right-click stays the browser's own here).
+        if (e.pointerType === "mouse" || field(e.target)) return;
+        hold.handlers.onPointerDown(e);
+      }}
+      onPointerMove={hold.handlers.onPointerMove}
+      onPointerUp={hold.handlers.onPointerUp}
+      onPointerLeave={hold.handlers.onPointerLeave}
+      onPointerCancel={hold.handlers.onPointerCancel}
+      onClickCapture={(e) => {
+        if (hold.wasLong()) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** What a part shows when there's nothing in it right now (while arranging). */
 const EMPTY: Partial<Record<WelcomeEl, string>> = {
   streak: "Shows on the day's first visit, once you have a streak.",
@@ -1491,7 +1593,7 @@ const EMPTY: Partial<Record<WelcomeEl, string>> = {
   reward: "Shows on the day's first visit.",
   line: "A new line each day.",
   reflect: "Add a question with its ✎.",
-  habits: "Pick pills with its ✎.",
+  habits: "Pick habits with its ✎.",
 };
 
 /** One of your reflection questions: the same one all day, ‹ › for another. */
