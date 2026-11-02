@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-02, `main` (welcome check-in: card, corner buttons and toucan kept clear of each other)
+- **Last updated:** 2026-11-02, `main` (feedback: Due soon add-all, snooze N days, quest editor, completing, victories, tomorrow's list)
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** ~35 notes queued (query in section 3). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
 
@@ -148,6 +148,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 2: Feedback (quests/Today, 13 notes): Due soon "Add all to today" and Edit-mode checkboxes; Snooze › Other… N days; quest editor XP −5 [bar] +5 [total], Save lights up when changed, Complete quest waits for Done to celebrate; celebration replays with XP edited from it; + sheet keeps title/details across kinds; time dial hour/minutes typeable; long-press/right-click a victory (Today and evening wins) to edit, a library portrait to delete (`lib/use-long-press.ts`); welcome "Choose today's quests" rows drawn as quest cards (portrait, board, XP via `welcomeContextAction`); tomorrow's quests one gold-sealed list (no importance toggle), Keep these at the bottom; Streaks "Start again" → Save.
 - Nov 2: Plan, the matrix, the Guild Hall and a friend's page load in one wave (their queued database waits now run together; the Guild Hall had about 8 in a row). Not measured live (no sign-in from the cloud).
 - Nov 2: Welcome check-in layout on phones (owner's screenshot: card cut off at the left, buttons hanging off its corner, toucan and bubble over the wise line and the footer, bubble off the right edge): the card's saved spot is clamped to the screen (centred on phones); minimize and gear sit inside the card's top-right corner (`data-welcome-corner`, card `pt-10`); the toucan finds the nearest spot where he and his bubble (its ✎ and respond line included) are on screen and off the card below its top band and off the corner buttons (`clearSpot` in `WelcomeCard.tsx`, re-checked as parts open and after the card emerges; a drag ends with a glide there); room above the card (`--wtop`), bubble and respond line narrower on small phones; his bubble rests while arranging. Checked at 375×560, 390×664, 430×800 and 820×1180 with stored off-screen spots. The cleaning habit's whole card opens/closes its tray (owner's recording).
 - Nov 2: Evening ritual › Plan tomorrow's day: "✨ Auto-schedule all" beside Tomorrow's quests opens Auto-schedule for tomorrow only (`day` prop on `AutoScheduler`: horizon 1, no daily cap, starts at tomorrow's 00:00); the rite ⋯ menu shows Edit for the special rites too (rename Plan tomorrow's day).
