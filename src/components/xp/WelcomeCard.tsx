@@ -768,7 +768,9 @@ function clearSpot(
   at: { x: number; y: number },
   home: { x: number; y: number },
   /** What his bubble must stay off: everything, only the corner buttons (a tall menu), or nothing (he alone stays clear). */
-  bubbleOff: "all" | "corners" | "none" = "all"
+  bubbleOff: "all" | "corners" | "none" = "all",
+  /** Only say whether he can stay where he is (null when he can't). */
+  stayOnly = false
 ): { x: number; y: number } | null {
   // He and his bubble, each as its own box (the bubble reaches past the corner buttons' line; he doesn't).
   const parts = [...wrap.children].map((c) => toucanBox(c as HTMLElement)).filter((b): b is Box => !!b);
@@ -796,6 +798,7 @@ function clearSpot(
         b.left + dx >= m - give && b.right + dx <= vw - m + give && b.top + dy >= m - give && b.bottom + dy <= vh - m + give &&
         !blocksFor(i).some((r) => b.left + dx < r.right + pad - give && b.right + dx > r.left - pad + give && b.top + dy < r.bottom + pad - give && b.bottom + dy > r.top - pad + give)
     );
+  if (stayOnly) return ok(at.x, at.y, 2) ? at : null;
   if (ok(0, 0)) return { x: 0, y: 0 };
   // Where he is now still fine (give or take a couple of pixels)? He stays (no back and forth).
   if (ok(at.x, at.y, 2)) return at;
@@ -848,6 +851,8 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
   const [landed, setLanded] = useState(landedBefore);
   const [flyIn] = useState(() => !landedBefore());
   const [menu, setMenu] = useState(false);
+  // His menu slides sideways to stay on screen (he doesn't move for it).
+  const [menuDx, setMenuDx] = useState(0);
   const [saying, setSaying] = useState<string | null>(null);
   const [rewording, setRewording] = useState(false);
   const [words, setWords] = useState("");
@@ -922,6 +927,19 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
       const home = { x: -off.x, y: -off.y };
       // Best: he and his bubble both clear. A tall bubble (his menu, a long talk) may lie over the card,
       // but never over the corner buttons if it can help it, and he himself never lands on the card.
+      // Tapping him opens his menu right where he is: he never hops for it (the menu itself slides onto the screen).
+      if (menu) {
+        const b = bubbleRef.current?.getBoundingClientRect();
+        if (b) {
+          const cur = Number(bubbleRef.current!.dataset.dx) || 0;
+          const left = b.left - cur;
+          const right = b.right - cur;
+          const dx = Math.round(Math.max(6 - left, Math.min(0, window.innerWidth - 6 - right)));
+          if (Math.abs(dx - cur) > 1) setMenuDx(dx);
+        }
+        return;
+      }
+      if (menuDx) setMenuDx(0);
       const next = clearSpot(w, drawn, home) ?? clearSpot(w, drawn, home, "corners") ?? clearSpot(w, drawn, home, "none") ?? onScreen(w, drawn);
       if (Math.abs(next.x - n.x) > 1 || Math.abs(next.y - n.y) > 1) {
         nudgeRef.current = next;
@@ -1029,8 +1047,9 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
             drag.current = null;
           }}
           ref={bubbleRef}
+          data-dx={menu ? menuDx : 0}
           // His menu hangs down from beside him (a tall list growing up would push him down onto the card).
-          className={`group/bubble toucan-bubble owl-say absolute ${menu ? "top-1" : "bottom-1"} left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,calc(100vw-188px))]" : "w-max min-w-[180px] max-w-[min(250px,calc(100vw-188px))]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+          className={`group/bubble toucan-bubble owl-say absolute ${menu ? "top-1" : "bottom-1"} left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,calc(100vw-188px))]" : "w-max min-w-[180px] max-w-[min(250px,calc(100vw-188px))]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)", translate: menu && menuDx ? `${menuDx}px 0` : undefined }}>
           {/* ✎ at the top right: rate what he asked, or say more about it. */}
           {/* Hidden while you're answering him (an answer already says it's a good question). */}
           {!menu && !saying && !talk && !replying && (
