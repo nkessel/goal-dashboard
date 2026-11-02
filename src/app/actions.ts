@@ -3023,7 +3023,7 @@ export async function fightMessAction(input: { day: string; spaceId: string; bef
   const xpEarned = battleXpToday(c, day, battleXp(before, after, minutes));
   const next = normalizeCleaning({
     ...c,
-    spaces: c.spaces.map((s) => (s.id === space.id ? { ...s, level: levelOfTen(after), ratedOn: day } : s)),
+    spaces: c.spaces.map((s) => (s.id === space.id ? { ...s, level: levelOfTen(after), mess: after, ratedOn: day } : s)),
     battles: [...(c.battles ?? []), { on: day, spaceId: space.id, before, after, minutes, took: n(input.took, 5), gave: n(input.gave, 5), xp: xpEarned }],
   })!;
   const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, cleaning: next } }).eq("id", ownerId);

@@ -14,6 +14,8 @@ export type Space = {
   name: string;
   icon: string;
   level: MessLevel;
+  /** How messy, on the drag bar: 0 spotless … 10 a disaster (newer than `level`, which follows it). */
+  mess?: number | null;
   /** The day it was last rated (or tidied). */
   ratedOn: string | null;
   /** Gets one step messier on its own every this many days (bathroom, kitchen); null = only when you say. */
@@ -31,7 +33,7 @@ export type Chore = {
   snoozedUntil: string | null;
 };
 
-/** Bin fill in quarters: 0 empty … 4 full. */
+/** Bin fill in quarters: 0 empty … 4 full (in tenths, from the drag bar). */
 export type Laundry = { readings: { on: string; fill: number }[]; loads: string[] };
 
 /** One round of fighting back the mess in a space: how messy before and after (0 spotless … 10 a disaster), and optionally how long it took and the energy it took and gave (0–5). */
@@ -102,6 +104,7 @@ export function normalizeCleaning(raw: unknown): Cleaning | null {
       name: text(s.name, 40),
       icon: text(s.icon, 16) || "✨",
       level: level(s.level),
+      mess: s.mess === null || s.mess === undefined || !Number.isFinite(Number(s.mess)) ? null : Math.max(0, Math.min(10, Math.round(Number(s.mess) * 10) / 10)),
       ratedOn: isDay(s.ratedOn) ? s.ratedOn : null,
       driftDays: Number(s.driftDays) >= 1 ? Math.min(60, Math.round(Number(s.driftDays))) : null,
     }));
@@ -121,7 +124,7 @@ export function normalizeCleaning(raw: unknown): Cleaning | null {
   const laundry: Laundry = {
     readings: (Array.isArray(l.readings) ? l.readings : [])
       .filter((x) => x && isDay(x.on))
-      .map((x) => ({ on: x.on, fill: Math.max(0, Math.min(4, Math.round(Number(x.fill) || 0))) }))
+      .map((x) => ({ on: x.on, fill: Math.max(0, Math.min(4, Math.round((Number(x.fill) || 0) * 10) / 10)) }))
       .slice(-30),
     loads: (Array.isArray(l.loads) ? l.loads : []).filter(isDay).slice(-20),
   };
@@ -167,11 +170,16 @@ export function dayLabel(d: string, today: string): string {
 // ---------------------------------------------------------------------------
 // Where things stand
 
-/** How messy a space is now: the last rating, plus any drift since. */
+/** How messy a space is now on the 0–10 bar: the last rating, plus any drift since (about a third of the bar every `driftDays`). */
+export function messNow(s: Space, today: string): number {
+  const base = s.mess ?? tenOf(s.level);
+  if (!s.driftDays || !s.ratedOn) return base;
+  return Math.min(10, Math.round((base + (3.5 * Math.max(0, daysBetween(s.ratedOn, today))) / s.driftDays) * 10) / 10);
+}
+
+/** The same, as one of the style's three words. */
 export function levelNow(s: Space, today: string): MessLevel {
-  if (!s.driftDays || !s.ratedOn) return s.level;
-  const steps = Math.floor(Math.max(0, daysBetween(s.ratedOn, today)) / s.driftDays);
-  return Math.min(2, s.level + steps) as MessLevel;
+  return levelOfTen(messNow(s, today));
 }
 
 /** Laundry: how full the bin likely is now, and the day the next load is due. */
@@ -217,10 +225,10 @@ export function todaysPicks(c: Cleaning, today: string): Pick[] {
   const style = styleOf(c.style);
   const scored: (Pick & { score: number })[] = [];
   for (const s of c.spaces) {
-    const lv = levelNow(s, today);
-    if (lv === 0) continue;
+    const m = messNow(s, today);
+    if (m < 2.5) continue;
     const age = s.ratedOn ? daysBetween(s.ratedOn, today) : 30;
-    scored.push({ kind: "space", id: s.id, name: s.name, icon: s.icon, why: style.words[lv], score: (lv === 2 ? 3 : 1.5) + Math.min(age, 30) / 100 });
+    scored.push({ kind: "space", id: s.id, name: s.name, icon: s.icon, why: style.words[levelOfTen(m)], score: (3.2 * m) / 10 + Math.min(age, 30) / 100 });
   }
   const l = laundryNow(c.laundry, today);
   if (l.daysLeft !== null && l.daysLeft <= 1) scored.push({ kind: "laundry", id: "laundry", name: "Laundry", icon: "🧺", why: l.daysLeft <= 0 ? "a load is due" : "due tomorrow", score: l.daysLeft <= 0 ? 3.5 : 1.8 });
@@ -238,7 +246,7 @@ export function todaysPicks(c: Cleaning, today: string): Pick[] {
 /** Where a space's 3-step level sits on the battle's 0–10 scale (the starting "before"). */
 export const tenOf = (lv: MessLevel) => [1, 5, 8][lv];
 /** Back from the 0–10 scale to the space's level. */
-export const levelOfTen = (n: number): MessLevel => (n <= 2 ? 0 : n <= 6 ? 1 : 2);
+export const levelOfTen = (n: number): MessLevel => (n < 2.5 ? 0 : n < 6.5 ? 1 : 2);
 
 /** XP a day can earn from battles (the rest still goes in the log). */
 export const MESS_XP_DAY_CAP = 60;
@@ -261,3 +269,24 @@ export function battleXpToday(c: Cleaning, day: string, xp: number): number {
 
 /** "Messy" words for a point on the 0–10 scale, in the chosen style. */
 export const tenWords = (style: MessStyle, n: number) => styleOf(style).words[levelOfTen(n)];
+
+// ---------------------------------------------------------------------------
+// One drag bar for everything: 0 nothing to do … 10 needs you badly
+
+/** How much a chore needs doing on the bar: 0 just done, 8 due, 10 well past due. */
+export function choreNeed(c: Chore, today: string): number {
+  if (c.snoozedUntil && c.snoozedUntil > today) return 0;
+  const dueOn = choreDueOn(c, today);
+  const left = daysBetween(today, dueOn);
+  const span = c.weekday != null ? 7 : c.everyDays;
+  if (left <= 0) return Math.min(10, 8 + (2 * -left) / span);
+  return Math.max(0, Math.round((8 - (8 * left) / span) * 10) / 10);
+}
+
+/** A chore dragged on its bar: near 0 is done today; otherwise (every-N-days chores) it was last done that long ago. */
+export function choreFromNeed(c: Chore, need: number, today: string): Chore {
+  if (need <= 0.5) return { ...c, lastDone: today, snoozedUntil: null };
+  if (c.weekday != null) return { ...c, snoozedUntil: null };
+  const back = Math.round((Math.min(8, need) / 8) * c.everyDays);
+  return { ...c, lastDone: addDays(today, -back), snoozedUntil: null };
+}
