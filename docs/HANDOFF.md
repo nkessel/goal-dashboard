@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-02, `main` (feedback: Due soon add-all, snooze N days, quest editor, completing, victories, tomorrow's list)
+- **Last updated:** 2026-11-02, `main` (Due soon fixes: added quests stay on Today, round checks, add-all on top; level bars; bigger portrait grid)
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** ~35 notes queued (query in section 3). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
 
@@ -148,6 +148,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 2: Due soon: quests pinned to Today no longer get pulled back into Due soon (`!t.is_manual_priority` in `src/app/page.tsx`; that was why added quests vanished from Today's quests); "Add all to today" at the top of the tray (no Tick all); in Edit the card keeps its width with a slim right column (round pick check, then ×) and a "Hide Due soon" link (brought back from Today's gear); the band leaves as quests move to Today and hides when empty. Every checkbox in the app is round (globals.css, `GoldCheck`). Quest card level bars show only their filled height (no empty track). Portrait library: "See more at once" widens the picker and shows a taller 8-across grid (`portrait-grid-wide`).
 - Nov 2: Welcome screen, from the UI check: the card's top band is pinned while it scrolls (`.welcome-cap`, sticky, parchment aligned like the foot), so nothing slides under the toucan's perch or the corner buttons; the toucan's menu hangs down from beside him and the placement falls back in tiers (bubble clear of everything, then only of the corner buttons, then only he stays clear), so tapping him near the right edge no longer drops him onto the greeting. Not fixed: with the keyboard up on Top priority, Snooze/Complete sit behind the keyboard (scroll to reach them).
 - Nov 2: Feedback (quests/Today, 13 notes): Due soon "Add all to today" and Edit-mode checkboxes; Snooze › Other… N days; quest editor XP −5 [bar] +5 [total], Save lights up when changed, Complete quest waits for Done to celebrate; celebration replays with XP edited from it; + sheet keeps title/details across kinds; time dial hour/minutes typeable; long-press/right-click a victory (Today and evening wins) to edit, a library portrait to delete (`lib/use-long-press.ts`); welcome "Choose today's quests" rows drawn as quest cards (portrait, board, XP via `welcomeContextAction`); tomorrow's quests one gold-sealed list (no importance toggle), Keep these at the bottom; Streaks "Start again" → Save.
 - Nov 2: Plan, the matrix, the Guild Hall and a friend's page load in one wave (their queued database waits now run together; the Guild Hall had about 8 in a row). Not measured live (no sign-in from the cloud).

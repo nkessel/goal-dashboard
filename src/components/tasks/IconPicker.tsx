@@ -86,6 +86,22 @@ export function IconPicker({
     } catch {}
   }
   const [query, setQuery] = useState("");
+  // "See more": a wider window and a taller, denser grid (remembered).
+  const [wide, setWide] = useState(() => {
+    try {
+      return window.localStorage.getItem("portrait-grid-wide") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleWide = () => {
+    setWide((w) => {
+      try {
+        window.localStorage.setItem("portrait-grid-wide", w ? "0" : "1");
+      } catch {}
+      return !w;
+    });
+  };
   const [shelf, setShelf] = useState<"all" | "quest" | "reward" | "character">(artStyle === "treasure" ? "reward" : "all");
   const [library, setLibrary] = useState<TaskIconLibraryEntry[] | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -267,7 +283,7 @@ export function IconPicker({
           role="dialog"
           aria-modal="true"
           aria-label="Choose a portrait"
-          className="card-pop-in relative flex max-h-[86vh] w-full max-w-[380px] flex-col overflow-y-auto rounded-2xl p-3.5 parchment parchment-framed shadow-2xl"
+          className={`card-pop-in relative flex max-h-[92vh] w-full ${wide ? "max-w-[720px]" : "max-w-[380px]"} flex-col overflow-y-auto rounded-2xl p-3.5 parchment parchment-framed shadow-2xl transition-[max-width] duration-300`}
           style={{
             background: "var(--t-panel)",
             border: "2px solid var(--t-panel-border)",
@@ -402,6 +418,14 @@ export function IconPicker({
             <span className="ml-auto text-[11.5px] font-normal underline">{libShown ? "Hide" : "Show"}</span>
           </button>
           {libShown && (
+            <button type="button" onClick={toggleWide} aria-pressed={wide} className="-mt-1 mb-1 flex h-8 items-center gap-1.5 self-end rounded-full px-3 text-[12.5px] font-semibold" style={{ border: "1px solid var(--t-panel-border)", color: "var(--t-ink)", background: wide ? "rgba(217,180,95,.3)" : undefined }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                {wide ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />}
+              </svg>
+              {wide ? "See fewer" : "See more at once"}
+            </button>
+          )}
+          {libShown && (
             <div className="reveal flex flex-col gap-2">
               <input
                 value={query}
@@ -438,7 +462,7 @@ export function IconPicker({
                 </p>
               )}
               {library && (
-                <div className="grid max-h-52 grid-cols-5 gap-1.5 overflow-y-auto overflow-x-hidden p-1">
+                <div className={`grid gap-1.5 overflow-y-auto overflow-x-hidden p-1 transition-[max-height] duration-300 ${wide ? "max-h-[62vh] grid-cols-5 sm:grid-cols-8" : "max-h-52 grid-cols-5"}`}>
                   {filteredLibrary?.map((entry) => (
                     <div key={entry.id} className="group/tile relative">
                       {/* Tap to use it; long-press (or right-click) to delete it from the library. */}

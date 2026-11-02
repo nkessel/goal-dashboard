@@ -142,7 +142,7 @@ function readHidden(): string[] {
  * inside); Edit lets you × a quest out of it for good, or tick quests to add
  * them to Today's Quests together. "Add all to today" adds every one at once.
  */
-function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks: TaskWithCategory[]; hours: number; theme: "calm" | "adventure"; lockedBehind: Map<string, TaskWithCategory> }) {
+function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind, onHide }: { tasks: TaskWithCategory[]; hours: number; theme: "calm" | "adventure"; lockedBehind: Map<string, TaskWithCategory>; /** Hide the whole band (brought back from Today's gear). */ onHide?: () => void }) {
   const isAdventure = theme === "adventure";
   const router = useRouter();
   const [folded, setFolded] = useState(false);
@@ -154,6 +154,9 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
   const [refilling, startRefill] = useTransition();
   const [adding, startAdding] = useTransition();
   const [ticked, setTicked] = useState<string[]>([]);
+  // Added to today, until the page refills without them: they leave the band at once.
+  const [moved, setMoved] = useState<string[]>([]);
+
   const [seenHours, setSeenHours] = useState(shownHours);
   if (seenHours !== shownHours) {
     setSeenHours(shownHours);
@@ -191,12 +194,13 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
     startRefill(() => router.refresh());
   };
   const closePicker = useCallback(() => setPicking(false), []);
-  const shown = tasks.filter((t) => !hidden.includes(t.id));
+  const shown = tasks.filter((t) => !hidden.includes(t.id) && !moved.includes(t.id));
   const notToday = shown.filter((t) => !t.is_manual_priority && t.status !== "completed");
   const tickedNow = ticked.filter((id) => notToday.some((t) => t.id === id));
   const addToToday = (ids: string[]) => {
     if (!ids.length) return;
     startAdding(async () => {
+      setMoved((m) => [...m, ...ids]);
       for (const id of ids) await toggleManualPriorityAction(id, true);
       setTicked([]);
       setEditing(false);
@@ -208,6 +212,8 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
   const border = isAdventure ? "rgba(240,150,90,.55)" : "var(--t-card-border)";
   const reach = dueWindowLabel(hours);
   const open = !folded;
+  // Nothing left in it (all added to today or taken out): it steps aside.
+  if (!shown.length) return null;
   return (
     // The same drawer as Additional Quests: the whole bar opens and closes it, and the tray slides.
     <section aria-label="Due soon" className="mb-5">
@@ -266,80 +272,67 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
       <div className="drawer-body" data-open={open ? "true" : "false"}>
         <div className="drawer-inner -mx-2 px-2">
           <div className="quest-tray mt-2.5 rounded-2xl px-2 pb-3 pt-3" style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }} inert={!open}>
+            {/* At the top: everything here onto Today in one tap (or just the ticked ones while editing). */}
+            {notToday.length > 0 && (
+              <div className="mb-2.5 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  disabled={adding}
+                  onClick={() => addToToday(editing && tickedNow.length ? tickedNow : notToday.map((t) => t.id))}
+                  className="h-8 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60"
+                  style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 2px 6px rgba(0,0,0,.3)" }}
+                >
+                  {adding ? "Adding…" : editing && tickedNow.length ? `Add ${tickedNow.length} to today` : "Add all to today"}
+                </button>
+              </div>
+            )}
             <Fold open={!!editing}>
               <p className="m-0 mb-2 text-center text-[12.5px]" style={{ color: ink, opacity: 0.85 }}>
-                Tick quests to add them to today. × takes a quest out of Due soon for good (it stays on its board).
+                ○ picks quests to add to today; × takes one out of Due soon for good (it stays on its board).{" "}
+                {onHide && (
+                  <button type="button" onClick={onHide} className="underline underline-offset-2" style={{ color: ink }}>
+                    Hide Due soon
+                  </button>
+                )}
               </p>
-              {notToday.length > 0 && (
-                <div className="mb-2.5 flex flex-wrap items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTicked(tickedNow.length === notToday.length ? [] : notToday.map((t) => t.id))}
-                    className="h-8 rounded-full px-3 text-[13px] font-semibold"
-                    style={{ border: `1px solid ${border}`, color: ink, background: "rgba(0,0,0,.12)" }}
-                  >
-                    {tickedNow.length === notToday.length ? "Untick all" : "Tick all"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!tickedNow.length || adding}
-                    onClick={() => addToToday(tickedNow)}
-                    className="h-8 rounded-full px-3.5 text-[13px] font-bold disabled:opacity-50"
-                    style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
-                  >
-                    {adding ? "Adding…" : tickedNow.length ? `Add ${tickedNow.length} to today` : "Add to today"}
-                  </button>
-                </div>
-              )}
             </Fold>
-            {!shown.length && (
-              <p className="m-0 px-1 text-center text-[13.5px]" style={{ color: ink, opacity: 0.85 }}>
-                Nothing due in the next {reach}.
-              </p>
-            )}
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               {shown.map((task) =>
                 editing ? (
-                  <li key={task.id} className="fade-in flex items-center gap-2">
-                    {notToday.some((t) => t.id === task.id) ? (
-                      <input
-                        type="checkbox"
-                        checked={tickedNow.includes(task.id)}
-                        onChange={() => tick(task.id)}
-                        aria-label={`Add “${task.title}” to today`}
-                        className="h-5 w-5 shrink-0 cursor-pointer"
-                        style={{ accentColor: "#d9b45f" }}
-                      />
-                    ) : (
-                      <span className="w-5 shrink-0 text-center text-[11px] leading-tight" style={{ color: ink, opacity: 0.8 }} title="Already in Today's Quests">
-                        ✓
-                      </span>
-                    )}
+                  <li key={task.id} className="fade-in flex items-center gap-1.5">
                     <ul className="m-0 min-w-0 flex-1 list-none p-0">
                       <TaskRow task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
                     </ul>
-                    <button type="button" onClick={() => snooze(task.id)} aria-label={`Take “${task.title}” out of Due soon for good`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] leading-none" style={{ border: "1.5px solid rgba(240,150,90,.6)", color: ink, background: "rgba(0,0,0,.18)" }}>
-                      ×
-                    </button>
+                    {/* A slim column on the right, so the card keeps its width: pick (round, like every check here), then ×. */}
+                    <span className="flex shrink-0 flex-col items-center gap-1.5">
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={tickedNow.includes(task.id)}
+                        onClick={() => tick(task.id)}
+                        aria-label={`Add “${task.title}” to today`}
+                        title="Pick for today"
+                        className="flex h-8 w-8 items-center justify-center rounded-full"
+                        style={
+                          tickedNow.includes(task.id)
+                            ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }
+                            : { border: "1.5px solid rgba(217,180,95,.75)", background: "rgba(0,0,0,.18)", color: "transparent" }
+                        }
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      <button type="button" onClick={() => snooze(task.id)} aria-label={`Take “${task.title}” out of Due soon for good`} title="Out of Due soon" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none" style={{ border: "1.5px solid rgba(240,150,90,.6)", color: ink, background: "rgba(0,0,0,.18)" }}>
+                        ×
+                      </button>
+                    </span>
                   </li>
                 ) : (
                   <TaskRow key={task.id} task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
                 )
               )}
             </ul>
-            {!editing && notToday.length > 0 && (
-              <div className="mt-3 flex justify-center">
-                <button
-                  type="button"
-                  disabled={adding}
-                  onClick={() => addToToday(notToday.map((t) => t.id))}
-                  className="h-9 rounded-full px-4 text-[14px] font-bold disabled:opacity-60"
-                  style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 2px 6px rgba(0,0,0,.3)" }}
-                >
-                  {adding ? "Adding…" : notToday.length === shown.length ? "Add all to today" : `Add the other ${notToday.length} to today`}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -573,7 +566,7 @@ export function TodayTaskBoard({
   return (
     <DndContext id="dnd-TodayTaskBoard" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
       {/* Its parts follow Today's arrangement (gear on Today): order and which show. */}
-      {!layout.hidden.includes("due") && <DueSoonBand tasks={due} hours={dueHours} theme={theme} lockedBehind={lockedBehind} />}
+      {!layout.hidden.includes("due") && due.length > 0 && <DueSoonBand tasks={due} hours={dueHours} theme={theme} lockedBehind={lockedBehind} onHide={() => saveTodayLayout({ ...layout, hidden: [...layout.hidden, "due"] })} />}
       {/* Daily Habits, Today's Quests and Additional Quests: drag a closed one to reorder. */}
       <SectionStack
         storageKey="today-section-order"

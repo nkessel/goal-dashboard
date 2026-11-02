@@ -189,7 +189,7 @@ export default async function Home() {
   // Snoozed for a while: off Today until then.
   const awake = (t: { snoozed_until?: string | null }) => !t.snoozed_until || Date.parse(t.snoozed_until) <= nowMs;
   const wakeAt = onToday.reduce<string | null>((m, t) => (t.snoozed_until && !awake(t) && (!m || t.snoozed_until < m) ? t.snoozed_until : m), null);
-  const dueTasks = onToday.filter((t) => awake(t) && inDueWindow(t.due_at, nowMs, dueHours) && !t.reward_id).sort(byDuePriority(nowMs));
+  const dueTasks = onToday.filter((t) => awake(t) && !t.is_manual_priority && inDueWindow(t.due_at, nowMs, dueHours) && !t.reward_id).sort(byDuePriority(nowMs));
   const rest = onToday.filter((t) => awake(t) && !dueTasks.includes(t));
   const topPriorities = rest.filter((t) => t.is_manual_priority);
   // Deadlines coming up rise to the top of Additional Quests (due next first,

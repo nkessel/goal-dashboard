@@ -1723,8 +1723,9 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   cursor: url("/design/cursor-hand.svg") 11 3, pointer;
 }
 
-/* Themed checkboxes everywhere: a small parchment box with an inked border
-   that fills with gold and a dark tick when checked. */
+/* Themed checkboxes everywhere: a small round parchment check with an inked
+   border (round, like the quest checks) that fills with gold and a dark tick
+   when checked. */
 @layer base {
   input[type="checkbox"]:not(.sr-only) {
     appearance: none;
@@ -1733,7 +1734,7 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
     width: 20px;
     height: 20px;
     margin: 0;
-    border-radius: 6px;
+    border-radius: 50%;
     border: 1.8px solid #6b5124;
     background: linear-gradient(180deg, #fbf3df, #ead6aa);
     box-shadow: inset 0 1px 2px rgba(60, 40, 10, 0.25);

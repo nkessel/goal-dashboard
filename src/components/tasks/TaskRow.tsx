@@ -1029,8 +1029,9 @@ function ScaleRuns({ runs, compact }: { runs: Run[]; compact: boolean }) {
       <span className="flex items-end gap-1.5">
         {runs.map((r) => (
           <span key={r.src} className="flex flex-col items-center gap-[3px]" title={r.title}>
-            <span aria-hidden className={`level-track relative block w-[6px] overflow-hidden rounded-full ${compact ? "h-[16px]" : "h-[20px]"}`}>
-              <span className="level-fill absolute inset-x-0 bottom-0 block rounded-full" style={{ height: `${Math.min(5, r.n) * 20}%` }} />
+            {/* Only as tall as its level: no empty track above it. */}
+            <span aria-hidden className={`relative block w-[6px] ${compact ? "h-[16px]" : "h-[20px]"}`}>
+              <span className="level-fill absolute inset-x-0 bottom-0 block rounded-full" style={{ height: `${Math.min(5, r.n) * 20}%`, minHeight: 4 }} />
             </span>
             {/* eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public */}
             <img src={r.src} alt="" width={14} height={14} className={`shrink-0 ${compact ? "h-[11px] w-[11px]" : "h-[12px] w-[12px] sm:h-[13px] sm:w-[13px]"}`} />

@@ -437,7 +437,7 @@ export function GoldCheck({ checked, onChange, children }: { checked: boolean; o
       <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span
         aria-hidden
-        className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#8a6116]"
+        className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#8a6116]"
         style={
           checked
             ? { background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 0 8px rgba(242,210,126,.55), inset 0 1px 0 rgba(255,255,255,.6)" }
