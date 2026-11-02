@@ -30,9 +30,9 @@ function StatTile({
 }) {
   // Sized to the Today's Quests reference: large painted icon, big serif number, two-line caption.
   return (
-    <div className="flex items-center gap-2 sm:gap-3">
+    <div className="flex items-center gap-1.5 sm:gap-3">
       {/* eslint-disable-next-line @next/next/no-img-element -- static /design asset */}
-      <img src={iconSrc} alt="" width={42} height={42} className="h-8 w-8 shrink-0 object-contain sm:h-[42px] sm:w-[42px]" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45))" }} />
+      <img src={iconSrc} alt="" width={42} height={42} className="h-7 w-7 shrink-0 min-[400px]:h-8 min-[400px]:w-8 object-contain sm:h-[42px] sm:w-[42px]" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45))" }} />
       <div className="flex flex-col">
         <span className={`font-display whitespace-nowrap leading-none ${long ? "text-[18px] sm:text-[22px]" : "text-[21px] sm:text-[25px]"}`} style={{ color: "var(--t-cream)" }}>
           {value}
@@ -89,7 +89,7 @@ export function XpSummary({
       <div className="flex flex-col gap-2">
         {/* Equal side columns keep the avatar dead center and both stat pairs
             balanced around it, whatever the screen width. */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 sm:gap-2">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-2">
           <div className="flex flex-col gap-5 justify-self-center sm:gap-6">
             <StatTile iconSrc="/design/ui-shield.png" value={stats?.questsComplete ?? 0} label={<>Quests<br />Complete</>} />
             <StatTile iconSrc="/design/ui-flame.png" value={profile.streak_count} label={<>Quest<br />Streak</>} />
@@ -97,7 +97,8 @@ export function XpSummary({
 
           <div className="flex flex-col items-center gap-3">
             {/* Character name above the portrait — click to rename. */}
-            <div className="-mb-1.5 flex w-[220px] justify-center sm:w-[270px]">
+            {/* Narrower on phones: at 220px the stat columns ran off a 390px screen (ui-check, Nov 2). */}
+            <div className="-mb-1.5 flex w-[min(220px,44vw)] justify-center sm:w-[270px]">
               <InlineNameEditor initialName={profile.name ?? ""} isAdventure variant="hero" />
             </div>
             <div className="relative h-[100px] w-[100px] sm:h-[124px] sm:w-[124px]">

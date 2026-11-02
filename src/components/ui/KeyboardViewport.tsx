@@ -55,6 +55,7 @@ export function KeyboardViewport() {
       if (kb) reveal();
       else {
         releaseRoom();
+        if (!isTextField(document.activeElement)) releaseLayers();
         // The keyboard has settled down: a page held for the feedback box gets its scroll back.
         if (pinned && !root.classList.contains("scroll-locked") && !feedbackHeld()) unpin();
       }
@@ -205,10 +206,37 @@ export function KeyboardViewport() {
       });
     };
 
+    // ── Hold full-screen layers at their size while typing ───────────────────
+    // Some phone browsers (Chrome on iPhone among them) shrink the layout itself
+    // when the keyboard opens, so every full-screen popup (inset: 0) got shorter,
+    // re-centred its card and showed the page under it, then sprang back as the
+    // keyboard closed (owner's recording, Nov 1, 22:05). While a field has focus,
+    // each one keeps the height it had; it's let go once the keyboard is down.
+    const held = new Map<HTMLElement, { height: string; bottom: string }>();
+    const holdLayers = () => {
+      const h = window.innerHeight;
+      document.querySelectorAll<HTMLElement>("body *").forEach((n) => {
+        if (held.has(n) || n.closest("[data-feedback-root], [data-welcome-root]")) return;
+        const cs = getComputedStyle(n);
+        if (cs.position !== "fixed" || cs.top !== "0px" || cs.bottom !== "0px") return;
+        held.set(n, { height: n.style.height, bottom: n.style.bottom });
+        n.style.height = `${h}px`;
+        n.style.bottom = "auto";
+      });
+    };
+    const releaseLayers = () => {
+      held.forEach((v, n) => {
+        n.style.height = v.height;
+        n.style.bottom = v.bottom;
+      });
+      held.clear();
+    };
+
     const onFocusIn = (e: FocusEvent) => {
       const el = e.target;
       if (!isTextField(el)) return;
       if (touch) {
+        if (!kbUp()) holdLayers();
         root.setAttribute("data-typing", "");
         // Moving between fields with the keyboard's arrows: same steadying as a tap.
         if (steadied(el)) focusSteady(el);
@@ -219,7 +247,10 @@ export function KeyboardViewport() {
     const onFocusOut = () => {
       // Moving straight to another field keeps the typing state.
       window.setTimeout(() => {
-        if (!isTextField(document.activeElement)) root.removeAttribute("data-typing");
+        if (!isTextField(document.activeElement)) {
+          root.removeAttribute("data-typing");
+          if (!kbUp()) releaseLayers();
+        }
         // No keyboard ever came up (or it's already down): let go of the page now.
         if (pinned && !root.classList.contains("scroll-locked") && !feedbackHeld()) unpin();
       }, 60);
@@ -245,6 +276,7 @@ export function KeyboardViewport() {
       document.removeEventListener("touchstart", onTouchStart, { capture: true });
       document.removeEventListener("touchend", onTouchEnd, { capture: true });
       lockWatch.disconnect();
+      releaseLayers();
       unpin();
       root.removeAttribute("data-kb");
       root.removeAttribute("data-typing");

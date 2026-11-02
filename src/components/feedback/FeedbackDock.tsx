@@ -142,11 +142,20 @@ function useViewport(): Viewport | null {
         innerH: window.innerHeight,
       };
       // Only re-render when something actually changed (at most once a frame).
-      setVp((p) => (p && p.left === next.left && p.top === next.top && p.w === next.w && p.h === next.h && p.innerW === next.innerW && p.innerH === next.innerH ? p : next));
+      // Small nudges (a few px of pan, the address bar settling) don't move the box.
+      const near = (a: number, b: number) => Math.abs(a - b) < 24;
+      setVp((p) => (p && near(p.left, next.left) && near(p.top, next.top) && near(p.w, next.w) && near(p.h, next.h) && p.innerW === next.innerW && near(p.innerH, next.innerH) ? p : next));
     };
     let pending = 0;
+    // Read once the keyboard has settled, not on every frame of its slide: iPhone pans the
+    // screen while the keyboard moves, and a box that chased each frame jumped about and
+    // flashed the page behind it (owner's recording, Nov 1, 22:05).
+    let quiet: number | undefined;
     const update = () => {
-      if (!pending) pending = requestAnimationFrame(read);
+      window.clearTimeout(quiet);
+      quiet = window.setTimeout(() => {
+        if (!pending) pending = requestAnimationFrame(read);
+      }, 140);
     };
     const raf = requestAnimationFrame(read);
     vv?.addEventListener("resize", update);
@@ -154,6 +163,7 @@ function useViewport(): Viewport | null {
     window.addEventListener("resize", update);
     return () => {
       cancelAnimationFrame(raf);
+      window.clearTimeout(quiet);
       if (pending) cancelAnimationFrame(pending);
       vv?.removeEventListener("resize", update);
       vv?.removeEventListener("scroll", update);

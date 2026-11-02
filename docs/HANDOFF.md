@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-02, `main` (Due soon fixes: added quests stay on Today, round checks, add-all on top; level bars; bigger portrait grid)
+- **Last updated:** 2026-11-02, `main` @ (this push) (UI check required before every push; keyboard, Due soon reach, section drag fixes)
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** ~35 notes queued (query in section 3). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
 
@@ -18,6 +18,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 | 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
 | 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. Left: consistent capitalization, pinned editor footer. The UX teams can now read real click timings from `ui_clicks`. |
 | 2 | **Owner's queue (Nov 1)** | In progress | Work through "Next up, in order" right below this table, top to bottom. |
+| 1c | **UI check: keep it covering everything** (owner, Nov 2: "so I don't find a bug at every screen") | Ongoing | `npm run ui-check` before every push (see CLAUDE.md, `docs/ui-check.md`). Findings log with status: `/mnt/project-files/ui-audit/2026-11-02-findings.md` (Claude project files). Next: flows for boards (a board's arrange mode), Treasure Chest editors, the quest editor's folds, the toucan chat, the feedback box itself; a "layout viewport shrinks" keyboard mode (Chrome on iPhone) in `fakeKeyboard`. |
 | 2b | **Smoothness audit follow-ups** | Ready | Audit method: in the signed-in browser pane, a layout-shift + DOM observer script opens every toggle and fakes the keyboard by overriding `visualViewport.height` (Oct 31 night). Left: a real-iPhone keyboard pass (the simulation can't show iOS panning); (Insights' Last night and the remaining exits were done Nov 1.) |
 | 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
 
@@ -96,12 +97,11 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
    ```
    The admin page `/feedback-review` shows the same queue in the app. Screenshots attached to notes are often unreachable from a cloud container; work from the words and say so.
 3. **Build.** `npx tsc --noEmit -p .`, `npx eslint <files you touched>`, then `npx next build --webpack`. A few server pages have pre-existing `Date.now()` lint errors; keep only your own files clean.
-4. **Look at it.** Run without a real database and screenshot with Playwright:
+4. **Run the UI check** (required before every push that changes what's on screen): `npm run ui-check`, then read `ui-check-out/report.md` and the screenshots of what you touched. Fix every error on your screens; add any new screen or section to `scripts/ui-check/flows.mjs`. See `docs/ui-check.md`. For a one-off look at a single state, the old way still works:
    ```
    NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:9 SUPABASE_SERVICE_ROLE_KEY=x AUTH_SECRET=devsecretdevsecretdevsecret npx next dev --webpack -p 3100
    node scripts/shot.mjs <url> <out.png> <width> <height> <fullPage 0|1> '<actions>'
    ```
-   Actions are joined by ` ;; `: `click:<sel>`, `wait:<ms>`, `eval:<js>`. Server actions fail offline; check layout only. `src/app/dev-preview/` is git-ignored; recreate small harness pages with mock props when needed.
 5. **Ship.** Commit to `main` and push. Vercel deploys in a few minutes.
 6. **Mark the feedback shipped:** `update journal_entries set auto_shipped_at = now() where id in (...)`.
 7. **Update this file** (section 1 and "Recently shipped"), in the same push or right after.
@@ -147,6 +147,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 2: **UI check** (`npm run ui-check`, `scripts/ui-check/`, `docs/ui-check.md`): builds the real app against an in-memory fake Supabase (reads columns from the migrations; fixtures in `fixtures.mjs`), signs in a test account, walks every flow in `flows.mjs` at 390px, 390px + simulated keyboard and 820px, morning and evening, and flags off-screen, clipped, covered, popup-behind, keyboard, jump-on-tap, layout-shift and console errors, with boxed screenshots in `ui-check-out/`. Required before every push (CLAUDE.md). Fixes from its first runs and the owner's recordings: Today's right-hand stats ran 29px off a 390px screen (`XpSummary`); the calendar's "To schedule" pill was cut off on tablets; Due soon's reach picker opened underneath Daily Habits (now anchored over everything, `DueWindowPicker anchor`); Today's sections can be dragged by their header open or closed, and a long press no longer selects the header's text on iPhone (which cancelled the drag; `SectionStack`, `.section-slot`); the feedback box waits for the keyboard to settle instead of chasing iPhone's pan frame by frame; full-screen popups keep their height while a field has focus (`holdLayers` in `KeyboardViewport`) so they don't re-centre or show the page under them when a browser shrinks the layout for the keyboard. Keyboard fixes need a real-iPhone check.
 
 - Nov 2: Due soon: quests pinned to Today no longer get pulled back into Due soon (`!t.is_manual_priority` in `src/app/page.tsx`; that was why added quests vanished from Today's quests); "Add all to today" at the top of the tray (no Tick all); in Edit the card keeps its width with a slim right column (round pick check, then ×) and a "Hide Due soon" link (brought back from Today's gear); the band leaves as quests move to Today and hides when empty. Every checkbox in the app is round (globals.css, `GoldCheck`). Quest card level bars show only their filled height (no empty track). Portrait library: "See more at once" widens the picker and shows a taller 8-across grid (`portrait-grid-wide`).
 - Nov 2: Welcome screen, from the UI check: the card's top band is pinned while it scrolls (`.welcome-cap`, sticky, parchment aligned like the foot), so nothing slides under the toucan's perch or the corner buttons; the toucan's menu hangs down from beside him and the placement falls back in tiers (bubble clear of everything, then only of the corner buttons, then only he stays clear), so tapping him near the right edge no longer drops him onto the greeting. Not fixed: with the keyboard up on Top priority, Snooze/Complete sit behind the keyboard (scroll to reach them).

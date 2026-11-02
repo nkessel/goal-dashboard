@@ -19,11 +19,13 @@ export function DueWindowPicker({ hours, onPick, onClose, ink, isAdventure, pape
   useEscape(onClose);
   useEffect(() => {
     const away = (e: PointerEvent) => {
+      // A tap on its own chip is the chip's to handle (it closes it); closing here too would reopen it.
+      if (anchor?.contains(e.target as Node)) return;
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener("pointerdown", away);
     return () => document.removeEventListener("pointerdown", away);
-  }, [onClose]);
+  }, [onClose, anchor]);
   const days = Math.round(Number(custom));
   const ok = Number.isFinite(days) && days >= 1 && days <= MAX_DUE_DAYS;
   const border = paper ? "rgba(139,112,64,.55)" : isAdventure ? "rgba(240,150,90,.55)" : "var(--t-card-border)";

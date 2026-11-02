@@ -22,10 +22,10 @@ function readOrder(key: string, ids: string[], fallback: string[]): string[] {
 
 /**
  * Sections stacked one above another that can be put in any order: press a
- * closed section's header and drag it up or down (touch: hold it a moment
- * first, so scrolling still works). Alt + ↑/↓ on a closed header moves it
- * too. The order is remembered on this device. Open sections stay put, so
- * dragging never fights with what's inside them.
+ * section's header (open or closed) and drag it up or down (touch: hold it a
+ * moment first, so scrolling still works). Alt + ↑/↓ on a header moves it
+ * too. The order is remembered on this device. Only the header starts a drag,
+ * so it never fights with what's inside an open section.
  */
 export function SectionStack({
   sections,
@@ -69,10 +69,16 @@ export function SectionStack({
     }
   }
 
-  /** A closed section's header (its toggle reports aria-expanded="false"). */
+  /**
+   * A section's header (its toggle reports aria-expanded), open or closed. Only
+   * the header's own toggle: things inside an open section (cards, their menus)
+   * keep their own drags.
+   */
   function closedHeader(target: EventTarget | null, slot: HTMLElement): boolean {
     const el = (target as HTMLElement | null)?.closest?.("[aria-expanded]");
-    return !!el && slot.contains(el) && el.getAttribute("aria-expanded") === "false";
+    if (!el || !slot.contains(el)) return false;
+    // The first toggle in the section is its header; later ones belong to its content.
+    return slot.querySelector("[aria-expanded]") === el;
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>, id: string) {
@@ -105,6 +111,10 @@ export function SectionStack({
     const stopScroll = (ev: TouchEvent) => {
       if (active) ev.preventDefault();
     };
+    // iPhone: a long press starts selecting text (and that cancels the drag). Not on a header.
+    const noSelect = (ev: Event) => ev.preventDefault();
+    document.addEventListener("selectstart", noSelect);
+    document.addEventListener("contextmenu", noSelect);
     const move = (ev: PointerEvent) => {
       const dy = ev.clientY - startY;
       if (!active) {
@@ -125,6 +135,9 @@ export function SectionStack({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("touchmove", stopScroll);
+      document.removeEventListener("selectstart", noSelect);
+      // The long-press menu stays off until the finger is up (it comes after the release on iPhone).
+      setTimeout(() => document.removeEventListener("contextmenu", noSelect), 400);
     };
     const up = (ev: PointerEvent) => {
       end();
@@ -201,6 +214,7 @@ export function SectionStack({
               filter: isDragged ? "drop-shadow(0 12px 18px rgba(0,0,0,.4))" : undefined,
               cursor: isDragged ? "grabbing" : undefined,
             }}
+            className="section-slot"
           >
             {s.node}
           </div>

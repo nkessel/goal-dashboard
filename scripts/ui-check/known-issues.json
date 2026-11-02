@@ -1,0 +1,6 @@
+[
+  {
+    "match": "welcome-toucan-right\\|moved-on-tap\\|toucan menu",
+    "why": "With the toucan dragged near the right edge, tapping him makes him hop about 26px down and 53px left. The welcome-screen thread has it (Nov 2). Remove this entry when it's fixed."
+  }
+]

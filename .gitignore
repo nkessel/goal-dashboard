@@ -46,3 +46,6 @@ dev.log
 
 # Local preview harness pages (mock props, never shipped)
 /src/app/dev-preview/
+
+# ui check output
+/ui-check-out/

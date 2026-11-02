@@ -142,8 +142,8 @@ export function CalendarLayers({
           aria-label={`To schedule (${toSchedule})`}
           title="To schedule"
           // A labelled pill that sticks out over the calendar's top-left corner.
-          // Sticks out over the calendar's corner on wide screens; on phones it stays inside the edge.
-          className="hover-glow relative z-[30] mr-auto flex h-11 shrink-0 translate-y-5 items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14.5px] font-bold touch-manipulation sm:-translate-x-3"
+          // Stays inside the edge on every screen (on tablets it stuck out and its left was cut off: ui-check, Nov 2).
+          className="hover-glow relative z-[30] mr-auto flex h-11 shrink-0 translate-y-5 items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14.5px] font-bold touch-manipulation"
           style={{
             ...(isAdventure ? { background: "radial-gradient(circle at 35% 25%, #f6e3a8, #d9b45f 60%, #a88a3f)", border: "2px solid #4a3913", color: "#2a1c10" } : { ...chip, color: "var(--t-ink)" }),
             boxShadow: "0 6px 14px rgba(0,0,0,.4)",

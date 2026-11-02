@@ -149,6 +149,7 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind, onHide }: 
   const [hidden, setHidden] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [reachEl, setReachEl] = useState<HTMLButtonElement | null>(null);
   // The reach just picked, until the page refills with it.
   const [hours, setHours] = useState(shownHours);
   const [refilling, startRefill] = useTransition();
@@ -252,6 +253,7 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind, onHide }: 
         <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
           <button
             type="button"
+            ref={setReachEl}
             onClick={() => setPicking((v) => !v)}
             aria-expanded={picking}
             aria-haspopup="dialog"
@@ -266,7 +268,8 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind, onHide }: 
               <path d="M5.5 9l6.5 6.5L18.5 9" stroke={isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          {picking && <DueWindowPicker hours={hours} onPick={pick} onClose={closePicker} ink={ink} isAdventure={isAdventure} />}
+          {/* Opens over everything (anchored to the chip): inside the bar it was drawn underneath Daily Habits (owner's recording, Nov 1). */}
+          {picking && <DueWindowPicker hours={hours} onPick={pick} onClose={closePicker} ink={ink} isAdventure={isAdventure} anchor={reachEl} />}
         </div>
       </div>
       <div className="drawer-body" data-open={open ? "true" : "false"}>
