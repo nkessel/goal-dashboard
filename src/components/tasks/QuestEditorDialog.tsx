@@ -2324,12 +2324,11 @@ export function QuestEditorDialog({
                 style={fieldStyle}
               />
               {/* Private files kept with it (a form to fill in): open in a tap, add more. */}
-              {task && (
+              {task && (task.attachments?.length || addedFiles.length) ? (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <FileChips files={[...(task.attachments ?? []), ...addedFiles]} />
-                  <AddFile taskId={task.id} onAdded={(f) => setAddedFiles((a) => [...a, f])} />
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -2508,6 +2507,12 @@ export function QuestEditorDialog({
           })}
           {!arranging && advancedHeader}
           {!arranging && advOpen && layout.order.filter((k) => layout.folded.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)}
+          {/* Adding a private file (a form, an application) is rare: it waits at the end of More. */}
+          {!arranging && advOpen && task && (
+            <div className="flex items-center gap-2">
+              <AddFile taskId={task.id} onAdded={(f) => setAddedFiles((a) => [...a, f])} />
+            </div>
+          )}
           {pickingSlot && (
             <SlotPickerDialog
               durationMinutes={Math.max(15, Number(estimate) || 30)}

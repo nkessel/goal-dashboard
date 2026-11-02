@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { translatePhraseAction } from "@/app/actions";
 import { DEFAULT_LANGUAGES, MORE_LANGUAGES, PHRASE_IDEAS, approxNote, type Translation } from "@/lib/languages";
 import { Fold } from "@/components/ui/Fold";
@@ -44,17 +45,56 @@ function printSheet(phrase: string, rows: Translation[]) {
   w.document.close();
 }
 
+// The last phrase and its words, kept so the window comes back as you left it.
+const LAST = "learn-language-last";
+function readLast(): { phrase: string; rows: Translation[] | null } {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(LAST) || "null") as { phrase?: string; rows?: Translation[] | null } | null;
+    return { phrase: typeof v?.phrase === "string" ? v.phrase : "", rows: Array.isArray(v?.rows) ? v.rows : null };
+  } catch {
+    return { phrase: "", rows: null };
+  }
+}
+
+// Scripts some computers have no font for (Phoenician on many): a web font fills the gap.
+const SCRIPT_FONTS = "https://fonts.googleapis.com/css2?family=Noto+Sans+Phoenician&family=Noto+Sans:wght@400;600&display=swap";
+const SCRIPT_STACK = "var(--font-eb-garamond), Georgia, 'Noto Sans Phoenician', 'Segoe UI Historic', 'Noto Sans', 'Segoe UI', serif";
+function useScriptFonts() {
+  useEffect(() => {
+    if (document.querySelector(`link[data-script-fonts]`)) return;
+    const l = document.createElement("link");
+    l.rel = "stylesheet";
+    l.href = SCRIPT_FONTS;
+    l.dataset.scriptFonts = "1";
+    document.head.appendChild(l);
+  }, []);
+}
+
 /** Learn a language: a phrase, the languages you're learning (all on), and the phrase in each. */
 export function LearnLanguage() {
+  useScriptFonts();
   const [saved, setSaved] = useState<Saved>(readSaved);
-  const [phrase, setPhrase] = useState("");
+  const [last] = useState(readLast);
+  const [phrase, setPhrase] = useState(last.phrase);
   const [adding, setAdding] = useState(false);
   const [newLang, setNewLang] = useState("");
-  const [rows, setRows] = useState<Translation[] | null>(null);
+  const [rows, setRows] = useState<Translation[] | null>(last.rows);
+  // Right-click or long-press a language: it asks to remove it, in place.
+  const [asking, setAsking] = useState<string | null>(null);
+  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressed = useRef(false);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LAST, JSON.stringify({ phrase, rows }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [phrase, rows]);
   const [error, setError] = useState<string | null>(null);
   const [busy, start] = useTransition();
   const on = saved.langs.filter((l) => !saved.off.includes(l));
   const save = (v: Saved) => (setSaved(v), writeSaved(v));
+  const remove = (l: string) => (save({ langs: saved.langs.filter((x) => x !== l), off: saved.off.filter((x) => x !== l) }), setAsking(null));
   const toggle = (l: string) => save({ ...saved, off: saved.off.includes(l) ? saved.off.filter((x) => x !== l) : [...saved.off, l] });
   const addLang = (raw: string) => {
     const l = raw.replace(/\s+/g, " ").trim().slice(0, 40);
@@ -107,10 +147,45 @@ export function LearnLanguage() {
         {saved.langs.map((l) => {
           const isOn = !saved.off.includes(l);
           return (
-            <button key={l} type="button" role="switch" aria-checked={isOn} onClick={() => toggle(l)} title={approxNote(l) || undefined} className="h-7 rounded-full px-2.5 text-[12.5px] font-semibold" style={isOn ? chipOn : chipOff}>
+            asking === l ? (
+              <span key={l} className="reveal flex h-7 items-center gap-1 rounded-full pl-2.5 pr-1 text-[12.5px]" style={{ border: "1px solid rgba(163,60,42,.55)", color: INK }}>
+                Remove {l}?
+                <button type="button" onClick={() => remove(l)} className="h-6 rounded-full px-2 font-bold" style={{ color: "#a33c2a" }}>
+                  Remove
+                </button>
+                <button type="button" onClick={() => setAsking(null)} aria-label="Keep it" className="flex h-6 w-6 items-center justify-center rounded-full" style={{ color: SOFT }}>
+                  ×
+                </button>
+              </span>
+            ) : (
+            <button
+              key={l}
+              type="button"
+              role="switch"
+              aria-checked={isOn}
+              onClick={() => (pressed.current ? (pressed.current = false) : toggle(l))}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setAsking(l);
+              }}
+              onPointerDown={() => {
+                pressed.current = false;
+                press.current = setTimeout(() => {
+                  pressed.current = true;
+                  setAsking(l);
+                }, 500);
+              }}
+              onPointerUp={() => press.current && clearTimeout(press.current)}
+              onPointerLeave={() => press.current && clearTimeout(press.current)}
+              title={approxNote(l) || "Right-click or hold to remove"}
+              className="h-7 select-none rounded-full px-2.5 text-[12.5px] font-semibold [-webkit-touch-callout:none]"
+              style={isOn ? chipOn : chipOff}
+            >
               {l}
               {approxNote(l) && <span className="ml-0.5 opacity-70">*</span>}
             </button>
+            )
           );
         })}
         {adding ? (
@@ -174,7 +249,7 @@ export function LearnLanguage() {
                 {r.approx && <span className="ml-1 text-[11px] font-normal italic">approx.</span>}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[16px] leading-snug [overflow-wrap:anywhere]" style={{ color: INK }}>
+                <span className="block text-[16px] leading-snug [overflow-wrap:anywhere]" style={{ color: INK, fontFamily: SCRIPT_STACK }}>
                   {r.text}
                 </span>
                 {r.say && (
@@ -196,56 +271,109 @@ export function LearnLanguage() {
   );
 }
 
-/** The welcome screen's habit pills: tap one to open it right there. */
+/** The welcome screen's habit pills: each opens its own window (Learn a language stays over every screen). */
 export const HABIT_PILLS = [{ key: "language", label: "Learn a language", icon: "🗣" }] as const;
 export type HabitPillKey = (typeof HABIT_PILLS)[number]["key"];
 
+const GILT = { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } as const;
+export const openLanguageWindow = () => window.dispatchEvent(new Event("language-window"));
+
 export function HabitPills({ pills }: { pills: string[] }) {
-  const [open, setOpen] = useState<string | null>(null);
   const shown = HABIT_PILLS.filter((p) => pills.includes(p.key));
   if (!shown.length) return null;
   return (
-    <div className="flex w-full flex-col items-center gap-2">
-      <div className="flex flex-wrap justify-center gap-1.5">
-        {shown.map((p) => (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => setOpen((o) => (o === p.key ? null : p.key))}
-            aria-expanded={open === p.key}
-            className="wheel-btn flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold"
-          >
-            <span aria-hidden>{p.icon}</span>
-            {p.label}
-          </button>
-        ))}
-      </div>
-      <Fold open={open === "language"} className="w-full">
-        <LearnLanguage />
-      </Fold>
+    <div className="flex flex-wrap justify-center gap-1.5">
+      {shown.map((p) => (
+        <button key={p.key} type="button" onClick={openLanguageWindow} className="font-display flex h-9 items-center gap-1.5 rounded-full px-4 text-[15px]" style={GILT}>
+          <span aria-hidden>{p.icon}</span>
+          {p.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-/** Under a "learn a language" habit: a pill that opens the phrase tool right there. */
+/** Under a "learn a language" habit: a pill that opens the phrase window. */
 export function LanguagePractice() {
-  const [open, setOpen] = useState(false);
   return (
-    <div className="ml-11 mt-0.5 flex flex-col gap-1.5 pr-2" onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold"
-        style={{ background: "rgba(201,162,74,.14)", border: "1px solid rgba(160,120,40,.45)", color: "#6b4c12" }}
-      >
-        <span aria-hidden>🗣</span> {open ? "Close the phrases" : "Practice a phrase"}
+    <div className="ml-11 mt-0.5 pr-2" onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+      <button type="button" onClick={openLanguageWindow} className="inline-flex h-7 w-fit items-center gap-1 rounded-full px-3 text-[12.5px] font-semibold" style={GILT}>
+        <span aria-hidden>🗣</span> Practice a phrase
       </button>
-      <Fold open={open}>
-        <div className="pb-1">
+    </div>
+  );
+}
+
+/**
+ * The language window: floats over every screen (the welcome screen too), can be
+ * minimized to a small 🗣 pill and brought back, or closed. Lives in the root layout,
+ * so it stays as you move between screens; remembered across reloads.
+ */
+type Mode = "open" | "min" | null;
+const MODE_KEY = "language-window";
+export function LanguageWindow() {
+  const [mode, setModeState] = useState<Mode>(null);
+  const [ready, setReady] = useState(false);
+  const setMode = (m: Mode) => {
+    setModeState(m);
+    try {
+      if (m) window.localStorage.setItem(MODE_KEY, m);
+      else window.localStorage.removeItem(MODE_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  useEffect(() => {
+    let m: Mode = null;
+    try {
+      const v = window.localStorage.getItem(MODE_KEY);
+      m = v === "open" || v === "min" ? v : null;
+    } catch {
+      /* storage unavailable */
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restore the window as it was left (browser storage, after hydration)
+    setModeState(m);
+    setReady(true);
+    const open = () => setMode("open");
+    window.addEventListener("language-window", open);
+    return () => window.removeEventListener("language-window", open);
+  }, []);
+  if (!ready || !mode) return null;
+  return createPortal(
+    mode === "min" ? (
+      <button
+        key="min"
+        type="button"
+        onClick={() => setMode("open")}
+        aria-label="Open Learn a language"
+        className="card-pop-in fixed left-3 z-[96] flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold shadow-lg"
+        style={{ ...GILT, bottom: "calc(env(safe-area-inset-bottom) + 84px)" }}
+      >
+        🗣 Phrases
+      </button>
+    ) : (
+      <div
+        key="open"
+        role="dialog"
+        aria-label="Learn a language"
+        data-no-ghost
+        className="card-pop-in parchment fixed left-3 z-[96] flex w-[min(400px,calc(100vw-24px))] flex-col rounded-2xl"
+        style={{ bottom: "calc(env(safe-area-inset-bottom) + 84px)", maxHeight: "min(72dvh, 640px)", background: "linear-gradient(180deg,#fbf3df,#f1e3c0)", border: "1.5px solid #a88a3f", boxShadow: "0 12px 36px rgba(0,0,0,.4)", color: "#2a1c10" }}
+      >
+        <div className="flex items-center gap-1 px-3 pb-1 pt-2">
+          <h2 className="font-display m-0 flex-1 text-[17px]">🗣 Learn a language</h2>
+          <button type="button" onClick={() => setMode("min")} aria-label="Minimize" title="Minimize (it waits bottom left)" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "#6b5631" }}>
+            –
+          </button>
+          <button type="button" onClick={() => setMode(null)} aria-label="Close" title="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none" style={{ color: "#6b5631" }}>
+            ×
+          </button>
+        </div>
+        <div className="overflow-y-auto overscroll-contain px-3 pb-3">
           <LearnLanguage />
         </div>
-      </Fold>
-    </div>
+      </div>
+    ),
+    document.body
   );
 }

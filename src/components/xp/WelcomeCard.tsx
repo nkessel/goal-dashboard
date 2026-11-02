@@ -351,18 +351,15 @@ export function WelcomeCard({
     habits: <HabitPills pills={fx.welcomeHabitPills ?? HABIT_PILLS.map((p) => p.key)} />,
     line: line ? (
       <div className="flex w-full flex-col items-center gap-0.5">
-        {/* Quiet thumbs, always to the right of the line (at its bottom right when it wraps), the line still centred. */}
-        <div className="grid w-full grid-cols-[5.25rem_1fr_5.25rem] items-end gap-1">
-          <span aria-hidden />
-          <p className={`m-0 text-[16px] leading-snug ${verdict === "dislike" ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
-            {line}
-          </p>
-          <span className="flex items-center gap-0.5">
+        {/* Quiet thumbs right after the line's last word (no reserved columns, so it never wraps for nothing). */}
+        <p className={`m-0 text-center text-[16px] leading-snug [text-wrap:pretty] ${verdict === "dislike" ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
+          {line}
+          <span className="ml-1 inline-flex items-center gap-0.5 whitespace-nowrap align-middle no-underline" style={{ textDecoration: "none" }}>
             <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"), setLineSaid(verdict === "like" ? "Taken back" : "Saved: it'll come back more often"))} />
             <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"), setLineWhy(verdict === "dislike" ? null : "down"), setLineSaid(verdict === "dislike" ? "It's back in the rotation" : "Got it: it won't come back"))} />
             <NoteButton on={lineWhy === "note"} onClick={() => setLineWhy((w) => (w === "note" ? null : "note"))} />
           </span>
-        </div>
+        </p>
         {/* Every press says it landed. */}
         <Confirm text={lineSaid} onDone={() => setLineSaid(null)} />
         {lineWhy && <WhyBox key={lineWhy} saying={line} source="Wise line" down={lineWhy === "down"} onDone={(sent) => (setLineWhy(null), sent && setLineSaid("Thanks, your feedback was sent"))} />}
@@ -497,7 +494,7 @@ export function WelcomeCard({
         <div ref={cardRef} onScroll={alignFoot} className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-5 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH && !arranging ? { maxHeight: screenH - 88 } : {}) }}>
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
           <div
-            className={`relative w-full px-8 ${writing === null ? "cursor-grab" : ""}`}
+            className={`relative w-full px-2 ${writing === null ? "cursor-grab" : ""}`}
             // Drag the heading to move the whole screen (a tap still writes the greeting); a double-click puts it back.
             onPointerDown={(e) => {
               if (writing !== null || (e.target as HTMLElement).closest("button, input, textarea, [contenteditable='true']")) return;
@@ -545,32 +542,34 @@ export function WelcomeCard({
               >
                 {writing === null && hello}
                 {greeting}
+                {/* Its ✎ and quiet thumbs, right after the last word. */}
+                {writing === null && (
+                  <span contentEditable={false} className="ml-1 inline-flex items-center gap-0.5 whitespace-nowrap align-middle font-sans text-[16px]">
+                    <span className={`transition-opacity ${arranging ? "" : "opacity-50 hover:opacity-100 focus-within:opacity-100"}`}>
+                      <EditButton
+                        open={arranging && greetingOpen}
+                        onClick={() => {
+                          setWriting(greeting);
+                          if (arranging) setGreetingOpen(true);
+                        }}
+                        label="Edit the greeting"
+                      />
+                    </span>
+                    {!arranging && (
+                      <span className="flex items-center gap-0.5 opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100">
+                        <LineVote kind="like" on={greetVerdict === "like"} onClick={() => voteGreeting(greetVerdict === "like" ? null : "like")} />
+                        <LineVote kind="dislike" on={greetVerdict === "dislike"} onClick={() => voteGreeting(greetVerdict === "dislike" ? null : "dislike")} />
+                        <NoteButton on={greetWhy === "note"} onClick={() => setGreetWhy((w) => (w === "note" ? null : "note"))} />
+                      </span>
+                    )}
+                  </span>
+                )}
               </p>
-              {/* Its ✎, at the text's own upper right. */}
-              {writing === null && (
-                <span className={`absolute -right-7 -top-1.5 transition-opacity ${arranging ? "" : "opacity-50 hover:opacity-100 focus-within:opacity-100"}`}>
-                  <EditButton
-                    open={arranging && greetingOpen}
-                    onClick={() => {
-                      setWriting(greeting);
-                      if (arranging) setGreetingOpen(true);
-                    }}
-                    label="Edit the greeting"
-                  />
-                </span>
-              )}
             </span>
           </div>
           {writing === null && !arranging && (
-            <div className="-my-2 flex w-full flex-col items-center">
-              <span className="flex h-6 items-center gap-0.5 self-end">
-                <Confirm text={greetSaid} onDone={() => setGreetSaid(null)} />
-                <span className="flex items-center gap-0.5 opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100">
-                  <LineVote kind="like" on={greetVerdict === "like"} onClick={() => voteGreeting(greetVerdict === "like" ? null : "like")} />
-                  <LineVote kind="dislike" on={greetVerdict === "dislike"} onClick={() => voteGreeting(greetVerdict === "dislike" ? null : "dislike")} />
-                  <NoteButton on={greetWhy === "note"} onClick={() => setGreetWhy((w) => (w === "note" ? null : "note"))} />
-                </span>
-              </span>
+            <div className="-my-1 flex w-full flex-col items-center empty:hidden">
+              {greetSaid && <Confirm text={greetSaid} onDone={() => setGreetSaid(null)} />}
               {greetWhy && <WhyBox key={greetWhy} saying={greeting} source="Welcome greeting" down={greetWhy === "down"} onDone={(sent) => (setGreetWhy(null), sent && setGreetSaid("Thanks, your feedback was sent"))} />}
             </div>
           )}

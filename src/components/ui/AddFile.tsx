@@ -37,8 +37,7 @@ export function AddFile({ cardId, taskId, onAdded }: { cardId?: string; taskId?:
         className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px]"
         style={{ border: "1px dashed rgba(160,120,40,.55)", color: "#7a5a1e", background: "transparent" }}
       >
-        <span aria-hidden>📎</span>
-        {busy ? "Adding…" : "Add a file"}
+        {busy ? "Adding…" : "Add a private file"}
       </button>
       <input ref={input} type="file" multiple hidden onChange={(e) => send(e.target.files)} />
       {err && (

@@ -4,6 +4,7 @@ import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteCheckNoteAction, logEventAction, updateCheckNoteAction } from "@/app/actions";
+import { setSplitOn, splitEvents, splitOn } from "@/lib/event-split";
 import { DateField } from "@/components/ui/DateField";
 
 type Note = { id: string; body: string; created_at: string; details?: string | null; tone?: number | null };
@@ -96,6 +97,8 @@ export function EventLog({ notes }: { notes: Note[] }) {
     const t = new Date(`${pickDate}T${pickTime || "12:00"}`);
     return Number.isFinite(t.getTime()) ? t.toISOString() : null;
   }
+  const [split, setSplit] = useState(splitOn);
+  const many = splitEvents(text.replace(/(^|\s)#[\p{L}\p{N}_-]{1,24}(?=\s|$)/gu, "$1"), true).length;
   function save() {
     const all = [...tags];
     const words = text
@@ -110,8 +113,10 @@ export function EventLog({ notes }: { notes: Note[] }) {
     setError(null);
     startTransition(async () => {
       try {
-        if (words) {
-          const r = await logEventAction({ title: words, details, tone, at, allDay });
+        // "a, b; c" is three events (unless you keep it as one).
+        const parts = splitEvents(words, split);
+        for (const w of parts) {
+          const r = await logEventAction({ title: w, details: parts.length > 1 ? null : details, tone, at, allDay });
           if (!r.ok) throw new Error(r.error);
         }
         for (const t of all) {
@@ -196,6 +201,18 @@ export function EventLog({ notes }: { notes: Note[] }) {
               style={{ color: INK }}
             />
           </div>
+          {/* Commas or semicolons: several events at once, or keep it as one. */}
+          {many > 1 && (
+            <div className="reveal flex flex-wrap items-center gap-1.5 text-[13px]" style={{ color: INK_SOFT }}>
+              <button type="button" aria-pressed={split} onClick={() => (setSplit(true), setSplitOn(true))} className="h-7 rounded-full px-2.5 font-semibold" style={chip(split)}>
+                {many} events
+              </button>
+              <button type="button" aria-pressed={!split} onClick={() => (setSplit(false), setSplitOn(false))} className="h-7 rounded-full px-2.5 font-semibold" style={chip(!split)}>
+                Keep as one
+              </button>
+              <span>split at , and ;</span>
+            </div>
+          )}
           {/* How it felt: three coloured buttons (tap again to clear). */}
           <div role="radiogroup" aria-label="How it felt" className="flex items-center gap-1.5">
             <span className="text-[13px] font-semibold" style={{ color: INK_SOFT }}>

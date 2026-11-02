@@ -329,9 +329,11 @@ function Part({ el, fx, empty, children, onArchive }: { el: WelcomeEl; fx: FxSet
       {open && el === "focus" && <QuestionOptions fx={fx} k="welcomeFocusQ" label="The question" fallback="What are your top priorities today?" />}
       </div>
       {children ? (
-        // The part as it looks (not live while arranging).
-        <div inert className={`pointer-events-none flex w-full flex-col items-center ${showing ? "" : "opacity-40 grayscale"}`}>
-          {children}
+        // The part as it looks (not live while arranging). A tap on it opens its options, like its ✎.
+        <div onClick={HAS_OPTIONS.includes(el) ? () => setOpen((v) => !v) : undefined} title={HAS_OPTIONS.includes(el) ? `Edit ${meta.label}` : undefined} className="w-full">
+          <div inert className={`pointer-events-none flex w-full flex-col items-center ${showing ? "" : "opacity-40 grayscale"}`}>
+            {children}
+          </div>
         </div>
       ) : (
         <p className="m-0 text-left text-[12.5px] italic" style={{ color: SOFT }}>

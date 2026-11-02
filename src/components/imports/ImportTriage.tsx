@@ -3,8 +3,6 @@
 import { Fold } from "@/components/ui/Fold";
 
 import { FileChips } from "@/components/ui/FileChips";
-import { AddFile } from "@/components/ui/AddFile";
-import type { FileRef } from "@/lib/file-refs";
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
@@ -570,9 +568,8 @@ function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onQuick, o
   const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [later, setLater] = useState(false);
-  // Files added here (shown at once; they're kept on the card and go with it onto the quest).
-  const [added, setAdded] = useState<{ card: string; files: FileRef[] }>({ card: card.id, files: [] });
-  const files = [...(card.attachments ?? []), ...(added.card === card.id ? added.files.filter((f) => !card.attachments?.some((a) => a.id === f.id)) : [])];
+  // Files kept with the card go with it onto the quest (adding one is in the quest editor's More).
+  const files = card.attachments ?? [];
   const facts = [card.repeat_text, card.due_on ? `Due ${dayLabel(card.due_on)}` : null, card.minutes ? minutesLabel(card.minutes) : null, card.board_hint ? `Board: ${card.board_hint}` : null].filter(Boolean) as string[];
   return (
     <div className="card-pop-in parchment relative flex flex-col gap-2.5 rounded-3xl p-4" style={frame} onContextMenu={(e) => (e.preventDefault(), setMenu(true))}>
@@ -604,10 +601,11 @@ function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onQuick, o
           {card.description}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <FileChips files={files} />
-        <AddFile cardId={card.id} onAdded={(f) => setAdded((a) => ({ card: card.id, files: [...(a.card === card.id ? a.files : []), f] }))} />
-      </div>
+      {files.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <FileChips files={files} />
+        </div>
+      )}
       {facts.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {facts.map((f) => (

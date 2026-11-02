@@ -4,6 +4,7 @@ import { snapTo, useSliderStep } from "@/lib/use-slider-step";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
+import { splitEvents, splitOn } from "@/lib/event-split";
 import { addCheckNoteAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
 import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft, MoonIcon, SunIcon, TimeToken } from "./NightFields";
 import { DateField } from "@/components/ui/DateField";
@@ -167,7 +168,8 @@ export function EnergyCheck({
       return sp;
     }).replace(/\s+/g, " ").trim();
     if (!text && !tags.length) return setNoting(false);
-    if (text) saveNote(text);
+    // "a, b; c" is three events (Insights › Events can keep it as one).
+    for (const w of splitEvents(text, splitOn())) saveNote(w);
     for (const t of tags) if (!notes.some((n) => n.body.toLowerCase() === `#${t}`)) saveNote(`#${t}`);
     setNoteText("");
     setPendingTags([]);
