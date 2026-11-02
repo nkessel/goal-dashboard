@@ -107,13 +107,17 @@ export function WelcomeCard({
   // The pinned foot's parchment lines up with the card's own (it showed as a different patch of paper).
   const cardRef = useRef<HTMLDivElement>(null);
   const footRef = useRef<HTMLDivElement>(null);
+  // The pinned cap at the card's top too (the band the toucan perches on and the corner buttons sit in).
+  const capRef = useRef<HTMLDivElement>(null);
   const alignFoot = () => {
     const c = cardRef.current;
-    const f = footRef.current;
-    if (!c || !f) return;
+    if (!c) return;
     const cr = c.getBoundingClientRect();
-    const fr = f.getBoundingClientRect();
-    f.style.backgroundPosition = `${Math.round(cr.left + c.clientLeft - fr.left)}px ${Math.round(cr.top + c.clientTop - fr.top)}px`;
+    for (const f of [footRef.current, capRef.current]) {
+      if (!f) continue;
+      const fr = f.getBoundingClientRect();
+      f.style.backgroundPosition = `${Math.round(cr.left + c.clientLeft - fr.left)}px ${Math.round(cr.top + c.clientTop - fr.top)}px`;
+    }
   };
   useLayoutEffect(() => {
     alignFoot();
@@ -512,6 +516,8 @@ export function WelcomeCard({
           />
         )}
         <div ref={cardRef} data-welcome-card onScroll={alignFoot} className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-var(--wtop)-12px)]"} flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-10 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH && !arranging ? { maxHeight: `calc(${screenH}px - var(--wtop) - 12px)` } : {}) }}>
+          {/* The top band stays put while the card scrolls, so nothing slides under the toucan's perch or the corner buttons. */}
+          <div ref={capRef} aria-hidden className="welcome-cap pointer-events-none sticky -top-10 z-[3] -mb-3 -ml-5 -mr-3 -mt-10 h-10 shrink-0 self-stretch" />
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
           <div
             className={`relative w-full px-2 ${writing === null ? "cursor-grab" : ""}`}
@@ -757,7 +763,13 @@ const PERCH_BAND = 34;
  * buttons, wise line and foot, and the minimize and gear buttons. The nearest shift from where he
  * was put (up first, then sideways, then down); null when there's no such spot.
  */
-function clearSpot(wrap: HTMLElement, at: { x: number; y: number }, home: { x: number; y: number }): { x: number; y: number } | null {
+function clearSpot(
+  wrap: HTMLElement,
+  at: { x: number; y: number },
+  home: { x: number; y: number },
+  /** What his bubble must stay off: everything, only the corner buttons (a tall menu), or nothing (he alone stays clear). */
+  bubbleOff: "all" | "corners" | "none" = "all"
+): { x: number; y: number } | null {
   // He and his bubble, each as its own box (the bubble reaches past the corner buttons' line; he doesn't).
   const parts = [...wrap.children].map((c) => toucanBox(c as HTMLElement)).filter((b): b is Box => !!b);
   const scope = wrap.parentElement;
@@ -765,20 +777,24 @@ function clearSpot(wrap: HTMLElement, at: { x: number; y: number }, home: { x: n
   if (!parts.length || !scope || !card) return null;
   // Where they'd be without the current shift.
   const boxes = parts.map((p) => ({ left: p.left - at.x, top: p.top - at.y, right: p.right - at.x, bottom: p.bottom - at.y }));
-  const blocks: Box[] = [{ left: card.left, top: card.top + PERCH_BAND, right: card.right, bottom: card.bottom }];
+  const cardBlock: Box = { left: card.left, top: card.top + PERCH_BAND, right: card.right, bottom: card.bottom };
+  const corners: Box[] = [];
   scope.querySelectorAll<HTMLElement>("[data-welcome-corner]").forEach((el) => {
     const r = el.getBoundingClientRect();
-    if (r.width) blocks.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+    if (r.width) corners.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
   });
+  const blocks: Box[] = [cardBlock, ...corners];
+  // He (the first box) always stays clear of everything; his bubble as asked.
+  const blocksFor = (i: number) => (i === 0 || bubbleOff === "all" ? blocks : bubbleOff === "corners" ? corners : []);
   const m = 6;
   const pad = 4;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const ok = (dx: number, dy: number, give = 0) =>
     boxes.every(
-      (b) =>
+      (b, i) =>
         b.left + dx >= m - give && b.right + dx <= vw - m + give && b.top + dy >= m - give && b.bottom + dy <= vh - m + give &&
-        !blocks.some((r) => b.left + dx < r.right + pad - give && b.right + dx > r.left - pad + give && b.top + dy < r.bottom + pad - give && b.bottom + dy > r.top - pad + give)
+        !blocksFor(i).some((r) => b.left + dx < r.right + pad - give && b.right + dx > r.left - pad + give && b.top + dy < r.bottom + pad - give && b.bottom + dy > r.top - pad + give)
     );
   if (ok(0, 0)) return { x: 0, y: 0 };
   // Where he is now still fine (give or take a couple of pixels)? He stays (no back and forth).
@@ -903,7 +919,10 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
       // Measured from where he is drawn now (a shift already asked for may not be on screen yet).
       const drawn = { x: Number(w.dataset.nx) || 0, y: Number(w.dataset.ny) || 0 };
       const n = nudgeRef.current;
-      const next = clearSpot(w, drawn, { x: -off.x, y: -off.y }) ?? onScreen(w, drawn);
+      const home = { x: -off.x, y: -off.y };
+      // Best: he and his bubble both clear. A tall bubble (his menu, a long talk) may lie over the card,
+      // but never over the corner buttons if it can help it, and he himself never lands on the card.
+      const next = clearSpot(w, drawn, home) ?? clearSpot(w, drawn, home, "corners") ?? clearSpot(w, drawn, home, "none") ?? onScreen(w, drawn);
       if (Math.abs(next.x - n.x) > 1 || Math.abs(next.y - n.y) > 1) {
         nudgeRef.current = next;
         setNudge(next);
@@ -944,7 +963,7 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
   const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setReplying(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
   const item = "font-semibold underline underline-offset-2";
   return (
-    <div ref={wrapRef} data-nx={nudge.x} data-ny={nudge.y} className={`${flyIn ? "welcome-toucan" : ""} absolute z-[3]`} style={{ left: 8 + off.x + nudge.x, top: -47 + off.y + nudge.y, transition: settling ? "left 260ms cubic-bezier(.2,.8,.3,1), top 260ms cubic-bezier(.2,.8,.3,1)" : undefined }}>
+    <div ref={wrapRef} data-nx={nudge.x} data-ny={nudge.y} className={`${flyIn ? "welcome-toucan" : ""} absolute z-[5]`} style={{ left: 8 + off.x + nudge.x, top: -47 + off.y + nudge.y, transition: settling ? "left 260ms cubic-bezier(.2,.8,.3,1), top 260ms cubic-bezier(.2,.8,.3,1)" : undefined }}>
       <button
         type="button"
         onClick={() => {
@@ -1010,7 +1029,8 @@ function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** Whil
             drag.current = null;
           }}
           ref={bubbleRef}
-          className={`group/bubble toucan-bubble owl-say absolute bottom-1 left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,calc(100vw-188px))]" : "w-max min-w-[180px] max-w-[min(250px,calc(100vw-188px))]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+          // His menu hangs down from beside him (a tall list growing up would push him down onto the card).
+          className={`group/bubble toucan-bubble owl-say absolute ${menu ? "top-1" : "bottom-1"} left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,calc(100vw-188px))]" : "w-max min-w-[180px] max-w-[min(250px,calc(100vw-188px))]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
           {/* ✎ at the top right: rate what he asked, or say more about it. */}
           {/* Hidden while you're answering him (an answer already says it's a good question). */}
           {!menu && !saying && !talk && !replying && (

@@ -2956,6 +2956,9 @@ html[data-welcome-open] .nav-loader-toucan { display: none; }
 /* The welcome card's foot (Snooze / Complete check-in): pinned while the card scrolls, on the card's own parchment. */
 .welcome-foot { background: linear-gradient(to bottom, transparent, var(--t-card, #fffaf0) 10px); }
 [data-theme="adventure"] .welcome-foot { background: #ecdab4 url(/design/tex-parchment-2.jpg) repeat; background-size: 384px 384px; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 8px); mask-image: linear-gradient(to bottom, transparent, #000 8px); }
+/* Its top band, pinned while the card scrolls (fades out at its lower edge). */
+.welcome-cap { background: linear-gradient(to top, transparent, var(--t-card, #fffaf0) 10px); }
+[data-theme="adventure"] .welcome-cap { background: #ecdab4 url(/design/tex-parchment-2.jpg) repeat; background-size: 384px 384px; -webkit-mask-image: linear-gradient(to top, transparent, #000 8px); mask-image: linear-gradient(to top, transparent, #000 8px); }
 /* The toucan nods when you answer him (one dip of the head and body). */
 .tc-nod { animation: tc-nod 420ms cubic-bezier(.3,.7,.3,1) both; transform-origin: 50% 90%; }
 @keyframes tc-nod { 0% { transform: none; } 35% { transform: rotate(7deg) translateY(2px); } 70% { transform: rotate(-2deg); } 100% { transform: none; } }
