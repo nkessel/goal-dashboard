@@ -459,6 +459,11 @@ export function DailyHabits({
               return (
                 <SortableHabit key={h.id} id={h.id} disabled={!open} raised={menuFor === h.id || confirmSkip === h.id}>
                 <div
+                  // The cleaning habit's whole card opens and closes its tray (not only its title).
+                  onClick={(e) => {
+                    if (h.id !== cleanId || !cleaning || (e.target as Element).closest("button,input,textarea,a,[role=menu]")) return;
+                    setCleanOpen((v) => !v);
+                  }}
                   onContextMenu={(e) => {
                     if ((e.target as Element).closest("input,textarea,a")) return;
                     e.preventDefault();

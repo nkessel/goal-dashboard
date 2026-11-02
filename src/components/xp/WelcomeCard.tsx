@@ -159,6 +159,24 @@ export function WelcomeCard({
   const [at, setAt] = useState<{ x: number; y: number }>(() => readJson("welcome-card-at", { x: 0, y: 0 }));
   const [cardW, setCardW] = useState<number>(() => readJson("welcome-card-w", 500));
   const moving = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
+  // Never off the screen: a spot (or width) kept from a wider window, or a drag too far, comes back in.
+  useLayoutEffect(() => {
+    const fitIn = () => {
+      const c = cardRef.current;
+      if (!c || moving.current) return;
+      const w = c.offsetWidth;
+      const maxX = Math.max(0, (window.innerWidth - w) / 2 - 16);
+      const maxY = Math.max(0, window.innerHeight * 0.4);
+      setAt((a) => {
+        const x = Math.round(Math.max(-maxX, Math.min(maxX, a.x)));
+        const y = Math.round(Math.max(0, Math.min(maxY, a.y)));
+        return x === a.x && y === a.y ? a : { x, y };
+      });
+    };
+    fitIn();
+    window.addEventListener("resize", fitIn);
+    return () => window.removeEventListener("resize", fitIn);
+  }, [cardW]);
   const sizing = useRef<{ x: number; w: number } | null>(null);
   // One toucan at a time: while this screen is open the perched one and his notes wait (see PerchedOwl, ToucanGuide).
   useEffect(() => {
@@ -418,7 +436,7 @@ export function WelcomeCard({
       document.body
     );
   return createPortal(
-    <div data-welcome-root data-kb-plain data-no-ghost style={{ ...(screenH ? { height: screenH, bottom: "auto" } : {}), translate: kbLift ? `0 ${-kbLift}px` : undefined, transition: "translate 240ms cubic-bezier(.2,.8,.2,1)" }} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-start justify-center px-3 pb-3 pt-[max(56px,calc(env(safe-area-inset-top)+48px),9dvh)] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
+    <div data-welcome-root data-kb-plain data-no-ghost style={{ ...(screenH ? { height: screenH, bottom: "auto" } : {}), translate: kbLift ? `0 ${-kbLift}px` : undefined, transition: "translate 240ms cubic-bezier(.2,.8,.2,1)", "--wtop": "max(92px, calc(env(safe-area-inset-top) + 84px), 12dvh)" } as React.CSSProperties} className={`fixed inset-0 ${preview ? "z-[95]" : drawerOpen ? "z-[49]" : "z-[60]"} flex items-start justify-center px-3 pb-3 pt-[var(--wtop)] ${leaving ? "pointer-events-none" : ""}`} onClick={() => arranging && setArranging(false)} role="dialog" aria-modal="true" aria-label={heading}>
       {/* Overscan: while a phone's keyboard opens or closes the screen briefly changes size; this keeps Today from peeking through above or below. */}
       <div aria-hidden className="pointer-events-none fixed inset-x-0 -bottom-[60vh] -top-[60vh] -z-[1]" style={{ background: "#1b2119" }} />
       {/* A misty valley, and the card coming out of the mist. While arranging, the castle's ✎ stands right beside it. */}
@@ -429,7 +447,7 @@ export function WelcomeCard({
       {arranging && <ArrangeAbove fx={fx} castleHidden={!castleSeen} />}
       <div className={`${leaving || minimizing ? "mist-card-out" : "mist-emerge"} relative min-h-0`} onClick={(e) => e.stopPropagation()}>
         {/* Kept mounted (and visible) while arranging, so he doesn't fly in again each time. */}
-        <WelcomeToucan fx={fx} onAway={() => minimize(true)} />
+        <WelcomeToucan fx={fx} quiet={arranging} onAway={() => minimize(true)} />
         {confetti && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
             {PIECES.map((p, i) => (
@@ -450,7 +468,8 @@ export function WelcomeCard({
             onClick={() => minimize()}
             aria-label="Minimize the check-in"
             title="Minimize (comes back from the sun bubble)"
-            className="settings-gear absolute -top-2 right-7 z-[2] flex h-[30px] w-[30px] items-center justify-center rounded-full"
+            data-welcome-corner
+            className="settings-gear absolute right-[42px] top-1.5 z-[4] flex h-[28px] w-[28px] items-center justify-center rounded-full"
             style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -465,7 +484,8 @@ export function WelcomeCard({
           aria-pressed={arranging}
           aria-label={arranging ? "Done arranging" : "Welcome screen settings"}
           title={arranging ? "Done arranging" : "Welcome screen settings"}
-          className="settings-gear absolute -right-2 -top-2 z-[2] flex h-[30px] w-[30px] items-center justify-center rounded-full"
+          data-welcome-corner
+          className="settings-gear absolute right-1.5 top-1.5 z-[4] flex h-[28px] w-[28px] items-center justify-center rounded-full"
           // While arranging it stays the gear, lit gold (pressed in); tap it again to finish.
           style={arranging ? { color: "#2a1c10", background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", boxShadow: "0 0 0 1.5px #4a3913, 0 0 12px rgba(242,210,126,.75), inset 0 1px 2px rgba(60,40,10,.35)" } : { color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
         >
@@ -491,7 +511,7 @@ export function WelcomeCard({
             }}
           />
         )}
-        <div ref={cardRef} onScroll={alignFoot} className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-88px)]"} flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-5 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH && !arranging ? { maxHeight: screenH - 88 } : {}) }}>
+        <div ref={cardRef} data-welcome-card onScroll={alignFoot} className={`parchment relative flex bg-[var(--t-card,#fffaf0)] ${arranging ? "max-h-[70dvh]" : "max-h-[calc(100dvh-var(--wtop)-12px)]"} flex-col items-center gap-3 overflow-y-auto rounded-2xl pb-4 pl-5 pr-3 pt-10 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH && !arranging ? { maxHeight: `calc(${screenH}px - var(--wtop) - 12px)` } : {}) }}>
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
           <div
             className={`relative w-full px-2 ${writing === null ? "cursor-grab" : ""}`}
@@ -506,7 +526,8 @@ export function WelcomeCard({
               if (!d) return;
               if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
               d.moved = true;
-              setAt({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y });
+              const half = Math.max(0, (window.innerWidth - (cardRef.current?.offsetWidth ?? 0)) / 2 - 16);
+              setAt({ x: Math.max(-half, Math.min(half, d.ox + e.clientX - d.x)), y: Math.max(0, Math.min(window.innerHeight * 0.4, d.oy + e.clientY - d.y)) });
             }}
             onPointerUp={() => {
               if (moving.current?.moved) writeJson("welcome-card-at", at);
@@ -716,32 +737,98 @@ function resetToucanFlight() {
     /* storage unavailable */
   }
 }
-/** Where he can sit without covering a button or field of the card: the nearest shift
- * (up first, then down, left, right) that clears every control under him. */
-function clearOfControls(wrap: HTMLElement, off: { x: number; y: number }): { x: number; y: number } {
-  const body = wrap.firstElementChild?.getBoundingClientRect();
-  const card = wrap.parentElement;
-  if (!body || !card) return off;
-  const controls = [...card.querySelectorAll<HTMLElement>("button, input, textarea, select, a, [role=button], [contenteditable=true]")]
-    .filter((el) => !wrap.contains(el))
-    .map((el) => el.getBoundingClientRect())
-    .filter((r) => r.width > 0 && r.height > 0);
+type Box = { left: number; top: number; right: number; bottom: number };
+/** Everything of his that shows (body, bubble, its ✎ and the line hanging under it), as one box. */
+function toucanBox(wrap: HTMLElement): Box | null {
+  let box: Box | null = null;
+  for (const el of [wrap, ...wrap.querySelectorAll<HTMLElement>("*")]) {
+    // His soft glow may spill past an edge.
+    if (el.classList.contains("toucan-aura")) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    box = box ? { left: Math.min(box.left, r.left), top: Math.min(box.top, r.top), right: Math.max(box.right, r.right), bottom: Math.max(box.bottom, r.bottom) } : { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  }
+  return box;
+}
+/** The card's top band he may perch over (above the greeting); everything below it is the card's own. */
+const PERCH_BAND = 34;
+/**
+ * Where he can sit so that he and his bubble stay on screen and off the card: its greeting,
+ * buttons, wise line and foot, and the minimize and gear buttons. The nearest shift from where he
+ * was put (up first, then sideways, then down); null when there's no such spot.
+ */
+function clearSpot(wrap: HTMLElement, at: { x: number; y: number }, home: { x: number; y: number }): { x: number; y: number } | null {
+  // He and his bubble, each as its own box (the bubble reaches past the corner buttons' line; he doesn't).
+  const parts = [...wrap.children].map((c) => toucanBox(c as HTMLElement)).filter((b): b is Box => !!b);
+  const scope = wrap.parentElement;
+  const card = scope?.querySelector<HTMLElement>("[data-welcome-card]")?.getBoundingClientRect();
+  if (!parts.length || !scope || !card) return null;
+  // Where they'd be without the current shift.
+  const boxes = parts.map((p) => ({ left: p.left - at.x, top: p.top - at.y, right: p.right - at.x, bottom: p.bottom - at.y }));
+  const blocks: Box[] = [{ left: card.left, top: card.top + PERCH_BAND, right: card.right, bottom: card.bottom }];
+  scope.querySelectorAll<HTMLElement>("[data-welcome-corner]").forEach((el) => {
+    const r = el.getBoundingClientRect();
+    if (r.width) blocks.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+  });
+  const m = 6;
   const pad = 4;
-  const hits = (dx: number, dy: number) =>
-    controls.some((r) => body.left + dx < r.right + pad && body.right + dx > r.left - pad && body.top + dy < r.bottom + pad && body.bottom + dy > r.top - pad);
-  if (!hits(0, 0)) return off;
   const vw = window.innerWidth;
-  const vh = window.visualViewport?.height ?? window.innerHeight;
-  for (let d = 8; d <= 480; d += 8) {
-    for (const [dx, dy] of [[0, -d], [0, d], [-d, 0], [d, 0]]) {
-      if (body.left + dx < 4 || body.right + dx > vw - 4 || body.top + dy < 4 || body.bottom + dy > vh - 4) continue;
-      if (!hits(dx, dy)) return { x: off.x + dx, y: off.y + dy };
+  const vh = window.innerHeight;
+  const ok = (dx: number, dy: number, give = 0) =>
+    boxes.every(
+      (b) =>
+        b.left + dx >= m - give && b.right + dx <= vw - m + give && b.top + dy >= m - give && b.bottom + dy <= vh - m + give &&
+        !blocks.some((r) => b.left + dx < r.right + pad - give && b.right + dx > r.left - pad + give && b.top + dy < r.bottom + pad - give && b.bottom + dy > r.top - pad + give)
+    );
+  if (ok(0, 0)) return { x: 0, y: 0 };
+  // Where he is now still fine (give or take a couple of pixels)? He stays (no back and forth).
+  if (ok(at.x, at.y, 2)) return at;
+  // The nearest clear spot: try every shift that lines one of his edges up with an edge of the
+  // card, a corner button or the screen (going up costs less than going down).
+  // His own perch (where he lands) is always one of them.
+  const xs = new Set<number>([0, home.x]);
+  const ys = new Set<number>([0, home.y]);
+  for (const b of boxes) {
+    for (const r of blocks) {
+      xs.add(Math.floor(r.left - pad - b.right - 1));
+      xs.add(Math.ceil(r.right + pad - b.left + 1));
+      ys.add(Math.floor(r.top - pad - b.bottom - 1));
+      ys.add(Math.ceil(r.bottom + pad - b.top + 1));
+    }
+    xs.add(Math.ceil(m - b.left));
+    xs.add(Math.floor(vw - m - b.right));
+    ys.add(Math.ceil(m - b.top));
+    ys.add(Math.floor(vh - m - b.bottom));
+  }
+  let best: { x: number; y: number } | null = null;
+  let cost = Infinity;
+  for (const dy of ys) {
+    for (const dx of xs) {
+      const c = dx * dx + (dy > 0 ? 4 : 1) * dy * dy;
+      if (c < cost && ok(dx, dy)) {
+        best = { x: dx, y: dy };
+        cost = c;
+      }
     }
   }
-  return off;
+  return best;
+}
+/** Only on screen (when no clear spot exists, e.g. a long talk with him). */
+function onScreen(wrap: HTMLElement, at: { x: number; y: number }): { x: number; y: number } {
+  const box = toucanBox(wrap);
+  if (!box) return at;
+  const m = 6;
+  const left = box.left - at.x;
+  const right = box.right - at.x;
+  const top = box.top - at.y;
+  const bottom = box.bottom - at.y;
+  return {
+    x: Math.round(Math.max(m - left, Math.min(0, window.innerWidth - m - right))),
+    y: Math.round(Math.max(m - top, Math.min(0, window.innerHeight - m - bottom))),
+  };
 }
 
-function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in the app (his settings): the screen tucks itself away first. */ onAway: () => void }) {
+function WelcomeToucan({ fx, quiet = false, onAway }: { fx: FxSettings; /** While the screen is being arranged his bubble rests (the panel above the card needs the room). */ quiet?: boolean; /** Going elsewhere in the app (his settings): the screen tucks itself away first. */ onAway: () => void }) {
   const [landed, setLanded] = useState(landedBefore);
   const [flyIn] = useState(() => !landedBefore());
   const [menu, setMenu] = useState(false);
@@ -787,45 +874,37 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
     }
   }
   const [off, setOff] = useState(readToucanAt);
-  // After a drop onto the card's buttons he hops aside (animated), so nothing is covered.
+  // On a narrow phone the respond line is a little shorter, so it stays under his bubble (clear of the card's buttons).
+  const replyW = Math.max(120, Math.min(REPLY_W, (typeof window === "undefined" ? 999 : window.innerWidth) - 240));
+  const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
+  // After a drop he glides (animated) to the nearest spot clear of the card's words and buttons.
   const [settling, setSettling] = useState(false);
   const settle = (at: { x: number; y: number }) => {
-    const w = wrapRef.current;
-    const to = w ? clearOfControls(w, at) : at;
-    if (to.x !== at.x || to.y !== at.y) {
-      setSettling(true);
-      setOff(to);
-      setTimeout(() => setSettling(false), 300);
-    }
+    setSettling(true);
+    setTimeout(() => setSettling(false), 320);
     try {
-      window.localStorage.setItem(TOUCAN_AT, JSON.stringify(to));
+      window.localStorage.setItem(TOUCAN_AT, JSON.stringify(at));
     } catch {}
   };
-  // Kept on screen: a spot saved on a wider window (or a bubble that grew) never runs him or his bubble off an edge.
+  // Kept on screen and off the card (its greeting, buttons, wise line and foot): wherever he was put,
+  // however his bubble grows, and as the card's parts open and close.
   const wrapRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [nudge, setNudge] = useState({ x: 0, y: 0 });
   const nudgeRef = useRef(nudge);
+  const [, setSettleTick] = useState(0);
   useLayoutEffect(() => {
     const fit = () => {
       const w = wrapRef.current;
-      if (!w || !landed) return;
+      if (!w || !landed || drag.current?.moved) return;
+      // Answering him with the keyboard up: he holds still (the card glides instead).
+      const a = document.activeElement;
+      if (a instanceof HTMLTextAreaElement && w.contains(a)) return;
+      // Measured from where he is drawn now (a shift already asked for may not be on screen yet).
+      const drawn = { x: Number(w.dataset.nx) || 0, y: Number(w.dataset.ny) || 0 };
       const n = nudgeRef.current;
-      const body = w.firstElementChild?.getBoundingClientRect();
-      const bub = bubbleRef.current?.getBoundingClientRect();
-      if (!body) return;
-      const m = 6;
-      const vw = window.innerWidth;
-      const vh = window.visualViewport?.height ?? window.innerHeight;
-      // Where they'd sit without the nudge.
-      const left = body.left - n.x;
-      const top = Math.min(body.top, bub?.top ?? body.top) - n.y;
-      const right = Math.max(body.right, bub?.right ?? 0) - n.x;
-      const bottom = Math.max(body.bottom, bub?.bottom ?? 0) - n.y;
-      const x = Math.max(m - left, Math.min(0, vw - m - right));
-      const y = Math.max(m - top, Math.min(0, vh - m - bottom));
-      const next = { x: Math.round(x), y: Math.round(y) };
-      if (next.x !== n.x || next.y !== n.y) {
+      const next = clearSpot(w, drawn, { x: -off.x, y: -off.y }) ?? onScreen(w, drawn);
+      if (Math.abs(next.x - n.x) > 1 || Math.abs(next.y - n.y) > 1) {
         nudgeRef.current = next;
         setNudge(next);
       }
@@ -833,13 +912,22 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
     fit();
     const ro = new ResizeObserver(fit);
     if (bubbleRef.current) ro.observe(bubbleRef.current);
+    const card = wrapRef.current?.parentElement?.querySelector("[data-welcome-card]");
+    if (card) {
+      ro.observe(card);
+      if (card.firstElementChild) for (const c of card.children) ro.observe(c);
+    }
     window.addEventListener("resize", fit);
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", fit);
     };
   });
-  const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
+  // Once the card has come out of the mist (it rises while it emerges), look again.
+  useEffect(() => {
+    const t = setTimeout(() => setSettleTick((n) => n + 1), 2300);
+    return () => clearTimeout(t);
+  }, [landed]);
   useEffect(() => {
     if (landedBefore()) return;
     const t = setTimeout(() => (markLanded(), setLanded(true)), 3150);
@@ -856,7 +944,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
   const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setReplying(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
   const item = "font-semibold underline underline-offset-2";
   return (
-    <div ref={wrapRef} className={`${flyIn ? "welcome-toucan" : ""} absolute z-[3]`} style={{ left: 8 + off.x + nudge.x, top: -47 + off.y + nudge.y, transition: settling ? "left 260ms cubic-bezier(.2,.8,.3,1), top 260ms cubic-bezier(.2,.8,.3,1)" : undefined }}>
+    <div ref={wrapRef} data-nx={nudge.x} data-ny={nudge.y} className={`${flyIn ? "welcome-toucan" : ""} absolute z-[3]`} style={{ left: 8 + off.x + nudge.x, top: -47 + off.y + nudge.y, transition: settling ? "left 260ms cubic-bezier(.2,.8,.3,1), top 260ms cubic-bezier(.2,.8,.3,1)" : undefined }}>
       <button
         type="button"
         onClick={() => {
@@ -902,7 +990,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
           </span>
         </span>
       </button>
-      {landed && (
+      {landed && !quiet && (
         <div
           // His bubble moves him too: drag it by its words (buttons and the reply line still work).
           onPointerDown={(e) => {
@@ -922,7 +1010,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
             drag.current = null;
           }}
           ref={bubbleRef}
-          className={`group/bubble toucan-bubble owl-say absolute bottom-1 left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,74vw)]" : "w-max min-w-[180px] max-w-[min(250px,62vw)]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+          className={`group/bubble toucan-bubble owl-say absolute bottom-1 left-[58px] cursor-grab touch-none z-[5] ${why || talk ? "w-[min(290px,calc(100vw-188px))]" : "w-max min-w-[180px] max-w-[min(250px,calc(100vw-188px))]"} rounded-2xl px-3 pb-3.5 pt-2 text-left text-[13.5px] leading-snug`} style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
           {/* ✎ at the top right: rate what he asked, or say more about it. */}
           {/* Hidden while you're answering him (an answer already says it's a good question). */}
           {!menu && !saying && !talk && !replying && (
@@ -974,7 +1062,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
                 }}
               >
                 {/* 16px text drawn at 13px (iPhone doesn't zoom on focus), in a box sized to what you see. */}
-                <span className="reply-box bubble-hang relative block overflow-hidden rounded-[11px]" style={{ width: REPLY_W, height: answerH }}>
+                <span className="reply-box bubble-hang relative block overflow-hidden rounded-[11px]" style={{ width: replyW, height: answerH }}>
                   <textarea
                     value={answer}
                     rows={1}
@@ -1004,7 +1092,7 @@ function WelcomeToucan({ fx, onAway }: { fx: FxSettings; /** Going elsewhere in 
                     enterKeyHint="send"
                     maxLength={400}
                     className="reply-line absolute left-0 top-0 block resize-none bg-transparent py-[3px] pl-3 pr-9 text-[16px] leading-[20px] outline-none"
-                    style={{ color: "#2a1c10", width: REPLY_W / REPLY_SCALE, height: answerH / REPLY_SCALE, transform: `scale(${REPLY_SCALE})`, transformOrigin: "0 0", overflowY: answerH >= REPLY_MAX ? "auto" : "hidden" }}
+                    style={{ color: "#2a1c10", width: replyW / REPLY_SCALE, height: answerH / REPLY_SCALE, transform: `scale(${REPLY_SCALE})`, transformOrigin: "0 0", overflowY: answerH >= REPLY_MAX ? "auto" : "hidden" }}
                   />
                 </span>
                 {answer.trim() && (
