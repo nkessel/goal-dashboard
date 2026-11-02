@@ -95,6 +95,13 @@ export const FLOWS = [
         await h.check("quest menu");
         await esc(h);
       }
+      // ✨ Plan my day from Today's Quests header (owner, Nov 2): today's quests placed around the day.
+      await h.page.hover("text=Today's Quests").catch(() => {});
+      if (await h.tap((p) => p.getByRole("button", { name: /^plan my day$/i }).first(), "plan my day", { optional: true, expectMove: true })) {
+        await h.settle(1500);
+        await h.check("plan my day");
+        await esc(h);
+      }
     },
   },
   {

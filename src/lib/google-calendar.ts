@@ -60,9 +60,9 @@ export async function createCalendarEvent(
 }
 
 /** Removes an event (a quest taken back off the calendar). */
-export async function deleteCalendarEvent(accessToken: string, eventId: string): Promise<void> {
+export async function deleteCalendarEvent(accessToken: string, eventId: string, calendarId = "primary"): Promise<void> {
   const calendar = calendarClient(accessToken);
-  await calendar.events.delete({ calendarId: "primary", eventId });
+  await calendar.events.delete({ calendarId, eventId });
 }
 
 /**

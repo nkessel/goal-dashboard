@@ -1,5 +1,6 @@
 "use client";
 
+import { openPlanMyDay } from "./PlanMyDay";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
@@ -160,6 +161,14 @@ export function CalendarLayers({
               {toSchedule}
             </span>
           )}
+        </button>
+        {/* Plan my day: today's quests placed in today's free time (beside the week/month scheduling list). */}
+        <button type="button" onClick={openPlanMyDay} aria-label="Plan my day" title="Plan my day" className="hover-glow flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[13.5px] font-semibold sm:px-3" style={chip}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: isAdventure ? "#e8c56c" : "var(--t-accent)" }}>
+            <path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z" fill="currentColor" />
+            <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" fill="currentColor" />
+          </svg>
+          <span className="hidden sm:inline">Plan my day</span>
         </button>
         {calendars.length > 0 && (() => {
           const othersOn = calendars.some((c) => !layers.hidden.includes(c.id));

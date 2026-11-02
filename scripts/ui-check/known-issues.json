@@ -1,1 +1,6 @@
-[]
+[
+  {
+    "match": "popup-behind\\|.*Create something new",
+    "reason": "Tablet only: the + sheet's kind tabs (Tiny task, Quest, Habit, Evening rite, Reward…) scroll sideways inside the sheet, and the tabs scrolled past its edge are clipped by it; the check samples them outside the sheet and hits the backdrop. The sheet itself is on top (see the screenshot)."
+  }
+]

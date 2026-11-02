@@ -1,5 +1,6 @@
 "use client";
 
+import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
 import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useRef, useState } from "react";
 import { FLOURISHES, readFlourish, saveFlourish, type Flourish } from "@/lib/toucan-flourish";
@@ -380,7 +381,7 @@ export function ToucanGuide() {
       const used = readCheckins(day);
       if (used.count >= dailyBudget(st)) return;
       const spend = (slot: string) => writeCheckins(day, { count: used.count + 1, slots: [...used.slots, slot] });
-      const planDay = { label: "Plan my day", run: () => talkToToucan(undefined, "talk", PLAN_DAY) };
+      const planDay = { label: "Plan my day", run: openPlanMyDay };
       const invite = (text: string, n: Omit<SnoozeNote, "text" | "until">) => say(text, actionsRef.current({ ...n, text: polish(st, text), until: 0 }));
 
       // A quest with no due date whose name matches something coming up on the calendar.
@@ -864,9 +865,9 @@ async function beginPromise(p: CoachPromise) {
   talkToToucan(undefined, "talk", `I'm beginning: "${p.text}". Help me take the first step.`);
 }
 
-const PROMPTS: { label: string; say?: string; mode?: Mode }[] = [
+const PROMPTS: { label: string; say?: string; mode?: Mode; /** Opens something instead of asking. */ open?: () => void }[] = [
   { label: "📚 Get me up to date on my courses", mode: "catchup" },
-  { label: "🗓 Plan my day", say: PLAN_DAY },
+  { label: "🗓 Plan my day", open: openPlanMyDay },
   { label: "What matters most today?" },
   { label: "I'm overwhelmed", say: "I'm feeling overwhelmed. Everything feels like too much." },
   { label: "Help me start something", say: "I want to get started on something but I can't seem to begin." },
@@ -1200,7 +1201,7 @@ function GuideSheet({
               {!thinking && (
                 <span className="flex flex-wrap gap-1.5">
                   {PROMPTS.filter((p) => msgs.length === 0 || p.mode === "catchup").map((p) => (
-                    <Pill key={p.label} onClick={() => (p.mode ? setMode(p.mode) : void ask(p.say ?? p.label))}>
+                    <Pill key={p.label} onClick={() => (p.open ? p.open() : p.mode ? setMode(p.mode) : void ask(p.say ?? p.label))}>
                       {p.label}
                     </Pill>
                   ))}

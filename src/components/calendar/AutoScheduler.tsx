@@ -4,10 +4,11 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
-import { applyAutoScheduleAction, saveSchedulerSettingsAction, schedulerContextAction } from "@/app/actions";
-import { MEAL_DEFAULTS, MEAL_ICONS, MEAL_NAMES, SCHEDULER_DEFAULTS, clockOf, holdAt, localDayKey, mealsOn, planSchedule, type Avoid, type Busy, type MealKey, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
+import { applyAutoScheduleAction, resolveOptionalEventAction, saveSchedulerSettingsAction, schedulerContextAction } from "@/app/actions";
+import { MEAL_DEFAULTS, MEAL_ICONS, MEAL_NAMES, SCHEDULER_DEFAULTS, clockOf, freeStretch, holdAt, localDayKey, mealsOn, planSchedule, type Avoid, type Busy, type MealKey, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
 import { useEscape } from "@/lib/use-escape";
-import { habitBlocksOn } from "@/lib/timed-habits";
+import { habitBlocksOn, habitOnDay } from "@/lib/timed-habits";
+import type { Repeat } from "@/lib/habit-repeat";
 import { Fold, useClosing } from "@/components/ui/Fold";
 
 const LOCAL_KEY = "auto-schedule";
@@ -44,20 +45,25 @@ const dayLabel = (d: Date) => {
   if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
   return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 };
-const hm = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+// "9:30a" (short, so a row's times stay on one line on phones).
+const hm = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AaPp])\.?\s?[Mm]\.?$/, (_, p: string) => p.toLowerCase());
 
 /**
  * One tap from the scheduling list to a planned fortnight: every quest on the
  * list, in its order, gets the first free time that suits it. You see the
  * whole plan first, nudge it, then place it all at once.
  */
-export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks: Task[]; theme: "calm" | "adventure"; onClose: () => void; /** Plan just this one day (the evening's "plan tomorrow"): everything goes on it. */ day?: Date }) {
+export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = false, onTomorrow }: { tasks: Task[]; theme: "calm" | "adventure"; onClose: () => void; /** Plan just this one day (the evening's "plan tomorrow"): everything goes on it. */ day?: Date; /** Opened over the welcome screen: drawn above it. */ over?: boolean; /** Plan my day, late: offer tomorrow when today has no room left. */ onTomorrow?: () => void }) {
   const { closing, close: onClose } = useClosing(closeNow);
   useEscape(() => onClose());
   const router = useRouter();
   const isAdventure = theme === "adventure";
   const [settings, setSettings] = useState<SchedulerSettings | null>(null);
   const [busy, setBusy] = useState<Busy[] | null>(null);
+  // One day's plan: habits with a length but no set time get room, and [bracketed] calendar events wait for ✓ or ×.
+  const [flexHabits, setFlexHabits] = useState<{ id: string; title: string; days: number[] | null; minutes: number; repeat: Repeat | null }[]>([]);
+  const [optional, setOptional] = useState<OptionalEvent[]>([]);
+  const [kept, setKept] = useState<Set<string>>(new Set());
   const [google, setGoogle] = useState(true);
   const [calendars, setCalendars] = useState<{ id: string; name: string; color: string | null; writable: boolean; primary: boolean }[]>([]);
   const [showCals, setShowCals] = useState(false);
@@ -83,13 +89,17 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks:
     const furthest = Math.max(0, ...tasks.map((t) => (t.plan_by ? Math.ceil((Date.parse(t.plan_by) - now.getTime()) / 86_400_000) : 0)));
     const to = new Date(now);
     to.setDate(to.getDate() + (day ? 1 : Math.min(62, Math.max(SCHEDULER_DEFAULTS.horizon, furthest + 1)) + 1));
-    schedulerContextAction(now.toISOString(), to.toISOString(), hiddenCalendars())
+    schedulerContextAction(now.toISOString(), to.toISOString(), hiddenCalendars(), day ? localDayKey(now) : undefined)
       .then((ctx) => {
         if (!live) return;
         // Habits with a set time (Gym at 7) hold their time on each day they fall on.
         const habitBusy: Busy[] = [];
         for (let d = new Date(now); d <= to; d = new Date(d.getTime() + 86_400_000)) habitBusy.push(...habitBlocksOn(ctx.habits ?? [], d, ctx.busy).map((b) => ({ start: b.start, end: b.end })));
         setBusy([...ctx.busy, ...habitBusy]);
+        if (day) {
+          setFlexHabits((ctx.flexHabits ?? []).filter((h) => habitOnDay(h, now)));
+          setOptional((ctx.optional ?? []).filter((o) => o.end > now.getTime()));
+        }
         setCalendars(ctx.calendars ?? []);
         setGoogle(ctx.google);
         setSettings({ ...SCHEDULER_DEFAULTS, ...(readLocal() ?? {}), ...((ctx.settings as Partial<SchedulerSettings> | null) ?? {}) });
@@ -130,7 +140,29 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks:
   );
   // Calendars that only inform (subscriptions, other people's) don't block time unless you say so.
   const fyi = useMemo(() => new Set(settings?.fyi ?? calendars.filter((c) => !c.writable && !c.primary).map((c) => c.id)), [settings?.fyi, calendars]);
-  const blocking = useMemo(() => busy?.filter((b) => !b.cal || !fyi.has(b.cal)) ?? null, [busy, fyi]);
+  const calBlocking = useMemo(() => {
+    if (!busy) return null;
+    const keptBusy = optional.filter((o) => kept.has(o.id)).map((o) => ({ start: o.start, end: o.end }));
+    return [...busy.filter((b) => !b.cal || !fyi.has(b.cal)), ...keptBusy];
+  }, [busy, fyi, optional, kept]);
+  // Untimed habits for the day, each in the first free stretch from now (they hold that room from quests).
+  const habitHolds = useMemo(() => {
+    if (!day || !settings || !calBlocking) return [] as HabitHold[];
+    const d0 = new Date(now);
+    d0.setHours(0, 0, 0, 0);
+    const from = Math.max(now.getTime(), d0.getTime() + settings.dayStart * 60_000);
+    const to = d0.getTime() + settings.dayEnd * 60_000;
+    const taken = [...calBlocking];
+    const out: HabitHold[] = [];
+    for (const h of flexHabits) {
+      const at = freeStretch(from, to, h.minutes, taken);
+      if (at === null) continue;
+      out.push({ id: h.id, title: h.title, start: at, end: at + h.minutes * 60_000 });
+      taken.push({ start: at, end: at + h.minutes * 60_000 });
+    }
+    return out;
+  }, [day, settings, calBlocking, flexHabits, now]);
+  const blocking = useMemo(() => (calBlocking ? [...calBlocking, ...habitHolds.map((h) => ({ start: h.start, end: h.end }))] : null), [calBlocking, habitHolds]);
   // "Another time": spots a quest shouldn't take again.
   const [avoid, setAvoid] = useState<Avoid>({});
   // One by one: each placement in time order; an accepted one keeps its time while the rest are planned around it.
@@ -204,7 +236,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks:
   const taskOf = new Map(tasks.map((t) => [t.id, t]));
 
   return createPortal(
-    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[62] flex items-end justify-center p-0 sm:items-center sm:p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 ${over ? "z-[95]" : "z-[62]"} flex items-end justify-center p-0 sm:items-center sm:p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
@@ -216,7 +248,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks:
         <div className="relative z-[1] flex items-start gap-2 px-4 pb-2 pt-3.5">
           <div className="min-w-0 flex-1">
             <h3 className={`m-0 ${isAdventure ? "font-display text-[21px]" : "text-[17px] font-bold"}`} style={{ color: ink }}>
-              ✨ Auto-schedule{day ? ` ${dayLabel(now).toLowerCase() === "tomorrow" ? "tomorrow" : dayLabel(now)}` : ""}
+              {day && dayLabel(now) === "Today" ? "✨ Plan my day" : `✨ Auto-schedule${day ? ` ${dayLabel(now).toLowerCase() === "tomorrow" ? "tomorrow" : dayLabel(now)}` : ""}`}
             </h3>
             <p className="m-0 text-[13.5px] leading-snug" style={{ color: soft }}>
               A plan for your list, in your free time{google ? " (around your Google calendars)" : ""}. Tap a gold block to change it.
@@ -341,15 +373,42 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks:
           </Fold>
         )}
 
-        <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-3">
+        <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-14 sm:pb-3">
           {!plan && !error && (
             <p className="m-0 py-8 text-center text-[14.5px] italic" style={{ color: soft }}>
               Reading your calendar…
             </p>
           )}
+          {day && plan && (optional.length > 0 || habitHolds.length > 0) && (
+            <OptionalAndHabits
+              optional={optional}
+              kept={kept}
+              habits={habitHolds}
+              isAdventure={isAdventure}
+              onKeep={(o) => {
+                setKept((k) => new Set(k).add(o.id));
+                resolveOptionalEventAction(o.calendarId, o.id, o.title, true).catch((e) => {
+                  setKept((k) => {
+                    const n = new Set(k);
+                    n.delete(o.id);
+                    return n;
+                  });
+                  setError(e instanceof Error ? e.message : "Couldn't keep it.");
+                });
+              }}
+              onDelete={(o) =>
+                resolveOptionalEventAction(o.calendarId, o.id, o.title, false)
+                  .then(() => setOptional((list) => list.filter((x) => x.id !== o.id)))
+                  .catch((e) => setError(e instanceof Error ? e.message : "Couldn't delete it."))
+              }
+            />
+          )}
+          {day && plan && plan.placed.length === 0 && fixed.length === 0 && settings && (
+            <DayStrip day={now} rows={[]} busy={(blocking ?? []).map((x) => ({ start: x.start, end: x.end }))} holds={holdsFor(now)} extras={dayExtras(habitHolds, optional, kept)} from={settings.dayStart} to={settings.dayEnd} picked={null} onPick={() => {}} isAdventure={isAdventure} />
+          )}
           {plan && plan.placed.length === 0 && plan.unplaced.length === 0 && (
             <p className="m-0 py-8 text-center text-[14.5px]" style={{ color: soft }}>
-              Everything on the list already has a time. 🎉
+              {day && tasks.length === 0 ? "No quests on Today yet: add some, and I'll find them a time." : "Everything on the list already has a time. 🎉"}
             </p>
           )}
           {oneByOne && (
@@ -374,6 +433,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks:
                 rows={g.rows}
                 busy={(blocking ?? []).map((x) => ({ start: new Date(x.start).getTime(), end: new Date(x.end).getTime() }))}
                 holds={holdsFor(g.rows[0].start)}
+                extras={day ? dayExtras(habitHolds, optional, kept) : []}
                 from={settings?.dayStart ?? 8 * 60}
                 to={settings?.dayEnd ?? 21 * 60}
                 picked={picked}
@@ -439,9 +499,15 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks:
                   </li>
                 ))}
               </ul>
-              <p className="m-0 text-[12.5px]" style={{ color: soft }}>
-                Try a longer day, a higher daily limit, or &ldquo;Any&rdquo; time.
-              </p>
+              {onTomorrow && plan.placed.length === 0 ? (
+                <button type="button" onClick={onTomorrow} className="self-start rounded-full px-3.5 py-1.5 text-[13.5px] font-bold" style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}>
+                  Plan tomorrow instead ›
+                </button>
+              ) : (
+                <p className="m-0 text-[12.5px]" style={{ color: soft }}>
+                  Try a longer day, a higher daily limit, or &ldquo;Any&rdquo; time.
+                </p>
+              )}
             </section>
           )}
           {skipped.size > 0 && (
@@ -501,7 +567,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day }: { tasks:
 }
 
 /** One day as a strip: your busy time (grey), essentials kept free (dashed), and each placed quest (a gold, numbered block). */
-function DayStrip({ day, rows, busy, holds, from, to, picked, onPick, isAdventure }: { day: Date; rows: Placed[]; busy: { start: number; end: number }[]; holds: Hold[]; from: number; to: number; picked: string | null; onPick: (id: string) => void; isAdventure: boolean }) {
+function DayStrip({ day, rows, busy, holds, extras = [], from, to, picked, onPick, isAdventure }: { day: Date; rows: Placed[]; busy: { start: number; end: number }[]; holds: Hold[]; /** Habits kept room for (🌿) and optional events (dotted, until kept). */ extras?: Extra[]; from: number; to: number; picked: string | null; onPick: (id: string) => void; isAdventure: boolean }) {
   const d0 = new Date(day);
   d0.setHours(0, 0, 0, 0);
   const t0 = d0.getTime() + from * 60_000;
@@ -523,8 +589,13 @@ function DayStrip({ day, rows, busy, holds, from, to, picked, onPick, isAdventur
         {hours.map((m) => (
           <span key={m} aria-hidden className="absolute inset-y-0 w-px" style={{ left: `${((m - from) / (to - from)) * 100}%`, background: "rgba(139,112,64,.15)" }} />
         ))}
-        {busy.filter((b) => b.end > t0 && b.start < t0 + span).map((b, i) => (
+        {busy.filter((b) => b.end > t0 && b.start < t0 + span && !extras.some((x) => x.kind === "habit" && x.start === b.start && x.end === b.end)).map((b, i) => (
           <span key={`b${i}`} aria-hidden className="absolute inset-y-1 rounded" style={{ ...pos(b.start, b.end), background: "rgba(90,80,60,.28)" }} />
+        ))}
+        {extras.filter((x) => x.end > t0 && x.start < t0 + span).map((x) => (
+          <span key={x.id} aria-hidden title={x.title} className="absolute inset-y-1 flex items-center justify-center overflow-hidden rounded text-[10px]" style={{ ...pos(x.start, x.end), ...(x.kind === "habit" ? { background: "rgba(92,138,70,.22)", border: "1px dashed rgba(63,106,44,.7)" } : { border: "1.5px dotted rgba(90,80,60,.6)", background: "rgba(90,80,60,.08)" }) }}>
+            {x.kind === "habit" ? "🌿" : "?"}
+          </span>
         ))}
         {holds.filter((h) => h.at !== null).map((h) => (
           <span key={h.key} aria-hidden title={MEAL_NAMES[h.key]} className="absolute inset-y-1.5 flex items-center justify-center rounded text-[10px]" style={{ ...pos(h.at!, h.at! + h.minutes * 60_000), border: "1px dashed rgba(139,112,64,.55)" }}>
@@ -557,6 +628,95 @@ function DayStrip({ day, rows, busy, holds, from, to, picked, onPick, isAdventur
 }
 
 type Hold = { key: MealKey; from: number; to: number; at: number | null; minutes: number };
+type HabitHold = { id: string; title: string; start: number; end: number };
+type OptionalEvent = { id: string; calendarId: string; title: string; start: number; end: number };
+type Extra = { id: string; title: string; start: number; end: number; kind: "habit" | "optional" };
+const dayExtras = (habits: HabitHold[], optional: OptionalEvent[], kept: Set<string>): Extra[] => [
+  ...habits.map((h) => ({ ...h, kind: "habit" as const })),
+  ...optional.filter((o) => !kept.has(o.id)).map((o) => ({ id: o.id, title: o.title, start: o.start, end: o.end, kind: "optional" as const })),
+];
+const clock = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP])M/i, (_, p: string) => p.toLowerCase());
+
+/**
+ * The day's other parts, above the plan: optional [bracketed] events from your calendar, each with
+ * ✓ (keep: its brackets come off and it holds its time) and × (delete; a moment to undo), and the
+ * habits it keeps room for.
+ */
+function OptionalAndHabits({ optional, kept, habits, isAdventure, onKeep, onDelete }: { optional: OptionalEvent[]; kept: Set<string>; habits: HabitHold[]; isAdventure: boolean; onKeep: (o: OptionalEvent) => void; onDelete: (o: OptionalEvent) => void }) {
+  const [leaving, setLeaving] = useState<Record<string, ReturnType<typeof setTimeout>>>({});
+  const soft = "var(--t-ink-soft)";
+  const ink = "var(--t-ink)";
+  const round = "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[14px] font-bold";
+  function del(o: OptionalEvent) {
+    const t = setTimeout(() => {
+      onDelete(o);
+      setLeaving((l) => {
+        const n = { ...l };
+        delete n[o.id];
+        return n;
+      });
+    }, 3500);
+    setLeaving((l) => ({ ...l, [o.id]: t }));
+  }
+  function undo(id: string) {
+    clearTimeout(leaving[id]);
+    setLeaving((l) => {
+      const n = { ...l };
+      delete n[id];
+      return n;
+    });
+  }
+  return (
+    <section className="flex flex-col gap-1">
+      {optional.length > 0 && (
+        <>
+          <h4 className={`m-0 ${isAdventure ? "font-display text-[16px]" : "text-[13.5px] font-bold uppercase tracking-wide"}`} style={{ color: isAdventure ? "#6b4f1d" : soft }}>
+            Optional today
+          </h4>
+          <ul className="m-0 flex list-none flex-col p-0">
+            {optional.map((o) => {
+              const isKept = kept.has(o.id);
+              const going = o.id in leaving;
+              return (
+                <li key={o.id} className="fade-in flex min-h-9 items-center gap-2 rounded-lg px-1.5" style={{ opacity: going ? 0.55 : 1, transition: "opacity .2s" }}>
+                  <span className="w-[86px] shrink-0 text-[12.5px] tabular-nums" style={{ color: soft }}>
+                    {clock(o.start)}–{clock(o.end)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold" style={{ color: ink, textDecoration: going ? "line-through" : undefined }}>
+                    {isKept ? o.title : `[${o.title}]`}
+                  </span>
+                  {going ? (
+                    <button type="button" onClick={() => undo(o.id)} className="h-7 shrink-0 rounded-full px-2.5 text-[12.5px] font-semibold underline underline-offset-2" style={{ color: ink }}>
+                      Undo
+                    </button>
+                  ) : isKept ? (
+                    <span className="confirm-pop shrink-0 text-[12.5px] font-semibold" style={{ color: "#3f6a2c" }}>
+                      ✓ Kept
+                    </span>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => onKeep(o)} aria-label={`Keep ${o.title}`} title="Keep it (holds its time)" className={round} style={{ border: "1.5px solid #3f6a2c", color: "#3f6a2c", background: "rgba(92,138,70,.12)" }}>
+                        ✓
+                      </button>
+                      <button type="button" onClick={() => del(o)} aria-label={`Delete ${o.title} from your calendar`} title="Delete it from your calendar" className={round} style={{ border: "1.5px solid #a3412a", color: "#a3412a", background: "rgba(163,65,42,.08)" }}>
+                        ×
+                      </button>
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+      {habits.length > 0 && (
+        <p className="m-0 text-[12.5px] leading-snug" style={{ color: soft }}>
+          🌿 Room kept for {habits.map((h) => `${h.title} (${clock(h.start)})`).join(", ")}.
+        </p>
+      )}
+    </section>
+  );
+}
 type Placed = { id: string; title: string; start: Date; end: Date; late?: boolean };
 
 /** One placement at a time: it looks good, another time, or leave it out. Nothing is placed until the end. */

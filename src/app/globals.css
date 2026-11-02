@@ -3049,3 +3049,16 @@ html[data-welcome-open] [data-app-shell] *, html[data-welcome-open] [data-perche
 @media (hover: none) and (pointer: coarse) {
   .touch-tools[data-show="false"] { display: none; }
 }
+
+/* Today's Quests header: ✨ Plan my day and + (owner, Nov 2: solid, centred, on hover or while the section is open). */
+.today-head-btn { border: 1.5px solid rgba(217, 180, 95, 0.85); color: var(--t-gold, #d9b45f); background: #26331f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
+[data-theme="calm"] .today-head-btn { background: var(--t-card, #fff); color: var(--t-accent, #8a6116); border-color: var(--t-card-border, #d9c9a3); }
+.today-head-btn:hover { filter: brightness(1.12); }
+.today-head-actions { transition: opacity 0.18s ease, visibility 0s; }
+@media (hover: hover) {
+  .today-head-actions { opacity: 0; }
+  .today-head:hover .today-head-actions, .today-head-actions:focus-within { opacity: 1; }
+}
+@media (hover: none) {
+  .today-head-actions[data-open="false"] { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.18s ease, visibility 0s linear 0.18s; }
+}

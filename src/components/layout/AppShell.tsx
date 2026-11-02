@@ -21,6 +21,7 @@ import { BackToToday } from "@/components/layout/BackToToday";
 import { BackToSettings } from "@/components/layout/BackToSettings";
 import { FocusTimerPill } from "@/components/one-thing/FocusTimerPill";
 import { FeedbackDock } from "@/components/feedback/FeedbackDock";
+import { PlanMyDayHost } from "@/components/calendar/PlanMyDay";
 import { NotificationPreview } from "@/components/notifications/NotificationPreview";
 import { Suspense } from "react";
 
@@ -126,6 +127,7 @@ export async function AppShell({
       {profileId && <WeatherSync place={profile?.life_wheel?.weather ?? null} />}
       {profileId && <BottomNav theme={theme} name={profile?.name ?? null} toucan={profile?.toucan ?? null} />}
       {profileId && <FeedbackDock theme={theme} />}
+      {profileId && <PlanMyDayHost theme={theme} />}
       {profileId && <NotificationPreview />}
     </div>
   );

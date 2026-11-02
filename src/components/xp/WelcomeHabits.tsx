@@ -134,7 +134,8 @@ export function WelcomeHabits({ fx }: { fx: FxSettings }) {
           {tools.map((p) => (
             <button key={p.key} type="button" onClick={openLanguageWindow} className="font-display flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[14.5px]" style={GILT}>
               <span aria-hidden>{p.icon}</span>
-              {p.label}
+              {/* A habit of the same name sits beside it, so this one says what it does. */}
+              {p.key === "language" ? "Practice a phrase" : p.label}
             </button>
           ))}
           {list !== null && !shown.length && (

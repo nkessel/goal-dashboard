@@ -1,5 +1,6 @@
 "use client";
 
+import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
 import { WelcomeHabits } from "@/components/xp/WelcomeHabits";
 
 import { fogOn } from "@/lib/welcome-fog";
@@ -17,7 +18,7 @@ import { addBackGreeting, checkinLabel, pickFor, readPromptVotes, reflectQuestio
 import { useEscape } from "@/lib/use-escape";
 import { useLongPress } from "@/lib/use-long-press";
 import { coachAction, setTopPriorityAction } from "@/app/actions";
-import { Digest, PLAN_DAY, talkToToucan } from "@/components/toucan/ToucanGuide";
+import { Digest, talkToToucan } from "@/components/toucan/ToucanGuide";
 import { GearIcon } from "@/components/ui/Icons";
 import { ArrangeAbove, ArrangeList, CastleEdit, EditButton, GoldCheck, GreetingOptions } from "./WelcomeArrange";
 import { MistScene } from "./MistScene";
@@ -136,6 +137,37 @@ export function WelcomeCard({
       ro.disconnect();
     };
   }, []);
+  // A part folding shut near the bottom must not pull everything down (the card would scroll back to
+  // fit, moving what you tapped; ui-check, Nov 2): a spacer under the parts holds the scroll still, and
+  // gives the room back as you scroll up.
+  const spacerRef = useRef<HTMLDivElement>(null);
+  const holdScroll = () => {
+    const c = cardRef.current;
+    const sp = spacerRef.current;
+    if (!c || !sp) return;
+    const st = c.scrollTop;
+    if (st <= 0) return;
+    const until = performance.now() + 700;
+    const tick = () => {
+      const max = c.scrollHeight - c.clientHeight;
+      if (max < st - 0.5) {
+        sp.style.height = `${(parseFloat(sp.style.height) || 0) + (st - max)}px`;
+        c.scrollTop = st;
+      }
+      if (performance.now() < until) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const lastTop = useRef(0);
+  const giveBack = () => {
+    const c = cardRef.current;
+    const sp = spacerRef.current;
+    if (!c || !sp) return;
+    const h = parseFloat(sp.style.height) || 0;
+    const up = lastTop.current - c.scrollTop;
+    lastTop.current = c.scrollTop;
+    if (h > 0 && up > 0) sp.style.height = `${Math.max(0, h - up)}px`;
+  };
   const [greeting, setGreeting] = useState(heading);
   // "Good morning!" before it (unless it already speaks of the time of day). Shown only, never saved into the line.
   const [hour] = useState(() => new Date().getHours());
@@ -536,7 +568,7 @@ export function WelcomeCard({
             }}
           />
         )}
-        <div ref={cardRef} data-welcome-card onScroll={alignFoot} className={`parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[calc(100svh-var(--wtop)-12px)] flex-col items-center gap-3 overflow-y-auto overscroll-none rounded-2xl pb-4 pl-5 pr-3 pt-10 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH ? { maxHeight: `calc(${screenH}px - var(--wtop) - 12px - ${Math.max(0, at.y)}px)` } : {}) }}>
+        <div ref={cardRef} data-welcome-card onScroll={() => (alignFoot(), giveBack())} onClickCapture={holdScroll} className={`parchment relative flex bg-[var(--t-card,#fffaf0)] max-h-[calc(100svh-var(--wtop)-12px)] flex-col items-center gap-3 overflow-y-auto overscroll-none rounded-2xl pb-4 pl-5 pr-3 pt-10 text-center [scrollbar-gutter:stable] welcome-scroll`} style={{ width: `min(${cardW}px, 94vw)`, ...(screenH ? { maxHeight: `calc(${screenH}px - var(--wtop) - 12px - ${Math.max(0, at.y)}px)` } : {}) }}>
           {/* The top band stays put while the card scrolls, so nothing slides under the toucan's perch or the corner buttons. */}
           <div ref={capRef} aria-hidden className="welcome-cap pointer-events-none sticky -top-10 z-[3] -mb-3 -ml-5 -mr-3 -mt-10 h-10 shrink-0 self-stretch" />
           {/* The greeting, with its ✎ at its upper right. Editing keeps the exact look and layout it will have. */}
@@ -653,6 +685,7 @@ export function WelcomeCard({
               </PartHold>
             ))
           )}
+          <div ref={spacerRef} aria-hidden className="w-full shrink-0" style={{ height: 0, marginTop: -12 }} />
           {/* The way on stays in reach: pinned to the card's foot while the rest scrolls. */}
           <div ref={footRef} className="welcome-foot sticky -bottom-4 z-[3] -mb-4 flex w-full justify-center pb-4 pt-2">
           {arranging ? (
@@ -1070,7 +1103,7 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
       </button>
       {/* ‹ › under him: one gilded coin, each half a button (mirrored chevrons, so it's truly symmetrical). */}
       {showCoin && (
-        <span className="bubble-coin fade-in absolute left-[14px] top-[61px]">
+        <span className="bubble-coin fade-in" style={{ position: "absolute", left: 14, top: 61 }}>
           <button type="button" onClick={() => step(-1)} aria-label="Something else he could ask" className="bubble-coin-half" data-side="l">
             <svg width="9" height="12" viewBox="0 0 9 12" fill="none" aria-hidden>
               <path d="M6.5 1.5 2 6l4.5 4.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -1173,7 +1206,7 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
           )}
           {menu && !rewording && (
             <span className="mt-1 flex flex-col">
-              <button type="button" onClick={() => (setMenu(false), talkToToucan(undefined, "talk", PLAN_DAY))} className={item}>
+              <button type="button" onClick={() => (setMenu(false), openPlanMyDay())} className={item}>
                 Plan my day
               </button>
               <button type="button" onClick={() => (setMenu(false), talkToToucan())} className={item}>

@@ -217,7 +217,7 @@ export function planSchedule(items: PlanItem[], busyIn: Busy[], settings: Schedu
       if (spot) spot.late = true;
     }
     if (!spot) {
-      unplaced.push({ id: item.id, title: item.title, why: pref === "any" ? `No free time in the next ${s.horizon} days` : `No free ${pref} in the next ${s.horizon} days` });
+      unplaced.push({ id: item.id, title: item.title, why: s.horizon === 1 ? (pref === "any" ? "No room left that day" : `No free ${pref} that day`) : pref === "any" ? `No free time in the next ${s.horizon} days` : `No free ${pref} in the next ${s.horizon} days` });
       continue;
     }
     placed.push(spot);

@@ -1,5 +1,6 @@
 "use client";
 
+import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
 import { useCallback, useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -588,7 +589,7 @@ export function TodayTaskBoard({
             id: "today",
             node: (
               <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
-                <div className="relative">
+                <div className="today-head relative">
                 {isAdventure ? (
                   <div className="flex items-center gap-2 px-1">
                     <span className="hidden flex-1 sm:flex">
@@ -616,17 +617,21 @@ export function TodayTaskBoard({
                     </h2>
                   </div>
                 )}
-                {/* A new quest straight into Today's Quests. */}
-                <button
-                  type="button"
-                  onClick={() => setAdding(true)}
-                  aria-label="Add a quest to Today's Quests"
-                  title="Add a quest to Today"
-                  className="hover-glow absolute right-0.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[20px] leading-none"
-                  style={{ border: "1.5px solid rgba(217,180,95,.7)", color: "var(--t-gold)", background: "rgba(242,210,126,.08)" }}
-                >
-                  +
-                </button>
+                {/* Plan my day and a new quest straight into Today's Quests: on hover (always while the section is open on touch screens). */}
+                <span className="today-head-actions absolute right-0.5 top-1/2 flex -translate-y-1/2 items-center gap-1.5" data-open={todayOpen ? "true" : "false"}>
+                  <button type="button" onClick={openPlanMyDay} aria-label="Plan my day" title="Plan my day: find today's quests a time" className="today-head-btn flex h-8 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z" fill="currentColor" />
+                      <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" fill="currentColor" />
+                    </svg>
+                    <span className="hidden sm:inline">Plan my day</span>
+                  </button>
+                  <button type="button" onClick={() => setAdding(true)} aria-label="Add a quest to Today's Quests" title="Add a quest to Today" className="today-head-btn flex h-8 w-8 items-center justify-center rounded-full">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                      <path d="M7 1.5v11M1.5 7h11" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </span>
                 </div>
                 {adding && <CreateSheet kinds={["quest"]} initial="quest" pinToToday theme={theme} onClose={() => setAdding(false)} />}
 

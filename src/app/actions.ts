@@ -2882,7 +2882,7 @@ export async function updateGoogleEventAction(
  * (except calendars switched off on the calendar screen, and all-day ones)
  * and quests already on the calendar. Plus the saved scheduler settings.
  */
-export async function schedulerContextAction(fromISO: string, toISO: string, hiddenCalendars: string[] = []) {
+export async function schedulerContextAction(fromISO: string, toISO: string, hiddenCalendars: string[] = [], /** The local day being planned ("2026-11-02"): which flexible habits are already done. */ dayKey?: string) {
   const { profileId, accessToken } = await requireSessionMaybeGoogle();
   const from = new Date(fromISO);
   const to = new Date(toISO);
@@ -2898,7 +2898,14 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
     busy.push({ start: new Date(t.scheduled_start).getTime(), end: new Date(t.scheduled_end).getTime() });
   }
   // Habits with a set time (Gym at 7) hold their time; the browser lays them out in local time.
-  const habits = timedHabitsFrom((await ritesData.listRites(profileId).catch(() => null)) ?? [], cleanRepeat);
+  const riteRows = (await ritesData.listRites(profileId).catch(() => null)) ?? [];
+  const habits = timedHabitsFrom(riteRows, cleanRepeat);
+  // Habits without a set time but with a length (20 mins of cleaning): the day planner keeps room for them.
+  const flex = riteRows.filter((r) => r.slot === "day" && !r.due_time && (r.estimate_minutes ?? 0) > 0 && r.kind !== "ritual");
+  const doneIds = dayKey && /^\d{4}-\d{2}-\d{2}$/.test(dayKey) && flex.length ? new Set((await ritesData.listCompletionsFor(profileId, flex.map((r) => r.id), dayKey).catch(() => [])).filter((c) => c.day === dayKey).map((c) => c.rite_id)) : new Set<string>();
+  const flexHabits = flex.filter((r) => !doneIds.has(r.id)).map((r) => ({ id: r.id, title: r.title, days: r.days ?? null, minutes: r.estimate_minutes ?? 15, repeat: cleanRepeat(r.repeat) }));
+  // Events written in [brackets] on your calendar are optional: they don't hold time until you keep them.
+  const optional: { id: string; calendarId: string; title: string; start: number; end: number }[] = [];
   let google = false;
   if (accessToken) {
     try {
@@ -2909,13 +2916,36 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
       const own = new Set(quests.map((t) => t.google_calendar_event_id).filter(Boolean));
       for (const e of all.events) {
         if (e.isAllDay || own.has(e.id) || (e.calendarId && hidden.has(e.calendarId))) continue;
+        if (/^\s*\[[^\]]+\]\s*$/.test(e.title ?? "")) {
+          optional.push({ id: e.id, calendarId: e.calendarId ?? "primary", title: e.title.trim().slice(1, -1).trim(), start: new Date(e.start).getTime(), end: new Date(e.end).getTime() });
+          continue;
+        }
         busy.push({ start: new Date(e.start).getTime(), end: new Date(e.end).getTime(), cal: e.calendarId });
       }
     } catch {
       /* planning still works from the app's own calendar */
     }
   }
-  return { busy, habits, google, calendars, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
+  return { busy, habits, flexHabits, optional, google, calendars, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
+}
+
+/** An optional [bracketed] calendar event: keep it (its brackets come off, so it holds its time) or delete it. */
+export async function resolveOptionalEventAction(calendarId: string, eventId: string, title: string, keep: boolean) {
+  const { accessToken } = await requireSessionMaybeGoogle();
+  if (!accessToken) throw new Error("Connect Google Calendar first.");
+  const g = await import("@/lib/google-calendar");
+  if (keep) await g.updateCalendarEvent(accessToken, eventId, { title: title.trim().slice(0, 300) }, calendarId || "primary");
+  else await g.deleteCalendarEvent(accessToken, eventId, calendarId || "primary");
+  return { ok: true };
+}
+
+/** Plan my day: Today's Quests and whatever is due by the end of the day (open, awake, approved). */
+export async function planDayTasksAction(dayEndISO: string) {
+  const ownerId = await requireProfileId();
+  const end = Date.parse(dayEndISO);
+  const now = Date.now();
+  const all = await tasksData.listOpenTasksForOwnerWithCategory(ownerId);
+  return all.filter((t) => !t.needs_review && !t.reward_id && (!t.snoozed_until || Date.parse(t.snoozed_until) <= now) && (t.is_manual_priority || (!!t.due_at && Date.parse(t.due_at) < end)));
 }
 
 /** Remember the scheduler's settings and time-of-day choices (on every device). */
