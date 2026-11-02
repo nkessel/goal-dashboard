@@ -34,7 +34,7 @@ const WAKE_TIMES = ["05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30
 /**
  * A time, shown in the display face (or a quiet "—" until set). Tapping it
  * opens a small parchment dial: the usual times as chips, and the hour and
- * minutes to fine-tune, in 5-minute steps.
+ * minutes to fine-tune, in 5-minute steps or typed in.
  */
 /** The app's time picker: a parchment token showing the time ("— : —" when unset) that opens the time dial. "spirit" suits the toucan's dark panels. */
 export function TimeToken({ value, onChange, label, icon, kind, compact = false, variant = "parchment", placeholder = "add time" }: { value: string; onChange: (v: string) => void; label: string; icon?: React.ReactNode; kind: "bed" | "wake" | "any"; compact?: boolean; variant?: "parchment" | "spirit"; /** Shown (softly, in words) while no time is set. */ placeholder?: string }) {
@@ -120,9 +120,26 @@ function TimeDial({ anchor, value, kind, label, onPick, onClose }: { anchor: HTM
       <div className="flex items-center justify-center gap-1">
         <div className="flex flex-col items-center">
           {arrow(1, () => step(1, 0), "One hour later")}
-          <span className="font-display w-11 text-center text-[30px] leading-tight tabular-nums" style={{ color: "#2a1c10" }}>
-            {((h + 11) % 12) + 1}
-          </span>
+          {/* Tap the number to type it. */}
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={2}
+            key={`h${h}`}
+            defaultValue={((h + 11) % 12) + 1}
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (v >= 1 && v <= 12 && (e.target.value.length === 2 || v > 1)) set((v % 12) + (h >= 12 ? 12 : 0), m);
+            }}
+            onBlur={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (v >= 1 && v <= 12) set((v % 12) + (h >= 12 ? 12 : 0), m);
+            }}
+            aria-label="Hour"
+            className="time-dial-num font-display w-12 rounded-lg bg-transparent text-center text-[30px] leading-tight tabular-nums focus:bg-white/60 focus:outline-none"
+            style={{ color: "#2a1c10" }}
+          />
           {arrow(-1, () => step(-1, 0), "One hour earlier")}
         </div>
         <span className="font-display pb-0.5 text-[28px]" style={{ color: "#8a6116" }}>
@@ -130,9 +147,25 @@ function TimeDial({ anchor, value, kind, label, onPick, onClose }: { anchor: HTM
         </span>
         <div className="flex flex-col items-center">
           {arrow(1, () => step(0, 5), "Five minutes later")}
-          <span className="font-display w-11 text-center text-[30px] leading-tight tabular-nums" style={{ color: "#2a1c10" }}>
-            {String(m).padStart(2, "0")}
-          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={2}
+            key={`m${m}`}
+            defaultValue={String(m).padStart(2, "0")}
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (e.target.value.length === 2 && v >= 0 && v <= 59) set(h, v);
+            }}
+            onBlur={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (v >= 0 && v <= 59) set(h, v);
+            }}
+            aria-label="Minutes"
+            className="time-dial-num font-display w-12 rounded-lg bg-transparent text-center text-[30px] leading-tight tabular-nums focus:bg-white/60 focus:outline-none"
+            style={{ color: "#2a1c10" }}
+          />
           {arrow(-1, () => step(0, -5), "Five minutes earlier")}
         </div>
         <div className="ml-2 flex flex-col gap-1">

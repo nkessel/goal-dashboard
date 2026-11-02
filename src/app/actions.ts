@@ -2172,8 +2172,21 @@ export async function welcomeContextAction() {
   const me = await profilesData.getProfileById(ownerId).catch(() => null);
   // Today's Quests (pinned for today), in their order, for choosing the day's quests here.
   const { data: pinned } = await supabaseAdmin().from("tasks").select("id, title, due_at").eq("owner_id", ownerId).eq("status", "open").eq("is_manual_priority", true).order("sort_order", { ascending: true }).limit(40);
-  const today = ((pinned ?? []) as { id: string; title: string; due_at: string | null }[]).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at }));
-  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map((t) => ({ id: t.id, title: t.title, due_at: t.due_at })), suggestions, priority, streak: me?.streak_count ?? 0, totalXp: me?.total_xp ?? null, today };
+  // Portrait, XP and board for each, so choosing the day's quests shows them like their cards.
+  const [{ data: looks }, { data: boardRows }] = await Promise.all([
+    supabaseAdmin().from("tasks").select("id, icon_key, icon_source, xp_value, board_id").eq("owner_id", ownerId).eq("status", "open"),
+    supabaseAdmin().from("boards").select("id, title").eq("owner_id", ownerId),
+  ]);
+  const boardName = new Map(((boardRows ?? []) as { id: string; title: string }[]).map((b) => [b.id, b.title]));
+  const lookOf = new Map(
+    ((looks ?? []) as { id: string; icon_key: string | null; icon_source: string | null; xp_value: number | null; board_id: string | null }[]).map((t) => [
+      t.id,
+      { icon: t.icon_source === "ai" || t.icon_source === "library" ? t.icon_key : null, xp: t.xp_value ?? 0, board: t.board_id ? (boardName.get(t.board_id) ?? null) : null },
+    ])
+  );
+  const card = (t: { id: string; title: string; due_at: string | null }) => ({ id: t.id, title: t.title, due_at: t.due_at, ...lookOf.get(t.id) });
+  const today = ((pinned ?? []) as { id: string; title: string; due_at: string | null }[]).map(card);
+  return { metrics, lastCheckInAt: last?.created_at ?? null, tasks: tasks.filter((t) => t.due_at).map(card), suggestions, priority, streak: me?.streak_count ?? 0, totalXp: me?.total_xp ?? null, today };
 }
 
 type Priority = { text: string; others?: string[]; day: string; at: string };

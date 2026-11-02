@@ -15,13 +15,14 @@ const SOFT = "#6b5631";
 
 /**
  * Snooze a quest: 30 minutes, 2 hours, tomorrow, or Other… (this evening,
- * 4 hours, or a time you pick). Other always has a way back; closing changes
+ * 4 hours, a number of days, or a time you pick). Other always has a way back; closing changes
  * nothing.
  */
 export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = "top of tomorrow's plan" }: { title: string; onPick: (c: SnoozeChoice) => void; onClose: () => void; /** What Tomorrow does here (imports: back on the list). */ tomorrowHint?: string }) {
   const { closing, close: onClose } = useClosing(closeNow);
   const [other, setOther] = useState(false);
   const [at, setAt] = useState("");
+  const [days, setDays] = useState(3);
   useEscape(() => (other ? setOther(false) : onClose()));
   const inMin = (m: number, label: string): SnoozeChoice => ({ until: new Date(clock() + m * 60_000), label });
   const evening = () => {
@@ -39,6 +40,13 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
       )}
     </button>
   );
+  // A number of days: back first thing (6am) that morning.
+  const daysOn = (n: number) => {
+    const d = new Date(clock() + n * 86_400_000);
+    d.setHours(6, 0, 0, 0);
+    return d;
+  };
+  const dayCount = Math.max(1, Math.min(365, Math.round(days) || 1));
   const hm = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const picked = at ? new Date(at) : null;
   const pickedOk = !!picked && Number.isFinite(picked.getTime()) && picked.getTime() > clock();
@@ -78,6 +86,32 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
           <div key="other" className="reveal flex flex-col gap-1">
             {evening().getTime() - clock() > 30 * 60_000 && choice("This evening", () => onPick({ until: evening(), label: "until this evening" }), hm(evening()))}
             {choice("4 hours", () => onPick(inMin(240, "for 4 hours")), hm(new Date(clock() + 240 * 60_000)))}
+            <div className="mt-1 flex flex-col gap-1 text-[12.5px] font-semibold" style={{ color: SOFT }}>
+              For a number of days
+              <span className="flex items-center gap-1.5">
+                <button type="button" onClick={() => setDays(Math.max(1, dayCount - 1))} aria-label="One day fewer" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[20px] font-bold" style={{ border: "1px solid #a88a3f", color: INK }}>
+                  −
+                </button>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={365}
+                  value={days || ""}
+                  onChange={(e) => setDays(Number(e.target.value))}
+                  aria-label="Days to snooze"
+                  className="time-field h-10 w-12 min-w-0 rounded-xl border px-1 text-center text-[16px] font-semibold"
+                  style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.85)", color: INK }}
+                />
+                <button type="button" onClick={() => setDays(Math.min(365, dayCount + 1))} aria-label="One day more" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[20px] font-bold" style={{ border: "1px solid #a88a3f", color: INK }}>
+                  +
+                </button>
+                <span className="min-w-0 flex-1 truncate text-[12px] font-normal">{daysOn(dayCount).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                <button type="button" onClick={() => onPick({ until: daysOn(dayCount), label: `for ${dayCount} day${dayCount === 1 ? "" : "s"}` })} className="h-10 shrink-0 rounded-full px-4 text-[14px] font-semibold" style={{ background: "var(--t-gold, #e2bb5c)", color: INK, border: "1px solid #8a6116" }}>
+                  Snooze
+                </button>
+              </span>
+            </div>
             <label className="mt-1 flex flex-col gap-1 text-[12.5px] font-semibold" style={{ color: SOFT }}>
               Pick a time
               <span className="flex items-center gap-1.5">

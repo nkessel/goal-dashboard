@@ -9,7 +9,7 @@ import { dueSoonList } from "@/lib/toucan-guide";
 import { dueWindowLabel, readDueHours, saveDueHours } from "@/lib/due-soon";
 import { DueWindowPicker } from "@/components/tasks/DueWindowPicker";
 
-type Lite = { id: string; title: string; due_at: string | null };
+type Lite = { id: string; title: string; due_at: string | null; icon?: string | null; xp?: number; board?: string | null };
 
 const GILT = { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } as const;
 const INK = "#3d2f18";
@@ -170,6 +170,42 @@ export function TodayPlanner({ today: initialToday, due }: { today: Lite[]; due:
   );
 }
 
+/** Drawn like a quest card on Today: parchment, the portrait in its ring, the title, board and XP. */
+const CARD = { background: "linear-gradient(180deg,#f8eed6,#ecdcb4)", border: "1.5px solid #b39a6a", boxShadow: "0 2px 5px rgba(60,40,10,.18), inset 0 1px 0 rgba(255,255,255,.5)" } as const;
+function CardBody({ q, meta }: { q: Lite; meta: React.ReactNode }) {
+  const sub = [q.board ? <span key="b">{q.board}</span> : null, meta].filter(Boolean);
+  return (
+    <>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ border: "2px solid #a58c66", boxShadow: "0 0 0 2px rgba(217,180,95,.45)", background: "radial-gradient(circle at 40% 35%, #fbf3dc, #ecdcb4)" }}>
+        {q.icon && (
+          // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+          <img src={q.icon} alt="" draggable={false} className="h-full w-full object-cover" />
+        )}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="line-clamp-2 text-[15px] font-semibold leading-snug" style={{ color: INK }}>
+          {q.title}
+        </span>
+        {sub.length > 0 && (
+          <span className="flex gap-1.5 truncate text-[12px]" style={{ color: SOFT }}>
+            {sub.map((x, i) => (
+              <span key={i}>
+                {i > 0 && "· "}
+                {x}
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
+      {!!q.xp && (
+        <span className="shrink-0 text-[13px] font-bold tabular-nums" style={{ color: "#4f6d3c" }}>
+          {q.xp} XP
+        </span>
+      )}
+    </>
+  );
+}
+
 function DueRow({ q, onAdd }: { q: Lite; onAdd: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `d:${q.id}` });
   const [now] = useState(() => Date.now());
@@ -179,15 +215,10 @@ function DueRow({ q, onAdd }: { q: Lite; onAdd: () => void }) {
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`due-in flex min-h-9 touch-manipulation items-center gap-2 rounded-xl px-2.5 py-1 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
-      style={{ transform: CSS.Translate.toString(transform), zIndex: isDragging ? 10 : undefined, background: isDragging ? "rgba(255,248,228,.98)" : "rgba(255,250,238,.7)", border: "1px solid rgba(139,112,64,.3)", boxShadow: isDragging ? "0 10px 22px rgba(0,0,0,.25)" : undefined }}
+      className={`due-in flex min-h-14 touch-manipulation items-center gap-2.5 rounded-2xl px-2.5 py-1.5 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+      style={{ ...CARD, transform: CSS.Translate.toString(transform), zIndex: isDragging ? 10 : undefined, boxShadow: isDragging ? "0 10px 22px rgba(0,0,0,.25)" : CARD.boxShadow }}
     >
-      <span className="min-w-0 flex-1 text-[13.5px] leading-snug" style={{ color: INK }}>
-        {q.title}
-      </span>
-      <span className="shrink-0 text-[11.5px]" style={{ color: past ? "#93402c" : SOFT }}>
-        {dueWord(q.due_at)}
-      </span>
+      <CardBody q={q} meta={<span style={{ color: past ? "#93402c" : SOFT }}>{dueWord(q.due_at)}</span>} />
       <button type="button" onClick={onAdd} onPointerDown={(e) => e.stopPropagation()} aria-label={`Add “${q.title}” to today`} title="Add to today" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] leading-none" style={GILT}>
         +
       </button>
@@ -211,15 +242,10 @@ function TodayRow({ q, onRemove }: { q: Lite; onRemove: () => void }) {
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`due-in flex min-h-9 touch-manipulation items-center gap-2 rounded-xl px-2.5 py-1 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
-      style={{ transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 10 : undefined, background: "rgba(255,250,238,.9)", border: "1px solid rgba(168,138,63,.5)", boxShadow: isDragging ? "0 10px 22px rgba(0,0,0,.25)" : "inset 3px 0 0 #c99a3a" }}
+      className={`due-in flex min-h-14 touch-manipulation items-center gap-2.5 rounded-2xl px-2.5 py-1.5 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+      style={{ ...CARD, border: "1.5px solid #c99a3a", transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 10 : undefined, boxShadow: isDragging ? "0 10px 22px rgba(0,0,0,.25)" : CARD.boxShadow }}
     >
-      <span aria-hidden style={{ color: "#c99a3a" }}>
-        ◆
-      </span>
-      <span className="min-w-0 flex-1 text-[13.5px] font-semibold leading-snug" style={{ color: INK }}>
-        {q.title}
-      </span>
+      <CardBody q={q} meta={q.due_at ? <span>due {dueWord(q.due_at)}</span> : null} />
       <button type="button" onClick={onRemove} onPointerDown={(e) => e.stopPropagation()} aria-label={`Take “${q.title}” off today`} title="Off today" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] leading-none hover:bg-black/[.06]" style={{ color: SOFT }}>
         ×
       </button>

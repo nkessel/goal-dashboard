@@ -83,6 +83,35 @@ export function CreateSheet({
   }
   const [toolbar, setToolbar] = useState<HTMLSpanElement | null>(null);
 
+  // Switching kinds carries the title and details typed so far into the new editor.
+  const carry = useRef<{ title: string; details: string } | null>(null);
+  function switchKind(k: CreateKind) {
+    if (k === kind) return;
+    const sheet = sheetRef.current;
+    const t = sheet?.querySelector<HTMLInputElement>('input:not([type]), input[type="text"]');
+    const d = sheet?.querySelector<HTMLTextAreaElement>("textarea");
+    carry.current = { title: t?.value ?? "", details: d?.value ?? "" };
+    setKind(k);
+  }
+  useEffect(() => {
+    const c = carry.current;
+    if (!c || (!c.title && !c.details)) return;
+    carry.current = null;
+    // Fill the new editor's own fields as if typed, so its state follows.
+    const id = window.setTimeout(() => {
+      const sheet = sheetRef.current;
+      const fill = (el: HTMLInputElement | HTMLTextAreaElement | null | undefined, v: string) => {
+        if (!el || !v || el.value) return;
+        const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, v);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      fill(sheet?.querySelector<HTMLInputElement>('input:not([type]), input[type="text"]'), c.title);
+      fill(sheet?.querySelector<HTMLTextAreaElement>("textarea"), c.details);
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [kind]);
+
   const shownKind: CreateKind = stage === "journal" ? "journal" : kind;
   const tabKinds = stage === "journal" || stage === "checkin" ? [] : makeKinds;
 
@@ -213,7 +242,7 @@ export function CreateSheet({
                         type="button"
                         role="tab"
                         aria-selected={active}
-                        onClick={() => setKind(k)}
+                        onClick={() => switchKind(k)}
                         className="create-kind flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold"
                         style={{
                           background: active ? (isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)") : "rgba(70,50,20,.08)",

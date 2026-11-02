@@ -373,7 +373,9 @@ export function QuestEditorDialog({
       setAlsoError(e instanceof Error ? e.message : "Couldn't save that.");
     });
   }
-  const isCompleted = task?.status === "completed";
+  // Completed from this window, waiting for Done to celebrate.
+  const [completedNow, setCompletedNow] = useState<{ xp: number; totalXp: number | null; coinsEarned: number } | null>(null);
+  const isCompleted = task?.status === "completed" || !!completedNow;
   const progressTracked = typeof task?.xp_awarded === "number";
   const initialProgress = task?.progress ?? 0;
   const [progress, setProgress] = useState(initialProgress);
@@ -599,8 +601,12 @@ export function QuestEditorDialog({
   // take its card (and this dialog) away mid-edit. It's saved on close.
   const fields = JSON.stringify([title, description, importance, urgency, xp, coinValue, earlyBonus, earlyCoins, earlyPerDay, effort, energyGain, est, chunkMinutes, dueAt, slot?.start ?? null, boardId, aspiration, tiny]);
   const [savedFields, setSavedFields] = useState(fields);
+  // Anything changed since the window opened: Save lights up.
+  const [openedFields] = useState(fields);
+
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const dirty = fields !== savedFields || stepsDirty;
+  const changed = fields !== openedFields || stepsDirty;
   const stepsRef = useRef(steps);
   const stepIds = useRef(new Map<string, string>());
   const savedSlotStart = useRef(initialSlot?.start ?? null);
@@ -732,12 +738,29 @@ export function QuestEditorDialog({
   const chipBorder = isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)";
   const labelCls = "text-[13px] font-semibold";
 
-  function close() {
+  function celebrateCompleted() {
+    if (!task || !completedNow) return;
+    const done = completedNow;
+    setCompletedNow(null);
+    celebrateQuest({
+      taskId: task.id,
+      title,
+      description,
+      xp: Math.max(0, xp - Math.round((xp * initialProgress) / 100)),
+      iconSrc: task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null,
+      // XP changed after completing is paid (or taken back) on save, so the total moves with it.
+      totalXp: done.totalXp === null ? null : done.totalXp + (xp - done.xp),
+      coinsEarned: done.coinsEarned,
+    });
+    router.refresh();
+  }  function close() {
     if (phase === "closing") return;
     setConfirmLeave(false);
     if (autosave) {
-      if (dirty || placement !== savedPlacement.current) void persist(true);
+      const saving = dirty || placement !== savedPlacement.current ? persist(true) : null;
       commitProgress();
+      // Completed here: celebrate once the last changes are saved.
+      if (completedNow) void Promise.resolve(saving).catch(() => {}).then(celebrateCompleted);
     }
     setPhase("closing");
     setTimeout(onClose, embedded ? 0 : origin === "fab" ? 260 : 180);
@@ -967,6 +990,10 @@ export function QuestEditorDialog({
   }
 
   /** An existing quest: save what's changed, then complete it (the Quest complete party plays). */
+  /**
+   * Marks it done but stays open: the celebration waits for Done, so the last
+   * touches (XP included) are in it.
+   */
   function completeExisting() {
     if (!task) return;
     setError(null);
@@ -976,23 +1003,13 @@ export function QuestEditorDialog({
         const fd = new FormData();
         fd.set("taskId", task.id);
         const res = await completeTaskAction(fd);
-        celebrateQuest({
-          taskId: task.id,
-          title,
-          description,
-          xp: Math.max(0, xp - Math.round((xp * initialProgress) / 100)),
-          iconSrc: task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null,
-          totalXp: res?.totalXp ?? null,
-          coinsEarned: res?.coinsEarned ?? 0,
-        });
-        router.refresh();
-        setPhase("closing");
-        setTimeout(onClose, embedded ? 0 : 180);
+        setCompletedNow({ xp, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't complete it.");
       }
     });
   }
+
 
   function remove() {
     if (!task) return;
@@ -1759,7 +1776,11 @@ export function QuestEditorDialog({
                     )}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
+                  {/* −5 and +5 either side of the bar, the amount to its right. */}
+                  <button type="button" onClick={() => (setXp(Math.max(0, xp - 5)), setXpOwn(true))} aria-label="5 XP less" title="−5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
+                    −5
+                  </button>
                   <input
                     type="range"
                     min={0}
@@ -1768,12 +1789,11 @@ export function QuestEditorDialog({
                     value={Math.min(XP_MAX, xp)}
                     onChange={(e) => (setXp(Number(e.target.value)), setXpOwn(true))}
                     aria-label="XP reward"
-                    className="h-8 min-w-0 basis-full"
+                    className="h-8 min-w-0 flex-1"
                     style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
                   />
-                  {/* −5 and +5 either side of the amount, for a quick nudge. */}
-                  <button type="button" onClick={() => (setXp(Math.max(0, xp - 5)), setXpOwn(true))} aria-label="5 XP less" title="−5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
-                    −5
+                  <button type="button" onClick={() => (setXp(Math.min(1000, xp + 5)), setXpOwn(true))} aria-label="5 XP more" title="+5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
+                    +5
                   </button>
                   <span className="flex h-9 shrink-0 items-center rounded-lg border pr-1.5" style={fieldStyle}>
                     <NumberInput
@@ -1790,9 +1810,8 @@ export function QuestEditorDialog({
                       XP
                     </span>
                   </span>
-                  <button type="button" onClick={() => (setXp(Math.min(1000, xp + 5)), setXpOwn(true))} aria-label="5 XP more" title="+5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
-                    +5
-                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
                   {!doingNow && (
                     <span className="ml-auto flex h-9 shrink-0 items-center gap-0.5 rounded-lg border px-1" style={fieldStyle} title="Coins earned on completion">
                       <button
@@ -2664,13 +2683,23 @@ export function QuestEditorDialog({
                       ✓ Complete {noun}
                     </button>
                   )}
+                  {completedNow && (
+                    <span className="card-pop-in flex h-10 items-center whitespace-nowrap px-1 text-[14px] font-semibold" style={{ color: "#4f6d3c" }}>
+                      ✓ Completed · Done to celebrate
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={close}
-                    className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold"
-                    style={{ background: "linear-gradient(180deg,#8fae7a,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f", boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)" }}
+                    className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold transition-all duration-300"
+                    // Quiet until something changes, then lit up green.
+                    style={
+                      changed || completedNow
+                        ? { background: "linear-gradient(180deg,#9fc488,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f", boxShadow: "inset 0 1px 0 rgba(255,255,255,.3), 0 0 0 3px rgba(143,174,122,.35), 0 0 14px rgba(143,200,110,.55)" }
+                        : { background: "rgba(255,250,238,.5)", color: "#56703f", border: "1.5px solid #8fae7a" }
+                    }
                   >
-                    Save
+                    {completedNow ? "Done" : "Save"}
                   </button>
                 </>
               ) : (

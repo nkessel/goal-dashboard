@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { listRecentWinsAction } from "@/app/actions";
+import { getQuestForEditAction, listRecentWinsAction } from "@/app/actions";
+import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { useLongPress } from "@/lib/use-long-press";
+import type { Task } from "@/lib/data/types";
 import { journalKindMeta } from "@/lib/journal-kinds";
 import { eveningDayKey } from "./evening-clock";
 import { Seal } from "@/components/xp/VictoriesToday";
@@ -44,6 +47,15 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
   const [wins, setWins] = useState<Win[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, startLoading] = useTransition();
+  // A quest opened for editing with a long press (or right-click); reloads the list on close.
+  const [editing, setEditing] = useState<Task | null>(null);
+  const [reload, setReload] = useState(0);
+  const editQuest = (winId: string) => {
+    if (!winId.startsWith("q-")) return;
+    getQuestForEditAction(winId.slice(2))
+      .then((t) => t && setEditing(t))
+      .catch(() => {});
+  };
 
   useEffect(() => {
     if (!day) return;
@@ -55,7 +67,7 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
         setError(e instanceof Error ? e.message : "Couldn't load your wins.");
       }
     });
-  }, [day, days]);
+  }, [day, days, reload]);
 
   // Group by the day each win belongs to (rites carry their own evening day).
   const groups = new Map<string, Win[]>();
@@ -67,6 +79,7 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
 
   // Feedback is one line per day ("Feedback submitted ×n"), like Victories Today.
   type Row = { id: string; seal: "check" | "star" | "gift"; label: React.ReactNode; xp: number };
+
   const rowsFor = (list: Win[]): Row[] => {
     const feedback = list.filter((w) => w.kind === "feedback");
     const rows: Row[] = list
@@ -158,9 +171,9 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
               )}
               <ul className="m-0 flex list-none flex-col p-0">
                 {rowsFor(list).map((row, i) => (
-                  <li
+                  <WinRow
                     key={row.id}
-                    className="flex min-h-[44px] items-center gap-3 py-2 text-[16.5px]"
+                    onEdit={row.id.startsWith("q-") ? () => editQuest(row.id) : undefined}
                     style={{ color: "var(--t-ink)", ...(i ? { borderTop: "1px solid rgba(139,112,64,.35)" } : null) }}
                   >
                     <Seal kind={row.seal} />
@@ -170,7 +183,7 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
                         +{row.xp} XP
                       </span>
                     )}
-                  </li>
+                  </WinRow>
                 ))}
               </ul>
             </div>
@@ -182,6 +195,17 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
           Hide victories
         </button>
       )}
+      {editing && <QuestEditorDialog mode={{ kind: "edit", task: editing }} theme="adventure" onClose={() => (setEditing(null), setReload((n) => n + 1))} />}
     </div>
+  );
+}
+
+/** One win; a quest can be edited with a long press (or right-click). */
+function WinRow({ onEdit, style, children }: { onEdit?: () => void; style: React.CSSProperties; children: React.ReactNode }) {
+  const { handlers } = useLongPress(() => onEdit?.());
+  return (
+    <li {...(onEdit ? handlers : {})} title={onEdit ? "Hold to edit" : undefined} className={`flex min-h-[44px] items-center gap-3 py-2 text-[16.5px] ${onEdit ? "select-none [-webkit-touch-callout:none]" : ""}`} style={style}>
+      {children}
+    </li>
   );
 }

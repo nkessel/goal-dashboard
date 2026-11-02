@@ -139,7 +139,8 @@ function readHidden(): string[] {
  * above everything else on Today. What's due next comes first; past due goes
  * last. It fills itself from due dates (nothing to drag here) and empties as
  * you finish. Tap its title to fold it away (it still says how many are
- * inside); Edit lets you × a quest out of it for good.
+ * inside); Edit lets you × a quest out of it for good, or tick quests to add
+ * them to Today's Quests together. "Add all to today" adds every one at once.
  */
 function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks: TaskWithCategory[]; hours: number; theme: "calm" | "adventure"; lockedBehind: Map<string, TaskWithCategory> }) {
   const isAdventure = theme === "adventure";
@@ -151,6 +152,8 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
   // The reach just picked, until the page refills with it.
   const [hours, setHours] = useState(shownHours);
   const [refilling, startRefill] = useTransition();
+  const [adding, startAdding] = useTransition();
+  const [ticked, setTicked] = useState<string[]>([]);
   const [seenHours, setSeenHours] = useState(shownHours);
   if (seenHours !== shownHours) {
     setSeenHours(shownHours);
@@ -189,6 +192,18 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
   };
   const closePicker = useCallback(() => setPicking(false), []);
   const shown = tasks.filter((t) => !hidden.includes(t.id));
+  const notToday = shown.filter((t) => !t.is_manual_priority && t.status !== "completed");
+  const tickedNow = ticked.filter((id) => notToday.some((t) => t.id === id));
+  const addToToday = (ids: string[]) => {
+    if (!ids.length) return;
+    startAdding(async () => {
+      for (const id of ids) await toggleManualPriorityAction(id, true);
+      setTicked([]);
+      setEditing(false);
+      router.refresh();
+    });
+  };
+  const tick = (id: string) => setTicked((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id]));
   const ink = isAdventure ? "#ffd9b8" : "var(--t-ink)";
   const border = isAdventure ? "rgba(240,150,90,.55)" : "var(--t-card-border)";
   const reach = dueWindowLabel(hours);
@@ -224,7 +239,7 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
         </button>
         {/* On the bar but not part of its tap: Edit on the left (while open), the reach and the chevron on the right. */}
         {open && shown.length > 0 && (
-          <button type="button" onClick={() => setEditing((v) => !v)} aria-pressed={editing} className="fade-in absolute left-3 top-1/2 h-8 -translate-y-1/2 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${border}`, color: ink, background: editing ? "rgba(242,210,126,.2)" : "rgba(0,0,0,.12)" }}>
+          <button type="button" onClick={() => { setEditing((v) => !v); setTicked([]); }} aria-pressed={editing} className="fade-in absolute left-3 top-1/2 h-8 -translate-y-1/2 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${border}`, color: ink, background: editing ? "rgba(242,210,126,.2)" : "rgba(0,0,0,.12)" }}>
             {editing ? "Done" : "Edit"}
           </button>
         )}
@@ -253,8 +268,29 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
           <div className="quest-tray mt-2.5 rounded-2xl px-2 pb-3 pt-3" style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }} inert={!open}>
             <Fold open={!!editing}>
               <p className="m-0 mb-2 text-center text-[12.5px]" style={{ color: ink, opacity: 0.85 }}>
-                × takes a quest out of Due soon for good (it stays on its board).
+                Tick quests to add them to today. × takes a quest out of Due soon for good (it stays on its board).
               </p>
+              {notToday.length > 0 && (
+                <div className="mb-2.5 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTicked(tickedNow.length === notToday.length ? [] : notToday.map((t) => t.id))}
+                    className="h-8 rounded-full px-3 text-[13px] font-semibold"
+                    style={{ border: `1px solid ${border}`, color: ink, background: "rgba(0,0,0,.12)" }}
+                  >
+                    {tickedNow.length === notToday.length ? "Untick all" : "Tick all"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!tickedNow.length || adding}
+                    onClick={() => addToToday(tickedNow)}
+                    className="h-8 rounded-full px-3.5 text-[13px] font-bold disabled:opacity-50"
+                    style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
+                  >
+                    {adding ? "Adding…" : tickedNow.length ? `Add ${tickedNow.length} to today` : "Add to today"}
+                  </button>
+                </div>
+              )}
             </Fold>
             {!shown.length && (
               <p className="m-0 px-1 text-center text-[13.5px]" style={{ color: ink, opacity: 0.85 }}>
@@ -265,6 +301,20 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
               {shown.map((task) =>
                 editing ? (
                   <li key={task.id} className="fade-in flex items-center gap-2">
+                    {notToday.some((t) => t.id === task.id) ? (
+                      <input
+                        type="checkbox"
+                        checked={tickedNow.includes(task.id)}
+                        onChange={() => tick(task.id)}
+                        aria-label={`Add “${task.title}” to today`}
+                        className="h-5 w-5 shrink-0 cursor-pointer"
+                        style={{ accentColor: "#d9b45f" }}
+                      />
+                    ) : (
+                      <span className="w-5 shrink-0 text-center text-[11px] leading-tight" style={{ color: ink, opacity: 0.8 }} title="Already in Today's Quests">
+                        ✓
+                      </span>
+                    )}
                     <ul className="m-0 min-w-0 flex-1 list-none p-0">
                       <TaskRow task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
                     </ul>
@@ -277,6 +327,19 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind }: { tasks:
                 )
               )}
             </ul>
+            {!editing && notToday.length > 0 && (
+              <div className="mt-3 flex justify-center">
+                <button
+                  type="button"
+                  disabled={adding}
+                  onClick={() => addToToday(notToday.map((t) => t.id))}
+                  className="h-9 rounded-full px-4 text-[14px] font-bold disabled:opacity-60"
+                  style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 2px 6px rgba(0,0,0,.3)" }}
+                >
+                  {adding ? "Adding…" : notToday.length === shown.length ? "Add all to today" : `Add the other ${notToday.length} to today`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

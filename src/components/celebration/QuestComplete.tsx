@@ -85,7 +85,7 @@ const Dust = memo(function Dust({ items, mode }: { items: Speck[]; mode: "center
 });
 
 export function QuestComplete(props: QuestCompleteProps) {
-  const { title, description, tag, questXp, level, xpIntoLevel, xpForNextLevel, iconSrc, avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, coinsEarned = 0, isReward = false, onClose } = props;
+  const { title, description, tag, questXp: givenXp, level, xpIntoLevel: givenInto, xpForNextLevel, iconSrc, avatarSrc = "/design/avatar-ranger.jpg", taskId = null, preview = false, coinsEarned = 0, isReward = false, onClose } = props;
   const [phase, setPhase] = useState<"celebrate" | "rewards">("celebrate");
   const [chest, setChest] = useState<{ rewards: Reward[]; coins: number } | null>(null);
   const [claimed, setClaimed] = useState<Reward | null>(null);
@@ -132,6 +132,24 @@ export function QuestComplete(props: QuestCompleteProps) {
   const [tier] = useState(() => effectsTier(fx));
   const lite = tier === "light";
   const [editTask, setEditTask] = useState<Task | null>(null);
+  // XP changed in the editor opened from here: the card and bar follow, and the fill plays again.
+  const [xpAdj, setXpAdj] = useState(0);
+  const [replay, setReplay] = useState(0);
+  const questXp = Math.max(0, givenXp + xpAdj);
+  const xpIntoLevel = Math.max(0, givenInto + xpAdj);
+  function closeEditor(before: Task) {
+    setEditTask(null);
+    if (!taskId) return;
+    getQuestForEditAction(taskId)
+      .then((t) => {
+        const d = t ? t.xp_value - before.xp_value : 0;
+        if (!d) return;
+        setXpAdj((a) => a + d);
+        setP(reduce ? 1 : 0);
+        setReplay((r) => r + 1);
+      })
+      .catch(() => {});
+  }
   const [undoing, startUndo] = useTransition();
   const [reduce] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const [p, setP] = useState(reduce ? 1 : 0);
@@ -166,7 +184,7 @@ export function QuestComplete(props: QuestCompleteProps) {
       }, tier === "full" ? 1250 : tier === "balanced" ? 550 : 300)
     );
     return stop;
-  }, [reduce, fx.fill, stop, tier]);
+  }, [reduce, fx.fill, stop, tier, replay]);
 
   useEscape(() => {
     if (!editTask) onClose();
@@ -193,7 +211,7 @@ export function QuestComplete(props: QuestCompleteProps) {
 
   // Editing replaces the celebration (it comes back when the editor closes),
   // so the two never draw over each other.
-  if (editTask) return <QuestEditorDialog mode={{ kind: "edit", task: editTask }} theme="adventure" onClose={() => setEditTask(null)} />;
+  if (editTask) return <QuestEditorDialog mode={{ kind: "edit", task: editTask }} theme="adventure" onClose={() => closeEditor(editTask)} />;
 
   return createPortal(
     <div

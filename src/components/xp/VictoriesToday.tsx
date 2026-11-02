@@ -6,6 +6,7 @@ import type { Task } from "@/lib/data/types";
 import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
+import { useLongPress } from "@/lib/use-long-press";
 import { SectionTitle } from "@/components/ui/Ornaments";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import { eveningDayKey } from "@/components/evening/evening-clock";
@@ -182,20 +183,15 @@ export function VictoriesToday({
         )}
         {todays.map((t, i) => (
           <li key={t.id} style={loginToday || i > 0 ? divider : undefined}>
-            <button
-              type="button"
-              onClick={() => setPreview(t)}
-              title="See this victory"
-              className={`${rowCls} w-full rounded-md text-left hover:bg-black/[.04]`}
-              style={{ color: "var(--t-ink)" }}
-            >
+            {/* Tap to see it; long-press (or right-click) to edit it. */}
+            <VictoryButton onOpen={() => setPreview(t)} onEdit={() => setEditing(t)} className={`${rowCls} w-full rounded-md text-left hover:bg-black/[.04]`}>
               <Seal kind="check" />
               <span className="min-w-0 flex-1 break-words leading-snug">
                 {t.title}
                 {doneEarlier(t) && <span style={{ color: "var(--t-ink-soft)" }}> ({doneEarlier(t)})</span>}
               </span>
               <XpCoins xp={t.xp_value} coins={questCoins(t)} xpStyle={xpStyle} />
-            </button>
+            </VictoryButton>
           </li>
         ))}
         {todaysRites.map((r, i) => (
@@ -376,5 +372,15 @@ function VictoryPreview({ task, coins, note, onEdit, onClose }: { task: Task; co
         </div>
       </div>
     </div>
+  );
+}
+
+/** A victory row: a tap opens it, a long press (or right-click) goes straight to editing. */
+function VictoryButton({ onOpen, onEdit, className, children }: { onOpen: () => void; onEdit: () => void; className: string; children: React.ReactNode }) {
+  const { handlers, wasLong } = useLongPress(onEdit);
+  return (
+    <button type="button" {...handlers} onClick={() => !wasLong() && onOpen()} title="See this victory (hold to edit)" className={`${className} select-none [-webkit-touch-callout:none]`} style={{ color: "var(--t-ink)" }}>
+      {children}
+    </button>
   );
 }

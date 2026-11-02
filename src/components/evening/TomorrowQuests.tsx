@@ -20,18 +20,11 @@ import { QuestPickerSheet } from "@/components/tasks/QuestPickerSheet";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
-type Mode = "rank" | "seq";
-
-const MODES: { key: Mode; label: string; hint: string }[] = [
-  { key: "rank", label: "By importance", hint: "Drag so the one that matters most is on top." },
-  { key: "seq", label: "In order", hint: "Drag into the order you'll do them. Today's Quests follow this order." },
-];
 
 /**
- * Evening planning: the quests for tomorrow, as many as you like, with two
- * orders — how much each matters, and the order you'll do them in. One "+"
- * adds another. When the day turns over (5:30am) they move into Today's
- * Quests in the order you'll do them, each showing how important it is.
+ * Evening planning: the quests for tomorrow, as many as you like, in one
+ * list dragged into the order you'll do them. One "+" adds another. When the
+ * day turns over (5:30am) they move into Today's Quests in that order.
  */
 export function TomorrowQuests({
   queued,
@@ -56,7 +49,6 @@ export function TomorrowQuests({
   /** How many are chosen after a change. */
   onCountChange?: (n: number) => void;
 }) {
-  const [mode, setMode] = useState<Mode>("rank");
   const [local, setLocal] = useState<{ rank: string[]; seq: string[] } | null>(null);
   const [seen, setSeen] = useState(queued);
   const [picking, setPicking] = useState(false);
@@ -83,7 +75,8 @@ export function TomorrowQuests({
   const seq =
     local?.seq ??
     (fromToday.length ? fromToday : [...queued].sort((a, b) => (a.queue_seq ?? a.queue_rank ?? 0) - (b.queue_seq ?? b.queue_rank ?? 0)).map((t) => t.id));
-  const ordered = (mode === "rank" ? rank : seq.filter((id) => rank.includes(id)));
+  // One list, in the order you'll do them (anything not yet placed goes last).
+  const ordered = [...seq.filter((id) => rank.includes(id)), ...rank.filter((id) => !seq.includes(id))];
 
   function save(nextRank: string[], nextSeq: string[]) {
     setLocal({ rank: nextRank, seq: nextSeq });
@@ -102,13 +95,12 @@ export function TomorrowQuests({
   function onDragEnd(e: DragEndEvent) {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
-    const list = mode === "rank" ? rank : seq;
-    const from = list.indexOf(String(active.id));
-    const to = list.indexOf(String(over.id));
+    const from = ordered.indexOf(String(active.id));
+    const to = ordered.indexOf(String(over.id));
     if (from < 0 || to < 0) return;
-    const moved = arrayMove(list, from, to);
-    if (mode === "rank") save(moved, seq);
-    else save(rank, moved);
+    // Importance follows the same order now that there's one list.
+    const moved = arrayMove(ordered, from, to);
+    save(moved, moved);
   }
 
   const isAdventure = theme === "adventure";
@@ -129,41 +121,14 @@ export function TomorrowQuests({
       )}
 
       {fromToday.length > 0 && (
-        <p className="m-0 flex flex-wrap items-center gap-x-2 px-1 text-[12.5px] italic" style={{ color: soft }}>
+        <p className="m-0 px-1 text-[12.5px] italic" style={{ color: soft }}>
           Starting from what&apos;s on Today now.
-          <button type="button" onClick={() => save(rank, seq)} className="rounded-full px-2.5 py-1 text-[12.5px] font-semibold not-italic" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
-            ✓ Keep these for tomorrow
-          </button>
         </p>
       )}
       {rank.length > 1 && (
-        <div className="flex flex-col gap-1">
-          <div role="tablist" aria-label="Order" className="inline-flex w-fit rounded-full p-0.5" style={{ background: embedded ? "rgba(70,50,20,.12)" : "rgba(255,255,255,.08)", border: embedded ? undefined : "1px solid rgba(217,180,95,.25)" }}>
-            {MODES.map((m) => {
-              const on = m.key === mode;
-              return (
-                <button
-                  key={m.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={on}
-                  onClick={() => setMode(m.key)}
-                  className="h-8 rounded-full px-3.5 text-[13.5px] font-semibold"
-                  style={{
-                    background: on ? (isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)") : "transparent",
-                    color: on ? (isAdventure ? "#2a1c10" : "#fff") : ink,
-                    boxShadow: on ? "0 1px 3px rgba(60,40,10,.3)" : undefined,
-                  }}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
-          <p className="m-0 text-[13px]" style={{ color: soft }}>
-            {MODES.find((m) => m.key === mode)!.hint}
-          </p>
-        </div>
+        <p className="m-0 px-1 text-[13px]" style={{ color: soft }}>
+          Drag into the order you&apos;ll do them. Today&apos;s Quests follow this order.
+        </p>
       )}
 
       {error && (
@@ -177,14 +142,11 @@ export function TomorrowQuests({
           <ol className="m-0 flex list-none flex-col gap-2 p-0">
             {ordered.map((id, i) => {
               const t = byId.get(id);
-              const importance = rank.indexOf(id) + 1;
               return (
                 <SlotCard
                   key={id}
                   id={id}
                   n={i + 1}
-                  mode={mode}
-                  importance={importance}
                   task={t}
                   onEdit={t ? () => setEditing(t) : undefined}
                   onRemove={() => save(rank.filter((x) => x !== id), seq.filter((x) => x !== id))}
@@ -208,6 +170,15 @@ export function TomorrowQuests({
         </SortableContext>
       </DndContext>
 
+      {/* Confirm at the end of the list, once you've looked them over. */}
+      {fromToday.length > 0 && (
+        <div className="flex justify-end">
+          <button type="button" onClick={() => save(rank, seq)} className="h-10 rounded-full px-4 text-[14px] font-semibold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10", boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}>
+            ✓ Keep these for tomorrow
+          </button>
+        </div>
+      )}
+
       {picking && (
         <QuestPickerSheet
           otherTasks={candidates.filter((t) => !rank.includes(t.id))}
@@ -223,17 +194,13 @@ export function TomorrowQuests({
   );
 }
 
-/** A round seal with the quest's place in the current order. */
-function OrderSeal({ n, mode }: { n: number; mode: Mode }) {
+/** A gilded round seal with the quest's place in the order. */
+function OrderSeal({ n }: { n: number }) {
   return (
     <span
       aria-hidden
       className="font-display flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[16px] font-bold"
-      style={
-        mode === "rank"
-          ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 1px 3px rgba(0,0,0,.35)" }
-          : { background: "rgba(255,250,238,.75)", border: "1.5px solid #8a6c2c", color: "#4a3913" }
-      }
+      style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 1px 3px rgba(0,0,0,.35)" }}
     >
       {n}
     </span>
@@ -243,16 +210,12 @@ function OrderSeal({ n, mode }: { n: number; mode: Mode }) {
 function SlotCard({
   id,
   n,
-  mode,
-  importance,
   task,
   onEdit,
   onRemove,
 }: {
   id: string;
   n: number;
-  mode: Mode;
-  importance: number;
   task?: TaskWithCategory;
   onEdit?: () => void;
   onRemove: () => void;
@@ -272,10 +235,10 @@ function SlotCard({
         zIndex: isDragging ? 5 : undefined,
         boxShadow: isDragging ? "0 12px 28px rgba(0,0,0,.5)" : undefined,
       }}
-      aria-label={`${mode === "rank" ? "Importance" : "Step"} ${n}: ${task?.title ?? "quest"} — drag to reorder`}
+      aria-label={`Step ${n}: ${task?.title ?? "quest"} — drag to reorder`}
     >
       <span className="relative z-[1]">
-        <OrderSeal n={n} mode={mode} />
+        <OrderSeal n={n} />
       </span>
       <span className="relative z-[1] flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ border: "1.5px solid #a58c66", background: "#f3e6c8" }}>
         {art ? (
@@ -290,7 +253,7 @@ function SlotCard({
           {task?.title ?? "Loading…"}
         </span>
         <span className="block truncate text-[12.5px]" style={{ color: "#5a4a30" }}>
-          {[mode === "seq" ? `#${importance} in importance` : null, task?.categoryLabel, task?.estimate_minutes ? `${task.estimate_minutes}m` : null].filter(Boolean).join(" · ")}
+          {[task?.categoryLabel, task?.estimate_minutes ? `${task.estimate_minutes}m` : null].filter(Boolean).join(" · ")}
         </span>
       </button>
       <button

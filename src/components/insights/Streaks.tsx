@@ -185,7 +185,7 @@ export function Streaks({ initial, notes: initialNotes, habits = [] }: { initial
                       Cancel
                     </button>
                     <button type="button" onClick={() => slip(def, slipping.at)} className="h-9 rounded-full px-4 text-[13.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-                      Start again
+                      Save
                     </button>
                   </div>
                 </div>

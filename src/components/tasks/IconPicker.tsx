@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
 import { useEscape } from "@/lib/use-escape";
+import { useLongPress } from "@/lib/use-long-press";
 
 const LIB_KEY = "portrait-library-shown";
 
@@ -440,17 +441,15 @@ export function IconPicker({
                 <div className="grid max-h-52 grid-cols-5 gap-1.5 overflow-y-auto overflow-x-hidden p-1">
                   {filteredLibrary?.map((entry) => (
                     <div key={entry.id} className="group/tile relative">
-                      <button
-                        type="button"
+                      {/* Tap to use it; long-press (or right-click) to delete it from the library. */}
+                      <LibraryTile
+                        src={entry.image_url}
                         title={entry.prompt ?? undefined}
                         disabled={isPending}
-                        onClick={() => pickLibraryEntry(entry.image_url)}
-                        className="hover-glow block aspect-square w-full overflow-hidden rounded-lg disabled:opacity-50"
-                        style={{ border: `2px solid ${currentImageUrl === entry.image_url ? "var(--t-gold)" : "transparent"}` }}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element -- static /design asset or external Supabase Storage URL */}
-                        <img src={entry.image_url} alt="" className="h-full w-full object-cover" />
-                      </button>
+                        current={currentImageUrl === entry.image_url}
+                        onPick={() => pickLibraryEntry(entry.image_url)}
+                        onLong={entry.id.includes(":") ? undefined : () => setConfirmRemove(entry)}
+                      />
                       {!entry.id.includes(":") && (
                       <button
                         type="button"
@@ -509,5 +508,24 @@ export function IconPicker({
         document.body
       )}
     </div>
+  );
+}
+
+/** A library image: tap to use it, hold (or right-click) to offer deleting it. */
+function LibraryTile({ src, title, disabled, current, onPick, onLong }: { src: string; title?: string; disabled: boolean; current: boolean; onPick: () => void; onLong?: () => void }) {
+  const { handlers, wasLong } = useLongPress(() => onLong?.());
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      {...(onLong ? handlers : {})}
+      onClick={() => !wasLong() && onPick()}
+      className="hover-glow block aspect-square w-full select-none overflow-hidden rounded-lg [-webkit-touch-callout:none] disabled:opacity-50"
+      style={{ border: `2px solid ${current ? "var(--t-gold)" : "transparent"}` }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- static /design asset or external Supabase Storage URL */}
+      <img src={src} alt="" draggable={false} className="pointer-events-none h-full w-full object-cover" />
+    </button>
   );
 }
