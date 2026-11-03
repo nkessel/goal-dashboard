@@ -253,7 +253,7 @@ export function BoardGrid({
             </span>
             {!dream && (
               <span className="block text-[12px] tabular-nums" style={{ color: board.isComplete ? "var(--t-good)" : soft }}>
-                ({board.questDone}/{board.questTotal} completed)
+                {board.questTotal - board.questDone > 0 ? `${board.questTotal - board.questDone} ${board.questTotal - board.questDone === 1 ? "quest" : "quests"}` : board.questTotal > 0 ? "✓ all done" : ""}
               </span>
             )}
           </span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { SnoozeIcon } from "@/components/ui/Icons";
 import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
 import { WelcomeHabits } from "@/components/xp/WelcomeHabits";
 
@@ -731,9 +732,7 @@ export function WelcomeCard({
             <div className="mt-1 flex w-full items-center gap-2">
               {snoozable && (
                 <button type="button" onClick={() => setSnoozing("main")} className="flex h-10 items-center gap-1.5 rounded-full border px-4 text-[14px] font-semibold" style={{ borderColor: "#b39a6a", color: "#5a4a30" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                  </svg>
+                  <SnoozeIcon />
                   Snooze
                 </button>
               )}

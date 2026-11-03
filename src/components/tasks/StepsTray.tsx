@@ -1,5 +1,6 @@
 "use client";
 
+import { progressWords } from "@/lib/progress-words";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { listQuestStepsAction, saveQuestStepsAction, setTaskProgressAction } from "@/app/actions";
@@ -91,7 +92,7 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
                     {st.title}
                   </span>
                   <span className="text-[11.5px] tabular-nums" style={{ color: soft }}>
-                    {done}/{inside.length}
+                    {progressWords(done, inside.length)}
                   </span>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform duration-300" style={{ color: soft, transform: open ? "rotate(180deg)" : undefined }}>
                     <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
@@ -167,7 +168,7 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
               <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#c99a3a,#f2d27e)", boxShadow: "0 0 6px rgba(242,210,126,.6)" }} />
             </span>
             <span className="text-[12px] tabular-nums" style={{ color: soft }}>
-              {doneCount}/{live.length}
+              {progressWords(doneCount, live.length)}
             </span>
           </div>
         )}

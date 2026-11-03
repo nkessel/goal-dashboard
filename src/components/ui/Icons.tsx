@@ -96,3 +96,15 @@ export function GearIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+/** Snooze, the same everywhere in the app: a little timer with a "z" (owner, Nov 2: not a moon). */
+export function SnoozeIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="11" cy="13.5" r="7.5" stroke="currentColor" strokeWidth="2" />
+      <path d="M9 2.5h4M11 2.5V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M8.3 11h5l-5 5h5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17.5 4.5h3l-3 3h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import { progressWords } from "@/lib/progress-words";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import {
@@ -656,7 +657,7 @@ export function EveningRites({
           <h2 className="font-display m-0 whitespace-nowrap text-[23px] leading-none sm:text-[27px]" style={{ color: "#f1ead2", textShadow: "0 2px 10px rgba(0,0,0,.6)" }}>
             Evening Rites
             <span className="ml-2 align-middle text-[14px] font-normal" style={{ color: "var(--t-gold)" }}>
-              {coreDone}/{core.length}
+              {progressWords(coreDone, core.length, "rite")}
             </span>
           </h2>
           <Leaf />

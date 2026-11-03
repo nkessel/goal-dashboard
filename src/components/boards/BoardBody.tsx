@@ -106,7 +106,7 @@ export function BoardBody({
             {board.is_private && <span className="ml-1.5 text-xs font-normal">🔒</span>}
           </h1>
           <div className="text-[12.5px]" style={{ color: soft, opacity: 0.75 }}>
-            {doneCount} of {quests.length} quests done · {xpEarned} {isAdventure ? "XP" : "pts"} earned
+            {[quests.length - doneCount > 0 ? `${quests.length - doneCount} ${quests.length - doneCount === 1 ? "quest" : "quests"}` : quests.length ? "✓ all done" : "", xpEarned > 0 ? `${xpEarned} ${isAdventure ? "XP" : "pts"} earned` : ""].filter(Boolean).join(" · ")}
           </div>
         </div>
         <Link

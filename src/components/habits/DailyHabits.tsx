@@ -1,6 +1,7 @@
 "use client";
 
-import { GearIcon } from "@/components/ui/Icons";
+import { progressWords } from "@/lib/progress-words";
+import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -559,7 +560,7 @@ export function DailyHabits({
                       className="relative z-[1] flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-[12.5px] font-semibold tabular-nums hover:bg-black/[.05]"
                       style={{ color: "var(--t-ink-soft)", border: "1px solid rgba(139,112,64,.35)" }}
                     >
-                      {subsOf(h).filter((st) => ticked(h, st.id)).length}/{subsOf(h).length}
+                      {progressWords(subsOf(h).filter((st) => ticked(h, st.id)).length, subsOf(h).length)}
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: openSubs.has(h.id) ? "rotate(90deg)" : undefined }}>
                         <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
@@ -650,23 +651,14 @@ export function DailyHabits({
                           </span>
                         ) : null}
                       </button>
-                      {skips !== null && (
-                        <button
-                          type="button"
-                          onClick={() => (s > 0 ? (setMenuFor(null), setConfirmSkip(h.id)) : setSkip(h, true))}
-                          className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5"
-                          style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
-                        >
-                          {h.repeat ? "⤼ Skip this time" : "⤼ Skip today"}
-                        </button>
-                      )}
+                      {/* No "Skip today": Snooze does the same (owner, Nov 2). */}
                       <button
                         type="button"
                         onClick={() => snooze(h, true)}
                         className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5"
                         style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
                       >
-                        ☾ Snooze until tomorrow
+                        <span className="flex items-center gap-2"><SnoozeIcon /> Snooze until tomorrow</span>
                       </button>
                     </div>
                   )}

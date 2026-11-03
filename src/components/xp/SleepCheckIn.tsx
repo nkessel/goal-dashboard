@@ -108,7 +108,10 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
     setQualityOpen(false);
     setOpen(false);
     setStamp((n) => n + 1);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2600);
   }
+  const [saved, setSaved] = useState(false);
   const [stamp, setStamp] = useState(0);
 
   function saveLists(next: { effort: string[]; hindrances: string[] }) {
@@ -130,12 +133,18 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
     <div className="flex w-full flex-col items-center">
       <button key={stamp} type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className={`font-display flex h-10 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-5 text-[16px] ${stamp ? "sleep-stamp" : ""}`} style={GILT}>
         <MoonIcon />
-        Sleep{logged && !dirty ? " ✓" : ""}
+        Sleep check-in{logged && !dirty ? " ✓" : ""}
         {summary && !open && <span className="truncate font-sans text-[12.5px] font-semibold tabular-nums opacity-80">· {summary}</span>}
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ transform: open ? "rotate(180deg)" : undefined }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
+      {/* Saved, said plainly (owner, Nov 2: "so the user knows it's not lost"). */}
+      <Fold open={saved}>
+        <span className="confirm-pop mt-1 block text-[12.5px] font-semibold" style={{ color: "#3f6a2c" }}>
+          ✓ Sleep saved
+        </span>
+      </Fold>
       <div className="drawer-body w-full" data-open={open ? "true" : "false"}>
         <div className="drawer-inner" inert={!open}>
           <div className="mt-2 flex w-full flex-col gap-2 text-left" style={{ ["--t-cream" as string]: "var(--t-ink)", ["--ec-soft" as string]: "var(--t-ink-soft)", ["--ec-gold" as string]: "#8a6116" }}>

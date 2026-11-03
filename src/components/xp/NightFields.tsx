@@ -330,22 +330,39 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day,
       >
         <WheelIcon />
         {/* Says once which day the lists are for (not in every section). */}
-        Factors of sleep · {yesterday || "yesterday"}
+        {/* "yesterday", not a date (owner, Nov 2); the date shows on hover. */}
+        <span title={yesterday || undefined}>Factors of sleep · yesterday</span>
         {checked > 0 && !open && <span className="tabular-nums opacity-80">· {checked}</span>}
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(90deg)" : undefined }}>
           <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
+      {/* Folded: what you picked shows under the button (owner, Nov 2). */}
+      <Fold open={!open && checked > 0}>
+        <p className="m-0 -mt-1 text-center text-[12px] leading-snug" style={{ color: SOFT }}>
+          {[...value.effort, ...value.hindrances.map((h) => h.name)].join(" · ")}
+        </p>
+      </Fold>
       <div className="drawer-body" data-open={open ? "true" : "false"}>
-        <div id={factorsId} className="drawer-inner flex flex-col gap-2.5 pt-0.5" inert={!open}>
+        <div id={factorsId} className="drawer-inner relative flex flex-col gap-2.5 pt-0.5" inert={!open}>
+          {/* Editing the lists: a gear at the section's upper right (owner, Nov 2), not a link at its foot. */}
+          {onLists && (
+            <button type="button" onClick={() => setEditingLists((v) => !v)} aria-pressed={editingLists} aria-label={editingLists ? "Done editing the lists" : "Edit the lists"} title={editingLists ? "Done editing" : "Edit the lists"} className="absolute right-0 top-0 z-[1] flex h-7 w-7 items-center justify-center rounded-full" style={{ color: SOFT, background: editingLists ? "rgba(217,180,95,.3)" : undefined }}>
+              {editingLists ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              )}
+            </button>
+          )}
           <div className="flex flex-col gap-1.5">
             <span className="flex items-center gap-2">
               <span className="text-[11px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--ec-gold, #f2d27e)" }}>
                 Right effort
               </span>
               {/* Today's own right effort is logged on the Wheel of Time (a new tab, so this screen stays). */}
-              <a href="/insights#wheel-of-time" target="_blank" rel="noopener" className="ml-auto text-[11.5px] underline underline-offset-2" style={{ color: SOFT }}>
+              <a href="/insights#wheel-of-time" target="_blank" rel="noopener" className="ml-auto mr-8 text-[11.5px] underline underline-offset-2" style={{ color: SOFT }}>
                 Add for today ↗
               </a>
             </span>
@@ -422,11 +439,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day,
             </form>
           </Fold>
           {/* The lists are edited right here (no trip to another page). */}
-          {onLists ? (
-            <button type="button" onClick={() => setEditingLists((v) => !v)} className="self-end text-[12px] underline underline-offset-2" style={{ color: SOFT }}>
-              {editingLists ? "Done editing" : "Edit the lists"}
-            </button>
-          ) : (
+          {onLists ? null : (
             <Link href="/insights#wheel-of-time" className="self-end text-[12px] underline underline-offset-2" style={{ color: SOFT }}>
               Edit the lists
             </Link>

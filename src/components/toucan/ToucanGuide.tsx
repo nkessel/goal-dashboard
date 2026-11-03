@@ -763,7 +763,9 @@ function PickTime({ onPick, onClose }: { onPick: (when: number) => void; onClose
 }
 
 function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { text: string; actions: NoteAction[]; onClose: () => void; onDismiss: () => void; instant?: boolean }) {
-  useEscape(onClose);
+  // × closes only his bubble: the toucan stays where he is (owner, Nov 2); a tap on him brings his words back.
+  const [quiet, setQuiet] = useState(false);
+  useEscape(() => (quiet ? onClose() : setQuiet(true)));
   // Drag it anywhere by its body; it remembers where you put it.
   const [at, setAt] = useState<{ x: number; y: number } | null>(() => {
     try {
@@ -774,6 +776,7 @@ function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { tex
     }
   });
   const drag = useRef<{ dx: number; dy: number; moved: boolean } | null>(null);
+  const movedLast = useRef(false);
   const place = at
     ? { left: Math.max(8, Math.min(window.innerWidth - 200, at.x)), top: Math.max(8, Math.min(window.innerHeight - 80, at.y)) }
     : null;
@@ -785,7 +788,7 @@ function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { tex
       className={`fixed z-[58] flex w-[min(380px,calc(100vw-24px))] cursor-grab touch-none items-end gap-1 ${place ? "" : "inset-x-0 bottom-24 mx-auto"}`}
       style={place ?? undefined}
       onPointerDown={(e) => {
-        if ((e.target as HTMLElement).closest("button")) return;
+        if ((e.target as HTMLElement).closest("button:not([data-bird])")) return;
         const r = e.currentTarget.getBoundingClientRect();
         drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false };
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -799,6 +802,7 @@ function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { tex
       onPointerUp={(e) => {
         const d = drag.current;
         drag.current = null;
+        movedLast.current = !!d?.moved;
         if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
         if (d?.moved && at) {
           try {
@@ -807,16 +811,17 @@ function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { tex
         }
       }}
     >
-      <span className={`${instant ? "" : "nudge-bird"} shrink-0`} aria-hidden style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,.45))" }}>
+      <button type="button" data-bird onClick={() => !movedLast.current && setQuiet(false)} aria-label={quiet ? "The toucan: show what he said" : "The toucan"} className={`${instant ? "" : "nudge-bird"} shrink-0 cursor-pointer`} style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,.45))" }}>
         <ToucanArt size={58} />
-      </span>
+      </button>
       <div
-        className={`${instant ? "" : "nudge-bubble"} relative mb-6 flex min-w-0 flex-1 flex-col gap-2 rounded-2xl p-3 pr-8`}
+        className={`${instant ? "" : "nudge-bubble"} relative mb-6 flex min-w-0 flex-1 flex-col gap-2 rounded-2xl p-3 pr-8 transition-[opacity,scale] duration-200 ${quiet ? "pointer-events-none scale-95 opacity-0" : ""}`}
+        aria-hidden={quiet || undefined}
         style={{ background: "linear-gradient(180deg, rgba(14,38,40,.96), rgba(8,22,26,.98))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.3), 0 10px 28px rgba(0,0,0,.5)" }}
       >
         {/* The bubble's tail points back at his bill. */}
         <span aria-hidden className="absolute -left-[7px] bottom-4 h-3 w-3 rotate-45" style={{ background: "rgba(10,28,32,.98)", borderLeft: "1.5px solid rgba(140,240,220,.55)", borderBottom: "1.5px solid rgba(140,240,220,.55)" }} />
-        <button type="button" onClick={onClose} aria-label="Close" title="Close" className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(232,255,248,.75)" }}>
+        <button type="button" onClick={() => setQuiet(true)} aria-label="Close what he said" title="Close" className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(232,255,248,.75)" }}>
           ×
         </button>
         <p className="m-0 text-[14px] leading-snug">{text}</p>

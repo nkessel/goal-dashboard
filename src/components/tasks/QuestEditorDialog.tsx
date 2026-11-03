@@ -1,5 +1,6 @@
 "use client";
 
+import { progressWords } from "@/lib/progress-words";
 import { FileChips } from "@/components/ui/FileChips";
 import { AddFile } from "@/components/ui/AddFile";
 import type { FileRef } from "@/lib/file-refs";
@@ -1465,7 +1466,7 @@ export function QuestEditorDialog({
                     </button>
                     {steps && steps.length > 0 && (
                       <span className="flex min-w-0 flex-1 items-center gap-2 text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                        {stepsDone}/{stepsLive}
+                        {progressWords(stepsDone, stepsLive)}
                         {/* How far the steps carry the quest. */}
                         <span className="h-2.5 min-w-[40px] max-w-[140px] flex-1 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 3px rgba(0,0,0,.6)" }} aria-label={`Steps ${stepsShare(steps)}% done`}>
                           <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${stepsShare(steps)}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 6px rgba(242,210,126,.5)" }} />
@@ -1594,7 +1595,7 @@ export function QuestEditorDialog({
                           />
                           {isHolder && (
                             <button type="button" onClick={() => setOpenSteps((o) => new Set(o).add(st.key))} className="mt-[3px] flex h-7 shrink-0 items-center rounded-full px-2 text-[12px] font-semibold tabular-nums" style={{ color: "var(--t-ink-soft)", border: "1px solid rgba(139,112,64,.35)" }} title="Sub-tasks done">
-                              {insideDone}/{inside.length}
+                              {progressWords(insideDone, inside.length)}
                             </button>
                           )}
                           {/* What this step is worth, right on the row: its share of the quest (tap to change) and the XP that brings. */}

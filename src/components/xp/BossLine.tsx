@@ -83,7 +83,7 @@ export function FaceBossButton({ boss, level }: { boss: BossView | null; level: 
         className="font-display hover-glow mx-auto flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[14px]"
         style={{ background: "linear-gradient(180deg, #4b2a6e, #2a1640)", border: "1.5px solid #d9b45f", color: "#f2d27e", boxShadow: "0 0 12px rgba(160,110,220,.45), 0 2px 6px rgba(0,0,0,.45)" }}
       >
-        <span aria-hidden>⚔</span> Face the Final Boss
+        <span aria-hidden>⚔</span> Level {boss?.level ?? level} · Final Boss
       </button>
       {stage === "portal" && <FinalBossPortal boss={boss} level={boss?.level ?? level} onEnter={() => setStage("level")} onClose={() => setStage(null)} />}
       {stage === "level" && <BossDialog boss={boss} level={boss?.level ?? level} onClose={() => setStage(null)} />}

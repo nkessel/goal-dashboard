@@ -4,6 +4,8 @@
 
 Read `docs/HANDOFF.md` before doing anything else. It has the current top priorities, how to ship (push to `main` deploys to the live app), the in-app feedback pipeline, and the owner's hard rules.
 
+Then read `docs/REPEAT-ASKS.md`: the owner's asks that came back 3+ times. Any work touching one of them is done at higher effort, checked on every screen it applies to, and its row updated (count, status) in the same push.
+
 When you ship to `main`, update `docs/HANDOFF.md` in the same push: bump "Last updated", move finished work to "Recently shipped", and add or re-rank anything new. The next session, on any account, picks up from that file.
 
 # Before every push to main: run the UI check
