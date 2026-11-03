@@ -1,5 +1,6 @@
 "use client";
 
+import { stopKeysButSave } from "@/lib/stop-keys";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { translatePhraseAction } from "@/app/actions";
@@ -296,7 +297,7 @@ export function HabitPills({ pills }: { pills: string[] }) {
 /** Under a "learn a language" habit: a pill that opens the phrase window. */
 export function LanguagePractice() {
   return (
-    <div className="ml-11 mt-0.5 pr-2" onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+    <div className="ml-11 mt-0.5 pr-2" onPointerDown={(e) => e.stopPropagation()} onKeyDown={stopKeysButSave}>
       <button type="button" onClick={openLanguageWindow} className="inline-flex h-7 w-fit items-center gap-1 rounded-full px-3 text-[12.5px] font-semibold" style={GILT}>
         <span aria-hidden>🗣</span> Practice a phrase
       </button>

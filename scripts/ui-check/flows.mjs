@@ -119,6 +119,51 @@ export const FLOWS = [
     },
   },
   {
+    // Ctrl/⌘+S and Ctrl/⌘+Enter save a quest (owner, Nov 2: "neither works"): a miss fails the check.
+    name: "savekeys",
+    async run(h) {
+      const p = h.page;
+      const report = (m) => {
+        if (/STILL OPEN|no \+ Add quest/.test(m)) throw new Error(`save shortcut: ${m}`);
+      };
+      for (const combo of ["Control+s", "Control+Enter"]) {
+        await h.goto("/", { name: "savekeys" });
+        await h.tap(/^create something new$/i, "+ button", { expectMove: true });
+        await h.tap(/new quest/i, "new quest", { optional: true, expectMove: true });
+        const field = p.getByPlaceholder(/quest title/i).first();
+        await field.fill(`Key test ${combo}`);
+        await p.keyboard.press(combo);
+        await p.waitForTimeout(1500);
+        const open = await p.locator(".create-sheet").count();
+        report(`+ sheet, ${combo}: ${open ? "STILL OPEN (not saved)" : "saved and closed"}`);
+      }
+      // A board's "+ Add quest" (the editor on its own, not inside the + sheet).
+      for (const combo of ["Control+s", "Control+Enter"]) {
+        await h.goto("/boards", { name: "savekeys" });
+        await h.tap("text=Errands", "open a board", { expectMove: true });
+        if (await h.tap(/^\+ add quest$/i, "add quest", { optional: true, expectMove: true })) {
+          await p.getByPlaceholder(/quest title/i).first().fill(`Board key test ${combo}`);
+          await p.keyboard.press(combo);
+          await p.waitForTimeout(1500);
+          const open = await p.locator("[role=dialog][data-save-keys]").count();
+          report(`board add, ${combo}: ${open ? "STILL OPEN (not saved)" : "saved and closed"}`);
+        } else report("board add: no + Add quest button found");
+      }
+      // Editing an existing quest.
+      for (const combo of ["Control+s", "Control+Enter"]) {
+        await h.goto("/", { name: "savekeys" });
+        if (await h.tap("text=Pick up medication", "open quest editor", { expectMove: true })) {
+          const t = p.getByPlaceholder(/quest title/i).first();
+          await t.fill("Pick up medication ✓");
+          await p.keyboard.press(combo);
+          await p.waitForTimeout(1500);
+          const open = await p.locator("[role=dialog][data-save-keys]").count();
+          report(`editor, ${combo}: ${open ? "STILL OPEN" : "saved and closed"}`);
+        }
+      }
+    },
+  },
+  {
     name: "cleaning",
     async run(h) {
       await h.goto("/", { name: "cleaning" });

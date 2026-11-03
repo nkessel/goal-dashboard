@@ -1,5 +1,6 @@
 "use client";
 
+import { stopKeysButSave } from "@/lib/stop-keys";
 import { FileChips } from "@/components/ui/FileChips";
 import { Linked } from "@/components/ui/Linked";
 
@@ -732,7 +733,7 @@ export function TaskRow({
 
       {/* Dialogs render in portals, but their events still bubble through this
           card in React — keep typing, selecting and Space from starting a card drag. */}
-      <div className="contents" onPointerDown={stopBubble} onMouseDown={stopBubble} onTouchStart={stopBubble} onKeyDown={stopKeyBubble} onClick={stopBubble}>
+      <div className="contents" onPointerDown={stopBubble} onMouseDown={stopBubble} onTouchStart={stopBubble} onKeyDown={stopKeysButSave} onClick={stopBubble}>
       {scheduling &&
         createPortal(
           <div
@@ -806,10 +807,6 @@ export function TaskRow({
 
 /** Slide a card out to the left and fade it, then close the gap it leaves. */
 const stopBubble = (e: React.SyntheticEvent) => e.stopPropagation();
-/** Escape still reaches the dialogs' window listeners. */
-const stopKeyBubble = (e: React.KeyboardEvent) => {
-  if (e.key !== "Escape") e.stopPropagation();
-};
 
 function slideOut(el: HTMLElement | null): Promise<void> {
   if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();

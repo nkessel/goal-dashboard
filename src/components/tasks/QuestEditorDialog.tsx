@@ -1029,14 +1029,20 @@ export function QuestEditorDialog({
   }
 
   // Ctrl/⌘+S saves, like Ctrl/⌘+Enter (which the + sheet handles when the editor sits inside it).
-  const onSaveKey = useEffectEvent((e: KeyboardEvent) => {
+  function handleSaveKey(e: KeyboardEvent) {
     const s = e.key === "s" || e.key === "S";
     if (!(e.ctrlKey || e.metaKey) || !(s || (e.key === "Enter" && !embedded))) return;
     if (e.target instanceof Element && e.target.closest("[data-feedback-root]")) return;
+    // Handled once per press: the panel catches it (a quest card the editor was opened from stops keys
+    // bubbling up to the window, so editing from a card never saved; owner, Nov 2), the window as a fallback.
+    const seen = e as KeyboardEvent & { qeSaved?: boolean };
+    if (seen.qeSaved) return;
+    seen.qeSaved = true;
     e.preventDefault();
     if (autosave) close();
     else if (!isSaving && title.trim()) save();
-  });
+  }
+  const onSaveKey = useEffectEvent((e: KeyboardEvent) => handleSaveKey(e));
   useEffect(() => {
     const h = (e: KeyboardEvent) => onSaveKey(e);
     window.addEventListener("keydown", h);
@@ -2161,6 +2167,7 @@ export function QuestEditorDialog({
           if (confirmLeave) setConfirmLeave(false);
         }}
         onKeyDown={(e) => {
+          handleSaveKey(e.nativeEvent);
           // Escape leaves the field (or little form) you're in first; a second one closes the editor.
           const t = e.target as HTMLElement;
           if (e.key === "Escape" && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) {

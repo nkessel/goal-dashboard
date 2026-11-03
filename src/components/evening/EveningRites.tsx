@@ -1,5 +1,6 @@
 "use client";
 
+import { stopKeysButSave } from "@/lib/stop-keys";
 import { progressWords } from "@/lib/progress-words";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { SettingsGear } from "@/components/ui/SettingsGear";
@@ -614,7 +615,7 @@ export function EveningRites({
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
+              onKeyDown={stopKeysButSave}
             >
               <div className="relative z-[1]">
                 {r.kind === "wins" ? (

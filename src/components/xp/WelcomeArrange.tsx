@@ -1,5 +1,6 @@
 "use client";
 
+import { stopKeysButSave } from "@/lib/stop-keys";
 import { HabitOptions } from "@/components/xp/WelcomeHabits";
 
 import { checkinLabel } from "@/lib/welcome";
@@ -353,7 +354,7 @@ function Part({ el, fx, empty, children, onArchive, startOpen = false }: { el: W
       {/* Its options slide open under it. Typing there: keys stay in the field (Space mustn't pick the part up). */}
       {hasOptions && (
         <Fold open={open}>
-          <div className="flex flex-col gap-1.5 px-2.5 pb-2" onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+          <div className="flex flex-col gap-1.5 px-2.5 pb-2" onKeyDown={stopKeysButSave} onPointerDown={(e) => e.stopPropagation()}>
             {el === "checkin" && <CheckinOptions fx={fx} />}
             {el === "line" && <LineOptions fx={fx} />}
             {el === "habits" && <HabitOptions fx={fx} />}
