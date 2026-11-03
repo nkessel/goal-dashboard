@@ -96,7 +96,8 @@ export const FLOWS = [
         await esc(h);
       }
       // A habit with sub-habits: tapping its card shows them inside the card (owner, Nov 2).
-      await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
+      // (Daily Habits is already open from the toggle above; tapping its header again would close it.)
+      if (!(await h.page.getByText("Vitamins before 12pm").first().isVisible().catch(() => false))) await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
       await h.page.getByText("Vitamins before 12pm").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
       await h.settle(300);
       if (await h.tap("text=Vitamins before 12pm", "habit sub-habits", { optional: true, expectMove: true })) {
@@ -117,6 +118,19 @@ export const FLOWS = [
         }
         await esc(h);
       }
+      // A sequence: open it from the quest's ⋯ menu and tap the quest waiting behind to edit it (Nov 3).
+      if (await h.tap((p) => p.getByRole("button", { name: /actions for pick up medication/i }).first(), "medication menu", { optional: true })) {
+        if (await h.tap("text=Edit the sequence…", "edit the sequence", { optional: true, expectMove: true })) {
+          await h.settle(800);
+          await h.check("sequence dialog");
+          if (await h.tap((p) => p.getByRole("button", { name: /drop the prescription receipt/i }).first(), "edit a waiting quest", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.check("sequence: waiting quest in the editor");
+          }
+          await esc(h);
+        }
+        await esc(h);
+      }
       // Schedule a quest from its ⋯ menu: the day drawn, tap a time (repeat ask 10).
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for schedule", { optional: true })) {
         if (await h.tap((p) => p.getByText(/^(re)?schedule on calendar$/i).first(), "schedule picker", { optional: true, expectMove: true })) {
@@ -130,19 +144,6 @@ export const FLOWS = [
       // A quest's ⋯ menu.
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu", { optional: true })) {
         await h.check("quest menu");
-        await esc(h);
-      }
-      // A sequence: open it from the quest's ⋯ menu and tap the quest waiting behind to edit it (Nov 3).
-      if (await h.tap((p) => p.getByRole("button", { name: /actions for pick up medication/i }).first(), "medication menu", { optional: true })) {
-        if (await h.tap("text=Edit the sequence…", "edit the sequence", { optional: true, expectMove: true })) {
-          await h.settle(800);
-          await h.check("sequence dialog");
-          if (await h.tap((p) => p.getByRole("button", { name: /drop the prescription receipt/i }).first(), "edit a waiting quest", { optional: true, expectMove: true })) {
-            await h.settle(1200);
-            await h.check("sequence: waiting quest in the editor");
-          }
-          await esc(h);
-        }
         await esc(h);
       }
       // A quest with steps: tapping its card slides the steps tray open under it (repeat ask 9: no overlap).

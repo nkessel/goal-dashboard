@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
 import { scheduleTaskAction, unscheduleTaskAction } from "@/app/actions";
 import { WhenPicker } from "@/components/calendar/WhenPicker";
+import { useEscape } from "@/lib/use-escape";
 
 type Slot = { start: string; end: string };
 
@@ -37,6 +38,8 @@ export function TaskScheduleControl({
     setOpen(false);
     onDone?.();
   }
+  // Esc closes it, like every other panel.
+  useEscape(() => finish(), open);
 
   function openAndFetch() {
     setOpen(true);
