@@ -1,5 +1,6 @@
 "use client";
 
+import { progressWords } from "@/lib/progress-words";
 import { FocusSteps as FocusStepsPanel } from "./FocusSteps";
 import { LevelScales } from "@/components/ui/LevelScales";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -593,7 +594,7 @@ function EditableFacts({ task, now, onSave }: { task: TaskWithCategory; now: num
             "rate it"
           )}
         </button>
-        {task.steps_total ? <span className="whitespace-nowrap px-1">{task.steps_done ?? 0}/{task.steps_total} steps</span> : null}
+        {task.steps_total ? <span className="whitespace-nowrap px-1">{progressWords(task.steps_done ?? 0, task.steps_total)}</span> : null}
       </div>
       {(open === "time" || open === "xp") && (
         <div className="flex items-center gap-2">

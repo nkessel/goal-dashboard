@@ -1,5 +1,6 @@
 "use client";
 
+import { progressWords } from "@/lib/progress-words";
 import { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -279,7 +280,7 @@ function MissionCard({
         </span>
         {total > 0 && (
           <span className="shrink-0 text-right text-[12.5px] tabular-nums leading-tight" style={{ color: "#6b5631" }}>
-            {done}/{total}
+            {progressWords(done, total, "mission")}
             {xpLeft > 0 && <span className="block text-[11px]">{xpLeft} XP to earn</span>}
           </span>
         )}

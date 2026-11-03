@@ -602,7 +602,10 @@ export function TodayTaskBoard({
                         Today&apos;s Quests
                       </button>
                     </h2>
-                    <Leaf />
+                    {/* On phones the ✨ and + sit where the right leaf would be (they overlapped it): the leaf steps aside while they show. */}
+                    <span className={todayOpen ? "max-sm:hidden" : ""}>
+                      <Leaf />
+                    </span>
                     <span className="hidden flex-1 sm:flex">
                       <GoldRule dir="right" />
                     </span>

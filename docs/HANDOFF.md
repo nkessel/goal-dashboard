@@ -14,7 +14,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 
 | # | Work | State | Next step |
 |---|---|---|---|
-| 000 | **docs/REPEAT-ASKS.md, open rows** (owner, Nov 2: do repeated asks comprehensively) | Ready | Work the open rows there first, highest count first: cards that don't grow (8), steps tray (9), visual scheduling app-wide (10), seamless calendar scroll (12), feedback tool lag (14), habit editor (15). |
+| 000 | **docs/REPEAT-ASKS.md, open rows** (owner, Nov 2: do repeated asks comprehensively) | Ready | Work the open rows there first, highest count first: visual scheduling app-wide (10), seamless calendar scroll (12), feedback tool lag (14), habit editor (15). |
 | 00 | **Plan my day follow-ups** (owner's notes, Nov 2) | Ready | Shipped (below). Left: mobile long-press on the Today's Quests header for a menu (the header's long press is the section drag on iPhone, so ✨ shows while the section is open instead); habits placed as real calendar blocks (now only room kept, 🌿); "🎧 something to listen to" as an icon in the planner to pick today's learning video (note); the owner's ask to plan Alliance Jiu Jitsu soon and Shaolin within 45 days (create as quests with plan_by; needs DB or the app); Martin-care quests as follow-ups when scheduling time with Dad; the morning exercise blocks on the owner's calendar go once the Gym habit holds the time. |
 | 0 | **Import scheduling: follow-ups** | Ready | Shipped Nov 1 (below). Left: a one-tap "Breakfast today" on Today/check-in only matters if breakfast is turned off; essentials' ideal times aren't editable yet (only ranges and lengths, in Auto-schedule › Daily essentials); accepted placements go straight on the calendar (no separate tentative state in the database). |
 | 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
@@ -149,6 +149,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 2 (night): Repeat asks 8 and 9. Quest cards: the due day moves under the bars in the right column ("Today", "Tomorrow", "Thu", "Nov 10", "Overdue"; full date on hover, no clock time) and the line it took is gone; tiny quests use the same clock icon; habit cards show their time above the XP. The steps tray is its own rounded panel just under the card (no overlap with the card's edge), no "✦ Next" tag, plain "Steps". Fractions gone from quest cards' steps, Secret Missions, import review, One Thing and focus steps. ui-check: Today flow opens a steps tray.
 
 - Nov 2 (night): Ctrl/⌘+S and Ctrl/⌘+Enter save a quest opened from its card (they never did: the card's key-stopper, there so typing doesn't drag the card, also swallowed the save keys; now `lib/stop-keys.ts` lets Escape and the save keys through, on cards, evening rites, welcome arrange and the language tool; the editor's panel also catches them itself). New ui-check flow `savekeys` presses both in the + sheet, a board's "+ Add quest" and an existing quest's editor, and fails the check if any stays open.
 

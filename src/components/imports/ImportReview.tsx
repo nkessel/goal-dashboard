@@ -1,5 +1,6 @@
 "use client";
 
+import { progressWords } from "@/lib/progress-words";
 import { DiamondIcon } from "@/components/ui/Icons";
 
 import { useEffect, useRef, useState } from "react";
@@ -111,7 +112,7 @@ export function ImportReview({ theme, onDone }: { theme: "calm" | "adventure"; o
       }}
     >
       <p className="px-1.5 pt-1 text-[11px] font-bold uppercase tracking-wide max-lg:hidden" style={{ color: "var(--t-ink-soft)" }}>
-        New imports · {confirmed.size}/{total} done
+        New imports · {progressWords(confirmed.size, total, "card")}
       </p>
       {items.map((it) => {
         const id = itemId(it);

@@ -1,5 +1,6 @@
 "use client";
 
+import { progressWords } from "@/lib/progress-words";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -177,7 +178,7 @@ export function FocusSteps({ taskId, progress = 0 }: { taskId: string; /** The q
   return (
     <div className="relative z-[1] flex w-full flex-col gap-2 text-left">
       <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: "#6b5534" }}>
-        Steps · {steps.filter((x) => x.done).length}/{steps.filter((x) => x.state !== "skipped").length}
+        Steps · {progressWords(steps.filter((x) => x.done).length, steps.filter((x) => x.state !== "skipped").length)}
       </span>
 
       {/* The step in focus: just its name, its time on the quest's clock, and what to do with it. */}

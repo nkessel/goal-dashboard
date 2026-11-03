@@ -1,5 +1,6 @@
 "use client";
 
+import { progressWords } from "@/lib/progress-words";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { FileChips } from "@/components/ui/FileChips";
 import { Linked } from "@/components/ui/Linked";
@@ -49,6 +50,18 @@ function dueLabel(iso: string): string {
   if (diff === 1) return `Due tomorrow, ${time}`;
   if (diff > 1 && diff < 7) return `Due ${d.toLocaleDateString(undefined, { weekday: "long" })}`;
   return `Due ${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`;
+}
+
+/** The due day in a word, for the card's right column: "Today" / "Tomorrow" / "Thu" / "Nov 10" (no clock time: owner, Nov 2). */
+function dueShort(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(d) - day(now)) / 86_400_000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  if (diff > 1 && diff < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 /** "25m" / "1h" / "1h 30m" — compact estimate format for the card's clock row. */
@@ -474,12 +487,23 @@ export function TaskRow({
             {task.title}
             {(task.steps_total ?? 0) > 0 && (
               <span className="ml-1.5 whitespace-nowrap text-[12px] font-semibold tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                {task.steps_done ?? 0}/{task.steps_total}
+                {progressWords(task.steps_done ?? 0, task.steps_total ?? 0)}
               </span>
             )}
           </p>
           <span className="flex shrink-0 items-center gap-2 whitespace-nowrap text-[13px]" style={{ color: isAdventure ? "#3d3628" : metaColor }}>
-            {task.estimate_minutes != null && <span>{isAdventure ? "" : "⏱ "}{formatEstimate(task.estimate_minutes)}</span>}
+            {/* The same clock as the full quest cards (owner, Nov 2). */}
+            {task.estimate_minutes != null && (
+              <span className="flex items-center gap-1">
+                {isAdventure ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
+                  <img src="/design/ui-clock.png" alt="" width={14} height={14} />
+                ) : (
+                  "⏱"
+                )}
+                {formatEstimate(task.estimate_minutes)}
+              </span>
+            )}
             {task.xp_value > 0 && (
               <span className="font-bold" style={{ color: xpColor }}>
                 {isAdventure ? `${task.xp_value} XP` : `${task.xp_value} pts`}
@@ -603,21 +627,8 @@ export function TaskRow({
             </p>
           )}
           <FileChips files={task.attachments} className="mt-1" />
-          <div className={`${compact ? "mt-1" : "mt-1.5"} flex flex-wrap items-center gap-x-2.5 gap-y-1`} style={{ color: isAdventure ? "#3d3628" : metaColor, fontSize: compact ? 12.5 : 13.5 }}>
-            {(task.due_at || (task.is_on_calendar && task.scheduled_start)) && (
-              <span className="flex items-center gap-1.5" style={isOverdue ? { color: "var(--t-warn)", fontWeight: 600 } : undefined}>
-                {isAdventure ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
-                  <img src="/design/ui-calendar.png" alt="" width={16} height={16} />
-                ) : (
-                  "📅"
-                )}
-                {isOverdue
-                  ? `Overdue · ${new Date((task.due_at ?? task.scheduled_start)!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
-                  : dueLabel((task.due_at ?? task.scheduled_start)!)}
-              </span>
-            )}
-
+          <div className={`${compact ? "mt-1" : "mt-1.5"} flex flex-wrap items-center gap-x-2.5 gap-y-1 empty:hidden`} style={{ color: isAdventure ? "#3d3628" : metaColor, fontSize: compact ? 12.5 : 13.5 }}>
+            {/* The due day sits in the right column, under the bars (owner, Nov 2: no extra line for it). */}
             {(() => {
               // Get ahead of the deadline: finishing early pays a bonus. The pill opens its choices;
               // with none set (and time to spare), a quiet invitation to choose one.
@@ -656,7 +667,7 @@ export function TaskRow({
                     <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="2.4" />
                     <path d="M7.5 12.5l3 3 6-6.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  {task.steps_done ?? 0}/{task.steps_total}
+                  {progressWords(task.steps_done ?? 0, task.steps_total ?? 0)}
                 </span>
               )}
               {/* The bar shows from the start once a quest has steps or progress. */}
@@ -720,6 +731,21 @@ export function TaskRow({
               ...(urgencyCount > 0 ? [{ src: "/design/ui-flame-sm.png", n: urgencyCount, title: `Urgency ${(task.urgency ?? 0).toFixed(1)}` }] : []),
             ]}
           />
+          {(task.due_at || (task.is_on_calendar && task.scheduled_start)) && (
+            <span
+              className="flex items-center gap-1 whitespace-nowrap text-[12px] font-semibold leading-none"
+              style={{ color: isOverdue ? "var(--t-warn)" : isAdventure ? "#5a4a30" : metaColor }}
+              title={isOverdue ? `Overdue · ${new Date((task.due_at ?? task.scheduled_start)!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : dueLabel((task.due_at ?? task.scheduled_start)!)}
+            >
+              {isAdventure ? (
+                // eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public
+                <img src="/design/ui-calendar.png" alt="" width={13} height={13} />
+              ) : (
+                "📅"
+              )}
+              {isOverdue ? "Overdue" : dueShort((task.due_at ?? task.scheduled_start)!)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -783,8 +809,8 @@ export function TaskRow({
     </div>
       </SwipeReveal>
       {hasSteps && !done && (
-        // Tucked under the card's lower edge while open.
-        <div className="drawer-body" data-open={tray ? "true" : "false"} style={{ marginTop: tray ? -12 : 0, transition: "grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 240ms ease, margin-top 320ms ease" }}>
+        // Slides open just under the card.
+        <div className="drawer-body" data-open={tray ? "true" : "false"} style={{ marginTop: tray ? 6 : 0, transition: "grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 240ms ease, margin-top 320ms ease" }}>
         <div className="drawer-inner" inert={!tray}>
         {trayEver && <StepsTray
           task={task}

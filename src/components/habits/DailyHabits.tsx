@@ -543,9 +543,10 @@ export function DailyHabits({
                         </>
                       )}
                     </span>
-                    {(h.description || h.due_time || h.estimate_minutes || (h.days && h.days.length < 7)) && (
+                    {/* How long it takes sits by the XP (owner, Nov 2); this line only when there's a time of day or a note. */}
+                    {(h.description || scheduleLabel(h)) && (
                       <span className="block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                        {[h.estimate_minutes ? `⏱ ${h.estimate_minutes}m` : null, scheduleLabel(h), h.description].filter(Boolean).join(" · ")}
+                        {[scheduleLabel(h), h.description].filter(Boolean).join(" · ")}
                       </span>
                     )}
                   </button>
@@ -567,6 +568,13 @@ export function DailyHabits({
                     </button>
                   )}
                   <span className="relative z-[1] flex shrink-0 flex-col items-end gap-0.5">
+                    {h.estimate_minutes ? (
+                      <span className="flex items-center gap-1 text-[12.5px] font-semibold tabular-nums leading-none" style={{ color: "var(--t-ink-soft)" }} title={`About ${h.estimate_minutes} minutes`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- the quest cards' clock */}
+                        <img src="/design/ui-clock.png" alt="" width={13} height={13} />
+                        {h.estimate_minutes < 60 ? `${h.estimate_minutes}m` : `${Math.floor(h.estimate_minutes / 60)}h${h.estimate_minutes % 60 ? ` ${h.estimate_minutes % 60}m` : ""}`}
+                      </span>
+                    ) : null}
                     <span className="flex items-center gap-1.5 text-[15px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
                       +{h.xp_value} XP
                       {(h.coin_value ?? coinsForXp(h.xp_value)) > 0 && (

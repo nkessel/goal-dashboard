@@ -108,10 +108,9 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
           }
           const struck = st.state === "skipped" || st.state === "failed";
           const checked = st.done;
-          const isNext = st.key === nextKey;
           return (
             <li key={st.key}>
-              <label className={`step-row flex min-h-9 items-center gap-2.5 rounded-xl px-2 py-1.5 ${struck ? "" : "cursor-pointer"} ${isNext ? "step-next" : ""}`}>
+              <label className={`step-row flex min-h-9 items-center gap-2.5 rounded-xl px-2 py-1.5 ${struck ? "" : "cursor-pointer"}`}>
                 <input type="checkbox" checked={checked} disabled={struck} onChange={(e) => tick(st.key, e.target.checked)} className="peer sr-only" />
                 <span
                   aria-hidden
@@ -130,14 +129,9 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
                     </svg>
                   )}
                 </span>
-                <span className={`min-w-0 flex-1 text-[14px] leading-snug transition-opacity duration-300 ${checked || struck ? "line-through opacity-55" : ""} ${isNext ? "font-semibold" : ""}`} style={{ color: ink }}>
+                <span className={`min-w-0 flex-1 text-[14px] leading-snug transition-opacity duration-300 ${checked || struck ? "line-through opacity-55" : ""}`} style={{ color: ink }}>
                   {st.title}
                 </span>
-                {isNext && (
-                  <span className="font-display shrink-0 rounded-full px-2 py-[1px] text-[11.5px]" style={{ color: "#2a1c10", background: "linear-gradient(180deg,#f8e3a0,#e2bf63 55%,#b8913f)", border: "1px solid #6b4a12", boxShadow: "inset 0 1px 0 rgba(255,250,230,.8)" }}>
-                    ✦ Next
-                  </span>
-                )}
               </label>
             </li>
           );
@@ -148,13 +142,15 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
 
   return (
     <div
-      className={`steps-tray relative mx-1.5 px-3 pb-3 pt-5 ${isAdventure ? "steps-tray-adv" : "rounded-b-2xl"}`}
+      // Its own little panel just under the card (it used to tuck under the card's rounded edge, which looked
+      // like the two overlapped; owner, asked 3 times). Steps stay in their own order, done or not, with no "Next" tag.
+      className={`steps-tray relative mx-2 px-3 pb-2.5 pt-3 ${isAdventure ? "steps-tray-adv" : "rounded-2xl"}`}
       onClick={(e) => e.stopPropagation()}
       // A scroll unrolled from under the card: parchment, a gilded hairline inside the edge.
       style={
         isAdventure
           ? undefined
-          : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderTop: 0, boxShadow: "inset 0 6px 8px -6px rgba(60,40,10,.35)" }
+          : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", boxShadow: "0 4px 10px rgba(60,40,10,.12)" }
       }
     >
       <div className="relative z-[1] flex flex-col">
@@ -162,7 +158,7 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
           // How far along: a gilded bar that fills as you tick.
           <div className="mb-2 flex items-center gap-2.5 px-2">
             <span className={isAdventure ? "font-display text-[16px]" : "text-[12px] font-bold uppercase tracking-wide"} style={{ color: isAdventure ? "#6b4a12" : soft }}>
-              {isAdventure ? "❦ Steps" : "Steps"}
+              Steps
             </span>
             <span className="relative h-[8px] flex-1 overflow-hidden rounded-full" style={{ background: "rgba(90,64,20,.14)", boxShadow: "inset 0 1px 2px rgba(0,0,0,.2), 0 1px 0 rgba(255,255,255,.6)" }}>
               <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#c99a3a,#f2d27e)", boxShadow: "0 0 6px rgba(242,210,126,.6)" }} />
