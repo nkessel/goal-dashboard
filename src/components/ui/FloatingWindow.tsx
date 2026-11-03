@@ -11,7 +11,7 @@ type Pos = { x: number; y: number };
  * (drag the chip too; a tap opens it again). Where it sits and whether it's minimized are
  * remembered per `storageKey`. Used for "To schedule" on the calendar (owner, Nov 2).
  */
-export function FloatingWindow({ storageKey, width, minimized, onRestore, chip, children }: { storageKey: string; width: number; minimized: boolean; onRestore: () => void; /** What the minimized chip says. */ chip: React.ReactNode; children: React.ReactNode }) {
+export function FloatingWindow({ storageKey, width, minimized, onRestore, chip, children, z = 40, at, label = "Open the scheduling list (drag to move)" }: { storageKey: string; width: number; minimized: boolean; onRestore: () => void; /** What the minimized chip says. */ chip: React.ReactNode; children: React.ReactNode; /** Stacking (the language window sits over the welcome screen). */ z?: number; /** Where it starts before you move it. */ at?: () => Pos; /** The chip's name for screen readers. */ label?: string }) {
   const [pos, setPos] = useState<Pos | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
@@ -28,7 +28,7 @@ export function FloatingWindow({ storageKey, width, minimized, onRestore, chip, 
       /* storage unavailable */
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the saved spot is only readable in the browser
-    setPos(clamp(p && Number.isFinite(p.x) && Number.isFinite(p.y) ? p : { x: window.innerWidth - width - 24, y: 150 }));
+    setPos(clamp(p && Number.isFinite(p.x) && Number.isFinite(p.y) ? p : at ? at() : { x: window.innerWidth - width - 24, y: 150 }));
     const resized = () => setPos((q) => (q ? clamp(q) : q));
     window.addEventListener("resize", resized);
     return () => window.removeEventListener("resize", resized);
@@ -69,11 +69,11 @@ export function FloatingWindow({ storageKey, width, minimized, onRestore, chip, 
       onPointerMove={move}
       onPointerUp={up}
       onPointerCancel={() => (drag.current = null)}
-      className={`fixed z-[40] ${minimized ? "card-pop-in" : "reveal"}`}
-      style={{ left: pos.x, top: pos.y, width: minimized ? undefined : width, maxHeight: `calc(100vh - ${pos.y}px - 16px)`, display: "flex", touchAction: minimized ? "none" : undefined }}
+      className={`fixed ${minimized ? "card-pop-in" : "reveal"}`}
+      style={{ zIndex: z, left: pos.x, top: pos.y, width: minimized ? undefined : `min(${width}px, calc(100vw - 16px))`, maxHeight: `calc(100dvh - ${pos.y}px - 16px)`, display: "flex", touchAction: minimized ? "none" : undefined }}
     >
       {minimized ? (
-        <button type="button" data-drag-handle className="hover-glow flex h-10 cursor-grab touch-none select-none items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14px] font-bold shadow-lg" style={{ background: "radial-gradient(circle at 35% 25%, #f6e3a8, #d9b45f 60%, #a88a3f)", border: "2px solid #4a3913", color: "#2a1c10" }} aria-label="Open the scheduling list (drag to move)">
+        <button type="button" data-drag-handle className="hover-glow flex h-10 cursor-grab touch-none select-none items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14px] font-bold shadow-lg" style={{ background: "radial-gradient(circle at 35% 25%, #f6e3a8, #d9b45f 60%, #a88a3f)", border: "2px solid #4a3913", color: "#2a1c10" }} aria-label={label}>
           {chip}
         </button>
       ) : (

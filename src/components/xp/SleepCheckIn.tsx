@@ -1,5 +1,6 @@
 "use client";
 
+import { saveNightToo } from "./save-night";
 import { useEffect, useState } from "react";
 import { saveCheckInAction, saveNightAction, setWheelOfTimeAction, wheelOfTimeAction } from "@/app/actions";
 import { EMPTY_NIGHT, NightFields, MoonIcon, SunIcon, TimeToken, clock12, type NightDraft } from "./NightFields";
@@ -77,7 +78,7 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
     setError(null);
     try {
       for (const n of filled) await saveNightAction({ day: n.day, bed: n.bed || null, wake: n.wake || null, effort: [], hindrances: [], keep: true });
-      if (touched) await saveNightAction({ bed: night.bed || null, wake: night.wake || null, effort: night.effort, hindrances: night.hindrances });
+      if (touched) await saveNightToo(night);
       if (qualityNew) await saveCheckInAction(null, [{ metric: "Sleep quality", level: quality * 2 }]);
       return true;
     } catch (e) {

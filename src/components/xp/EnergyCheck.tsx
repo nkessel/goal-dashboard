@@ -1,5 +1,6 @@
 "use client";
 
+import { saveNightToo } from "./save-night";
 import { snapTo, useSliderStep } from "@/lib/use-slider-step";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
@@ -255,7 +256,7 @@ export function EnergyCheck({
         if (nightsFilled.length) setOtherNights([]);
         const nightLogged = nightTouched;
         if (nightLogged) {
-          await saveNightAction({ bed: night.bed || null, wake: night.wake || null, effort: night.effort, hindrances: night.hindrances });
+          await saveNightToo(night);
           setWheel(null);
           setNight(EMPTY_NIGHT);
         }

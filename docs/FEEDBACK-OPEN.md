@@ -6,7 +6,6 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - (Nov 3, built: sub-habits always in view and dragged in place, XP/coins and Remove from a dot or right-click, Daily / Certain days / Every week / Every month / Custom, "Other" minutes, Close turns into Save.) Still open: the editor's parts as pills like the quest editor's; a sub-habit's right-click menu on the Today card too.
 - The cleaning habit's sub-habits are missing from the habit editor.
 - Let habits sit in Today's agenda too. The owner asked for ideas first, as a plain message.
-- Learn a language: dragging its popup scrolls the page instead of moving the popup. Its minimized button reads "Language" with a Japanese character, and it can be customized from the popup's gear.
 
 ## Mess check-in (cleaning)
 - (Nov 3, built: line icons, self-sorting rows, no predictor, own emoji, compact editors.) Ask the owner whether the mess words ("Stormy", "Cloudy") count as the metaphors to drop.
@@ -28,9 +27,7 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Built Nov 3 (pictures in the background, recent notes to edit). Confirm on the iPhone.
 
 ## Other
-- Hide the character traits being developed from the main view (keep them in Settings › Character).
 - Make "delete a portrait" a small context menu.
 - Today scrolls slowly on the laptop: look into it.
 - Agenda for a visit (owner, Nov 3): once "Schedule time to be with my dad" is on the calendar, the quests waiting behind it (parents' calendars, Dad's computer, Martin-care quests) show as agenda options for that visit. The quests are set up as its sequence (Family board).
 - Data: add Alliance Jiu Jitsu to plan soon, and Shaolin within 45 days (as quests with plan-by). After that, Martin-care quests become a follow-up to scheduling time with Dad, together with the Martin and Family boards.
-- Factors of sleep: a one-tap yesterday/today switch.

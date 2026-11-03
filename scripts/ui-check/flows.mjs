@@ -382,6 +382,22 @@ export const FLOWS = [
     },
   },
   {
+    // Learn a language: a window you move by its title, minimized to a chip you can name (owner, Nov 3).
+    name: "language",
+    async run(h) {
+      await h.goto("/", { name: "language" });
+      await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
+      if (await h.tap((p) => p.getByRole("button", { name: /practice a phrase/i }).first(), "open language window", { optional: true, expectMove: true })) {
+        await h.settle(700);
+        await h.check("language window");
+        await h.tap((p) => p.getByRole("button", { name: /settings: the minimized button/i }).first(), "language chip settings", { optional: true, expectMove: true });
+        await h.check("language window: chip settings");
+        await h.tap((p) => p.getByRole("dialog", { name: /learn a language/i }).getByRole("button", { name: /^minimize$/i }).first(), "minimize language", { optional: true, expectMove: true });
+        await h.check("language chip");
+      }
+    },
+  },
+  {
     name: "pages",
     async run(h) {
       for (const path of ["/boards", "/calendar", "/rewards", "/feed", "/plan", "/matrix", "/journal", "/notifications", "/settings/inventory", "/power-ups"]) {

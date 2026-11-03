@@ -7,7 +7,15 @@ import type { Hindrance } from "@/lib/wheel-of-time";
 import { Fold, useLingerValue } from "@/components/ui/Fold";
 import { TimeRuler } from "./TimeRuler";
 
-export type NightDraft = { bed: string; wake: string; effort: string[]; hindrances: Hindrance[] };
+/** `today`: the factors picked are today's (for tonight's sleep), not yesterday's (owner, Nov 3: a one-tap switch). */
+export type NightDraft = { bed: string; wake: string; effort: string[]; hindrances: Hindrance[]; today?: boolean };
+
+/** The day after a YYYY-MM-DD key (where today's factors are kept: they belong to tonight's sleep). */
+export function nextDayKey(day: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const x = new Date(y, m - 1, d + 1);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+}
 export const EMPTY_NIGHT: NightDraft = { bed: "", wake: "", effort: [], hindrances: [] };
 export const nightIsEmpty = (n: NightDraft) => !n.bed && !n.wake && !n.effort.length && !n.hindrances.length;
 
@@ -321,22 +329,33 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day,
           </div>
         )}
       </Fold>
+      <span className="mx-auto flex items-center gap-1">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={factorsId}
-        className="wheel-btn mx-auto flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold"
+        className="wheel-btn flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold"
       >
         <WheelIcon />
-        {/* Says once which day the lists are for (not in every section). */}
-        {/* "yesterday", not a date (owner, Nov 2); the date shows on hover. */}
-        <span title={yesterday || undefined}>Factors of sleep · yesterday</span>
+        <span>Factors of sleep</span>
         {checked > 0 && !open && <span className="tabular-nums opacity-80">· {checked}</span>}
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(90deg)" : undefined }}>
           <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
+      {/* Yesterday's factors (for last night) or today's (for tonight): one tap switches (owner, Nov 3). */}
+      <button
+        type="button"
+        onClick={() => set({ today: !value.today })}
+        aria-pressed={!!value.today}
+        title={value.today ? "Logging today's factors (for tonight). Tap for yesterday's" : `Logging yesterday's factors${yesterday ? ` (${yesterday})` : ""}. Tap for today's`}
+        className="wheel-btn flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold"
+      >
+        <span aria-hidden className="text-[11px] opacity-70">⇄</span>
+        {value.today ? "today" : "yesterday"}
+      </button>
+      </span>
 
       {/* Folded: what you picked shows under the button (owner, Nov 2). */}
       <Fold open={!open && checked > 0}>

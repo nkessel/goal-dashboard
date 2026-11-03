@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { CharacterStats } from "./CharacterStats";
 import { HonoraryLevel } from "./HonoraryLevel";
-import { DEFAULT_STATS } from "@/lib/stats";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import type { Profile } from "@/lib/data/types";
 import { xpToNextLevel } from "@/lib/data/xp";
@@ -173,7 +171,7 @@ export function XpSummary({
               ) : (heldByBoss || xpIntoLevel >= xpForNextLevel!) && (boss || bossesEnabled) && profile.display_level == null ? (
                 <FaceBossButton boss={boss && boss.level === level ? boss : null} level={level} />
               ) : null}
-              <CharacterStats order={Array.isArray(profile.stats) ? profile.stats : [...DEFAULT_STATS]} xp={profile.stat_xp ?? {}} />
+              {/* Character traits being grown live in Settings › Character stats, not here (owner, Nov 3). */}
             </div>
           </div>
 

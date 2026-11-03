@@ -1,5 +1,6 @@
 "use client";
 
+import { FloatingWindow } from "@/components/ui/FloatingWindow";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
@@ -315,6 +316,7 @@ const MODE_KEY = "language-window";
 export function LanguageWindow() {
   const [mode, setModeState] = useState<Mode>(null);
   const [ready, setReady] = useState(false);
+  const [chipEdit, setChipEdit] = useState(false);
   const setMode = (m: Mode) => {
     setModeState(m);
     try {
@@ -340,41 +342,96 @@ export function LanguageWindow() {
     return () => window.removeEventListener("language-window", open);
   }, []);
   if (!ready || !mode) return null;
-  return createPortal(
-    mode === "min" ? (
-      <button
-        key="min"
-        type="button"
-        onClick={() => setMode("open")}
-        aria-label="Open Learn a language"
-        className="card-pop-in fixed left-3 z-[96] flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold shadow-lg"
-        style={{ ...GILT, bottom: "calc(env(safe-area-inset-bottom) + 84px)" }}
-      >
-        🗣 Phrases
-      </button>
-    ) : (
+  // A window you move by its title (on a phone too: the title doesn't scroll the page), minimized to a chip you
+  // can name yourself (owner, Nov 3: "Language" with a Japanese character, changed from the gear).
+  return (
+    <FloatingWindow
+      storageKey="language-window-at"
+      width={400}
+      z={96}
+      minimized={mode === "min"}
+      onRestore={() => setMode("open")}
+      label="Open Learn a language (drag to move)"
+      at={() => ({ x: 12, y: Math.max(80, window.innerHeight - 640) })}
+      chip={<ChipFace />}
+    >
       <div
-        key="open"
         role="dialog"
         aria-label="Learn a language"
         data-no-ghost
-        className="card-pop-in parchment fixed left-3 z-[96] flex w-[min(400px,calc(100vw-24px))] flex-col rounded-2xl"
-        style={{ bottom: "calc(env(safe-area-inset-bottom) + 84px)", maxHeight: "min(72dvh, 640px)", background: "linear-gradient(180deg,#fbf3df,#f1e3c0)", border: "1.5px solid #a88a3f", boxShadow: "0 12px 36px rgba(0,0,0,.4)", color: "#2a1c10" }}
+        className="parchment flex min-h-0 w-full flex-col rounded-2xl"
+        style={{ maxHeight: "min(72dvh, 640px)", background: "linear-gradient(180deg,#fbf3df,#f1e3c0)", border: "1.5px solid #a88a3f", boxShadow: "0 12px 36px rgba(0,0,0,.4)", color: "#2a1c10" }}
       >
-        <div className="flex items-center gap-1 px-3 pb-1 pt-2">
+        <div data-drag-handle className="flex cursor-grab touch-none select-none items-center gap-1 px-3 pb-1 pt-2 active:cursor-grabbing" title="Drag to move">
           <h2 className="font-display m-0 flex-1 text-[17px]">🗣 Learn a language</h2>
-          <button type="button" onClick={() => setMode("min")} aria-label="Minimize" title="Minimize (it waits bottom left)" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "#6b5631" }}>
+          <button type="button" onClick={() => setChipEdit((o) => !o)} aria-pressed={chipEdit} aria-label="Settings: the minimized button" title="Settings" className="flex h-8 w-8 items-center justify-center rounded-full" style={{ color: "#6b5631", background: chipEdit ? "rgba(217,180,95,.35)" : undefined }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M10.3 2.8h3.4l.5 2.6 1.6.7 2.2-1.5 2.4 2.4-1.5 2.2.7 1.6 2.6.5v3.4l-2.6.5-.7 1.6 1.5 2.2-2.4 2.4-2.2-1.5-1.6.7-.5 2.6h-3.4l-.5-2.6-1.6-.7-2.2 1.5-2.4-2.4 1.5-2.2-.7-1.6-2.6-.5v-3.4l2.6-.5.7-1.6-1.5-2.2 2.4-2.4 2.2 1.5 1.6-.7z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+              <circle cx="12" cy="12" r="3.1" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+          </button>
+          <button type="button" onClick={() => setMode("min")} aria-label="Minimize" title="Minimize to a button you can move" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "#6b5631" }}>
             –
           </button>
           <button type="button" onClick={() => setMode(null)} aria-label="Close" title="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none" style={{ color: "#6b5631" }}>
             ×
           </button>
         </div>
+        {chipEdit && <ChipEditor />}
         <div className="overflow-y-auto overscroll-contain px-3 pb-3">
           <LearnLanguage />
         </div>
       </div>
-    ),
-    document.body
+    </FloatingWindow>
+  );
+}
+
+const CHIP_KEY = "language-chip";
+const CHIP_DEFAULT = { icon: "🈲", label: "Language" };
+function readChip(): { icon: string; label: string } {
+  try {
+    return { ...CHIP_DEFAULT, ...(JSON.parse(window.localStorage.getItem(CHIP_KEY) ?? "null") ?? {}) };
+  } catch {
+    return CHIP_DEFAULT;
+  }
+}
+function ChipFace() {
+  const [c, setC] = useState(CHIP_DEFAULT);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- your chip's name lives in this browser
+    setC(readChip());
+    const on = () => setC(readChip());
+    window.addEventListener("language-chip", on);
+    return () => window.removeEventListener("language-chip", on);
+  }, []);
+  return (
+    <>
+      <span aria-hidden>{c.icon}</span> {c.label}
+    </>
+  );
+}
+/** The minimized button's icon and word, set from the window's gear. */
+function ChipEditor() {
+  const [c, setC] = useState(readChip);
+  const save = (next: { icon: string; label: string }) => {
+    setC(next);
+    try {
+      window.localStorage.setItem(CHIP_KEY, JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+    window.dispatchEvent(new Event("language-chip"));
+  };
+  return (
+    <div className="reveal mx-3 mb-2 flex flex-wrap items-center gap-1.5 rounded-xl px-2.5 py-2 text-[13px]" style={{ background: "rgba(255,250,238,.6)", border: "1px dashed rgba(139,112,64,.5)" }}>
+      <span className="font-semibold">Minimized button</span>
+      <input value={c.icon} onChange={(e) => save({ ...c, icon: [...e.target.value].slice(-2).join("") || CHIP_DEFAULT.icon })} aria-label="Its icon" className="h-8 w-10 rounded-lg border text-center text-[16px]" style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.7)" }} />
+      <input value={c.label} onChange={(e) => save({ ...c, label: e.target.value.slice(0, 20) })} aria-label="Its word" className="h-8 w-28 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.7)" }} />
+      {["🈲", "あ", "語", "🗣", "🌍"].map((x) => (
+        <button key={x} type="button" onClick={() => save({ ...c, icon: x })} className="h-8 w-8 rounded-lg text-[15px]" style={{ background: c.icon === x ? "rgba(217,180,95,.45)" : undefined }}>
+          {x}
+        </button>
+      ))}
+    </div>
   );
 }
