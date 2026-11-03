@@ -18,7 +18,7 @@ const SOFT = "#6b5631";
  * 4 hours, a number of days, or a time you pick). Other always has a way back; closing changes
  * nothing.
  */
-export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = "top of tomorrow's plan" }: { title: string; onPick: (c: SnoozeChoice) => void; onClose: () => void; /** What Tomorrow does here (imports: back on the list). */ tomorrowHint?: string }) {
+export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = "top of tomorrow's plan", anchor }: { title: string; onPick: (c: SnoozeChoice) => void; onClose: () => void; /** What Tomorrow does here (imports: back on the list). */ tomorrowHint?: string; /** The card it's for: then it's a small menu beside it, not a dialog (owner, Nov 3: "a small menu"). */ anchor?: { top: number; bottom: number; left: number; right: number } | null }) {
   const { closing, close: onClose } = useClosing(closeNow);
   const [other, setOther] = useState(false);
   const [at, setAt] = useState("");
@@ -30,8 +30,9 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
     d.setHours(18, 0, 0, 0);
     return d;
   };
+  const small = !!anchor;
   const choice = (label: string, run: () => void, hint?: string) => (
-    <button key={label} type="button" onClick={run} className="snooze-choice flex h-10 items-center justify-between rounded-xl px-3.5 text-left text-[14.5px] font-semibold" style={{ color: INK }}>
+    <button key={label} type="button" onClick={run} className={`snooze-choice flex ${small ? "h-9" : "h-10"} items-center justify-between rounded-xl px-3.5 text-left text-[14.5px] font-semibold`} style={{ color: INK }}>
       {label}
       {hint && (
         <span className="text-[12px] font-normal" style={{ color: SOFT }}>
@@ -52,13 +53,13 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
   const pickedOk = !!picked && Number.isFinite(picked.getTime()) && picked.getTime() > clock();
 
   return createPortal(
-    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[80] flex items-center justify-center p-4`} style={{ background: "var(--t-overlay, rgba(10,8,4,.55))" }} onClick={(e) => (e.stopPropagation(), onClose())} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.key !== "Escape" && e.stopPropagation()}>
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[80] ${small ? "" : "flex items-center justify-center p-4"}`} style={{ background: small ? "transparent" : "var(--t-overlay, rgba(10,8,4,.55))" }} onClick={(e) => (e.stopPropagation(), onClose())} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.key !== "Escape" && e.stopPropagation()}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Snooze until…"
-        className="card-pop-in relative flex w-full max-w-[320px] flex-col gap-1.5 rounded-2xl p-3.5"
-        style={{ background: "linear-gradient(180deg,#fbf3df,#f1e3c0)", border: "1.5px solid #a88a3f", boxShadow: "0 16px 40px rgba(0,0,0,.45)", color: INK }}
+        className={`card-pop-in ${small ? "fixed w-[min(260px,calc(100vw-16px))] gap-1 p-2.5" : "relative w-full max-w-[320px] gap-1.5 p-3.5"} flex flex-col rounded-2xl`}
+        style={{ background: "linear-gradient(180deg,#fbf3df,#f1e3c0)", border: "1.5px solid #a88a3f", boxShadow: "0 16px 40px rgba(0,0,0,.45)", color: INK, ...(anchor ? menuSpot(anchor, other) : {}) }}
         onClick={(e) => e.stopPropagation()}
       >
         <button type="button" onClick={onClose} aria-label="Close" className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none" style={{ color: SOFT }}>
@@ -70,20 +71,24 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
               ‹
             </button>
           )}
-          <h3 className="m-0 font-display text-[18px]">Snooze until…</h3>
+          <h3 className={`m-0 font-display ${small ? "text-[15.5px]" : "text-[18px]"}`}>Snooze until…</h3>
         </div>
-        <p className="m-0 mb-1 truncate text-[12.5px]" style={{ color: SOFT }}>
-          {title}
-        </p>
+        {!small && (
+          <p className="m-0 mb-1 truncate text-[12.5px]" style={{ color: SOFT }}>
+            {title}
+          </p>
+        )}
         {!other ? (
           <div key="main" className="reveal flex flex-col gap-1">
-            {choice("30 minutes", () => onPick(inMin(30, "for 30 minutes")), hm(new Date(clock() + 30 * 60_000)))}
-            {choice("2 hours", () => onPick(inMin(120, "for 2 hours")), hm(new Date(clock() + 120 * 60_000)))}
-            {choice("Tomorrow", () => onPick({ tomorrow: true }), tomorrowHint)}
+            {/* Tomorrow, 2 days, Other (owner, Nov 3); the short snoozes wait under Other. */}
+            {choice("Tomorrow", () => onPick({ tomorrow: true }), small ? undefined : tomorrowHint)}
+            {choice("2 days", () => onPick({ until: daysOn(2), label: "for 2 days" }), daysOn(2).toLocaleDateString(undefined, { weekday: "short" }))}
             {choice("Other…", () => setOther(true))}
           </div>
         ) : (
           <div key="other" className="reveal flex flex-col gap-1">
+            {choice("30 minutes", () => onPick(inMin(30, "for 30 minutes")), hm(new Date(clock() + 30 * 60_000)))}
+            {choice("2 hours", () => onPick(inMin(120, "for 2 hours")), hm(new Date(clock() + 120 * 60_000)))}
             {evening().getTime() - clock() > 30 * 60_000 && choice("This evening", () => onPick({ until: evening(), label: "until this evening" }), hm(evening()))}
             {choice("4 hours", () => onPick(inMin(240, "for 4 hours")), hm(new Date(clock() + 240 * 60_000)))}
             <div className="mt-1 flex flex-col gap-1 text-[12.5px] font-semibold" style={{ color: SOFT }}>
@@ -127,4 +132,14 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
     </div>,
     document.body
   );
+}
+
+/** Where the small menu sits: under the card's right end, or above it if there's no room below. */
+function menuSpot(a: { top: number; bottom: number; left: number; right: number }, tall: boolean): React.CSSProperties {
+  const w = Math.min(260, window.innerWidth - 16);
+  const h = tall ? 420 : 190;
+  const left = Math.max(8, Math.min(window.innerWidth - w - 8, a.right - w));
+  const below = a.bottom + 6;
+  const top = below + h < window.innerHeight - 8 ? below : Math.max(8, a.top - h - 6);
+  return { left, top, maxHeight: window.innerHeight - 16, overflowY: "auto" };
 }

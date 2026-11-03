@@ -1,5 +1,6 @@
 "use client";
 
+import { Linked } from "@/components/ui/Linked";
 import { progressWords } from "@/lib/progress-words";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -130,7 +131,8 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
                   )}
                 </span>
                 <span className={`min-w-0 flex-1 text-[14px] leading-snug transition-opacity duration-300 ${checked || struck ? "line-through opacity-55" : ""}`} style={{ color: ink }}>
-                  {st.title}
+                  {/* A web address in a step opens (course quests: "links work in the steps", owner Nov 3). */}
+                  <Linked text={st.title} />
                 </span>
               </label>
             </li>

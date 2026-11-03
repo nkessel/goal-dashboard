@@ -5,6 +5,7 @@ import { QuestsTabs } from "@/components/layout/QuestsTabs";
 import { CreateBoardForm } from "@/components/boards/CreateBoardForm";
 import { BoardGrid } from "@/components/boards/BoardGrid";
 import { DreamCloud } from "@/components/boards/DreamCloud";
+import { ArchivedQuests, QuestFinder } from "@/components/boards/QuestFinder";
 import { dreamBoardIds } from "@/lib/dream-boards";
 import { listBoardsWithStatsForOwner } from "@/lib/data/boards";
 import { getProfileById } from "@/lib/data/profiles";
@@ -32,6 +33,8 @@ export default async function BoardsPage() {
         </div>
         <QuestsTabs active="boards" isAdventure={isAdventure} />
 
+        <QuestFinder isAdventure={isAdventure} />
+
         <CreateBoardForm theme={theme} />
 
         {scrolls.length === 0 ? (
@@ -51,6 +54,8 @@ export default async function BoardsPage() {
         )}
 
         <DreamCloud boards={dreams} theme={theme} />
+
+        <ArchivedQuests isAdventure={isAdventure} />
       </div>
     </AppShell>
   );

@@ -23,6 +23,7 @@ import {
   createBoardFromEditorAction,
   createQuestAction,
   deleteTaskAction,
+  archiveTaskAction,
   generateTaskIconAction,
   listBoardOptionsAction,
   listQuestStepsAction,
@@ -59,7 +60,7 @@ import type { QuestTemplate } from "@/lib/quest-templates";
 import { descendants, parentKeys, stepPayload, stepsShare, stepWeights, treeOrder, type StepDraft } from "@/lib/quest-steps";
 import { EditorArrange } from "./EditorArrange";
 import { EarlyBonusFields } from "./EarlyBonusFields";
-import { EDITOR_PARTS, readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
+import { readEditorLayout, serverEditorLayout, subscribeEditorLayout, type EditorPart } from "@/lib/quest-editor-layout";
 import { DateField } from "@/components/ui/DateField";
 
 export type QuestDraft = {
@@ -183,6 +184,8 @@ function dueIso(date: string, time: string): string | null {
  * once. `origin="fab"` makes it rise out of the + button; inside the + sheet
  * (EmbedHost) it renders in place without its own overlay or header.
  */
+const ESTIMATE_PICKS = [5, 10, 15, 30];
+
 export function QuestEditorDialog({
   mode,
   theme = "calm",
@@ -239,6 +242,8 @@ export function QuestEditorDialog({
     const v = task?.estimate_minutes ?? prefill?.estimateMinutes ?? (create?.powerUp || create?.tiny ? 5 : undefined);
     return v != null ? String(v) : "";
   });
+  // "Other" minutes: a field of its own (open when the time isn't one of the picks).
+  const [estOther, setEstOther] = useState(() => !!estimate && !ESTIMATE_PICKS.includes(Number(estimate)));
   // Pieces of time are no longer offered; an existing setting is kept as it is.
   const [chunk] = useState<string>(task?.chunk_minutes ? String(task.chunk_minutes) : "");
   // A stand-in shows its board's due date; the editor only edits its own, so saving doesn't freeze the borrowed one in.
@@ -267,7 +272,8 @@ export function QuestEditorDialog({
   // Arranging the editor in place (its gear).
   const [arranging, setArranging] = useState(false);
   const coarsePointer = useSyncExternalStore(noSubscribe, () => window.matchMedia("(pointer: coarse)").matches, () => false);
-  const [advOpen, setAdvOpen] = useState(false);
+  // Which of the extra pills (what used to sit under "More") is open.
+  const [morePick, setMorePick] = useState<string | null>(null);
   const schedRef = useRef<HTMLDivElement>(null);
   const [stepsReload, setStepsReload] = useState(0);
   const [savedTick, setSavedTick] = useState(false);
@@ -289,6 +295,12 @@ export function QuestEditorDialog({
   const [statsOpen, setStatsOpen] = useState(false);
   // XP you set yourself (an existing quest whose XP isn't its minutes counts): time to complete no longer sets it.
   const [xpOwn, setXpOwn] = useState(() => !!task && task.xp_value > 0 && task.xp_value !== task.estimate_minutes);
+  /** Minutes picked or typed; XP follows the minutes (1 XP a minute) until you set the XP yourself. */
+  const pickEstimate = (v: string) => {
+    setEstimate(v);
+    const m = Math.round(Number(v));
+    if (!xpOwn && Number.isFinite(m) && m > 0) setXp(Math.min(1000, m));
+  };
   const statTotal = Object.values(statSplit).reduce((a, b) => a + b, 0);
   function changeStatSplit(next: Record<string, number>) {
     setStatSplit(next);
@@ -606,6 +618,7 @@ export function QuestEditorDialog({
   const chunkMinutes = chunk.trim() && Number(chunk) > 0 ? Math.round(Number(chunk)) : null;
   const dueAt = dueIso(dueDate, dueTime);
   const hasSchedule = Boolean(dueDate || fixedSchedule || slot || toSchedule || aspiration);
+  const onCalendar = Boolean(fixedSchedule || slot);
 
   // ---- Saving as you go (existing quests) ----------------------------------
   const autosave = Boolean(task) && !review;
@@ -1024,13 +1037,14 @@ export function QuestEditorDialog({
   }
 
 
-  function remove() {
+  function remove(archive = false) {
     if (!task) return;
     setError(null);
     deleted.current = true;
     startSaving(async () => {
       try {
-        await deleteTaskAction(task.id);
+        if (archive) await archiveTaskAction(task.id);
+        else await deleteTaskAction(task.id);
         setPhase("closing");
         setTimeout(onClose, 180);
       } catch (e) {
@@ -1120,122 +1134,9 @@ export function QuestEditorDialog({
     if (!run.length) return null;
     return <LevelScales items={run.map((x) => SCALES[x])} renderRow={(it) => <IconScale label={it.label} icon={it.icon} hint={it.hint} value={it.value} onChange={it.onChange} />} />;
   };
-  const partNodes: Record<EditorPart, React.ReactNode> = {
-    showsIn: (
-      <>
-              {/* Where it shows on Today: Today's Quests, Additional Quests, or the backlog (just its board). One choice. */}
-              {!doingNow && !isCompleted && !fixedSchedule && (
-                <div className="flex items-center gap-2">
-                  <span className={`${labelCls} shrink-0`}>Priority</span>
-                  <div
-                    role="radiogroup"
-                    aria-label="Priority: primary objective (Today's Quests), secondary objective (Additional Quests) or backlog (only on its board)"
-                    className="grid min-h-9 min-w-0 flex-1 grid-cols-3 gap-0.5 rounded-[18px] p-[3px]"
-                    style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.14)" }}
-                  >
-                    {(
-                      [
-                        { v: "today" as const, label: `Primary objective: shows in Today's ${isAdventure ? "Quests" : "Tasks"}`, short: "Primary objective" },
-                        { v: "additional" as const, label: `Secondary objective: shows in Additional ${isAdventure ? "Quests" : "Tasks"}`, short: "Secondary objective" },
-                        { v: "none" as const, label: "Backlog: only on its board", short: "Backlog" },
-                      ]
-                    ).map((o) => {
-                      const on = placement === o.v;
-                      return (
-                        <button
-                          key={o.v}
-                          type="button"
-                          role="radio"
-                          aria-checked={on}
-                          aria-label={o.label}
-                          title={o.label}
-                          onClick={() => setPlacement(o.v)}
-                          className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-[15px] px-1.5 py-0.5 text-[12px] font-semibold leading-[1.1] transition-[background,box-shadow] duration-150"
-                          style={{
-                            background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
-                            boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
-                            color: on ? "#2a1c10" : "var(--t-ink-soft)",
-                          }}
-                        >
-                          <span
-                            aria-hidden
-                            className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full"
-                            style={{ border: `1.5px solid ${on ? "#6b4a12" : "rgba(110,90,50,.55)"}` }}
-                          >
-                            {on && <span className="block h-1.5 w-1.5 rounded-full" style={{ background: "#6b4a12" }} />}
-                          </span>
-                          <span className="text-left">{o.short}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-      </>
-    ),
-    time: (
-      <>
-              {/* Time to complete */}
-              {!doingNow && (
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2.5">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- same clock glyph as the quest card */}
-                    <img src="/design/ui-clock.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-                    <span className={`${labelCls} min-w-0 flex-1`}>Time to complete</span>
-                    <input
-                      type="number"
-                      onFocus={(e) => e.currentTarget.select()}
-                      inputMode="numeric"
-                      min={0}
-                      step={5}
-                      value={estimate}
-                      onChange={(e) => {
-                        setEstimate(e.target.value);
-                        // XP follows the minutes (1 XP a minute) until you set the XP yourself.
-                        const m = Math.round(Number(e.target.value));
-                        if (!xpOwn && Number.isFinite(m) && m > 0) setXp(Math.min(1000, m));
-                      }}
-                      placeholder="—"
-                      aria-label="Minutes to complete"
-                      className="h-9 w-16 rounded-lg border px-2 text-right text-[16px] tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      style={fieldStyle}
-                    />
-                    <span className="text-sm" style={{ color: "var(--t-ink-soft)" }}>
-                      min
-                    </span>
-                  </div>
-                  {/* Calendar and steps: buttons that open their fields. */}
-                  <div className="flex flex-wrap gap-1.5 pl-7">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSchedOpen(true);
-                        requestAnimationFrame(() => schedRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
-                      }}
-                      aria-expanded={schedOpen}
-                      className="hover-glow flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold"
-                      style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: schedOpen ? "rgba(217,180,95,.25)" : "rgba(255,250,235,.35)" }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
-                      <img src="/design/ui-calendar.png" alt="" width={15} height={15} className="h-[15px] w-[15px]" />
-                      {hasSchedule ? "Scheduled" : "Add to calendar"}
-                    </button>
-                    {/* Once there are steps, their own "Add steps" button does this. */}
-                    {!stepsUnavailable && !isCompleted && steps !== null && steps.length === 0 && !addingStep && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAddingStep(true);
-                          requestAnimationFrame(() => newStepRef.current?.focus());
-                        }}
-                        className="hover-glow flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold"
-                        style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
-                      >
-                        <StepsGlyph size={15} />
-                        Add steps
-                      </button>
-                    )}
-                  </div>
+  // Putting it on the calendar, the scheduling list or "not actionable yet": opened from the Due panel (owner, Nov 3: "scheduling goes with the due date").
+  const schedulingBlock = (
+    <>
               {/* Scheduling: due date, a calendar slot, the scheduling list, the matrix and "not actionable yet" — folded away until wanted */}
               {!doingNow && (schedOpen || hasSchedule) && (
                 <div ref={schedRef} className="flex flex-col gap-2">
@@ -1355,6 +1256,113 @@ export function QuestEditorDialog({
                   )}
                 </div>
               )}
+    </>
+  );
+  const partNodes: Record<EditorPart, React.ReactNode> = {
+    showsIn: (
+      <>
+              {/* Where it shows on Today: Today's Quests, Additional Quests, or the backlog (just its board). One choice. */}
+              {!doingNow && !isCompleted && !fixedSchedule && (
+                <div className="flex items-center gap-2">
+                  <span className={`${labelCls} shrink-0`}>Priority</span>
+                  <div
+                    role="radiogroup"
+                    aria-label="Priority: primary objective (Today's Quests), secondary objective (Additional Quests) or backlog (only on its board)"
+                    className="grid min-h-9 min-w-0 flex-1 grid-cols-3 gap-0.5 rounded-[18px] p-[3px]"
+                    style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.14)" }}
+                  >
+                    {(
+                      [
+                        { v: "today" as const, label: `Primary objective: shows in Today's ${isAdventure ? "Quests" : "Tasks"}`, short: "Primary objective" },
+                        { v: "additional" as const, label: `Secondary objective: shows in Additional ${isAdventure ? "Quests" : "Tasks"}`, short: "Secondary objective" },
+                        { v: "none" as const, label: "Backlog: only on its board", short: "Backlog" },
+                      ]
+                    ).map((o) => {
+                      const on = placement === o.v;
+                      return (
+                        <button
+                          key={o.v}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          aria-label={o.label}
+                          title={o.label}
+                          onClick={() => setPlacement(o.v)}
+                          className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-[15px] px-1.5 py-0.5 text-[12px] font-semibold leading-[1.1] transition-[background,box-shadow] duration-150"
+                          style={{
+                            background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
+                            boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
+                            color: on ? "#2a1c10" : "var(--t-ink-soft)",
+                          }}
+                        >
+                          <span
+                            aria-hidden
+                            className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full"
+                            style={{ border: `1.5px solid ${on ? "#6b4a12" : "rgba(110,90,50,.55)"}` }}
+                          >
+                            {on && <span className="block h-1.5 w-1.5 rounded-full" style={{ background: "#6b4a12" }} />}
+                          </span>
+                          <span className="text-left">{o.short}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+      </>
+    ),
+    time: (
+      <>
+              {/* Time to complete */}
+              {!doingNow && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- same clock glyph as the quest card */}
+                    <img src="/design/ui-clock.png" alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+                    <span className={`${labelCls} shrink-0`}>Time</span>
+                    {/* 5, 10, 15 or 30 minutes, or your own (owner, Nov 3). */}
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                      {ESTIMATE_PICKS.map((m) => {
+                        const on = Number(estimate) === m && !estOther;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => (setEstOther(false), pickEstimate(on ? "" : String(m)))}
+                            className="h-8 min-w-10 rounded-full px-2.5 text-[13px] font-semibold tabular-nums"
+                            style={on ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" } : { border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
+                          >
+                            {m}m
+                          </button>
+                        );
+                      })}
+                      {estOther ? (
+                        <span className="reveal flex h-8 items-center gap-1 rounded-full border pl-1 pr-2.5" style={{ borderColor: "#8a6116" }}>
+                          <input
+                            type="number"
+                            autoFocus
+                            onFocus={(e) => e.currentTarget.select()}
+                            inputMode="numeric"
+                            min={0}
+                            step={5}
+                            value={estimate}
+                            onChange={(e) => pickEstimate(e.target.value)}
+                            placeholder="—"
+                            aria-label="Minutes to complete"
+                            className="h-7 w-14 rounded-full border-0 bg-transparent px-1 text-center text-[16px] tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                          <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+                            min
+                          </span>
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => setEstOther(true)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}>
+                          Other
+                        </button>
+                      )}
+                    </span>
+                  </div>
                 </div>
               )}
       </>
@@ -1375,6 +1383,21 @@ export function QuestEditorDialog({
                       {task ? ((task.behind?.length ?? 0) > 0 ? `${task.behind!.length} waiting after this` : "") : seqLinks.length ? `${seqLinks.length} linked` : ""}
                     </span>
                   </button>
+                  {/* Steps live with the sequence (owner, Nov 3): a checklist inside this quest, or quests one after another. */}
+                  {!stepsUnavailable && !isCompleted && steps !== null && steps.length === 0 && !addingStep && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingStep(true);
+                        requestAnimationFrame(() => newStepRef.current?.focus());
+                      }}
+                      className="hover-glow flex h-8 items-center gap-1.5 self-start rounded-full px-3 text-[13px] font-semibold"
+                      style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
+                    >
+                      <StepsGlyph size={15} />
+                      Add steps
+                    </button>
+                  )}
                   {!task && seqOpen && (
                     <div className="reveal flex flex-col gap-2 rounded-xl px-3 py-2.5" style={{ border: "1px dashed rgba(139,112,64,.5)" }}>
                       <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -1779,7 +1802,7 @@ export function QuestEditorDialog({
                   <span className="flex flex-col items-start gap-0.5">
                     <span className={labelCls}>{isAdventure ? "XP reward" : "Points"}</span>
                     {/* Under the title: send some of the XP to character stats (the tray opens below the XP bar). */}
-                    {!doingNow && (!layout.folded.includes("stats") || advOpen) && (
+                    {!doingNow && (
                       <button type="button" onClick={() => setStatsOpen((o) => !o)} aria-expanded={statsOpen} className="flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: statsOpen ? "rgba(217,180,95,.3)" : "rgba(255,250,235,.35)" }}>
                         {statTotal > 0 ? `${Math.round((xp * statTotal) / 100)} XP to stats` : "＋ Add to stats"}
                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: statsOpen ? "rotate(90deg)" : undefined }}>
@@ -2168,21 +2191,40 @@ export function QuestEditorDialog({
     standsFor: !!task && !review,
     alsoOn: !!task && !review,
     private: !doingNow,
-    template: !!task && !review && !!title.trim(),
+    // Templates are out of the editor (owner, Nov 3); the + sheet still has them.
+    template: false,
   };
   const foldedParts = layout.order.filter((k) => layout.folded.includes(k) && partShown[k]);
-  const advancedHeader = foldedParts.length > 0 && (
-    <button type="button" onClick={() => setAdvOpen((o) => !o)} aria-expanded={advOpen} className="flex min-h-9 items-center gap-1.5 border-t pt-2 text-left" style={{ borderColor: "rgba(139,112,64,.25)" }}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: advOpen ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
-        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <span className="text-[14px] font-semibold" style={{ color: "var(--t-ink)" }}>
-        More
-      </span>
-      <span className="ml-auto min-w-0 truncate text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-        {advOpen ? "" : foldedParts.map((k) => MORE_NAMES[k] ?? EDITOR_PARTS.find((p) => p.key === k)?.label).join(", ")}
-      </span>
-    </button>
+  // No "More" fold (owner, Nov 3): the extra parts are small pills in a row, each opening its own panel in place.
+  const SCALE_PARTS: EditorPart[] = ["importance", "urgency", "difficulty", "energy"];
+  const pillKeys: string[] = [...new Set<string>(foldedParts.filter((k) => k !== "stats" && k !== "template").map((k) => (SCALE_PARTS.includes(k) ? "scales" : k)))].concat(task ? ["file"] : []);
+  const pillName = (k: string) => (k === "scales" ? "Importance & effort" : k === "file" ? "Add a file" : k === "matrix" ? "Matrix" : (MORE_NAMES[k as EditorPart] ?? k).replace(/^./, (c) => c.toUpperCase()));
+  const morePills = pillKeys.length > 0 && (
+    <div className="flex flex-col gap-2 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.25)" }}>
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="More details">
+        {pillKeys.map((k) => (
+          <button key={k} type="button" onClick={() => setMorePick((o) => (o === k ? null : k))} aria-expanded={morePick === k} className="qe-fact flex h-8 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" data-open={morePick === k ? "true" : undefined}>
+            <span aria-hidden className="text-[13px] leading-none opacity-70">{morePick === k ? "−" : "+"}</span>
+            {pillName(k)}
+          </button>
+        ))}
+      </div>
+      {morePick && pillKeys.includes(morePick) && (
+        <div key={morePick} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
+          {morePick === "scales" ? (
+            SCALE_PARTS.filter((k) => foldedParts.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)
+          ) : morePick === "file" ? (
+            task && (
+              <div className="flex items-center gap-2">
+                <AddFile taskId={task.id} onAdded={(f) => setAddedFiles((a) => [...a, f])} />
+              </div>
+            )
+          ) : (
+            partNodes[morePick as EditorPart]
+          )}
+        </div>
+      )}
+    </div>
   );
   return createPortal(
     <div
@@ -2298,7 +2340,7 @@ export function QuestEditorDialog({
             <div className="relative flex shrink-0 flex-col items-center gap-1">
               {/* The board, on the avatar like the quest card's tag. */}
               {boardLabel && (
-                <span className="pointer-events-none absolute -left-1.5 -top-1.5 z-[2] max-w-[84px] truncate rounded-md px-1.5 py-[1px] text-[11px] font-semibold" style={{ background: "#f6ecd2", border: "1px solid #a58c66", color: "#3b2a14", boxShadow: "0 1px 2px rgba(0,0,0,.25)" }} title={boardLabel}>
+                <span className="pointer-events-none absolute -top-1.5 left-1/2 z-[2] max-w-[84px] -translate-x-1/2 whitespace-nowrap truncate rounded-md px-1.5 py-[1px] text-[11px] font-semibold" style={{ background: "#f6ecd2", border: "1px solid #a58c66", color: "#3b2a14", boxShadow: "0 1px 2px rgba(0,0,0,.25)" }} title={boardLabel}>
                   {boardLabel}
                 </span>
               )}
@@ -2523,17 +2565,11 @@ export function QuestEditorDialog({
                       <button type="button" onClick={() => setFactOpen((o) => (o === "due" ? null : "due"))} aria-expanded={factOpen === "due"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "due" ? "true" : undefined}>
                         {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
                         <img src="/design/ui-calendar.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />
-                        <span className="max-w-[150px] truncate">{dueDate ? `Due ${dueChipLabel(dueDate)}` : "Due date"}</span>
+                        <span className="max-w-[170px] truncate">{dueDate ? `Due ${dueChipLabel(dueDate)}` : onCalendar ? "On the calendar" : "Due date"}{dueDate && onCalendar ? " · on the calendar" : ""}</span>
                         <FactCaret open={factOpen === "due"} />
                       </button>
                     )}
-                    {!doingNow && !isCompleted && dueDate && (
-                      <button type="button" onClick={() => setFactOpen((o) => (o === "bonus" ? null : "bonus"))} aria-expanded={factOpen === "bonus"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "bonus" ? "true" : undefined}>
-                        <span aria-hidden className="text-[12px]">⏱</span>
-                        <span className="max-w-[150px] truncate">{earlyBonus === null ? "Early bonus" : earlyBonus > 0 || earlyCoins || earlyPerDay ? `Early bonus +${earlyBonus} XP${earlyCoins ? ` · ${earlyCoins} coins` : ""}` : "No early bonus"}</span>
-                        <FactCaret open={factOpen === "bonus"} />
-                      </button>
-                    )}
+
                   </div>
                   {factOpen === "due" && (
                     <div key="due" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
@@ -2556,16 +2592,37 @@ export function QuestEditorDialog({
                           </>
                         )}
                       </div>
+                      {/* Finishing early: a reward, right with the date it's measured from. */}
+                      {dueDate && (
+                        <div className="flex flex-col gap-1.5 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.22)" }}>
+                          <span className="flex items-center gap-1.5 text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
+                            <span aria-hidden className="text-[12px]">⏱</span> Early bonus
+                            <span className="font-normal" style={{ color: "var(--t-ink-soft)" }}>
+                              for finishing before it&rsquo;s due
+                            </span>
+                          </span>
+                          <EarlyBonusFields value={{ xp: earlyBonus, coins: earlyCoins, perDay: earlyPerDay }} onChange={(v) => (setEarlyBonus(v.xp), setEarlyCoins(v.coins), setEarlyPerDay(v.perDay))} chipBorder={chipBorder} />
+                        </div>
+                      )}
+                      {/* A time on the calendar, the scheduling list, "not actionable yet". */}
+                      <div className="flex flex-col gap-1.5 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.22)" }}>
+                        {!schedOpen && !hasSchedule && (
+                          <button
+                            type="button"
+                            onClick={() => setSchedOpen(true)}
+                            className="hover-glow flex h-8 items-center gap-1.5 self-start rounded-full px-3 text-[13px] font-semibold"
+                            style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
+                            <img src="/design/ui-calendar.png" alt="" width={15} height={15} className="h-[15px] w-[15px]" />
+                            Add to calendar
+                          </button>
+                        )}
+                        {schedulingBlock}
+                      </div>
                     </div>
                   )}
-                  {factOpen === "bonus" && dueDate && (
-                    <div key="bonus" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
-                      <span className="text-[13.5px]" style={{ color: "var(--t-ink)" }}>
-                        A reward for finishing before it&rsquo;s due.
-                      </span>
-                      <EarlyBonusFields value={{ xp: earlyBonus, coins: earlyCoins, perDay: earlyPerDay }} onChange={(v) => (setEarlyBonus(v.xp), setEarlyCoins(v.coins), setEarlyPerDay(v.perDay))} chipBorder={chipBorder} />
-                    </div>
-                  )}
+
                   {factOpen && factOpen !== "due" && factOpen !== "bonus" && facts.includes(factOpen) && (
                     <div key={factOpen} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
                       {partNodes[factOpen]}
@@ -2576,14 +2633,8 @@ export function QuestEditorDialog({
             }
             return <Fragment key={k}>{partNodes[k]}</Fragment>;
           })}
-          {!arranging && advancedHeader}
-          {!arranging && advOpen && layout.order.filter((k) => layout.folded.includes(k)).map((k) => <Fragment key={k}>{partNodes[k]}</Fragment>)}
-          {/* Adding a private file (a form, an application) is rare: it waits at the end of More. */}
-          {!arranging && advOpen && task && (
-            <div className="flex items-center gap-2">
-              <AddFile taskId={task.id} onAdded={(f) => setAddedFiles((a) => [...a, f])} />
-            </div>
-          )}
+          {!arranging && morePills}
+
           {pickingSlot && (
             <SlotPickerDialog
               durationMinutes={Math.max(15, Number(estimate) || 30)}
@@ -2668,15 +2719,26 @@ export function QuestEditorDialog({
                   )}
                 </span>
               ) : (
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  {/* Archive keeps it (Boards › Archived quests brings it back); delete is for good. */}
                   <button
                     type="button"
-                    onClick={remove}
+                    onClick={() => remove(true)}
+                    disabled={isSaving}
+                    className="rounded-full px-3 py-1.5 font-semibold disabled:opacity-50"
+                    style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}
+                    title="Keep a copy you can bring back from Boards › Archived quests"
+                  >
+                    Archive
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove()}
                     disabled={isSaving}
                     className="rounded-full px-3 py-1.5 font-semibold disabled:opacity-50"
                     style={{ background: "var(--t-warn)", color: "#fff" }}
                   >
-                    Yes, delete
+                    Delete for good
                   </button>
                   <button type="button" onClick={() => setConfirmingDelete(false)} style={{ color: "var(--t-ink-soft)" }}>
                     Keep
@@ -2709,10 +2771,18 @@ export function QuestEditorDialog({
                 className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-black/[.06]"
                 style={{ color: isPriv ? "#8a6116" : "var(--t-ink-soft)", background: isPriv ? "rgba(217,180,95,.28)" : undefined, opacity: isPriv ? 1 : 0.6 }}
               >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="2" fill={isPriv ? "currentColor" : "none"} fillOpacity={isPriv ? 0.25 : 0} />
-                  <path d={isPriv ? "M8 11V8a4 4 0 0 1 8 0v3" : "M8 11V8a4 4 0 0 1 7.6-1.7"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                {/* A globe while your party can see it, a lock once it's private (owner, Nov 3). */}
+                {isPriv ? (
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="2" fill="currentColor" fillOpacity={0.25} />
+                    <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.9" />
+                    <path d="M3.5 12h17M12 3.5c2.6 2.5 3.8 5.3 3.8 8.5s-1.2 6-3.8 8.5M12 3.5C9.4 6 8.2 8.8 8.2 12s1.2 6 3.8 8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                )}
               </button>
             )}
             <div className="relative ml-auto flex items-center gap-2">

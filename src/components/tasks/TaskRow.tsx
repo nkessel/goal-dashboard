@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
-import { completeTaskAction, deleteTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, snoozeQuestUntilAction, undoSnoozeUntilAction, setNextStepAction } from "@/app/actions";
+import { completeTaskAction, deleteTaskAction, archiveTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, snoozeQuestUntilAction, undoSnoozeUntilAction, setNextStepAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
 import { earlyBirdBonus, earlyBirdCoins, roomToFinishEarly } from "@/lib/next-action";
@@ -142,6 +142,7 @@ export function TaskRow({
   const countUnit = useProgressUnit(task.id);
   const [logOpen, setLogOpen] = useState(false);
   const [snoozing, setSnoozing] = useState(false);
+  const [snoozeAt, setSnoozeAt] = useState<{ top: number; bottom: number; left: number; right: number } | null>(null);
   const [tray, setTrayOpen] = useState(false);
   // Once opened, the steps stay mounted so the tray can slide closed too.
   const [trayEver, setTrayEver] = useState(false);
@@ -293,10 +294,14 @@ export function TaskRow({
     }
     if (action === "snooze") {
       // From the menu: choose how long (swiping snoozes until tomorrow straight away).
-      if (fromMenu) return setSnoozing(true);
+      if (fromMenu) {
+        const r = liRef.current?.getBoundingClientRect();
+        setSnoozeAt(r ? { top: r.top, bottom: r.bottom, left: r.left, right: r.right } : null);
+        return setSnoozing(true);
+      }
       return snoozeNow({ tomorrow: true });
     }
-    if (listMoves && (action === "battle" || action === "offtoday" || action === "delete")) {
+    if (listMoves && (action === "battle" || action === "offtoday" || action === "delete" || action === "archive")) {
       // Leave the list right away (slide left, fade, close the gap), then save.
       const to = action === "battle" ? (task.is_manual_priority ? "other" : "priority") : null;
       startTransition(async () => {
@@ -305,6 +310,7 @@ export function TaskRow({
         try {
           if (action === "battle") await toggleManualPriorityAction(task.id, !task.is_manual_priority);
           else if (action === "offtoday") await setTaskPlacementAction(task.id, "none");
+          else if (action === "archive") await archiveTaskAction(task.id);
           else await deleteTaskAction(task.id);
         } catch (e) {
           resetSlide(liRef.current);
@@ -321,6 +327,8 @@ export function TaskRow({
           await setTaskPlacementAction(task.id, "none");
         } else if (action === "delete") {
           await deleteTaskAction(task.id);
+        } else if (action === "archive") {
+          await archiveTaskAction(task.id);
         } else {
           setDone(true);
           // Save in the background; celebrate as soon as the check has landed
@@ -443,7 +451,8 @@ export function TaskRow({
             setMenuAnchor(e.currentTarget);
             setMenu((m) => (m === "dots" ? null : "dots"));
           }}
-          className="quest-dots flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"
+          // A finger-sized target (owner, Nov 3: "⋯ opens the steps tray" — a near miss landed on the card).
+          className="quest-dots -mr-1 -mt-1 flex h-10 w-10 items-center justify-center rounded-full hover:bg-black/5"
           style={{ color: "var(--t-ink-soft)" }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -659,7 +668,7 @@ export function TaskRow({
                 </button>
               );
             })()}
-            {snoozing && <SnoozePicker title={task.title} onPick={snoozeNow} onClose={() => setSnoozing(false)} />}
+            {snoozing && <SnoozePicker title={task.title} anchor={snoozeAt} onPick={snoozeNow} onClose={() => setSnoozing(false)} />}
             {bonusOpen && <EarlyBonusPopup taskId={task.id} initial={{ xp: task.early_bonus_xp ?? null, coins: task.early_bonus_coins ?? null, perDay: task.early_bonus_per_day ?? null }} onClose={() => setBonusOpen(false)} />}
           </div>
           {((task.progress ?? 0) > 0 || (task.steps_total ?? 0) > 0 || !!countUnit) && (

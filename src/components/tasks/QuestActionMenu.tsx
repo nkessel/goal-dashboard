@@ -9,7 +9,7 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { arrangeMenu, readMenuLayout, saveMenuLayout, serverMenuLayout, subscribeMenuLayout, type MenuLayout } from "@/lib/quest-menu-layout";
 
-export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "board" | "earlier" | "nextstep" | "sequence" | "delete";
+export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "board" | "earlier" | "nextstep" | "sequence" | "delete" | "archive";
 
 /**
  * The quest card's action list — opened from the card's icon (the blank
@@ -147,10 +147,16 @@ export function QuestActionMenu({
     >
       {confirmDelete ? (
         <div className="flex flex-col gap-2 p-3 text-sm">
-          <p className="font-semibold">{isAdventure ? "Delete this quest for good?" : "Delete this task for good?"}</p>
-          <div className="flex justify-end gap-2">
+          <p className="font-semibold">{isAdventure ? "Archive this quest, or delete it for good?" : "Archive this task, or delete it for good?"}</p>
+          <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+            Archived ones wait under Boards › Archived quests, ready to bring back.
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
             <button type="button" onClick={() => setConfirmDelete(false)} className="h-9 rounded-full px-3" style={{ color: "var(--t-ink-soft)" }}>
               Cancel
+            </button>
+            <button type="button" onClick={() => onPick("archive")} className="h-9 rounded-full px-4 font-semibold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
+              Archive
             </button>
             <button
               type="button"
@@ -158,7 +164,7 @@ export function QuestActionMenu({
               className="h-9 rounded-full px-4 font-semibold"
               style={{ background: "var(--t-warn)", color: "#fff" }}
             >
-              Delete
+              Delete for good
             </button>
           </div>
         </div>

@@ -661,6 +661,52 @@ export async function deleteTaskAction(taskId: string) {
   revalidatePath("/boards", "layout");
 }
 
+/**
+ * Archive instead of delete (owner, Nov 3: "a record of deleted quests that can be recovered"): the quest and its
+ * steps are kept whole in the account's extras (last 60), then the quest is removed. Restoring puts both back.
+ */
+type ArchivedQuest = { at: string; task: Record<string, unknown>; steps: Record<string, unknown>[] };
+function archivedOf(extras: Record<string, unknown>): ArchivedQuest[] {
+  return (Array.isArray(extras.archivedQuests) ? (extras.archivedQuests as ArchivedQuest[]) : []).filter((a) => a && a.task && typeof a.task.id === "string");
+}
+
+export async function archiveTaskAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  const db = supabaseAdmin();
+  const { data: row } = await db.from("tasks").select("*").eq("id", taskId).eq("owner_id", ownerId).maybeSingle<Record<string, unknown>>();
+  if (!row) throw new Error("That quest isn't there any more.");
+  const { data: steps } = await db.from("quest_steps").select("*").eq("owner_id", ownerId).eq("task_id", taskId);
+  const extras = await readExtras(ownerId);
+  const list = [{ at: new Date().toISOString(), task: row, steps: (steps ?? []) as Record<string, unknown>[] }, ...archivedOf(extras).filter((a) => a.task.id !== taskId)].slice(0, 60);
+  const { error } = await db.from("profiles").update({ life_wheel: { ...extras, archivedQuests: list } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't archive it: ${error.message}`);
+  await deleteTaskAction(taskId);
+}
+
+/** Archived quests, newest first (title, when, board). */
+export async function listArchivedQuestsAction() {
+  const ownerId = await requireProfileId();
+  return archivedOf(await readExtras(ownerId)).map((a) => ({ id: a.task.id as string, title: String(a.task.title ?? "A quest"), at: a.at, boardId: (a.task.board_id as string | null) ?? null, steps: a.steps.length }));
+}
+
+export async function restoreArchivedQuestAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  const db = supabaseAdmin();
+  const extras = await readExtras(ownerId);
+  const all = archivedOf(extras);
+  const hit = all.find((a) => a.task.id === taskId);
+  if (!hit) throw new Error("That quest isn't in the archive.");
+  // Back as it was, open again (no XP is paid twice: deleting took back what it had paid).
+  const task = { ...hit.task, owner_id: ownerId, status: hit.task.status === "completed" ? "open" : hit.task.status, completed_at: null, xp_awarded: null, locked_by_task_id: null };
+  const { error } = await db.from("tasks").insert(task);
+  if (error) throw new Error(`Couldn't bring it back: ${error.message}`);
+  if (hit.steps.length) await db.from("quest_steps").insert(hit.steps.map((st) => ({ ...st, owner_id: ownerId }))).then(() => {}, () => {});
+  await db.from("profiles").update({ life_wheel: { ...extras, archivedQuests: all.filter((a) => a.task.id !== taskId) } }).eq("id", ownerId);
+  revalidatePath("/");
+  revalidatePath("/boards", "layout");
+  return { title: String(hit.task.title ?? "") };
+}
+
 export async function reopenTaskAction(taskId: string) {
   const ownerId = await requireProfileId();
   const before = await tasksData.getTask(taskId, ownerId);

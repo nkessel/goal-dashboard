@@ -91,6 +91,9 @@ export const FLOWS = [
       // Quest editor from the first quest card.
       if (await h.tap("text=Pick up medication", "open quest editor", { expectMove: true })) {
         await h.check("quest editor");
+        // The extra pills (no "More" fold): open the scales, then the due panel with scheduling and early bonus.
+        if (await h.tap((p) => p.getByRole("button", { name: /importance & effort/i }).first(), "editor: scales pill", { optional: true, expectMove: true })) await h.check("quest editor: scales");
+        if (await h.tap((p) => p.getByRole("button", { name: /^due date$/i }).first(), "editor: due", { optional: true, expectMove: true })) await h.check("quest editor: due panel");
         await h.typeIn((p) => p.locator("[role=dialog] input, [role=dialog] textarea").first(), "quest editor title");
         await h.tap(/^close$|^×$/i, "close quest editor", { optional: true });
         await esc(h);
@@ -117,6 +120,16 @@ export const FLOWS = [
       // A quest's ⋯ menu.
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu", { optional: true })) {
         await h.check("quest menu");
+        await esc(h);
+      }
+      // Snooze from a quest's ⋯: a small menu beside the card (Tomorrow, 2 days, Other; owner, Nov 3).
+      if (await h.tap((p) => p.locator("li", { hasText: "Pick up medication" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for snooze", { optional: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /snooze/i }).first(), "snooze menu", { optional: true, expectMove: true })) {
+          await h.check("snooze menu");
+          await h.tap("text=Other…", "snooze other", { optional: true, expectMove: true });
+          await h.check("snooze menu: other");
+        }
+        await esc(h);
         await esc(h);
       }
       // A quest with steps: tapping its card slides the steps tray open under it (repeat ask 9: no overlap).
@@ -347,6 +360,11 @@ export const FLOWS = [
         await h.goto(path);
         await h.check("loaded");
       }
+      // Find a quest from the boards list.
+      await h.goto("/boards");
+      await h.page.getByLabel("Find a quest").first().fill("insurance").catch(() => {});
+      await h.settle(900);
+      await h.check("boards: find a quest");
       // The first board.
       await h.goto("/boards");
       if (await h.tap((p) => p.locator("main a[href^='/boards/']").first(), "open a board", { optional: true, expectMove: true })) {
