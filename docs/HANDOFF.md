@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-02 (afternoon), `main` @ see `git log` (Plan my day; welcome toucan, habits, sleep ruler; faster first screen)
+- **Last updated:** 2026-11-03, `main` @ see `git log` (Plan my day; welcome toucan, habits, sleep ruler; faster first screen)
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** ~86 notes (the app's count, Nov 2 afternoon; query in section 3; the owner's own notes also read at /journal › App feedback when no DB connector). Not marked shipped this push (no database access from that session). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
 
@@ -150,6 +150,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 3: Habit editor (repeat ask 15): sub-habits always shown under the name, each row dragged to reorder (no ↑), renamed in place, a dot or right-click opens XP, coins and Remove under the row (`evening/SubHabitList.tsx`); a ticked sub-habit pays its own XP/coins, unticking takes them back (`payStep`, `setRiteStepCheck` now returns whether it changed; stored in `rites.steps` jsonb, no migration). Repeats: Daily / Certain days / Every week / Every month / Custom… (unit as chips, no dropdown; yearly stays under Custom). Takes: 5/10/15/30 + Other (shows the current value). No Cancel: the button reads Close until something changes, then Save. Sequences: tap a quest in "Edit the sequence…" to edit it (`questForEditAction`), the dialog sits near the top so loading suggestions no longer shifts it under the pointer, and suggestions wait until the field is touched. Data: "Get my parents' calendars onto my Google Calendar" and "Help Dad get a better computer" wait behind "Schedule time to be with my dad" (Family board).
 
 - Nov 3: Sleep and wake times to the minute (owner: "allow exact timing"): the ruler reads every minute as you swipe (no 5-minute snapping; ticks still mark 5s), ‹ › nudge by a minute, the exact time shows between them and a tap on it types one (`TimeRuler.tsx`). Open feedback written down by area in `docs/FEEDBACK-OPEN.md`.
 

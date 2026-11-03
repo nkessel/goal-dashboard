@@ -65,7 +65,7 @@ export type RiteView = {
   /** Habits: repeat on an interval (every N days/weeks/months/years); null = weekdays. */
   repeat?: import("@/lib/habit-repeat").Repeat | null;
   /** Habits: sub-habits ticked off each day. */
-  steps?: { id: string; title: string }[];
+  steps?: { id: string; title: string; xp?: number; coins?: number }[];
 };
 
 const CORE_ZONE = "zone:core";

@@ -36,7 +36,8 @@ export type Rite = {
   updated_at: string;
 };
 
-export type RiteStep = { id: string; title: string };
+/** A sub-habit; `xp`/`coins` are paid when it is ticked (on top of the habit's own). */
+export type RiteStep = { id: string; title: string; xp?: number; coins?: number };
 
 export type RiteCompletion = {
   id: string;
@@ -328,7 +329,11 @@ export function cleanRiteSteps(raw: unknown): RiteStep[] {
   return (Array.isArray(raw) ? raw : [])
     .map((x) => (x ?? {}) as Partial<RiteStep>)
     .filter((x) => typeof x.id === "string" && typeof x.title === "string" && x.title.trim())
-    .map((x) => ({ id: x.id!.slice(0, 40), title: x.title!.replace(/\s+/g, " ").trim().slice(0, 120) }))
+    .map((x) => {
+      const xp = Math.max(0, Math.min(100, Math.round(Number(x.xp) || 0)));
+      const coins = Math.max(0, Math.min(50, Math.round(Number(x.coins) || 0)));
+      return { id: x.id!.slice(0, 40), title: x.title!.replace(/\s+/g, " ").trim().slice(0, 120), ...(xp ? { xp } : {}), ...(coins ? { coins } : {}) };
+    })
     .slice(0, 20);
 }
 
@@ -345,7 +350,8 @@ export async function listRiteStepChecks(ownerId: string, sinceDay: string): Pro
   return (data ?? []) as { rite_id: string; step_id: string; day: string }[];
 }
 
-export async function setRiteStepCheck(ownerId: string, riteId: string, stepId: string, day: string, on: boolean): Promise<void> {
+/** Tick or untick one sub-habit; true when that changed something (so its XP is paid once). */
+export async function setRiteStepCheck(ownerId: string, riteId: string, stepId: string, day: string, on: boolean): Promise<boolean> {
   const db = supabaseAdmin();
   if (on) {
     const { error } = await db.from("rite_step_checks").insert({ owner_id: ownerId, rite_id: riteId, step_id: stepId, day });
@@ -353,8 +359,9 @@ export async function setRiteStepCheck(ownerId: string, riteId: string, stepId: 
       if (/rite_step_checks/.test(error.message)) throw new Error("Sub-habits need a quick database update first.");
       throw new Error(`Couldn't tick that: ${error.message}`);
     }
-  } else {
-    const { error } = await db.from("rite_step_checks").delete().eq("owner_id", ownerId).eq("rite_id", riteId).eq("step_id", stepId).eq("day", day);
-    if (error) throw new Error(`Couldn't untick that: ${error.message}`);
+    return !error;
   }
+  const { data, error } = await db.from("rite_step_checks").delete().eq("owner_id", ownerId).eq("rite_id", riteId).eq("step_id", stepId).eq("day", day).select("step_id");
+  if (error) throw new Error(`Couldn't untick that: ${error.message}`);
+  return (data?.length ?? 0) > 0;
 }

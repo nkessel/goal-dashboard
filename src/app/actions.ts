@@ -3699,6 +3699,12 @@ export async function sequenceOfAction(taskId: string) {
   return sequenceOf(ownerId, taskId);
 }
 
+/** One quest, whole, to open in the editor from somewhere that only has its id (e.g. a quest waiting in a sequence). */
+export async function questForEditAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  return tasksData.getTask(taskId, ownerId);
+}
+
 /** Open quests to pick from when adding one to a sequence (title search). */
 export async function findQuestsAction(query: string, exclude: string[] = []) {
   const ownerId = await requireProfileId();
@@ -3805,7 +3811,7 @@ export async function sequenceMoveAction(taskId: string, dir: -1 | 1, viewFrom?:
 /* ── Sub-habits ──────────────────────────────────────────────────────── */
 
 /** Save a habit's sub-habit checklist. */
-export async function setRiteStepsAction(riteId: string, steps: { id: string; title: string }[]) {
+export async function setRiteStepsAction(riteId: string, steps: { id: string; title: string; xp?: number; coins?: number }[]) {
   const ownerId = await requireProfileId();
   const clean = ritesData.cleanRiteSteps(steps);
   await ritesData.setRiteSteps(ownerId, riteId, clean);
@@ -3822,8 +3828,11 @@ export async function tickRiteStepAction(riteId: string, stepId: string, day: st
   assertDay(day);
   const rite = await ritesData.getRite(riteId, ownerId);
   if (!rite) throw new Error("That habit isn't here anymore.");
-  await ritesData.setRiteStepCheck(ownerId, riteId, stepId, day, on);
+  const changed = await ritesData.setRiteStepCheck(ownerId, riteId, stepId, day, on);
   const steps = ritesData.cleanRiteSteps(rite.steps);
+  // A sub-habit with its own XP or coins pays them when ticked (and takes them back when unticked).
+  const step = steps.find((st) => st.id === stepId);
+  if (changed && step) await payStep(ownerId, step, on ? 1 : -1);
   const checks = ((await ritesData.listRiteStepChecks(ownerId, day)) ?? []).filter((c) => c.rite_id === riteId && c.day === day);
   const ticked = new Set(checks.map((c) => c.step_id));
   const all = steps.length > 0 && steps.every((st) => ticked.has(st.id));
@@ -3835,13 +3844,21 @@ export async function tickRiteStepAction(riteId: string, stepId: string, day: st
   return { done: all, xp: completed?.xp ?? 0 };
 }
 
+async function payStep(ownerId: string, step: ritesData.RiteStep, sign: 1 | -1) {
+  if (step.xp) await xp.awardXp(ownerId, sign * step.xp, "task_completed").catch(() => {});
+  if (step.coins) await rewardsData.addCoins(ownerId, sign * step.coins).catch(() => {});
+}
+
 /** Check (or clear) every sub-habit at once, with the habit itself. */
 export async function tickAllRiteStepsAction(riteId: string, day: string, on: boolean) {
   const ownerId = await requireProfileId();
   assertDay(day);
   const rite = await ritesData.getRite(riteId, ownerId);
   if (!rite) return;
-  for (const st of ritesData.cleanRiteSteps(rite.steps)) await ritesData.setRiteStepCheck(ownerId, riteId, st.id, day, on).catch(() => {});
+  for (const st of ritesData.cleanRiteSteps(rite.steps)) {
+    const changed = await ritesData.setRiteStepCheck(ownerId, riteId, st.id, day, on).catch(() => false);
+    if (changed) await payStep(ownerId, st, on ? 1 : -1);
+  }
 }
 
 /* ── Final Boss battle plans ─────────────────────────────────────────── */

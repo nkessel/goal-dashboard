@@ -14,9 +14,10 @@ import { CoinIcon } from "@/components/ui/Icons";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import { coinsForXp } from "@/lib/coins";
 import { RiteGlyph, glyphFor } from "./RiteGlyph";
+import { SubHabitList, type SubHabit } from "./SubHabitList";
 
 const XP_PRESETS = [1, 3, 5, 10, 15];
-const MINUTE_PRESETS = [5, 10, 15, 30, 60];
+const MINUTE_PRESETS = [5, 10, 15, 30];
 
 /**
  * Create or edit an evening rite (name, note, XP, whether it's non-negotiable)
@@ -52,9 +53,7 @@ export function RiteEditorDialog({
   const [coinValue, setCoinValue] = useState<number | null>(rite?.coin_value ?? null);
   const [minutes, setMinutes] = useState<number | null>(rite?.estimate_minutes ?? null);
   // Sub-habits: a checklist ticked off each day.
-  const [subs, setSubs] = useState<{ id: string; title: string }[]>(rite?.steps ?? []);
-  const [subText, setSubText] = useState("");
-  const [subsOpen, setSubsOpen] = useState((rite?.steps?.length ?? 0) > 0 || !!startWithSub);
+  const [subs, setSubs] = useState<SubHabit[]>(rite?.steps ?? []);
   const focusSub = !!startWithSub;
   const [repeatsOpen, setRepeatsOpen] = useState(true);
   // Or on an interval: every N days, weeks, months or years, from a start date.
@@ -63,15 +62,27 @@ export function RiteEditorDialog({
     const d = new Date(Date.now() - 330 * 60_000);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
-  const [customOpen, setCustomOpen] = useState(!!rite?.repeat && !(rite.repeat.every === 1 && rite.repeat.unit !== "day"));
+  const [customOpen, setCustomOpen] = useState(!!rite?.repeat && !(rite.repeat.every === 1 && (rite.repeat.unit === "week" || rite.repeat.unit === "month")));
   const [dueOpen, setDueOpen] = useState(!!rite?.due_time);
   const subsChanged = JSON.stringify(subs) !== JSON.stringify(rite?.steps ?? []);
-  function addSub() {
-    const t = subText.replace(/\s+/g, " ").trim();
-    if (!t) return;
-    setSubs((l) => [...l, { id: Math.random().toString(36).slice(2, 10), title: t }]);
-    setSubText("");
-  }
+  // Has anything changed? Then the footer's Close becomes Save (owner: "Close turns into Save").
+  const dirty =
+    !rite ||
+    subsChanged ||
+    title !== rite.title ||
+    description !== (rite.description ?? "") ||
+    xp !== rite.xp_value ||
+    isCore !== rite.is_core ||
+    JSON.stringify(days) !== JSON.stringify(rite.days ?? [0, 1, 2, 3, 4, 5, 6]) ||
+    dueTime !== (rite.due_time ?? "") ||
+    windowTo !== (rite.window_to ?? "") ||
+    (icon?.url ?? null) !== (rite.icon_source ? rite.icon_key : null) ||
+    coinValue !== (rite.coin_value ?? null) ||
+    minutes !== (rite.estimate_minutes ?? null) ||
+    JSON.stringify(repeat) !== JSON.stringify(rite.repeat ?? null);
+  // "Certain days" shows the weekday picker; "Daily" is every day with nothing to pick.
+  const [certainDays, setCertainDays] = useState(!rite?.repeat && (rite?.days?.length ?? 7) < 7);
+  const [minutesOther, setMinutesOther] = useState(minutes !== null && !MINUTE_PRESETS.includes(minutes));
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -87,9 +98,10 @@ export function RiteEditorDialog({
     startSaving(async () => {
       try {
         if (isHabit && !repeat && days.length === 0) throw new Error("Pick at least one day.");
+        if (rite && !dirty) return close();
         const picture = { iconKey: icon?.url ?? null, iconSource: icon?.source ?? null };
         const schedule = isHabit ? { days: repeat ? null : days.length === 7 ? null : days, repeat, dueTime: dueTime || null, windowTo: dueTime && windowTo ? windowTo : null, ...picture, coinValue, estimateMinutes: minutes } : picture;
-        const pending = subText.trim() ? [...subs, { id: Math.random().toString(36).slice(2, 10), title: subText.trim() }] : subs;
+        const pending = subs;
         if (rite) {
           await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
           if (isHabit && (subsChanged || pending !== subs)) await setRiteStepsAction(rite.id, pending);
@@ -190,11 +202,23 @@ export function RiteEditorDialog({
         </div>
 
         {isHabit && (
+          <div data-mi="subs" className="relative z-[1] flex flex-col gap-1">
+            <span className="text-[14.5px] font-semibold">Sub-habits</span>
+            <SubHabitList list={subs} onChange={setSubs} autoFocus={focusSub} />
+            {subs.length > 0 && (
+              <p className="m-0 pl-2 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+                Drag to reorder · right-click or tap a dot for XP and coins
+              </p>
+            )}
+          </div>
+        )}
+
+        {isHabit && (
           <div data-mi="repeats" className="relative z-[1] flex flex-col gap-2">
             <button type="button" onClick={() => setRepeatsOpen((o) => !o)} aria-expanded={repeatsOpen} className="flex items-center gap-1.5 self-start text-[14.5px] font-semibold">
               <Caret open={repeatsOpen} />
               Repeats
-              {!repeatsOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{repeat ? repeatLabel(repeat).toLowerCase() : days.length === 7 ? "every day" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "no days"}</span>}
+              {!repeatsOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{repeat ? repeatLabel(repeat).toLowerCase() : days.length === 7 ? "daily" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "no days"}</span>}
             </button>
             {repeatsOpen && (
             <div className="reveal flex flex-col gap-2">
@@ -202,21 +226,22 @@ export function RiteEditorDialog({
             <div className="flex flex-wrap items-center gap-1.5">
               {(
                 [
-                  ["weekdays", "On weekdays"],
+                  ["daily", "Daily"],
+                  ["days", "Certain days"],
                   ["week", "Every week"],
                   ["month", "Every month"],
-                  ["year", "Every year"],
                   ["custom", "Custom…"],
                 ] as const
               ).map(([k, label]) => {
-                const on = k === "weekdays" ? !repeat : k === "custom" ? !!repeat && customOpen : !!repeat && !customOpen && repeat.every === 1 && repeat.unit === k;
+                const on = k === "daily" ? !repeat && !certainDays : k === "days" ? !repeat && certainDays : k === "custom" ? !!repeat && customOpen : !!repeat && !customOpen && repeat.every === 1 && repeat.unit === k;
                 return (
                   <button
                     key={k}
                     type="button"
                     aria-pressed={on}
                     onClick={() => {
-                      if (k === "weekdays") return (setRepeat(null), setCustomOpen(false));
+                      if (k === "daily") return (setRepeat(null), setCustomOpen(false), setCertainDays(false), setDays([0, 1, 2, 3, 4, 5, 6]));
+                      if (k === "days") return (setRepeat(null), setCustomOpen(false), setCertainDays(true));
                       if (k === "custom") return (setCustomOpen(true), setRepeat((r) => r ?? { every: 2, unit: "week", from: todayKey() }));
                       setCustomOpen(false);
                       setRepeat((r) => ({ every: 1, unit: k, from: r?.from ?? todayKey() }));
@@ -246,13 +271,18 @@ export function RiteEditorDialog({
                       className="h-8 w-[58px] rounded-full border px-1.5 text-center text-[16px] font-semibold tabular-nums"
                       style={{ borderColor: "#b39a6a" }}
                     />
-                    <select value={repeat.unit} onChange={(e) => setRepeat({ ...repeat, unit: e.target.value as Repeat["unit"] })} aria-label="Days, weeks, months or years" className="h-8 rounded-full border bg-transparent px-2 text-[14px]" style={{ borderColor: "#b39a6a" }}>
-                      {(["day", "week", "month", "year"] as const).map((u) => (
-                        <option key={u} value={u}>
-                          {repeat.every === 1 ? u : `${u}s`}
-                        </option>
-                      ))}
-                    </select>
+{(["day", "week", "month", "year"] as const).map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        aria-pressed={repeat.unit === u}
+                        onClick={() => setRepeat({ ...repeat, unit: u })}
+                        className="h-8 rounded-full px-2.5 text-[13px] font-semibold"
+                        style={repeat.unit === u ? { background: "rgba(217,180,95,.55)", border: "1px solid #5a4520", color: "#2a1c10" } : { border: "1px solid #b39a6a", color: "var(--t-ink-soft)" }}
+                      >
+                        {repeat.every === 1 ? u : `${u}s`}
+                      </button>
+                    ))}
                   </>
                 )}
                 <span>starting</span>
@@ -262,16 +292,8 @@ export function RiteEditorDialog({
                 </span>
               </div>
             )}
-            {!repeat && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setDays(days.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
-                className="h-8 rounded-full px-3 text-[13.5px] font-semibold"
-                style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}
-              >
-                {days.length === 7 ? "Deselect all" : "Select all"}
-              </button>
+            {!repeat && certainDays && (
+            <div className="reveal flex flex-wrap items-center gap-1.5">
               {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => {
                 const on = days.includes(i);
                 return (
@@ -303,7 +325,7 @@ export function RiteEditorDialog({
                 key={m}
                 type="button"
                 aria-pressed={minutes === m}
-                onClick={() => setMinutes(minutes === m ? null : m)}
+                onClick={() => (setMinutes(minutes === m ? null : m), setMinutesOther(false))}
                 className="h-8 min-w-10 rounded-full px-2.5 text-[13.5px] font-semibold tabular-nums"
                 style={
                   minutes === m
@@ -314,25 +336,35 @@ export function RiteEditorDialog({
                 {m}m
               </button>
             ))}
-            <input
-              type="number"
-              onFocus={(e) => e.currentTarget.select()}
-              inputMode="numeric"
-              min={1}
-              max={600}
-              value={minutes !== null && !MINUTE_PRESETS.includes(minutes) ? minutes : ""}
-              placeholder="other"
-              onChange={(e) => {
-                const n = Math.round(Number(e.target.value) || 0);
-                setMinutes(n > 0 ? Math.min(600, n) : null);
-              }}
-              aria-label="Minutes it takes (any amount)"
-              className="other-pill h-8 w-[78px] appearance-none rounded-full border bg-[rgba(255,250,238,.7)] px-2 text-center text-[15px] font-semibold tabular-nums placeholder:font-normal placeholder:italic placeholder:text-[13.5px] placeholder:text-[var(--t-ink-soft)] [appearance:textfield] focus:outline-none focus:ring-2 focus:ring-[rgba(138,97,22,.35)] [&::-webkit-inner-spin-button]:appearance-none"
-              style={{
-                borderColor: minutes !== null && !MINUTE_PRESETS.includes(minutes) ? "#5a4520" : "#b39a6a",
-                background: minutes !== null && !MINUTE_PRESETS.includes(minutes) ? "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" : undefined,
-              }}
-            />
+            {!minutesOther ? (
+              <button
+                type="button"
+                onClick={() => setMinutesOther(true)}
+                className="h-8 rounded-full px-3 text-[13.5px] font-semibold"
+                style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}
+              >
+                Other
+              </button>
+            ) : (
+              <span className="reveal flex h-8 items-center gap-1 rounded-full border pl-1 pr-2.5" style={{ borderColor: "#5a4520", background: minutes !== null && !MINUTE_PRESETS.includes(minutes) ? "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" : undefined }}>
+                <input
+                  type="number"
+                  autoFocus
+                  onFocus={(e) => e.currentTarget.select()}
+                  inputMode="numeric"
+                  min={1}
+                  max={600}
+                  value={minutes ?? ""}
+                  onChange={(e) => {
+                    const n = Math.round(Number(e.target.value) || 0);
+                    setMinutes(n > 0 ? Math.min(600, n) : null);
+                  }}
+                  aria-label="Minutes it takes (any amount)"
+                  className="h-7 w-[52px] appearance-none rounded-full border-0 bg-transparent px-1 text-center text-[16px] font-semibold tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="text-[13px] font-semibold">min</span>
+              </span>
+            )}
             <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
               {minutes ? "focus mode's timer" : "optional"}
             </span>
@@ -445,64 +477,6 @@ export function RiteEditorDialog({
           </div>
         )}
 
-        {isHabit && (
-          <div data-mi="subs" className="relative z-[1] flex flex-col gap-1.5">
-            {subs.length > 0 && <span className="text-[14.5px] font-semibold">Sub-habits</span>}
-            {!subsOpen && subs.length === 0 ? (
-              <button type="button" onClick={() => setSubsOpen(true)} className="flex h-9 items-center gap-2 self-start rounded-full px-3 text-[14px] font-semibold" style={{ border: "1.5px dashed #b39a6a", color: "var(--t-ink)" }}>
-                <span aria-hidden className="text-[16px] leading-none" style={{ color: "#8a6116" }}>+</span>
-                Add a sub-habit
-                <span className="text-[12px] font-normal" style={{ color: "var(--t-ink-soft)" }}>steps you tick off each day</span>
-              </button>
-            ) : (
-              <div className="reveal flex flex-col gap-1 pl-3">
-                <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                  {subs.map((st, i) => (
-                    <li key={st.id} className="flex items-center gap-2">
-                      <span aria-hidden className="h-[18px] w-[18px] shrink-0 rounded-full" style={{ border: "2px solid #a58c66", background: "rgba(255,250,238,.6)" }} />
-                      <input
-                        value={st.title}
-                        onChange={(e) => setSubs((l) => l.map((x) => (x.id === st.id ? { ...x, title: e.target.value } : x)))}
-                        aria-label={`Sub-habit ${i + 1}`}
-                        className="h-8 min-w-0 flex-1 rounded-md border-0 bg-transparent px-1 text-[15px]"
-                      />
-                      <button type="button" disabled={i === 0} onClick={() => setSubs((l) => { const n = [...l]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })} aria-label="Move up" className="flex h-7 w-7 items-center justify-center rounded-full text-[14px] hover:bg-black/5 disabled:opacity-25">
-                        ↑
-                      </button>
-                      <button type="button" onClick={() => setSubs((l) => l.filter((x) => x.id !== st.id))} aria-label={`Remove ${st.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[16px] hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex items-center gap-2">
-                  <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed text-[12px]" style={{ borderColor: "#a58c66", color: "var(--t-ink-soft)" }}>
-                    +
-                  </span>
-                  <input
-                    value={subText}
-                    onChange={(e) => setSubText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !(e.ctrlKey || e.metaKey)) {
-                        e.preventDefault();
-                        addSub();
-                      }
-                    }}
-                    onBlur={addSub}
-                    autoFocus={subs.length === 0 || focusSub}
-                    placeholder={subs.length ? "Another step" : "e.g. Food and water"}
-                    aria-label="Add a sub-habit"
-                    className="h-8 min-w-0 flex-1 rounded-md border border-dashed bg-transparent px-2 text-[15px]"
-                    style={{ borderColor: "#b39a6a" }}
-                  />
-                </div>
-                <p className="m-0 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-                  Ticking the last one completes the habit for the day.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
 
         {!isHabit && (
         <label className="relative z-[1] flex cursor-pointer items-start gap-2.5 rounded-lg px-3 py-2.5" style={{ background: "rgba(255,250,238,.5)", border: "1px solid #b39a6a" }}>
@@ -551,18 +525,16 @@ export function RiteEditorDialog({
             <span />
           )}
           <span className="flex gap-2">
-            <button type="button" onClick={close} className="h-10 rounded-full border-[1.5px] px-4 text-[15px] font-semibold transition-colors hover:bg-[rgba(139,112,64,.16)]" style={{ borderColor: "#a58c66", color: "var(--t-ink)" }}>
-              Cancel
-            </button>
+
             <button
               type="button"
               data-submit
               onClick={save}
               disabled={isSaving || !title.trim()}
-              className="hover-glow h-10 rounded-full px-5 text-[15px] disabled:opacity-50"
-              style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+              className="hover-glow h-10 rounded-full px-5 text-[15px] transition-colors disabled:opacity-50"
+              style={rite && !dirty ? { border: "1.5px solid #a58c66", color: "var(--t-ink)" } : { background: "var(--t-gold)", color: "#2a1c10" }}
             >
-              {isSaving ? "Saving…" : rite ? "Save" : isHabit ? "Add habit" : "Add rite"}
+              {isSaving ? "Saving…" : rite ? (dirty ? "Save" : "Close") : isHabit ? "Add habit" : "Add rite"}
             </button>
           </span>
         </div>

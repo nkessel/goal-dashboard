@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { findQuestsAction, listQuestStepsAction, sequenceDetachAction, sequenceLinkAction, sequenceMoveAction, sequenceOfAction, stepsToSequenceAction } from "@/app/actions";
+import { findQuestsAction, listQuestStepsAction, questForEditAction, sequenceDetachAction, sequenceLinkAction, sequenceMoveAction, sequenceOfAction, stepsToSequenceAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 import type { SequenceItem } from "@/lib/data/sequences";
 import { useClosing } from "@/components/ui/Fold";
+import type { Task } from "@/lib/data/types";
+
+// Loaded on demand (the editor imports this file too).
+const EditTaskModal = lazy(() => import("./EditTaskModal").then((m) => ({ default: m.EditTaskModal })));
 
 type Waiting = { id: string; title: string; estimate_minutes: number | null };
 
@@ -174,8 +178,11 @@ export function QuestPicker({ exclude, onPick, autoFocus = false, placeholder = 
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Found[]>([]);
   const [hi, setHi] = useState(0);
+  // Suggestions wait until the field is touched, so the list never appears under a tap meant for the field.
+  const [touched, setTouched] = useState(autoFocus);
   const excludeKey = exclude.join(",");
   useEffect(() => {
+    if (!touched) return;
     let live = true;
     const t = setTimeout(() => {
       findQuestsAction(q, excludeKey ? excludeKey.split(",") : []).then((r) => live && (setFound(r), setHi(0)), () => {});
@@ -184,7 +191,7 @@ export function QuestPicker({ exclude, onPick, autoFocus = false, placeholder = 
       live = false;
       clearTimeout(t);
     };
-  }, [q, excludeKey]);
+  }, [q, excludeKey, touched]);
   const term = q.trim();
   const exact = found.some((f) => f.title.trim().toLowerCase() === term.toLowerCase());
   const options: ({ id: string; title: string } | { title: string; isNew: true })[] = [...found.slice(0, 7), ...(term && !exact ? [{ title: term, isNew: true as const }] : [])];
@@ -196,7 +203,8 @@ export function QuestPicker({ exclude, onPick, autoFocus = false, placeholder = 
     <div className="flex flex-col gap-1">
       <input
         value={q}
-        onChange={(e) => setQ(e.target.value)}
+        onChange={(e) => (setQ(e.target.value), setTouched(true))}
+        onFocus={() => setTouched(true)}
         autoFocus={autoFocus}
         placeholder={placeholder}
         aria-label={placeholder}
@@ -255,7 +263,7 @@ export function QuestPicker({ exclude, onPick, autoFocus = false, placeholder = 
  * down, take them out, add quests before or after this one, or turn the
  * quest's steps into a sequence of quests (a project).
  */
-export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, onStepsMoved }: { taskId: string; title: string; isAdventure: boolean; onClose: () => void; onStepsMoved?: () => void }) {
+export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, onStepsMoved, onEditSelf }: { taskId: string; title: string; isAdventure: boolean; onClose: () => void; onStepsMoved?: () => void; /** Tapping this quest's own row (e.g. close and go back to its editor). */ onEditSelf?: () => void }) {
   const { closing, close: onClose } = useClosing(closeNow);
   const router = useRouter();
   const [chain, setChain] = useState<SequenceItem[] | null>(null);
@@ -282,14 +290,40 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
     });
   const open = (chain ?? []).filter((c) => c.status === "open");
   const ink = "var(--t-ink-soft)";
+  // A quest in the sequence opened in its own editor (owner: "make quests in a sequence easy to edit").
+  const [editing, setEditing] = useState<Task | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+  const edit = (id: string) => {
+    if (id === taskId && onEditSelf) return onEditSelf();
+    setOpening(id);
+    questForEditAction(id).then(
+      (t) => (setOpening(null), t ? setEditing(t) : setError("That quest isn't there any more.")),
+      () => (setOpening(null), setError("Couldn't open that quest."))
+    );
+  };
+  if (editing)
+    return (
+      <Suspense fallback={null}>
+        <EditTaskModal
+          task={editing}
+          theme={isAdventure ? "adventure" : "calm"}
+          onClose={() => {
+            setEditing(null);
+            sequenceOfAction(taskId).then(setChain, () => {});
+            router.refresh();
+          }}
+        />
+      </Suspense>
+    );
   return createPortal(
-    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[72] flex items-center justify-center p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    // Anchored near the top, so it grows downward and nothing already on it moves.
+    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[72] flex items-start justify-center p-4 pt-[min(12vh,96px)]`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Quest sequence"
         onClick={(e) => e.stopPropagation()}
-        className="card-pop-in parchment parchment-framed relative flex max-h-[88vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl p-5"
+        className="card-pop-in parchment parchment-framed relative flex max-h-[calc(100dvh-min(12vh,96px)-16px)] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl p-5"
         style={{ color: "var(--t-ink)", background: isAdventure ? undefined : "var(--t-card)" }}
       >
         <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-3 z-[2] flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/5" style={{ color: ink }}>
@@ -321,7 +355,15 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold" style={{ border: "1.5px solid #b39a6a", color: ink }}>
                   {done ? "✓" : at + 1}
                 </span>
-                <span className={`min-w-0 flex-1 truncate text-[14.5px] ${me ? "font-semibold" : ""} ${done ? "line-through" : ""}`}>{c.title}</span>
+                <button
+                  type="button"
+                  onClick={() => edit(c.id)}
+                  disabled={opening === c.id || (me && !onEditSelf)}
+                  title={me && !onEditSelf ? undefined : `Edit “${c.title}”`}
+                  className={`min-w-0 flex-1 truncate text-left text-[14.5px] disabled:cursor-default ${me ? "font-semibold" : "hover:underline"} ${done ? "line-through" : ""} ${opening === c.id ? "opacity-60" : ""}`}
+                >
+                  {c.title}
+                </button>
                 {!done && !c.reward && (
                   <span className="flex shrink-0 items-center">
                     <IconBtn label="Earlier" disabled={busy || at <= 0} onClick={() => run(() => sequenceMoveAction(c.id, -1, taskId))}>

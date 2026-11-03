@@ -103,6 +103,20 @@ export const FLOWS = [
         await h.check("habit sub-habits open");
         await h.tap("text=Vitamins before 12pm", "habit sub-habits close", { optional: true, expectMove: true });
       }
+      // The habit editor (repeat ask 15): sub-habits in view, dragged to reorder, a dot opens XP/coins/Remove.
+      await h.page.getByText("Vitamins before 12pm").first().click({ button: "right" }).catch(() => {});
+      await h.settle(300);
+      if (await h.tap(/edit habit/i, "habit editor", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("habit editor");
+        if (await h.tap((p) => p.getByRole("button", { name: /options for b12/i }).first(), "sub-habit options", { optional: true, expectMove: true })) {
+          await h.check("habit editor: sub-habit options");
+        }
+        if (await h.tap((p) => p.getByRole("button", { name: /^certain days$/i }).first(), "certain days", { optional: true, expectMove: true })) {
+          await h.check("habit editor: certain days");
+        }
+        await esc(h);
+      }
       // Schedule a quest from its ⋯ menu: the day drawn, tap a time (repeat ask 10).
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for schedule", { optional: true })) {
         if (await h.tap((p) => p.getByText(/^(re)?schedule on calendar$/i).first(), "schedule picker", { optional: true, expectMove: true })) {
@@ -116,6 +130,19 @@ export const FLOWS = [
       // A quest's ⋯ menu.
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu", { optional: true })) {
         await h.check("quest menu");
+        await esc(h);
+      }
+      // A sequence: open it from the quest's ⋯ menu and tap the quest waiting behind to edit it (Nov 3).
+      if (await h.tap((p) => p.getByRole("button", { name: /actions for pick up medication/i }).first(), "medication menu", { optional: true })) {
+        if (await h.tap("text=Edit the sequence…", "edit the sequence", { optional: true, expectMove: true })) {
+          await h.settle(800);
+          await h.check("sequence dialog");
+          if (await h.tap((p) => p.getByRole("button", { name: /drop the prescription receipt/i }).first(), "edit a waiting quest", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.check("sequence: waiting quest in the editor");
+          }
+          await esc(h);
+        }
         await esc(h);
       }
       // A quest with steps: tapping its card slides the steps tray open under it (repeat ask 9: no overlap).

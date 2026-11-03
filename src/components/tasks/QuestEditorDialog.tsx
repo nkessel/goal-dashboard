@@ -1431,6 +1431,7 @@ export function QuestEditorDialog({
                       title={title}
                       isAdventure={isAdventure}
                       onClose={() => setSeqDialog(false)}
+                      onEditSelf={() => setSeqDialog(false)}
                       onStepsMoved={() => {
                         setStepsDirty(false);
                         setStepsReload((n) => n + 1);

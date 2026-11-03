@@ -3,10 +3,8 @@
 The owner's notes that aren't built yet, grouped by area. They were read from `/journal` › App feedback, because there was no database connector. Take a group, build it, move it to HANDOFF › Recently shipped, and delete its lines here. Anything also in `docs/REPEAT-ASKS.md` is built there first, with more care.
 
 ## Habits and the habit editor (repeat ask 15)
-- Make the habit editor as organized and easy as the quest editor. The sub-habit field should be easy to see; sub-habits reorder by dragging (no ↑ arrows) and reorder in place.
-- Sub-habits get XP and coins, a background that fits the theme, and their own right-click menu.
+- (Nov 3, built: sub-habits always in view and dragged in place, XP/coins and Remove from a dot or right-click, Daily / Certain days / Every week / Every month / Custom, "Other" minutes, Close turns into Save.) Still open: the editor's parts as pills like the quest editor's; a sub-habit's right-click menu on the Today card too.
 - The cleaning habit's sub-habits are missing from the habit editor.
-- Repeats is simpler: no "Every year", and "Daily" instead of weekdays. The "60m" chip becomes "Other", and an "Other" field shows the current value and takes your own.
 - Let habits sit in Today's agenda too. The owner asked for ideas first, as a plain message.
 - Learn a language: dragging its popup scrolls the page instead of moving the popup. Its minimized button reads "Language" with a Japanese character, and it can be customized from the popup's gear.
 
@@ -22,7 +20,7 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Add a location pill (icon only, last), shown on the card. Privacy shows as a globe or a lock. Take out Templates.
 - Center the board label over the portrait (in the editor and on cards).
 - Add an archive option in the delete confirmation: a record of deleted quests that can be recovered.
-- Make quests in a sequence easy to edit. The sequence popup can be moved, resized and minimized; the upcoming quests peek above the first one, and "1 after this" shows only on hover or long-press.
+- Make quests in a sequence easy to edit (Nov 3: tap one in "Edit the sequence…" to open its editor; the dialog no longer jumps when its suggestions load). The sequence popup can be moved, resized and minimized; the upcoming quests peek above the first one, and "1 after this" shows only on hover or long-press.
 - The ⋯ button opens the menu, never the steps tray. The menu's editor needs no Done (the gear turns into a ✓ and an outside click saves), and its gear icon should match the others.
 - Make links work in course quests and their steps.
 - Let the colours of the difficulty, urgency and other bars be set in Settings.
@@ -43,5 +41,6 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Hide the character traits being developed from the main view (keep them in Settings › Character).
 - Make "delete a portrait" a small context menu.
 - Today scrolls slowly on the laptop: look into it.
+- Agenda for a visit (owner, Nov 3): once "Schedule time to be with my dad" is on the calendar, the quests waiting behind it (parents' calendars, Dad's computer, Martin-care quests) show as agenda options for that visit. The quests are set up as its sequence (Family board).
 - Data: add Alliance Jiu Jitsu to plan soon, and Shaolin within 45 days (as quests with plan-by). After that, Martin-care quests become a follow-up to scheduling time with Dad, together with the Martin and Family boards.
 - Factors of sleep: a one-tap yesterday/today switch.

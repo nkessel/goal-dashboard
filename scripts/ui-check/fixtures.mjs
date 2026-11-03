@@ -48,7 +48,9 @@ export function makeFixtures() {
     task("Plan the weekend trip", { in_additional: true, due_at: inHours(170) }),
     task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20 }),
   ];
-  const [reading] = tasks;
+  const [reading, medication] = tasks;
+  // A quest waiting behind another (a sequence): hidden until "Pick up medication" is done.
+  tasks.push(task("Drop the prescription receipt at the insurance office", { locked_by_task_id: medication.id }));
   const steps = ["Skim the chapter", "Highlight three ideas", "Write one page", "Post it in the forum"].map((title, i) => ({
     id: randomUUID(), owner_id: OWNER_ID, task_id: reading.id, title, sort_order: i, done: i === 0, done_at: i === 0 ? inHours(-2) : null,
   }));
