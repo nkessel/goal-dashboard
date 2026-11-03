@@ -234,16 +234,19 @@ function QuestCard({
   const done = task.status === "completed";
   const { w, h } = box;
   const line = h < 30;
-  // Narrow and tall enough: the creature stands above the title.
-  const stack = !line && (portrait || w < 130) && h >= 54;
-  const titlePx = w < 52 ? 11 : w < 110 ? 12.5 : 14;
-  // Stacked, the creature takes what's left once the title (up to two lines, by a rough measure) has room.
-  const titleLines = Math.min(2, Math.ceil((task.title.length * titlePx * 0.42) / Math.max(1, w - 8)));
+  // Narrow and tall enough: the creature stands above the title; a narrow one-hour card puts it beside, like the mockup.
+  const stack = !line && (portrait || w < 130) && h >= 66;
+  const titlePx = w < 52 ? 11 : w < 110 ? (stack ? 12.5 : 11.5) : 14;
+  // Stacked, the creature and the title share the height: the creature gets what the title (at least one line) leaves,
+  // so even a narrow one-hour card keeps its creature, like a card in a storybook (owner's mockup, Nov 3).
+  const lineH = titlePx * 1.12;
+  const wantLines = Math.min(3, Math.max(1, Math.ceil((task.title.length * titlePx * 0.5) / Math.max(1, w - 8))));
+  const stackArt = (keep: number) => Math.max(0, Math.min(w - 10, h - 12 - Math.ceil(lineH * keep), 64));
   const artPx = line
     ? Math.max(0, Math.min(h - 6, 22))
     : stack
-      ? Math.max(0, Math.min(w - 4, h - 12 - Math.ceil(titlePx * 1.12 * titleLines), 64))
-      : Math.max(0, Math.min(h - 6, h >= 80 ? 64 : 52, w * 0.38));
+      ? stackArt(wantLines) >= 30 ? stackArt(wantLines) : stackArt(Math.min(wantLines, 2)) >= 18 ? stackArt(Math.min(wantLines, 2)) : stackArt(1)
+      : Math.max(0, Math.min(h - 10, h >= 80 ? 64 : 52, w < 130 ? w * 0.3 : w * 0.38));
   const showArt = artPx >= 16;
   const sealPx = Math.min(artPx, stack ? 24 : 26);
   const doneNote = done && !line && h >= (stack ? 64 : 44);

@@ -313,6 +313,26 @@ export const FLOWS = [
     },
   },
   {
+    // The calendar (owner, Nov 3: "beautiful like the mockup"): week and day, quests and mini-quests for their duration.
+    name: "calendar",
+    async run(h) {
+      await h.goto("/calendar?view=week", { name: "calendar" });
+      await h.settle(1200);
+      await h.check("week");
+      await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
+      await h.settle(400);
+      await h.check("week: the cards");
+      await h.goto("/calendar?view=day", { name: "calendar" });
+      await h.settle(1200);
+      await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
+      await h.settle(400);
+      await h.check("day");
+      await h.page.locator("[title^='Edit \"Take out the trash']").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await h.settle(400);
+      await h.check("day: the mini-quest at 4:30");
+    },
+  },
+  {
     name: "pages",
     async run(h) {
       for (const path of ["/boards", "/calendar", "/rewards", "/feed", "/plan", "/matrix", "/journal", "/notifications", "/settings/inventory", "/power-ups"]) {

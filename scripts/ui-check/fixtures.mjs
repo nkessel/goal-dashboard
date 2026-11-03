@@ -48,6 +48,16 @@ export function makeFixtures() {
     task("Plan the weekend trip", { in_additional: true, due_at: inHours(170) }),
     task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20 }),
   ];
+  // The calendar: quests placed on it today and this week, one done, and a mini-quest with a time (Nov 3).
+  const at = (h, mins = 60) => ({ is_on_calendar: true, scheduled_start: inHours(h), scheduled_end: inHours(h + mins / 60), estimate_minutes: mins });
+  tasks.push(
+    task("Goblin paperwork: renew the car registration", at(1.5)),
+    task("Draft the facilitation workshop outline", { board_id: course.id, ...at(3.5, 90) }),
+    task("Herb gathering at the farmers market", { status: "completed", completed_at: inHours(-1), xp_awarded: 20, ...at(-1.5, 45) }),
+    task("Scout the old trail with Chester", at(25, 60)),
+    task("Rune puzzle: fix the printer", at(-19, 30)),
+    task("Take out the trash", { is_tiny: true, is_manual_priority: true, due_at: inHours(8), estimate_minutes: 15 }),
+  );
   const [reading] = tasks;
   // A quest waiting behind another (a sequence): hidden until the reading is done.
   tasks.push(task("Post the reflection link in the course chat", { board_id: course.id, locked_by_task_id: reading.id }));

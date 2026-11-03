@@ -668,7 +668,7 @@ export async function listCalendarTasksForOwner(
   const startIso = rangeStart.toISOString();
   const endIso = rangeEnd.toISOString();
 
-  const [scheduledRes, completedRes] = await Promise.all([
+  const [scheduledRes, completedRes, miniRes] = await Promise.all([
     db
       .from("tasks")
       .select("*")
@@ -683,6 +683,16 @@ export async function listCalendarTasksForOwner(
       .eq("status", "completed")
       .gte("completed_at", startIso)
       .lt("completed_at", endIso),
+    // Mini-quests with a time ("take out the trash, 4:30") sit on the calendar at that time for their length,
+    // without being put on Google Calendar (owner, Nov 3). Kept local; the view drops end-of-day deadlines.
+    db
+      .from("tasks")
+      .select("*")
+      .eq("owner_id", ownerId)
+      .eq("status", "open")
+      .eq("is_tiny", true)
+      .gte("due_at", startIso)
+      .lt("due_at", endIso),
   ]);
 
   if (scheduledRes.error) throw new Error(`Failed to list scheduled tasks: ${scheduledRes.error.message}`);
@@ -691,6 +701,7 @@ export async function listCalendarTasksForOwner(
   const byId = new Map<string, Task>();
   for (const t of scheduledRes.data ?? []) byId.set(t.id, t);
   for (const t of completedRes.data ?? []) byId.set(t.id, t);
+  for (const t of miniRes.data ?? []) if (!byId.has(t.id) && !t.locked_by_task_id) byId.set(t.id, t);
   return [...byId.values()];
 }
 

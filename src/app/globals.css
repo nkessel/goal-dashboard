@@ -2661,12 +2661,25 @@ input[type="time"]::-webkit-datetime-edit-hour-field:focus, input[type="time"]::
 .quest-card {
   /* Soft, rounded corners (owner, Oct 31); tiny tasks a little less. */
   border-radius: 18px;
-  background: linear-gradient(180deg, #f8efd6, #ecdcb5);
-  border: 1px solid #b0904f;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 252, 240, 0.85), rgba(255, 252, 240, 0) 60%),
+    linear-gradient(180deg, #f7eccf, #e9d5a8);
+  border: 1.5px solid #a88a3f;
   box-shadow:
-    inset 0 0 0 2px rgba(255, 249, 232, 0.55),
-    inset 0 0 0 3px rgba(176, 144, 79, 0.28),
-    0 2px 5px rgba(70, 45, 10, 0.25);
+    inset 0 0 0 2px rgba(255, 249, 232, 0.6),
+    inset 0 0 0 3px rgba(168, 138, 63, 0.3),
+    0 3px 8px rgba(60, 38, 8, 0.28),
+    0 1px 1px rgba(60, 38, 8, 0.2);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+@media (hover: hover) {
+  .quest-card:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 249, 232, 0.6),
+      inset 0 0 0 3px rgba(168, 138, 63, 0.35),
+      0 6px 14px rgba(60, 38, 8, 0.32);
+  }
 }
 .quest-card-done {
   background: linear-gradient(180deg, #e2e6c9, #cdd5ae);

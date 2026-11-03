@@ -21,6 +21,7 @@ import {
 import { CalendarAddPopup } from "./CalendarAddPopup";
 import { CalendarItemMenu, type MenuTarget } from "./CalendarItemMenu";
 import { CalendarTaskChip, getTaskDisplayWindow } from "./CalendarTaskChip";
+import { showsOnCalendar } from "@/lib/calendar-task-window";
 import { GoogleEventChip } from "./GoogleEventChip";
 import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
 import { SCHEDULER_DEFAULTS, holdAt, mealsOn, MEAL_ICONS, MEAL_NAMES } from "@/lib/auto-schedule";
@@ -497,11 +498,14 @@ export function WeekView({
     items.push({ kind: "event", key: `e-${event.id}`, dayIndex, top, bottom: Math.max(top + 20, offset(end, days[dayIndex])), start, end, event });
   }
   for (const task of tasks) {
+    if (!showsOnCalendar(task)) continue;
     const { start, end } = getTaskDisplayWindow(task);
     const dayIndex = days.findIndex((d) => isSameDay(d, start));
     if (dayIndex === -1) continue;
     const top = offset(start, days[dayIndex]);
-    items.push({ kind: "task", key: `t-${task.id}`, dayIndex, top, bottom: Math.max(top + 20, offset(end, days[dayIndex])), start, end, task });
+    // A short quest (a 15-minute mini-quest) still gets room for its card: at least ~30px tall.
+    const minMins = Math.max(20, (30 / HOUR_PX) * 60);
+    items.push({ kind: "task", key: `t-${task.id}`, dayIndex, top, bottom: Math.max(top + minMins, offset(end, days[dayIndex])), start, end, task });
   }
 
   // An item being dragged (or just dropped, until fresh data arrives) shows at its new spot.

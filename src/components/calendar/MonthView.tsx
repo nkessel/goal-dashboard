@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { WEEKDAY_LABELS, formatDateParam, getMonthGridWeeks, isSameDay, parseDateParam } from "@/lib/calendar-dates";
-import { getTaskDisplayWindow } from "@/lib/calendar-task-window";
+import { getTaskDisplayWindow, showsOnCalendar } from "@/lib/calendar-task-window";
 import { creatureFor, questArt } from "./CalendarTaskChip";
 
 export function MonthView({
@@ -59,7 +59,7 @@ export function MonthView({
           week.map((day) => {
             const inMonth = day.getMonth() === month.getMonth();
             const isToday = isSameDay(day, today);
-            const dayTasks = mounted ? tasks.filter((t) => isSameDay(getTaskDisplayWindow(t).start, day)) : [];
+            const dayTasks = mounted ? tasks.filter((t) => showsOnCalendar(t) && isSameDay(getTaskDisplayWindow(t).start, day)) : [];
             const dayEvents = mounted ? events.filter((e) => isSameDay(new Date(e.start), day)) : [];
             const dots = dayTasks.slice(0, isAdventure ? 2 : 3);
             const eventDots = dayEvents.slice(0, Math.max(0, 3 - dots.length));

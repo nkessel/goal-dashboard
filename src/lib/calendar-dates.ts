@@ -5,7 +5,7 @@
 // don't need any timezone conversion.
 
 export const HOUR_START = 7; // 7 AM
-export const HOUR_END = 21; // 9 PM (last displayed hour row)
+export const HOUR_END = 22; // 10 PM (last displayed hour row, to 11 PM: room for "before bed")
 
 export const WEEKDAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
