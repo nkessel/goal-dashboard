@@ -190,6 +190,9 @@ export const FLOWS = [
         if (await h.tap((p) => p.getByRole("button", { name: /options for stretch/i }).first(), "sub-habit options", { optional: true, expectMove: true })) {
           await h.check("habit editor: sub-habit options");
         }
+        // Its details are pills now: open Repeats, then pick Certain days.
+        await h.tap((p) => p.locator("[data-mi=pills] button").first(), "repeats pill", { optional: true, expectMove: true });
+        await h.check("habit editor: repeats pill");
         if (await h.tap((p) => p.getByRole("button", { name: /^certain days$/i }).first(), "certain days", { optional: true, expectMove: true })) {
           await h.check("habit editor: certain days");
         }

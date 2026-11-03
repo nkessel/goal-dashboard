@@ -17,8 +17,8 @@ type Waiting = { id: string; title: string; estimate_minutes: number | null };
 const mins = (m: number | null) => (m ? (m >= 60 ? `${Math.round((m / 60) * 10) / 10} h` : `${m} min`) : null);
 
 /**
- * The quests waiting behind a quest: blank card outlines peeking out under it,
- * one per quest (up to three drawn), with a small tab to peek at what's next.
+ * The quests waiting behind a quest: blank card outlines peeking out above it (owner, Nov 3),
+ * one per quest (up to three drawn); "N after this" shows on hover (or focus) to peek at what's next.
  */
 export function SequenceStack({ queue, isAdventure, onEdit }: { queue: Waiting[]; isAdventure: boolean; onEdit: () => void }) {
   const [peekAt, setPeekAt] = useState<HTMLElement | null>(null);
@@ -36,8 +36,8 @@ export function SequenceStack({ queue, isAdventure, onEdit }: { queue: Waiting[]
             zIndex: 0,
             left: 10 + i * 9,
             right: 10 + i * 9,
-            top: 16,
-            bottom: stackPad(queue.length) - (i + 1) * 6,
+            top: stackPad(queue.length) - (i + 1) * 6,
+            bottom: 16,
             border: `1.5px solid ${edge}`,
             background: isAdventure ? `rgba(240,226,196,${0.92 - i * 0.18})` : "var(--t-card)",
             opacity: 1 - i * 0.18,
@@ -55,9 +55,10 @@ export function SequenceStack({ queue, isAdventure, onEdit }: { queue: Waiting[]
         onPointerDown={(e) => e.stopPropagation()}
         aria-label={`${queue.length} more ${queue.length === 1 ? "quest" : "quests"} in this sequence — peek`}
         aria-expanded={peek}
-        className="seq-tab absolute left-1/2 z-[2] flex h-6 -translate-x-1/2 items-center gap-1 rounded-full px-2.5 text-[12px] font-semibold"
+        className="seq-tab absolute left-1/2 z-[3] flex h-6 -translate-x-1/2 items-center gap-1 rounded-full px-2.5 text-[12px] font-semibold"
+        data-open={peek ? "true" : undefined}
         style={{
-          bottom: 0,
+          top: -6,
           background: isAdventure ? "linear-gradient(180deg,#f4e7c6,#e3cd9b)" : "var(--t-card)",
           border: `1.5px solid ${edge}`,
           color: "var(--t-ink-soft)",
@@ -83,7 +84,7 @@ export function SequenceStack({ queue, isAdventure, onEdit }: { queue: Waiting[]
 }
 
 /** Room under a card for its stack and the peek tab. */
-export const stackPad = (n: number) => (n ? Math.min(3, n) * 6 + 12 : 0);
+export const stackPad = (n: number) => (n ? Math.min(3, n) * 6 + 2 : 0);
 
 function StackMini() {
   return (

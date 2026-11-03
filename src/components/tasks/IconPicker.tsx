@@ -474,6 +474,17 @@ export function IconPicker({
                         onPick={() => pickLibraryEntry(entry.image_url)}
                         onLong={entry.id.includes(":") ? undefined : () => setConfirmRemove(entry)}
                       />
+                      {/* Delete: a small menu right on the tile (owner, Nov 3: "a much smaller context menu"). */}
+                      {confirmRemove?.id === entry.id && (
+                        <div role="menu" aria-label="Delete this image from the library?" className="card-pop-in absolute left-1/2 top-[70%] z-[5] flex w-max -translate-x-1/2 flex-col items-stretch gap-1 rounded-xl p-1.5 text-[12px] shadow-xl" style={{ background: "var(--t-panel)", border: "1px solid var(--t-panel-border)" }}>
+                          <button type="button" role="menuitem" autoFocus onClick={() => removeEntry(entry)} className="h-8 rounded-lg px-2.5 font-semibold" style={{ background: "var(--t-warn)", color: "#fff" }} title="Quests already using it keep it">
+                            Delete from library
+                          </button>
+                          <button type="button" role="menuitem" onClick={() => setConfirmRemove(null)} className="h-7 rounded-lg px-2.5" style={{ color: "var(--t-ink-soft)" }}>
+                            Keep it
+                          </button>
+                        </div>
+                      )}
                       {!entry.id.includes(":") && (
                       <button
                         type="button"
@@ -497,34 +508,7 @@ export function IconPicker({
               )}
             </div>
           )}
-          {confirmRemove && (
-            <div
-              role="alertdialog"
-              aria-label="Delete this image from the library?"
-              className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl p-3 text-center"
-              style={{ background: "var(--t-panel)" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- library image */}
-              <img src={confirmRemove.image_url} alt="" className="h-14 w-14 rounded-lg object-cover" />
-              <p className="text-sm font-semibold">Delete this image from the library?</p>
-              <p className="text-[11px]" style={{ color: "var(--t-ink-soft)" }}>
-                Quests already using it keep it.
-              </p>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setConfirmRemove(null)} className="h-8 rounded-full px-3 text-xs" style={{ border: "1px solid var(--t-panel-border)" }}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeEntry(confirmRemove)}
-                  className="h-8 rounded-full px-3 text-xs font-semibold"
-                  style={{ background: "var(--t-warn)", color: "#fff" }}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          )}
+
           </div>
         </div>
         </div>

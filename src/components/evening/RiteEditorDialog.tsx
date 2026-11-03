@@ -1,6 +1,6 @@
 "use client";
 
-import { TimeToken } from "@/components/xp/NightFields";
+import { TimeToken, clock12 } from "@/components/xp/NightFields";
 import { useState, useTransition } from "react";
 import { nextOccurrence, repeatLabel, type Repeat } from "@/lib/habit-repeat";
 import { createPortal } from "react-dom";
@@ -64,6 +64,8 @@ export function RiteEditorDialog({
   };
   const [customOpen, setCustomOpen] = useState(!!rite?.repeat && !(rite.repeat.every === 1 && (rite.repeat.unit === "week" || rite.repeat.unit === "month")));
   const [dueOpen, setDueOpen] = useState(!!rite?.due_time);
+  // A habit's details are pills like the quest editor's (owner, Nov 3); one opens at a time, in place.
+  const [pill, setPill] = useState<"repeats" | "takes" | "reward" | "due" | null>(null);
   const subsChanged = JSON.stringify(subs) !== JSON.stringify(rite?.steps ?? []);
   // Has anything changed? Then the footer's Close becomes Save (owner: "Close turns into Save").
   const dirty =
@@ -214,13 +216,41 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div data-mi="repeats" className="relative z-[1] flex flex-col gap-2">
-            <button type="button" onClick={() => setRepeatsOpen((o) => !o)} aria-expanded={repeatsOpen} className="flex items-center gap-1.5 self-start text-[14.5px] font-semibold">
+          <div data-mi="pills" className="relative z-[1] flex flex-wrap items-center gap-1.5" role="group" aria-label="Habit details">
+            {(
+              [
+                ["repeats", "↻", repeat ? repeatLabel(repeat) : days.length === 7 ? "Daily" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "No days"],
+                ["takes", "◷", minutes ? (minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes} min`) : "Time"],
+                ["reward", "✦", `${xp} XP${(coinValue ?? coinsForXp(xp)) ? ` · ${coinValue ?? coinsForXp(xp)} coins` : ""}`],
+                ["due", "⏰", dueTime ? (windowTo ? `${clock12(dueTime)}–${clock12(windowTo)}` : `by ${clock12(dueTime)}`) : "Due by"],
+              ] as const
+            ).map(([k, icon, label]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setPill((p) => (p === k ? null : k))}
+                aria-expanded={pill === k}
+                className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold"
+                style={pill === k ? { background: "linear-gradient(180deg,#f6e3a8,#dcb763)", border: "1px solid #8a6116", color: "#2a1c10" } : { border: "1px solid #b39a6a", color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
+              >
+                <span aria-hidden className="text-[13px] opacity-75">{icon}</span>
+                <span className="max-w-[160px] truncate">{label}</span>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="opacity-60 transition-transform" style={{ transform: pill === k ? "rotate(180deg)" : undefined }}>
+                  <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isHabit && (
+          <div data-mi="repeats" className={`relative z-[1] flex flex-col gap-2 ${pill === "repeats" ? "reveal qe-fact-panel rounded-xl p-3" : "hidden"}`}>
+            <button type="button" onClick={() => setRepeatsOpen((o) => !o)} aria-expanded={repeatsOpen} className="hidden items-center gap-1.5 self-start text-[14.5px] font-semibold">
               <Caret open={repeatsOpen} />
               Repeats
               {!repeatsOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{repeat ? repeatLabel(repeat).toLowerCase() : days.length === 7 ? "daily" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "no days"}</span>}
             </button>
-            {repeatsOpen && (
+            {(repeatsOpen || isHabit) && (
             <div className="reveal flex flex-col gap-2">
             {/* Every week, month or year (or any number of them), from a start date. */}
             <div className="flex flex-wrap items-center gap-1.5">
@@ -318,7 +348,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div data-mi="takes" className="relative z-[1] flex flex-wrap items-center gap-1.5">
+          <div data-mi="takes" className={`relative z-[1] flex-wrap items-center gap-1.5 ${pill === "takes" ? "reveal qe-fact-panel flex rounded-xl p-3" : "hidden"}`}>
             <span className="mr-0.5 text-[14.5px] font-semibold">Takes</span>
             {MINUTE_PRESETS.map((m) => (
               <button
@@ -372,7 +402,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div data-mi="coins" className="relative z-[1] flex flex-wrap items-center gap-2">
+          <div data-mi="coins" className={`relative z-[1] flex-wrap items-center gap-2 ${pill === "reward" ? "reveal qe-fact-panel flex rounded-xl p-3" : "hidden"}`}>
             <span className="flex items-center gap-1.5 text-[14.5px] font-semibold">
               <CoinIcon size={17} /> Coins
             </span>
@@ -411,7 +441,7 @@ export function RiteEditorDialog({
           </div>
         )}
 
-        <div data-mi="xp" className="relative z-[1] flex flex-wrap items-center gap-1.5">
+        <div data-mi="xp" className={`relative z-[1] flex-wrap items-center gap-1.5 ${!isHabit ? "flex" : pill === "reward" ? "reveal qe-fact-panel flex rounded-xl p-3" : "hidden"}`}>
           <span className="mr-0.5 text-[14.5px] font-semibold">XP</span>
           {XP_PRESETS.map((v) => (
             <button
@@ -444,14 +474,14 @@ export function RiteEditorDialog({
         </div>
 
         {isHabit && (
-          <div data-mi="due" className="relative z-[1] flex flex-col gap-2">
-            <button type="button" onClick={() => setDueOpen((o) => !o)} aria-expanded={dueOpen} className="flex items-center gap-1.5 self-start text-[14.5px] font-semibold">
+          <div data-mi="due" className={`relative z-[1] flex-col gap-2 ${pill === "due" ? "reveal qe-fact-panel flex rounded-xl p-3" : "hidden"}`}>
+            <button type="button" onClick={() => setDueOpen((o) => !o)} aria-expanded={dueOpen} className="hidden items-center gap-1.5 self-start text-[14.5px] font-semibold">
               <Caret open={dueOpen} />
               {windowTo ? "Time" : "Due by"}
               {!dueOpen && <span className="text-[13px] font-normal" style={{ color: "var(--t-ink-soft)" }}>{dueTime ? (windowTo ? `${dueTime}–${windowTo}` : dueTime) : "any time"}</span>}
             </button>
-            {dueOpen && (
-            <label className="reveal flex items-center gap-2 pl-4 text-[14.5px] font-semibold">
+            {(dueOpen || isHabit) && (
+            <label className="reveal flex items-center gap-2 text-[14.5px] font-semibold">
               <TimeToken value={dueTime} onChange={setDueTime} label={windowTo ? "From" : "Due by (optional)"} kind="any" compact />
               {dueTime && (windowTo ? (
                 <>

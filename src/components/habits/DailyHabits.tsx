@@ -119,6 +119,14 @@ export function DailyHabits({
   }, [lookMenu]);
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<RiteView | "new" | null>(null);
+  // A sub-habit's own menu (right-click), by "habit:step".
+  const [subMenu, setSubMenu] = useState<string | null>(null);
+  useEffect(() => {
+    if (!subMenu) return;
+    const close = (e: PointerEvent) => !(e.target as Element).closest?.("[role=menu]") && setSubMenu(null);
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [subMenu]);
   const [editSub, setEditSub] = useState(false);
   const [pop, setPop] = useState<{ id: string; xp: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -710,8 +718,18 @@ export function DailyHabits({
                     <ul className="due-in relative z-[1] m-0 mt-1 flex w-full basis-full list-none flex-col gap-0.5 pb-0.5 pl-12">
                       {subsOf(h).map((st) => {
                         const t = ticked(h, st.id);
+                        const sk = `${h.id}:${st.id}`;
                         return (
-                          <li key={st.id}>
+                          <li
+                            key={st.id}
+                            // Its own small menu (owner, Nov 3): right-click a sub-habit.
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSubMenu((m) => (m === sk ? null : sk));
+                            }}
+                            className="relative"
+                          >
                             <button
                               type="button"
                               role="checkbox"
@@ -732,10 +750,26 @@ export function DailyHabits({
                                   </svg>
                                 )}
                               </span>
-                              <span className="text-[15px] leading-snug" style={{ color: "var(--t-ink)", textDecoration: t ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)", opacity: t ? 0.7 : 1 }}>
+                              <span className="min-w-0 flex-1 text-[15px] leading-snug" style={{ color: "var(--t-ink)", textDecoration: t ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)", opacity: t ? 0.7 : 1 }}>
                                 {st.title}
                               </span>
+                              {(st.xp || st.coins) && (
+                                <span className="shrink-0 text-[12px] font-bold tabular-nums" style={{ color: "var(--t-xp, #4f7d38)" }}>
+                                  {st.xp ? `+${st.xp} XP` : ""}
+                                  {st.coins ? ` · ${st.coins}🪙` : ""}
+                                </span>
+                              )}
                             </button>
+                            {subMenu === sk && (
+                              <span role="menu" className="card-pop-in absolute right-1 top-full z-[5] flex flex-col rounded-xl p-1 shadow-xl" style={{ background: "linear-gradient(180deg,#fbf3df,#f1e3c0)", border: "1px solid #a88a3f" }} onMouseDown={(e) => e.stopPropagation()}>
+                                <button type="button" role="menuitem" onClick={() => (setSubMenu(null), tickStep(h, st.id))} className="h-9 rounded-lg px-3 text-left text-[13.5px] font-semibold hover:bg-black/[.05]" style={{ color: "#2a1c10" }}>
+                                  {t ? "Untick it" : "Tick it"}
+                                </button>
+                                <button type="button" role="menuitem" onClick={() => (setSubMenu(null), setEditing(h))} className="h-9 rounded-lg px-3 text-left text-[13.5px] font-semibold hover:bg-black/[.05]" style={{ color: "#2a1c10" }}>
+                                  Edit sub-habits, XP and coins…
+                                </button>
+                              </span>
+                            )}
                           </li>
                         );
                       })}

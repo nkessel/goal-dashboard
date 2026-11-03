@@ -3,7 +3,7 @@
 The owner's notes that aren't built yet, grouped by area. They were read from `/journal` › App feedback, because there was no database connector. Take a group, build it, move it to HANDOFF › Recently shipped, and delete its lines here. Anything also in `docs/REPEAT-ASKS.md` is built there first, with more care.
 
 ## Habits and the habit editor (repeat ask 15)
-- (Nov 3, built: sub-habits always in view and dragged in place, XP/coins and Remove from a dot or right-click, Daily / Certain days / Every week / Every month / Custom, "Other" minutes, Close turns into Save.) Still open: the editor's parts as pills like the quest editor's; a sub-habit's right-click menu on the Today card too.
+- (Nov 3, built: sub-habits in view and draggable, XP/coins, simpler repeats, Other minutes, Close→Save, details as pills, a sub-habit's menu on the card.)
 - The cleaning habit's sub-habits are missing from the habit editor.
 - Let habits sit in Today's agenda too. The owner asked for ideas first, as a plain message.
 
@@ -13,8 +13,7 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 
 ## Quests and the quest editor
 - Add a location pill (icon only, last), shown on the card.
-- Make quests in a sequence easy to edit (Nov 3: tap one in "Edit the sequence…" to open its editor; the dialog no longer jumps when its suggestions load). The sequence popup can be moved, resized and minimized; the upcoming quests peek above the first one, and "1 after this" shows only on hover or long-press.
-- (⋯ now has a bigger target.) The menu's editor needs no Done (the gear turns into a ✓ and an outside click saves), and its gear icon should match the others.
+- The sequence popup can be moved, resized and minimized. (Done Nov 3: edit a waiting quest from it, quests peek above, "1 after this" on hover.)
 - Let the colours of the difficulty, urgency and other bars be set in Settings.
 
 ## Calendar
@@ -25,6 +24,5 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 
 ## Other
 - Martin-care quests as a follow-up to scheduling time with Dad (with the agenda feature above).
-- Make "delete a portrait" a small context menu.
 - Today scrolls slowly on the laptop: look into it.
 - Agenda for a visit (owner, Nov 3): once "Schedule time to be with my dad" is on the calendar, the quests waiting behind it (parents' calendars, Dad's computer, Martin-care quests) show as agenda options for that visit. The quests are set up as its sequence (Family board).

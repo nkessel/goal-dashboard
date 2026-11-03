@@ -3084,3 +3084,17 @@ html[data-welcome-open] [data-app-shell] *, html[data-welcome-open] [data-perche
 .cal-days-scroll::-webkit-scrollbar {
   display: none;
 }
+
+/* A sequence's "N after this" tab waits until you're on the card (owner, Nov 3: "only on hover or long-press"). */
+.seq-tab {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+li:hover > .seq-tab,
+li:focus-within > .seq-tab,
+.seq-tab[data-open="true"],
+.seq-tab:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}

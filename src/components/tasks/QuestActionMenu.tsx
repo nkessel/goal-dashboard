@@ -179,10 +179,17 @@ export function QuestActionMenu({
           className="absolute right-1.5 top-1.5 z-[1] flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5"
           style={{ color: "var(--t-ink-soft)", background: arranging ? "rgba(217,180,95,.3)" : undefined }}
         >
-          <GearIcon size={15} />
+          {/* Arranging: the gear turns into a ✓ that finishes (each change is kept as you make it; no Done button). */}
+          {arranging ? (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#5c7a2e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <GearIcon size={15} />
+          )}
         </button>
         {arranging ? (
-          <ArrangeItems items={allItems} layout={layout} isAdventure={isAdventure} onDone={() => setArranging(false)} />
+          <ArrangeItems items={allItems} layout={layout} isAdventure={isAdventure} />
         ) : items.map((it, i) => (
           <button
             key={it.key}
@@ -216,7 +223,7 @@ export function QuestActionMenu({
 }
 
 /** The menu arranged in place: every item drags; the eye on its right hides it (or brings it back). */
-function ArrangeItems({ items, layout, isAdventure, onDone }: { items: { key: QuestAction; icon: React.ReactNode; label: string }[]; layout: MenuLayout; isAdventure: boolean; onDone: () => void }) {
+function ArrangeItems({ items, layout, isAdventure }: { items: { key: QuestAction; icon: React.ReactNode; label: string }[]; layout: MenuLayout; isAdventure: boolean }) {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } }),
@@ -248,9 +255,7 @@ function ArrangeItems({ items, layout, isAdventure, onDone }: { items: { key: Qu
           ))}
         </SortableContext>
       </DndContext>
-      <button type="button" onClick={onDone} className="mx-3 my-1.5 h-8 self-end rounded-full px-4 text-[13px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
-        Done
-      </button>
+
     </div>
   );
 }

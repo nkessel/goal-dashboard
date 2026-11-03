@@ -405,7 +405,7 @@ export function TaskRow({
       className={behind ? "relative pt-7" : "relative"}
       style={{
         ...(sortable ? { ...sortable.style, opacity: sortable.isDragging ? 0.35 : 1, touchAction: "manipulation", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" } : {}),
-        ...(queue.length ? { paddingBottom: stackPad(queue.length) } : {}),
+        ...(queue.length ? { paddingTop: stackPad(queue.length) } : {}),
       }}
     >
       {/* A locked reward peeks out from behind its prerequisite quest. */}
