@@ -48,6 +48,9 @@ export function useNowMinute() {
   );
 }
 
+/** The fixed time column, while the days scroll under it: parchment, so the days slide behind it. */
+const TIME_BG = "linear-gradient(90deg, #f3e6c8 85%, #efe0bd)";
+
 export function WeekView({
   dayKeys,
   tasks,
@@ -55,6 +58,8 @@ export function WeekView({
   theme = "calm",
   portraits = false,
   card,
+  visible,
+  buffer = 0,
   daily,
   essentials = "dashed",
   habitLook = "quest",
@@ -66,6 +71,10 @@ export function WeekView({
   portraits?: boolean;
   /** What a quest card shows (creature, time, XP, coins). */
   card?: CardShow;
+  /** How many days fit on screen; the rest of `dayKeys` (`buffer` days each side) are there to scroll to. */
+  visible?: number;
+  /** Days before and after the visible ones: the days scroll seamlessly, partway too (owner: repeat ask 12). */
+  buffer?: number;
   /** The columns to show (YYYY-MM-DD, read in the viewer's own time zone) — 7 for a week, 1 for a day. */
   dayKeys: string[];
   tasks: Task[];
@@ -142,7 +151,10 @@ export function WeekView({
       setPlacing(false);
     }
   }
-  const single = days.length === 1;
+  const vis = Math.max(1, Math.min(days.length, visible ?? days.length));
+  const seamless = buffer > 0 && days.length > vis;
+  const single = vis === 1;
+  const timeBg = isAdventure ? TIME_BG : "var(--t-card)";
   const nowMinute = useNowMinute();
   const now = nowMinute ? new Date(nowMinute * 60_000) : null;
   const hourCount = HOUR_END - HOUR_START + 1;
@@ -254,16 +266,71 @@ export function WeekView({
       el.removeEventListener("wheel", onWheel);
     };
   }, []);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const firstHourRef = useRef<HTMLDivElement>(null);
+  // Where the hours start under the day headers (the time column above the strip lines up with it).
+  const [headTop, setHeadTop] = useState(0);
+  useLayoutEffect(() => {
+    const h = firstHourRef.current;
+    if (!h) return;
+    const m = () => setHeadTop(h.offsetTop);
+    m();
+    const ro = new ResizeObserver(m);
+    if (h.parentElement) ro.observe(h.parentElement);
+    return () => ro.disconnect();
+  }, [seamless]);
   const [colWidth, setColWidth] = useState(0);
   useLayoutEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const measure = () => setColWidth((el.clientWidth - 20 - 40) / Math.max(1, days.length));
+    // Seamless: the days' room is the scroll strip's width less the time column and the gaps between days.
+    const measure = () => setColWidth(seamless && scrollRef.current ? (scrollRef.current.clientWidth - 40 - 2 * vis) / vis : (el.clientWidth - 20 - 40) / vis);
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [days.length]);
+  }, [vis, seamless]);
+
+  // Seamless days: the grid scrolls sideways under a fixed time column, stopping wherever you leave it (part of a
+  // day too). Past a few days from the middle, the window of loaded days moves along and the spot is kept.
+  const [firstIdx, setFirstIdx] = useState(buffer);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!seamless || !el || colWidth <= 0) return;
+    let frac = 0;
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem("cal-scroll") ?? "null") as { key: string; frac: number } | null;
+      if (saved && saved.key === dayKeys[buffer]) frac = saved.frac;
+      window.sessionStorage.removeItem("cal-scroll");
+    } catch {
+      /* storage unavailable */
+    }
+    el.scrollLeft = buffer * (colWidth + 2) + frac * (colWidth + 2);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the scroll spot is only known once laid out
+    setFirstIdx(buffer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the loaded days or the column size change
+  }, [seamless, colWidth, dayKeys[0], buffer]);
+  function onDaysScroll() {
+    const el = scrollRef.current;
+    if (!el || colWidth <= 0) return;
+    const at = el.scrollLeft / (colWidth + 2);
+    setFirstIdx(Math.floor(at + 0.5));
+    clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      const idx = Math.floor(at);
+      if (Math.abs(idx - buffer) < Math.ceil(buffer / 2)) return;
+      // Load the days around where you are, and come back to this exact spot.
+      const key = dayKeys[idx];
+      if (!key) return;
+      try {
+        window.sessionStorage.setItem("cal-scroll", JSON.stringify({ key, frac: at - idx }));
+      } catch {
+        /* storage unavailable */
+      }
+      router.replace(vis === 1 ? `/calendar?view=day&date=${key}` : `/calendar?view=days&n=${vis}&date=${key}`, { scroll: false });
+    }, 260);
+  }
 
   // Fluid days: drag the day headers sideways to move through days, or drag
   // the grip at their right end to make every day wider or narrower (more or
@@ -271,7 +338,7 @@ export function WeekView({
   const [fluid, setFluid] = useState<{ dx: number; w: number | null; n?: number } | null>(null);
   const dragged = useRef(false);
   const goTo = (startOffset: number, n: number) => {
-    const first = new Date(days[0]);
+    const first = new Date(days[seamless ? Math.max(0, Math.min(days.length - 1, firstIdx)) : 0]);
     first.setDate(first.getDate() + startOffset);
     const key = formatDateParam(first);
     const k = Math.max(1, Math.min(14, n));
@@ -281,6 +348,28 @@ export function WeekView({
     if (e.button !== 0 || colWidth <= 0) return;
     const x0 = e.clientX;
     dragged.current = false;
+    if (seamless) {
+      // A mouse drags the days along (a finger already scrolls them); nothing snaps.
+      if (e.pointerType !== "mouse") return;
+      const el = scrollRef.current;
+      if (!el) return;
+      const s0 = el.scrollLeft;
+      const mv = (m: PointerEvent) => {
+        const dx = m.clientX - x0;
+        if (!dragged.current && Math.abs(dx) < 6) return;
+        dragged.current = true;
+        el.scrollLeft = s0 - dx;
+      };
+      const end = () => {
+        window.removeEventListener("pointermove", mv);
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+      };
+      window.addEventListener("pointermove", mv);
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+      return;
+    }
     const move = (m: PointerEvent) => {
       const dx = m.clientX - x0;
       if (!dragged.current && Math.abs(dx) < 8) return;
@@ -294,7 +383,7 @@ export function WeekView({
       if (!dragged.current) return;
       const shift = Math.round(-(u.clientX - x0) / (colWidth + 2));
       setFluid(null);
-      if (shift) goTo(shift, days.length);
+      if (shift) goTo(shift, vis);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -308,7 +397,7 @@ export function WeekView({
     // The grip sits on the last day's right edge: wherever you pull that edge, the days share the room up to it.
     const left = el.getBoundingClientRect().left + 10 + 40;
     const avail = el.clientWidth - 20 - 40;
-    const widthAt = (x: number) => Math.max(36, Math.min(avail, (x - left) / Math.max(1, days.length)));
+    const widthAt = (x: number) => Math.max(36, Math.min(avail, (x - left) / vis));
     const fit = (w: number) => Math.max(1, Math.min(14, Math.round(avail / w)));
     const move = (m: PointerEvent) => setFluid({ dx: 0, w: widthAt(m.clientX), n: fit(widthAt(m.clientX)) });
     const up = (u: PointerEvent) => {
@@ -317,7 +406,7 @@ export function WeekView({
       window.removeEventListener("pointercancel", up);
       const n = fit(widthAt(u.clientX));
       setFluid(null);
-      if (n !== days.length) goTo(0, n);
+      if (n !== vis) goTo(0, n);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -326,7 +415,8 @@ export function WeekView({
   // A sideways trackpad swipe moves through the days too.
   const swipe = useRef(0);
   const onSideWheel = useEffectEvent((e: WheelEvent) => {
-    if (e.ctrlKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY) || colWidth <= 0) return;
+    // Seamless: a sideways swipe just scrolls the days (natively).
+    if (seamless || e.ctrlKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY) || colWidth <= 0) return;
     e.preventDefault();
     swipe.current += e.deltaX;
     setFluid({ dx: -swipe.current, w: null });
@@ -335,7 +425,7 @@ export function WeekView({
       const shift = Math.round(swipe.current / (colWidth + 2));
       swipe.current = 0;
       setFluid(null);
-      if (shift) goTo(shift, days.length);
+      if (shift) goTo(shift, vis);
     }, 180);
   });
   const swipeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -347,6 +437,55 @@ export function WeekView({
     return () => el.removeEventListener("wheel", h);
   }, []);
 
+  // The times' zoom handle: in the grid, or (seamless days) on the time column that stays put over them.
+  const zoomSlider = (sliderStyle: React.CSSProperties) => (
+        <div
+      role="slider"
+      aria-label="Zoom the calendar (drag the times)"
+      aria-valuemin={MIN_HOUR_PX}
+      aria-valuemax={MAX_HOUR_PX}
+      aria-valuenow={hourPx}
+      tabIndex={0}
+      title="Drag the times up or down to zoom"
+      className="group relative z-[5] cursor-ns-resize touch-none"
+      style={sliderStyle}
+      onPointerMove={(e) => setGripY(e.clientY - e.currentTarget.getBoundingClientRect().top)}
+      onPointerLeave={() => setGripY(null)}
+      onPointerDown={onZoomDown}
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        zoomTo(hourPx + (e.key === "ArrowDown" ? 6 : -6));
+      }}
+    >
+      {/* A gilded rail and grip appear where you can stretch the day. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute bottom-1 right-0 top-1 w-[2px] rounded-full opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
+        style={{ background: "linear-gradient(180deg, transparent, rgba(217,180,95,.85) 12%, rgba(217,180,95,.85) 88%, transparent)" }}
+      />
+      {gripY !== null && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -right-[7px] flex h-[34px] w-4 flex-col items-center justify-between rounded-full py-[3px]"
+          style={{
+            top: Math.max(0, gripY - 17),
+            background: "radial-gradient(circle at 40% 30%, #f9e7ad, #d9b45f 60%, #a88a3f)",
+            border: "1px solid #4a3913",
+            boxShadow: "0 2px 6px rgba(60,40,10,.35)",
+          }}
+        >
+          <svg width="9" height="6" viewBox="0 0 10 6" aria-hidden>
+            <path d="M1 5l4-4 4 4" fill="none" stroke="#3b2a14" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="h-[3px] w-[3px] rotate-45" style={{ background: "#3b2a14" }} />
+          <svg width="9" height="6" viewBox="0 0 10 6" aria-hidden>
+            <path d="M1 1l4 4 4-4" fill="none" stroke="#3b2a14" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      )}
+    </div>
+  );
   const gridStart = (d: Date) => {
     const x = new Date(d);
     x.setHours(HOUR_START, 0, 0, 0);
@@ -585,21 +724,41 @@ export function WeekView({
           </>
         )}
       </div>
-      <div className="relative overflow-hidden">
+      <div className="relative">
+      {seamless && (
+        // The time column stays put while the days scroll under it (a sticky cell can't leave its grid cell, so it's its own layer).
+        <div className="pointer-events-none absolute left-0 top-0 z-[30]" style={{ width: 40, height: headTop + hourCount * HOUR_PX, background: timeBg, boxShadow: "4px 0 6px -4px rgba(60,40,10,.25)" }}>
+          {Array.from({ length: hourCount }, (_, row) => (
+            <div
+              key={`t-${row}`}
+              className="absolute left-0 right-0"
+              style={{ top: headTop + row * HOUR_PX, height: HOUR_PX, fontSize: HOUR_PX < 30 ? 10.5 : 11.5, lineHeight: 1.1, overflow: "hidden", whiteSpace: "pre-line", color: "var(--t-ink-soft)", paddingTop: 2, borderTop: `1px solid ${lineColor}` }}
+            >
+              {HOUR_PX < 30
+                ? formatHourLabel(HOUR_START + row).replace(/:00/, "").replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase())
+                : formatHourLabel(HOUR_START + row).replace(" ", "\n")}
+            </div>
+          ))}
+          <div className="pointer-events-auto absolute left-0 right-0" style={{ top: headTop, height: hourCount * HOUR_PX }}>
+            {zoomSlider({ position: "absolute", inset: 0 })}
+          </div>
+        </div>
+      )}
+      <div ref={scrollRef} onScroll={seamless ? onDaysScroll : undefined} className={`relative ${seamless ? "cal-days-scroll overflow-x-auto overflow-y-hidden" : "overflow-hidden"}`}>
       <div
         className="grid"
         style={{
-          gridTemplateColumns: fluid?.w ? `40px repeat(${days.length}, ${fluid.w}px)` : `40px repeat(${days.length}, minmax(0, 1fr))`,
+          gridTemplateColumns: fluid?.w ? `40px repeat(${days.length}, ${fluid.w}px)` : seamless && colWidth > 0 ? `40px repeat(${days.length}, ${colWidth}px)` : `40px repeat(${days.length}, minmax(0, 1fr))`,
           gridTemplateRows: `auto repeat(${hourCount}, ${HOUR_PX}px)`,
           columnGap: 2,
           transform: fluid?.dx ? `translateX(${fluid.dx}px)` : undefined,
           transition: fluid ? "none" : "transform .25s ease-out",
-          touchAction: "pan-y pinch-zoom",
+          touchAction: seamless ? "pan-x pan-y pinch-zoom" : "pan-y pinch-zoom",
         }}
       >
         <div />
         {/* The grip on the last day's edge: pull it in for narrower days (more of them), out for wider ones. */}
-        <div className="pointer-events-none relative z-[3]" style={{ gridColumn: days.length + 1, gridRow: 1 }}>
+        <div className="pointer-events-none relative z-[3]" style={{ gridColumn: (seamless ? Math.min(days.length, firstIdx + vis) : days.length) + 1, gridRow: 1 }}>
           <button
             type="button"
             onPointerDown={startDayResize}
@@ -639,7 +798,7 @@ export function WeekView({
               <span
                 className={isAdventure ? "font-display uppercase" : ""}
                 style={{
-                  fontSize: isAdventure ? (days.length >= 5 ? 12 : 13.5) : 13.5,
+                  fontSize: isAdventure ? (vis >= 5 ? 12 : 13.5) : 13.5,
                   letterSpacing: isAdventure ? ".06em" : undefined,
                   fontWeight: isToday ? 700 : 500,
                   color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : isAdventure ? "#4a3a22" : "var(--t-ink-soft)",
@@ -662,7 +821,7 @@ export function WeekView({
                 if (!w) return null;
                 return (
                   <span className="mt-0.5 flex flex-col items-center text-[11px] leading-tight tabular-nums" style={{ color: "var(--t-ink-soft)" }} title={`High ${w.hi}°, low ${w.lo}°, ${w.rain}% chance of rain`}>
-                    {days.length >= 5 ? (
+                    {vis >= 5 ? (
                       // Narrow columns: high over low, so neighbours never run together.
                       <>
                         <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b>
@@ -702,7 +861,10 @@ export function WeekView({
         {Array.from({ length: hourCount }, (_, row) => (
           <div
             key={`hour-${row}`}
+            ref={row === 0 ? firstHourRef : undefined}
             style={{
+              // Seamless: the labels are drawn on the time column above the strip; these only keep the room.
+              ...(seamless ? { visibility: "hidden" as const } : {}),
               gridColumn: 1,
               gridRow: row + 2,
               fontSize: HOUR_PX < 30 ? 10.5 : 11.5,
@@ -725,7 +887,7 @@ export function WeekView({
             className="relative"
             style={{ gridColumn: `2 / ${days.length + 2}`, gridRow: row + 2, borderTop: `1px solid ${lineColor}` }}
           >
-            {single && weather?.[dayKeys[0]]?.[HOUR_START + row] && (() => {
+            {single && !seamless && weather?.[dayKeys[0]]?.[HOUR_START + row] && (() => {
               const w = weather[dayKeys[0]][HOUR_START + row];
               return (
                 <span
@@ -741,52 +903,7 @@ export function WeekView({
           </div>
         ))}
         {/* Drag the times up or down to squeeze or stretch the day. */}
-        <div
-          role="slider"
-          aria-label="Zoom the calendar (drag the times)"
-          aria-valuemin={MIN_HOUR_PX}
-          aria-valuemax={MAX_HOUR_PX}
-          aria-valuenow={hourPx}
-          tabIndex={0}
-          title="Drag the times up or down to zoom"
-          className="group relative z-[5] cursor-ns-resize touch-none"
-          style={{ gridColumn: 1, gridRow: `2 / ${hourCount + 2}` }}
-          onPointerMove={(e) => setGripY(e.clientY - e.currentTarget.getBoundingClientRect().top)}
-          onPointerLeave={() => setGripY(null)}
-          onPointerDown={onZoomDown}
-          onKeyDown={(e) => {
-            if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-            e.preventDefault();
-            zoomTo(hourPx + (e.key === "ArrowDown" ? 6 : -6));
-          }}
-        >
-          {/* A gilded rail and grip appear where you can stretch the day. */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute bottom-1 right-0 top-1 w-[2px] rounded-full opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
-            style={{ background: "linear-gradient(180deg, transparent, rgba(217,180,95,.85) 12%, rgba(217,180,95,.85) 88%, transparent)" }}
-          />
-          {gripY !== null && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -right-[7px] flex h-[34px] w-4 flex-col items-center justify-between rounded-full py-[3px]"
-              style={{
-                top: Math.max(0, gripY - 17),
-                background: "radial-gradient(circle at 40% 30%, #f9e7ad, #d9b45f 60%, #a88a3f)",
-                border: "1px solid #4a3913",
-                boxShadow: "0 2px 6px rgba(60,40,10,.35)",
-              }}
-            >
-              <svg width="9" height="6" viewBox="0 0 10 6" aria-hidden>
-                <path d="M1 5l4-4 4 4" fill="none" stroke="#3b2a14" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="h-[3px] w-[3px] rotate-45" style={{ background: "#3b2a14" }} />
-              <svg width="9" height="6" viewBox="0 0 10 6" aria-hidden>
-                <path d="M1 1l4 4 4-4" fill="none" stroke="#3b2a14" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-          )}
-        </div>
+        {!seamless && zoomSlider({ gridColumn: 1, gridRow: `2 / ${hourCount + 2}` })}
 
         {/* Drag-to-add hit cells — one per (day, hour). Rendered before the
             task/event chips below so a chip occupying the same cell stacks
@@ -856,6 +973,18 @@ export function WeekView({
           const showNow = nowTop !== null && nowTop > 0 && nowTop < gridMinutes;
           return (
             <div key={`col-${dayIndex}`} className="pointer-events-none relative" style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}` }}>
+              {/* One day on screen: its hourly weather at the right of each hour (it scrolls with its day). */}
+              {seamless && single && weather?.[dayKeys[dayIndex]] &&
+                Array.from({ length: hourCount }, (_, row) => {
+                  const w = weather[dayKeys[dayIndex]]?.[HOUR_START + row];
+                  if (!w) return null;
+                  return (
+                    <span key={`w-${row}`} className="pointer-events-none absolute right-1 z-[4] flex items-center gap-1 rounded px-1 text-[11.5px] tabular-nums" style={{ top: row * HOUR_PX + 2, color: "var(--t-ink-soft)", background: isAdventure ? "rgba(243,230,200,.75)" : "var(--t-card)" }} title={`${w.temp}° · ${w.rain}% chance of rain`}>
+                      {w.rain >= 30 && <span style={{ color: "#3f6fa8" }}>💧{w.rain}%</span>}
+                      {w.temp}°
+                    </span>
+                  );
+                })}
               {daily && (
                 <DailyBlocks
                   day={day}
@@ -936,6 +1065,7 @@ export function WeekView({
             </div>
           );
         })}
+      </div>
       </div>
       </div>
 

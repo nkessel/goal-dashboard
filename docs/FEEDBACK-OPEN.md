@@ -22,7 +22,6 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Let the colours of the difficulty, urgency and other bars be set in Settings.
 
 ## Calendar
-- Drag days seamlessly, including partial days with no day-by-day steps (repeat ask 12).
 - Google Calendar toggles, plus an ordered list of all your calendars (subscribed ones too) that you can reorder and archive.
 - Weather: a blue-filled rain cloud with the % chance, the date on the weekday's row, the weather on the temperature's row, and the location named.
 - The "To schedule" folders: add a folder icon for Relationships, number the top three, and drop the move-to-folder button (dragging does it).

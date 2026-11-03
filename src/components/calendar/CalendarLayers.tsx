@@ -296,8 +296,8 @@ export function CalendarLayers({
         )}
       </div>
 
-      {view === "day" && <DayView dateKey={dayKeys[0]} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
-      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={dayKeys} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
+      {view === "day" && <DayView dateKey={dayKeys[0]} wideKeys={widen(dayKeys, BUFFER)} buffer={BUFFER} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
+      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={widen(dayKeys, BUFFER)} visible={dayKeys.length} buffer={BUFFER} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
       {view === "month" && <MonthView monthKey={monthKey} todayKey={todayKey} tasks={shownTasks} events={shownEvents} theme={theme} />}
     </div>
   );
@@ -332,6 +332,18 @@ function CardShowPicker({ value, onChange }: { value: CardShow; onChange: (v: Ca
       </span>
     </div>
   );
+}
+
+/** Days loaded either side of the ones on screen, so the calendar scrolls on seamlessly (the page loads them too). */
+const BUFFER = 7;
+function widen(keys: string[], n: number): string[] {
+  if (!keys.length) return keys;
+  const at = (k: string, d: number) => {
+    const [y, m, day] = k.split("-").map(Number);
+    const x = new Date(y, m - 1, day + d);
+    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+  };
+  return [...Array.from({ length: n }, (_, i) => at(keys[0], i - n)), ...keys, ...Array.from({ length: n }, (_, i) => at(keys[keys.length - 1], i + 1))];
 }
 
 function LookPicker({ label, value, options, onPick }: { label: string; value: string; options: [string, string][]; onPick: (v: string) => void }) {

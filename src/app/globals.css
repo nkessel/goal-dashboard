@@ -3074,3 +3074,13 @@ html[data-welcome-open] [data-app-shell] *, html[data-welcome-open] [data-perche
 @media (hover: none) {
   .today-head-actions[data-open="false"] { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.18s ease, visibility 0s linear 0.18s; }
 }
+
+/* The calendar's days scroll sideways seamlessly (repeat ask 12): no scroll bar, no snapping, no bounce into the page. */
+.cal-days-scroll {
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.cal-days-scroll::-webkit-scrollbar {
+  display: none;
+}

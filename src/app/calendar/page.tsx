@@ -126,8 +126,10 @@ export default async function CalendarPage({
 
   // The server runs on UTC; fetch a day either side so evening items in the
   // viewer's time zone aren't cut off (the views place items by local day).
-  rangeStart = addDays(rangeStart, -1);
-  rangeEnd = addDays(rangeEnd, 1);
+  // A week either side too (not the month): the days scroll on seamlessly into them (repeat ask 12).
+  const extra = view === "month" ? 1 : 8;
+  rangeStart = addDays(rangeStart, -extra);
+  rangeEnd = addDays(rangeEnd, extra);
   // Google's appointments load alongside the quests (not after them).
   // A failure is shown, not swallowed (owner, Nov 3: "the google calendars are still not showing"): it says why and offers to reconnect.
   let googleProblem: string | null = null;

@@ -16,6 +16,8 @@ export function DayView({
   theme = "calm",
   portraits = false,
   card,
+  wideKeys,
+  buffer = 0,
   daily,
   essentials,
   habitLook,
@@ -29,6 +31,9 @@ export function DayView({
   theme?: "calm" | "adventure";
   portraits?: boolean;
   card?: CardShow;
+  /** The days around it too, so the day scrolls seamlessly into the next. */
+  wideKeys?: string[];
+  buffer?: number;
 }) {
   const isAdventure = theme === "adventure";
   const date = parseDateParam(dateKey);
@@ -69,7 +74,7 @@ export function DayView({
           );
         })}
       </div>
-      <WeekView dayKeys={[dateKey]} tasks={tasks} events={events} theme={theme} portraits={portraits} card={card} daily={daily} essentials={essentials} habitLook={habitLook} />
+      <WeekView dayKeys={wideKeys ?? [dateKey]} visible={1} buffer={wideKeys ? buffer : 0} tasks={tasks} events={events} theme={theme} portraits={portraits} card={card} daily={daily} essentials={essentials} habitLook={habitLook} />
     </div>
   );
 }

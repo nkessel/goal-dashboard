@@ -343,12 +343,16 @@ export const FLOWS = [
         await h.tap((p) => p.getByRole("button", { name: /^creature$/i }).first(), "show creature", { optional: true });
         await esc(h);
       }
+      // Seamless days (repeat ask 12): scroll sideways part of a day; it stays where it's left.
+      await h.page.evaluate(() => document.querySelector(".cal-days-scroll")?.scrollBy({ left: 130 })).catch(() => {});
+      await h.settle(900);
+      await h.check("week: scrolled partway");
       await h.goto("/calendar?view=day", { name: "calendar" });
       await h.settle(1200);
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
       await h.settle(400);
       await h.check("day");
-      await h.page.locator("[title^='Edit \"Take out the trash']").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await h.page.locator("[title^='Edit \"Take out the trash']").first().evaluate((el) => el.scrollIntoView({ block: "center", inline: "nearest" })).catch(() => {});
       await h.settle(400);
       await h.check("day: the mini-quest at 4:30");
     },

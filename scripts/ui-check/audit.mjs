@@ -84,10 +84,14 @@ export function auditPage(opts) {
     let clippedByBox = false;
     for (let a = el.parentElement; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
       const s = style(a);
+      // Any clipping box on screen hides it (a card's own overflow-hidden doesn't count if the card itself is off screen,
+      // e.g. a day scrolled out of the calendar's sideways-scrolling strip).
       if (s.overflowX !== "visible") {
         const ar = a.getBoundingClientRect();
-        if (ar.right <= W + 1 && ar.left >= -1) clippedByBox = true;
-        break;
+        if (ar.right <= W + 1 && ar.left >= -1) {
+          clippedByBox = true;
+          break;
+        }
       }
     }
     if (clippedByBox) continue;
