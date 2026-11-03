@@ -16,16 +16,10 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Data: trash & recycling becomes a weekly habit on Tuesday evenings, not a chore; cleaning the weed supplies becomes a regular cleaning task with a need slider.
 
 ## Quests and the quest editor
-- Take out the "More" fold: its parts become pills, like the others. Time to complete offers 5, 10, 15 and 30 min, plus Other. Scheduling and the early bonus go with the due date, and Steps go with the sequence.
-- Add a location pill (icon only, last), shown on the card. Privacy shows as a globe or a lock. Take out Templates.
-- Center the board label over the portrait (in the editor and on cards).
-- Add an archive option in the delete confirmation: a record of deleted quests that can be recovered.
+- Add a location pill (icon only, last), shown on the card.
 - Make quests in a sequence easy to edit (Nov 3: tap one in "Edit the sequence…" to open its editor; the dialog no longer jumps when its suggestions load). The sequence popup can be moved, resized and minimized; the upcoming quests peek above the first one, and "1 after this" shows only on hover or long-press.
-- The ⋯ button opens the menu, never the steps tray. The menu's editor needs no Done (the gear turns into a ✓ and an outside click saves), and its gear icon should match the others.
-- Make links work in course quests and their steps.
+- (⋯ now has a bigger target.) The menu's editor needs no Done (the gear turns into a ✓ and an outside click saves), and its gear icon should match the others.
 - Let the colours of the difficulty, urgency and other bars be set in Settings.
-- Search for quests on the boards list.
-- A quest's snooze is a small menu: Tomorrow, 2 days, Other.
 
 ## Calendar
 - Drag days seamlessly, including partial days with no day-by-day steps (repeat ask 12).

@@ -92,7 +92,7 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
             {evening().getTime() - clock() > 30 * 60_000 && choice("This evening", () => onPick({ until: evening(), label: "until this evening" }), hm(evening()))}
             {choice("4 hours", () => onPick(inMin(240, "for 4 hours")), hm(new Date(clock() + 240 * 60_000)))}
             <div className="mt-1 flex flex-col gap-1 text-[12.5px] font-semibold" style={{ color: SOFT }}>
-              For a number of days
+              For a number of days{small ? ` · until ${daysOn(dayCount).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}
               <span className="flex items-center gap-1.5">
                 <button type="button" onClick={() => setDays(Math.max(1, dayCount - 1))} aria-label="One day fewer" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[20px] font-bold" style={{ border: "1px solid #a88a3f", color: INK }}>
                   −
@@ -111,7 +111,7 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
                 <button type="button" onClick={() => setDays(Math.min(365, dayCount + 1))} aria-label="One day more" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[20px] font-bold" style={{ border: "1px solid #a88a3f", color: INK }}>
                   +
                 </button>
-                <span className="min-w-0 flex-1 truncate text-[12px] font-normal">{daysOn(dayCount).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                {small ? <span className="flex-1" /> : <span className="min-w-0 flex-1 truncate text-[12px] font-normal">{daysOn(dayCount).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>}
                 <button type="button" onClick={() => onPick({ until: daysOn(dayCount), label: `for ${dayCount} day${dayCount === 1 ? "" : "s"}` })} className="h-10 shrink-0 rounded-full px-4 text-[14px] font-semibold" style={{ background: "var(--t-gold, #e2bb5c)", color: INK, border: "1px solid #8a6116" }}>
                   Snooze
                 </button>

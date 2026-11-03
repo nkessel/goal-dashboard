@@ -463,6 +463,8 @@ export function TaskRow({
         </button>
         {menu === "dots" && menuEl("right")}
       </div>
+      {/* Outside both card layouts: a tiny quest's Snooze never opened before (it sat in the full card's branch). */}
+      {snoozing && <SnoozePicker title={task.title} anchor={snoozeAt} onPick={snoozeNow} onClose={() => setSnoozing(false)} />}
 
       {tiny ? (
         <div className="flex min-h-[34px] items-center gap-2.5">
@@ -668,7 +670,6 @@ export function TaskRow({
                 </button>
               );
             })()}
-            {snoozing && <SnoozePicker title={task.title} anchor={snoozeAt} onPick={snoozeNow} onClose={() => setSnoozing(false)} />}
             {bonusOpen && <EarlyBonusPopup taskId={task.id} initial={{ xp: task.early_bonus_xp ?? null, coins: task.early_bonus_coins ?? null, perDay: task.early_bonus_per_day ?? null }} onClose={() => setBonusOpen(false)} />}
           </div>
           {((task.progress ?? 0) > 0 || (task.steps_total ?? 0) > 0 || !!countUnit) && (
