@@ -12,8 +12,6 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Data: trash & recycling becomes a weekly habit on Tuesday evenings, not a chore; cleaning the weed supplies becomes a regular cleaning task with a need slider.
 
 ## Quests and the quest editor
-- Add a location pill (icon only, last), shown on the card.
-- The sequence popup can be moved, resized and minimized. (Done Nov 3: edit a waiting quest from it, quests peek above, "1 after this" on hover.)
 - Let the colours of the difficulty, urgency and other bars be set in Settings.
 
 ## Calendar

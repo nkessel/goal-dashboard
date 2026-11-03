@@ -69,6 +69,9 @@ export function FloatingWindow({ storageKey, width, minimized, onRestore, chip, 
       onPointerMove={move}
       onPointerUp={up}
       onPointerCancel={() => (drag.current = null)}
+      // A window opened from inside a card mustn't also tap the card (React carries events up through portals).
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.key !== "Escape" && e.stopPropagation()}
       className={`fixed ${minimized ? "card-pop-in" : "reveal"}`}
       style={{ zIndex: z, left: pos.x, top: pos.y, width: minimized ? undefined : `min(${width}px, calc(100vw - 16px))`, maxHeight: `calc(100dvh - ${pos.y}px - 16px)`, display: "flex", touchAction: minimized ? "none" : undefined }}
     >

@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuestPlace } from "@/lib/use-quest-places";
 import { progressWords } from "@/lib/progress-words";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { FileChips } from "@/components/ui/FileChips";
@@ -140,6 +141,7 @@ export function TaskRow({
   const [bonusOpen, setBonusOpen] = useState(false);
   // Counted in pages (or anything) instead of percent, and the little stepper to log it from the card.
   const countUnit = useProgressUnit(task.id);
+  const place = useQuestPlace(task.id);
   const [logOpen, setLogOpen] = useState(false);
   const [snoozing, setSnoozing] = useState(false);
   const [snoozeAt, setSnoozeAt] = useState<{ top: number; bottom: number; left: number; right: number } | null>(null);
@@ -642,6 +644,12 @@ export function TaskRow({
           {task.description && !compact && (
             <p dir="auto" className={`user-text line-clamp-2 break-words text-[12.5px] leading-snug sm:text-[13px]`} style={{ color: isAdventure ? "#4d4535" : "var(--t-ink-soft)" }}>
               <Linked text={task.description} />
+            </p>
+          )}
+          {place && (
+            <p className="m-0 mt-0.5 flex items-center gap-1 truncate text-[12.5px]" style={{ color: isAdventure ? "#5a4a2c" : "var(--t-ink-soft)" }} title={`Where: ${place}`}>
+              <span aria-hidden>📍</span>
+              <span className="truncate">{place}</span>
             </p>
           )}
           <FileChips files={task.attachments} className="mt-1" />

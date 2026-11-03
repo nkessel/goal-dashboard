@@ -159,7 +159,7 @@ export const FLOWS = [
       await h.goto("/", { name: "sequence" });
       // A sequence: open it from the quest's ⋯ menu and tap the quest waiting behind to edit it (Nov 3).
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for sequence", { optional: true })) {
-        if (await h.tap(/(edit the|create a) sequence…/i, "edit the sequence", { optional: true, expectMove: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /sequence/i }).first(), "edit the sequence", { optional: true, expectMove: true })) {
           await h.settle(800);
           await h.check("sequence dialog");
           if (await h.tap((p) => p.getByRole("button", { name: /post the reflection link/i }).first(), "edit a waiting quest", { optional: true, expectMove: true })) {

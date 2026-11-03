@@ -1,5 +1,6 @@
 "use client";
 
+import { FloatingWindow } from "@/components/ui/FloatingWindow";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -291,6 +292,7 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
     });
   const open = (chain ?? []).filter((c) => c.status === "open");
   const ink = "var(--t-ink-soft)";
+  const [minimized, setMinimized] = useState(false);
   // A quest in the sequence opened in its own editor (owner: "make quests in a sequence easy to edit").
   const [editing, setEditing] = useState<Task | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
@@ -316,21 +318,25 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
         />
       </Suspense>
     );
-  return createPortal(
-    // Anchored near the top, so it grows downward and nothing already on it moves.
-    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[72] flex items-start justify-center p-4 pt-[min(12vh,96px)]`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+  // A window you can move (drag its title), resize (its corner) and minimize to a chip (owner, Nov 3).
+  return (
+    <FloatingWindow storageKey="sequence-window-at" width={448} z={72} minimized={minimized} onRestore={() => setMinimized(false)} label="Open the sequence (drag to move)" at={() => ({ x: Math.max(8, (window.innerWidth - 448) / 2), y: Math.min(96, window.innerHeight * 0.12) })} chip={<>🧩 Sequence</>}>
       <div
         role="dialog"
-        aria-modal="true"
         aria-label="Quest sequence"
         onClick={(e) => e.stopPropagation()}
-        className="card-pop-in parchment parchment-framed relative flex max-h-[calc(100dvh-min(12vh,96px)-16px)] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl p-5"
-        style={{ color: "var(--t-ink)", background: isAdventure ? undefined : "var(--t-card)" }}
+        className={`${closing ? "overlay-fade-out pointer-events-none" : "card-pop-in"} parchment parchment-framed relative flex min-h-[220px] min-w-[280px] w-full max-h-[calc(100dvh-110px)] flex-col gap-3 overflow-y-auto rounded-2xl p-5`}
+        style={{ color: "var(--t-ink)", background: isAdventure ? undefined : "var(--t-card)", resize: "both", boxShadow: "0 18px 44px rgba(0,0,0,.45)" }}
       >
-        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-3 z-[2] flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/5" style={{ color: ink }}>
-          ×
-        </button>
-        <div className="relative z-[1] flex flex-col gap-0.5 pr-8">
+        <span className="absolute right-3 top-3 z-[2] flex items-center gap-0.5">
+          <button type="button" onClick={() => setMinimized(true)} aria-label="Minimize" title="Minimize to a button you can move" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/5" style={{ color: ink }}>
+            –
+          </button>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/5" style={{ color: ink }}>
+            ×
+          </button>
+        </span>
+        <div data-drag-handle className="relative z-[1] flex cursor-grab touch-none select-none flex-col gap-0.5 pr-16 active:cursor-grabbing" title="Drag to move">
           <p className={`m-0 text-[19px] ${isAdventure ? "font-display" : "font-bold"}`}>{chain && chain.length > 1 ? "Sequence" : "Create a sequence"}</p>
           <p className="m-0 text-[13.5px]" style={{ color: ink }}>
             One quest at a time: each waits, stacked out of sight, until the one before it is done.
@@ -456,8 +462,7 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
           </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </FloatingWindow>
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, type ProgressUnit } from "@/lib/progress-units";
 import { progressWords } from "@/lib/progress-words";
@@ -214,7 +215,7 @@ export function QuestEditorDialog({
   const embedded = useIsEmbedded();
   const scaleStyle = useScaleStyle();
   // Which quick-detail chip is open (one at a time).
-  const [factOpen, setFactOpen] = useState<EditorPart | "due" | "bonus" | null>(null);
+  const [factOpen, setFactOpen] = useState<EditorPart | "due" | "bonus" | "place" | null>(null);
   const isAdventure = theme === "adventure";
   const task = mode.kind === "edit" ? mode.task : null;
   const create = mode.kind === "create" ? mode : null;
@@ -619,6 +620,7 @@ export function QuestEditorDialog({
   const dueAt = dueIso(dueDate, dueTime);
   const hasSchedule = Boolean(dueDate || fixedSchedule || slot || toSchedule || aspiration);
   const onCalendar = Boolean(fixedSchedule || slot);
+  const place = useQuestPlace(task?.id);
 
   // ---- Saving as you go (existing quests) ----------------------------------
   const autosave = Boolean(task) && !review;
@@ -2569,8 +2571,35 @@ export function QuestEditorDialog({
                         <FactCaret open={factOpen === "due"} />
                       </button>
                     )}
+                    {/* Where it happens: an icon-only pill, last (owner, Nov 3); shown on the card too. */}
+                    {task && !doingNow && (
+                      <button type="button" onClick={() => setFactOpen((o) => (o === "place" ? null : "place"))} aria-expanded={factOpen === "place"} aria-label={place ? `Place: ${place}` : "Add a place"} title={place ? `📍 ${place}` : "Where it happens"} className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "place" ? "true" : undefined}>
+                        <PinGlyph />
+                        {place && <span className="max-w-[110px] truncate">{place}</span>}
+                      </button>
+                    )}
 
                   </div>
+                  {factOpen === "place" && task && (
+                    <div key="place" className="reveal qe-fact-panel flex items-center gap-2 rounded-xl p-3">
+                      <PinGlyph />
+                      <input
+                        autoFocus
+                        defaultValue={place ?? ""}
+                        placeholder="Where? (e.g. Natick library)"
+                        aria-label="Where it happens"
+                        onBlur={(e) => void saveQuestPlace(task.id, e.target.value).catch(() => {})}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), (e.target as HTMLInputElement).blur(), setFactOpen(null))}
+                        className="h-9 min-w-0 flex-1 rounded-lg border px-2 text-[16px]"
+                        style={fieldStyle}
+                      />
+                      {place && (
+                        <button type="button" onClick={() => (void saveQuestPlace(task.id, null).catch(() => {}), setFactOpen(null))} aria-label="No place" className="h-9 w-7 shrink-0 text-[18px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {factOpen === "due" && (
                     <div key="due" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -2623,7 +2652,7 @@ export function QuestEditorDialog({
                     </div>
                   )}
 
-                  {factOpen && factOpen !== "due" && factOpen !== "bonus" && facts.includes(factOpen) && (
+                  {factOpen && factOpen !== "due" && factOpen !== "bonus" && factOpen !== "place" && facts.includes(factOpen) && (
                     <div key={factOpen} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
                       {partNodes[factOpen]}
                     </div>
@@ -2991,6 +3020,16 @@ function StepsGlyph({ size = 18 }: { size?: number }) {
       <path d="M4.3 6.6l1.2 1.2 2.1-2.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       <rect x="3" y="14" width="5" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.8" />
       <path d="M11 6.5h10M11 16.5h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A map pin (a quest's place). */
+function PinGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 21s-6.5-6.2-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 14.8 12 21 12 21z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" fill="rgba(217,180,95,.35)" />
+      <circle cx="12" cy="9.8" r="2.3" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   );
 }

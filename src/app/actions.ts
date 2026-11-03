@@ -3320,6 +3320,28 @@ export async function setProgressUnitAction(taskId: string, unit: import("@/lib/
   return u;
 }
 
+/** Where quests happen ("📍 Natick library"), by quest id. */
+export async function questPlacesAction(): Promise<Record<string, string>> {
+  const ownerId = await requireProfileId();
+  const raw = (await readExtras(ownerId)).questPlaces;
+  const out: Record<string, string> = {};
+  if (raw && typeof raw === "object") for (const [k, v] of Object.entries(raw as Record<string, unknown>)) if (/^[0-9a-f-]{36}$/i.test(k) && typeof v === "string" && v.trim()) out[k] = v.slice(0, 80);
+  return out;
+}
+
+export async function setQuestPlaceAction(taskId: string, place: string | null) {
+  const ownerId = await requireProfileId();
+  if (!/^[0-9a-f-]{36}$/i.test(taskId)) throw new Error("Unknown quest.");
+  const extras = await readExtras(ownerId);
+  const all = { ...((extras.questPlaces as Record<string, string> | undefined) ?? {}) };
+  const p = place?.replace(/\s+/g, " ").trim().slice(0, 80) || null;
+  if (p) all[taskId] = p;
+  else delete all[taskId];
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questPlaces: all } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return p;
+}
+
 /** A board shown whole (no mist over all but its next step), or misty again. Kept on the account. */
 export async function setBoardMistAction(boardId: string, mist: boolean) {
   const ownerId = await requireProfileId();
