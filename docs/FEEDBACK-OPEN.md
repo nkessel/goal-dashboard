@@ -19,15 +19,12 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 
 ## Calendar
 - Google Calendar toggles, plus an ordered list of all your calendars (subscribed ones too) that you can reorder and archive.
-- Weather: a blue-filled rain cloud with the % chance, the date on the weekday's row, the weather on the temperature's row, and the location named.
-- The "To schedule" folders: add a folder icon for Relationships, number the top three, and drop the move-to-folder button (dragging does it).
-- 🎧 "Something to listen to" goes in Plan my day as an icon, to pick today's video.
 
 ## Feedback tool (repeat ask 14)
 - Built Nov 3 (pictures in the background, recent notes to edit). Confirm on the iPhone.
 
 ## Other
+- Martin-care quests as a follow-up to scheduling time with Dad (with the agenda feature above).
 - Make "delete a portrait" a small context menu.
 - Today scrolls slowly on the laptop: look into it.
 - Agenda for a visit (owner, Nov 3): once "Schedule time to be with my dad" is on the calendar, the quests waiting behind it (parents' calendars, Dad's computer, Martin-care quests) show as agenda options for that visit. The quests are set up as its sequence (Family board).
-- Data: add Alliance Jiu Jitsu to plan soon, and Shaolin within 45 days (as quests with plan-by). After that, Martin-care quests become a follow-up to scheduling time with Dad, together with the Martin and Family boards.

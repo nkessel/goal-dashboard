@@ -376,7 +376,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform duration-150" style={{ transform: f.open ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
                       <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <FolderGlyph open={f.open} />
+                    <FolderGlyph open={f.open} name={g.key} />
                     {renaming === g.key ? (
                       <input
                         autoFocus
@@ -431,12 +431,13 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
                           Empty — drag quests here.
                         </li>
                       )}
-                      {g.ids.map((id) => (
+                      {g.ids.map((id, i) => (
                         <Row
                           key={id}
                           task={byId.get(id)!}
-                          n={null}
-                          dividerBefore={false}
+                          // A folder's first three are numbered too (owner, Nov 3).
+                          n={i < NUMBERED ? i + 1 : null}
+                          dividerBefore={i === NUMBERED}
                           onOpen={() => setEditing(byId.get(id)!)}
                           onSchedule={() => setScheduling(byId.get(id)!)}
                           onPlace={() => place2(byId.get(id)!)}
@@ -556,11 +557,22 @@ function GroupZone({ id, children }: { id: string; children: React.ReactNode }) 
   );
 }
 
-function FolderGlyph({ open }: { open: boolean }) {
+/** A folder, with a small mark for what it holds: a heart for Relationships (owner, Nov 3), and so on. */
+function FolderGlyph({ open, name = "" }: { open: boolean; name?: string }) {
+  const mark = /relation|love|family|friend|partner|couple/i.test(name)
+    ? "M12 17.2l-3.4-3.1c-1.5-1.4-1.2-3.4.4-3.9 1.1-.4 2.2.1 3 1 .8-.9 1.9-1.4 3-1 1.6.5 1.9 2.5.4 3.9z"
+    : /work|job|career|business/i.test(name)
+      ? "M9 11.5h6M9.5 11.5v-1a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1M8 11.5h8v5H8z"
+      : /home|house|chore|clean/i.test(name)
+        ? "M8 16.5v-4l4-3 4 3v4zM11 16.5v-2.2h2v2.2"
+        : /health|body|gym|exercise/i.test(name)
+          ? "M8.5 13.5h7M12 10v7"
+          : null;
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden className="shrink-0">
       <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2h8.8A1.5 1.5 0 0 1 21 8.5V18a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" fill="#d9b45f" stroke="#4a3913" strokeWidth="1.4" strokeLinejoin="round" />
       {open && <path d="M3.4 18.6L6 11h16l-2.8 8.1" fill="#f3dc95" stroke="#4a3913" strokeWidth="1.4" strokeLinejoin="round" />}
+      {mark && <path d={mark} fill={/relation|love|family|friend|partner|couple/i.test(name) ? "#b8453a" : "none"} stroke="#4a3913" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round" />}
     </svg>
   );
 }
@@ -650,9 +662,7 @@ function Row({
             <path d="M3.5 9.6h17M8 3v4M16 3v4M12 12.5v5M9.5 15h5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
           </svg>
         </button>
-        <IconBtn label="Move to a folder" {...stop} onClick={(e) => onMove(e.clientX, e.clientY)}>
-          <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2h8.8A1.5 1.5 0 0 1 21 8.5V18a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" stroke="currentColor" strokeWidth="1.9" fill="none" strokeLinejoin="round" />
-        </IconBtn>
+        {/* No "move to a folder" button (owner, Nov 3): drag it, or right-click for the menu. */}
         <IconBtn label="Take it off the list" {...stop} onClick={onRemove}>
           <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
         </IconBtn>

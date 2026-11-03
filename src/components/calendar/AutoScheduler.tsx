@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
-import { applyAutoScheduleAction, resolveOptionalEventAction, saveSchedulerSettingsAction, schedulerContextAction } from "@/app/actions";
+import { applyAutoScheduleAction, listenBoardAction, resolveOptionalEventAction, saveSchedulerSettingsAction, schedulerContextAction } from "@/app/actions";
 import { MEAL_DEFAULTS, MEAL_ICONS, MEAL_NAMES, SCHEDULER_DEFAULTS, clockOf, freeStretch, holdAt, localDayKey, mealsOn, planSchedule, type Avoid, type Busy, type MealKey, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
 import { useEscape } from "@/lib/use-escape";
 import { habitBlocksOn, habitOnDay } from "@/lib/timed-habits";
@@ -69,6 +69,11 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = fal
   const [showCals, setShowCals] = useState(false);
   const [showMeals, setShowMeals] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [listenBoard, setListenBoard] = useState<string | null>(null);
+  useEffect(() => {
+    if (day) listenBoardAction().then(setListenBoard, () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the planner opens
+  }, []);
   // The block you tapped: its options open under the day.
   const [picked, setPicked] = useState<string | null>(null);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
@@ -254,6 +259,12 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = fal
               A plan for your list, in your free time{google ? " (around your Google calendars)" : ""}. Tap a gold block to change it.
             </p>
           </div>
+          {/* 🎧 Today's learning video: the Online learning videos list, a tap away while planning (owner, Nov 3). */}
+          {day && listenBoard && (
+            <a href={`/boards/${listenBoard}`} aria-label="Something to listen to: pick today's learning video" title="Something to listen to: pick today's learning video" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[17px] hover:bg-black/[.06]">
+              🎧
+            </a>
+          )}
           {/* The finer settings (hours, daily limit, essentials, calendars) wait behind the gear. */}
           <button type="button" onClick={() => setShowSettings((v) => !v)} aria-expanded={showSettings} aria-label="Settings" title="Settings" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: soft, background: showSettings ? "rgba(217,180,95,.22)" : undefined }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>

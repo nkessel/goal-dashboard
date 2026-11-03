@@ -3035,6 +3035,14 @@ export async function resolveOptionalEventAction(calendarId: string, eventId: st
 }
 
 /** Plan my day: Today's Quests and whatever is due by the end of the day (open, awake, approved). */
+/** The board of things to listen to (the "Online learning videos" list), for 🎧 in Plan my day. */
+export async function listenBoardAction(): Promise<string | null> {
+  const ownerId = await requireProfileId();
+  const { data } = await supabaseAdmin().from("boards").select("id, title").eq("owner_id", ownerId);
+  const hit = ((data ?? []) as { id: string; title: string }[]).find((b) => /learning videos|listen/i.test(b.title));
+  return hit?.id ?? null;
+}
+
 export async function planDayTasksAction(dayEndISO: string) {
   const ownerId = await requireProfileId();
   const end = Date.parse(dayEndISO);

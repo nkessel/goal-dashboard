@@ -795,44 +795,44 @@ export function WeekView({
               style={{ borderBottom: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, paddingTop: isAdventure ? 18 : undefined, gridColumn: i + 2, gridRow: 1 }}
             >
               {isAdventure && isToday && <TodayCrest />}
-              <span
-                className={isAdventure ? "font-display uppercase" : ""}
-                style={{
-                  fontSize: isAdventure ? (vis >= 5 ? 12 : 13.5) : 13.5,
-                  letterSpacing: isAdventure ? ".06em" : undefined,
-                  fontWeight: isToday ? 700 : 500,
-                  color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : isAdventure ? "#4a3a22" : "var(--t-ink-soft)",
-                }}
-              >
-                {day.toLocaleDateString(undefined, { weekday: "short" })}
-              </span>
-              <span
-                className="flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[13px] tabular-nums"
-                style={
-                  isToday
-                    ? { background: isAdventure ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", fontWeight: 700 }
-                    : { color: "var(--t-ink)" }
-                }
-              >
-                {day.getDate()}
+              {/* The weekday and its date on one line; the weather on the next (owner, Nov 3). */}
+              <span className="flex items-center gap-1">
+                <span
+                  className={isAdventure ? "font-display uppercase" : ""}
+                  style={{
+                    fontSize: isAdventure ? (vis >= 5 ? 12 : 13.5) : 13.5,
+                    letterSpacing: isAdventure ? ".06em" : undefined,
+                    fontWeight: isToday ? 700 : 500,
+                    color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : isAdventure ? "#4a3a22" : "var(--t-ink-soft)",
+                  }}
+                >
+                  {day.toLocaleDateString(undefined, { weekday: vis >= 6 && colWidth > 0 && colWidth < 52 ? "narrow" : "short" })}
+                </span>
+                <span
+                  className="flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[13px] tabular-nums"
+                  style={
+                    isToday
+                      ? { background: isAdventure ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", fontWeight: 700 }
+                      : { color: "var(--t-ink)" }
+                  }
+                >
+                  {day.getDate()}
+                </span>
               </span>
               {!single && weather && (() => {
                 const w = daySummary(weather[dayKeys[i]]);
                 if (!w) return null;
                 return (
-                  <span className="mt-0.5 flex flex-col items-center text-[11px] leading-tight tabular-nums" style={{ color: "var(--t-ink-soft)" }} title={`High ${w.hi}°, low ${w.lo}°, ${w.rain}% chance of rain`}>
-                    {vis >= 5 ? (
-                      // Narrow columns: high over low, so neighbours never run together.
-                      <>
-                        <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b>
-                        <span className="text-[10px] opacity-80">{w.lo}°</span>
-                      </>
-                    ) : (
-                      <span>
-                        <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b> {w.lo}°
+                  <span className="mt-0.5 flex flex-wrap items-center justify-center gap-x-1 text-[11px] leading-tight tabular-nums" style={{ color: "var(--t-ink-soft)" }} title={`High ${w.hi}°, low ${w.lo}°, ${w.rain}% chance of rain`}>
+                    <span>
+                      <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b> <span className="opacity-80">{w.lo}°</span>
+                    </span>
+                    {w.rain >= 20 && (
+                      <span className="flex items-center gap-0.5" style={{ color: "#2f5f99" }}>
+                        <RainCloud />
+                        {w.rain}%
                       </span>
                     )}
-                    {w.rain >= 30 && <span style={{ color: "#3f6fa8" }}>💧{w.rain}%</span>}
                   </span>
                 );
               })()}
@@ -895,7 +895,7 @@ export function WeekView({
                   style={{ color: "var(--t-ink-soft)", background: isAdventure ? "rgba(243,230,200,.75)" : "var(--t-card)" }}
                   title={`${w.temp}° · ${w.rain}% chance of rain`}
                 >
-                  {w.rain >= 30 && <span style={{ color: "#3f6fa8" }}>💧{w.rain}%</span>}
+                  {w.rain >= 30 && <span className="flex items-center gap-0.5" style={{ color: "#2f5f99" }}><RainCloud />{w.rain}%</span>}
                   {w.temp}°
                 </span>
               );
@@ -980,7 +980,7 @@ export function WeekView({
                   if (!w) return null;
                   return (
                     <span key={`w-${row}`} className="pointer-events-none absolute right-1 z-[4] flex items-center gap-1 rounded px-1 text-[11.5px] tabular-nums" style={{ top: row * HOUR_PX + 2, color: "var(--t-ink-soft)", background: isAdventure ? "rgba(243,230,200,.75)" : "var(--t-card)" }} title={`${w.temp}° · ${w.rain}% chance of rain`}>
-                      {w.rain >= 30 && <span style={{ color: "#3f6fa8" }}>💧{w.rain}%</span>}
+                      {w.rain >= 30 && <span className="flex items-center gap-0.5" style={{ color: "#2f5f99" }}><RainCloud />{w.rain}%</span>}
                       {w.temp}°
                     </span>
                   );
@@ -1195,5 +1195,15 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
         );
       })}
     </>
+  );
+}
+
+/** A small rain cloud, filled blue (the day's chance of rain sits beside it). */
+function RainCloud() {
+  return (
+    <svg width="13" height="12" viewBox="0 0 24 22" aria-hidden>
+      <path d="M7 14.5a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.3 1.6A3.8 3.8 0 0 1 17.5 14.5z" fill="#5b8fd6" stroke="#2f5f99" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M8.5 17.5l-1 2.5M12.5 17.5l-1 2.5M16.5 17.5l-1 2.5" stroke="#2f5f99" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   );
 }
