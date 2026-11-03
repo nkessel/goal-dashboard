@@ -28,7 +28,7 @@ export type EditorPart =
 
 // Scheduling opens right under its "Add to calendar" / "Scheduled" button, so it isn't placed on its own.
 export const EDITOR_PARTS: { key: EditorPart; label: string }[] = [
-  { key: "showsIn", label: "Shows in (Today, Additional, Backlog)" },
+  { key: "showsIn", label: "Priority (primary, secondary, backlog)" },
   { key: "time", label: "Time to complete and scheduling" },
   { key: "sequence", label: "Sequence" },
   { key: "steps", label: "Steps" },

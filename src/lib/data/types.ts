@@ -192,7 +192,7 @@ export type Profile = {
   /** The toucan spirit's add-ons: owned, and worn per slot. */
   toucan?: { owned?: string[]; equipped?: Record<string, string> } | null;
   /** The life wheel's areas (Insights). */
-  life_wheel?: { topics?: string[]; streaks?: import("@/lib/streaks").StreakDef[]; inventory?: import("@/lib/inventory").Inventory; weather?: { lat: number; lon: number; name?: string | null }; cleaning?: unknown } | null;
+  life_wheel?: { topics?: string[]; streaks?: import("@/lib/streaks").StreakDef[]; inventory?: import("@/lib/inventory").Inventory; weather?: { lat: number; lon: number; name?: string | null }; cleaning?: unknown; /** Boards shown whole, without the mist over all but the next step. */ clearBoards?: string[] } | null;
   /** Private long quests with steps (see lib/missions). */
   secret_missions?: unknown;
 };

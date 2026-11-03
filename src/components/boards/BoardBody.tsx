@@ -41,12 +41,15 @@ export function BoardBody({
   theme,
   onDark = true,
   arrange = false,
+  mist = true,
 }: {
   data: Awaited<ReturnType<typeof loadBoard>>;
   theme: "calm" | "adventure";
   onDark?: boolean;
   /** On the full page, its gear arranges the parts below the title (the same order for every board). */
   arrange?: boolean;
+  /** The mist over all but the next step (turned off per board). */
+  mist?: boolean;
 }) {
   const isAdventure = theme === "adventure";
   const text = onDark && isAdventure ? "var(--t-cream)" : "var(--t-ink)";
@@ -93,7 +96,7 @@ export function BoardBody({
           </section>
         ) : null,
     },
-    { key: "quests", label: "Quests", hint: "The board's quests", keep: true, node: <BoardQuestList tasks={allTasks} boardId={board.id} boardTitle={board.title} nextTaskId={board.next_task_id ?? null} theme={theme} /> },
+    { key: "quests", label: "Quests", hint: "The board's quests", keep: true, node: <BoardQuestList tasks={allTasks} boardId={board.id} boardTitle={board.title} nextTaskId={board.next_task_id ?? null} theme={theme} mist={mist} /> },
   ];
 
   return (

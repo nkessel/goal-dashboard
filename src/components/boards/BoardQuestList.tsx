@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { setBoardMistAction } from "@/app/actions";
 import { nextActionOf } from "@/lib/next-action";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 
@@ -16,6 +17,7 @@ export function BoardQuestList({
   nextTaskId = null,
   boardTitle = null,
   theme,
+  mist = true,
 }: {
   tasks: Task[];
   boardId?: string;
@@ -24,6 +26,8 @@ export function BoardQuestList({
   /** The board's name (courses pick their next step by the deadline coming up). */
   boardTitle?: string | null;
   theme: "calm" | "adventure";
+  /** The mist over all but the next step; off for boards like a list of videos (owner, Nov 2). */
+  mist?: boolean;
 }) {
   const isAdventure = theme === "adventure";
   const open = tasks.filter((t) => t.status === "open" && !t.is_aspiration);
@@ -53,15 +57,26 @@ export function BoardQuestList({
   // A quest linked here from another board wears that board's name.
   const linkTag = (t: Task) => (boardId && t.board_id && t.board_id !== boardId && t.home_board_title ? `↗ ${t.home_board_title}` : undefined);
   const next = boardId ? (nextActionOf({ id: boardId, title: boardTitle, next_task_id: nextTaskId }, open) ?? open[0]) : open[0];
-  const foggy = open.length > 2 && !!next;
+  const [mistOn, setMistOn] = useState(mist);
+  const [, startMist] = useTransition();
+  const setMist = (on: boolean) => {
+    if (!boardId) return;
+    setMistOn(on);
+    startMist(() => void setBoardMistAction(boardId, on).catch(() => setMistOn(!on)));
+  };
+  const foggy = mistOn && open.length > 2 && !!next;
   const rest = foggy ? open.filter((t) => t.id !== next!.id) : open;
-  const xpAhead = rest.reduce((n, t) => n + (t.xp_value ?? 0), 0);
   return (
     <div className="flex flex-col gap-3">
       {foggy && (
         <section aria-label="Next step" className="flex flex-col gap-1.5">
           <h2 className={`m-0 flex items-center gap-2 ${isAdventure ? "font-display text-[17px]" : "text-[13.5px] font-bold uppercase tracking-wide"}`} style={{ color: isAdventure ? "#f2d27e" : "var(--t-accent)" }}>
-            <span aria-hidden className="summit-next inline-block h-2.5 w-2.5 rounded-full" style={{ background: isAdventure ? "#f2d27e" : "var(--t-accent)" }} />
+            {/* A quiet target: focusing, not flashing (owner, Nov 2). */}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+            </svg>
             Next step
           </h2>
           <ul className="flex flex-col gap-3">
@@ -83,12 +98,18 @@ export function BoardQuestList({
               {revealed ? "Back into the mist" : `${rest.length} more quests in the mist`}
             </span>
             <span className="text-[13px]" style={{ opacity: 0.75 }}>
-              {revealed ? "Just the next step, for focus" : `${xpAhead} XP ahead · one step at a time — tap to see the road`}
+              {revealed ? "Just the next step, for focus" : "One step at a time — tap to see the road"}
             </span>
           </span>
           <span aria-hidden className="relative z-[1] text-[18px] transition-transform duration-200" style={{ transform: revealed ? "rotate(90deg)" : undefined }}>
             ›
           </span>
+        </button>
+      )}
+      {/* The mist is a choice per board: off for lists you browse (videos, ideas). */}
+      {boardId && open.length > 2 && !!next && (
+        <button type="button" onClick={() => setMist(!mistOn)} className="-mt-1.5 self-end text-[12px] underline underline-offset-2" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.6 }}>
+          {mistOn ? "No mist on this board" : "🌫 Use the mist on this board"}
         </button>
       )}
       {open.length > 0 ? (

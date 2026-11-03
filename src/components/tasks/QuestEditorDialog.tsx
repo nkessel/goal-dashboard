@@ -1108,18 +1108,18 @@ export function QuestEditorDialog({
               {/* Where it shows on Today: Today's Quests, Additional Quests, or the backlog (just its board). One choice. */}
               {!doingNow && !isCompleted && !fixedSchedule && (
                 <div className="flex items-center gap-2">
-                  <span className={`${labelCls} shrink-0`}>Shows in</span>
+                  <span className={`${labelCls} shrink-0`}>Priority</span>
                   <div
                     role="radiogroup"
-                    aria-label="Where it shows on the Today screen"
-                    className="grid h-9 min-w-0 flex-1 grid-cols-3 gap-0.5 rounded-full p-[3px]"
+                    aria-label="Priority: primary objective (Today's Quests), secondary objective (Additional Quests) or backlog (only on its board)"
+                    className="grid min-h-9 min-w-0 flex-1 grid-cols-3 gap-0.5 rounded-[18px] p-[3px]"
                     style={{ background: "rgba(70,50,20,.09)", boxShadow: "inset 0 1px 2px rgba(70,50,20,.14)" }}
                   >
                     {(
                       [
-                        { v: "today" as const, label: `Today's ${isAdventure ? "Quests" : "Tasks"}`, short: "Today" },
-                        { v: "additional" as const, label: `Additional ${isAdventure ? "Quests" : "Tasks"}`, short: "Additional" },
-                        { v: "none" as const, label: "Backlog", short: "Backlog" },
+                        { v: "today" as const, label: `Primary objective: shows in Today's ${isAdventure ? "Quests" : "Tasks"}`, short: "Primary objective" },
+                        { v: "additional" as const, label: `Secondary objective: shows in Additional ${isAdventure ? "Quests" : "Tasks"}`, short: "Secondary objective" },
+                        { v: "none" as const, label: "Backlog: only on its board", short: "Backlog" },
                       ]
                     ).map((o) => {
                       const on = placement === o.v;
@@ -1132,7 +1132,7 @@ export function QuestEditorDialog({
                           aria-label={o.label}
                           title={o.label}
                           onClick={() => setPlacement(o.v)}
-                          className="flex min-w-0 items-center justify-center gap-1 rounded-full px-1 text-[12.5px] font-semibold transition-[background,box-shadow] duration-150"
+                          className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-[15px] px-1.5 py-0.5 text-[12px] font-semibold leading-[1.1] transition-[background,box-shadow] duration-150"
                           style={{
                             background: on ? (isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)") : "transparent",
                             boxShadow: on ? "0 1px 3px rgba(60,40,10,.3), 0 0 0 1px rgba(138,97,22,.55)" : undefined,
@@ -1146,7 +1146,7 @@ export function QuestEditorDialog({
                           >
                             {on && <span className="block h-1.5 w-1.5 rounded-full" style={{ background: "#6b4a12" }} />}
                           </span>
-                          <span className="truncate">{o.short}</span>
+                          <span className="text-left">{o.short}</span>
                         </button>
                       );
                     })}
@@ -2067,11 +2067,7 @@ export function QuestEditorDialog({
   const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp", "board"];
   const factLabel = (f: EditorPart) =>
     f === "showsIn"
-      ? placement === "today"
-        ? "Today"
-        : placement === "additional"
-          ? "Additional"
-          : "Backlog"
+      ? `Priority · ${placement === "today" ? "Primary" : placement === "additional" ? "Secondary" : "Backlog"}`
       : f === "time"
         ? estimate.trim()
           ? `${estimate.trim()} min${slot ? " · scheduled" : ""}`
@@ -2091,9 +2087,13 @@ export function QuestEditorDialog({
       );
     if (f === "showsIn")
       return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "#8a6116" }}>
-          <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" stroke="currentColor" strokeWidth="2" />
-          <circle cx="12" cy="10" r="2.2" fill="currentColor" />
+        // Priority: a bullseye with an arrow in its heart (the pin is kept for a quest's location).
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="11" cy="13" r="8.5" fill="#f6e3a8" stroke="#8a6116" strokeWidth="1.6" />
+          <circle cx="11" cy="13" r="5.3" fill="#fffaf0" stroke="#a3412a" strokeWidth="1.6" />
+          <circle cx="11" cy="13" r="2.2" fill="#a3412a" />
+          <path d="M11 13 20.5 3.5" stroke="#4a3913" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M18 3.2l2.8.3.3 2.8M17.4 6.4l1.5.2M20.6 6.1l.2 1.5" stroke="#4a3913" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     // eslint-disable-next-line @next/next/no-img-element -- card glyph

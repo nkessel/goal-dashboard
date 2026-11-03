@@ -3195,6 +3195,18 @@ async function readExtras(ownerId: string) {
   return data?.life_wheel ?? {};
 }
 
+/** A board shown whole (no mist over all but its next step), or misty again. Kept on the account. */
+export async function setBoardMistAction(boardId: string, mist: boolean) {
+  const ownerId = await requireProfileId();
+  if (!/^[0-9a-f-]{36}$/i.test(boardId)) throw new Error("Unknown board.");
+  const extras = await readExtras(ownerId);
+  const list = (Array.isArray(extras.clearBoards) ? (extras.clearBoards as unknown[]) : []).filter((x): x is string => typeof x === "string" && x !== boardId);
+  const next = mist ? list : [...list, boardId].slice(-200);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, clearBoards: next } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  revalidatePath(`/boards/${boardId}`);
+}
+
 export async function listQuestTemplatesAction() {
   const ownerId = await requireProfileId();
   const { normalizeTemplates } = await import("@/lib/quest-templates");
