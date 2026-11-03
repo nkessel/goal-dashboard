@@ -354,6 +354,25 @@ export const FLOWS = [
     },
   },
   {
+    // The feedback box (repeat ask 14: no lag): open it, take a screen picture (writing goes on), your recent notes.
+    name: "feedback",
+    async run(h) {
+      await h.goto("/", { name: "feedback" });
+      if (await h.tap((p) => p.getByRole("button", { name: /^feedback \(f\)$/i }).first(), "open feedback", { optional: true, expectMove: true })) {
+        await h.settle(600);
+        await h.check("feedback box");
+        await h.tap((p) => p.getByRole("button", { name: /add a picture of this screen/i }).first(), "screen picture", { optional: true });
+        await h.page.keyboard.type("Typing right after the picture").catch(() => {});
+        await h.settle(1500);
+        await h.check("feedback: picture and writing");
+        if (await h.tap((p) => p.getByRole("button", { name: /your recent notes/i }).first(), "recent notes", { optional: true, expectMove: true })) {
+          await h.settle(800);
+          await h.check("feedback: recent notes");
+        }
+      }
+    },
+  },
+  {
     name: "pages",
     async run(h) {
       for (const path of ["/boards", "/calendar", "/rewards", "/feed", "/plan", "/matrix", "/journal", "/notifications", "/settings/inventory", "/power-ups"]) {

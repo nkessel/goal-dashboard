@@ -29,7 +29,7 @@ Only the owner moves an item to *confirmed*. When they bring it up again, add on
 | 11 | **"To schedule" movable and minimizable** | 2 | built, unconfirmed (Nov 2, evening: a floating window on wide screens, – to a chip) | The calendar on a computer; on a phone it stays a slide-in drawer. |
 | 12 | **The calendar scrolls seamlessly** (drag to reveal days partway, no whole-day steps) | 2 | open | `/calendar` days view, computer and phone. |
 | 13 | **Sleep check-in is clear**: one line for times, a "saved" confirmation, a preview when folded, "yesterday" for the factors, editing behind a gear | 3 | built, unconfirmed (Nov 2) | Welcome › Sleep check-in. Still open: a one-tap yesterday/today switch for the factors. |
-| 14 | **The feedback tool never lags**: type straight after adding a screenshot, screenshots taken without stopping you, a list of your recent notes to edit | 2 | open | `FeedbackDock.tsx`. |
+| 14 | **The feedback tool never lags**: type straight after adding a screenshot, screenshots taken without stopping you, a list of your recent notes to edit | 2 | built, unconfirmed (Nov 3) | `FeedbackDock.tsx`. |
 | 15 | **The habit editor as easy as the quest editor** (sub-habits visible, draggable, XP and coins, in-place order, themed dropdowns, Close turns into Save) | 2 | built, unconfirmed (Nov 3: `SubHabitList.tsx`; parts not yet pills) | `RiteEditorDialog`, Daily Habits. |
 
 When an item is confirmed, keep its row for a week, then delete it.

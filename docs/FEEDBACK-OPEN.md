@@ -29,7 +29,7 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - 🎧 "Something to listen to" goes in Plan my day as an icon, to pick today's video.
 
 ## Feedback tool (repeat ask 14)
-- No lag: you can type straight after adding a screenshot, and screenshots don't wait. Add a list of your latest notes so you can edit them.
+- Built Nov 3 (pictures in the background, recent notes to edit). Confirm on the iPhone.
 
 ## Other
 - Hide the character traits being developed from the main view (keep them in Settings › Character).

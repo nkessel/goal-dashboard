@@ -1,5 +1,6 @@
 "use client";
 
+import { RecentNotes } from "./RecentNotes";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { loadFx, type FeedbackStyle } from "@/lib/celebration-fx";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
@@ -264,6 +265,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const vp = useViewport();
   const [loaded, setLoaded] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  // Your latest sent notes, to read or change, in place of the writing box.
+  const [recentOpen, setRecentOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [sent, setSent] = useState<{ id: string; kind: WhenKind; xp: number } | null>(null);
   // The little celebration after Submit: it plays and fades by itself.
@@ -690,6 +693,22 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
                 {!isSent && (
                   <button
                     type="button"
+                    onClick={() => setRecentOpen((o) => !o)}
+                    aria-pressed={recentOpen}
+                    aria-label="Your recent notes"
+                    title="Your recent notes: read or edit them"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
+                    style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)", background: recentOpen ? "rgba(217,180,95,.3)" : undefined }}
+                  >
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
+                      <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+                {!isSent && (
+                  <button
+                    type="button"
                     onClick={(e) => {
                       // The feedback button comes back right beside where you tapped.
                       const r = e.currentTarget.getBoundingClientRect();
@@ -716,6 +735,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
 
               {isSent && sent ? (
                 <Sent kind={sent.kind} xp={sent.xp} isAdventure={isAdventure} onAnother={startNew} />
+              ) : recentOpen ? (
+                <RecentNotes isAdventure={isAdventure} onBack={() => setRecentOpen(false)} />
               ) : (
                 <Composer
                   key={open.id}
@@ -945,7 +966,14 @@ async function captureScreen(): Promise<File | null> {
       width: window.innerWidth,
       height: window.innerHeight,
       style: { transform: `translateY(-${window.scrollY}px)` },
-      filter: (n: Node) => !(n instanceof Element && n.closest("[data-feedback-root]")),
+      // Only what's on screen is drawn: skipping everything scrolled out of view makes the picture several times quicker.
+      filter: (n: Node) => {
+        if (!(n instanceof Element)) return true;
+        if (n.closest("[data-feedback-root]")) return false;
+        const r = n.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) return true;
+        return !(r.bottom < -40 || r.top > window.innerHeight + 40 || r.right < -40 || r.left > window.innerWidth + 40) || getComputedStyle(n).position === "fixed";
+      },
     });
     const blob = await (await fetch(dataUrl)).blob();
     return new File([blob], "screen.jpg", { type: "image/jpeg" });
@@ -998,7 +1026,6 @@ function Composer({
   const submitBtn = useRef<HTMLButtonElement>(null);
   // Past three paragraphs, the note's own count joins the choices.
   const long = Math.min(XP_MAX, paragraphs(draft.body));
-  const [uploading, setUploading] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   // A picture added: the box grows to fit its thumbnail rather than squeezing the writing.
   const shots = (draft.shot ? 1 : 0) + (draft.images ?? []).length;
@@ -1017,16 +1044,48 @@ function Composer({
   const submit = onSubmit;
   // Tap an attachment to see it full size.
   const [viewing, setViewing] = useState<string | null>(null);
-  async function attach(files: File[]) {
+  // Pictures on their way: shown at once from the device (owner, Nov 3: "no lag: type straight after adding a
+  // screenshot, screenshots don't wait"), swapped for the uploaded copy when it lands. Writing never waits for them.
+  const [pending, setPending] = useState<{ key: string; url: string | null }[]>([]);
+  const latest = useRef(draft);
+  useEffect(() => {
+    latest.current = draft;
+  });
+  const addUrl = (url: string, asShot: boolean) => {
+    const d = latest.current;
+    onChange(asShot && !d.shot ? { shot: url } : { images: [...(d.images ?? []), url] });
+  };
+  function attach(files: File[]) {
     setAttachError(null);
-    setUploading(true);
-    const urls: string[] = [];
-    // Each picture uploads in the background (with retries), so the note can be sent meanwhile.
-    const got = await Promise.all(files.slice(0, 4 - (draft.images ?? []).length).map((f) => uploadFor(draft.id, () => shrinkImage(f))));
-    for (const u of got) if (u) urls.push(u);
-    if (got.some((u) => !u)) setAttachError("A picture is still trying to send; see the bar at the bottom right.");
-    setUploading(false);
-    if (urls.length) onChange({ images: [...(draft.images ?? []), ...urls] });
+    for (const f of files.slice(0, 4 - (draft.images ?? []).length)) {
+      const key = `p${Math.random().toString(36).slice(2, 8)}`;
+      setPending((p) => [...p, { key, url: URL.createObjectURL(f) }]);
+      void uploadFor(draft.id, () => shrinkImage(f)).then((u) => {
+        setPending((p) => p.filter((x) => x.key !== key));
+        if (u) addUrl(u, false);
+        else setAttachError("A picture is still trying to send; see the bar at the bottom right.");
+      });
+    }
+    textRef.current?.focus();
+  }
+  function snapScreen() {
+    setAttachError(null);
+    const key = `s${Math.random().toString(36).slice(2, 8)}`;
+    setPending((p) => [...p, { key, url: null }]);
+    textRef.current?.focus();
+    // After the next paint, so the tap and the cursor answer first.
+    setTimeout(async () => {
+      const shot = await captureScreen();
+      if (!shot) {
+        setPending((p) => p.filter((x) => x.key !== key));
+        return setAttachError("Couldn't take a picture of this screen.");
+      }
+      setPending((p) => p.map((x) => (x.key === key ? { ...x, url: URL.createObjectURL(shot) } : x)));
+      const url = await uploadFor(draft.id, async () => shot);
+      setPending((p) => p.filter((x) => x.key !== key));
+      if (url) addUrl(url, true);
+      else setAttachError("A picture is still trying to send; see the bar at the bottom right.");
+    }, 60);
   }
   return (
     <div ref={rootRef} className="flex min-h-0 flex-1 flex-col gap-1.5 px-3.5 pb-1.5 pt-0.5">
@@ -1138,21 +1197,21 @@ function Composer({
             </button>
           </span>
         ))}
-        {uploading && <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>Attaching…</span>}
+        {pending.map((p) => (
+          <span key={p.key} className="card-pop-in relative block h-11 w-11 overflow-hidden rounded-md" style={{ border: "1px dashed var(--t-panel-border)", background: "rgba(255,250,235,.5)" }} title="Sending in the background: keep writing">
+            {p.url && (
+              // eslint-disable-next-line @next/next/no-img-element -- the picture on this device, until its upload lands
+              <img src={p.url} alt="" className="h-full w-full object-cover opacity-70" />
+            )}
+            <span aria-hidden className="absolute inset-0 m-auto h-4 w-4 animate-spin rounded-full border-2" style={{ borderColor: "rgba(138,97,22,.25)", borderTopColor: "#8a6116" }} />
+          </span>
+        ))}
         {attachError && <span className="text-[12.5px]" style={{ color: "var(--t-warn)" }}>{attachError}</span>}
         <span className="ml-auto flex items-center gap-1">
         {(draft.shot ? 1 : 0) + (draft.images ?? []).length < 5 && (
           <button
             type="button"
-            onClick={async () => {
-              setUploading(true);
-              const shot = await captureScreen();
-              const url = shot ? await uploadFor(draft.id, async () => shot) : null;
-              setUploading(false);
-              // The first picture of the screen is "the" screenshot; more join the images.
-              if (url) onChange(draft.shot ? { images: [...(draft.images ?? []), url] } : { shot: url });
-              else setAttachError("Couldn't take a picture of this screen.");
-            }}
+            onClick={snapScreen}
             title="Add a picture of this screen"
             aria-label="Add a picture of this screen"
             className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]"
