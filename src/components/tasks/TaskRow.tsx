@@ -28,7 +28,11 @@ import { openFocusMode } from "@/lib/focus-timer";
 import { coinsForXp } from "@/lib/coins";
 import { DateField } from "@/components/ui/DateField";
 import { useScaleStyle } from "@/components/ui/LevelScales";
-import { useClosing } from "@/components/ui/Fold";
+import { Fold, useClosing } from "@/components/ui/Fold";
+import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
+import { pctOf, unitLabel, type ProgressUnit } from "@/lib/progress-units";
+import { setTaskProgressAction } from "@/app/actions";
+import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
  * Kept as a plain helper (not inlined in the component) so the impure
@@ -134,6 +138,9 @@ export function TaskRow({
   const [editing, setEditing] = useState(false);
   // A quest with steps: a tap slides out its checklist instead of opening the editor.
   const [bonusOpen, setBonusOpen] = useState(false);
+  // Counted in pages (or anything) instead of percent, and the little stepper to log it from the card.
+  const countUnit = useProgressUnit(task.id);
+  const [logOpen, setLogOpen] = useState(false);
   const [snoozing, setSnoozing] = useState(false);
   const [tray, setTrayOpen] = useState(false);
   // Once opened, the steps stay mounted so the tray can slide closed too.
@@ -655,8 +662,8 @@ export function TaskRow({
             {snoozing && <SnoozePicker title={task.title} onPick={snoozeNow} onClose={() => setSnoozing(false)} />}
             {bonusOpen && <EarlyBonusPopup taskId={task.id} initial={{ xp: task.early_bonus_xp ?? null, coins: task.early_bonus_coins ?? null, perDay: task.early_bonus_per_day ?? null }} onClose={() => setBonusOpen(false)} />}
           </div>
-          {((task.progress ?? 0) > 0 || (task.steps_total ?? 0) > 0) && (
-            <div className="mt-2 flex items-center gap-2" title={`${task.progress ?? 0}% done`}>
+          {((task.progress ?? 0) > 0 || (task.steps_total ?? 0) > 0 || !!countUnit) && (
+            <div className="mt-2 flex items-center gap-2" title={countUnit ? unitLabel(countUnit) : `${task.progress ?? 0}% done`}>
               {(task.steps_total ?? 0) > 0 && (
                 <span
                   className="flex shrink-0 items-center gap-1 text-[12.5px] font-semibold tabular-nums"
@@ -682,20 +689,34 @@ export function TaskRow({
                 }}
               >
                 <div
-                  className="h-full rounded-full"
+                  className="h-full rounded-full transition-[width] duration-500"
                   style={{
-                    width: `${task.progress ?? 0}%`,
+                    width: `${countUnit ? pctOf(countUnit) : (task.progress ?? 0)}%`,
                     background: isAdventure ? "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)" : "var(--t-accent)",
                   }}
                 />
               </div>
-              <span className="text-[12.5px] font-semibold tabular-nums" style={{ color: isAdventure ? "#6f5a24" : "var(--t-ink-soft)" }}>
-                {task.progress ?? 0}%
-              </span>
+              {/* Tap to log progress right here: ± a page (or 5%). */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (task.status === "open") setLogOpen((v) => !v);
+                }}
+                aria-expanded={logOpen}
+                title="Log progress"
+                className="whitespace-nowrap rounded-full px-1.5 text-[12.5px] font-semibold tabular-nums hover:bg-black/[.05]"
+                style={{ color: isAdventure ? "#6f5a24" : "var(--t-ink-soft)", background: logOpen ? "rgba(217,180,95,.25)" : undefined }}
+              >
+                {countUnit ? unitLabel(countUnit) : `${task.progress ?? 0}%`}
+              </button>
               </>
               )}
             </div>
           )}
+          <Fold open={logOpen && task.status === "open"}>
+            <ProgressLog task={task} unit={countUnit} isAdventure={isAdventure} onComplete={() => (setLogOpen(false), pick("complete"))} />
+          </Fold>
         </div>
 
         <div className="shrink-0" style={{ width: 1, background: dividerColor }} aria-hidden />
@@ -1079,5 +1100,79 @@ function IconRun({ src, n, compact, title }: { src: string; n: number; compact: 
         <img key={i} src={src} alt="" width={14} height={14} className={`shrink-0 ${compact ? "h-[11px] w-[11px]" : "h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]"}`} />
       ))}
     </span>
+  );
+}
+
+/**
+ * Log progress from the card: − and + (a page, or 5%), or type it. Saved a moment after the last
+ * change; it earns its share of the XP like the editor's bar. At the end, a "Complete it" (owner, Nov 2:
+ * "how many pages I've read out of 32").
+ */
+function ProgressLog({ task, unit, isAdventure, onComplete }: { task: Task; unit: ProgressUnit | null; isAdventure: boolean; onComplete: () => void }) {
+  const router = useRouter();
+  const max = unit ? unit.total : 100;
+  const step = unit ? 1 : 5;
+  const [value, setValue] = useState(unit ? unit.done : (task.progress ?? 0));
+  const [saved, setSaved] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const from = useRef(task.progress ?? 0);
+  function change(v: number) {
+    const next = Math.max(0, Math.min(max, Math.round(v)));
+    setValue(next);
+    setSaved(false);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      const pct = unit ? pctOf({ ...unit, done: next }) : next;
+      try {
+        if (unit) await saveProgressUnit(task.id, { ...unit, done: next });
+        if (pct < 100 && pct !== from.current) {
+          const res = await setTaskProgressAction(task.id, pct);
+          if (res.xpEarned > 0) celebrateProgress({ title: task.title, xp: res.xpEarned, coinsEarned: res.coinsEarned, fromPct: from.current, toPct: pct });
+          from.current = pct;
+        }
+        setSaved(true);
+        router.refresh();
+      } catch {
+        /* the next change tries again */
+      }
+    }, 900);
+  }
+  const btn = "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px] font-bold leading-none";
+  const btnStyle = { border: "1.5px solid #b39a6a", color: isAdventure ? "#6b4a12" : "var(--t-ink)", background: "rgba(255,250,238,.7)" };
+  return (
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pt-1.5" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+      <span className="flex shrink-0 items-center gap-1.5">
+      <button type="button" onClick={() => change(value - step)} aria-label={unit ? `One ${unit.unit.replace(/s$/, "")} less` : "5% less"} className={btn} style={btnStyle}>
+        −
+      </button>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={max}
+        value={value}
+        onChange={(e) => change(Number(e.target.value))}
+        aria-label={unit ? `${unit.unit} done` : "Percent done"}
+        className="h-8 rounded-lg border bg-transparent px-1 text-center text-[16px] font-bold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+        style={{ borderColor: "#b39a6a", color: isAdventure ? "var(--t-xp)" : "var(--t-accent)", width: 48, minWidth: 0 }}
+      />
+      <button type="button" onClick={() => change(value + step)} aria-label={unit ? `One ${unit.unit.replace(/s$/, "")} more` : "5% more"} className={btn} style={btnStyle}>
+        +
+      </button>
+      </span>
+      <span className="whitespace-nowrap text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+        {unit ? `of ${unit.total} ${unit.unit}` : "%"}
+      </span>
+      {saved && value < max && (
+        <span className="confirm-pop text-[12px] font-semibold" style={{ color: "#3f6a2c" }}>
+          ✓ Saved
+        </span>
+      )}
+      {value >= max && (
+        <button type="button" onClick={onComplete} className="reveal h-8 rounded-full px-3 text-[13px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+          Complete it ✓
+        </button>
+      )}
+    </div>
   );
 }

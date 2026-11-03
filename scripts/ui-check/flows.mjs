@@ -101,6 +101,11 @@ export const FLOWS = [
         await h.check("steps tray open");
         await h.tap("text=read chapter four", "steps tray close", { optional: true, expectMove: true });
       }
+      // Log progress from a card (tap its % or "12 of 32 pages"): − / + and a number, in place.
+      if (await h.tap((p) => p.getByTitle("Log progress").first(), "log progress", { optional: true, expectMove: true })) {
+        await h.check("progress stepper");
+        await h.tap((p) => p.getByTitle("Log progress").first(), "close progress stepper", { optional: true, expectMove: true });
+      }
       // ✨ Plan my day from Today's Quests header (owner, Nov 2): today's quests placed around the day.
       await h.page.hover("text=Today's Quests").catch(() => {});
       if (await h.tap((p) => p.getByRole("button", { name: /^plan my day$/i }).first(), "plan my day", { optional: true, expectMove: true })) {

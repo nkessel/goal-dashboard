@@ -1,5 +1,7 @@
 "use client";
 
+import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
+import { pctOf, type ProgressUnit } from "@/lib/progress-units";
 import { progressWords } from "@/lib/progress-words";
 import { FileChips } from "@/components/ui/FileChips";
 import { AddFile } from "@/components/ui/AddFile";
@@ -380,6 +382,15 @@ export function QuestEditorDialog({
   const progressTracked = typeof task?.xp_awarded === "number";
   const initialProgress = task?.progress ?? 0;
   const [progress, setProgress] = useState(initialProgress);
+  // Counted in something other than percent ("12 of 32 pages"); undefined until changed here.
+  const savedUnit = useProgressUnit(task?.id);
+  const [unitEdit, setUnitEdit] = useState<ProgressUnit | null | undefined>(undefined);
+  const unit = unitEdit === undefined ? savedUnit : unitEdit;
+  const setCount = (u: ProgressUnit) => {
+    const clean = { ...u, done: Math.max(0, Math.min(u.total, u.done)) };
+    setUnitEdit(clean);
+    setProgress(pctOf(clean));
+  };
   // Steps: a small checklist inside the quest. null while loading an existing quest's steps.
   const [steps, setSteps] = useState<StepDraft[] | null>(task ? null : []);
   const [stepsUnavailable, setStepsUnavailable] = useState(false);
@@ -758,6 +769,7 @@ export function QuestEditorDialog({
     if (phase === "closing") return;
     setConfirmLeave(false);
     if (autosave) {
+      if (task && unitEdit !== undefined && JSON.stringify(unitEdit) !== JSON.stringify(savedUnit)) void saveProgressUnit(task.id, unitEdit).catch(() => {});
       const saving = dirty || placement !== savedPlacement.current ? persist(true) : null;
       commitProgress();
       // Completed here: celebrate once the last changes are saved.
@@ -1920,15 +1932,46 @@ export function QuestEditorDialog({
                             : `${Math.round((xp * progress) / 100)} XP earned · ${xp - Math.round((xp * progress) / 100)} more on completion`}
                     </span>
                   </div>
+                  {/* Count it in percent, or in pages (or anything): "12 of 32 pages" (owner, Nov 2). */}
+                  <div className="flex items-center gap-1.5">
+                    <span role="radiogroup" aria-label="Count progress in" className="flex rounded-full p-0.5" style={{ background: "rgba(70,50,20,.09)" }}>
+                      {(["percent", "count"] as const).map((m) => {
+                        const on = m === "count" ? !!unit : !unit;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            disabled={!progressTracked}
+                            onClick={() => (m === "count" ? !unit && setCount({ total: 32, unit: "pages", done: Math.round((progress / 100) * 32) }) : unit && setUnitEdit(null))}
+                            className="h-7 rounded-full px-2.5 text-[12.5px] font-semibold"
+                            style={on ? { background: isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-card)", color: "#2a1c10", boxShadow: "0 1px 2px rgba(60,40,10,.3)" } : { color: "var(--t-ink-soft)" }}
+                          >
+                            {m === "percent" ? "Percent" : "Count"}
+                          </button>
+                        );
+                      })}
+                    </span>
+                    {unit && (
+                      <span className="fade-in flex min-w-0 items-center gap-1 text-[13.5px]" style={{ color: "var(--t-ink)" }}>
+                        <span>of</span>
+                        <span className="flex h-8 items-center rounded-lg border px-1" style={fieldStyle}>
+                          <NumberInput min={1} max={100000} value={unit.total} onValueChange={(v) => setCount({ ...unit, total: Math.max(1, v) })} aria-label="Out of" className="bare-input h-full w-12 bg-transparent px-1 text-right text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
+                        </span>
+                        <input value={unit.unit} onChange={(e) => setCount({ ...unit, unit: e.target.value.slice(0, 24) })} onBlur={(e) => !e.target.value.trim() && setCount({ ...unit, unit: "pages" })} aria-label="What you're counting" className="bare-input h-8 min-w-0 w-[84px] rounded-lg border bg-transparent px-2 text-[16px]" style={fieldStyle} />
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <input
                       type="range"
                       min={0}
-                      max={100}
-                      step={5}
-                      value={progress}
+                      max={unit ? unit.total : 100}
+                      step={unit ? 1 : 5}
+                      value={unit ? unit.done : progress}
                       disabled={!progressTracked}
-                      onChange={(e) => setProgress(Number(e.target.value))}
+                      onChange={(e) => (unit ? setCount({ ...unit, done: Number(e.target.value) }) : setProgress(Number(e.target.value)))}
                       aria-label="Quest progress"
                       className="h-8 min-w-0 flex-1"
                       style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
@@ -1936,16 +1979,16 @@ export function QuestEditorDialog({
                     <span className="flex h-9 shrink-0 items-center rounded-lg border pr-1.5" style={fieldStyle}>
                       <NumberInput
                         min={0}
-                        max={100}
-                        value={progress}
+                        max={unit ? unit.total : 100}
+                        value={unit ? unit.done : progress}
                         disabled={!progressTracked}
-                        onValueChange={setProgress}
-                        aria-label="Progress percent"
+                        onValueChange={(v) => (unit ? setCount({ ...unit, done: v }) : setProgress(v))}
+                        aria-label={unit ? `${unit.unit} done` : "Progress percent"}
                         className="bare-input h-full w-11 bg-transparent px-1 text-right text-[16px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                         style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
                       />
-                      <span className="text-[12px] font-bold" style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}>
-                        %
+                      <span className="max-w-[64px] truncate text-[12px] font-bold" style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}>
+                        {unit ? `/${unit.total}` : "%"}
                       </span>
                     </span>
                   </div>

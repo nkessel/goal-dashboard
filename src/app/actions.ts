@@ -3195,6 +3195,28 @@ async function readExtras(ownerId: string) {
   return data?.life_wheel ?? {};
 }
 
+/** Quests counted in something other than percent ("12 of 32 pages"), by quest id. */
+export async function progressUnitsAction() {
+  const ownerId = await requireProfileId();
+  const { cleanUnits } = await import("@/lib/progress-units");
+  return cleanUnits((await readExtras(ownerId)).progressUnits);
+}
+
+/** Count a quest's progress in pages (or anything), or back in percent (null). */
+export async function setProgressUnitAction(taskId: string, unit: import("@/lib/progress-units").ProgressUnit | null) {
+  const ownerId = await requireProfileId();
+  if (!/^[0-9a-f-]{36}$/i.test(taskId)) throw new Error("Unknown quest.");
+  const { cleanUnit, cleanUnits } = await import("@/lib/progress-units");
+  const extras = await readExtras(ownerId);
+  const all = cleanUnits(extras.progressUnits);
+  const u = unit ? cleanUnit(unit) : null;
+  if (u) all[taskId] = u;
+  else delete all[taskId];
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, progressUnits: all } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return u;
+}
+
 /** A board shown whole (no mist over all but its next step), or misty again. Kept on the account. */
 export async function setBoardMistAction(boardId: string, mist: boolean) {
   const ownerId = await requireProfileId();

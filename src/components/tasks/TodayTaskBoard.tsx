@@ -591,7 +591,7 @@ export function TodayTaskBoard({
               <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
                 <div className="today-head relative">
                 {isAdventure ? (
-                  <div className="flex items-center gap-2 px-1">
+                  <div className={`flex items-center gap-2 px-1 ${todayOpen ? "max-sm:pr-[84px]" : ""}`}>
                     <span className="hidden flex-1 sm:flex">
                       <GoldRule dir="left" />
                     </span>
