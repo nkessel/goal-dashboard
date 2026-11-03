@@ -14,6 +14,7 @@ Ranked. Take the first item that isn't blocked on the owner. When you finish one
 
 | # | Work | State | Next step |
 |---|---|---|---|
+| 0000 | **docs/FEEDBACK-OPEN.md** (the owner's open notes, by area) | Ready | Build a group at a time; repeat asks first. |
 | 000 | **docs/REPEAT-ASKS.md, open rows** (owner, Nov 2: do repeated asks comprehensively) | Ready | Work the open rows there first, highest count first: seamless calendar scroll (12), feedback tool lag (14), habit editor (15). |
 | 00 | **Plan my day follow-ups** (owner's notes, Nov 2) | Ready | Shipped (below). Left: mobile long-press on the Today's Quests header for a menu (the header's long press is the section drag on iPhone, so ✨ shows while the section is open instead); habits placed as real calendar blocks (now only room kept, 🌿); "🎧 something to listen to" as an icon in the planner to pick today's learning video (note); the owner's ask to plan Alliance Jiu Jitsu soon and Shaolin within 45 days (create as quests with plan_by; needs DB or the app); Martin-care quests as follow-ups when scheduling time with Dad; the morning exercise blocks on the owner's calendar go once the Gym habit holds the time. |
 | 0 | **Import scheduling: follow-ups** | Ready | Shipped Nov 1 (below). Left: a one-tap "Breakfast today" on Today/check-in only matters if breakfast is turned off; essentials' ideal times aren't editable yet (only ranges and lengths, in Auto-schedule › Daily essentials); accepted placements go straight on the calendar (no separate tentative state in the database). |
@@ -149,6 +150,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 3: Sleep and wake times to the minute (owner: "allow exact timing"): the ruler reads every minute as you swipe (no 5-minute snapping; ticks still mark 5s), ‹ › nudge by a minute, the exact time shows between them and a tap on it types one (`TimeRuler.tsx`). Open feedback written down by area in `docs/FEEDBACK-OPEN.md`.
 
 - Nov 2 (late): Scheduling is visual (repeat ask 10): `calendar/WhenPicker.tsx` in `TaskScheduleControl` (a quest's ⋯ › Schedule on calendar, the To schedule list) and the quest editor's `SlotPickerDialog`; busy blocks carry titles (`schedulerContextAction`). Toucan notes: a note shown as the stand-alone bubble (`NudgeNote`) was never counted as said, so due-quest notes came back on every refresh and their buttons and × seemed dead (`raise` now returns true when a note will show); "Already done ✓" on quest notes; Snooze… offers Tomorrow first; he stays after a choice (tap him to talk); no "at 11:59 PM". Habits: tapping a card shows its sub-habits inside the card; completing a habit no longer ticks its sub-habits; swipe left for "Snooze today"; the language habit's card opens the phrase tool; edit via ⋯ or right-click (long-press is the reorder drag). ui-check: the schedule picker; the habit sub-habits step still can't reach the habit in the fake data (tap times out), so that change is unchecked by the tool.
 

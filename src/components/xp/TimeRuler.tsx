@@ -30,13 +30,17 @@ const fromMin = (n: number) => {
   return `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`;
 };
 const inRange = (kind: RulerKind, min: number) => (min - RANGE[kind].start + 1440) % 1440 <= RANGE[kind].count * STEP;
-function indexOf(kind: RulerKind, min: number) {
+const minOf = (kind: RulerKind, i: number) => (RANGE[kind].start + i * STEP) % 1440;
+// Minute fidelity (owner, Nov 3: "allow exact timing"): the ruler reads to the minute; ticks still mark every 5.
+const PX_MIN = TICK / STEP;
+const offOf = (kind: RulerKind, min: number) => {
   const { start, count } = RANGE[kind];
   const d = (min - start + 1440) % 1440;
-  if (d <= count * STEP) return Math.min(count, Math.round(d / STEP));
-  return d - count * STEP < 1440 - d ? count : 0;
-}
-const minOf = (kind: RulerKind, i: number) => (RANGE[kind].start + i * STEP) % 1440;
+  const max = count * STEP;
+  if (d <= max) return d;
+  return d - max < 1440 - d ? max : 0;
+};
+const minAt = (kind: RulerKind, off: number) => (RANGE[kind].start + off) % 1440;
 
 /** "1045" → 10:45, "945" → 9:45, "7" → 7:00, "22:30" → 22:30; am or pm from the ruler's range. */
 export function parseTyped(raw: string, kind: RulerKind, near: number | null): string | null {
@@ -67,10 +71,11 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
   const ref = useRef<HTMLDivElement>(null);
   const { count } = RANGE[kind];
   const cur = toMin(value);
-  const [startIdx] = useState(() => indexOf(kind, cur ?? FALLBACK[kind]));
+  const maxOff = count * STEP;
+  const [startOff] = useState(() => offOf(kind, cur ?? FALLBACK[kind]));
   // Only your own touch, swipe, drag, wheel or key moves the time (never the ruler placing itself).
   const live = useRef(false);
-  const lastIdx = useRef(startIdx);
+  const lastOff = useRef(startOff);
   const latest = useRef({ onChange, value });
   useEffect(() => {
     latest.current = { onChange, value };
@@ -81,8 +86,8 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
 
   // Centred on the time before it's drawn (no visible scroll on opening).
   useLayoutEffect(() => {
-    if (ref.current) ref.current.scrollLeft = startIdx * TICK;
-  }, [startIdx]);
+    if (ref.current) ref.current.scrollLeft = startOff * PX_MIN;
+  }, [startOff]);
 
   useEffect(() => {
     const el = ref.current;
@@ -91,10 +96,10 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
     const read = () => {
       raf = 0;
       if (!live.current) return;
-      const i = Math.max(0, Math.min(count, Math.round(el.scrollLeft / TICK)));
-      if (i === lastIdx.current && latest.current.value) return;
-      lastIdx.current = i;
-      latest.current.onChange(fromMin(minOf(kind, i)));
+      const m = Math.max(0, Math.min(maxOff, Math.round(el.scrollLeft / PX_MIN)));
+      if (m === lastOff.current && latest.current.value) return;
+      lastOff.current = m;
+      latest.current.onChange(fromMin(minAt(kind, m)));
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(read);
@@ -118,20 +123,23 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
       el.removeEventListener("pointerdown", arm);
       el.removeEventListener("wheel", wheel);
     };
-  }, [kind, count]);
+  }, [kind, count, maxOff]);
 
-  const glide = (i: number, quiet = false) => {
+  /** Glide the ruler to a minute offset. */
+  const glide = (off: number, quiet = false) => {
     const el = ref.current;
     if (!el) return;
-    const j = Math.max(0, Math.min(count, i));
+    const j = Math.max(0, Math.min(maxOff, off));
     live.current = !quiet;
-    el.scrollTo({ left: j * TICK, behavior: "smooth" });
+    el.scrollTo({ left: j * PX_MIN, behavior: "smooth" });
   };
   const setTo = (v: string) => {
-    lastIdx.current = indexOf(kind, toMin(v)!);
+    lastOff.current = offOf(kind, toMin(v)!);
     onChange(v);
-    glide(lastIdx.current, true);
+    glide(lastOff.current, true);
   };
+  /** A minute earlier or later (or more), exactly. */
+  const nudge = (d: number) => setTo(fromMin(minAt(kind, Math.max(0, Math.min(maxOff, (cur === null ? startOff : offOf(kind, cur)) + d)))));
 
   // A mouse drags the strip like a finger would (phones scroll it natively).
   const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null);
@@ -165,8 +173,8 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
           tabIndex={0}
           aria-label={label}
           aria-valuemin={0}
-          aria-valuemax={count}
-          aria-valuenow={cur === null ? undefined : indexOf(kind, cur)}
+          aria-valuemax={maxOff}
+          aria-valuenow={cur === null ? undefined : offOf(kind, cur)}
           aria-valuetext={cur === null ? "not set" : spoken(cur)}
           className="time-ruler-scroll"
           onPointerDown={(e) => {
@@ -187,8 +195,7 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
             drag.current = null;
             if (!d?.moved) return;
             const el = e.currentTarget;
-            el.style.scrollSnapType = "";
-            glide(Math.round(el.scrollLeft / TICK));
+            glide(Math.round(el.scrollLeft / PX_MIN));
             // The click that ends a drag isn't a tap on a tick.
             const stop = (c: MouseEvent) => (c.stopPropagation(), c.preventDefault());
             el.addEventListener("click", stop, { capture: true, once: true });
@@ -198,20 +205,19 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
             // A tap on a tick glides there (and sets it).
             const el = e.currentTarget;
             const r = el.getBoundingClientRect();
+            // A tap lands on the nearest 5-minute tick; swipe, the ‹ › or typing give any minute.
             const i = Math.round((e.clientX - r.left - el.clientWidth / 2) / TICK + el.scrollLeft / TICK);
-            const j = Math.max(0, Math.min(count, i));
-            if (!value || j !== lastIdx.current) {
-              lastIdx.current = j;
-              onChange(fromMin(minOf(kind, j)));
+            const j = Math.max(0, Math.min(count, i)) * STEP;
+            if (!value || j !== lastOff.current) {
+              lastOff.current = j;
+              onChange(fromMin(minAt(kind, j)));
             }
             glide(j);
           }}
           onKeyDown={(e) => {
-            const i = cur === null ? startIdx : indexOf(kind, cur);
             if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
               e.preventDefault();
-              const j = Math.max(0, Math.min(count, i + (e.key === "ArrowRight" ? 1 : -1) * (e.shiftKey ? 12 : 1)));
-              setTo(fromMin(minOf(kind, j)));
+              nudge((e.key === "ArrowRight" ? 1 : -1) * (e.shiftKey ? 15 : 1));
             } else if (/^\d$/.test(e.key)) {
               e.preventDefault();
               const b = keyBuf.current;
@@ -243,6 +249,21 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
           </button>
         )}
         <span className="flex-1" />
+        {!typing && (
+          <span className="flex items-center gap-1">
+            <button type="button" onClick={() => nudge(-1)} aria-label="One minute earlier" className="flex h-7 w-7 items-center justify-center rounded-full text-[15px]" style={{ border: "1px solid rgba(139,112,64,.45)" }}>
+              ‹
+            </button>
+            {/* The exact time; tap it to type one (owner: "type a time by tapping the time field"). */}
+            <button type="button" onClick={() => setTyping(true)} title="Type a time" className="font-display h-7 min-w-[74px] rounded-full px-2 text-[15px] tabular-nums" style={{ color: "var(--t-ink, #2a1c10)", background: "rgba(255,250,238,.75)", border: "1px solid rgba(139,112,64,.45)" }}>
+              {cur === null ? "type…" : spoken(cur)}
+            </button>
+            <button type="button" onClick={() => nudge(1)} aria-label="One minute later" className="flex h-7 w-7 items-center justify-center rounded-full text-[15px]" style={{ border: "1px solid rgba(139,112,64,.45)" }}>
+              ›
+            </button>
+          </span>
+        )}
+        <span className="flex-1" />
         {typing ? (
           <form
             className="flex items-center gap-1"
@@ -271,11 +292,7 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
               className="time-ruler-type font-display h-7 w-[76px] rounded-full px-2.5 text-center text-[16px] tabular-nums outline-none"
             />
           </form>
-        ) : (
-          <button type="button" onClick={() => setTyping(true)} className="underline underline-offset-2">
-            Type
-          </button>
-        )}
+        ) : null}
         <button type="button" onClick={onDone} className="h-7 rounded-full px-3.5 text-[12.5px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
           Done
         </button>
