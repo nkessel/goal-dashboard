@@ -97,39 +97,12 @@ export const FLOWS = [
       }
       // A habit with sub-habits: tapping its card shows them inside the card (owner, Nov 2).
       // (Daily Habits is already open from the toggle above; tapping its header again would close it.)
-      if (!(await h.page.getByText("Vitamins before 12pm").first().isVisible().catch(() => false))) await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
+      await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
       await h.page.getByText("Vitamins before 12pm").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
       await h.settle(300);
       if (await h.tap("text=Vitamins before 12pm", "habit sub-habits", { optional: true, expectMove: true })) {
         await h.check("habit sub-habits open");
         await h.tap("text=Vitamins before 12pm", "habit sub-habits close", { optional: true, expectMove: true });
-      }
-      // The habit editor (repeat ask 15): sub-habits in view, dragged to reorder, a dot opens XP/coins/Remove.
-      await h.page.getByText("Vitamins before 12pm").first().click({ button: "right" }).catch(() => {});
-      await h.settle(300);
-      if (await h.tap(/edit habit/i, "habit editor", { optional: true, expectMove: true })) {
-        await h.settle(500);
-        await h.check("habit editor");
-        if (await h.tap((p) => p.getByRole("button", { name: /options for b12/i }).first(), "sub-habit options", { optional: true, expectMove: true })) {
-          await h.check("habit editor: sub-habit options");
-        }
-        if (await h.tap((p) => p.getByRole("button", { name: /^certain days$/i }).first(), "certain days", { optional: true, expectMove: true })) {
-          await h.check("habit editor: certain days");
-        }
-        await esc(h);
-      }
-      // A sequence: open it from the quest's ⋯ menu and tap the quest waiting behind to edit it (Nov 3).
-      if (await h.tap((p) => p.getByRole("button", { name: /actions for pick up medication/i }).first(), "medication menu", { optional: true })) {
-        if (await h.tap("text=Edit the sequence…", "edit the sequence", { optional: true, expectMove: true })) {
-          await h.settle(800);
-          await h.check("sequence dialog");
-          if (await h.tap((p) => p.getByRole("button", { name: /drop the prescription receipt/i }).first(), "edit a waiting quest", { optional: true, expectMove: true })) {
-            await h.settle(1200);
-            await h.check("sequence: waiting quest in the editor");
-          }
-          await esc(h);
-        }
-        await esc(h);
       }
       // Schedule a quest from its ⋯ menu: the day drawn, tap a time (repeat ask 10).
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for schedule", { optional: true })) {
@@ -162,6 +135,51 @@ export const FLOWS = [
       if (await h.tap((p) => p.getByRole("button", { name: /^plan my day$/i }).first(), "plan my day", { optional: true, expectMove: true })) {
         await h.settle(1500);
         await h.check("plan my day");
+        await esc(h);
+      }
+    },
+  },
+  {
+    // Quests in a sequence: tap one in "Edit the sequence…" to edit it (owner, Nov 3).
+    name: "sequence",
+    async run(h) {
+      await h.goto("/", { name: "sequence" });
+      // A sequence: open it from the quest's ⋯ menu and tap the quest waiting behind to edit it (Nov 3).
+      if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for sequence", { optional: true })) {
+        if (await h.tap(/(edit the|create a) sequence…/i, "edit the sequence", { optional: true, expectMove: true })) {
+          await h.settle(800);
+          await h.check("sequence dialog");
+          if (await h.tap((p) => p.getByRole("button", { name: /post the reflection link/i }).first(), "edit a waiting quest", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.check("sequence: waiting quest in the editor");
+          }
+          await esc(h);
+        }
+        await esc(h);
+      }
+    },
+  },
+  {
+    // The habit editor (repeat ask 15).
+    name: "habiteditor",
+    async run(h) {
+      await h.goto("/", { name: "habiteditor" });
+      await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
+      await h.page.getByText("Gym 🏋️").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await h.settle(300);
+      // The habit editor (repeat ask 15): sub-habits in view, dragged to reorder, a dot opens XP/coins/Remove.
+      if (await h.tap("text=Gym 🏋️", "habit editor", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("habit editor");
+        await h.page.getByLabel("Add a sub-habit").first().fill("Stretch").catch(() => {});
+        await h.page.getByLabel("Add a sub-habit").first().press("Enter").catch(() => {});
+        await h.settle(300);
+        if (await h.tap((p) => p.getByRole("button", { name: /options for stretch/i }).first(), "sub-habit options", { optional: true, expectMove: true })) {
+          await h.check("habit editor: sub-habit options");
+        }
+        if (await h.tap((p) => p.getByRole("button", { name: /^certain days$/i }).first(), "certain days", { optional: true, expectMove: true })) {
+          await h.check("habit editor: certain days");
+        }
         await esc(h);
       }
     },

@@ -133,7 +133,7 @@ export function RiteEditorDialog({
   const portalTarget = usePortalTarget();
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${closing ? "overlay-fade-out" : "overlay-fade-in"}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 ${closing ? "overlay-fade-out" : "overlay-fade-in"}`}
       style={{ background: "rgba(6,8,22,.65)" }}
       onClick={close}
     >
@@ -144,7 +144,7 @@ export function RiteEditorDialog({
         onClick={(e) => e.stopPropagation()}
         // Its parts take the order and hiding chosen in Settings › Layout.
         data-menu={isHabit ? "habit-editor" : undefined}
-        className={`parchment parchment-framed ${isHabit ? "" : "moonlit"} flex w-full max-w-md flex-col gap-3 rounded-2xl p-5 shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
+        className={`parchment parchment-framed ${isHabit ? "" : "moonlit"} flex max-h-[calc(100dvh-24px)] w-full max-w-md flex-col gap-3 overflow-y-auto overscroll-contain rounded-2xl p-5 shadow-2xl ${closing ? "sheet-minimize-out" : "sheet-slide-up-in"}`}
       >
         <div data-embed-hide className="relative z-[1] flex items-center justify-between">
           <h3 className="font-display flex items-center gap-2 text-lg">
@@ -502,7 +502,7 @@ export function RiteEditorDialog({
           </p>
         )}
 
-        <div className="relative z-[1] flex items-center justify-between gap-2 pt-1" style={{ order: 99 }}>
+        <div className="sticky -bottom-5 z-[2] -mx-5 -mb-5 flex items-center justify-between gap-2 px-5 pb-5 pt-2" style={{ order: 99, background: "linear-gradient(180deg, rgba(240,226,192,0), rgba(240,226,192,.96) 30%)" }}>
           {rite ? (
             !confirmingDelete ? (
               <button type="button" onClick={() => setConfirmingDelete(true)} className="flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[14px] font-semibold hover:bg-black/5" style={{ color: "var(--t-warn)" }}>
