@@ -2887,7 +2887,7 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
   const from = new Date(fromISO);
   const to = new Date(toISO);
   const hidden = new Set(hiddenCalendars);
-  const busy: { start: number; end: number; cal?: string }[] = [];
+  const busy: { start: number; end: number; cal?: string; title?: string }[] = [];
   let calendars: { id: string; name: string; color: string | null; writable: boolean; primary: boolean }[] = [];
   const [quests, profileRes] = await Promise.all([
     tasksData.listCalendarTasksForOwner(profileId, from, to).catch(() => []),
@@ -2895,7 +2895,7 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
   ]);
   for (const t of quests) {
     if (t.status !== "open" || !t.scheduled_start || !t.scheduled_end) continue;
-    busy.push({ start: new Date(t.scheduled_start).getTime(), end: new Date(t.scheduled_end).getTime() });
+    busy.push({ start: new Date(t.scheduled_start).getTime(), end: new Date(t.scheduled_end).getTime(), title: t.title });
   }
   // Habits with a set time (Gym at 7) hold their time; the browser lays them out in local time.
   const riteRows = (await ritesData.listRites(profileId).catch(() => null)) ?? [];
@@ -2920,7 +2920,7 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
           optional.push({ id: e.id, calendarId: e.calendarId ?? "primary", title: e.title.trim().slice(1, -1).trim(), start: new Date(e.start).getTime(), end: new Date(e.end).getTime() });
           continue;
         }
-        busy.push({ start: new Date(e.start).getTime(), end: new Date(e.end).getTime(), cal: e.calendarId });
+        busy.push({ start: new Date(e.start).getTime(), end: new Date(e.end).getTime(), cal: e.calendarId, title: e.title });
       }
     } catch {
       /* planning still works from the app's own calendar */

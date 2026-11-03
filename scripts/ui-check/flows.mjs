@@ -51,7 +51,12 @@ export const FLOWS = [
       await h.tap(/^the toucan:/i, "toucan menu", { optional: true });
       await h.check("toucan menu");
       await esc(h);
-      await h.tap(/close what he.s saying/i, "close his saying", { optional: true, expectMove: true });
+      // × must close his saying (owner, Nov 2: "closing the toucan phrase isn't working"): fail the check if it stays.
+      if (await h.tap(/close what he.s saying/i, "close his saying", { optional: true, expectMove: true })) {
+        await h.settle(400);
+        const still = await h.page.locator(".toucan-bubble").count();
+        if (still) throw new Error(`toucan: his bubble is still there after × (${still})`);
+      }
       await h.check("toucan bubble closed");
       await h.page.evaluate(() => localStorage.removeItem("welcome-toucan-at"));
       await h.goto("/", { welcome: true, name: "welcome" });
@@ -89,6 +94,24 @@ export const FLOWS = [
         await h.typeIn((p) => p.locator("[role=dialog] input, [role=dialog] textarea").first(), "quest editor title");
         await h.tap(/^close$|^×$/i, "close quest editor", { optional: true });
         await esc(h);
+      }
+      // A habit with sub-habits: tapping its card shows them inside the card (owner, Nov 2).
+      await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
+      await h.page.getByText("Vitamins before 12pm").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await h.settle(300);
+      if (await h.tap("text=Vitamins before 12pm", "habit sub-habits", { optional: true, expectMove: true })) {
+        await h.check("habit sub-habits open");
+        await h.tap("text=Vitamins before 12pm", "habit sub-habits close", { optional: true, expectMove: true });
+      }
+      // Schedule a quest from its ⋯ menu: the day drawn, tap a time (repeat ask 10).
+      if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for schedule", { optional: true })) {
+        if (await h.tap((p) => p.getByText(/^(re)?schedule on calendar$/i).first(), "schedule picker", { optional: true, expectMove: true })) {
+          await h.settle(1200);
+          await h.check("schedule picker");
+          await h.tap((p) => p.locator("[aria-label^='Your ']").first(), "pick a time", { optional: true });
+          await h.check("schedule picker: time picked");
+          await esc(h);
+        } else await esc(h);
       }
       // A quest's ⋯ menu.
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu", { optional: true })) {

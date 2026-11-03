@@ -2,23 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
-import { scheduleTaskAction, suggestSlotsAction } from "@/app/actions";
+import { scheduleTaskAction, unscheduleTaskAction } from "@/app/actions";
+import { WhenPicker } from "@/components/calendar/WhenPicker";
 
 type Slot = { start: string; end: string };
-
-function formatSlot(slot: Slot) {
-  const start = new Date(slot.start);
-  const end = new Date(slot.end);
-  const sameDay = start.toDateString() === new Date().toDateString();
-  const dayLabel = sameDay
-    ? "Today"
-    : start.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-  const timeLabel = `${start.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  })}–${end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
-  return `${dayLabel} · ${timeLabel}`;
-}
 
 export function TaskScheduleControl({
   task,
@@ -34,9 +21,6 @@ export function TaskScheduleControl({
   onDone?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [slots, setSlots] = useState<Slot[] | null>(null);
-  const [manualStart, setManualStart] = useState("");
-  const [manualEnd, setManualEnd] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
@@ -54,23 +38,9 @@ export function TaskScheduleControl({
     onDone?.();
   }
 
-  const fieldStyle = {
-    borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)",
-    background: isAdventure ? "var(--t-panel-2)" : "var(--t-bg)",
-    color: "var(--t-ink)",
-  };
-
   function openAndFetch() {
     setOpen(true);
     setError(null);
-    startTransition(async () => {
-      try {
-        const suggested = await suggestSlotsAction(30);
-        setSlots(suggested);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't load calendar slots");
-      }
-    });
   }
 
   function pick(slot: Slot) {
@@ -85,19 +55,14 @@ export function TaskScheduleControl({
     });
   }
 
-  function pickManual() {
-    if (!manualStart || !manualEnd) return;
+  function unschedule() {
     setError(null);
     startTransition(async () => {
       try {
-        await scheduleTaskAction(
-          task.id,
-          new Date(manualStart).toISOString(),
-          new Date(manualEnd).toISOString()
-        );
+        await unscheduleTaskAction(task.id);
         finish();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Couldn't schedule task");
+        setError(e instanceof Error ? e.message : "Couldn't take it off");
       }
     });
   }
@@ -118,87 +83,33 @@ export function TaskScheduleControl({
 
   return (
     <div
-      className="w-full rounded-lg p-3 text-xs"
+      className="w-full rounded-2xl p-3 text-[13px]"
       style={{
         background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
         border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
         color: "var(--t-ink)",
       }}
     >
-      <p className="mb-2 font-medium">
-        {task.is_on_calendar ? "Reschedule" : "Pull"} &quot;{task.title}&quot; onto your calendar
-      </p>
-
-      {slots === null && !error && <p style={{ color: "var(--t-ink-soft)" }}>Finding open slots…</p>}
+      <div className="mb-2 flex items-center gap-2">
+        <p className={`m-0 min-w-0 flex-1 truncate ${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} title={task.title}>
+          When for &ldquo;{task.title}&rdquo;?
+        </p>
+        <button type="button" onClick={finish} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[20px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+          ×
+        </button>
+      </div>
+      {/* The day, drawn: what's already there and where this quest would go (owner: "visual, in context"). */}
+      <WhenPicker minutes={task.estimate_minutes ?? 30} title={task.title} isAdventure={isAdventure} initial={task.is_on_calendar ? task.scheduled_start : null} placing={isPending} onPick={pick} />
       {error && (
-        <p className="mb-2" style={{ color: "var(--t-warn)" }}>
+        <p className="mb-0 mt-2" style={{ color: "var(--t-warn)" }}>
           {error}
         </p>
       )}
-
-      {slots && slots.length === 0 && (
-        <p className="mb-2" style={{ color: "var(--t-ink-soft)" }}>
-          No open slots found in the next 14 days.
-        </p>
+      {task.is_on_calendar && (
+        <button type="button" onClick={unschedule} disabled={isPending} className="mt-2 text-[12.5px] underline underline-offset-2 disabled:opacity-50" style={{ color: "var(--t-ink-soft)" }}>
+          Take it off the calendar
+        </button>
       )}
-
-      {slots && slots.length > 0 && (
-        <div className="mb-2 flex flex-col gap-1">
-          {slots.map((slot) => (
-            <button
-              key={slot.start}
-              type="button"
-              disabled={isPending}
-              onClick={() => pick(slot)}
-              className="hover-glow rounded border px-2 py-1 text-left disabled:opacity-50"
-              style={{ borderColor: isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)" }}
-            >
-              {formatSlot(slot)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <details className="mt-1">
-        <summary className="cursor-pointer" style={{ color: "var(--t-ink-soft)" }}>
-          Pick a different time
-        </summary>
-        <div className="mt-2 flex flex-col gap-1">
-          <label className="flex items-center justify-between gap-2">
-            Start
-            <input
-              type="datetime-local"
-              value={manualStart}
-              onChange={(e) => setManualStart(e.target.value)}
-              className="rounded border px-1 py-0.5"
-              style={fieldStyle}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-2">
-            End
-            <input
-              type="datetime-local"
-              value={manualEnd}
-              onChange={(e) => setManualEnd(e.target.value)}
-              className="rounded border px-1 py-0.5"
-              style={fieldStyle}
-            />
-          </label>
-          <button
-            type="button"
-            disabled={isPending || !manualStart || !manualEnd}
-            onClick={pickManual}
-            className="hover-glow mt-1 rounded px-2 py-1 disabled:opacity-50"
-            style={{ background: isAdventure ? "var(--t-gold)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff" }}
-          >
-            Use this time
-          </button>
-        </div>
-      </details>
-
-      <button type="button" onClick={finish} className="mt-2 underline" style={{ color: "var(--t-ink-soft)" }}>
-        cancel
-      </button>
     </div>
   );
 }

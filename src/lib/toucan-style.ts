@@ -247,6 +247,8 @@ export const voice = {
   },
   dueToday(s: ToucanStyle, title: string, time: string) {
     const q = s.form === "question" ? "Fifteen minutes on it now?" : "Let's do fifteen minutes on it now.";
+    // Due "by the end of the day" (11:59 PM) reads as just today.
+    if (!time) return polish(s, `“${title}” is due today. ${q}`);
     if (s.tone === "playful") return polish(s, `“${title}” is due at ${time}. ${q}`);
     return polish(s, `“${title}” is due today at ${time}. ${q}`);
   },

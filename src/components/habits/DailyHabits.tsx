@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { completeRiteAction, reorderRitesAction, skipHabitAction, tickAllRiteStepsAction, tickRiteStepAction, uncompleteRiteAction, unskipHabitAction } from "@/app/actions";
+import { completeRiteAction, reorderRitesAction, skipHabitAction, tickRiteStepAction, uncompleteRiteAction, unskipHabitAction } from "@/app/actions";
 import { useLocalDay } from "@/components/evening/evening-clock";
 import { nextOccurrence, repeatIsUp, repeatLabel } from "@/lib/habit-repeat";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
@@ -17,7 +17,8 @@ import { coinsForXp } from "@/lib/coins";
 import { fromFeedback } from "@/lib/from-feedback";
 import { defaultCleaning, normalizeCleaning, todaysPicks } from "@/lib/cleaning";
 import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
-import { LanguagePractice } from "@/components/xp/LearnLanguage";
+import { LanguagePractice, openLanguageWindow } from "@/components/xp/LearnLanguage";
+import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { Fold } from "@/components/ui/Fold";
 
 /**
@@ -177,7 +178,7 @@ export function DailyHabits({
   };
   const done = (id: string) => optimistic[id] ?? doneSet.has(`${id}|${day}`);
   const tickSet = new Set(stepChecks.map((c) => `${c.rite_id}|${c.step_id}|${c.day}`));
-  const ticked = (h: RiteView, stepId: string) => stepOpt[`${h.id}|${stepId}`] ?? (tickSet.has(`${h.id}|${stepId}|${day}`) || (done(h.id) && optimistic[h.id] === true));
+  const ticked = (h: RiteView, stepId: string) => stepOpt[`${h.id}|${stepId}`] ?? tickSet.has(`${h.id}|${stepId}|${day}`);
   const subsOf = (h: RiteView) => h.steps ?? [];
   const skipped = (id: string) => skipOverride[id] ?? skipSet.has(`${id}|${day}`);
   const dueToday = ordered.filter((h) => dueOn(h, weekday));
@@ -190,6 +191,21 @@ export function DailyHabits({
     } catch {}
   }, []);
   const isSnoozed = (id: string) => !!day && snoozed[id] === day;
+  /** A tap on a habit's card: its sub-habits, the mess check-in, the phrase tool, or else its editor (⋯ and right-click edit any habit). */
+  function cardTap(h: RiteView) {
+    if (h.id === cleanId && cleaning) return setCleanOpen((v) => !v);
+    if (subsOf(h).length) {
+      return setOpenSubs((o) => {
+        const n = new Set(o);
+        if (n.has(h.id)) n.delete(h.id);
+        else n.add(h.id);
+        return n;
+      });
+    }
+    if (/learn(ing)? (a )?language|language practice/i.test(h.title)) return openLanguageWindow();
+    setEditing(h);
+  }
+
   function snooze(h: RiteView, on: boolean) {
     if (!day) return;
     setMenuFor(null);
@@ -276,11 +292,9 @@ export function DailyHabits({
       setPop({ id: h.id, xp: h.xp_value });
       setTimeout(() => setPop((p) => (p?.id === h.id ? null : p)), 1400);
     }
-    const subs = subsOf(h);
-    if (subs.length) setStepOpt((o) => ({ ...o, ...Object.fromEntries(subs.map((st) => [`${h.id}|${st.id}`, next])) }));
+    // The habit done doesn't mean every sub-habit was (owner, Nov 2): they keep their own ticks.
     startTransition(async () => {
       try {
-        if (subs.length) await tickAllRiteStepsAction(h.id, day, next);
         if (next) await completeRiteAction(h.id, day);
         else await uncompleteRiteAction(h.id, day);
       } catch (e) {
@@ -459,11 +473,13 @@ export function DailyHabits({
               const s = streak(h);
               return (
                 <SortableHabit key={h.id} id={h.id} disabled={!open} raised={menuFor === h.id || confirmSkip === h.id}>
+                {/* Swipe left for "Snooze for today" (owner, Nov 2). */}
+                <SwipeReveal side="right" label="Snooze today" icon={<SnoozeIcon size={18} />} background="linear-gradient(180deg,#5b6b8a,#3f4c66)" onAction={() => snooze(h, true)} disabled={d}>
                 <div
                   // The cleaning habit's whole card opens and closes its tray (not only its title).
                   onClick={(e) => {
-                    if (h.id !== cleanId || !cleaning || (e.target as Element).closest("button,input,textarea,a,[role=menu]")) return;
-                    setCleanOpen((v) => !v);
+                    if ((e.target as Element).closest("button,input,textarea,a,[role=menu]")) return;
+                    cardTap(h);
                   }}
                   onContextMenu={(e) => {
                     if ((e.target as Element).closest("input,textarea,a")) return;
@@ -472,7 +488,7 @@ export function DailyHabits({
                     setMenuUp(window.innerHeight - r.bottom < 200);
                     setMenuFor(h.id);
                   }}
-                  className={`habit-row relative flex items-center gap-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
+                  className={`habit-row relative flex flex-wrap items-center gap-x-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
                   // A gilded edge and a soft shadow, so each habit sits on the velvet like a card.
                   style={isAdventure ? { borderRadius: 16, boxShadow: "0 0 0 1.5px #b39a6a, 0 0 0 3px rgba(60,44,16,.55), 0 4px 10px rgba(0,0,0,.4)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
                 >
@@ -519,10 +535,10 @@ export function DailyHabits({
                   )}
                   <button
                     type="button"
-                    onClick={() => (h.id === cleanId && cleaning ? setCleanOpen((v) => !v) : setEditing(h))}
+                    onClick={() => cardTap(h)}
                     aria-expanded={h.id === cleanId && cleaning ? cleanOpen : undefined}
                     className="relative z-[1] min-w-0 flex-1 text-left"
-                    title={h.id === cleanId && cleaning ? "Today's pick, your spaces, laundry and chores" : "Edit habit"}
+                    title={h.id === cleanId && cleaning ? "Today's pick, your spaces, laundry and chores" : subsOf(h).length ? "Show its sub-habits" : "Edit habit (or ⋯ / right-click)"}
                   >
                     <span
                       className="block text-[16px] font-semibold leading-snug"
@@ -690,42 +706,43 @@ export function DailyHabits({
                       +{pop.xp} XP
                     </span>
                   )}
-                </div>
-                {subsOf(h).length > 0 && openSubs.has(h.id) && (
-                  <ul className="reveal m-0 ml-7 mt-1 flex list-none flex-col gap-0.5 rounded-xl px-2 py-1.5" style={isAdventure ? { background: "rgba(240,226,196,.9)", border: "1.5px solid #b39a6a" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}>
-                    {subsOf(h).map((st) => {
-                      const t = ticked(h, st.id);
-                      return (
-                        <li key={st.id}>
-                          <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={t}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onTouchStart={(e) => e.stopPropagation()}
-                            onClick={() => tickStep(h, st.id)}
-                            className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-1.5 text-left hover:bg-black/[.04]"
-                          >
-                            <span
-                              aria-hidden
-                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
-                              style={{ background: t ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "rgba(255,250,238,.6)", border: `2px solid ${t ? "#2f5a26" : "#a58c66"}` }}
+                  {subsOf(h).length > 0 && openSubs.has(h.id) && (
+                    <ul className="due-in relative z-[1] m-0 mt-1 flex w-full basis-full list-none flex-col gap-0.5 pb-0.5 pl-12">
+                      {subsOf(h).map((st) => {
+                        const t = ticked(h, st.id);
+                        return (
+                          <li key={st.id}>
+                            <button
+                              type="button"
+                              role="checkbox"
+                              aria-checked={t}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onTouchStart={(e) => e.stopPropagation()}
+                              onClick={() => tickStep(h, st.id)}
+                              className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-1.5 text-left hover:bg-black/[.04]"
                             >
-                              {t && (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                  <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </span>
-                            <span className="text-[15px] leading-snug" style={{ color: "var(--t-ink)", textDecoration: t ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)", opacity: t ? 0.7 : 1 }}>
-                              {st.title}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+                              <span
+                                aria-hidden
+                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
+                                style={{ background: t ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "rgba(255,250,238,.6)", border: `2px solid ${t ? "#2f5a26" : "#a58c66"}` }}
+                              >
+                                {t && (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                    <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </span>
+                              <span className="text-[15px] leading-snug" style={{ color: "var(--t-ink)", textDecoration: t ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)", opacity: t ? 0.7 : 1 }}>
+                                {st.title}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+                </SwipeReveal>
                 {/learn(ing)? (a )?language|language practice/i.test(h.title) && <LanguagePractice />}
                 {listenHref && !d && LISTEN_HABIT.test(h.title) && (
                   <a href={listenHref} onPointerDown={(e) => e.stopPropagation()} className="due-in ml-11 mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold no-underline" style={{ background: "rgba(201,162,74,.14)", border: "1px solid rgba(160,120,40,.45)", color: "#6b4c12" }}>

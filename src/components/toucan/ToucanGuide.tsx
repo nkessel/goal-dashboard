@@ -24,6 +24,7 @@ import {
   deleteTaskAction,
   coachPromiseAction,
   coachStateAction,
+  completeTaskAction,
   courseworkAction,
   addJournalEntryAction,
   answerDeadlineGuessAction,
@@ -192,6 +193,12 @@ export function ToucanGuide() {
   // Pick a time: where the time goes, and the choices to come back to if you close it.
   const [pickTime, setPickTime] = useState<{ at: (when: number) => void; back?: () => void } | null>(null);
   const router = useRouter();
+  // A quest done from his note: show it done.
+  useEffect(() => {
+    const h = () => router.refresh();
+    window.addEventListener("toucan-refresh", h);
+    return () => window.removeEventListener("toucan-refresh", h);
+  }, [router]);
 
   useEffect(() => {
     const h = (e: Event) => {
@@ -221,12 +228,13 @@ export function ToucanGuide() {
         clearInterval(wait);
         setTimeout(() => raiseRef.current(text, actions, note, opts), 1500);
       }, 1000);
-      return false;
+      // It will be said once the welcome screen closes: count it as said, or callers raise it again and again.
+      return note;
     }
     if (send()) return true;
     if (opts.instant) {
       setFallback({ text, actions, instant: true, onClose: opts.onClose });
-      return false;
+      return true;
     }
     let tries = 0;
     const retry = () => {
@@ -235,7 +243,9 @@ export function ToucanGuide() {
       else if (note) setFallback({ text, actions });
     };
     setTimeout(retry, 800);
-    return false;
+    // Said by the bird or, failing that, as a note: either way it's said (returning false here made a due
+    // quest's note come back on every refresh, so its buttons and × seemed not to work; owner, Nov 2).
+    return note;
   };
   const raiseRef = useRef(raise);
   useEffect(() => {
@@ -248,6 +258,8 @@ export function ToucanGuide() {
     ...(n.quiz ? [{ label: "Let's do it", run: () => window.dispatchEvent(new Event("toucan-quiz")) }] : []),
     ...(n.plan ? [{ label: n.plan.estimate ? "Plan it" : "Estimate & plan", run: () => talkToToucan(n.plan!) }] : []),
     ...(n.begin ? [{ label: "Begin · 15 min", run: () => void beginQuest(n.begin!) }] : []),
+    // "I already did this task" (owner, Nov 2): one tap marks the quest done.
+    ...(n.begin ? [{ label: "Already done ✓", run: () => void completeQuestFromNote(n.begin!) }] : []),
     ...(n.talk ? [{ label: n.talkLabel ?? "Let's go", run: () => talkToToucan(undefined, "talk", n.talk) }] : []),
     snoozeFor(n),
   ];
@@ -265,8 +277,8 @@ export function ToucanGuide() {
         raiseRef.current(
           "When should I bring it back?",
           [
+            { label: "Tomorrow", run: () => at(tomorrowMorning()) },
             { label: "15 min", run: () => inHours(0.25) },
-            { label: "30 min", run: () => inHours(0.5) },
             { label: "1 hour", run: () => inHours(1) },
             { label: "Other…", run: () => setPickTime({ at, back: ask }) },
             { label: "Skip it", run: () => void (n.taskId && snoozeToucanAction(n.taskId, 1).catch(() => {})) },
@@ -514,7 +526,8 @@ export function ToucanGuide() {
         timers.push(
           setTimeout(() => {
             const st = styleRef.current;
-            const time = new Date(t.due_at!).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+            const due = new Date(t.due_at!);
+            const time = due.getHours() === 23 && due.getMinutes() >= 59 ? "" : due.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
             const text = voice.dueToday(st, t.title, time);
             const seen = raiseRef.current(text, actionsRef.current({ text, until: 0, taskId: t.id, begin: t.id }));
             if (seen) {
@@ -645,10 +658,10 @@ export function ToucanGuide() {
       )}
       {fallback && (
         <NudgeNote
+          key={fallback.text}
           text={fallback.text}
           actions={fallback.actions}
           instant={fallback.instant}
-          onDismiss={() => setFallback(null)}
           onClose={() => {
             const back = fallback.onClose;
             setFallback(null);
@@ -762,7 +775,7 @@ function PickTime({ onPick, onClose }: { onPick: (when: number) => void; onClose
   );
 }
 
-function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { text: string; actions: NoteAction[]; onClose: () => void; onDismiss: () => void; instant?: boolean }) {
+function NudgeNote({ text, actions, onClose, instant = false }: { text: string; actions: NoteAction[]; onClose: () => void; instant?: boolean }) {
   // × closes only his bubble: the toucan stays where he is (owner, Nov 2); a tap on him brings his words back.
   const [quiet, setQuiet] = useState(false);
   useEscape(() => (quiet ? onClose() : setQuiet(true)));
@@ -777,6 +790,8 @@ function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { tex
   });
   const drag = useRef<{ dx: number; dy: number; moved: boolean } | null>(null);
   const movedLast = useRef(false);
+  // After a choice he stays, resting: a tap on him then starts a talk (his note has had its say).
+  const acted = useRef(false);
   const place = at
     ? { left: Math.max(8, Math.min(window.innerWidth - 200, at.x)), top: Math.max(8, Math.min(window.innerHeight - 80, at.y)) }
     : null;
@@ -811,7 +826,7 @@ function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { tex
         }
       }}
     >
-      <button type="button" data-bird onClick={() => !movedLast.current && setQuiet(false)} aria-label={quiet ? "The toucan: show what he said" : "The toucan"} className={`${instant ? "" : "nudge-bird"} shrink-0 cursor-pointer`} style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,.45))" }}>
+      <button type="button" data-bird onClick={() => (movedLast.current ? undefined : acted.current ? talkToToucan() : setQuiet(false))} aria-label={quiet ? "The toucan: show what he said" : "The toucan"} className={`${instant ? "" : "nudge-bird"} shrink-0 cursor-pointer`} style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,.45))" }}>
         <ToucanArt size={58} />
       </button>
       <div
@@ -831,7 +846,9 @@ function NudgeNote({ text, actions, onClose, onDismiss, instant = false }: { tex
               key={a.label}
               type="button"
               onClick={() => {
-                onDismiss();
+                // He stays (owner, Nov 2: "he disappeared completely when I said skip it"); only his words go.
+                acted.current = true;
+                setQuiet(true);
                 a.run();
               }}
               className="h-8 rounded-full px-3 text-[12.5px]"
@@ -859,6 +876,14 @@ function eventWhen(d: Date) {
 }
 
 export const PLAN_DAY = "Help me plan my day so nothing slips: what's due next first, then what matters most, and anything past due after that. Suggest an order and times that fit around my calendar.";
+
+/** "Already done ✓" from his note: the quest is completed, with its celebration. */
+async function completeQuestFromNote(taskId: string) {
+  const fd = new FormData();
+  fd.set("taskId", taskId);
+  const res = await completeTaskAction(fd).catch(() => null);
+  if (res) window.dispatchEvent(new Event("toucan-refresh"));
+}
 
 /** Begin a promise: its quest in focus mode if it has one, otherwise a word with the toucan. */
 async function beginPromise(p: CoachPromise) {
