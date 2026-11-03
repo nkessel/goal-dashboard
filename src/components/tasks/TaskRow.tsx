@@ -28,7 +28,7 @@ import { QuestMonogram } from "./QuestMonogram";
 import { openFocusMode } from "@/lib/focus-timer";
 import { coinsForXp } from "@/lib/coins";
 import { DateField } from "@/components/ui/DateField";
-import { useScaleStyle } from "@/components/ui/LevelScales";
+import { fillFor, useScaleColors, useScaleStyle, type ScaleKey } from "@/components/ui/LevelScales";
 import { Fold, useClosing } from "@/components/ui/Fold";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, unitLabel, type ProgressUnit } from "@/lib/progress-units";
@@ -766,8 +766,8 @@ export function TaskRow({
           <ScaleRuns
             compact={compact}
             runs={[
-              ...(importanceCount > 0 ? [{ src: "/design/ui-trophy.svg", n: importanceCount, title: `Importance ${task.importance.toFixed(1)}` }] : []),
-              ...(urgencyCount > 0 ? [{ src: "/design/ui-flame-sm.png", n: urgencyCount, title: `Urgency ${(task.urgency ?? 0).toFixed(1)}` }] : []),
+              ...(importanceCount > 0 ? [{ key: "importance" as const, src: "/design/ui-trophy.svg", n: importanceCount, title: `Importance ${task.importance.toFixed(1)}` }] : []),
+              ...(urgencyCount > 0 ? [{ key: "urgency" as const, src: "/design/ui-flame-sm.png", n: urgencyCount, title: `Urgency ${(task.urgency ?? 0).toFixed(1)}` }] : []),
             ]}
           />
           {(task.due_at || (task.is_on_calendar && task.scheduled_start)) && (
@@ -1077,7 +1077,7 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose: closeN
 }
 
 /** A short run of trophies or flames, always on one row (they shrink a little rather than wrap). */
-type Run = { src: string; n: number; title: string };
+type Run = { key?: ScaleKey; src: string; n: number; title: string };
 /**
  * Importance, urgency and the like on a card. As bars (the default): side by
  * side, each one smooth bar filled to its level with its icon underneath. As
@@ -1085,6 +1085,7 @@ type Run = { src: string; n: number; title: string };
  */
 function ScaleRuns({ runs, compact }: { runs: Run[]; compact: boolean }) {
   const style = useScaleStyle();
+  const colors = useScaleColors();
   if (!runs.length) return null;
   if (style === "bars")
     return (
@@ -1093,7 +1094,7 @@ function ScaleRuns({ runs, compact }: { runs: Run[]; compact: boolean }) {
           <span key={r.src} className="flex flex-col items-center gap-[3px]" title={r.title}>
             {/* Only as tall as its level: no empty track above it. */}
             <span aria-hidden className={`relative block w-[6px] ${compact ? "h-[16px]" : "h-[20px]"}`}>
-              <span className="level-fill absolute inset-x-0 bottom-0 block rounded-full" style={{ height: `${Math.min(5, r.n) * 20}%`, minHeight: 4 }} />
+              <span className="level-fill absolute inset-x-0 bottom-0 block rounded-full" style={{ height: `${Math.min(5, r.n) * 20}%`, minHeight: 4, ...fillFor(r.key ? colors[r.key] : undefined) }} />
             </span>
             {/* eslint-disable-next-line @next/next/no-img-element -- decorative glyph from /public */}
             <img src={r.src} alt="" width={14} height={14} className={`shrink-0 ${compact ? "h-[11px] w-[11px]" : "h-[12px] w-[12px] sm:h-[13px] sm:w-[13px]"}`} />

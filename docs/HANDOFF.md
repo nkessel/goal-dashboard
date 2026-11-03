@@ -151,6 +151,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 3: Settings › Visual Effects › Scale colours: a colour per scale (importance, urgency, difficulty, energy) for the bars on cards and in the editor (`scale-colors` in localStorage, `fillFor`/`useScaleColors` in `ui/LevelScales.tsx`).
+
 - Nov 3: A quest's place: an icon-only 📍 pill, last in the editor's row, and "📍 Natick library" on its card (`life_wheel.questPlaces`, `lib/use-quest-places.ts`, `questPlacesAction`/`setQuestPlaceAction`; move to a `tasks` column with DB access). The sequence window moves by its title, resizes from its corner and minimizes to a "🧩 Sequence" chip (`FloatingWindow`, which now stops clicks from reaching the card under it).
 
 - Nov 3: Habit editor details are pills like the quest editor's (↻ repeats, ◷ time, ✦ XP & coins, ⏰ due by), one opening in place at a time; sub-habits on a Today card have their own right-click menu (tick, edit sub-habits, XP and coins) and show their XP. A sequence's waiting quests peek out above the card, and "N after this" shows on hover or focus. The quest ⋯ menu's arranging: the gear turns into a ✓, no Done button. Deleting a library portrait is a small menu on the tile.

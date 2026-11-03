@@ -12,7 +12,6 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Data: trash & recycling becomes a weekly habit on Tuesday evenings, not a chore; cleaning the weed supplies becomes a regular cleaning task with a need slider.
 
 ## Quests and the quest editor
-- Let the colours of the difficulty, urgency and other bars be set in Settings.
 
 ## Calendar
 - Google Calendar toggles, plus an ordered list of all your calendars (subscribed ones too) that you can reorder and archive.

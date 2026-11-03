@@ -1,4 +1,5 @@
 import { FoldGroup as FxGroup } from "./FoldGroup";
+import { ScaleColorSettings } from "@/components/ui/LevelScales";
 import Link from "next/link";
 import { ToucanWorkshop } from "./ToucanWorkshop";
 import { BackpackIcon } from "./BackpackIcon";
@@ -444,6 +445,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
                   <FabSettings />
                 </FxGroup>
               )}
+              <FxGroup open={opens("visual-effects") && openGroup === "scale-colors"} title="Scale colours" hint="The bars for importance, urgency, difficulty and energy, on quest cards and in the editor." isAdventure={isAdventure}>
+                <ScaleColorSettings />
+              </FxGroup>
               <FxGroup open={opens("visual-effects") && openGroup === "loading"} title="While a screen loads" value={<LoadingValue />} isAdventure={isAdventure}>
                 <LoadingSettings />
               </FxGroup>

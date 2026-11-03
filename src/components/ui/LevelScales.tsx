@@ -42,6 +42,82 @@ export function useScaleStyle(): ScaleStyle {
   );
 }
 
+/** The colours of the scale bars (Settings › Visual Effects › Scale colours), kept in this browser. */
+export const SCALE_KEYS = [
+  ["importance", "Importance"],
+  ["urgency", "Urgency"],
+  ["difficulty", "Difficulty"],
+  ["energy", "Energy boost"],
+] as const;
+export type ScaleKey = (typeof SCALE_KEYS)[number][0];
+const COLOR_KEY = "scale-colors";
+const COLOR_EVENT = "scale-colors-change";
+let colorCache: { raw: string | null; v: Partial<Record<ScaleKey, string>> } = { raw: null, v: {} };
+function readScaleColors(): Partial<Record<ScaleKey, string>> {
+  try {
+    const raw = localStorage.getItem(COLOR_KEY);
+    if (raw !== colorCache.raw) colorCache = { raw, v: raw ? JSON.parse(raw) : {} };
+    return colorCache.v;
+  } catch {
+    return colorCache.v;
+  }
+}
+const NO_COLORS = {};
+export function useScaleColors(): Partial<Record<ScaleKey, string>> {
+  return useSyncExternalStore(
+    (cb) => {
+      window.addEventListener(COLOR_EVENT, cb);
+      window.addEventListener("storage", cb);
+      return () => {
+        window.removeEventListener(COLOR_EVENT, cb);
+        window.removeEventListener("storage", cb);
+      };
+    },
+    readScaleColors,
+    () => NO_COLORS
+  );
+}
+export function setScaleColor(k: ScaleKey, c: string | null) {
+  const next = { ...readScaleColors() };
+  if (c) next[k] = c;
+  else delete next[k];
+  try {
+    localStorage.setItem(COLOR_KEY, JSON.stringify(next));
+  } catch {}
+  window.dispatchEvent(new Event(COLOR_EVENT));
+}
+/** A bar's fill in a chosen colour (shaded like the gold one), or undefined for the gold. */
+export function fillFor(c: string | undefined): React.CSSProperties | undefined {
+  if (!c) return undefined;
+  return { background: `linear-gradient(0deg, color-mix(in srgb, ${c} 70%, #000), ${c} 60%, color-mix(in srgb, ${c} 50%, #fff))`, boxShadow: `0 0 6px color-mix(in srgb, ${c} 50%, transparent), inset 0 1px 0 rgba(255,255,255,.5)` };
+}
+
+/** Settings › Visual Effects › Scale colours: one swatch row per scale. */
+export function ScaleColorSettings() {
+  const colors = useScaleColors();
+  const swatches = ["#d9b45f", "#c0533f", "#d98a2e", "#5c8f3a", "#3f7fb8", "#7a5ab0", "#8a8a8a"];
+  return (
+    <div className="flex flex-col gap-2">
+      {SCALE_KEYS.map(([k, label]) => (
+        <div key={k} className="flex flex-wrap items-center gap-1.5">
+          <span className="w-28 text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
+            {label}
+          </span>
+          {swatches.map((c, i) => {
+            const on = (colors[k] ?? "#d9b45f") === c;
+            return (
+              <button key={c} type="button" onClick={() => setScaleColor(k, i === 0 ? null : c)} aria-label={`${label}: ${i === 0 ? "gold" : c}`} aria-pressed={on} className="h-7 w-7 rounded-full" style={{ background: c, boxShadow: on ? "0 0 0 2px #fff, 0 0 0 4px #4a3913" : "inset 0 0 0 1px rgba(0,0,0,.25)" }} />
+            );
+          })}
+          <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-full" title="Any colour" style={{ background: "conic-gradient(red, yellow, lime, aqua, blue, magenta, red)", boxShadow: colors[k] && !swatches.includes(colors[k]!) ? "0 0 0 2px #fff, 0 0 0 4px #4a3913" : undefined }}>
+            <input type="color" value={colors[k] ?? "#d9b45f"} onChange={(e) => setScaleColor(k, e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label={`${label}: any colour`} />
+          </label>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export type ScaleItem = { key: string; label: string; icon: string; hint?: string; value: number; onChange: (v: number) => void };
 
 /** One or more 0–5 scales, drawn in the chosen style, with the toggle between styles. */
@@ -93,6 +169,7 @@ function StyleToggle({ style }: { style: ScaleStyle }) {
  * again for 0), or drag up and down; arrow keys work too.
  */
 function LevelBar({ item }: { item: ScaleItem }) {
+  const colors = useScaleColors();
   const track = useRef<HTMLDivElement>(null);
   const drag = useRef<{ y: number; moved: boolean; start: number } | null>(null);
   const valueAt = (clientY: number) => {
@@ -144,7 +221,7 @@ function LevelBar({ item }: { item: ScaleItem }) {
         }}
       >
         {/* One smooth bar filled to the level (no segments). */}
-        <span aria-hidden className="level-fill pointer-events-none absolute inset-x-[3px] bottom-[3px] block rounded-full transition-[height] duration-200" style={{ height: `calc(${value * 20}% - ${(value * 6) / 5}px)` }} />
+        <span aria-hidden className="level-fill pointer-events-none absolute inset-x-[3px] bottom-[3px] block rounded-full transition-[height] duration-200" style={{ height: `calc(${value * 20}% - ${(value * 6) / 5}px)`, ...fillFor(colors[item.key as ScaleKey]) }} />
       </div>
       {/* The icon at the bar's foot. */}
       {/* eslint-disable-next-line @next/next/no-img-element -- scale glyph */}
