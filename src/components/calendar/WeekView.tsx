@@ -1013,9 +1013,11 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
         const quest = habitLook === "quest";
         if (quest && isAdventure) {
           // Like a quest: a storybook card with the habit's portrait beside its name (owner's mockup, Nov 3).
-          const art = height >= 26 ? Math.min(height - 8, 40) : 0;
+          // Tall enough: the portrait stands above the name (so a narrow week column still shows both); else beside it.
+          const tall = height >= 50;
+          const art = tall ? Math.min(height - 24, 34) : height >= 26 ? Math.min(height - 8, 30) : 0;
           return (
-            <div key={b.habit.id} className="quest-card absolute inset-x-0.5 flex items-center gap-1.5 overflow-hidden" title={`${b.habit.title}: a daily habit, ${time}`} style={{ top: top + 1, height, zIndex: 1, padding: height >= 26 ? "3px 6px 3px 4px" : "1px 6px", borderRadius: 14 }}>
+            <div key={b.habit.id} className={`quest-card absolute inset-x-0.5 flex overflow-hidden ${tall ? "flex-col items-center justify-center gap-0.5 text-center" : "items-center gap-1.5"}`} title={`${b.habit.title}: a daily habit, ${time}`} style={{ top: top + 1, height, zIndex: 1, padding: tall ? "3px 3px" : height >= 26 ? "3px 6px 3px 4px" : "1px 6px", borderRadius: 14 }}>
               {art >= 16 ? (
                 <span className="quest-art flex shrink-0 items-center justify-center overflow-hidden" style={{ width: art, height: art, borderRadius: art > 30 ? 8 : 5 }}>
                   {b.habit.icon_key ? (
@@ -1026,11 +1028,11 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
                   )}
                 </span>
               ) : null}
-              <span className="min-w-0 flex-1">
+              <span className={tall ? "w-full min-w-0" : "min-w-0 flex-1"}>
                 <span className="font-display block truncate" style={{ color: "#3a2a14", fontSize: 12.5, lineHeight: 1.15 }}>
                   {b.habit.title}
                 </span>
-                {height >= 34 && (
+                {height >= (tall ? 76 : 34) && (
                   <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
                     {time}
                   </span>
