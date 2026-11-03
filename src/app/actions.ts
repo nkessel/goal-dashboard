@@ -1271,6 +1271,55 @@ export async function createQuestAction(input: {
   return task.id;
 }
 
+/**
+ * Today's quests and your daily habits without a picture yet, for the calendar's storybook cards (owner, Nov 3:
+ * "let's get gym and other items nice avatars"). One at a time, so each call stays short: paints the next one,
+ * puts it on that habit or quest, and says how many are left.
+ */
+async function todayWithoutArt(ownerId: string) {
+  const db = supabaseAdmin();
+  const soon = new Date(Date.now() + 8 * 86400_000).toISOString();
+  const [rites, pinned, scheduled, timed] = await Promise.all([
+    db.from("rites").select("id, title").eq("owner_id", ownerId).eq("archived", false).eq("slot", "day").is("icon_key", null),
+    db.from("tasks").select("id, title").eq("owner_id", ownerId).eq("status", "open").eq("is_manual_priority", true).is("icon_key", null),
+    db.from("tasks").select("id, title").eq("owner_id", ownerId).eq("status", "open").eq("is_on_calendar", true).lt("scheduled_start", soon).gt("scheduled_end", new Date().toISOString()).is("icon_key", null),
+    db.from("tasks").select("id, title").eq("owner_id", ownerId).eq("status", "open").eq("is_tiny", true).lt("due_at", soon).is("icon_key", null),
+  ]);
+  const quests = new Map<string, string>();
+  for (const r of [...(pinned.data ?? []), ...(scheduled.data ?? []), ...(timed.data ?? [])]) quests.set(r.id as string, r.title as string);
+  return {
+    habits: ((rites.data ?? []) as { id: string; title: string }[]).filter((r) => r.title?.trim()),
+    quests: [...quests].map(([id, title]) => ({ id, title })).filter((q) => q.title?.trim()),
+  };
+}
+
+export async function countTodayWithoutArtAction(): Promise<number> {
+  const ownerId = await requireProfileId();
+  const { habits, quests } = await todayWithoutArt(ownerId);
+  return habits.length + quests.length;
+}
+
+export async function paintNextTodayArtAction(): Promise<{ painted: string | null; left: number }> {
+  const ownerId = await requireProfileId();
+  const { habits, quests } = await todayWithoutArt(ownerId);
+  const next = habits[0] ? { kind: "habit" as const, ...habits[0] } : quests[0] ? { kind: "quest" as const, ...quests[0] } : null;
+  if (!next) return { painted: null, left: 0 };
+  const subject = next.title.replace(/[^\p{L}\p{N}\s'&:,-]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 160) || "a small adventure";
+  let url: string;
+  try {
+    assertFamilyFriendly(subject);
+    url = await generateAndStoreImage(buildQuestScenePrompt(await visualSubjectFor(subject)), `${next.kind === "habit" ? "rites" : "tasks"}/${next.id}-${Date.now()}.jpg`);
+  } catch (e) {
+    throw new Error(`Couldn't paint “${next.title}”: ${e instanceof Error ? e.message : "try again"}`);
+  }
+  if (next.kind === "habit") await supabaseAdmin().from("rites").update({ icon_key: url, icon_source: "ai" }).eq("id", next.id).eq("owner_id", ownerId);
+  else await tasksData.setTaskIcon(next.id, ownerId, { iconKey: url, iconSource: "ai" });
+  await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: subject }).catch(() => {});
+  revalidatePath("/");
+  revalidatePath("/calendar");
+  return { painted: next.title, left: habits.length + quests.length - 1 };
+}
+
 /** Generate a quest portrait without attaching it to a quest yet (the create
  * dialog, before the quest exists). Added to the shared icon library. */
 export async function generateQuestIconImageAction(prompt: string, artStyle: "monster" | "treasure" = "monster"): Promise<string> {

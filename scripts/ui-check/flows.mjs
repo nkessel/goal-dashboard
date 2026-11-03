@@ -322,6 +322,14 @@ export const FLOWS = [
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
       await h.settle(400);
       await h.check("week: the cards");
+      // Display settings: what quest cards show (creature, time, XP, coins).
+      if (await h.tap((p) => p.getByRole("button", { name: /display settings|calendar settings/i }).first(), "calendar display", { optional: true, expectMove: true })) {
+        await h.check("display settings");
+        await h.tap((p) => p.getByRole("button", { name: /^creature$/i }).first(), "hide creature", { optional: true });
+        await h.check("cards without creatures");
+        await h.tap((p) => p.getByRole("button", { name: /^creature$/i }).first(), "show creature", { optional: true });
+        await esc(h);
+      }
       await h.goto("/calendar?view=day", { name: "calendar" });
       await h.settle(1200);
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});

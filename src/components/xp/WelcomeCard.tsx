@@ -373,6 +373,13 @@ export function WelcomeCard({
     // From another page, the fog takes over once the mist has rolled in, and Today lifts it.
     setTimeout(() => (onClose(), toToday?.()), elsewhere ? 1350 : 2400);
   };
+  // Snoozing leaves the same way as Continue: the card dives into the forest and the mist lifts (owner, Nov 3: "it just jumps").
+  const snoozeOut = (ms: number) => {
+    if (leaving) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return onSnooze?.(ms);
+    setLeaving(true);
+    setTimeout(() => onSnooze?.(ms), window.location.pathname === "/" ? 2400 : 1350);
+  };
   // Only the bottom-right button goes on to town: Escape and taps on the mist just close what's open.
   useEscape(() => {
     if (arranging) setArranging(false);
@@ -702,7 +709,7 @@ export function WelcomeCard({
                 </svg>
               </button>
               {(snoozing === "main" ? SNOOZE_MAIN : snoozeOther()).map((c, i) => (
-                <button key={`${snoozing}-${c.label}`} type="button" onClick={() => (c.ms === "tomorrow" ? leave() : onSnooze!(c.ms))} className="snooze-pop h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold" style={{ ...PILL, animationDelay: `${i * 45}ms` }}>
+                <button key={`${snoozing}-${c.label}`} type="button" onClick={() => (c.ms === "tomorrow" ? leave() : snoozeOut(c.ms))} className="snooze-pop h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold" style={{ ...PILL, animationDelay: `${i * 45}ms` }}>
                   {c.label}
                 </button>
               ))}
@@ -717,7 +724,7 @@ export function WelcomeCard({
                   onSubmit={(e) => {
                     e.preventDefault();
                     const n = Math.round(Number(customMin));
-                    if (n > 0) onSnooze!(Math.min(24 * 60, n) * 60_000);
+                    if (n > 0) snoozeOut(Math.min(24 * 60, n) * 60_000);
                   }}
                 >
                   <input value={customMin} onChange={(e) => setCustomMin(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="45" aria-label="Minutes" className="h-6 w-9 bg-transparent text-center text-[16px] tabular-nums focus:outline-none" />

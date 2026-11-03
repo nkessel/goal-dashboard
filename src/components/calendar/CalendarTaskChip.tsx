@@ -6,6 +6,9 @@ import type { Task } from "@/lib/data/types";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { formatTimeRange } from "@/lib/calendar-dates";
+import { coinsForXp } from "@/lib/coins";
+import { CoinIcon } from "@/components/ui/Icons";
+import type { CardShow } from "./CalendarLayers";
 
 import { getTaskDisplayWindow } from "@/lib/calendar-task-window";
 export { getTaskDisplayWindow };
@@ -19,7 +22,10 @@ export function CalendarTaskChip({
   oneLine = false,
   portrait = false,
   box,
+  show = { art: true, time: true, xp: true, coins: true },
 }: {
+  /** Which parts the card shows (calendar gear › Display › Quest cards show). */
+  show?: CardShow;
   /** The card's size on the grid. With it, Adventure draws a picture-book quest card. */
   box?: { w: number; h: number };
   /** The quest's portrait large above its title, like a card on a quest map. */
@@ -61,6 +67,7 @@ export function CalendarTaskChip({
           warned={isWarned}
           tint={tint}
           portrait={portrait}
+          show={show}
           onOpen={() => setEditing(true)}
         />
         {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
@@ -160,7 +167,8 @@ export function CalendarTaskChip({
             task.title
           )}
         </p>
-        {timeLabel && !oneLine && !tall && (
+        {!oneLine && (show.xp || show.coins) && <Pays xp={show.xp ? task.xp_value : 0} coins={show.coins ? (task.coin_value ?? coinsForXp(task.xp_value)) : 0} done={isCompleted} center={tall} />}
+        {show.time && timeLabel && !oneLine && !tall && (
           <p className="truncate leading-tight" style={{ color: "var(--t-ink-soft)", fontSize: 10.5 }}>
             {timeLabel}
           </p>
@@ -219,8 +227,10 @@ function QuestCard({
   warned,
   tint,
   portrait,
+  show,
   onOpen,
 }: {
+  show: CardShow;
   task: Task;
   box: { w: number; h: number };
   art: string | null;
@@ -234,6 +244,10 @@ function QuestCard({
   const done = task.status === "completed";
   const { w, h } = box;
   const line = h < 30;
+  // What it pays: XP and coins (done: what it paid). Shown on a line of its own when there's room, else at the end of a one-line card.
+  const xpN = done ? (task.xp_awarded ?? task.xp_value) : task.xp_value;
+  const coinN = task.coin_value ?? coinsForXp(xpN);
+  const pays = (show.xp && xpN > 0) || (show.coins && coinN > 0);
   // Narrow and tall enough: the creature stands above the title; a narrow one-hour card puts it beside, like the mockup.
   const stack = !line && (portrait || w < 130) && h >= 66;
   const titlePx = w < 52 ? 11 : w < 110 ? (stack ? 12.5 : 11.5) : 14;
@@ -247,10 +261,12 @@ function QuestCard({
     : stack
       ? stackArt(wantLines) >= 30 ? stackArt(wantLines) : stackArt(Math.min(wantLines, 2)) >= 18 ? stackArt(Math.min(wantLines, 2)) : stackArt(1)
       : Math.max(0, Math.min(h - 10, h >= 80 ? 64 : 52, w < 130 ? w * 0.3 : w * 0.38));
-  const showArt = artPx >= 16;
+  const showArt = show.art && artPx >= 16;
   const sealPx = Math.min(artPx, stack ? 24 : 26);
   const doneNote = done && !line && h >= (stack ? 64 : 44);
-  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? 13 : 0)) / (titlePx * 1.12)));
+  const payLine = pays && !line && h >= (stack ? 60 : 40);
+  const payInline = pays && line && w >= 120;
+  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? 13 : 0) - (payLine ? 14 : 0)) / (titlePx * 1.12)));
 
   return (
     <button
@@ -269,7 +285,7 @@ function QuestCard({
         ...(warned ? { borderColor: "var(--t-warn)" } : {}),
       }}
     >
-      {done && showArt ? (
+      {done && (showArt || (!show.art && !line && h >= 40)) ? (
         <span className="quest-seal flex shrink-0 items-center justify-center rounded-full" style={{ width: sealPx, height: sealPx }}>
           <svg width="62%" height="62%" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -316,12 +332,31 @@ function QuestCard({
             Completed
           </span>
         )}
-        {!done && !stack && !line && timeLabel && h >= 52 && w >= 110 && (
+        {payLine && <Pays xp={show.xp ? xpN : 0} coins={show.coins ? coinN : 0} done={done} center={stack} />}
+        {show.time && !done && !stack && !line && timeLabel && h >= (payLine ? 66 : 52) && w >= 110 && (
           <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
             {timeLabel}
           </span>
         )}
       </span>
+      {payInline && <Pays xp={show.xp ? xpN : 0} coins={show.coins ? coinN : 0} done={done} />}
     </button>
+  );
+}
+
+/** What a quest pays, on its calendar card: "+20 XP · 1 🪙" (done: what it paid, in green). */
+function Pays({ xp, coins, done, center = false }: { xp: number; coins: number; done: boolean; center?: boolean }) {
+  if (!xp && !coins) return null;
+  return (
+    <span className={`flex shrink-0 items-center gap-1 whitespace-nowrap tabular-nums ${center ? "justify-center" : ""}`} style={{ fontSize: 10.5, lineHeight: "14px", fontWeight: 700, color: done ? "#4e6a35" : "#7a5a1c" }}>
+      {xp > 0 && <span>+{xp} XP</span>}
+      {xp > 0 && coins > 0 && <span aria-hidden style={{ opacity: 0.5 }}>·</span>}
+      {coins > 0 && (
+        <span className="flex items-center gap-0.5">
+          {coins}
+          <CoinIcon size={11} />
+        </span>
+      )}
+    </span>
   );
 }

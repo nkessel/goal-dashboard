@@ -129,7 +129,15 @@ export default async function CalendarPage({
   rangeStart = addDays(rangeStart, -1);
   rangeEnd = addDays(rangeEnd, 1);
   // Google's appointments load alongside the quests (not after them).
-  const googleP = session.googleAccessToken ? listEventsAllCalendars(session.googleAccessToken, rangeStart, rangeEnd).catch((err) => (console.warn("Failed to load Google Calendar events:", err), null)) : Promise.resolve(null);
+  // A failure is shown, not swallowed (owner, Nov 3: "the google calendars are still not showing"): it says why and offers to reconnect.
+  let googleProblem: string | null = null;
+  const googleP = session.googleAccessToken
+    ? listEventsAllCalendars(session.googleAccessToken, rangeStart, rangeEnd).catch((err) => {
+        console.warn("Failed to load Google Calendar events:", err);
+        googleProblem = googleProblemWords(err);
+        return null;
+      })
+    : Promise.resolve(null);
   const [tasks, toSchedule, scheduleFolders, googleAll] = await Promise.all([
     listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
     listSchedulingList(session.user.id),
@@ -157,6 +165,7 @@ export default async function CalendarPage({
         <RememberView view={view} n={nDays} who={session.user.id} />
         <PageHeader isAdventure={isAdventure} title="Quest Calendar" calmTitle="Calendar" />
         {!session.googleAccessToken && <ConnectCalendar isAdventure={isAdventure} />}
+        {session.googleAccessToken && googleProblem && <ConnectCalendar isAdventure={isAdventure} problem={googleProblem} />}
 
         {/* Its gear arranges the screen in place: drag the parts, the eye hides one. */}
         <ScreenArrange
@@ -348,4 +357,13 @@ export default async function CalendarPage({
       </div>
     </AppShell>
   );
+}
+
+/** Why Google Calendar didn't answer, in plain words. */
+function googleProblemWords(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const code = (err as { code?: number | string; status?: number })?.code ?? (err as { status?: number })?.status;
+  if (code === 401 || /invalid[_ ]?(grant|credentials)|unauthori[sz]ed|expired/i.test(raw)) return "Google says the app's permission has expired or was taken back.";
+  if (code === 403 || /insufficient|permission|scope/i.test(raw)) return "Google says the app isn't allowed to read your calendars.";
+  return `Google didn't answer this time (${raw.slice(0, 120)}).`;
 }

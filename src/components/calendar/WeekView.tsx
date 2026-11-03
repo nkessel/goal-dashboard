@@ -22,6 +22,7 @@ import { CalendarAddPopup } from "./CalendarAddPopup";
 import { CalendarItemMenu, type MenuTarget } from "./CalendarItemMenu";
 import { CalendarTaskChip, getTaskDisplayWindow } from "./CalendarTaskChip";
 import { showsOnCalendar } from "@/lib/calendar-task-window";
+import type { CardShow } from "./CalendarLayers";
 import { GoogleEventChip } from "./GoogleEventChip";
 import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
 import { SCHEDULER_DEFAULTS, holdAt, mealsOn, MEAL_ICONS, MEAL_NAMES } from "@/lib/auto-schedule";
@@ -53,6 +54,7 @@ export function WeekView({
   events = [],
   theme = "calm",
   portraits = false,
+  card,
   daily,
   essentials = "dashed",
   habitLook = "quest",
@@ -62,6 +64,8 @@ export function WeekView({
   habitLook?: HabitLook;
   /** Show quests as portrait cards (art above the title). */
   portraits?: boolean;
+  /** What a quest card shows (creature, time, XP, coins). */
+  card?: CardShow;
   /** The columns to show (YYYY-MM-DD, read in the viewer's own time zone) — 7 for a week, 1 for a day. */
   dayKeys: string[];
   tasks: Task[];
@@ -914,7 +918,7 @@ export function WeekView({
                     {it.kind === "event" ? (
                       <GoogleEventChip event={it.event} theme={theme} compact timeLabel={label} oneLine={oneLine} />
                     ) : (
-                      <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} box={colWidth > 0 ? { w: cardW, h: height } : undefined} />
+                      <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} show={card} box={colWidth > 0 ? { w: cardW, h: height } : undefined} />
                     )}
                     {canDrag && height >= 18 && (
                       <div data-resize aria-hidden title="Drag to change how long it runs" className="cal-resize absolute inset-x-1 bottom-0 h-[7px] cursor-ns-resize" />
@@ -1007,6 +1011,34 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
         const height = Math.max(18, topOf(new Date(b.end)) - top - 2);
         const time = new Date(b.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
         const quest = habitLook === "quest";
+        if (quest && isAdventure) {
+          // Like a quest: a storybook card with the habit's portrait beside its name (owner's mockup, Nov 3).
+          const art = height >= 26 ? Math.min(height - 8, 40) : 0;
+          return (
+            <div key={b.habit.id} className="quest-card absolute inset-x-0.5 flex items-center gap-1.5 overflow-hidden" title={`${b.habit.title}: a daily habit, ${time}`} style={{ top: top + 1, height, zIndex: 1, padding: height >= 26 ? "3px 6px 3px 4px" : "1px 6px", borderRadius: 14 }}>
+              {art >= 16 ? (
+                <span className="quest-art flex shrink-0 items-center justify-center overflow-hidden" style={{ width: art, height: art, borderRadius: art > 30 ? 8 : 5 }}>
+                  {b.habit.icon_key ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- habit portrait
+                    <img src={b.habit.icon_key} alt="" className="h-full w-full object-cover" draggable={false} />
+                  ) : (
+                    <span style={{ fontSize: art * 0.62, lineHeight: 1 }}>🌱</span>
+                  )}
+                </span>
+              ) : null}
+              <span className="min-w-0 flex-1">
+                <span className="font-display block truncate" style={{ color: "#3a2a14", fontSize: 12.5, lineHeight: 1.15 }}>
+                  {b.habit.title}
+                </span>
+                {height >= 34 && (
+                  <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
+                    {time}
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+        }
         return (
           <div
             key={b.habit.id}

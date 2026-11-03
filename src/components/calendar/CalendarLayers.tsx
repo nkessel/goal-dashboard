@@ -1,5 +1,6 @@
 "use client";
 
+import { PaintTodayArt } from "./PaintTodayArt";
 import { openPlanMyDay } from "./PlanMyDay";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
@@ -18,8 +19,11 @@ const KEY = "calendar-layers";
 /** How daily essentials (meal time, wind-down…) and habits with a set time look. */
 export type EssentialsLook = "dashed" | "soft" | "line" | "hidden";
 export type HabitLook = "quest" | "dashed" | "hidden";
-type Layers = { hidden: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook };
-const DEFAULTS: Layers = { hidden: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "quest" };
+/** What a quest card on the calendar shows (owner, Nov 3: "options to customize what shows on quest cards"). */
+export type CardShow = { art: boolean; time: boolean; xp: boolean; coins: boolean };
+export const CARD_SHOW_DEFAULT: CardShow = { art: true, time: true, xp: true, coins: true };
+type Layers = { hidden: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
+const DEFAULTS: Layers = { hidden: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "quest", card: CARD_SHOW_DEFAULT };
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("storage", cb);
@@ -33,7 +37,10 @@ let cache: { raw: string | null; val: Layers } = { raw: null, val: DEFAULTS };
 function read(): Layers {
   try {
     const raw = window.localStorage.getItem(KEY);
-    if (raw !== cache.raw) cache = { raw, val: { ...DEFAULTS, ...(raw ? (JSON.parse(raw) as Partial<Layers>) : {}) } };
+    if (raw !== cache.raw) {
+      const got = raw ? (JSON.parse(raw) as Partial<Layers>) : {};
+      cache = { raw, val: { ...DEFAULTS, ...got, card: { ...CARD_SHOW_DEFAULT, ...(got.card ?? {}) } } };
+    }
     return cache.val;
   } catch {
     return DEFAULTS;
@@ -255,6 +262,8 @@ export function CalendarLayers({
               </label>
             )}
             {row("Quests as portrait cards", layers.portraits, () => set({ portraits: !layers.portraits }))}
+            <CardShowPicker value={layers.card} onChange={(card) => set({ card })} />
+            <PaintTodayArt />
             {row("Finished quests", layers.done, () => set({ done: !layers.done }))}
             {row("All-day events", layers.allDay, () => set({ allDay: !layers.allDay }))}
             <LookPicker
@@ -287,9 +296,40 @@ export function CalendarLayers({
         )}
       </div>
 
-      {view === "day" && <DayView dateKey={dayKeys[0]} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
-      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={dayKeys} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
+      {view === "day" && <DayView dateKey={dayKeys[0]} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
+      {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={dayKeys} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
       {view === "month" && <MonthView monthKey={monthKey} todayKey={todayKey} tasks={shownTasks} events={shownEvents} theme={theme} />}
+    </div>
+  );
+}
+
+/** Which parts a quest card shows: its creature, time, XP and coins (each a toggle chip). */
+function CardShowPicker({ value, onChange }: { value: CardShow; onChange: (v: CardShow) => void }) {
+  const parts: [keyof CardShow, string][] = [
+    ["art", "Creature"],
+    ["time", "Time"],
+    ["xp", "XP"],
+    ["coins", "Coins"],
+  ];
+  return (
+    <div className="flex flex-col gap-1 px-2 py-1.5">
+      <span className="text-[13.5px]" style={{ color: "var(--t-ink)" }}>
+        Quest cards show
+      </span>
+      <span role="group" aria-label="Quest cards show" className="flex flex-wrap gap-1">
+        {parts.map(([k, l]) => (
+          <button
+            key={k}
+            type="button"
+            aria-pressed={value[k]}
+            onClick={() => onChange({ ...value, [k]: !value[k] })}
+            className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold"
+            style={value[k] ? { background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" } : { border: "1px solid rgba(139,112,64,.45)", color: "var(--t-ink-soft)" }}
+          >
+            {l}
+          </button>
+        ))}
+      </span>
     </div>
   );
 }
