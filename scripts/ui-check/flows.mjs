@@ -263,6 +263,11 @@ export const FLOWS = [
       await h.tap(/daily habits/i, "open daily habits", { optional: true });
       if (await h.tap("text=20 mins of house cleaning", "cleaning check-in")) {
         await h.check("cleaning tray");
+        // Set the bathroom's bar to messy: the rows sort themselves (owner, Nov 3).
+        await h.page.getByLabel("How messy is Bathroom?").first().fill("9").catch(() => {});
+        await h.page.getByLabel("How messy is Bathroom?").first().dispatchEvent("pointerup").catch(() => {});
+        await h.settle(700);
+        await h.check("cleaning: re-sorted");
         await h.tap("text=Kitchen", "edit a space", { optional: true });
         await h.check("space editor");
         await esc(h);

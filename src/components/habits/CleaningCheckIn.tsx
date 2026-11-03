@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { saveCleaningAction } from "@/app/actions";
 import { freshKey } from "@/lib/quest-drafts";
 import {
@@ -40,7 +40,7 @@ const holdStill = {
 };
 
 /** One line of the list: a space, the laundry bin or a chore, each with its drag bar (0 nothing to do … 10 needs you). */
-type Item = { kind: "space" | "laundry" | "chore"; id: string; icon: string; name: string; value: number; note: string; ends: [string, string] };
+type Item = { kind: "space" | "laundry" | "chore"; id: string; icon: string; name: string; value: number; note: string; ends: [React.ReactNode, React.ReactNode] };
 
 function itemsOf(c: Cleaning, day: string): Item[] {
   const style = styleOf(c.style);
@@ -49,7 +49,7 @@ function itemsOf(c: Cleaning, day: string): Item[] {
   return [
     ...c.spaces.map((s): Item => {
       const m = messNow(s, day);
-      return { kind: "space", id: s.id, icon: s.icon, name: s.name, value: m, note: style.words[levelOfTen(m)], ends: [style.glyphs[0], style.glyphs[2]] };
+      return { kind: "space", id: s.id, icon: s.icon, name: s.name, value: m, note: style.words[levelOfTen(m)], ends: [<TidyIcon key="t" />, <MessIcon key="m" />] };
     }),
     {
       kind: "laundry",
@@ -57,14 +57,15 @@ function itemsOf(c: Cleaning, day: string): Item[] {
       icon: "🧺",
       name: "Laundry",
       value: ((readToday ?? l.fill ?? 0) / 4) * 10,
-      note: l.dueOn === null ? "slide it now and then; I'll predict the next load" : l.daysLeft! <= 0 ? "a load is due" : `next load ${dayLabel(l.dueOn, day)}`,
-      ends: ["empty", "full"],
+      // No guessing the next load for now (owner, Nov 3): just how full it is.
+      note: (readToday ?? l.fill ?? 0) >= 3.2 ? "ready for a load" : "",
+      ends: [<BinIcon key="e" full={false} />, <BinIcon key="f" full />],
     },
     ...c.chores.map((ch): Item => {
       const snoozed = ch.snoozedUntil && ch.snoozedUntil > day;
       const dueOn = choreDueOn(ch, day);
       const when = snoozed ? `💤 until ${dayLabel(ch.snoozedUntil!, day)}` : choreIsDue(ch, day) ? (dueOn < day ? `due since ${ago(dueOn, day)}` : "due today") : `next ${dayLabel(dueOn, day)}`;
-      return { kind: "chore", id: ch.id, icon: ch.icon, name: ch.name, value: choreNeed(ch, day), note: when, ends: ["done", "due"] };
+      return { kind: "chore", id: ch.id, icon: ch.icon, name: ch.name, value: choreNeed(ch, day), note: when, ends: [<DoneIcon key="d" />, <DueIcon key="u" />] };
     }),
   ];
 }
@@ -131,13 +132,38 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
     setChore(id, { snoozedUntil: addDays(day, Math.max(1, Math.min(365, Math.round(days)))) });
   };
 
+  // Rows sort themselves as you set them (owner, Nov 3), gliding to their new places, the neediest on top.
+  const listRef = useRef<HTMLUListElement>(null);
+  const before = useRef<Map<string, number> | null>(null);
+  const resort = (next: Cleaning) => {
+    const el = listRef.current;
+    if (el) before.current = new Map([...el.querySelectorAll<HTMLElement>("[data-row]")].map((r) => [r.dataset.row!, r.getBoundingClientRect().top]));
+    setOrder(itemsOf(next, day).sort((a, b) => b.value - a.value).map(key));
+  };
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    const was = before.current;
+    before.current = null;
+    if (!el || !was || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    for (const r of el.querySelectorAll<HTMLElement>("[data-row]")) {
+      const from = was.get(r.dataset.row!);
+      if (from === undefined) continue;
+      const dy = from - r.getBoundingClientRect().top;
+      if (Math.abs(dy) < 1) continue;
+      r.animate([{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }], { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" });
+    }
+  }, [order]);
+
   function drag(it: Item, v: number) {
-    if (it.kind === "space") setSpace(it.id, { mess: v, level: levelOfTen(v), ratedOn: day });
-    else if (it.kind === "laundry") save({ ...c, laundry: { ...c.laundry, readings: [...c.laundry.readings.filter((r) => r.on !== day), { on: day, fill: Math.round((v / 10) * 40) / 10 }].slice(-30) } });
+    let next: Cleaning = c;
+    if (it.kind === "space") next = { ...c, spaces: c.spaces.map((s) => (s.id === it.id ? { ...s, mess: v, level: levelOfTen(v), ratedOn: day } : s)) };
+    else if (it.kind === "laundry") next = { ...c, laundry: { ...c.laundry, readings: [...c.laundry.readings.filter((r) => r.on !== day), { on: day, fill: Math.round((v / 10) * 40) / 10 }].slice(-30) } };
     else {
       const ch = c.chores.find((x) => x.id === it.id);
-      if (ch) save({ ...c, chores: c.chores.map((x) => (x.id === ch.id ? choreFromNeed(ch, v, day) : x)) });
+      if (ch) next = { ...c, chores: c.chores.map((x) => (x.id === ch.id ? choreFromNeed(ch, v, day) : x)) };
     }
+    save(next);
+    resort(next);
   }
 
   function add(kind: "space" | "chore") {
@@ -176,14 +202,14 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
                 {error}
               </p>
             )}
-            <ul className="m-0 flex list-none flex-col p-0">
+            <ul ref={listRef} className="m-0 flex list-none flex-col p-0">
               {list.map((it, i) => {
                 const k = key(it);
                 const space = it.kind === "space" ? c.spaces.find((s) => s.id === it.id) : undefined;
                 const chore = it.kind === "chore" ? c.chores.find((x) => x.id === it.id) : undefined;
                 const due = chore ? choreIsDue(chore, day) : false;
                 return (
-                  <li key={k} className="flex flex-col py-1" style={{ borderTop: i ? "1px solid rgba(139,112,64,.18)" : undefined }}>
+                  <li key={k} data-row={k} className="relative flex flex-col py-1" style={{ borderTop: i ? "1px solid rgba(139,112,64,.18)" : undefined, background: "inherit" }}>
                     <div className="flex items-center gap-1.5">
                       <button type="button" onClick={() => (it.kind === "laundry" ? setRunning((r) => !r) : setEditing(editing === k ? null : k))} className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left" title={it.kind === "laundry" ? "Start a load" : "Edit"}>
                         <span aria-hidden className="text-[16px]">{it.icon}</span>
@@ -260,17 +286,16 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
 }
 
 /** The drag bar: moves freely, saved when you let go. */
-function Bar({ value, ends, label, onCommit }: { value: number; ends: [string, string]; label: string; onCommit: (v: number) => void }) {
+function Bar({ value, ends, label, onCommit }: { value: number; ends: [React.ReactNode, React.ReactNode]; label: string; onCommit: (v: number) => void }) {
   const [drag, setDrag] = useState<number | null>(null);
   const v = drag ?? value;
   const commit = () => {
     if (drag !== null && Math.abs(drag - value) >= 0.05) onCommit(drag);
     setDrag(null);
   };
-  const word = (e: string) => /^[a-z]/.test(e);
   return (
     <div className="flex items-center gap-1.5">
-      <span aria-hidden className={`w-8 shrink-0 text-center leading-none ${word(ends[0]) ? "text-[11px]" : "text-[13px]"}`} style={{ color: "var(--t-ink-soft)", letterSpacing: word(ends[0]) ? undefined : "-0.12em" }}>
+      <span aria-hidden className="flex w-8 shrink-0 items-center justify-center leading-none" style={{ color: "#2a2318" }}>
         {ends[0]}
       </span>
       <input
@@ -287,7 +312,7 @@ function Bar({ value, ends, label, onCommit }: { value: number; ends: [string, s
         className="mess-bar h-7 min-w-0 flex-1"
         style={{ "--p": `${v * 10}%` } as React.CSSProperties}
       />
-      <span aria-hidden className={`w-8 shrink-0 text-center leading-none ${word(ends[1]) ? "text-[11px]" : "text-[13px]"}`} style={{ color: "var(--t-ink-soft)", letterSpacing: word(ends[1]) ? undefined : "-0.12em" }}>
+      <span aria-hidden className="flex w-8 shrink-0 items-center justify-center leading-none" style={{ color: "#2a2318" }}>
         {ends[1]}
       </span>
     </div>
@@ -323,38 +348,32 @@ function SnoozeRow({ name, onSnooze }: { name: string; onSnooze: (days: number) 
   );
 }
 
-function SpaceEditor({ s, day, onSet, onRemove, onClose }: { s: Space; day: string; onSet: (p: Partial<Space>) => void; onRemove: () => void; onClose: () => void }) {
+function SpaceEditor({ s, onSet, onRemove, onClose }: { s: Space; day: string; onSet: (p: Partial<Space>) => void; onRemove: () => void; onClose: () => void }) {
+  const [was] = useState(() => JSON.stringify({ name: s.name, icon: s.icon }));
+  const changed = JSON.stringify({ name: s.name, icon: s.icon }) !== was;
   return (
     <div className="flex flex-col gap-1.5 px-1 pb-1 pt-1">
-      <input defaultValue={s.name} aria-label="Name" onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== s.name && onSet({ name: e.target.value.trim().slice(0, 40) })} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} className="h-8 rounded-lg px-2 text-[14px]" style={field} />
-      <IconRow icons={SPACE_ICONS} value={s.icon} onPick={(icon) => onSet({ icon })} />
-      <label className="flex flex-wrap items-center gap-1.5 text-[13px]" style={{ color: "var(--t-ink)" }}>
-        Gets messier on its own
-        <select value={s.driftDays ?? 0} onChange={(e) => onSet({ driftDays: Number(e.target.value) || null, mess: messNow(s, day), ratedOn: day })} className="h-8 rounded-lg px-1.5 text-[13px]" style={field}>
-          <option value={0}>no, only when I say</option>
-          {[1, 2, 3, 4, 5, 7, 10, 14].map((n) => (
-            <option key={n} value={n}>
-              a bit every {n === 1 ? "day" : `${n} days`}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="flex justify-between">
-        <button type="button" onClick={onClose} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={gold}>
-          Close
-        </button>
-        <button type="button" onClick={onRemove} className="h-8 px-2 text-[13px] underline" style={{ color: "var(--t-warn)" }}>
-          Remove
-        </button>
+      <div className="flex items-center gap-1.5">
+        <input defaultValue={s.name} aria-label="Name" onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== s.name && onSet({ name: e.target.value.trim().slice(0, 40) })} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} className="h-8 min-w-0 flex-1 rounded-lg px-2 text-[14px]" style={field} />
+        <RemoveBtn name={s.name} onRemove={onRemove} />
+        <DoneBtn changed={changed} onClose={onClose} />
       </div>
+      <IconRow icons={SPACE_ICONS} value={s.icon} onPick={(icon) => onSet({ icon })} />
     </div>
   );
 }
 
 function ChoreEditor({ ch, onSet, onRemove, onClose }: { ch: Chore; onSet: (p: Partial<Chore>) => void; onRemove: () => void; onClose: () => void }) {
+  const snap = (x: Chore) => JSON.stringify({ n: x.name, i: x.icon, w: x.weekday ?? null, e: x.everyDays });
+  const [was] = useState(() => snap(ch));
+  const changed = snap(ch) !== was;
   return (
     <div className="flex flex-col gap-1.5 px-1 pb-1 pt-1">
-      <input defaultValue={ch.name} aria-label="Name" onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== ch.name && onSet({ name: e.target.value.trim().slice(0, 48) })} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} className="h-8 rounded-lg px-2 text-[14px]" style={field} />
+      <div className="flex items-center gap-1.5">
+        <input defaultValue={ch.name} aria-label="Name" onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== ch.name && onSet({ name: e.target.value.trim().slice(0, 48) })} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} className="h-8 min-w-0 flex-1 rounded-lg px-2 text-[14px]" style={field} />
+        <RemoveBtn name={ch.name} onRemove={onRemove} />
+        <DoneBtn changed={changed} onClose={onClose} />
+      </div>
       <IconRow icons={CHORE_ICONS} value={ch.icon} onPick={(icon) => onSet({ icon })} />
       {/* Repeats every N days, or on one day of the week (trash night). */}
       <div className="flex flex-wrap items-center gap-1" role="radiogroup" aria-label="Repeats on">
@@ -371,15 +390,79 @@ function ChoreEditor({ ch, onSet, onRemove, onClose }: { ch: Chore; onSet: (p: P
           days
         </label>
       )}
-      <div className="flex justify-between">
-        <button type="button" onClick={onClose} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={gold}>
-          Close
-        </button>
-        <button type="button" onClick={onRemove} className="h-8 px-2 text-[13px] underline" style={{ color: "var(--t-warn)" }}>
-          Remove
-        </button>
-      </div>
     </div>
+  );
+}
+
+/** Close, or Save once something changed (it's kept as you go; this is where you say you're done). */
+function DoneBtn({ changed, onClose }: { changed: boolean; onClose: () => void }) {
+  return (
+    <button type="button" onClick={onClose} className="h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold transition-colors" style={changed ? gold : chipOn(false)}>
+      {changed ? "Save" : "Close"}
+    </button>
+  );
+}
+
+/** A small bin that asks once, in place. */
+function RemoveBtn({ name, onRemove }: { name: string; onRemove: () => void }) {
+  const [sure, setSure] = useState(false);
+  return sure ? (
+    <button type="button" onClick={onRemove} onBlur={() => setSure(false)} autoFocus className="h-8 shrink-0 rounded-full px-2.5 text-[12.5px] font-semibold" style={{ background: "var(--t-warn)", color: "#fff" }}>
+      Remove?
+    </button>
+  ) : (
+    <button type="button" onClick={() => setSure(true)} aria-label={`Remove ${name}`} title="Remove" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-warn)" }}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5L17.5 7M9.5 7V4.5h5V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
+/* The bar's ends: plain black-and-white line icons (owner, Nov 3), no faces or metaphors. */
+const ink = { stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
+function TidyIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-label="tidy">
+      <path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1-5.1-1.9 5.1-1.9z" {...ink} />
+      <path d="M19 16v4M17 18h4" {...ink} />
+    </svg>
+  );
+}
+function MessIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-label="messy">
+      <path d="M3.5 19.5h17" {...ink} />
+      <path d="M5 19.5l2.5-5 3 2 2-4.5 3.5 3 3-2.5 1 7" {...ink} />
+      <circle cx="9" cy="8" r="1.2" fill="currentColor" />
+      <circle cx="15.5" cy="6.5" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+function BinIcon({ full }: { full: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-label={full ? "full" : "empty"}>
+      <path d="M4.5 9h15l-1.6 10.2a1.5 1.5 0 0 1-1.5 1.3H7.6a1.5 1.5 0 0 1-1.5-1.3z" {...ink} />
+      <path d="M8 12.5v5M12 12.5v5M16 12.5v5" {...ink} strokeWidth={1.3} />
+      {full && <path d="M6 9c.8-3 3-4.5 6-4.5s5.2 1.5 6 4.5" {...ink} />}
+      {full && <path d="M9 5.5c1-1 2-1.3 3-1.3" {...ink} />}
+    </svg>
+  );
+}
+function DoneIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-label="done">
+      <circle cx="12" cy="12" r="8" {...ink} />
+      <path d="M8.5 12.3l2.4 2.4 4.6-5" {...ink} />
+    </svg>
+  );
+}
+function DueIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-label="due">
+      <circle cx="12" cy="13" r="7.5" {...ink} />
+      <path d="M12 9v4.2l2.6 1.6M9.5 3.5h5" {...ink} />
+    </svg>
   );
 }
 
@@ -458,7 +541,20 @@ export function MessStylePicker({ value, onPick, compact = false }: { value: Mes
 
 function IconRow({ icons, value, onPick }: { icons: string[]; value: string; onPick: (i: string) => void }) {
   return (
-    <div role="radiogroup" aria-label="Icon" className="flex flex-wrap gap-1">
+    <div role="radiogroup" aria-label="Icon" className="flex flex-wrap items-center gap-1">
+      {/* Your own emoji (owner, Nov 3: "each area's emoji is editable"). */}
+      <input
+        defaultValue={icons.includes(value) ? "" : value}
+        placeholder="🙂"
+        aria-label="Your own emoji"
+        title="Type or paste any emoji"
+        onChange={(e) => {
+          const g = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(e.target.value.trim())].at(-1)?.segment;
+          if (g) onPick(g);
+        }}
+        className="h-8 w-10 rounded-lg text-center text-[16px]"
+        style={{ ...field, boxShadow: !icons.includes(value) ? "inset 0 0 0 1.5px #a88a3f" : undefined }}
+      />
       {icons.map((i) => (
         <button key={i} type="button" role="radio" aria-checked={value === i} onClick={() => onPick(i)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[16px]" style={{ background: value === i ? "rgba(217,180,95,.45)" : "transparent", boxShadow: value === i ? "inset 0 0 0 1.5px #a88a3f" : undefined }}>
           {i}

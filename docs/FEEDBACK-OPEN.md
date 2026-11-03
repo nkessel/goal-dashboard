@@ -9,10 +9,7 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Learn a language: dragging its popup scrolls the page instead of moving the popup. Its minimized button reads "Language" with a Japanese character, and it can be customized from the popup's gear.
 
 ## Mess check-in (cleaning)
-- Simple black-and-white icons for clean/dirty and for an empty or full laundry bin; no clean/dirty metaphors. Each area's emoji is editable.
-- Sliders sort themselves (animated) as they move, and the top priority shown updates with them.
-- Remove the date predictor for now (later, an option per area, off by default).
-- The chore editor's Close turns into Save when something changes. Close and Remove don't take a row of their own, and dropdowns are app-themed.
+- (Nov 3, built: line icons, self-sorting rows, no predictor, own emoji, compact editors.) Ask the owner whether the mess words ("Stormy", "Cloudy") count as the metaphors to drop.
 - Data: trash & recycling becomes a weekly habit on Tuesday evenings, not a chore; cleaning the weed supplies becomes a regular cleaning task with a need slider.
 
 ## Quests and the quest editor
