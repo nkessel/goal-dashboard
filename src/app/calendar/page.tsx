@@ -150,12 +150,25 @@ export default async function CalendarPage({
         return { day: planDay, tasks: (await planDayTasksAction(end.toISOString())) as Task[] };
       }).catch(() => ({ day: planDay, tasks: [] as Task[] }))
     : Promise.resolve(null);
-  const [tasks, toSchedule, scheduleFolders, googleAll, planToday] = await Promise.all([
+  // Calendars of interest (owner, Nov 4): their feeds show in week and month views, for planning ahead.
+  const interestP = import("@/app/actions").then(({ interestCalendarsAction }) => interestCalendarsAction()).catch(() => []);
+  const interestEventsP = view === "week" || view === "month" || view === "next7"
+    ? interestP.then(async (list) => {
+        const { feedEvents } = await import("@/lib/data/ics");
+        const { INTEREST_COLORS } = await import("@/lib/interest-calendars");
+        const feeds = list.filter((c) => c.kind === "feed" && c.on !== false);
+        const lists = await Promise.all(feeds.map((c, i) => feedEvents({ ...c, color: c.color ?? INTEREST_COLORS[i % INTEREST_COLORS.length] }, rangeStart, rangeEnd).catch(() => [])));
+        return lists.flat();
+      })
+    : Promise.resolve([]);
+  const [tasks, toSchedule, scheduleFolders, googleAll, planToday, interest, interestEvents] = await Promise.all([
     listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
     listSchedulingList(session.user.id),
     getSchedulingFolders(session.user.id),
     googleP,
     planP,
+    interestP,
+    interestEventsP,
   ]);
   // The quests waiting behind each quest on the calendar: its agenda (a visit's to-talk-about list).
   const agenda = await listWaitingBehind(session.user.id, tasks.filter((t) => t.status !== "completed").map((t) => t.id)).catch(() => ({}));
@@ -172,6 +185,7 @@ export default async function CalendarPage({
     calendars = googleAll.calendars;
     events = googleAll.events.filter((e) => !importedEventIds.has(e.id));
   }
+  events = [...events, ...interestEvents];
 
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
@@ -342,6 +356,7 @@ export default async function CalendarPage({
               <CalendarSlide slideKey={`${view}|${nDays}|${formatDateParam(rangeStart)}`}>
               <CalendarLayers
                 agenda={agenda}
+                interest={interest}
                 view={view}
                 dayKeys={
                   view === "day"

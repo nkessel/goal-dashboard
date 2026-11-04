@@ -11,6 +11,9 @@ import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
 import { fromFeedback } from "@/lib/from-feedback";
 import { CalendarList } from "./CalendarList";
+import { InterestCalendars } from "./InterestCalendars";
+import { KeepInTouch } from "./KeepInTouch";
+import type { InterestCalendar } from "@/lib/interest-calendars";
 import { AgendaContext } from "./CalendarTaskChip";
 import type { SchedulerSettings } from "@/lib/auto-schedule";
 import type { TimedHabit } from "@/lib/timed-habits";
@@ -86,7 +89,10 @@ export function CalendarLayers({
   toSchedule = 0,
   daily,
   agenda = {},
+  interest = [],
 }: {
+  /** Calendars of interest: feeds shown in week and month views, and links to open. */
+  interest?: InterestCalendar[];
   /** The quests waiting behind each quest on the calendar (its agenda). */
   agenda?: Record<string, { id: string; title: string }[]>;
   /** Daily essentials kept free and habits with a set time, drawn on the time grid. */
@@ -106,7 +112,7 @@ export function CalendarLayers({
   theme: "calm" | "adventure";
 }) {
   const layers = useSyncExternalStore(subscribe, read, () => DEFAULTS);
-  const [open, setOpen] = useState<"display" | "calendars" | null>(null);
+  const [open, setOpen] = useState<"display" | "calendars" | "interest" | "friends" | null>(null);
   const router = useRouter();
   const [days, setDays] = useState(nDays);
   const panel = useRef<HTMLDivElement>(null);
@@ -163,7 +169,7 @@ export function CalendarLayers({
   return (
     <AgendaContext.Provider value={agenda}>
     <div className="flex flex-col gap-2">
-      <div ref={panel} className="relative z-[25] -mt-1 flex items-center justify-end gap-1.5 sm:gap-2">
+      <div ref={panel} className={`relative ${open ? "z-[45]" : "z-[25]"} -mt-1 flex items-center justify-end gap-1.5 sm:gap-2`}>
         {/* Top-left: the scheduling list, as a calendar button with its count. */}
         <button
           type="button"
@@ -172,7 +178,7 @@ export function CalendarLayers({
           title="Auto-scheduler: your list of quests to place"
           // A labelled pill that sticks out over the calendar's top-left corner.
           // Stays inside the edge on every screen (on tablets it stuck out and its left was cut off: ui-check, Nov 2).
-          className="hover-glow relative z-[30] mr-auto flex h-11 shrink-0 translate-y-5 items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14.5px] font-bold touch-manipulation"
+          className={`hover-glow relative ${open ? "z-[1]" : "z-[30]"} mr-auto flex h-11 shrink-0 translate-y-5 items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14.5px] font-bold touch-manipulation`}
           style={{
             ...(isAdventure ? { background: "radial-gradient(circle at 35% 25%, #f6e3a8, #d9b45f 60%, #a88a3f)", border: "2px solid #4a3913", color: "#2a1c10" } : { ...chip, color: "var(--t-ink)" }),
             boxShadow: "0 6px 14px rgba(0,0,0,.4)",
@@ -233,6 +239,32 @@ export function CalendarLayers({
             </span>
           );
         })()}
+        {/* Calendars of interest, right beside the Google calendars (owner, Nov 4). */}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => (o === "interest" ? null : "interest"))}
+          aria-expanded={open === "interest"}
+          aria-label="Calendars of interest"
+          title="Calendars of interest (for week and month planning)"
+          className="flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[13.5px] font-semibold"
+          style={{ ...chip, ...(open === "interest" ? { background: isAdventure ? "rgba(217,180,95,.35)" : "var(--t-accent-soft)" } : {}) }}
+        >
+          <span aria-hidden>★</span>
+          <span className="hidden sm:inline">Of interest</span>
+        </button>
+        {/* Friends to keep in touch with (owner, Nov 4). */}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => (o === "friends" ? null : "friends"))}
+          aria-expanded={open === "friends"}
+          aria-label="Keep in touch"
+          title="Keep in touch: friends to reach out to"
+          className="flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[13.5px] font-semibold"
+          style={{ ...chip, ...(open === "friends" ? { background: isAdventure ? "rgba(217,180,95,.35)" : "var(--t-accent-soft)" } : {}) }}
+        >
+          <span aria-hidden>💬</span>
+          <span className="hidden sm:inline">Keep in touch</span>
+        </button>
         <button
           type="button"
           onClick={() => setOpen((o) => (o === "display" ? null : "display"))}
@@ -247,8 +279,26 @@ export function CalendarLayers({
             <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" stroke="currentColor" strokeWidth="1.6" />
           </svg>
         </button>
+        {open === "friends" && (
+          <div className="reveal absolute right-0 top-11 z-[35] w-[320px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
+            <p className="m-0 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
+              Keep in touch
+            </p>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <KeepInTouch />
+            </div>
+          </div>
+        )}
+        {open === "interest" && (
+          <div className="reveal absolute right-0 top-11 z-[35] w-[300px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
+            <p className="m-0 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
+              Calendars of interest
+            </p>
+            <InterestCalendars initial={interest} isAdventure={isAdventure} />
+          </div>
+        )}
         {open === "calendars" && (
-          <div className="reveal absolute right-0 top-11 w-[270px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
+          <div className="reveal absolute right-0 top-11 z-[35] w-[270px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
             <p className="m-0 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
               Calendars{hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ""}
             </p>
@@ -276,7 +326,7 @@ export function CalendarLayers({
           </div>
         )}
         {open === "display" && (
-          <div className="reveal absolute right-0 top-11 w-[270px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
+          <div className="reveal absolute right-0 top-11 z-[35] w-[270px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
             <p className="m-0 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
               Display
             </p>

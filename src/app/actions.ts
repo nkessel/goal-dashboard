@@ -4273,3 +4273,52 @@ export async function translatePhraseAction(phrase: string, languages: string[])
   });
   return { results };
 }
+
+// ---------------------------------------------------------------------------
+// Calendars of interest (owner, Nov 4): feeds shown in week and month views, and links to open.
+
+export async function interestCalendarsAction() {
+  const ownerId = await requireProfileId();
+  const { normalizeInterest, INTEREST_SEED } = await import("@/lib/interest-calendars");
+  return normalizeInterest((await readExtras(ownerId)).interestCalendars) ?? INTEREST_SEED;
+}
+
+export async function saveInterestCalendarsAction(list: import("@/lib/interest-calendars").InterestCalendar[]) {
+  const ownerId = await requireProfileId();
+  const { normalizeInterest } = await import("@/lib/interest-calendars");
+  const clean = normalizeInterest(list) ?? [];
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, interestCalendars: clean } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  revalidatePath("/calendar");
+  return clean;
+}
+
+/** Look for a calendar feed at (or behind) a link: its address, or null when there isn't one. */
+export async function findFeedAction(url: string) {
+  await requireProfileId();
+  const { cleanUrl } = await import("@/lib/interest-calendars");
+  const u = cleanUrl(url);
+  if (!u) return null;
+  const { findFeed } = await import("@/lib/data/ics");
+  return findFeed(u);
+}
+
+// ---------------------------------------------------------------------------
+// Keep in touch (owner, Nov 4): friends with a bar of how due reaching out is.
+
+export async function keepInTouchAction() {
+  const ownerId = await requireProfileId();
+  const { normalizeFriends } = await import("@/lib/keep-in-touch");
+  return normalizeFriends((await readExtras(ownerId)).keepInTouch);
+}
+
+export async function saveKeepInTouchAction(list: import("@/lib/keep-in-touch").Friend[]) {
+  const ownerId = await requireProfileId();
+  const { normalizeFriends } = await import("@/lib/keep-in-touch");
+  const clean = normalizeFriends(list);
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, keepInTouch: clean } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return clean;
+}

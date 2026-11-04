@@ -286,7 +286,7 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
 }
 
 /** The drag bar: moves freely, saved when you let go. */
-function Bar({ value, ends, label, onCommit }: { value: number; ends: [React.ReactNode, React.ReactNode]; label: string; onCommit: (v: number) => void }) {
+export function Bar({ value, ends, label, onCommit }: { value: number; ends: [React.ReactNode, React.ReactNode]; label: string; onCommit: (v: number) => void }) {
   const [drag, setDrag] = useState<number | null>(null);
   const v = drag ?? value;
   const commit = () => {

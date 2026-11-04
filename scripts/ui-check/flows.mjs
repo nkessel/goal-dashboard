@@ -352,6 +352,23 @@ export const FLOWS = [
       await h.goto("/calendar?view=week", { name: "calendar" });
       await h.settle(1200);
       await h.check("week");
+      // Calendars of interest (owner, Nov 4): feeds for week and month, links to open.
+      if (await h.tap((p) => p.getByRole("button", { name: /^calendars of interest$/i }).first(), "calendars of interest", { optional: true, expectMove: true })) {
+        await h.check("calendars of interest");
+        await h.tap((p) => p.getByRole("button", { name: /^calendars of interest$/i }).first(), "close calendars of interest", { optional: true });
+      }
+      // Keep in touch (owner, Nov 4): friends with bars like the cleaning list's.
+      if (await h.tap((p) => p.getByRole("button", { name: /^keep in touch$/i }).first(), "keep in touch", { optional: true, expectMove: true })) {
+        await h.settle(800);
+        const add = h.page.getByLabel("Add a friend").first();
+        if (await add.count()) {
+          await add.fill("Sam");
+          await add.press("Enter");
+          await h.settle(600);
+        }
+        await h.check("keep in touch");
+        await h.tap((p) => p.getByRole("button", { name: /^keep in touch$/i }).first(), "close keep in touch", { optional: true });
+      }
       // The auto-scheduler window (owner, Nov 3): a list that moves, resizes and minimizes, over the full calendar.
       if (await h.tap((p) => p.getByRole("button", { name: /^auto-scheduler/i }).first(), "open the auto-scheduler", { optional: true, expectMove: true })) {
         await h.settle(500);

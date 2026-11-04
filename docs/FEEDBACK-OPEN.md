@@ -36,4 +36,5 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Portraits: tapping the avatar opens the painter directly (no extra button); clearer what you're looking at; the description highlighted on opening; a style selector (reward, quest, evening/morning routine…).
 - Drag events (not only tap) in Plan tomorrow's day.
 - Boards: custom colours with a wheel picker (Nov 3).
-- Calendars of interest list for weekly and monthly planning (Temple Beth Elohim, TBZ): brainstorm sent to the owner Nov 4, waiting on his pick.
+- (Nov 4, built: calendars of interest, feeds + links; keep in touch list.) Owner to add the temples' feed links if he finds them.
+- Anti-habits: like events, tracked with their timing. Owner didn't like the chip idea; more ideas sent Nov 4, waiting on his pick.

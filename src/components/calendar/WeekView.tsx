@@ -1196,19 +1196,6 @@ function setLook(key: string, look: "quest" | "hold" | null) {
   }
   window.dispatchEvent(new Event("hold-looks"));
 }
-/** All of them at once: the calendar's own setting for meals and timed habits (the per-item choices are cleared). */
-function setAllLooks(quest: boolean) {
-  try {
-    const cur = JSON.parse(window.localStorage.getItem("calendar-layers") || "{}");
-    window.localStorage.setItem("calendar-layers", JSON.stringify({ ...cur, essentials: quest ? "quest" : "dashed", habits: quest ? "quest" : "dashed", v: 2 }));
-    window.localStorage.removeItem(LOOKS_KEY);
-  } catch {
-    /* storage unavailable */
-  }
-  window.dispatchEvent(new Event("calendar-layers"));
-  window.dispatchEvent(new Event("hold-looks"));
-}
-
 type HoldTarget = { key: string; label: string; at: number; minutes: number; kept: boolean; crowded: boolean; meal: boolean };
 
 /**
@@ -1281,7 +1268,8 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
     });
     const t = el ? targets[el.dataset.holdKey ?? ""] : undefined;
     if (!t) return;
-    if (d.kind === "tap") {
+    // A crowded (muted red) one opens at a single tap or click (owner, Nov 4).
+    if (d.kind === "tap" && !t.crowded) {
       const last = lastTap.current;
       if (!(last && last.key === t.key && d.t - last.at < 360)) {
         lastTap.current = { key: t.key, at: d.t };
@@ -1354,7 +1342,7 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
                 </span>
                 {height >= 34 && (
                   <span className="block truncate" style={{ color: h.crowded ? "#8a3f2c" : "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
-                    {h.crowded ? "no room in its time" : clock(h.at)}
+                    {clock(h.at)}
                   </span>
                 )}
               </span>
@@ -1370,7 +1358,6 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
             style={{ top: top + 1, height, color: ink, opacity: 0.9, zIndex: menu?.key === h.key ? 3 : 0, ...look }}
           >
             <span aria-hidden>{MEAL_ICONS[h.key]}</span> {MEAL_NAMES[h.key]}
-            {h.crowded && height >= 28 && <span className="block not-italic text-[10.5px] font-semibold">no room in its time</span>}
           </div>
         );
       })}
@@ -1404,7 +1391,7 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
                 </span>
                 {height >= (tall ? 76 : 34) && (
                   <span className="block truncate" style={{ color: b.crowded ? "#8a3f2c" : "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
-                    {b.crowded ? "no room in its time" : time}
+                    {time}
                   </span>
                 )}
               </span>
@@ -1431,7 +1418,7 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
             <span aria-hidden>🌱</span>
             <span className="min-w-0">
               <b className="block truncate">{b.habit.title}</b>
-              {height >= 30 && <span className="opacity-70">{b.crowded ? "no room in its time" : time}</span>}
+              {height >= 30 && <span className="opacity-70">{time}</span>}
             </span>
           </div>
         );
@@ -1449,7 +1436,7 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
           <span className="relative z-[1] px-1 font-display text-[14.5px] leading-snug">
             {menu.label}
             <span className="block font-sans text-[12px] tabular-nums" style={{ color: menu.crowded ? "#8a3f2c" : "#6b5631" }}>
-              {clock(menu.at)} · {menu.minutes}m{menu.crowded ? " · no room in its time" : menu.kept ? " · kept here" : ""}
+              {clock(menu.at)} · {menu.minutes}m{menu.kept ? " · kept here" : ""}
             </span>
           </span>
           {!menu.kept && (
@@ -1491,9 +1478,6 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
               <>
                 <button type="button" role="menuitem" onClick={() => (setLook(menu.key, isQuest ? "hold" : "quest"), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]">
                   {isQuest ? "◌ Show this one as a hold" : "▣ Show this one as a quest card"}
-                </button>
-                <button type="button" role="menuitem" onClick={() => (setAllLooks(!isQuest), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left text-[12.5px] hover:bg-black/[.05]" style={{ color: "#6b5631" }}>
-                  {isQuest ? "Show all of them as holds" : "Show all of them as quest cards"}
                 </button>
               </>
             );
