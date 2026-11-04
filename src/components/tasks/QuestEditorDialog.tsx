@@ -1,5 +1,6 @@
 "use client";
 
+import { InlineNumber } from "@/components/ui/InlineNumber";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, type ProgressUnit } from "@/lib/progress-units";
@@ -124,7 +125,7 @@ const MORE_NAMES: Partial<Record<EditorPart, string>> = {
   tags: "tags",
   board: "board",
   sequence: "sequence",
-  steps: "steps",
+  steps: "sub-quests",
 };
 /** The due chip's label: "today", "tomorrow", "Fri", or "Nov 12". */
 function dueChipLabel(day: string) {
@@ -337,7 +338,6 @@ export function QuestEditorDialog({
   const boardLabel = boardId ? (boardOptions?.find((o) => o.id === boardId)?.label.split(" › ").pop() ?? null) : null;
   const [alsoOn, setAlsoOn] = useState<string[]>(task?.also_on ?? []);
   const [stepMenu, setStepMenu] = useState<string | null>(null);
-  const [shareStep, setShareStep] = useState<string | null>(null);
   // Quest templates: ready-made quests to start from (new quests), and saving one (existing quests).
   const [templates, setTemplates] = useState<QuestTemplate[] | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -1374,7 +1374,7 @@ export function QuestEditorDialog({
               {/* Sequence: a fine setting, folded away until wanted. */}
               {!doingNow && !review && (
                 <div className="flex flex-col gap-1.5">
-                  <button type="button" onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))} aria-expanded={task ? undefined : seqOpen} className="flex min-h-8 items-center gap-1.5 self-start text-left" title="Quests before or after this one, or its steps as quests of their own">
+                  <button type="button" onClick={() => (task ? setSeqDialog(true) : setSeqOpen((o) => !o))} aria-expanded={task ? undefined : seqOpen} className="flex min-h-8 items-center gap-1.5 self-start text-left" title="Quests before or after this one, or its sub-quests as quests of their own">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: seqOpen && !task ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
                       <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -1397,7 +1397,7 @@ export function QuestEditorDialog({
                       style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
                     >
                       <StepsGlyph size={15} />
-                      Add steps
+                      Add sub-quests
                     </button>
                   )}
                   {!task && seqOpen && (
@@ -1502,19 +1502,19 @@ export function QuestEditorDialog({
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2.5">
                     <StepsGlyph />
-                    <button type="button" onClick={() => setStepsFolded((f) => !f)} aria-expanded={!stepsFolded} className="flex items-center gap-1.5" title={stepsFolded ? "Show the steps" : "Fold the steps away"}>
-                      <span className={labelCls}>Steps</span>
+                    <button type="button" onClick={() => setStepsFolded((f) => !f)} aria-expanded={!stepsFolded} className="flex items-center gap-1.5" title={stepsFolded ? "Show the sub-quests" : "Fold the sub-quests away"}>
+                      <span className={labelCls}>Sub-quests</span>
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: stepsFolded ? undefined : "rotate(90deg)", color: "var(--t-ink-soft)" }}>
                         <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
                     {steps && steps.length > 0 && (
-                      <span className="flex min-w-0 flex-1 items-center gap-2 text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                        {progressWords(stepsDone, stepsLive)}
-                        {/* How far the steps carry the quest. */}
-                        <span className="h-2.5 min-w-[40px] max-w-[140px] flex-1 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 3px rgba(0,0,0,.6)" }} aria-label={`Steps ${stepsShare(steps)}% done`}>
+                      <span className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+                        {/* How far the sub-quests carry the quest, labelled (owner, Nov 4). */}
+                        <span className="h-2.5 min-w-[40px] max-w-[140px] flex-1 overflow-hidden rounded-full" style={{ background: "#141a13", border: "1px solid #8a6c2c", boxShadow: "inset 0 1px 3px rgba(0,0,0,.6)" }} aria-label={`Sub-quests ${stepsShare(steps)}% done`}>
                           <span className="block h-full rounded-full transition-[width] duration-300" style={{ width: `${stepsShare(steps)}%`, background: "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)", boxShadow: "0 0 6px rgba(242,210,126,.5)" }} />
                         </span>
+                        <span>{stepsShare(steps)}% done</span>
                       </span>
                     )}
                     {stepXpPop !== null && (
@@ -1523,19 +1523,19 @@ export function QuestEditorDialog({
                       </span>
                     )}
                     {!isCompleted && steps !== null && !addingStep && (
-                      <button
+                      <button aria-label="Add a sub-quest"
                         type="button"
                         onClick={() => (setAddingStep(true), setStepsFolded(false))}
                         className="hover-glow ml-auto flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-bold"
                         style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", border: isAdventure ? "1px solid #8a6116" : undefined, boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
                       >
-                        <span aria-hidden className="text-[16px] leading-none">+</span> Add steps
+                        <span aria-hidden className="text-[16px] leading-none">+</span> {steps.length ? "Add" : "Add sub-quests"}
                       </button>
                     )}
                   </div>
                   {stepsFolded ? null : steps === null && (task?.steps_total ?? 0) > 0 ? (
                     // Loading: hold the steps' place so the editor doesn't jump when they arrive.
-                    <ul className="m-0 flex list-none flex-col p-0 pl-[22px]" aria-busy="true" aria-label="Loading steps">
+                    <ul className="m-0 flex list-none flex-col p-0 pl-[22px]" aria-busy="true" aria-label="Loading sub-quests">
                       {Array.from({ length: task?.steps_total ?? 0 }).map((_, i) => (
                         <li key={i} className="flex items-center gap-2 py-[5px] pl-1">
                           <span className="h-[18px] w-[18px] shrink-0 rounded-[5px]" style={{ border: `1.5px solid ${isAdventure ? "#8a6c2c" : "var(--t-card-border)"}`, opacity: 0.5 }} />
@@ -1642,24 +1642,11 @@ export function QuestEditorDialog({
                               {progressWords(insideDone, inside.length)}
                             </button>
                           )}
-                          {/* What this step is worth, right on the row: its share of the quest (tap to change) and the XP that brings. */}
+                          {/* The XP it brings, on its row; its share and how far along sit labelled under it. */}
                           {!isHolder && (
-                          <span className="mt-[3px] flex h-7 shrink-0 items-center gap-1 text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
-                            <button
-                              type="button"
-                              onClick={() => setShareStep(shareStep === st.key ? null : st.key)}
-                              aria-expanded={shareStep === st.key}
-                              aria-label={`Share of the quest for ${st.title}: ${Math.round((wOf.get(st.key) ?? 0) * 100)} percent — change`}
-                              title="Share of the quest (tap to change)"
-                              className="step-worth h-7 rounded-md px-1 text-[14px] font-semibold tabular-nums hover:bg-black/[.05]"
-                              style={{ color: st.weight ? "var(--t-ink)" : "var(--t-ink-soft)" }}
-                            >
-                              {Math.round((wOf.get(st.key) ?? 0) * 100)}%
-                            </button>
-                            <span className="font-semibold" style={{ color: "var(--t-xp)" }}>
+                            <span className="mt-[3px] flex h-7 shrink-0 items-center text-[12.5px] font-semibold tabular-nums" style={{ color: "var(--t-xp)" }} title="XP this sub-quest brings">
                               {Math.round((wOf.get(st.key) ?? 0) * xp) + (st.xp ?? 0)} XP
                             </span>
-                          </span>
                           )}
                           <span className="relative shrink-0">
                             <button
@@ -1681,7 +1668,7 @@ export function QuestEditorDialog({
                                     ...(st.state !== "skipped" ? [["skip", "⏭", "Skip it", "var(--t-ink)"]] : []),
                                     ...(st.state !== "failed" ? [["fail", "✗", "Failed", "#b5321f"]] : []),
                                     ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),
-                                    ["remove", "🗑", "Remove step", "var(--t-ink-soft)"],
+                                    ["remove", "🗑", "Remove sub-quest", "var(--t-ink-soft)"],
                                   ] as [string, string, string, string][]
                                 ).map(([k, icon, label, color]) => (
                                   <button
@@ -1707,44 +1694,49 @@ export function QuestEditorDialog({
                             )}
                           </span>
                         </div>
-                        {/* Its share of the quest, as a slider (blank = an equal share). */}
-                        {shareStep === st.key && !isHolder && (
-                          <div className="reveal ml-[26px] mr-9 flex items-center gap-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                            <span className="shrink-0">Share</span>
-                            <input
-                              type="range"
-                              min={1}
-                              max={100}
-                              value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}
-                              onChange={(e) => updateStep(st.key, { weight: Number(e.target.value) })}
-                              aria-label={`Share of the quest for ${st.title}, in percent`}
-                              className="h-6 min-w-0 flex-1"
-                              style={{ accentColor: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
-                            />
-                            {st.weight != null && (
-                              <button type="button" onClick={() => updateStep(st.key, { weight: null })} className="shrink-0 underline">
-                                equal
-                              </button>
+                        {/* Labelled, and each number is typed over in place (owner, Nov 4): how far along it is, and its share of the quest's XP. */}
+                        {!isHolder && !isCompleted && (
+                          <div className="ml-[26px] mr-9 flex flex-col gap-0.5 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                            {!st.done && !st.state && (
+                              <span className="flex items-center gap-2">
+                                <span className="w-[74px] shrink-0">Done</span>
+                                <InlineNumber value={st.progress ?? 0} label={`How far along ${st.title} is, in percent`} onChange={(v) => updateStep(st.key, { progress: v, done: v >= 100 })} className="w-[38px] justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  step={5}
+                                  value={st.progress ?? 0}
+                                  onChange={(e) => {
+                                    const v = Number(e.target.value);
+                                    updateStep(st.key, { progress: v, done: v >= 100 });
+                                  }}
+                                  aria-label={`How far along ${st.title} is`}
+                                  className="step-progress min-w-0 flex-1"
+                                  style={{ ["--p" as string]: `${st.progress ?? 0}%` }}
+                                />
+                              </span>
                             )}
+                            <span className="flex items-center gap-2">
+                              <span className="w-[74px] shrink-0">Share of XP</span>
+                              <InlineNumber value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)} min={1} label={`Share of the quest's XP for ${st.title}, in percent`} onChange={(v) => updateStep(st.key, { weight: v })} className="w-[38px] justify-end font-semibold" style={{ color: "var(--t-ink)" }} />
+                              <input
+                                type="range"
+                                min={1}
+                                max={100}
+                                value={st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}
+                                onChange={(e) => updateStep(st.key, { weight: Number(e.target.value) })}
+                                aria-label={`Share of the quest's XP for ${st.title}, in percent`}
+                                className="step-progress min-w-0 flex-1"
+                                style={{ ["--p" as string]: `${st.weight ?? Math.round((wOf.get(st.key) ?? 0) * 100)}%` }}
+                              />
+                              {st.weight != null && (
+                                <button type="button" onClick={() => updateStep(st.key, { weight: null })} className="shrink-0 underline underline-offset-2" title="Back to an equal share">
+                                  equal
+                                </button>
+                              )}
+                            </span>
                           </div>
-                        )}
-                        {/* How far along: a slim slider under each open step. */}
-                        {!st.done && !st.state && !isCompleted && !isHolder && (
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            step={5}
-                            value={st.progress ?? 0}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              updateStep(st.key, { progress: v, done: v >= 100 });
-                            }}
-                            aria-label={`How far along ${st.title} is`}
-                            title={`${st.progress ?? 0}% done`}
-                            className="step-progress ml-[26px] mr-9"
-                            style={{ ["--p" as string]: `${st.progress ?? 0}%` }}
-                          />
                         )}
                         </li>
                         );
@@ -1783,8 +1775,8 @@ export function QuestEditorDialog({
                             }}
                             autoFocus
                             enterKeyHint="enter"
-                            placeholder="Add a step, then Enter"
-                            aria-label="Add a step"
+                            placeholder="Add a sub-quest, then Enter"
+                            aria-label="Add a sub-quest"
                             className="bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none"
                             style={{ color: "var(--t-ink)" }}
                           />

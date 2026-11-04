@@ -162,7 +162,7 @@ export function QuestMap({
           ← {board.title}
         </Link>
         <span className="text-[13px] tabular-nums" style={{ color: "var(--t-cream)", opacity: 0.85 }}>
-          {n === 0 ? "No steps yet" : `${doneCount} of ${n} ${n === 1 ? "step" : "steps"} · ${xpEarned} XP earned${xpAhead ? ` · ${xpAhead} ahead` : ""}`}
+          {n === 0 ? "No sub-quests yet" : `${doneCount} of ${n} ${n === 1 ? "sub-quest" : "sub-quests"} · ${xpEarned} XP earned${xpAhead ? ` · ${xpAhead} ahead` : ""}`}
         </span>
       </div>
 
@@ -235,7 +235,7 @@ export function QuestMap({
                   key={`mist${j}`}
                   type="button"
                   onClick={() => say("Still in the mist. It clears as you get closer.")}
-                  aria-label="Steps still in the mist"
+                  aria-label="Sub-quests still in the mist"
                   className="absolute z-[2] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full"
                   style={{ left: p.x, top: p.y, width: TOKEN - 8, height: TOKEN - 8, background: "rgba(42,28,16,.55)", border: "3px solid rgba(233,220,184,.7)" }}
                 >
@@ -250,7 +250,7 @@ export function QuestMap({
                   <button
                     type="button"
                     onClick={() => setPastOpen(true)}
-                    aria-label={`Show ${nd.count} earlier steps`}
+                    aria-label={`Show ${nd.count} earlier sub-quests`}
                     className="absolute z-[2] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-[18px]"
                     style={{ left: p.x, top: p.y, width: TOKEN + 6, height: TOKEN - 2, background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "3px solid #f2d27e", boxShadow: "0 0 14px rgba(242,210,126,.6), 0 4px 10px rgba(0,0,0,.35)", color: "#3b2a10" }}
                   >

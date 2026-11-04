@@ -266,8 +266,14 @@ export function QuestPicker({ exclude, onPick, autoFocus = false, placeholder = 
  * quest's steps into a sequence of quests (a project).
  */
 export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, onStepsMoved, onEditSelf }: { taskId: string; title: string; isAdventure: boolean; onClose: () => void; onStepsMoved?: () => void; /** Tapping this quest's own row (e.g. close and go back to its editor). */ onEditSelf?: () => void }) {
-  const { closing, close: onClose } = useClosing(closeNow);
   const router = useRouter();
+  // Changes show on the page once the window closes: refreshing while it's open took away the card
+  // (and the editor) it was opened from, so the window vanished mid-edit (owner, Nov 4).
+  const changed = useRef(false);
+  const { closing, close: onClose } = useClosing(() => {
+    if (changed.current) router.refresh();
+    closeNow();
+  });
   const [chain, setChain] = useState<SequenceItem[] | null>(null);
   const [where, setWhere] = useState<"before" | "after">("after");
   const [error, setError] = useState<string | null>(null);
@@ -285,7 +291,7 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
       setError(null);
       try {
         setChain(await fn());
-        router.refresh();
+        changed.current = true;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't change that.");
       }
@@ -418,7 +424,7 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
             {!confirmSteps ? (
               <button type="button" disabled={busy} onClick={() => setConfirmSteps(true)} className="flex min-h-9 items-center gap-2 text-left text-[14px] font-semibold disabled:opacity-50">
                 <StackMini />
-                Turn its {openSteps} {openSteps === 1 ? "step" : "steps"} into a sequence of quests
+                Turn its {openSteps} {openSteps === 1 ? "sub-quest" : "sub-quests"} into a sequence of quests
               </button>
             ) : (
               <>

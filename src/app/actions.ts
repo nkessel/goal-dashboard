@@ -3864,7 +3864,16 @@ export async function sequenceLinkAction(anchorId: string, where: "before" | "af
   }
   // A quest already in a sequence just moves here.
   if (where === "after") await seq.placeAfter(ownerId, id, anchorId);
-  else await seq.placeBefore(ownerId, id, anchorId);
+  else {
+    await seq.placeBefore(ownerId, id, anchorId);
+    // The quest put in front takes the anchor's place (owner, Nov 4: adding a pre-quest to a quest on
+    // Today made both vanish: the anchor was locked away and the new one wasn't on Today).
+    const take: Record<string, unknown> = {};
+    const order = (anchor as unknown as { sort_order?: number }).sort_order;
+    if (typeof order === "number") take.sort_order = order;
+    if (anchor.is_manual_priority) take.is_manual_priority = true;
+    if (Object.keys(take).length) await supabaseAdmin().from("tasks").update(take).eq("owner_id", ownerId).eq("id", id).eq("status", "open");
+  }
   revalidatePath("/", "layout");
   return seq.sequenceOf(ownerId, anchorId);
 }

@@ -1098,7 +1098,7 @@ function StepsList({ steps, onChange, kind, rewards = [], onRewards }: { steps: 
     <div className="flex flex-col gap-1">
       {steps.length > 0 && (
         <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: GOLD }}>
-          {kind === "habit" ? "Sub-habits" : buying ? "Items · 🎁 makes one a reward" : "Steps"}
+          {kind === "habit" ? "Sub-habits" : buying ? "Items · 🎁 makes one a reward" : "Sub-quests"}
         </span>
       )}
       {steps.map((s, i) => (
@@ -1139,8 +1139,8 @@ function StepsList({ steps, onChange, kind, rewards = [], onRewards }: { steps: 
               setAdd("");
             }
           }}
-          placeholder={buying ? "Add an item" : "Add a step"}
-          aria-label={buying ? "Add an item" : "Add a step"}
+          placeholder={buying ? "Add an item" : "Add a sub-quest"}
+          aria-label={buying ? "Add an item" : "Add a sub-quest"}
           className="bare-input h-8 min-w-0 flex-1 bg-transparent px-1 text-[14.5px]"
           style={{ color: "#2a1c10" }}
         />

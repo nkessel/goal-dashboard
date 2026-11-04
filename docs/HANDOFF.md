@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-03 (night), `main` @ see `git log` (Plan my day; welcome toucan, habits, sleep ruler; faster first screen)
+- **Last updated:** 2026-11-04 (afternoon), `main` @ see `git log` (sub-quests: labelled bars, inline %; pre-quest fix)
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** ~86 notes (the app's count, Nov 2 afternoon; query in section 3; the owner's own notes also read at /journal › App feedback when no DB connector). Not marked shipped this push (no database access from that session). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
 
@@ -150,6 +150,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 4 (afternoon): "Steps" are **sub-quests** everywhere the owner sees them (editor, tray, card hints, import, toucan, map, focus). In the quest editor each sub-quest shows its XP on its row and two labelled lines under it, "Done" and "Share of XP", each with a slim bar and a % you tap and type over in place (`ui/InlineNumber.tsx`: same font, no box, no wash; owner: "editing the text in-line without any color, style, or size modifications"). Adding a pre-quest to a quest on Today made both vanish (the anchor got locked, the new one wasn't on Today, and the refresh closed the editor under the sequence window): the quest put in front now takes the anchor's place on Today and order (`sequenceLinkAction`), and the sequence window refreshes the page only when it closes.
 
 - Nov 4 (later): A board's colour can be any colour (a colour-wheel swatch after the pastels in the board editor); writing feedback, a touch or scroll on the page outside the box unpins the page (`outside` in `KeyboardViewport`).
 

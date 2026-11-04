@@ -23,7 +23,7 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
   useEffect(() => {
     listQuestStepsAction(task.id).then(
       (rows) => setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null })))),
-      () => setError("Couldn't load the steps.")
+      () => setError("Couldn't load the sub-quests.")
     );
   }, [task.id]);
 
@@ -160,13 +160,13 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
           // How far along: a gilded bar that fills as you tick.
           <div className="mb-2 flex items-center gap-2.5 px-2">
             <span className={isAdventure ? "font-display text-[16px]" : "text-[12px] font-bold uppercase tracking-wide"} style={{ color: isAdventure ? "#6b4a12" : soft }}>
-              Steps
+              Sub-quests
             </span>
             <span className="relative h-[8px] flex-1 overflow-hidden rounded-full" style={{ background: "rgba(90,64,20,.14)", boxShadow: "inset 0 1px 2px rgba(0,0,0,.2), 0 1px 0 rgba(255,255,255,.6)" }}>
               <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#c99a3a,#f2d27e)", boxShadow: "0 0 6px rgba(242,210,126,.6)" }} />
             </span>
             <span className="text-[12px] tabular-nums" style={{ color: soft }}>
-              {progressWords(doneCount, live.length)}
+              {pct}% done · {progressWords(doneCount, live.length)}
             </span>
           </div>
         )}
@@ -196,7 +196,7 @@ export function StepsTray({ task, isAdventure, onEdit, onComplete }: { task: Tas
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
             </svg>
-            Edit steps
+            Edit sub-quests
           </button>
         </div>
       </div>

@@ -1550,7 +1550,7 @@ function OfferCard({ action: a, onPlan, onPromise }: { action: CoachAction; onPl
     return (
       <div className="flex w-[88%] flex-col gap-1.5 rounded-2xl p-3" style={box}>
         <span className="text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "rgba(140,240,220,.85)" }}>
-          Steps for “{a.quest}”
+          Sub-quests for “{a.quest}”
         </span>
         <ol className="m-0 flex list-decimal flex-col gap-0.5 pl-5 text-[13.5px] leading-snug">
           {a.steps.map((st) => (
@@ -1559,7 +1559,7 @@ function OfferCard({ action: a, onPlan, onPromise }: { action: CoachAction; onPl
         </ol>
         {state === "idle" || state === "busy" ? (
           <Pill strong onClick={() => void run(() => coachAddStepsAction(a.questId, a.steps), "Added to the quest ✓")}>
-            {state === "busy" ? "Adding…" : "Add these steps"}
+            {state === "busy" ? "Adding…" : "Add these sub-quests"}
           </Pill>
         ) : (
           doneLine

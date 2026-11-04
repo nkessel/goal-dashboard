@@ -97,7 +97,7 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
               )}
               {w.kind === "reward" && <span style={{ color: "var(--t-ink-soft)" }}>Treasure accepted: </span>}
               {w.title}
-              {w.kind === "step" && w.sub && <span style={{ color: "var(--t-ink-soft)" }}> · step of {w.sub}</span>}
+              {w.kind === "step" && w.sub && <span style={{ color: "var(--t-ink-soft)" }}> · sub-quest of {w.sub}</span>}
             </>
           ),
         };

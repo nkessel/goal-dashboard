@@ -3113,3 +3113,10 @@ li:focus-within > .seq-tab,
   pointer-events: none;
   background-attachment: scroll !important;
 }
+
+/* A number edited in place (sub-quest share and progress, owner Nov 4): same ink, size and spot; no box, no wash. */
+.inline-number { display: inline-flex; align-items: baseline; padding: 0; background: none; border: 0; font: inherit; color: inherit; border-bottom: 1px dotted rgba(139,112,64,.55); border-radius: 0; line-height: inherit; cursor: url("/design/cursor-hand.svg") 11 3, text; }
+.inline-number-input { appearance: none; padding: 0; margin: 0; border: 0 !important; background: transparent !important; box-shadow: none !important; outline: none !important; font: inherit !important; color: inherit !important; text-align: right; caret-color: #8a6116; }
+.inline-number:focus-visible { outline: none; border-bottom-color: #8a6116; }
+.step-progress:focus, .step-progress:focus-visible { outline: none; }
+.step-worth:focus { background: none; }

@@ -436,7 +436,7 @@ export function TaskRow({
         setMenuAnchor(dots);
         setMenu("dots");
       }}
-      title={hasSteps ? "Click for its steps · right-click for more" : "Click to edit · right-click for more"}
+      title={hasSteps ? "Click for its sub-quests · right-click for more" : "Click to edit · right-click for more"}
       className={`quest-card hover-glow relative flex cursor-pointer flex-col ${tiny ? "tiny-quest rounded-xl py-1.5 pl-2.5 pr-10" : "rounded-2xl px-3 pb-3 pt-2.5"} ${behind || queue.length ? "z-[1]" : ""} ${task.reward_id ? "reward-quest" : ""} ${
         draggable ? "active:cursor-grabbing" : ""
       } ${isPending ? "opacity-70" : ""}`}

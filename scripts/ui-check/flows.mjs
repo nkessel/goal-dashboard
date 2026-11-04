@@ -143,6 +143,25 @@ export const FLOWS = [
       if (await h.tap("text=read chapter four", "steps tray", { optional: true, expectMove: true })) {
         await h.settle(500);
         await h.check("steps tray open");
+        // Sub-quests in the editor: labelled Done / Share of XP rows, each % typed over in place (owner, Nov 4).
+        const editSubs = h.page.getByRole("button", { name: /edit sub-quests/i }).first();
+        if (await editSubs.isVisible().catch(() => false)) {
+          await editSubs.evaluate((el) => el.click());
+          await h.page.waitForTimeout(1500);
+          // In the fake database the card can come back closed (a refresh); open the editor from its ⋯ menu instead.
+          if (!(await h.page.getByText("Share of XP").count())) {
+            await h.page.locator("text=read chapter four").first().click({ button: "right" }).catch(() => {});
+            await h.page.waitForTimeout(600);
+            await h.page.getByRole("menuitem", { name: /^edit/i }).first().click({ timeout: 3000 }).catch(() => {});
+          }
+          await h.page.getByPlaceholder(/quest title/i).first().waitFor({ state: "visible", timeout: 6000 }).catch(() => {});
+          await h.settle(800);
+          await h.page.getByText("Share of XP").first().scrollIntoViewIfNeeded().catch(() => {});
+          await h.check("editor sub-quests");
+          if (await h.tap((p) => p.getByRole("button", { name: /share of the quest's xp.*tap to change/i }).first(), "type a share", { optional: true })) await h.check("share typed in place");
+          await esc(h);
+          await esc(h);
+        }
         await h.tap("text=read chapter four", "steps tray close", { optional: true, expectMove: true });
       }
       // Log progress from a card (tap its % or "12 of 32 pages"): − / + and a number, in place.

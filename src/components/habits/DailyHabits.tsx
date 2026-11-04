@@ -581,11 +581,11 @@ export function DailyHabits({
                       onTouchStart={(e) => e.stopPropagation()}
                       onClick={() => setOpenSubs((o) => { const n = new Set(o); if (n.has(h.id)) n.delete(h.id); else n.add(h.id); return n; })}
                       aria-expanded={openSubs.has(h.id)}
-                      aria-label={`${openSubs.has(h.id) ? "Hide" : "Show"} the steps of ${h.title}`}
+                      aria-label={`${openSubs.has(h.id) ? "Hide" : "Show"} the sub-habits of ${h.title}`}
                       className="relative z-[1] flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-[12.5px] font-semibold tabular-nums hover:bg-black/[.05]"
                       style={{ color: "var(--t-ink-soft)", border: "1px solid rgba(139,112,64,.35)" }}
                     >
-                      {progressWords(subsOf(h).filter((st) => ticked(h, st.id)).length, subsOf(h).length)}
+                      {progressWords(subsOf(h).filter((st) => ticked(h, st.id)).length, subsOf(h).length, "sub-habit")}
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: openSubs.has(h.id) ? "rotate(90deg)" : undefined }}>
                         <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>

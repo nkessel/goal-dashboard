@@ -12,6 +12,7 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Data done (trash & recycling weekly habit, Tuesdays; weed supplies a chore). The owner deletes the old "clean weed supplies" habit (Daily Habits › Not today › ✎ › Delete).
 
 ## Quests and the quest editor
+- (Nov 4, built: "sub-quests" not "steps"; labelled Done / Share of XP lines with an inline-typed %; a pre-quest takes its quest's place on Today.) Owner to try on the phone: tap a % and type.
 
 ## Calendar
 - (Nov 3 late, built: the auto-scheduler window + its ✨ Auto-schedule button + Plan my day on the calendar.) Owner to try: drag from the list, ✨ Auto-schedule, drag/resize on the calendar, tap for info. Plan tomorrow's day's own grid still moves a quest by Move › tap a time (no drag yet).
