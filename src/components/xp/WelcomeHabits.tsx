@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { completeRiteAction, createRiteAction, uncompleteRiteAction, welcomeHabitsAction } from "@/app/actions";
+import { completeRiteAction, createRiteAction, reorderRitesAction, uncompleteRiteAction, welcomeHabitsAction } from "@/app/actions";
+import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useLocalDay } from "@/components/evening/evening-clock";
 import { HABIT_PILLS, openLanguageWindow } from "@/components/xp/LearnLanguage";
 import { Fold } from "@/components/ui/Fold";
@@ -83,6 +86,15 @@ export function WelcomeHabits({ fx }: { fx: FxSettings }) {
   const picked = fx.welcomeHabitIds;
   const shown = (list ?? []).filter((h) => h.today && (!picked || picked.includes(h.id)));
   const tools = HABIT_PILLS.filter((p) => (fx.welcomeHabitPills ?? HABIT_PILLS.map((x) => x.key)).includes(p.key));
+  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }));
+  // Drag a habit to reorder (owner, Nov 4: "the habits aren't reorderable"); the same order as Today's Daily Habits.
+  function onDragEnd(e: DragEndEvent) {
+    if (!list || !e.over || e.active.id === e.over.id) return;
+    const ids = list.map((h) => h.id);
+    const next = arrayMove(ids, ids.indexOf(String(e.active.id)), ids.indexOf(String(e.over.id)));
+    setList(next.map((id) => list.find((h) => h.id === id)!));
+    reorderRitesAction(next).catch(() => setSaid("That order didn't save. Try again?"));
+  }
   function toggle(h: WelcomeHabit) {
     if (!day) return;
     const next = !h.done;
@@ -112,25 +124,30 @@ export function WelcomeHabits({ fx }: { fx: FxSettings }) {
               Gathering your habits…
             </span>
           )}
-          {shown.map((h) => (
-            <button
-              key={h.id}
-              type="button"
-              aria-pressed={h.done}
-              onClick={() => toggle(h)}
-              className="welcome-habit flex h-9 max-w-full items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold"
-              data-done={h.done ? "true" : "false"}
-            >
-              <span aria-hidden className="welcome-habit-check flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full">
-                {h.done && (
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </span>
-              <span className="truncate">{h.title}</span>
-            </button>
-          ))}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={shown.map((h) => h.id)} strategy={rectSortingStrategy}>
+              {shown.map((h) => (
+                <SortablePill key={h.id} id={h.id}>
+                  <button
+                    type="button"
+                    aria-pressed={h.done}
+                    onClick={() => toggle(h)}
+                    className="welcome-habit flex h-9 max-w-full items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold"
+                    data-done={h.done ? "true" : "false"}
+                  >
+                    <span aria-hidden className="welcome-habit-check flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full">
+                      {h.done && (
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                          <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="truncate">{h.title}</span>
+                  </button>
+                </SortablePill>
+              ))}
+            </SortableContext>
+          </DndContext>
           {tools.map((p) => (
             <button key={p.key} type="button" onClick={openLanguageWindow} className="font-display flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[14.5px]" style={GILT}>
               <span aria-hidden>{p.icon}</span>
@@ -199,5 +216,15 @@ export function HabitOptions({ fx }: { fx: FxSettings }) {
         />
       </div>
     </div>
+  );
+}
+
+/** A habit pill you can drag into a new place (a tap still ticks it). */
+function SortablePill({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <span ref={setNodeRef} {...attributes} {...listeners} role="presentation" className="touch-manipulation" style={{ transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 5 : undefined, position: "relative", maxWidth: "100%", cursor: isDragging ? "grabbing" : undefined }}>
+      {children}
+    </span>
   );
 }

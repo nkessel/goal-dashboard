@@ -116,7 +116,7 @@ export function QuestActionMenu({
     ...(canSnooze ? [{ key: "snooze" as const, icon: <SnoozeGlyph />, label: "Snooze…" }] : []),
     // In Additional Quests, taking it out of that list takes it off the Today screen.
     ...(onToday && !inBattle ? [{ key: "offtoday" as const, icon: <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />, label: isAdventure ? "Remove from Additional Quests" : "Remove from More tasks" }] : []),
-    { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule on calendar" : "Schedule on calendar" },
+    { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule" : "Auto-schedule" },
     ...(onBoard && !isReward ? [{ key: "board" as const, icon: <Glyph d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z" />, label: "See quest in its board" }] : []),
     ...(!isReward
       ? [

@@ -79,7 +79,7 @@ export function setEveningMode(on: boolean) {
 export const PROMPT_AT_KEY = "evening-prompt-at";
 const PROMPT_HIDDEN_KEY = "evening-prompt-hidden";
 const PROMPT_EVENT = "evening-prompt-change";
-export const PROMPT_DEFAULT = 17 * 60;
+export const PROMPT_DEFAULT = 16 * 60 + 30; // 4:30pm (owner, Nov 4)
 
 export function readPromptAt(): number | "off" {
   try {

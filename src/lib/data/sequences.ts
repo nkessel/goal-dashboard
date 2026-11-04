@@ -63,14 +63,17 @@ export async function attachSequences<T extends Task>(ownerId: string, tasks: T[
     });
 }
 
-export type SequenceItem = { id: string; title: string; status: "open" | "completed"; board_id: string | null; reward: boolean };
+export type SequenceItem = { id: string; title: string; status: "open" | "completed"; board_id: string | null; reward: boolean; /** Portrait (painted or from the library), null for none. */ icon?: string | null; xp?: number; minutes?: number | null };
+type SeqRow = { id: string; title: string; status: "open" | "completed"; board_id: string | null; reward_id: string | null; locked_by_task_id: string | null; icon_key: string | null; icon_source: string | null; xp_value: number | null; estimate_minutes: number | null };
+const COLS = "id, title, status, board_id, reward_id, locked_by_task_id, icon_key, icon_source, xp_value, estimate_minutes";
+const item = (t: SeqRow): SequenceItem => ({ id: t.id, title: t.title, status: t.status, board_id: t.board_id, reward: !!t.reward_id, icon: t.icon_source === "ai" || t.icon_source === "library" ? t.icon_key : null, xp: t.xp_value ?? 0, minutes: t.estimate_minutes });
 
 /** The whole sequence a quest belongs to, front to back (finished ones first). */
 export async function sequenceOf(ownerId: string, taskId: string): Promise<SequenceItem[]> {
   const db = supabaseAdmin();
   const get = async (id: string) => {
-    const { data } = await db.from("tasks").select("id, title, status, board_id, reward_id, locked_by_task_id").eq("owner_id", ownerId).eq("id", id).maybeSingle();
-    return data as (SequenceItem & { reward_id: string | null; locked_by_task_id: string | null }) | null;
+    const { data } = await db.from("tasks").select(COLS).eq("owner_id", ownerId).eq("id", id).maybeSingle();
+    return data as SeqRow | null;
   };
   const me = await get(taskId);
   if (!me) return [];
@@ -82,23 +85,23 @@ export async function sequenceOf(ownerId: string, taskId: string): Promise<Seque
     seen.add(cur);
     const t = await get(cur);
     if (!t) break;
-    before.unshift({ id: t.id, title: t.title, status: t.status, board_id: t.board_id, reward: !!t.reward_id });
+    before.unshift(item(t));
     cur = t.locked_by_task_id;
   }
   // And forward through everything waiting (open or finished).
-  const { data: all } = await db.from("tasks").select("id, title, status, board_id, reward_id, locked_by_task_id").eq("owner_id", ownerId).not("locked_by_task_id", "is", null);
-  const rows = (all ?? []) as (SequenceItem & { reward_id: string | null; locked_by_task_id: string | null })[];
+  const { data: all } = await db.from("tasks").select(COLS).eq("owner_id", ownerId).not("locked_by_task_id", "is", null);
+  const rows = (all ?? []) as SeqRow[];
   const after: SequenceItem[] = [];
   const queue = [taskId];
   while (queue.length && after.length < 30) {
     const id = queue.shift()!;
     for (const r of rows) if (r.locked_by_task_id === id && !seen.has(r.id)) {
       seen.add(r.id);
-      after.push({ id: r.id, title: r.title, status: r.status, board_id: r.board_id, reward: !!r.reward_id });
+      after.push(item(r));
       queue.push(r.id);
     }
   }
-  return [...before, { id: me.id, title: me.title, status: me.status, board_id: me.board_id, reward: !!me.reward_id }, ...after];
+  return [...before, item(me), ...after];
 }
 
 async function lockerOf(ownerId: string, id: string): Promise<string | null> {

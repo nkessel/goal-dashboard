@@ -16,8 +16,14 @@ export function SettingsRow({
   defaultOpen = false,
   disabled = false,
   theme = "calm",
+  id,
+  quiet = false,
   children,
 }: {
+  /** Found by Settings search (data-settings-row). */
+  id?: string;
+  /** A smaller, quieter row for things opened less often. */
+  quiet?: boolean;
   icon: React.ReactNode;
   label: string;
   /** Short status text shown before the chevron, e.g. "Woodland (Default)". */
@@ -59,6 +65,7 @@ export function SettingsRow({
   return (
     <div
       ref={box}
+      data-settings-row={id}
       className={isAdventure ? "parchment" : ""}
       style={{
         scrollMarginTop: 12,
@@ -71,16 +78,18 @@ export function SettingsRow({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className={`${disabled ? "" : "hover-glow"} flex w-full items-center gap-3 rounded-[14px] px-4 py-3.5 text-left`}
+        aria-expanded={open}
+        data-settings-toggle
+        className={`${disabled ? "" : "hover-glow"} flex w-full items-center gap-3 rounded-[14px] text-left ${quiet ? "px-3.5 py-2" : "px-4 py-3.5"}`}
         style={{ cursor: disabled ? "default" : "pointer" }}
       >
         <span
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+          className={`flex shrink-0 items-center justify-center rounded-full ${quiet ? "h-7 w-7" : "h-8 w-8"}`}
           style={{ background: isAdventure ? "rgba(209,161,60,.16)" : "var(--t-accent-soft)" }}
         >
           {icon}
         </span>
-        <span className="flex-1 text-[16px] font-medium" style={{ color: "var(--t-ink)" }}>
+        <span className={`flex-1 font-medium ${quiet ? "text-[14.5px]" : "text-[16px]"}`} style={{ color: "var(--t-ink)" }}>
           {label}
         </span>
         {rightLabel && (

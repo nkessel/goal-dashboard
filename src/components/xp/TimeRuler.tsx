@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
  * every 5 minutes under a fixed gold needle. Swipe it (the phone's own
  * momentum and snapping), drag it with a mouse, tap a tick to glide there, or
  * use ← → (Shift: an hour) and type digits ("1045") on a computer. The time
- * follows live. "Type" in its foot still lets you key a time in on a phone.
+ * follows live. A tap on the time in its foot types one in place.
  * Three-team design, Nov 2 (docs/ux/2026-11-02-sleep-times.md).
  */
 
@@ -249,24 +249,10 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
           </button>
         )}
         <span className="flex-1" />
-        {!typing && (
-          <span className="flex items-center gap-1">
-            <button type="button" onClick={() => nudge(-1)} aria-label="One minute earlier" className="flex h-7 w-7 items-center justify-center rounded-full text-[15px]" style={{ border: "1px solid rgba(139,112,64,.45)" }}>
-              ‹
-            </button>
-            {/* The exact time; tap it to type one (owner: "type a time by tapping the time field"). */}
-            <button type="button" onClick={() => setTyping(true)} title="Type a time" className="font-display h-7 min-w-[74px] rounded-full px-2 text-[15px] tabular-nums" style={{ color: "var(--t-ink, #2a1c10)", background: "rgba(255,250,238,.75)", border: "1px solid rgba(139,112,64,.45)" }}>
-              {cur === null ? "type…" : spoken(cur)}
-            </button>
-            <button type="button" onClick={() => nudge(1)} aria-label="One minute later" className="flex h-7 w-7 items-center justify-center rounded-full text-[15px]" style={{ border: "1px solid rgba(139,112,64,.45)" }}>
-              ›
-            </button>
-          </span>
-        )}
-        <span className="flex-1" />
+        {/* The exact time, right in the middle; tap it and type over it in place (owner, Nov 4: no "type", no ‹ › — the ruler is fine enough). */}
         {typing ? (
           <form
-            className="flex items-center gap-1"
+            className="flex items-center"
             onSubmit={(e) => {
               e.preventDefault();
               finishTyping();
@@ -287,12 +273,17 @@ export function TimeRuler({ kind, value, onChange, onDone, label }: { kind: Rule
               }}
               inputMode="numeric"
               enterKeyHint="done"
-              placeholder="10:45"
+              placeholder={cur === null ? "10:45" : spoken(cur)}
               aria-label={`${label}, typed`}
-              className="time-ruler-type font-display h-7 w-[76px] rounded-full px-2.5 text-center text-[16px] tabular-nums outline-none"
+              className="time-ruler-type font-display h-7 w-[84px] bg-transparent px-1 text-center text-[16px] tabular-nums outline-none"
             />
           </form>
-        ) : null}
+        ) : (
+          <button type="button" onClick={() => setTyping(true)} title="Tap to type a time" className="font-display h-7 min-w-[84px] px-1 text-[16px] tabular-nums" style={{ color: "var(--t-ink, #2a1c10)" }}>
+            {cur === null ? "— : —" : spoken(cur)}
+          </button>
+        )}
+        <span className="flex-1" />
         <button type="button" onClick={onDone} className="h-7 rounded-full px-3.5 text-[12.5px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
           Done
         </button>

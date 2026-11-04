@@ -403,7 +403,8 @@ export async function createTask(
       ...(input.isPowerUp ? { is_power_up: true } : {}),
       ...(input.dueAt ? { due_at: input.dueAt } : {}),
       ...(input.chunkMinutes ? { chunk_minutes: Math.max(1, Math.round(input.chunkMinutes)) } : {}),
-      ...(input.coinValue != null ? { coin_value: Math.max(0, Math.round(input.coinValue)) } : {}),
+      // New quests are worth 15 XP and a coin unless said otherwise (owner, Nov 4).
+      coin_value: input.coinValue === undefined ? 1 : input.coinValue === null ? null : Math.max(0, Math.round(input.coinValue)),
       ...(input.earlyBonusXp != null ? { early_bonus_xp: Math.max(0, Math.round(input.earlyBonusXp)) } : {}),
       ...(input.earlyBonusCoins ? { early_bonus_coins: Math.max(0, Math.round(input.earlyBonusCoins)) } : {}),
       ...(input.earlyBonusPerDay ? { early_bonus_per_day: Math.max(0, Math.round(input.earlyBonusPerDay)) } : {}),
@@ -417,7 +418,7 @@ export async function createTask(
       description: input.description || null,
       importance: input.importance ?? 0,
       urgency: input.urgency ?? 0,
-      xp_value: input.xpValue ?? 0,
+      xp_value: input.xpValue ?? 15,
       color: input.color || null,
       estimate_minutes:
         input.estimateMinutes === undefined || input.estimateMinutes === null

@@ -3932,6 +3932,31 @@ export async function sequenceDetachAction(taskId: string, viewFrom?: string) {
 }
 
 /** Move a quest one place earlier or later in its sequence. */
+/**
+ * The open quests of a sequence in a new order (the sequence window's cards are dragged, owner Nov 4).
+ * The front quest takes the old front's place on Today, so the sequence never drops out of sight.
+ */
+export async function sequenceReorderAction(ids: string[], viewFrom: string) {
+  const ownerId = await requireProfileId();
+  const seq = await import("@/lib/data/sequences");
+  const chain = (await seq.sequenceOf(ownerId, viewFrom)).filter((t) => t.status === "open" && !t.reward);
+  const known = new Set(chain.map((c) => c.id));
+  const order = ids.filter((id) => known.has(id));
+  if (order.length !== chain.length || order.every((id, i) => id === chain[i].id)) return seq.sequenceOf(ownerId, viewFrom);
+  const db = supabaseAdmin();
+  const { data: front } = await db.from("tasks").select("locked_by_task_id, is_manual_priority, sort_order").eq("owner_id", ownerId).eq("id", chain[0].id).maybeSingle<{ locked_by_task_id: string | null; is_manual_priority: boolean; sort_order: number | null }>();
+  for (let i = 0; i < order.length; i++) {
+    const patch: Record<string, unknown> = { locked_by_task_id: i === 0 ? (front?.locked_by_task_id ?? null) : order[i - 1] };
+    if (i === 0 && order[0] !== chain[0].id) {
+      if (front?.is_manual_priority) patch.is_manual_priority = true;
+      if (typeof front?.sort_order === "number") patch.sort_order = front.sort_order;
+    }
+    await db.from("tasks").update(patch).eq("owner_id", ownerId).eq("id", order[i]);
+  }
+  revalidatePath("/", "layout");
+  return seq.sequenceOf(ownerId, viewFrom);
+}
+
 export async function sequenceMoveAction(taskId: string, dir: -1 | 1, viewFrom?: string) {
   const ownerId = await requireProfileId();
   const seq = await import("@/lib/data/sequences");

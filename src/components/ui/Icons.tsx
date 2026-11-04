@@ -108,3 +108,12 @@ export function SnoozeIcon({ size = 15 }: { size?: number }) {
     </svg>
   );
 }
+
+/** A close ✕ drawn as two strokes, so it sits dead centre in its circle (a typed × rides off-centre in most fonts; owner, Nov 4). */
+export function CloseIcon({ size = 14, strokeWidth = 2.4 }: { size?: number; strokeWidth?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden style={{ display: "block" }}>
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" />
+    </svg>
+  );
+}

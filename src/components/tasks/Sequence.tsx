@@ -4,7 +4,10 @@ import { FloatingWindow } from "@/components/ui/FloatingWindow";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { findQuestsAction, listQuestStepsAction, questForEditAction, sequenceDetachAction, sequenceLinkAction, sequenceMoveAction, sequenceOfAction, stepsToSequenceAction } from "@/app/actions";
+import { findQuestsAction, listQuestStepsAction, questForEditAction, sequenceDetachAction, sequenceLinkAction, sequenceOfAction, sequenceReorderAction, stepsToSequenceAction } from "@/app/actions";
+import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useEscape } from "@/lib/use-escape";
 import type { SequenceItem } from "@/lib/data/sequences";
 import { useClosing } from "@/components/ui/Fold";
@@ -297,6 +300,8 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
       }
     });
   const open = (chain ?? []).filter((c) => c.status === "open");
+  const movable = open.filter((c) => !c.reward);
+  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }));
   const ink = "var(--t-ink-soft)";
   const [minimized, setMinimized] = useState(false);
   // A quest in the sequence opened in its own editor (owner: "make quests in a sequence easy to edit").
@@ -345,57 +350,42 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
         <div data-drag-handle className="relative z-[1] flex cursor-grab touch-none select-none flex-col gap-0.5 pr-16 active:cursor-grabbing" title="Drag to move">
           <p className={`m-0 text-[19px] ${isAdventure ? "font-display" : "font-bold"}`}>{chain && chain.length > 1 ? "Sequence" : "Create a sequence"}</p>
           <p className="m-0 text-[13.5px]" style={{ color: ink }}>
-            One quest at a time: each waits, stacked out of sight, until the one before it is done.
+            One quest at a time, top to bottom. Drag a card to reorder; tap it to edit.
           </p>
         </div>
 
-        <ol className="relative z-[1] m-0 flex list-none flex-col gap-1.5 p-0">
-          {chain === null && !error && <li className="text-[14px] italic" style={{ color: ink }}>Gathering the quests…</li>}
-          {(chain ?? []).map((c) => {
-            const me = c.id === taskId;
-            const done = c.status !== "open";
-            const at = open.findIndex((o) => o.id === c.id);
-            return (
-              <li
-                key={c.id}
-                className="flex min-h-11 items-center gap-2 rounded-xl px-2.5"
-                style={{
-                  border: `1.5px solid ${me ? "var(--t-gold, #c9a14a)" : "rgba(140,110,60,.35)"}`,
-                  background: me ? "rgba(242,213,138,.25)" : undefined,
-                  opacity: done ? 0.6 : 1,
-                }}
-              >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold" style={{ border: "1.5px solid #b39a6a", color: ink }}>
-                  {done ? "✓" : at + 1}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => edit(c.id)}
-                  disabled={opening === c.id || (me && !onEditSelf)}
-                  title={me && !onEditSelf ? undefined : `Edit “${c.title}”`}
-                  className={`min-w-0 flex-1 truncate text-left text-[14.5px] disabled:cursor-default ${me ? "font-semibold" : "hover:underline"} ${done ? "line-through" : ""} ${opening === c.id ? "opacity-60" : ""}`}
-                >
-                  {c.title}
-                </button>
-                {!done && !c.reward && (
-                  <span className="flex shrink-0 items-center">
-                    <IconBtn label="Earlier" disabled={busy || at <= 0} onClick={() => run(() => sequenceMoveAction(c.id, -1, taskId))}>
-                      ↑
-                    </IconBtn>
-                    <IconBtn label="Later" disabled={busy || at < 0 || at >= open.length - 1} onClick={() => run(() => sequenceMoveAction(c.id, 1, taskId))}>
-                      ↓
-                    </IconBtn>
-                    {open.length > 1 && (
-                      <IconBtn label={me ? "Take this quest out of the sequence" : "Take out of the sequence"} disabled={busy} onClick={() => run(() => sequenceDetachAction(c.id, taskId))}>
-                        ×
-                      </IconBtn>
-                    )}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+        {/* The quests as cards, in order (owner, Nov 4): drag a card to reorder, tap it to edit. */}
+        <div className="relative z-[1] flex flex-col gap-1.5">
+          {chain === null && !error && <p className="m-0 text-[14px] italic" style={{ color: ink }}>Gathering the quests…</p>}
+          {(chain ?? [])
+            .filter((c) => c.status !== "open")
+            .map((c) => (
+              <SeqCard key={c.id} c={c} me={c.id === taskId} done onEdit={() => edit(c.id)} opening={opening === c.id} />
+            ))}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(e) => {
+              const ids = movable.map((c) => c.id);
+              const from = ids.indexOf(String(e.active.id));
+              const to = e.over ? ids.indexOf(String(e.over.id)) : -1;
+              if (from < 0 || to < 0 || from === to) return;
+              const next = arrayMove(ids, from, to);
+              // Show the new order at once; the server confirms it.
+              setChain((cur) => (cur ? [...cur.filter((c) => c.status !== "open" || c.reward), ...next.map((id) => cur.find((c) => c.id === id)!)] : cur));
+              run(() => sequenceReorderAction(next, taskId));
+            }}
+          >
+            <SortableContext items={movable.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+              {movable.map((c, i) => (
+                <SortableSeqCard key={c.id} c={c} n={i + 1} me={c.id === taskId} onEdit={() => (c.id === taskId && !onEditSelf ? undefined : edit(c.id))} opening={opening === c.id} onTakeOut={movable.length > 1 ? () => run(() => sequenceDetachAction(c.id, taskId)) : undefined} busy={busy} />
+              ))}
+            </SortableContext>
+          </DndContext>
+          {(chain ?? []).filter((c) => c.status === "open" && c.reward).map((c) => (
+            <SeqCard key={c.id} c={c} me={false} done={false} onEdit={() => {}} opening={false} />
+          ))}
+        </div>
 
         <div className="relative z-[1] flex flex-col gap-2 rounded-xl p-3" style={{ border: "1px dashed rgba(140,110,60,.5)" }}>
           <div className="flex flex-wrap items-center gap-1.5 text-[14px]">
@@ -472,10 +462,79 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
   );
 }
 
-function IconBtn({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
+const SEQ_CARD = { background: "linear-gradient(180deg,#f8eed6,#ecdcb4)", border: "1.5px solid #b39a6a", boxShadow: "0 2px 5px rgba(60,40,10,.18), inset 0 1px 0 rgba(255,255,255,.5)" } as const;
+
+/** A quest in the sequence, drawn like a small quest card: portrait, title, time and XP. */
+function SeqCardBody({ c, n, me, done }: { c: SequenceItem; n?: number; me: boolean; done: boolean }) {
   return (
-    <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="flex h-8 w-8 items-center justify-center rounded-full text-[15px] hover:bg-black/5 disabled:opacity-30">
-      {children}
+    <>
+      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ border: "2px solid #a58c66", boxShadow: "0 0 0 2px rgba(217,180,95,.45)", background: "radial-gradient(circle at 40% 35%, #fbf3dc, #ecdcb4)" }}>
+        {c.icon ? (
+          // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+          <img src={c.icon} alt="" draggable={false} className="h-full w-full object-cover" />
+        ) : (
+          <span className="text-[14px] font-bold" style={{ color: "#6b5631" }}>{done ? "✓" : c.reward ? "🎁" : n}</span>
+        )}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className={`line-clamp-2 text-[15px] leading-snug ${me ? "font-bold" : "font-semibold"}`} style={{ color: "#3d2f18" }}>
+          {c.title}
+        </span>
+        <span className="text-[12px]" style={{ color: "#6b5631" }}>
+          {done ? "Done" : c.reward ? "Reward at the end" : me ? "This quest" : n === 1 ? "Up first" : `Then, ${ordinal(n ?? 0)}`}
+          {!done && c.minutes ? ` · ${mins(c.minutes)}` : ""}
+        </span>
+      </span>
+      {!!c.xp && !c.reward && (
+        <span className="shrink-0 text-[13px] font-bold tabular-nums" style={{ color: "#4f6d3c" }}>
+          {c.xp} XP
+        </span>
+      )}
+    </>
+  );
+}
+
+function ordinal(n: number) {
+  return ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"][n] ?? `#${n}`;
+}
+
+function SeqCard({ c, me, done, onEdit, opening }: { c: SequenceItem; me: boolean; done: boolean; onEdit: () => void; opening: boolean }) {
+  return (
+    <button type="button" onClick={onEdit} disabled={opening || c.reward} className="flex min-h-14 w-full items-center gap-2.5 rounded-2xl px-2.5 py-1.5 text-left" style={{ ...SEQ_CARD, opacity: done ? 0.6 : 1 }}>
+      <SeqCardBody c={c} me={me} done={done} />
     </button>
+  );
+}
+
+function SortableSeqCard({ c, n, me, onEdit, opening, onTakeOut, busy }: { c: SequenceItem; n: number; me: boolean; onEdit: () => void; opening: boolean; onTakeOut?: () => void; busy: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: c.id });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={onEdit}
+      title={`Drag to reorder · tap to edit “${c.title}”`}
+      className={`flex min-h-14 touch-manipulation items-center gap-2.5 rounded-2xl px-2.5 py-1.5 ${isDragging ? "cursor-grabbing" : "cursor-grab"} ${opening ? "opacity-60" : ""}`}
+      style={{ ...SEQ_CARD, ...(me ? { border: "1.5px solid #c99a3a", boxShadow: "0 0 0 2px rgba(217,180,95,.35), 0 2px 5px rgba(60,40,10,.18)" } : {}), transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 10 : undefined, position: "relative", ...(isDragging ? { boxShadow: "0 10px 22px rgba(0,0,0,.25)" } : {}) }}
+    >
+      <SeqCardBody c={c} n={n} me={me} done={false} />
+      {onTakeOut && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={(e) => (e.stopPropagation(), onTakeOut())}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label={`Take “${c.title}” out of the sequence`}
+          title="Take out of the sequence"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full leading-none hover:bg-black/[.06] disabled:opacity-40"
+          style={{ color: "#6b5631" }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
+    </div>
   );
 }

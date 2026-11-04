@@ -1,5 +1,7 @@
 "use client";
 
+import { CloseIcon } from "@/components/ui/Icons";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEscape } from "@/lib/use-escape";
@@ -51,10 +53,10 @@ export function SideDrawer({ theme, title, children }: { theme: "calm" | "advent
             type="button"
             onClick={close}
             aria-label="Close menu"
-            className="hover-glow flex h-10 w-10 items-center justify-center rounded-full text-[26px] leading-none"
+            className="hover-glow flex h-10 w-10 items-center justify-center rounded-full"
             style={{ color: isAdventure ? "var(--t-gold)" : "var(--t-ink)" }}
           >
-            ×
+            <CloseIcon size={18} />
           </button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-4 pb-10">{children}</div>

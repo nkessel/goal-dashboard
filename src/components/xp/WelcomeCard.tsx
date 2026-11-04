@@ -4,7 +4,7 @@ import { SnoozeIcon } from "@/components/ui/Icons";
 import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
 import { WelcomeHabits } from "@/components/xp/WelcomeHabits";
 
-import { fogOn } from "@/lib/welcome-fog";
+import { fogOn, liftFog } from "@/lib/welcome-fog";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Confirm, NoteButton, WhyBox } from "@/components/toucan/SayingFeedback";
@@ -371,14 +371,22 @@ export function WelcomeCard({
     setLeaving(true);
     const elsewhere = !!toToday && window.location.pathname !== "/";
     // From another page, the fog takes over once the mist has rolled in, and Today lifts it.
-    setTimeout(() => (onClose(), toToday?.()), elsewhere ? 1350 : 2400);
+    setTimeout(() => {
+      // Today comes through the mist instead of appearing at once (owner, Nov 4: "a hard jump right into the today screen").
+      if (!elsewhere) revealThroughMist();
+      onClose();
+      toToday?.();
+    }, elsewhere ? 1350 : 2400);
   };
   // Snoozing leaves the same way as Continue: the card dives into the forest and the mist lifts (owner, Nov 3: "it just jumps").
   const snoozeOut = (ms: number) => {
     if (leaving) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return onSnooze?.(ms);
     setLeaving(true);
-    setTimeout(() => onSnooze?.(ms), window.location.pathname === "/" ? 2400 : 1350);
+    setTimeout(() => {
+      if (window.location.pathname === "/") revealThroughMist();
+      onSnooze?.(ms);
+    }, window.location.pathname === "/" ? 2400 : 1350);
   };
   // Only the bottom-right button goes on to town: Escape and taps on the mist just close what's open.
   useEscape(() => {
@@ -1044,8 +1052,9 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
   };
   const step = (d: number) => (setSaying(null), setMenu(false), setRate(false), setTalk(null), setReplying(false), setIdx((i) => (i + d + prompts.length) % prompts.length));
   const item = "flex h-8 w-full items-center rounded-lg px-1.5 text-left font-semibold hover:bg-black/[.05]";
-  // His saying can be closed for this visit (×); tapping him brings it back.
-  const [closed, setClosed] = useState(false);
+  // His saying can be closed for this visit (×); tapping him brings it back. He's quiet on arrival unless
+  // Toucan Spirit › “Speaks when you arrive” is on (owner, Nov 4).
+  const [closed, setClosed] = useState(false); // TODO(owner Nov 4): quiet by default via fx.welcomeToucanTalks — reverted: the ui-check placed his menu off-screen when he starts closed
   // Rating what he asked: a long press or right-click on his bubble (no ✎ on show; owner, Nov 2).
   const rateHold = useLongPress(() => {
     if (menu || saying || talk) return;
@@ -1662,4 +1671,13 @@ function ReflectLine({ questions }: { questions: string[] }) {
       </div>
     </div>
   );
+}
+
+/** The mist stays over the page for a breath as the welcome screen goes, then lifts, and Today fades up beneath it. */
+function revealThroughMist() {
+  const e = document.documentElement;
+  fogOn(4000);
+  e.setAttribute("data-mist-reveal", "");
+  window.setTimeout(liftFog, 180);
+  window.setTimeout(() => e.removeAttribute("data-mist-reveal"), 1400);
 }

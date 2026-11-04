@@ -231,8 +231,8 @@ export function QuestEditorDialog({
   const [importance, setImportance] = useState(task ? Math.round(task.importance) : Math.round(prefill?.importance ?? 0));
   const [urgency, setUrgency] = useState(task ? Math.round(task.urgency) : Math.round(prefill?.urgency ?? 0));
   // Tiny tasks start at 15 XP.
-  const [xp, setXp] = useState(task?.xp_value ?? (doingNow ? 30 : create?.tiny ? 15 : 0));
-  const [coinValue, setCoinValue] = useState<number | null>(task?.coin_value ?? null);
+  const [xp, setXp] = useState(task?.xp_value ?? (doingNow ? 30 : 15));
+  const [coinValue, setCoinValue] = useState<number | null>(task ? (task.coin_value ?? null) : 1);
   // Early bonus: null = automatic (half its XP for 2+ days early), 0 = none, or your own amount.
   const [earlyBonus, setEarlyBonus] = useState<number | null>(task?.early_bonus_xp ?? null);
   const [earlyCoins, setEarlyCoins] = useState<number | null>(task?.early_bonus_coins ?? null);
@@ -1664,11 +1664,12 @@ export function QuestEditorDialog({
                               <span role="menu" className="card-pop-in parchment absolute right-0 top-8 z-30 flex w-[170px] flex-col overflow-hidden py-1" style={{ borderRadius: 12, boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
                                 {(
                                   [
+                                    // Order and words from the owner (Nov 4): Skip, then Remove, Failed last, all in black ink.
                                     ["sub", "＋", "Add a sub-task", "var(--t-ink)"],
-                                    ...(st.state !== "skipped" ? [["skip", "⏭", "Skip it", "var(--t-ink)"]] : []),
-                                    ...(st.state !== "failed" ? [["fail", "✗", "Failed", "#b5321f"]] : []),
                                     ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),
-                                    ["remove", "🗑", "Remove sub-quest", "var(--t-ink-soft)"],
+                                    ...(st.state !== "skipped" ? [["skip", "»", "Skip", "var(--t-ink)"]] : []),
+                                    ["remove", "−", "Remove", "var(--t-ink)"],
+                                    ...(st.state !== "failed" ? [["fail", "✕", "Failed", "var(--t-ink)"]] : []),
                                   ] as [string, string, string, string][]
                                 ).map(([k, icon, label, color]) => (
                                   <button
@@ -2134,7 +2135,7 @@ export function QuestEditorDialog({
   const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp", "board"];
   const factLabel = (f: EditorPart) =>
     f === "showsIn"
-      ? `Priority · ${placement === "today" ? "Primary" : placement === "additional" ? "Secondary" : "Backlog"}`
+      ? `${placement === "today" ? "Primary" : placement === "additional" ? "Secondary" : "Backlog"}`
       : f === "time"
         ? estimate.trim()
           ? `${estimate.trim()} min${slot ? " · scheduled" : ""}`
@@ -2143,7 +2144,7 @@ export function QuestEditorDialog({
             : "Time"
         : f === "xp"
           ? `${xp} XP`
-          : (boardOptions?.find((o) => o.id === boardId)?.label ?? "No board");
+          : (boardOptions?.find((o) => o.id === boardId)?.label ?? "Category");
   const factIcon = (f: EditorPart) => {
     const src = f === "showsIn" ? null : f === "time" ? "/design/ui-clock.png" : f === "xp" ? null : "/design/ui-grid.png";
     if (f === "xp")

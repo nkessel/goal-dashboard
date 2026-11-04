@@ -10,7 +10,6 @@ import { EveningRoutineTile } from "./EveningRoutineTile";
 import { StatsTile } from "./StatsTile";
 import { SetAsDefault } from "./SetAsDefault";
 import { PlanningSettings } from "./PlanningSettings";
-import { CleaningSettings } from "./CleaningSettings";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
@@ -29,6 +28,9 @@ import { SharingSettings } from "@/components/settings/SharingSettings";
 import { PartyViewSettings } from "@/components/social/PartyView";
 import { NotificationPrefs } from "@/components/settings/NotificationPrefs";
 import { SettingsRow } from "@/components/settings/SettingsRow";
+import { SettingsSearch } from "@/components/settings/SettingsSearch";
+import { ArrangeTodayLink } from "@/components/settings/ArrangeTodayLink";
+import { MissionsTile } from "@/components/settings/MissionsTile";
 import { BoltIcon, CoinIcon, DiamondIcon } from "@/components/ui/Icons";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import { CelebrationSettings, FabSettings, FabValue, WelcomeSettings } from "@/components/settings/CelebrationSettings";
@@ -58,7 +60,10 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
   const newFeedback = admin ? await countUnreviewed() : 0;
   if (!profile) notFound();
   // ?open= names a section (and maybe one of its groups: "visual-effects.celebrations"); the gears around the app link here.
-  const [openSection, openGroup] = (open ?? "").split(".");
+  const [rawSection, rawGroup] = (open ?? "").split(".");
+  // Older links (gears around the app) name sections that now live inside Visual settings or Account.
+  const moved: Record<string, [string, string | undefined]> = { "visual-effects": ["visual", rawGroup], theme: ["visual", "theme"], menus: ["visual", rawGroup ?? "layout"], "calendar-sync": ["account", undefined] };
+  const [openSection, openGroup] = moved[rawSection] ?? [rawSection, rawGroup];
   const opens = (id: string) => openSection === id;
   const openAppearance = open === "appearance" || opens("theme");
   const isAdventure = profile.theme === "adventure";
@@ -251,18 +256,125 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             </span>
           </Link>
           </TileItem>
+          <TileItem id="missions">
+            <MissionsTile isAdventure={isAdventure} count={Array.isArray(profile.secret_missions) ? profile.secret_missions.length : 0} open={open === "missions" || opens("secret-missions")}>
+              <SecretMissions initial={profile.secret_missions ?? []} steps={missionSteps} />
+            </MissionsTile>
+          </TileItem>
           <TileItem id="stats">
             <StatsTile isAdventure={isAdventure} />
           </TileItem>
         </ReorderableTiles>
 
         {/* Expandable settings rows (drag to reorder) */}
+        <SettingsSearch isAdventure={isAdventure} />
+        {/* The settings opened most, full size (drag to reorder). */}
         <ReorderableSections>
-          <SectionItem id="account">
+          <SectionItem id="visual">
           <SettingsRow
             theme={profile.theme}
+            id="visual"
+            label="Visual settings"
+            defaultOpen={opens("visual") || openAppearance}
+            rightLabel="Theme · layout · effects"
+            icon={<span style={{ fontSize: 14 }}>🎨</span>}
+          >
+            <div className="flex flex-col gap-2">
+              <FxGroup open={openAppearance} id="theme" title="Theme & colours" value={themeLabel} isAdventure={isAdventure}>
+            <div className="flex flex-col gap-3">
+                <div>
+                  <p className="mb-1.5 text-xs" style={{ color: "var(--t-ink-soft)" }}>
+                    Calm keeps things quiet and minimal. Adventure turns your day into a battle —
+                    bouncier animations, monster icons, and level-up fanfare.
+                  </p>
+                  <ThemeToggle theme={profile.theme} />
+                </div>
+                {isAdventure && <PalettePicker current={isPalette((profile.life_wheel as { palette?: unknown } | null)?.palette) ? ((profile.life_wheel as { palette: PaletteKey }).palette) : "forest"} />}
+                <ViewTransitionLink
+                  href="/settings/avatar"
+                  className="hover-glow inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
+                  style={{
+                    background: isAdventure ? "var(--t-gold)" : "var(--t-accent)",
+                    color: isAdventure ? "#2a1c10" : "#fff",
+                  }}
+                >
+                  Edit avatar
+                </ViewTransitionLink>
+              </div>
+              </FxGroup>
+              <FxGroup open={opens("visual") && openGroup === "layout"} id="layout" title="Layout" value="Editors · menus" isAdventure={isAdventure}>
+                <ArrangeTodayLink />
+                <MenusSettings isAdventure={isAdventure} openGroup={opens("visual") ? openGroup : undefined} />
+              </FxGroup>
+              <FxGroup open={opens("visual") && openGroup === "celebrations"} id="celebrations" title="Celebrations" hint="The dust and sparks that fly when you complete a quest." isAdventure={isAdventure}>
+                <CelebrationSettings />
+              </FxGroup>
+              <FxGroup open={opens("visual") && openGroup === "evening-button"} id="evening-button" title="Evening Routine button" value={<EveningButtonValue />} isAdventure={isAdventure}>
+                <EveningButtonFxSettings />
+              </FxGroup>
+              {isAdventure && (
+                <FxGroup open={opens("visual") && openGroup === "fab"} id="fab" title="The + button" value={<FabValue />} isAdventure={isAdventure}>
+                  <FabSettings />
+                </FxGroup>
+              )}
+              <FxGroup open={opens("visual") && openGroup === "scale-colors"} id="scale-colors" title="Scale colours" hint="The bars for importance, urgency, difficulty and energy, on quest cards and in the editor." isAdventure={isAdventure}>
+                <ScaleColorSettings />
+              </FxGroup>
+              <FxGroup open={opens("visual") && openGroup === "loading"} id="loading" title="While a screen loads" value={<LoadingValue />} isAdventure={isAdventure}>
+                <LoadingSettings />
+              </FxGroup>
+              <FxGroup open={opens("visual") && openGroup === "victories"} id="victories" title="Victories Today, when closed" value={<VictoriesValue />} hint="Tap its title to close it. Its header then shows:" isAdventure={isAdventure}>
+                <VictoriesHeaderSettings />
+              </FxGroup>
+              <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
+                Saved on this device.
+              </p>
+            </div>
+          </SettingsRow>
+          </SectionItem>
+          <SectionItem id="toucan-spirit">
+          <SettingsRow id="toucan-spirit"
+            theme={profile.theme}
+            label="Toucan Spirit"
+            rightLabel={`${(profile.toucan?.owned ?? []).length} add-on${(profile.toucan?.owned ?? []).length === 1 ? "" : "s"}`}
+            defaultOpen={open === "toucan" || opens("toucan-spirit")}
+            icon={<span style={{ fontSize: 14 }}>🦜</span>}
+          >
+            <ToucanSettings
+              initialMode={(((profile.life_wheel as { toucanPrefs?: { mode?: string } } | null)?.toucanPrefs?.mode as "simple" | "lite" | "full" | undefined) ?? "full")}
+              initialRetired={(profile.life_wheel as { toucanPrefs?: { retired?: string[] } } | null)?.toucanPrefs?.retired ?? []}
+            />
+            <div className="mt-2 flex flex-col gap-2">
+              <FxGroup title="His look" hint="How “Talk with me” shows, and how he moves when he shares wisdom." isAdventure={isAdventure}>
+                <ToucanLookSettings />
+              </FxGroup>
+              <FxGroup title="His add-ons" hint="Hats, trinkets and the rest, bought with coins." isAdventure={isAdventure}>
+                <ToucanWorkshop initial={profile.toucan ?? null} coins={profile.coins ?? 0} />
+              </FxGroup>
+            </div>
+          </SettingsRow>
+          </SectionItem>
+          <SectionItem id="welcome-screen">
+          <SettingsRow id="welcome-screen" theme={profile.theme} defaultOpen={opens("welcome-screen")} label="Welcome Screen" rightLabel="Check-in · greetings · what's on it" icon={<span style={{ fontSize: 14 }}>🌅</span>}>
+            <WelcomeSettings />
+          </SettingsRow>
+          </SectionItem>
+          <SectionItem id="planning">
+          <SettingsRow id="planning" theme={profile.theme} defaultOpen={opens("planning")} label="Planning & evening" rightLabel="Evening routine · planning steps" icon={<span style={{ fontSize: 14 }}>🗺</span>}>
+            <PlanningSettings isAdventure={isAdventure} withPair={admin} />
+          </SettingsRow>
+          </SectionItem>
+        </ReorderableSections>
+        {/* Account and the rest: opened less, so quieter and smaller. */}
+        <p className={`m-0 mt-1 px-1 text-[12px] font-bold uppercase tracking-wider`} style={{ color: isAdventure ? "var(--t-cream, #f3e6c4)" : "var(--t-ink-soft)", opacity: 0.8 }}>
+          Account & more
+        </p>
+        <ReorderableSections storageKey="settings-order-more">
+          <SectionItem id="account">
+          <SettingsRow id="account" quiet
+            theme={profile.theme}
             label="Account"
-            defaultOpen={opens("account")}
+            defaultOpen={opens("account") || opens("calendar-sync")}
             rightLabel={session?.user?.email ?? undefined}
             icon={
               <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
@@ -291,51 +403,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
                 Sign out
               </button>
             </form>
-          </SettingsRow>
-          </SectionItem>
-
-
-          <SectionItem id="notifications-link">
-          <Link
-            href="/notifications?from=settings"
-            className={`hover-glow flex w-full items-center gap-3 px-4 py-3.5 ${isAdventure ? "parchment" : ""}`}
-            style={
-              isAdventure
-                ? { borderRadius: 14 }
-                : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", borderRadius: 14 }
-            }
-          >
-            <span
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-              style={{ background: isAdventure ? "rgba(209,161,60,.16)" : "var(--t-accent-soft)" }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
-                <path d="M6 9a6 6 0 1 1 12 0c0 3.5 1 5.5 2 6.5H4c1-1 2-3 2-6.5z" strokeLinejoin="round" />
-                <path d="M10 19a2 2 0 0 0 4 0" strokeLinecap="round" />
-              </svg>
-            </span>
-            <span className="flex-1 text-[16px] font-medium" style={{ color: "var(--t-ink)" }}>
-              Notifications
-            </span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M9 5l7 7-7 7" stroke="var(--t-ink-soft)" strokeWidth="2" fill="none" />
-            </svg>
-          </Link>
-          </SectionItem>
-
-          <SectionItem id="calendar-sync">
-          <SettingsRow
-            theme={profile.theme}
-            label="Calendar Sync"
-            defaultOpen={opens("calendar-sync")}
-            rightLabel={session?.googleAccessToken ? "Google Calendar ✓" : "Not connected"}
-            icon={
-              <svg width="15" height="15" viewBox="0 0 24 24" {...ICON_STROKE} stroke={iconColor}>
-                <rect x="3" y="5" width="18" height="16" rx="2" />
-                <path d="M3 9h18M8 3v4M16 3v4" />
-              </svg>
-            }
-          >
+            <FxGroup id="calendar-sync" open={opens("calendar-sync") || opens("account")} title="Calendar sync" value={session?.googleAccessToken ? "Google Calendar ✓" : "Not connected"} isAdventure={isAdventure}>
             {session?.googleAccessToken ? (
               <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
                 Your Google Calendar is connected — appointments show on the Calendar view, and scheduling a quest adds it to your calendar too.
@@ -344,155 +412,24 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             ) : (
               <ConnectCalendar isAdventure={isAdventure} returnTo="/settings" compact />
             )}
+            </FxGroup>
           </SettingsRow>
           </SectionItem>
-
-          <SectionItem id="theme">
-          <SettingsRow
-            theme={profile.theme}
-            label="Theme"
-            rightLabel={themeLabel}
-            defaultOpen={openAppearance}
-            icon={<span style={{ fontSize: 14 }}>🎨</span>}
-          >
-            <div className="flex flex-col gap-3">
-              <div>
-                <p className="mb-1.5 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-                  Calm keeps things quiet and minimal. Adventure turns your day into a battle —
-                  bouncier animations, monster icons, and level-up fanfare.
-                </p>
-                <ThemeToggle theme={profile.theme} />
-              </div>
-              {isAdventure && <PalettePicker current={isPalette((profile.life_wheel as { palette?: unknown } | null)?.palette) ? ((profile.life_wheel as { palette: PaletteKey }).palette) : "forest"} />}
-              <ViewTransitionLink
-                href="/settings/avatar"
-                className="hover-glow inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
-                style={{
-                  background: isAdventure ? "var(--t-gold)" : "var(--t-accent)",
-                  color: isAdventure ? "#2a1c10" : "#fff",
-                }}
-              >
-                Edit avatar
-              </ViewTransitionLink>
-            </div>
-          </SettingsRow>
-          </SectionItem>
-
-
-
-          <SectionItem id="toucan-spirit">
-          <SettingsRow
-            theme={profile.theme}
-            label="Toucan Spirit"
-            rightLabel={`${(profile.toucan?.owned ?? []).length} add-on${(profile.toucan?.owned ?? []).length === 1 ? "" : "s"}`}
-            defaultOpen={open === "toucan" || opens("toucan-spirit")}
-            icon={<span style={{ fontSize: 14 }}>🦜</span>}
-          >
-            <ToucanSettings
-              initialMode={(((profile.life_wheel as { toucanPrefs?: { mode?: string } } | null)?.toucanPrefs?.mode as "simple" | "lite" | "full" | undefined) ?? "full")}
-              initialRetired={(profile.life_wheel as { toucanPrefs?: { retired?: string[] } } | null)?.toucanPrefs?.retired ?? []}
-            />
-            <div className="mt-2 flex flex-col gap-2">
-              <FxGroup title="His look" hint="How “Talk with me” shows, and how he moves when he shares wisdom." isAdventure={isAdventure}>
-                <ToucanLookSettings />
-              </FxGroup>
-              <FxGroup title="His add-ons" hint="Hats, trinkets and the rest, bought with coins." isAdventure={isAdventure}>
-                <ToucanWorkshop initial={profile.toucan ?? null} coins={profile.coins ?? 0} />
-              </FxGroup>
-            </div>
-          </SettingsRow>
-          </SectionItem>
-
-          <SectionItem id="secret-missions">
-          <SettingsRow
-            theme={profile.theme}
-            label="Secret Missions"
-            rightLabel={(() => {
-              const n = Array.isArray(profile.secret_missions) ? profile.secret_missions.length : 0;
-              return n ? `${n} sealed` : "None yet";
-            })()}
-            defaultOpen={open === "missions" || opens("secret-missions")}
-            icon={<span style={{ fontSize: 14 }}>🗝️</span>}
-          >
-            <SecretMissions initial={profile.secret_missions ?? []} steps={missionSteps} />
-          </SettingsRow>
-          </SectionItem>
-
-          <SectionItem id="welcome-screen">
-          <SettingsRow theme={profile.theme} defaultOpen={opens("welcome-screen")} label="Welcome Screen" rightLabel="Check-in · greetings · what's on it" icon={<span style={{ fontSize: 14 }}>🌅</span>}>
-            <WelcomeSettings />
-          </SettingsRow>
-          </SectionItem>
-
-          <SectionItem id="visual-effects">
-          <SettingsRow
-            theme={profile.theme}
-            label="Visual Effects"
-            defaultOpen={opens("visual-effects")}
-            rightLabel="Celebrations · + button · Victories"
-            icon={<span style={{ fontSize: 14 }}>✨</span>}
-          >
-            {/* Folded groups, like Layout: open only the one you're changing. */}
-            <div className="flex flex-col gap-2">
-              <FxGroup open={opens("visual-effects") && openGroup === "celebrations"} title="Celebrations" hint="The dust and sparks that fly when you complete a quest." isAdventure={isAdventure}>
-                <CelebrationSettings />
-              </FxGroup>
-              <FxGroup open={opens("visual-effects") && openGroup === "evening-button"} title="Evening Routine button" value={<EveningButtonValue />} isAdventure={isAdventure}>
-                <EveningButtonFxSettings />
-              </FxGroup>
-              {isAdventure && (
-                <FxGroup open={opens("visual-effects") && openGroup === "fab"} title="The + button" value={<FabValue />} isAdventure={isAdventure}>
-                  <FabSettings />
-                </FxGroup>
-              )}
-              <FxGroup open={opens("visual-effects") && openGroup === "scale-colors"} title="Scale colours" hint="The bars for importance, urgency, difficulty and energy, on quest cards and in the editor." isAdventure={isAdventure}>
-                <ScaleColorSettings />
-              </FxGroup>
-              <FxGroup open={opens("visual-effects") && openGroup === "loading"} title="While a screen loads" value={<LoadingValue />} isAdventure={isAdventure}>
-                <LoadingSettings />
-              </FxGroup>
-              <FxGroup open={opens("visual-effects") && openGroup === "victories"} title="Victories Today, when closed" value={<VictoriesValue />} hint="Tap its title to close it. Its header then shows:" isAdventure={isAdventure}>
-                <VictoriesHeaderSettings />
-              </FxGroup>
-              <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-                Saved on this device.
-              </p>
-            </div>
-          </SettingsRow>
-          </SectionItem>
-
-
-          <SectionItem id="mess-check-in">
-          <SettingsRow theme={profile.theme} defaultOpen={opens("mess-check-in")} label="Mess check-in" rightLabel="How messes look · under your cleaning habit" icon={<span style={{ fontSize: 14 }}>🧹</span>}>
-            <CleaningSettings initial={profile.life_wheel?.cleaning ?? null} />
-          </SettingsRow>
-          </SectionItem>
-
-          <SectionItem id="planning">
-          <SettingsRow theme={profile.theme} defaultOpen={opens("planning")} label="Planning & evening" rightLabel="Evening routine · planning steps" icon={<span style={{ fontSize: 14 }}>🗺</span>}>
-            <PlanningSettings isAdventure={isAdventure} withPair={admin} />
-          </SettingsRow>
-          </SectionItem>
-
-          <SectionItem id="menus">
-          <SettingsRow theme={profile.theme} defaultOpen={opens("menus")} label="Layout" rightLabel="Editors · menus" icon={<span style={{ fontSize: 14 }}>☰</span>}>
-            <MenusSettings isAdventure={isAdventure} openGroup={opens("menus") ? openGroup : undefined} />
-          </SettingsRow>
-          </SectionItem>
-
           <SectionItem id="notifications">
-          <SettingsRow
+          <SettingsRow id="notifications" quiet
             theme={profile.theme}
             label="Notifications"
             defaultOpen={opens("notifications")}
             icon={<span style={{ fontSize: 14 }}>🔔</span>}
           >
+            <Link href="/notifications?from=settings" className="self-start text-[13.5px] font-semibold underline underline-offset-2" style={{ color: "var(--t-ink)" }}>
+              See your notifications ›
+            </Link>
             <NotificationPrefs level={profile.notify_level ?? "all"} email={profile.notify_email ?? true} />
           </SettingsRow>
           </SectionItem>
-
           <SectionItem id="party-view">
-          <SettingsRow
+          <SettingsRow id="party-view" quiet
             theme={profile.theme}
             label="Guild Hall"
             defaultOpen={opens("party-view")}
@@ -507,9 +444,8 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             <PartyViewSettings isAdventure={isAdventure} />
           </SettingsRow>
           </SectionItem>
-
           <SectionItem id="privacy-security">
-          <SettingsRow
+          <SettingsRow id="privacy-security" quiet
             theme={profile.theme}
             label="Privacy & Security"
             defaultOpen={opens("privacy-security")}
@@ -528,9 +464,8 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             </div>
           </SettingsRow>
           </SectionItem>
-
           <SectionItem id="your-data">
-          <SettingsRow
+          <SettingsRow id="your-data" quiet
             theme={profile.theme}
             label="Your Data"
             defaultOpen={opens("your-data")}
@@ -548,9 +483,8 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
             <ExportDataButton theme={profile.theme} />
           </SettingsRow>
           </SectionItem>
-
           <SectionItem id="help-support">
-          <SettingsRow
+          <SettingsRow id="help-support" quiet
             theme={profile.theme}
             label="Help & Support"
             defaultOpen={opens("help-support")}

@@ -1,5 +1,7 @@
 "use client";
 
+import { loadFx, patchFx } from "@/lib/celebration-fx";
+
 import { FoldGroup } from "./FoldGroup";
 import { useEffect, useState } from "react";
 import { saveToucanPrefsAction } from "@/app/actions";
@@ -198,6 +200,7 @@ export function ToucanLookSettings() {
   const pick = (on: boolean) => (on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border, rgba(139,112,64,.35))", color: "var(--t-ink)" });
   return (
     <div className="flex flex-col gap-2.5" style={{ color: "var(--t-ink)" }}>
+      <ArrivalTalk />
       <ToucanPreview text="Rivers carve canyons not by force, but by returning." talk={talk} flourish={flourish} play={play} />
       <span className="text-sm font-semibold">“Talk with me” on his speech bubble</span>
       <div role="radiogroup" aria-label="How Talk with me shows" className="flex flex-col gap-1.5">
@@ -245,5 +248,28 @@ export function ToucanLookSettings() {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Whether the welcome toucan speaks as you arrive, or waits to be tapped (the default, owner Nov 4). */
+function ArrivalTalk() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- saved on this device, only readable in the browser
+    setOn(!!loadFx().welcomeToucanTalks);
+  }, []);
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => {
+          setOn(e.target.checked);
+          patchFx({ welcomeToucanTalks: e.target.checked });
+        }}
+        className="h-4 w-4 rounded-full"
+      />
+      Speaks when you arrive on the welcome screen
+    </label>
   );
 }

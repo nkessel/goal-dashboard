@@ -464,15 +464,15 @@ export function QuestComplete(props: QuestCompleteProps) {
             <button
               type="button"
               onClick={openChest}
-              className={`min-h-14 flex-1 cursor-pointer rounded-[14px] px-2 font-bold leading-[1.05] tracking-[.01em] ${isReward ? "text-[17px]" : "text-[19px]"}`}
+              className="min-h-14 flex-[1] cursor-pointer rounded-[14px] px-2 text-[15px] font-bold leading-[1.05] tracking-[.01em]"
               style={{ border: "3px solid #31301e", background: "radial-gradient(circle at 32% 28%, #f2c96a, #d9b45f 55%, #a88a3f)", color: "#2a1c10", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5), inset 0 -3px 5px rgba(0,0,0,.25), 0 6px 14px rgba(0,0,0,.45)" }}
             >
-              {isReward ? "Receive another reward" : "Choose a Reward"}
+              {isReward ? "Another reward" : "Choose a Reward"}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="min-h-14 flex-1 cursor-pointer rounded-[14px] px-2 text-[17px] font-bold leading-[1.05] tracking-[.01em]"
+              className="min-h-14 flex-[2] cursor-pointer rounded-[14px] px-2 text-[17px] font-bold leading-[1.05] tracking-[.01em]"
               style={{ border: "2px solid #d9b45f", background: "linear-gradient(180deg,#3b4636,#232c22)", color: "#efe6cc", boxShadow: "inset 0 1px 0 rgba(255,235,180,.2), 0 6px 14px rgba(0,0,0,.45)" }}
             >
               Continue Your Journey
@@ -492,7 +492,7 @@ export function QuestComplete(props: QuestCompleteProps) {
               className="-mt-1 cursor-pointer text-[13.5px] underline underline-offset-2 disabled:opacity-50"
               style={{ color: "#d9c79a" }}
             >
-              {undoing ? "Undoing…" : "Not done yet? Undo this completion"}
+              {undoing ? "Undoing…" : "Undo quest completion"}
             </button>
           )}
           </>

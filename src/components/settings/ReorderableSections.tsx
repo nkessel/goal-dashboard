@@ -51,14 +51,14 @@ export function SectionItem({ id, children }: { id: string; children: React.Reac
  * The Settings sections, in your order: drag one (hold it on a phone) to
  * move it. While a section is open, the list stays put.
  */
-export function ReorderableSections({ children }: { children: React.ReactNode }) {
+export function ReorderableSections({ children, storageKey = KEY }: { children: React.ReactNode; /** Each list keeps its own order. */ storageKey?: string }) {
   const items = useMemo(() => Children.toArray(children).filter(isValidElement) as React.ReactElement<{ id: string }>[], [children]);
   const ids = items.map((c) => c.props.id);
   const [order, setOrder] = useState<string[] | null>(null);
   const [openSet, setOpenSet] = useState<Set<string>>(new Set());
   useEffect(() => {
     try {
-      const saved = JSON.parse(window.localStorage.getItem(KEY) ?? "null") as string[] | null;
+      const saved = JSON.parse(window.localStorage.getItem(storageKey) ?? "null") as string[] | null;
       // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
       if (Array.isArray(saved)) setOrder(saved);
     } catch {
@@ -98,7 +98,7 @@ export function ReorderableSections({ children }: { children: React.ReactNode })
     const next = arrayMove(sorted, sorted.indexOf(String(e.active.id)), sorted.indexOf(String(e.over.id)));
     setOrder(next);
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(next));
+      window.localStorage.setItem(storageKey, JSON.stringify(next));
     } catch {
       /* storage unavailable */
     }

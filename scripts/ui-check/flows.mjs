@@ -193,7 +193,7 @@ export const FLOWS = [
         if (await h.tap((p) => p.getByRole("menuitem", { name: /sequence/i }).first(), "edit the sequence", { optional: true, expectMove: true })) {
           await h.settle(800);
           await h.check("sequence dialog");
-          if (await h.tap((p) => p.getByRole("button", { name: /post the reflection link/i }).first(), "edit a waiting quest", { optional: true, expectMove: true })) {
+          if (await h.tap((p) => p.locator("[aria-label='Quest sequence']").getByText(/post the reflection link/i).first(), "edit a waiting quest", { optional: true, expectMove: true })) {
             await h.settle(1200);
             await h.check("sequence: waiting quest in the editor");
           }
@@ -351,6 +351,23 @@ export const FLOWS = [
         const name = ((await row.innerText().catch(() => "")) || `group ${i + 1}`).split("\n")[0].slice(0, 30);
         if (!(await h.tap(() => row, `open ${name}`, { optional: true }))) break;
         await h.check(`group ${name}`);
+      }
+      // Search (owner, Nov 4): "loading" finds "While a screen loads" inside Visual settings and opens it.
+      await h.goto("/settings", { name: "settings search" });
+      const q = h.page.getByRole("searchbox", { name: /search settings/i }).first();
+      if (await q.isVisible().catch(() => false)) {
+        await q.fill("loading");
+        await h.settle(400);
+        await h.check("search results");
+        await h.tap((p) => p.getByRole("button", { name: /while a screen loads/i }).first(), "open loading settings", { optional: true, expectMove: true });
+        await h.settle(900);
+        await h.check("found: loading");
+      }
+      // Secret Missions slides in from the right as its own screen.
+      if (await h.tap((p) => p.getByRole("button", { name: /secret missions/i }).first(), "secret missions", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("secret missions screen");
+        await esc(h);
       }
     },
   },

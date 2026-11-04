@@ -7,8 +7,12 @@ import { PROMPT_DEFAULT, readPromptAt, savePromptAt, setEveningMode } from "@/co
 import { OneMenu } from "./MenuLayoutSettings";
 import { FoldGroup } from "./FoldGroup";
 
-const TIMES = [16, 17, 18, 19, 20, 21].map((h) => h * 60);
-const label = (m: number) => `${m / 60 - 12}pm`;
+const TIMES = [16, 16.5, 17, 18, 19, 20, 21].map((h) => h * 60);
+const label = (m: number) => {
+  const h = Math.floor(m / 60), mm = m % 60;
+  return `${((h + 11) % 12) + 1}${mm ? `:${String(mm).padStart(2, "0")}` : ""}${h < 12 ? "am" : "pm"}`;
+};
+const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("evening-prompt-change", cb);
@@ -27,7 +31,7 @@ export function PlanningSettings({ isAdventure, withPair }: { isAdventure: boole
   const chip = (on: boolean) => (on ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" } : { border: "1px solid rgba(139,112,64,.45)", color: "var(--t-ink)" });
   return (
     <div className="flex flex-col gap-2">
-      <FoldGroup title="Evening routine" value={at === "off" ? "Off" : `From ${label(at)}`} hint="It sits at the top of Today from this time (in place of a planning invitation), with a small “hide”." isAdventure={isAdventure}>
+      <FoldGroup title="Evening routine" value={at === "off" ? "Off" : `From ${label(at)}`} hint="It sits at the top of Today from this time (in place of a planning invitation)." isAdventure={isAdventure}>
       <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-1.5">
         {TIMES.map((m) => (
@@ -35,6 +39,20 @@ export function PlanningSettings({ isAdventure, withPair }: { isAdventure: boole
             {label(m)}
           </button>
         ))}
+        {/* Any time (owner, Nov 4: "set custom time for evening routine to start"). */}
+        <label className="flex h-8 items-center gap-1 rounded-full pl-3 pr-1 text-[13px] font-semibold" style={chip(at !== "off" && !TIMES.includes(at))}>
+          Other
+          <input
+            type="time"
+            value={at === "off" ? "" : hhmm(at)}
+            onChange={(e) => {
+              const [h, m] = e.target.value.split(":").map(Number);
+              if (Number.isFinite(h) && Number.isFinite(m)) savePromptAt(h * 60 + m);
+            }}
+            aria-label="Evening routine starts at"
+            className="time-field h-7 bg-transparent px-1 text-[13px]"
+          />
+        </label>
         <button type="button" aria-pressed={at === "off"} onClick={() => savePromptAt("off")} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={chip(at === "off")}>
           Off
         </button>

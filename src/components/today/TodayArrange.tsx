@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GearIcon } from "@/components/ui/Icons";
 import { BOARD_PARTS, DEFAULT_TODAY_LAYOUT, TODAY_PARTS, readTodayLayout, saveTodayLayout, serverTodayLayout, subscribeTodayLayout, type TodayPart } from "@/lib/today-layout";
 
 const GOLD = "#8a6116";
@@ -19,6 +18,23 @@ const GOLD = "#8a6116";
 export function TodayArrange({ parts, board }: { parts: Partial<Record<TodayPart, React.ReactNode>>; board: React.ReactNode }) {
   const layout = useSyncExternalStore(subscribeTodayLayout, readTodayLayout, serverTodayLayout);
   const [arranging, setArranging] = useState(false);
+  // Opened from Settings › Visual settings › Layout (owner, Nov 4: no gear on Today itself).
+  useEffect(() => {
+    const start = () => {
+      try {
+        if (window.sessionStorage.getItem("arrange-today")) {
+          window.sessionStorage.removeItem("arrange-today");
+          setArranging(true);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      } catch {
+        /* storage unavailable */
+      }
+    };
+    start();
+    window.addEventListener("arrange-today", start);
+    return () => window.removeEventListener("arrange-today", start);
+  }, []);
   const shown = layout.order.filter((k) => !layout.hidden.includes(k));
   // The board sits where the first of its parts does.
   const boardAt = layout.order.find((k) => BOARD_PARTS.includes(k));
@@ -30,17 +46,6 @@ export function TodayArrange({ parts, board }: { parts: Partial<Record<TodayPart
 
   return (
     <div className="group/today relative flex flex-col gap-6">
-      <button
-        type="button"
-        onClick={() => setArranging((v) => !v)}
-        aria-pressed={arranging}
-        aria-label={arranging ? "Done arranging Today" : "Arrange Today"}
-        title={arranging ? "Done arranging" : "Arrange Today"}
-        className={`settings-gear absolute -top-3 right-0 z-[3] flex h-8 w-8 items-center justify-center rounded-full transition-opacity ${arranging ? "opacity-100" : "opacity-0 group-hover/today:opacity-80 focus-visible:opacity-100 [@media(hover:none)]:opacity-45"}`}
-        style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
-      >
-        <GearIcon size={16} />
-      </button>
       {arranging ? <Arranging parts={parts} onDone={() => setArranging(false)} /> : nodes}
     </div>
   );
