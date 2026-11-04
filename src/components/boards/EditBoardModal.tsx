@@ -111,6 +111,18 @@ export function EditBoardModal({
                 aria-label={c ?? "Default"}
               />
             ))}
+            {/* Any colour, from the colour wheel (owner, Nov 3). */}
+            <label
+              title="Pick any colour"
+              className="relative flex h-7 w-7 cursor-pointer items-center justify-center overflow-hidden rounded-full border"
+              style={{
+                background: color && !COLORS.includes(color) ? color : "conic-gradient(#e06666, #f6b26b, #ffd966, #93c47d, #6fa8dc, #8e7cc3, #c27ba0, #e06666)",
+                borderColor: color && !COLORS.includes(color) ? (isAdventure ? "var(--t-gold)" : "var(--t-accent)") : "var(--t-card-border)",
+                borderWidth: color && !COLORS.includes(color) ? 2 : 1,
+              }}
+            >
+              <input type="color" value={color && /^#[0-9a-f]{6}$/i.test(color) ? color : "#c9a86a"} onChange={(e) => setColor(e.target.value)} aria-label="Pick any colour" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+            </label>
           </div>
         </div>
 

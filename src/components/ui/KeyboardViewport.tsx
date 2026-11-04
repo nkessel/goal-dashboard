@@ -120,6 +120,17 @@ export function KeyboardViewport() {
       if (!root.classList.contains("scroll-locked") && !feedbackHeld()) unpin();
     });
     lockWatch.observe(root, { attributes: true, attributeFilter: ["class"] });
+    // Writing feedback while looking around: touching or scrolling the page outside the box gives it
+    // its scroll back (owner, Nov 3: "trying to scroll down just jumped right back").
+    const outside = (e: Event) => {
+      if (!pinned || root.classList.contains("scroll-locked")) return;
+      const t = e.target;
+      if (t instanceof Element && t.closest("[data-feedback-root]")) return;
+      const a = document.activeElement;
+      if (a instanceof HTMLElement && inFeedback(a)) unpin();
+    };
+    document.addEventListener("touchstart", outside, { passive: true, capture: true });
+    document.addEventListener("wheel", outside, { passive: true, capture: true });
 
     // Focus a field as if it were already at the top of the screen, so the
     // browser has no reason to pan; the transform is gone a frame later.
@@ -275,6 +286,8 @@ export function KeyboardViewport() {
       document.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("touchstart", onTouchStart, { capture: true });
       document.removeEventListener("touchend", onTouchEnd, { capture: true });
+      document.removeEventListener("touchstart", outside, { capture: true });
+      document.removeEventListener("wheel", outside, { capture: true });
       lockWatch.disconnect();
       releaseLayers();
       unpin();
