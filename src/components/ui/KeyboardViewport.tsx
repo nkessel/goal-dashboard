@@ -127,7 +127,7 @@ export function KeyboardViewport() {
       pin();
       // The feedback box and the welcome screen (data-kb-plain) hold their own size; the
       // off-screen trick below made iPhones flash and lag, so they're focused plainly.
-      if (el.closest("[data-feedback-root], [data-kb-plain]")) {
+      if (el.closest("[data-feedback-root], [data-kb-plain], [data-kb-fit]")) {
         if (document.activeElement !== el) el.focus({ preventScroll: true });
         return;
       }
@@ -216,7 +216,7 @@ export function KeyboardViewport() {
     const holdLayers = () => {
       const h = window.innerHeight;
       document.querySelectorAll<HTMLElement>("body *").forEach((n) => {
-        if (held.has(n) || n.closest("[data-feedback-root], [data-welcome-root]")) return;
+        if (held.has(n) || n.closest("[data-feedback-root], [data-welcome-root], [data-kb-fit]")) return;
         const cs = getComputedStyle(n);
         if (cs.position !== "fixed" || cs.top !== "0px" || cs.bottom !== "0px") return;
         held.set(n, { height: n.style.height, bottom: n.style.bottom });

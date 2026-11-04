@@ -14,6 +14,7 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 ## Quests and the quest editor
 
 ## Calendar
+- (Nov 3 late, built: the auto-scheduler window + its ✨ Auto-schedule button + Plan my day on the calendar.) Owner to try: drag from the list, ✨ Auto-schedule, drag/resize on the calendar, tap for info. Plan tomorrow's day's own grid still moves a quest by Move › tap a time (no drag yet).
 - (Nov 3, built: every calendar listed, Google-hidden ones too and unticked ones start hidden; drag to reorder; archive skips loading.) Confirm on the live app once Google is reconnected.
 
 ## Feedback tool (repeat ask 14)

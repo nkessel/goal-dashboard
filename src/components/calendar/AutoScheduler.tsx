@@ -170,17 +170,29 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = fal
   const blocking = useMemo(() => (calBlocking ? [...calBlocking, ...habitHolds.map((h) => ({ start: h.start, end: h.end }))] : null), [calBlocking, habitHolds]);
   // "Another time": spots a quest shouldn't take again.
   const [avoid, setAvoid] = useState<Avoid>({});
-  // One by one: each placement in time order; an accepted one keeps its time while the rest are planned around it.
-  const [oneByOne, setOneByOne] = useState(false);
+  // One by one (the way it opens, owner Nov 3): each placement in time order; an accepted one keeps its time
+  // while the rest are planned around it. Skipped ones wait until a chosen number of others are placed, then
+  // are offered again wherever there's room by then.
+  const [oneByOne, setOneByOne] = useState(true);
   const [fixed, setFixed] = useState<Placed[]>([]);
+  const [later, setLater] = useState<{ id: string; at: number }[]>([]);
+  const handled = fixed.length + skipped.size;
+  const waiting = useMemo(() => new Set(later.filter((l) => l.at > handled).map((l) => l.id)), [later, handled]);
   const plan = useMemo(() => {
     if (!settings || !blocking) return null;
     const held = new Set(fixed.map((f) => f.id));
     // One day: all of it goes on that day (no daily cap, weekends too).
     const eff = day ? { ...settings, horizon: 1, maxPerDay: Math.max(settings.maxPerDay, 16 * 60), skipWeekends: false } : settings;
-    return planSchedule(items.filter((i) => !held.has(i.id)), [...blocking, ...fixed.map((f) => ({ start: f.start.getTime(), end: f.end.getTime() }))], eff, now, avoid);
-  }, [items, blocking, settings, now, avoid, fixed, day]);
+    const run = (hold: Set<string>) => planSchedule(items.filter((i) => !held.has(i.id) && !hold.has(i.id)), [...blocking, ...fixed.map((f) => ({ start: f.start.getTime(), end: f.end.getTime() }))], eff, now, avoid);
+    if (!oneByOne || !waiting.size) return run(new Set());
+    // Waiting ones come back as soon as nothing else is left to look at.
+    const without = run(waiting);
+    return without.placed.length ? without : run(new Set());
+  }, [items, blocking, settings, now, avoid, fixed, day, oneByOne, waiting]);
   const current = useMemo(() => [...(plan?.placed ?? [])].sort((a, b) => a.start.getTime() - b.start.getTime())[0] ?? null, [plan]);
+  // Moved or resized by hand (drag on its strip, or Adjust): it's offered there instead.
+  const [moved, setMoved] = useState<{ id: string; start: number; minutes: number } | null>(null);
+  const shown = current && moved?.id === current.id ? { ...current, start: new Date(moved.start), end: new Date(moved.start + moved.minutes * 60_000), late: false } : current;
   const meals = Object.fromEntries((Object.keys(MEAL_DEFAULTS) as MealKey[]).map((k) => [k, { ...MEAL_DEFAULTS[k], ...((settings?.meals as Partial<Record<MealKey, object>> | undefined)?.[k] ?? {}) }])) as typeof MEAL_DEFAULTS;
   function setMeal(key: MealKey, patch: Partial<(typeof meals)[MealKey]>) {
     change({ meals: { ...meals, [key]: { ...meals[key], ...patch } } });
@@ -424,13 +436,37 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = fal
           )}
           {oneByOne && (
             <OneByOne
-              current={current}
+              current={shown}
               accepted={[...fixed].sort((a, b) => a.start.getTime() - b.start.getTime())}
-              holds={current ? holdsFor(current.start) : []}
+              holds={shown ? holdsFor(shown.start) : []}
+              busy={blocking ?? []}
+              extras={day ? dayExtras(habitHolds, optional, kept) : []}
+              from={settings?.dayStart ?? 8 * 60}
+              to={settings?.dayEnd ?? 21 * 60}
+              left={(plan?.placed.length ?? 1) - 1 + waiting.size}
+              waiting={later.filter((l) => waiting.has(l.id)).map((l) => ({ title: taskOf.get(l.id)?.title ?? "A quest", after: l.at === Infinity ? null : l.at - handled }))}
               isAdventure={isAdventure}
-              onAccept={() => current && setFixed((f) => [...f, current])}
-              onAnother={() => current && setAvoid((v) => ({ ...v, [current.id]: [...(v[current.id] ?? []), { start: current.start.getTime(), end: current.end.getTime() }] }))}
-              onLeave={() => current && setSkipped((x) => new Set(x).add(current.id))}
+              onAccept={() => {
+                if (!shown) return;
+                setFixed((f) => [...f, shown]);
+                setMoved(null);
+              }}
+              onMove={(start, minutes) => current && setMoved({ id: current.id, start, minutes })}
+              onAnother={() => {
+                if (!current) return;
+                setMoved(null);
+                setAvoid((v) => ({ ...v, [current.id]: [...(v[current.id] ?? []), { start: current.start.getTime(), end: current.end.getTime() }] }));
+              }}
+              onSkip={(n) => {
+                if (!current) return;
+                setMoved(null);
+                setLater((l) => [...l.filter((x) => x.id !== current.id), { id: current.id, at: n === null ? Infinity : handled + n }]);
+              }}
+              onLeave={() => {
+                if (!current) return;
+                setMoved(null);
+                setSkipped((x) => new Set(x).add(current.id));
+              }}
               onUndo={(id) => setFixed((f) => f.filter((x) => x.id !== id))}
             />
           )}
@@ -560,11 +596,11 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = fal
                   <button
                     type="button"
                     onClick={apply}
-                    disabled={applying || fixed.length === 0 || !!current}
+                    disabled={applying || fixed.length === 0}
                     className="hover-glow ml-auto h-11 rounded-full px-5 text-[15px] font-bold disabled:opacity-50"
                     style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}
                   >
-                    {applying ? "Placing…" : `Place ${fixed.length} on the calendar`}
+                    {applying ? "Placing…" : current ? `Place the ${fixed.length === 1 ? "one" : fixed.length} OK'd` : `Place ${fixed.length} on the calendar`}
                   </button>
                 </>
               )}
@@ -730,17 +766,68 @@ function OptionalAndHabits({ optional, kept, habits, isAdventure, onKeep, onDele
 }
 type Placed = { id: string; title: string; start: Date; end: Date; late?: boolean };
 
-/** One placement at a time: it looks good, another time, or leave it out. Nothing is placed until the end. */
-function OneByOne({ current, accepted, holds, isAdventure, onAccept, onAnother, onLeave, onUndo }: { current: Placed | null; accepted: Placed[]; holds: Hold[]; isAdventure: boolean; onAccept: () => void; onAnother: () => void; onLeave: () => void; onUndo: (id: string) => void }) {
+/**
+ * One placement at a time (owner, Nov 3: "it goes through where it thinks each item should go, in sequence"):
+ * its day as a strip where the gold block is dragged (or a time tapped) to move it, Adjust for the day,
+ * time and length, then Looks good, Another time, Skip (offered again after a chosen number of others),
+ * or Leave it out. Nothing is placed until the end.
+ */
+function OneByOne({
+  current,
+  accepted,
+  holds,
+  busy,
+  extras,
+  from,
+  to,
+  left,
+  waiting,
+  isAdventure,
+  onAccept,
+  onMove,
+  onAnother,
+  onSkip,
+  onLeave,
+  onUndo,
+}: {
+  current: Placed | null;
+  accepted: Placed[];
+  holds: Hold[];
+  busy: Busy[];
+  extras: Extra[];
+  from: number;
+  to: number;
+  /** How many more after this one (no fractions). */
+  left: number;
+  waiting: { title: string; after: number | null }[];
+  isAdventure: boolean;
+  onAccept: () => void;
+  onMove: (start: number, minutes: number) => void;
+  onAnother: () => void;
+  onSkip: (after: number | null) => void;
+  onLeave: () => void;
+  onUndo: (id: string) => void;
+}) {
   const ink = "var(--t-ink)";
   const soft = "var(--t-ink-soft)";
   const gold = isAdventure ? "var(--t-gold)" : "var(--t-accent)";
+  const [adjust, setAdjust] = useState(false);
+  const [skipOpen, setSkipOpen] = useState(false);
+  const minutes = current ? Math.round((current.end.getTime() - current.start.getTime()) / 60_000) : 0;
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+  const clash = current
+    ? [...busy, ...accepted.map((p) => ({ start: p.start.getTime(), end: p.end.getTime() }))].some((b) => b.start < current.end.getTime() && b.end > current.start.getTime())
+    : false;
+  const chip = "h-8 rounded-full px-2.5 text-[12.5px] font-semibold";
+  const quiet = { border: "1px solid #b39a6a", color: ink };
+  const on = { background: gold, color: isAdventure ? "#2a1c10" : "#fff" };
   return (
     <div className="flex flex-col gap-3">
       {current ? (
-        <div key={`${current.id}-${current.start.getTime()}`} className="card-pop-in flex flex-col gap-2 rounded-2xl px-4 py-3" style={{ background: isAdventure ? "rgba(255,250,238,.7)" : "var(--t-bg)", border: "1.5px dashed #b8913f" }}>
-          <span className="text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: isAdventure ? "#8a6116" : soft }}>
-            Tentative
+        <div key={current.id} className="card-pop-in flex flex-col gap-2 rounded-2xl px-3.5 py-3" style={{ background: isAdventure ? "rgba(255,250,238,.7)" : "var(--t-bg)", border: "1.5px dashed #b8913f" }}>
+          <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[.08em]" style={{ color: isAdventure ? "#8a6116" : soft }}>
+            Where it could go
+            {left > 0 && <span className="ml-auto font-semibold normal-case tracking-normal">{left === 1 ? "1 more after this" : `${left} more after this`}</span>}
           </span>
           <span className={`${isAdventure ? "font-display text-[20px]" : "text-[17px] font-bold"} leading-snug`} style={{ color: ink }}>
             {current.title}
@@ -752,20 +839,89 @@ function OneByOne({ current, accepted, holds, isAdventure, onAccept, onAnother, 
                 later than hoped
               </span>
             )}
+            {clash && (
+              <span className="ml-1.5 text-[12px] font-bold" style={{ color: "var(--t-warn)" }}>
+                overlaps something
+              </span>
+            )}
           </span>
+          <ReviewStrip
+            day={current.start}
+            current={current}
+            accepted={accepted.filter((p) => sameDay(p.start, current.start))}
+            busy={busy}
+            holds={holds}
+            extras={extras}
+            from={from}
+            to={to}
+            isAdventure={isAdventure}
+            onMove={(start) => onMove(start, minutes)}
+          />
           {holds.length > 0 && (
             <span className="text-[12.5px] italic" style={{ color: soft }}>
               {holds.map((h) => `${MEAL_ICONS[h.key]} ${MEAL_NAMES[h.key]}${h.at !== null ? ` ${hm(new Date(h.at))}` : ": crowded out"}`).join(" · ")}
             </span>
           )}
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={onAccept} className="hover-glow h-10 rounded-full px-5 text-[14.5px] font-bold" style={{ background: gold, color: isAdventure ? "#2a1c10" : "#fff" }}>
+          <Fold open={adjust}>
+            <div className="flex flex-col gap-1.5 rounded-xl px-2 py-2" style={{ background: "rgba(120,90,40,.08)" }}>
+              <span className="flex flex-wrap items-center gap-1">
+                <button type="button" onClick={() => onMove(current.start.getTime() - 86_400_000, minutes)} className={chip} style={quiet} aria-label="A day earlier">
+                  ‹ Day
+                </button>
+                <button type="button" onClick={() => onMove(current.start.getTime() - 15 * 60_000, minutes)} className={chip} style={quiet} aria-label="15 minutes earlier">
+                  −15
+                </button>
+                <span className="min-w-[64px] text-center text-[13.5px] font-bold tabular-nums" style={{ color: ink }}>
+                  {hm(current.start)}
+                </span>
+                <button type="button" onClick={() => onMove(current.start.getTime() + 15 * 60_000, minutes)} className={chip} style={quiet} aria-label="15 minutes later">
+                  +15
+                </button>
+                <button type="button" onClick={() => onMove(current.start.getTime() + 86_400_000, minutes)} className={chip} style={quiet} aria-label="A day later">
+                  Day ›
+                </button>
+              </span>
+              <span className="flex flex-wrap items-center gap-1">
+                <span className="mr-0.5 text-[12.5px]" style={{ color: soft }}>
+                  Length
+                </span>
+                {[15, 30, 45, 60, 90, 120].map((m) => (
+                  <button key={m} type="button" onClick={() => onMove(current.start.getTime(), m)} aria-pressed={m === minutes} className={chip} style={m === minutes ? on : quiet}>
+                    {m < 60 ? `${m}m` : m === 90 ? "1½h" : `${m / 60}h`}
+                  </button>
+                ))}
+              </span>
+            </div>
+          </Fold>
+          <Fold open={skipOpen}>
+            <div className="flex flex-wrap items-center gap-1 rounded-xl px-2 py-2" style={{ background: "rgba(120,90,40,.08)" }}>
+              <span className="mr-0.5 text-[12.5px]" style={{ color: soft }}>
+                Offer it again after
+              </span>
+              {[1, 2, 3, 5].map((n) => (
+                <button key={n} type="button" onClick={() => (setSkipOpen(false), onSkip(n))} className={chip} style={quiet}>
+                  {n === 1 ? "the next one" : `${n} others`}
+                </button>
+              ))}
+              <button type="button" onClick={() => (setSkipOpen(false), onSkip(null))} className={chip} style={quiet}>
+                all the rest
+              </button>
+            </div>
+          </Fold>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+            <button type="button" onClick={() => (setAdjust(false), setSkipOpen(false), onAccept())} className="hover-glow h-10 rounded-full px-5 text-[14.5px] font-bold" style={on}>
               Looks good ✓
             </button>
-            <button type="button" onClick={onAnother} className="h-10 rounded-full px-4 text-[14px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: ink }}>
+            <button type="button" onClick={onAnother} className="h-10 rounded-full px-3.5 text-[14px] font-semibold" style={{ border: "1.5px solid #b39a6a", color: ink }}>
               Another time
             </button>
-            <button type="button" onClick={onLeave} className="h-10 rounded-full px-3 text-[13.5px] underline underline-offset-2" style={{ color: soft }}>
+            <button type="button" onClick={() => (setSkipOpen((v) => !v), setAdjust(false))} aria-expanded={skipOpen} className="h-10 rounded-full px-3 text-[14px] font-semibold" style={{ color: ink, background: skipOpen ? "rgba(217,180,95,.22)" : undefined }}>
+              Skip…
+            </button>
+            <button type="button" onClick={() => (setAdjust((v) => !v), setSkipOpen(false))} aria-expanded={adjust} className="h-10 rounded-full px-3 text-[14px] font-semibold" style={{ color: ink, background: adjust ? "rgba(217,180,95,.22)" : undefined }}>
+              Adjust
+            </button>
+            <button type="button" onClick={onLeave} className="ml-auto h-10 rounded-full px-2 text-[13px] underline underline-offset-2" style={{ color: soft }}>
               Leave it out
             </button>
           </div>
@@ -775,10 +931,15 @@ function OneByOne({ current, accepted, holds, isAdventure, onAccept, onAnother, 
           {accepted.length ? "All looked over. Place them when you're ready." : "Nothing left to look over."}
         </p>
       )}
+      {waiting.length > 0 && (
+        <p className="m-0 text-[12.5px]" style={{ color: soft }}>
+          Coming back: {waiting.map((w) => `${w.title}${w.after === null ? " (at the end)" : w.after === 1 ? " (after the next one)" : ` (after ${w.after} more)`}`).join(" · ")}
+        </p>
+      )}
       {accepted.length > 0 && (
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
           {accepted.map((p) => (
-            <li key={p.id} className="flex items-center gap-2 text-[13.5px]" style={{ color: ink }}>
+            <li key={p.id} className="due-in flex items-center gap-2 text-[13.5px]" style={{ color: ink }}>
               <span aria-hidden style={{ color: "#3f6a2c" }}>
                 ✓
               </span>
@@ -786,13 +947,117 @@ function OneByOne({ current, accepted, holds, isAdventure, onAccept, onAnother, 
               <span className="shrink-0 tabular-nums" style={{ color: soft }}>
                 {dayLabel(p.start).replace(/day,.*/, "day")} {hm(p.start)}
               </span>
-              <button type="button" onClick={() => onUndo(p.id)} aria-label={`Look at ${p.title} again`} className="flex h-8 w-8 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: soft }}>
+              <button type="button" onClick={() => onUndo(p.id)} aria-label={`Look at ${p.title} again`} title="Look at it again" className="flex h-8 w-8 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: soft }}>
                 ↺
               </button>
             </li>
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** The day of the quest being looked at: drag its gold block (or tap a time) to move it; 5-minute steps. */
+function ReviewStrip({ day, current, accepted, busy, holds, extras, from, to, isAdventure, onMove }: { day: Date; current: Placed; accepted: Placed[]; busy: Busy[]; holds: Hold[]; extras: Extra[]; from: number; to: number; isAdventure: boolean; onMove: (start: number) => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x0: number; s0: number; moved: boolean } | null>(null);
+  const d0 = new Date(day);
+  d0.setHours(0, 0, 0, 0);
+  // The strip covers your day, and stretches if the quest sits outside it.
+  const startMin = Math.round((current.start.getTime() - d0.getTime()) / 60_000);
+  const endMin = Math.round((current.end.getTime() - d0.getTime()) / 60_000);
+  const a = Math.min(from, Math.floor(startMin / 60) * 60);
+  const b = Math.max(to, Math.ceil(endMin / 60) * 60);
+  const t0 = d0.getTime() + a * 60_000;
+  const span = Math.max(60, b - a) * 60_000;
+  const len = current.end.getTime() - current.start.getTime();
+  const pos = (s: number, e: number) => {
+    const l = Math.max(0, Math.min(1, (s - t0) / span));
+    const r = Math.max(0, Math.min(1, (e - t0) / span));
+    return { left: `${l * 100}%`, width: `${Math.max(0, r - l) * 100}%` };
+  };
+  const snap = (ms: number) => Math.max(t0, Math.min(t0 + span - len, Math.round(ms / 300_000) * 300_000));
+  const at = (clientX: number) => {
+    const r = box.current?.getBoundingClientRect();
+    return r ? t0 + ((clientX - r.left) / r.width) * span : current.start.getTime();
+  };
+  const hours: number[] = [];
+  for (let m = Math.ceil(a / 60) * 60; m <= b; m += 60) hours.push(m);
+  const label = (m: number) => {
+    const h = Math.floor(m / 60) % 24;
+    return h === 0 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`;
+  };
+  const wide = pos(current.start.getTime(), current.end.getTime());
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div
+        ref={box}
+        className="relative h-12 cursor-pointer overflow-hidden rounded-lg"
+        style={{ background: isAdventure ? "rgba(255,250,238,.75)" : "var(--t-card)", border: "1px solid rgba(139,112,64,.35)" }}
+        // Tap a time: the quest moves there.
+        onClick={(e) => onMove(snap(at(e.clientX) - len / 2))}
+        title="Tap a time, or drag the gold block"
+      >
+        {hours.map((m) => (
+          <span key={m} aria-hidden className="absolute inset-y-0 w-px" style={{ left: `${((m - a) / (b - a)) * 100}%`, background: "rgba(139,112,64,.15)" }} />
+        ))}
+        {busy.filter((x) => x.end > t0 && x.start < t0 + span).map((x, i) => (
+          <span key={`b${i}`} aria-hidden className="absolute inset-y-1 rounded" style={{ ...pos(x.start, x.end), background: "rgba(90,80,60,.28)" }} />
+        ))}
+        {extras.filter((x) => x.end > t0 && x.start < t0 + span).map((x) => (
+          <span key={x.id} aria-hidden title={x.title} className="absolute inset-y-1 flex items-center justify-center overflow-hidden rounded text-[10px]" style={{ ...pos(x.start, x.end), ...(x.kind === "habit" ? { background: "rgba(92,138,70,.22)", border: "1px dashed rgba(63,106,44,.7)" } : { border: "1.5px dotted rgba(90,80,60,.6)", background: "rgba(90,80,60,.08)" }) }}>
+            {x.kind === "habit" ? "🌿" : "?"}
+          </span>
+        ))}
+        {holds.filter((h) => h.at !== null).map((h) => (
+          <span key={h.key} aria-hidden title={MEAL_NAMES[h.key]} className="absolute inset-y-2 flex items-center justify-center rounded text-[10px]" style={{ ...pos(h.at!, h.at! + h.minutes * 60_000), border: "1px dashed rgba(139,112,64,.55)" }}>
+            {MEAL_ICONS[h.key]}
+          </span>
+        ))}
+        {accepted.map((p) => (
+          <span key={p.id} aria-hidden title={p.title} className="absolute inset-y-1.5 rounded-md" style={{ ...pos(p.start.getTime(), p.end.getTime()), background: "rgba(63,106,44,.35)", border: "1px solid rgba(63,106,44,.7)" }} />
+        ))}
+        <button
+          type="button"
+          aria-label={`${current.title}: drag to move, or use the arrow keys`}
+          className="absolute inset-y-0.5 flex cursor-grab touch-none items-center justify-center overflow-hidden rounded-md px-1 text-[11px] font-bold active:cursor-grabbing"
+          style={{ ...wide, minWidth: 18, background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", color: "#2a1c10", border: "2px solid #6b4f1d", boxShadow: "0 2px 6px rgba(0,0,0,.25)" }}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            drag.current = { x0: e.clientX, s0: current.start.getTime(), moved: false };
+          }}
+          onPointerMove={(e) => {
+            const d = drag.current;
+            const r = box.current?.getBoundingClientRect();
+            if (!d || !r) return;
+            if (!d.moved && Math.abs(e.clientX - d.x0) < 4) return;
+            d.moved = true;
+            onMove(snap(d.s0 + ((e.clientX - d.x0) / r.width) * span));
+          }}
+          onPointerUp={(e) => {
+            drag.current = null;
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+          }}
+          onPointerCancel={() => (drag.current = null)}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+            e.preventDefault();
+            onMove(snap(current.start.getTime() + (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 60 : 5) * 60_000));
+          }}
+        >
+          <span className="truncate">{current.title}</span>
+        </button>
+      </div>
+      <div className="relative h-3.5 text-[10px] tabular-nums" aria-hidden style={{ color: "rgba(107,79,29,.7)" }}>
+        {hours.filter((m, i) => i % 2 === 0 && m - a >= (b - a) * 0.03 && b - m >= (b - a) * 0.03).map((m) => (
+          <span key={m} className="absolute -translate-x-1/2" style={{ left: `${((m - a) / (b - a)) * 100}%` }}>
+            {label(m)}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

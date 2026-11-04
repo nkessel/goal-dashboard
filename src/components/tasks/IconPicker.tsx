@@ -15,6 +15,7 @@ import { MONSTER_ICONS } from "@/lib/monster-icons";
 import type { TaskIconLibraryEntry } from "@/lib/data/types";
 import { useEscape } from "@/lib/use-escape";
 import { useLongPress } from "@/lib/use-long-press";
+import { useFitAboveKeyboard } from "@/lib/use-fit-above-keyboard";
 
 const LIB_KEY = "portrait-library-shown";
 
@@ -66,6 +67,8 @@ export function IconPicker({
   onPromptChange?: (prompt: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // With the keyboard up, the picker sits in the strip above it (owner's recording, Nov 3).
+  const kb = useFitAboveKeyboard(open);
   // Shows a new pick right away (the quest prop only updates after a refresh).
   const [override, setOverride] = useState<{ icon: string | null; source: "monster" | "library" | "ai" } | null>(null);
   const router = useRouter();
@@ -269,7 +272,12 @@ export function IconPicker({
       {open &&
         createPortal(
         <>
-        <div className="fixed inset-0 z-[59] flex items-center justify-center p-4">
+        <div
+          data-kb-fit
+          data-kb-self
+          className={`fixed inset-0 z-[59] flex justify-center ${kb ? "items-start p-2" : "items-center p-4"}`}
+          style={kb ? { top: kb.top, height: kb.height, bottom: "auto" } : undefined}
+        >
         <div
           className="overlay-fade-in absolute inset-0"
           style={{ background: "var(--t-overlay)" }}
@@ -283,11 +291,17 @@ export function IconPicker({
           role="dialog"
           aria-modal="true"
           aria-label="Choose a portrait"
-          className={`card-pop-in relative flex max-h-[92vh] w-full ${wide ? "max-w-[720px]" : "max-w-[380px]"} flex-col overflow-y-auto rounded-2xl p-3.5 parchment parchment-framed shadow-2xl transition-[max-width] duration-300`}
+          className={`card-pop-in relative flex ${kb ? "" : "max-h-[92vh]"} w-full ${wide ? "max-w-[720px]" : "max-w-[380px]"} flex-col overflow-y-auto rounded-2xl p-3.5 parchment parchment-framed shadow-2xl transition-[max-width] duration-300`}
           style={{
             background: "var(--t-panel)",
             border: "2px solid var(--t-panel-border)",
             color: "var(--t-ink)",
+            ...(kb ? { maxHeight: kb.height - 16 } : {}),
+          }}
+          // A field brought into sight inside the picker's own scroll, once the keyboard is up.
+          onFocus={(e) => {
+            const f = e.target;
+            if (f instanceof HTMLTextAreaElement || f instanceof HTMLInputElement) window.setTimeout(() => f.scrollIntoView({ block: "nearest" }), 320);
           }}
         >
           <div className="relative z-[1] mb-2 flex items-center gap-3">

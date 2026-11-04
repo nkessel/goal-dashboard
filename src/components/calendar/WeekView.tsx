@@ -115,7 +115,13 @@ export function WeekView({
     }
     const y0 = e.clientY;
     const z0 = hourPx;
-    const move = (ev: PointerEvent) => zoomTo(z0 * Math.pow(2, (ev.clientY - y0) / 160));
+    // Only a real drag zooms: a tap or a wobble used to squeeze the day (owner's recording, Nov 3).
+    let going = false;
+    const move = (ev: PointerEvent) => {
+      if (!going && Math.abs(ev.clientY - y0) < 12) return;
+      going = true;
+      zoomTo(z0 * Math.pow(2, (ev.clientY - y0 + (ev.clientY > y0 ? -12 : 12)) / 160));
+    };
     const up = () => {
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);

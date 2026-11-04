@@ -19,7 +19,7 @@ import {
 } from "@/app/actions";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { fromFeedback } from "@/lib/from-feedback";
-import { AutoScheduler } from "@/components/calendar/AutoScheduler";
+import { findSlot } from "@/components/calendar/place-next";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 type Carry =
@@ -133,7 +133,6 @@ export function DayPlanner({
   const [editingQuick, setEditingQuick] = useState(false);
   const [planning, setPlanning] = useState(true);
   // "Auto-schedule tomorrow": every quest still to place, onto tomorrow only.
-  const [auto, setAuto] = useState(false);
   const [mealsOpen, setMealsOpen] = useState(false);
   const [xpFor, setXpFor] = useState<string | null>(null);
   const [height, setHeight] = useState(DEFAULT_HEIGHT);
@@ -468,8 +467,51 @@ export function DayPlanner({
           if (it.type === "event") {
             return (
               // Appointments recede so quests stand out.
-              <div key={`e-${it.id}`} className="pointer-events-none absolute overflow-hidden rounded-md px-1.5 py-0.5 text-[12px] leading-tight" style={{ top, height: h, left, width, background: "rgba(140,150,190,.14)", border: "1px solid rgba(160,170,210,.28)", color: "#aeb3cc" }}>
-                {it.title}
+              // A tap shows what it is at once (owner, Nov 3: "this info should pop up immediately and easily when tapped").
+              <div key={`e-${it.id}`} className={`absolute ${carry ? "pointer-events-none" : ""}`} style={{ top, height: h, left, width, zIndex: menu === `e-${it.id}` ? 25 : undefined }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenu(menu === `e-${it.id}` ? null : `e-${it.id}`);
+                  }}
+                  className="block h-full w-full overflow-hidden rounded-md px-1.5 py-0.5 text-left text-[12px] leading-tight"
+                  style={{ background: menu === `e-${it.id}` ? "rgba(140,150,190,.3)" : "rgba(140,150,190,.14)", border: "1px solid rgba(160,170,210,.28)", color: "#aeb3cc" }}
+                >
+                  {it.title}
+                </button>
+                {menu === `e-${it.id}` && (
+                  <div
+                    role="dialog"
+                    aria-label={it.title}
+                    className="card-pop-in absolute left-0 z-30 mt-1 flex w-[min(260px,calc(100vw-48px))] flex-col gap-1 rounded-xl p-3 text-[13.5px] parchment"
+                    style={{ borderRadius: 12, top: "100%", color: "#2a1c10" }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button type="button" onClick={() => setMenu(null)} aria-label="Close" className="absolute right-1 top-1 z-[1] flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none" style={{ color: "#6b5631" }}>
+                      ×
+                    </button>
+                    <b className="relative z-[1] pr-6 font-display text-[15px] leading-snug">{it.title}</b>
+                    <span className="relative z-[1] tabular-nums" style={{ color: "#6b5631" }}>
+                      {timeLabel(it.start)} – {timeLabel(it.end)}
+                    </span>
+                    {it.location && (
+                      <span className="relative z-[1] break-words" style={{ color: "#4a3a20" }}>
+                        📍 {it.location}
+                      </span>
+                    )}
+                    {it.description && (
+                      <span className="relative z-[1] line-clamp-5 whitespace-pre-line break-words text-[12.5px]" style={{ color: "#4a3a20" }}>
+                        {it.description.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").trim()}
+                      </span>
+                    )}
+                    {it.calendarName && (
+                      <span className="relative z-[1] text-[11.5px]" style={{ color: "#8a7550" }}>
+                        {it.calendarName}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           }
@@ -600,7 +642,13 @@ export function DayPlanner({
     el.setPointerCapture(e.pointerId);
     const y0 = e.clientY;
     const z0 = HOUR_PX;
-    const move = (ev: PointerEvent) => zoomTo(z0 * Math.pow(2, (ev.clientY - y0) / 160));
+    // Only a real drag zooms: a tap or a small wobble left the day squeezed (owner's recording, Nov 3).
+    let going = false;
+    const move = (ev: PointerEvent) => {
+      if (!going && Math.abs(ev.clientY - y0) < 12) return;
+      going = true;
+      zoomTo(z0 * Math.pow(2, (ev.clientY - y0 + (ev.clientY > y0 ? -12 : 12)) / 160));
+    };
     const up = () => {
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
@@ -687,17 +735,7 @@ export function DayPlanner({
         </svg>
       </button>
 
-      {auto && (
-        <AutoScheduler
-          tasks={toPlace}
-          theme={theme ?? "adventure"}
-          day={new Date(`${tomorrow}T12:00:00`)}
-          onClose={() => {
-            setAuto(false);
-            void load();
-          }}
-        />
-      )}
+
       {planning && (
         <div className="flex flex-col gap-2" onClick={() => setXpFor(null)}>
           {toPlace.length > 0 && (
@@ -706,14 +744,35 @@ export function DayPlanner({
                 <span className="min-w-0 flex-1 text-[12px] font-semibold uppercase tracking-[.12em]" style={{ color: N.faint }}>
                   Tomorrow&rsquo;s quests · tap one, then a time
                 </span>
+                {/* The auto-scheduler, one at a time (owner, Nov 3): the next quest goes in the first free slot; tap it on the plan to move it. */}
                 <button
                   type="button"
-                  onClick={(e) => (e.stopPropagation(), setAuto(true))}
-                  title="Place all of tomorrow's quests in tomorrow's free time"
-                  className="hover-glow h-8 shrink-0 rounded-full px-3 text-[12.5px] font-bold"
+                  disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const t = toPlace[0];
+                    if (!t) return;
+                    setError(null);
+                    startBusy(async () => {
+                      try {
+                        const slot = await findSlot(t, new Date(`${tomorrow}T12:00:00`));
+                        if (!slot) {
+                          setError(`No free time tomorrow for “${t.title}”.`);
+                          return;
+                        }
+                        await planQuestAtAction(t.id, slot.start.toISOString(), slot.end.toISOString());
+                        setNote(`${t.title} · ${slot.start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}. Tap it on the plan to move it.`);
+                        await load();
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Couldn't place it.");
+                      }
+                    });
+                  }}
+                  title={`Put “${toPlace[0]?.title ?? ""}” in tomorrow's first free time`}
+                  className="hover-glow h-8 shrink-0 rounded-full px-3 text-[12.5px] font-bold disabled:opacity-60"
                   style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10" }}
                 >
-                  ✨ Auto-schedule all
+                  ✨ Auto-schedule
                 </button>
               </li>
               {toPlace.map((t) => {

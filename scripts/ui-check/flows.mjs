@@ -95,6 +95,13 @@ export const FLOWS = [
         if (await h.tap((p) => p.getByRole("button", { name: /importance & effort/i }).first(), "editor: scales pill", { optional: true, expectMove: true })) await h.check("quest editor: scales");
         if (await h.tap((p) => p.getByRole("button", { name: /^due date$/i }).first(), "editor: due", { optional: true, expectMove: true })) await h.check("quest editor: due panel");
         await h.typeIn((p) => p.locator("[role=dialog] input, [role=dialog] textarea").first(), "quest editor title");
+        // The portrait picker with the keyboard up: it sits above the keyboard (owner's recording, Nov 3).
+        if (await h.tap((p) => p.getByTitle("Change the portrait").first(), "portrait picker", { optional: true, expectMove: true })) {
+          await h.check("portrait picker");
+          await h.typeIn((p) => p.getByPlaceholder(/describe the portrait/i).first(), "portrait description");
+          await h.page.keyboard.press("Escape");
+          await h.settle(300);
+        }
         await h.tap(/^close$|^×$/i, "close quest editor", { optional: true });
         await esc(h);
       }
@@ -148,7 +155,12 @@ export const FLOWS = [
       if (await h.tap((p) => p.getByRole("button", { name: /^plan my day$/i }).first(), "plan my day", { optional: true, expectMove: true })) {
         await h.settle(1500);
         await h.check("plan my day");
-        await esc(h);
+        // Plan my day is the auto-scheduler on the calendar (owner, Nov 3): the day view with the window listing today's quests.
+        if (await h.tap((p) => p.getByRole("button", { name: /auto-schedule$/i }).first(), "auto-scheduler: auto-schedule one", { optional: true, expectMove: true })) {
+          await h.settle(1500);
+          await h.check("auto-scheduler: placed one");
+        }
+        await h.goto("/", { name: "today" });
       }
     },
   },
@@ -340,6 +352,11 @@ export const FLOWS = [
       await h.goto("/calendar?view=week", { name: "calendar" });
       await h.settle(1200);
       await h.check("week");
+      // The auto-scheduler window (owner, Nov 3): a list that moves, resizes and minimizes, over the full calendar.
+      if (await h.tap((p) => p.getByRole("button", { name: /^auto-scheduler/i }).first(), "open the auto-scheduler", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("auto-scheduler window");
+      }
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
       await h.settle(400);
       await h.check("week: the cards");

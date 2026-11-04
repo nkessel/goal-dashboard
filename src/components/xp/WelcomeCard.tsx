@@ -1212,7 +1212,7 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
           )}
           {menu && !rewording && (
             <span className="mt-1 flex flex-col">
-              <button type="button" onClick={() => (setMenu(false), openPlanMyDay())} className={item}>
+              <button type="button" onClick={() => (setMenu(false), onAway?.(), openPlanMyDay())} className={item}>
                 Plan my day
               </button>
               <button type="button" onClick={() => (setMenu(false), talkToToucan())} className={item}>

@@ -19,7 +19,11 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "@/lib/data/types";
+import { useRouter } from "next/navigation";
+import { findSlot } from "./place-next";
 import {
+  applyAutoScheduleAction,
+  unscheduleTaskAction,
   deleteSchedulingFolderAction,
   moveSchedulingFolderAction,
   renameSchedulingFolderAction,
@@ -28,7 +32,6 @@ import {
   setSchedulingFoldersAction,
 } from "@/app/actions";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
-import { AutoScheduler } from "./AutoScheduler";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { TaskScheduleControl } from "@/components/tasks/TaskScheduleControl";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE } from "@/lib/schedule-carry";
@@ -62,8 +65,9 @@ function useWide() {
  * numbered; the rest wait below, and anything can be filed into light
  * folders (e.g. "Relationships") that open and close with a caret.
  */
-export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { tasks: Task[]; folders: Folder[]; theme: "calm" | "adventure" }) {
+export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today = null }: { tasks: Task[]; folders: Folder[]; theme: "calm" | "adventure"; /** Plan my day: today's quests, at the top of the list (owner, Nov 3). */ today?: { day: string; tasks: Task[] } | null }) {
   const wide = useWide();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   // On wide screens it floats: drag it by its title, – tucks it into a chip (owner, Nov 2).
   const [min, setMin] = useState(false);
@@ -95,7 +99,9 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
   const [folderMenu, setFolderMenu] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [auto, setAuto] = useState(false);
+  // ✨ Auto-schedule: the next one on the list goes into the first free slot, a moment to undo.
+  const [placing, setPlacing] = useState(false);
+  const [placed, setPlaced] = useState<{ id: string; title: string; at: Date } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   if (seen !== tasks) {
@@ -113,8 +119,12 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
       const v = window.localStorage.getItem(OPEN_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
       setOpen(v === null ? window.matchMedia("(min-width: 1024px)").matches : v === "1");
-      // Arrived from Today's "waiting for a time" card: straight to the auto-scheduler.
-      if (new URLSearchParams(window.location.search).get("auto") === "1") setAuto(true);
+      // Arrived from Plan my day or Today's "waiting for a time" card: the list opens, not minimized.
+      const q = new URLSearchParams(window.location.search);
+      if (q.get("auto") === "1" || q.get("plan")) {
+        setOpen(true);
+        setMin(false);
+      }
     } catch {
       /* storage unavailable */
     }
@@ -256,40 +266,73 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
   function place2(t: Task) {
     if (carried?.id === t.id) return carryQuest(null);
     carryQuest({ id: t.id, title: t.title, minutes: Math.max(15, t.estimate_minutes ?? 60) });
-    if (!wide) toggle(false); // get the slide-out out of the way of the calendar
+    if (!wide) minimize(true); // out of the way of the calendar; its chip stays
+  }
+
+  const todayIds = (today?.tasks ?? []).filter((t) => !(t.is_on_calendar && t.scheduled_start)).map((t) => t.id);
+  const todayById = new Map((today?.tasks ?? []).map((t) => [t.id, t]));
+  /** The next one waiting: today's first (when planning the day), then the list in its order. */
+  const nextUp = (): Task | null => {
+    const fromToday = todayIds.map((id) => todayById.get(id)!).find(Boolean);
+    if (fromToday) return fromToday;
+    return flat(groups).map((id) => byId.get(id)!).find((t) => t && !(t.is_on_calendar && t.scheduled_start && Date.parse(t.scheduled_start) > Date.now())) ?? null;
+  };
+  function placeNext() {
+    const t = nextUp();
+    if (!t || placing) return;
+    setPlacing(true);
+    setError(null);
+    const day = today && todayIds.includes(t.id) ? new Date(`${today.day}T12:00:00`) : undefined;
+    findSlot(t, day)
+      .then(async (slot) => {
+        if (!slot) {
+          setError(`No free time found for “${t.title}”${day ? " that day" : " in the next two weeks"}.`);
+          return;
+        }
+        await applyAutoScheduleAction([{ taskId: t.id, startISO: slot.start.toISOString(), endISO: slot.end.toISOString() }]);
+        setPlaced({ id: t.id, title: t.title, at: slot.start });
+        router.refresh();
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Couldn't place it."))
+      .finally(() => setPlacing(false));
+  }
+  function undoPlaced() {
+    const p = placed;
+    if (!p) return;
+    setPlaced(null);
+    unscheduleTaskAction(p.id)
+      .then(() => router.refresh())
+      .catch((e) => setError(e instanceof Error ? e.message : "Couldn't take it back."));
   }
 
   const panel = (
     <aside
       aria-label="Scheduling priority list"
-      className={`flex max-h-full min-h-0 flex-col ${isAdventure ? "parchment parchment-framed" : ""}`}
+      className={`flex max-h-full min-h-0 flex-1 flex-col ${isAdventure ? "parchment parchment-framed" : ""}`}
       style={{
-        borderRadius: wide ? 16 : "16px 0 0 16px",
+        borderRadius: 16,
         ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }),
-        ...(wide ? {} : { height: "100%" }),
       }}
     >
       <div className="relative z-[1] flex flex-col gap-1.5 px-3 pb-2 pt-2.5">
-        <div data-drag-handle={wide ? "" : undefined} className={`flex items-center gap-2 ${wide ? "cursor-grab select-none active:cursor-grabbing" : ""}`} title={wide ? "Drag to move" : undefined}>
+        <div data-drag-handle="" className="flex cursor-grab touch-none select-none items-center gap-2 active:cursor-grabbing" title="Drag to move">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "var(--t-ink)" }}>
             <rect x="3.5" y="5" width="17" height="15.5" rx="2.2" stroke="currentColor" strokeWidth="1.9" />
             <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
           </svg>
           <span className={`flex-1 ${isAdventure ? "font-display text-[18px]" : "text-[15px] font-bold"}`} style={{ color: "var(--t-ink)" }}>
-            To schedule
-            {count > 0 && <span className="ml-1.5 text-[13.5px] font-normal tabular-nums" style={{ color: "var(--t-ink-soft)" }}>{count}</span>}
+            Auto-scheduler
+            {count + todayIds.length > 0 && <span className="ml-1.5 text-[13.5px] font-normal tabular-nums" style={{ color: "var(--t-ink-soft)" }}>{count + todayIds.length}</span>}
           </span>
-          {wide && (
-            <button type="button" onClick={() => minimize(true)} aria-label="Minimize the scheduling list" title="Minimize" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                <path d="M2.5 7h9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-              </svg>
-            </button>
-          )}
+          <button type="button" onClick={() => minimize(true)} aria-label="Minimize the auto-scheduler" title="Minimize" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+              <path d="M2.5 7h9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+            </svg>
+          </button>
           <button
             type="button"
             onClick={() => toggle(false)}
-            aria-label="Close the scheduling list"
+            aria-label="Close the auto-scheduler"
             title="Close"
             className="flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none hover:bg-black/[.06]"
             style={{ color: "var(--t-ink-soft)" }}
@@ -299,28 +342,29 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
         </div>
         {/* Its tools, quietly on one line. */}
         <div className="flex items-center gap-1.5">
-          {count > 0 && (
+          {count + todayIds.length > 0 && (
             <button
               type="button"
-              onClick={() => setAuto(true)}
-              className="hover-glow h-8 rounded-full px-3 text-[12.5px] font-bold"
+              onClick={placeNext}
+              disabled={placing}
+              className="hover-glow h-8 whitespace-nowrap rounded-full px-3 text-[12.5px] font-bold disabled:opacity-60"
               style={isAdventure ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { background: "var(--t-accent)", color: "#fff" }}
-              title="Place the whole list into your free time, in order"
+              title={nextUp() ? `Put “${nextUp()!.title}” in the first free time; then drag it on the calendar to change it` : "Nothing left to place"}
             >
-              ✨ Auto-schedule
+              {placing ? "Finding a time…" : "✨ Auto-schedule"}
             </button>
           )}
           <button
             type="button"
             onClick={() => talkToToucan(undefined, "catchup")}
-            className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]"
+            className="h-8 whitespace-nowrap rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]"
             style={{ color: "var(--t-ink)", border: "1px solid rgba(139,112,64,.45)" }}
             title="Coursework catch-up: coming up first, then missed ones from the beginning"
           >
             📚 Catch-up
           </button>
-          <button type="button" onClick={() => setAdding(true)} className="ml-auto h-8 rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)", border: "1px solid rgba(139,112,64,.45)" }} title="Add a folder">
-            + Folder
+          <button type="button" onClick={() => setAdding(true)} aria-label="Add a folder" className="ml-auto h-8 w-8 shrink-0 whitespace-nowrap rounded-full text-[17px] font-semibold hover:bg-black/[.06]" style={{ color: "var(--t-ink)", border: "1px solid rgba(139,112,64,.45)" }} title="Add a folder">
+            +
           </button>
         </div>
       </div>
@@ -331,10 +375,39 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
             {error}
           </p>
         )}
+        {placed && (
+          <p className="due-in m-0 flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-[13px]" style={{ background: "rgba(92,138,70,.16)", color: "var(--t-ink)" }}>
+            <span className="min-w-0 flex-1">
+              ✓ <b>{placed.title}</b> · {placed.at.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}. Drag it on the calendar to change it.
+            </span>
+            <button type="button" onClick={undoPlaced} className="shrink-0 font-semibold underline underline-offset-2">
+              Undo
+            </button>
+          </p>
+        )}
+        {today && (
+          <section className="flex flex-col gap-1 pb-1">
+            <h4 className="m-0 px-1 text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "var(--t-ink-soft)" }}>
+              {new Date(`${today.day}T12:00:00`).toDateString() === new Date().toDateString() ? "Today's quests" : new Date(`${today.day}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" })}
+            </h4>
+            {todayIds.length === 0 ? (
+              <p className="m-0 px-1.5 text-[13.5px] italic" style={{ color: "var(--t-ink-soft)" }}>
+                {(today.tasks.length ? "All of them have a time. 🎉" : "No quests on Today yet.")}
+              </p>
+            ) : (
+              <ol className="m-0 flex list-none flex-col gap-1 p-0">
+                {todayIds.map((id) => (
+                  <PlainRow key={id} task={todayById.get(id)!} placing={carried?.id === id} onOpen={() => setEditing(todayById.get(id)!)} onPlace={() => place2(todayById.get(id)!)} />
+                ))}
+              </ol>
+            )}
+            {count > 0 && <span aria-hidden className="mx-1 mt-1 block border-t border-dashed" style={{ borderColor: "rgba(139,112,64,.4)" }} />}
+          </section>
+        )}
         <DndContext id="dnd-SchedulingList" sensors={sensors} collisionDetection={collision} onDragEnd={onDragEnd}>
           {/* Loose quests: the first three are numbered. */}
           <GroupZone id={LOOSE}>
-            {groups[0].ids.length === 0 ? (
+            {groups[0].ids.length === 0 && today && count === 0 ? null : groups[0].ids.length === 0 ? (
               <p className="m-0 px-1.5 py-1 text-[13.5px] italic" style={{ color: "var(--t-ink-soft)" }}>
                 {count === 0 ? "Nothing waiting. Tick “Add to the scheduling list” in a quest to line it up here." : "Drag a quest here to number it."}
               </p>
@@ -480,39 +553,24 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
 
   return (
     <>
-      {wide ? (
-        open && (
-          <FloatingWindow
-            storageKey="scheduling-window"
-            width={320}
-            minimized={min}
-            onRestore={() => minimize(false)}
-            chip={
-              <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <rect x="3.5" y="5" width="17" height="15.5" rx="2.2" stroke="currentColor" strokeWidth="1.9" />
-                  <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-                </svg>
-                <span className="font-display tracking-wide">To schedule</span>
-                {count > 0 && <span className="tabular-nums opacity-80">{count}</span>}
-              </>
-            }
-          >
-            {panel}
-          </FloatingWindow>
-        )
-      ) : (
-        <>
-          {open &&
-            createPortal(
-              <div className="fixed inset-0 z-[46]" onClick={() => toggle(false)} style={{ background: "rgba(10,8,4,.35)" }}>
-                <div className="slide-in-right absolute bottom-0 right-0 top-0 w-[min(360px,90vw)] py-3" onClick={(e) => e.stopPropagation()}>
-                  {panel}
-                </div>
-              </div>,
-              document.body
-            )}
-        </>
+      {/* A floating window on every screen (owner, Nov 3): moved by its title, resized from its corner, minimized to a chip. */}
+      {open && (
+        <FloatingWindow
+          storageKey="scheduling-window"
+          width={wide ? 320 : 280}
+          resizable
+          minimized={min}
+          onRestore={() => minimize(false)}
+          chip={
+            <>
+              <span aria-hidden>✨</span>
+              <span className="font-display tracking-wide">Auto-scheduler</span>
+              {count + todayIds.length > 0 && <span className="tabular-nums opacity-80">{count + todayIds.length}</span>}
+            </>
+          }
+        >
+          {panel}
+        </FloatingWindow>
       )}
 
       {moving && (
@@ -534,7 +592,6 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme }: { ta
         />
       )}
       {editing && <EditTaskModal task={editing} theme={theme} onClose={() => setEditing(null)} />}
-      {auto && <AutoScheduler tasks={flat(groups).map((id) => byId.get(id)!).filter(Boolean)} theme={theme} onClose={() => setAuto(false)} />}
       {sched.value &&
         createPortal(
           <div className={`overlay-fade-in fixed inset-0 z-[60] flex items-center justify-center p-4${sched.leaving ? " overlay-fade-out pointer-events-none" : ""}`} style={{ background: "var(--t-overlay)" }} onClick={() => setScheduling(null)}>
@@ -667,6 +724,51 @@ function Row({
           <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
         </IconBtn>
       </div>
+    </li>
+  );
+}
+
+/** A quest in the day's part of the list: open it, or place it (tap, then a time; or drag it onto the calendar). */
+function PlainRow({ task, placing, onOpen, onPlace }: { task: Task; placing: boolean; onOpen: () => void; onPlace: () => void }) {
+  const art = (task.icon_source === "ai" || task.icon_source === "library") && task.icon_key ? task.icon_key : null;
+  const carry = { id: task.id, title: task.title, minutes: Math.max(15, task.estimate_minutes ?? 60) };
+  return (
+    <li
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(QUEST_DRAG_TYPE, JSON.stringify(carry));
+        e.dataTransfer.effectAllowed = "move";
+        carryQuest(carry);
+      }}
+      className="flex items-center gap-1.5 rounded-xl px-1 py-1 hover:bg-black/[.04]"
+    >
+      <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full" style={{ border: "1.5px solid #a58c66", background: "#f3e6c8" }}>
+        {art ? (
+          // eslint-disable-next-line @next/next/no-img-element -- quest portrait
+          <img src={art} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <QuestMonogram id={task.id} title={task.title} size={32} />
+        )}
+      </span>
+      <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left" title="Open this quest">
+        <span className="line-clamp-2 block text-[14.5px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
+          {task.title}
+        </span>
+        {task.estimate_minutes ? <span className="block text-[12px]" style={{ color: "var(--t-ink-soft)" }}>{task.estimate_minutes}m</span> : null}
+      </button>
+      <button
+        type="button"
+        onClick={onPlace}
+        aria-label={`Place ${task.title} on the calendar`}
+        title="Place on the calendar: tap, then tap a time — or drag onto the calendar"
+        className="flex h-8 w-7 shrink-0 cursor-grab items-center justify-center rounded-full hover:bg-black/[.07]"
+        style={placing ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10" } : { color: "var(--t-ink-soft)" }}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden>
+          <rect x="3.5" y="5" width="17" height="15.5" rx="2.4" stroke="currentColor" strokeWidth="1.9" fill="none" />
+          <path d="M3.5 9.6h17M8 3v4M16 3v4M12 12.5v5M9.5 15h5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        </svg>
+      </button>
     </li>
   );
 }

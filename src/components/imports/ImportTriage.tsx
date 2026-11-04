@@ -13,7 +13,6 @@ import { useEscape } from "@/lib/use-escape";
 import { DateField } from "@/components/ui/DateField";
 import { SnoozePicker, type SnoozeChoice } from "@/components/tasks/SnoozePicker";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
-import { AutoScheduler } from "@/components/calendar/AutoScheduler";
 import type { Task } from "@/lib/data/types";
 
 /*
@@ -171,7 +170,6 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
   // The card being worked on (picked from the list, or the next in line).
   const [focusId, setFocusId] = useState<string | null>(focus);
   const card = visible.find((c) => c.id === focusId) ?? visible[0] ?? null;
-  const [scheduling, setScheduling] = useState(false);
   // Steps added from the review ("+ Plan it within…").
   const [extra, setExtra] = useState<Step[]>([]);
 
@@ -504,7 +502,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           </p>
           {toSchedule.length > 0 ? (
             <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
-              <button type="button" onClick={() => setScheduling(true)} className="flex h-11 items-center rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+              <button type="button" onClick={() => router.push("/calendar?auto=1")} className="flex h-11 items-center rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
                 Schedule these ({toSchedule.length})
               </button>
               <Link href="/" className="text-[14px] underline underline-offset-2" style={{ color: "#6b5631" }}>
@@ -526,11 +524,10 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
       ) : null}
 
       {card && toSchedule.length > 0 && mode === "card" && (
-        <button type="button" onClick={() => setScheduling(true)} className="self-start text-[13.5px] underline underline-offset-2" style={{ color: isAdventure ? "rgba(242,226,180,.85)" : SOFT }}>
+        <button type="button" onClick={() => router.push("/calendar?auto=1")} className="self-start text-[13.5px] underline underline-offset-2" style={{ color: isAdventure ? "rgba(242,226,180,.85)" : SOFT }}>
           📅 Schedule what&rsquo;s on the list ({toSchedule.length})
         </button>
       )}
-      {scheduling && <AutoScheduler tasks={toSchedule} theme={theme} onClose={() => setScheduling(false)} />}
       {aside.length > 0 && <SetAside cards={aside} onBack={(c) => (putBack(c), decideImportCardAction(c.id, { kind: "restore" }).catch(() => null))} isAdventure={isAdventure} />}
 
       {snoozing && <SnoozePicker title={snoozing.title} tomorrowHint="back on this list tomorrow" onPick={snoozeTo} onClose={() => setSnoozing(false)} />}

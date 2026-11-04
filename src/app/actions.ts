@@ -1923,7 +1923,7 @@ export async function undoSnoozeAction(taskId: string, prev: tomorrowData.Snooze
 // ---------------------------------------------------------------------------
 
 export type DayPlan = {
-  events: { id: string; title: string; start: string; end: string; isAllDay: boolean }[];
+  events: { id: string; title: string; start: string; end: string; isAllDay: boolean; location?: string | null; description?: string | null; calendarName?: string | null }[];
   quests: { id: string; title: string; start: string; end: string; icon_key: string | null; icon_source: string | null; status: string }[];
   calendarConnected: boolean;
 };
@@ -1941,7 +1941,7 @@ export async function getDayPlanAction(startISO: string, endISO: string): Promis
   const linked = new Set(tasks.map((t) => t.google_calendar_event_id).filter(Boolean));
   return {
     calendarConnected: !!accessToken,
-    events: events.filter((e) => !linked.has(e.id)).map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, isAllDay: e.isAllDay })),
+    events: events.filter((e) => !linked.has(e.id)).map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, isAllDay: e.isAllDay, location: e.location ?? null, description: e.description ? e.description.slice(0, 600) : null, calendarName: e.calendarName ?? null })),
     quests: tasks
       .filter((t) => t.scheduled_start && t.scheduled_end)
       .map((t) => ({ id: t.id, title: t.title, start: t.scheduled_start!, end: t.scheduled_end!, icon_key: t.icon_key ?? null, icon_source: t.icon_source ?? null, status: t.status })),

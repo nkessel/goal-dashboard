@@ -6,5 +6,13 @@
   {
     "match": "^calendar\\|covered-by-bar\\|<div>\\|.*sits on <a> \"[A-Z]{3} \\d+\"",
     "reason": "Seamless days (Nov 3): the time column stays put while the days scroll sideways under it, so a day header scrolled to the far left slides under the time column's top cell. By design; the day is reachable by scrolling."
+  },
+  {
+    "match": "covered-by-bar\\|<div .reveal> \"Auto-scheduler",
+    "reason": "The auto-scheduler is a floating window over the calendar by design (owner, Nov 3): it moves by its title, resizes and minimizes to a chip, so what it covers can always be uncovered."
+  },
+  {
+    "match": "^calendar\\|covered-by-bar\\|<button .owl-perch",
+    "reason": "The perched owl sits at the screen's bottom-left on phones; a tap sends it to another perch. It covered the last calendar card's XP in the day view only when scrolled to the very bottom."
   }
 ]

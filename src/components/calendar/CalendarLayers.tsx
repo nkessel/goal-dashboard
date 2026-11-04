@@ -162,8 +162,8 @@ export function CalendarLayers({
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event("open-scheduling"))}
-          aria-label={`To schedule (${toSchedule})`}
-          title="To schedule"
+          aria-label={`Auto-scheduler (${toSchedule})`}
+          title="Auto-scheduler: your list of quests to place"
           // A labelled pill that sticks out over the calendar's top-left corner.
           // Stays inside the edge on every screen (on tablets it stuck out and its left was cut off: ui-check, Nov 2).
           className="hover-glow relative z-[30] mr-auto flex h-11 shrink-0 translate-y-5 items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14.5px] font-bold touch-manipulation"
@@ -177,7 +177,7 @@ export function CalendarLayers({
             <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
             <path d="M8 13.5h4M8 16.8h7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           </svg>
-          <span className={isAdventure ? "font-display tracking-wide" : ""}>To schedule</span>
+          <span className={isAdventure ? "font-display tracking-wide" : ""}>✨ Auto-scheduler</span>
           {toSchedule > 0 && (
             <span className="absolute -right-1.5 -top-1.5 flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-1 text-[11px] font-bold tabular-nums" style={{ background: "#2a1c10", color: "#f6dc8e", border: "1px solid #d9b45f" }}>
               {toSchedule}

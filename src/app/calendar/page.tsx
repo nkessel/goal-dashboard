@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import type { Task } from "@/lib/data/types";
 import { RememberView } from "@/components/calendar/RememberView";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
 import { requireSession } from "@/lib/session";
@@ -55,7 +56,7 @@ function todayKey() {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string; n?: string }>;
+  searchParams: Promise<{ view?: string; date?: string; n?: string; plan?: string }>;
 }) {
   const session = await requireSession();
   const params = await searchParams;
@@ -140,11 +141,21 @@ export default async function CalendarPage({
         return null;
       })
     : Promise.resolve(null);
-  const [tasks, toSchedule, scheduleFolders, googleAll] = await Promise.all([
+  // Plan my day (owner, Nov 3): the auto-scheduler window lists that day's quests first.
+  const planDay = params.plan && /^\d{4}-\d{2}-\d{2}$/.test(params.plan) ? params.plan : null;
+  const planP = planDay
+    ? import("@/app/actions").then(async ({ planDayTasksAction }) => {
+        const end = new Date(`${planDay}T00:00:00`);
+        end.setDate(end.getDate() + 1);
+        return { day: planDay, tasks: (await planDayTasksAction(end.toISOString())) as Task[] };
+      }).catch(() => ({ day: planDay, tasks: [] as Task[] }))
+    : Promise.resolve(null);
+  const [tasks, toSchedule, scheduleFolders, googleAll, planToday] = await Promise.all([
     listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
     listSchedulingList(session.user.id),
     getSchedulingFolders(session.user.id),
     googleP,
+    planP,
   ]);
   // The quests waiting behind each quest on the calendar: its agenda (a visit's to-talk-about list).
   const agenda = await listWaitingBehind(session.user.id, tasks.filter((t) => t.status !== "completed").map((t) => t.id)).catch(() => ({}));
@@ -358,7 +369,7 @@ export default async function CalendarPage({
         />
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
-      <SchedulingDrawer tasks={toSchedule} folders={scheduleFolders} theme={theme} />
+      <SchedulingDrawer tasks={toSchedule} folders={scheduleFolders} theme={theme} today={planToday} />
       </div>
     </AppShell>
   );
