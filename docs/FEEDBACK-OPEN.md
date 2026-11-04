@@ -4,22 +4,22 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 
 ## Habits and the habit editor (repeat ask 15)
 - (Nov 3, built: sub-habits in view and draggable, XP/coins, simpler repeats, Other minutes, Close→Save, details as pills, a sub-habit's menu on the card.)
-- The cleaning habit's sub-habits are missing from the habit editor.
+- (Nov 3, built: the cleaning habit's editor lists its spaces and chores from the mess check-in, with a link to change them.)
 - Let habits sit in Today's agenda too. The owner asked for ideas first, as a plain message.
 
 ## Mess check-in (cleaning)
-- (Nov 3, built: line icons, self-sorting rows, no predictor, own emoji, compact editors.) Ask the owner whether the mess words ("Stormy", "Cloudy") count as the metaphors to drop.
-- Data: trash & recycling becomes a weekly habit on Tuesday evenings, not a chore; cleaning the weed supplies becomes a regular cleaning task with a need slider.
+- (Nov 3, built: coloured icons at the bars' ends, plain words instead of the weather ones, self-sorting rows, no predictor, own emoji, compact editors.)
+- Data done (trash & recycling weekly habit, Tuesdays; weed supplies a chore). The owner deletes the old "clean weed supplies" habit (Daily Habits › Not today › ✎ › Delete).
 
 ## Quests and the quest editor
 
 ## Calendar
-- Google Calendar toggles, plus an ordered list of all your calendars (subscribed ones too) that you can reorder and archive.
+- (Nov 3, built: every calendar listed, Google-hidden ones too and unticked ones start hidden; drag to reorder; archive skips loading.) Confirm on the live app once Google is reconnected.
 
 ## Feedback tool (repeat ask 14)
 - Built Nov 3 (pictures in the background, recent notes to edit). Confirm on the iPhone.
 
 ## Other
 - Martin-care quests as a follow-up to scheduling time with Dad (with the agenda feature above).
-- Today scrolls slowly on the laptop: look into it.
-- Agenda for a visit (owner, Nov 3): once "Schedule time to be with my dad" is on the calendar, the quests waiting behind it (parents' calendars, Dad's computer, Martin-care quests) show as agenda options for that visit. The quests are set up as its sequence (Family board).
+- (Nov 3, built: the forest background is a fixed layer, no repaint on scroll.) Confirm on the laptop.
+- (Nov 3, built: a quest on the calendar lists the quests waiting behind it as "Agenda".) Left: Martin-care quests added behind the Dad quest (which ones: ask). Original ask: Agenda for a visit (owner, Nov 3): once "Schedule time to be with my dad" is on the calendar, the quests waiting behind it (parents' calendars, Dad's computer, Martin-care quests) show as agenda options for that visit. The quests are set up as its sequence (Family board).

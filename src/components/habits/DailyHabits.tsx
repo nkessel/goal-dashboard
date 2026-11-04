@@ -882,6 +882,18 @@ export function DailyHabits({
           rite={editing === "new" ? undefined : editing}
           slot="day"
           startWithSub={editSub}
+          extraSubs={
+            editing !== "new" && editing.id === cleanId && cleaning ? (
+              <CleaningParts
+                cleaning={cleaning}
+                onOpen={() => {
+                  setEditing(null);
+                  setEditSub(false);
+                  setCleanOpen(true);
+                }}
+              />
+            ) : undefined
+          }
           onClose={() => {
             setEditing(null);
             setEditSub(false);
@@ -1076,5 +1088,31 @@ function HeaderAdornment({ look, habits, isAdventure }: { look: HeaderLook; habi
         style={{ width: `${(n / habits.length) * 100}%`, background: "linear-gradient(90deg, rgba(242,210,126,.25), #f2d27e)", boxShadow: n ? "0 0 8px rgba(242,210,126,.8)" : undefined }}
       />
     </span>
+  );
+}
+
+/**
+ * The cleaning habit's own parts in its editor (owner, Nov 3: "the cleaning habit's sub-habits are missing"):
+ * its spaces, chores and laundry, as they stand in the mess check-in, with a way to open it to change them.
+ */
+function CleaningParts({ cleaning, onOpen }: { cleaning: NonNullable<ReturnType<typeof normalizeCleaning>>; onOpen: () => void }) {
+  const parts = [...cleaning.spaces.map((s) => ({ id: s.id, icon: s.icon, name: s.name })), { id: "laundry", icon: "🧺", name: "Laundry" }, ...cleaning.chores.map((c) => ({ id: c.id, icon: c.icon, name: c.name }))];
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl px-2.5 py-2" style={{ background: "rgba(168,138,63,.1)", border: "1px solid rgba(168,138,63,.35)" }}>
+      <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+        Spaces and chores (from the mess check-in)
+      </span>
+      <div className="flex flex-wrap gap-1">
+        {parts.map((p) => (
+          <span key={p.id} className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px]" style={{ background: "rgba(255,250,238,.8)", border: "1px solid rgba(168,138,63,.45)", color: "#2a1c10" }}>
+            <span aria-hidden>{p.icon}</span>
+            {p.name}
+          </span>
+        ))}
+      </div>
+      <button type="button" onClick={onOpen} className="self-start text-[13px] font-semibold underline underline-offset-2" style={{ color: "#6b4a12" }}>
+        Change them in the mess check-in ›
+      </button>
+    </div>
   );
 }

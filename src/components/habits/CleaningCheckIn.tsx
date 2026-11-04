@@ -419,49 +419,59 @@ function RemoveBtn({ name, onRemove }: { name: string; onRemove: () => void }) {
   );
 }
 
-/* The bar's ends: plain black-and-white line icons (owner, Nov 3), no faces or metaphors. */
-const ink = { stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
+/* The bar's ends: small storybook icons in colour (owner, Nov 3: "better than white/black"), no faces or metaphors. */
+const line = { strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 function TidyIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-label="tidy">
-      <path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1-5.1-1.9 5.1-1.9z" {...ink} />
-      <path d="M19 16v4M17 18h4" {...ink} />
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-label="tidy">
+      <path d="M11 3l2 5.4 5.4 2-5.4 2L11 18l-2-5.6-5.4-2 5.4-2z" fill="#f6dc8e" stroke="#a8781e" strokeWidth="1.4" {...line} />
+      <path d="M11 6.5l.9 2.6 2.6.9-2.6.9-.9 2.7-.9-2.7-2.6-.9 2.6-.9z" fill="#fff8df" />
+      <path d="M18.5 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="#9ccf8a" stroke="#4f7a3c" strokeWidth="1" {...line} />
     </svg>
   );
 }
 function MessIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-label="messy">
-      <path d="M3.5 19.5h17" {...ink} />
-      <path d="M5 19.5l2.5-5 3 2 2-4.5 3.5 3 3-2.5 1 7" {...ink} />
-      <circle cx="9" cy="8" r="1.2" fill="currentColor" />
-      <circle cx="15.5" cy="6.5" r="1.2" fill="currentColor" />
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-label="messy">
+      <ellipse cx="12" cy="20" rx="9" ry="1.6" fill="#000" opacity=".12" />
+      <rect x="4" y="14.5" width="9" height="4.5" rx="1" fill="#6f8fc4" stroke="#36507e" strokeWidth="1.2" transform="rotate(-8 8.5 16.8)" />
+      <path d="M12.5 19.2c0-2.6 1.2-5 3.6-5.7l1.3 1.3c.9-.5 2.1-.4 2.6.5.6 1-.2 2.3-1.6 2.6l-.4 1.3z" fill="#d4774e" stroke="#8a3f1f" strokeWidth="1.2" {...line} />
+      <path d="M7 13.8l1.6-5.3h4.2l1.4 5.3z" fill="#9ccf8a" stroke="#4f7a3c" strokeWidth="1.2" {...line} />
+      <path d="M8.6 8.5c0-1.2 1-2 2.1-2s2.1.8 2.1 2" fill="none" stroke="#4f7a3c" strokeWidth="1.2" {...line} />
     </svg>
   );
 }
 function BinIcon({ full }: { full: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-label={full ? "full" : "empty"}>
-      <path d="M4.5 9h15l-1.6 10.2a1.5 1.5 0 0 1-1.5 1.3H7.6a1.5 1.5 0 0 1-1.5-1.3z" {...ink} />
-      <path d="M8 12.5v5M12 12.5v5M16 12.5v5" {...ink} strokeWidth={1.3} />
-      {full && <path d="M6 9c.8-3 3-4.5 6-4.5s5.2 1.5 6 4.5" {...ink} />}
-      {full && <path d="M9 5.5c1-1 2-1.3 3-1.3" {...ink} />}
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-label={full ? "full" : "empty"}>
+      {full && (
+        <>
+          <path d="M5.5 10c.4-2.4 1.8-3.8 3.6-3.8 1 0 1.8.6 2.2 1.4" fill="#d4774e" stroke="#8a3f1f" strokeWidth="1.2" {...line} />
+          <path d="M10 9.5c.6-3 2.4-4.6 4.6-4.6 1.6 0 3 1.2 3.4 3.3L18.5 10z" fill="#6f8fc4" stroke="#36507e" strokeWidth="1.2" {...line} />
+          <path d="M8.5 10c.8-1.8 2-2.6 3.5-2.6s2.6.9 3.2 2.6z" fill="#f2d27e" stroke="#a8781e" strokeWidth="1.1" {...line} />
+        </>
+      )}
+      <path d="M4 9.5h16l-1.7 10a1.6 1.6 0 0 1-1.6 1.3H7.3a1.6 1.6 0 0 1-1.6-1.3z" fill="#e2c07a" stroke="#8a6116" strokeWidth="1.4" {...line} />
+      <path d="M5 13h14M5.6 16.5h12.8" stroke="#a8803a" strokeWidth="1" {...line} />
+      <path d="M8.5 9.5l.6 11M12 9.5v11M15.5 9.5l-.6 11" stroke="#a8803a" strokeWidth=".9" {...line} />
     </svg>
   );
 }
 function DoneIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-label="done">
-      <circle cx="12" cy="12" r="8" {...ink} />
-      <path d="M8.5 12.3l2.4 2.4 4.6-5" {...ink} />
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-label="done">
+      <circle cx="12" cy="12" r="8.5" fill="#7fae67" stroke="#3f6a2f" strokeWidth="1.4" />
+      <path d="M8.3 12.3l2.6 2.6 4.9-5.4" fill="none" stroke="#fffbe9" strokeWidth="2.2" {...line} />
     </svg>
   );
 }
 function DueIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-label="due">
-      <circle cx="12" cy="13" r="7.5" {...ink} />
-      <path d="M12 9v4.2l2.6 1.6M9.5 3.5h5" {...ink} />
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-label="due">
+      <path d="M9.5 3h5" stroke="#8a4a14" strokeWidth="1.8" {...line} />
+      <circle cx="12" cy="13" r="7.8" fill="#f3c27a" stroke="#9a5a1c" strokeWidth="1.4" />
+      <circle cx="12" cy="13" r="5.6" fill="#fff4dc" />
+      <path d="M12 9.6v3.6l2.4 1.5" fill="none" stroke="#9a5a1c" strokeWidth="1.7" {...line} />
     </svg>
   );
 }

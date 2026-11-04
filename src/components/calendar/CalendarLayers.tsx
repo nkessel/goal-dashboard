@@ -10,6 +10,8 @@ import { DayView } from "./DayView";
 import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
 import { fromFeedback } from "@/lib/from-feedback";
+import { CalendarList } from "./CalendarList";
+import { AgendaContext } from "./CalendarTaskChip";
 import type { SchedulerSettings } from "@/lib/auto-schedule";
 import type { TimedHabit } from "@/lib/timed-habits";
 
@@ -22,8 +24,8 @@ export type HabitLook = "quest" | "dashed" | "hidden";
 /** What a quest card on the calendar shows (owner, Nov 3: "options to customize what shows on quest cards"). */
 export type CardShow = { art: boolean; time: boolean; xp: boolean; coins: boolean };
 export const CARD_SHOW_DEFAULT: CardShow = { art: true, time: true, xp: true, coins: true };
-type Layers = { hidden: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
-const DEFAULTS: Layers = { hidden: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "quest", card: CARD_SHOW_DEFAULT };
+type Layers = { hidden: string[]; /** The calendars' own order (owner, Nov 3). */ order: string[]; /** Archived: not shown, not loaded (the server reads the cal-skip cookie). */ archived: string[]; /** Calendars met before (ones unticked in Google start hidden the first time). */ seen: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
+const DEFAULTS: Layers = { hidden: [], order: [], archived: [], seen: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "quest", card: CARD_SHOW_DEFAULT };
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("storage", cb);
@@ -49,6 +51,8 @@ function read(): Layers {
 function write(next: Layers) {
   try {
     window.localStorage.setItem(KEY, JSON.stringify(next));
+    // The server skips archived calendars (no wasted calls to Google).
+    document.cookie = `cal-skip=${encodeURIComponent(next.archived.join("|"))}; path=/; max-age=31536000; samesite=lax`;
   } catch {
     /* storage unavailable */
   }
@@ -75,7 +79,10 @@ export function CalendarLayers({
   nDays,
   toSchedule = 0,
   daily,
+  agenda = {},
 }: {
+  /** The quests waiting behind each quest on the calendar (its agenda). */
+  agenda?: Record<string, { id: string; title: string }[]>;
   /** Daily essentials kept free and habits with a set time, drawn on the time grid. */
   daily?: DailyLayer;
   /** Quests waiting on the scheduling list (the badge on its calendar button). */
@@ -117,7 +124,14 @@ export function CalendarLayers({
   const shownEvents = events.filter((e) => !layers.hidden.includes(e.calendarId ?? "primary") && (layers.allDay || !e.isAllDay));
   const set = (patch: Partial<Layers>) => write({ ...layers, ...patch });
   const toggleCal = (id: string) => set({ hidden: layers.hidden.includes(id) ? layers.hidden.filter((x) => x !== id) : [...layers.hidden, id] });
-  const hiddenCount = layers.hidden.length + (layers.quests ? 0 : 1);
+  const hiddenCount = layers.hidden.filter((id) => !layers.archived.includes(id)).length + (layers.quests ? 0 : 1);
+  // Calendars unticked in Google (subscriptions you keep but don't look at) start hidden here, once.
+  const unseen = calendars.filter((c) => !layers.seen.includes(c.id));
+  useEffect(() => {
+    if (!unseen.length) return;
+    const off = unseen.filter((c) => c.selected === false).map((c) => c.id);
+    write({ ...layers, seen: [...layers.seen, ...unseen.map((c) => c.id)], hidden: [...layers.hidden, ...off.filter((id) => !layers.hidden.includes(id))] });
+  }, [unseen, layers]);
   const chip = { background: isAdventure ? "rgba(14,18,10,.55)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "#f6ecd2" : "var(--t-ink)" };
   const popup = { background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, boxShadow: "0 12px 30px rgba(0,0,0,.35)" };
 
@@ -141,6 +155,7 @@ export function CalendarLayers({
   );
 
   return (
+    <AgendaContext.Provider value={agenda}>
     <div className="flex flex-col gap-2">
       <div ref={panel} className="relative z-[25] -mt-1 flex items-center justify-end gap-1.5 sm:gap-2">
         {/* Top-left: the scheduling list, as a calendar button with its count. */}
@@ -178,14 +193,14 @@ export function CalendarLayers({
           <span className="hidden sm:inline">Plan my day</span>
         </button>
         {calendars.length > 0 && (() => {
-          const othersOn = calendars.some((c) => !layers.hidden.includes(c.id));
+          const othersOn = calendars.some((c) => !layers.hidden.includes(c.id) && !layers.archived.includes(c.id));
           return (
             <span className="flex h-9 shrink-0 items-center rounded-full" style={chip}>
               <button
                 type="button"
                 role="switch"
                 aria-checked={othersOn}
-                onClick={() => set({ hidden: othersOn ? calendars.map((c) => c.id) : [] })}
+                onClick={() => set({ hidden: othersOn ? calendars.map((c) => c.id) : layers.archived })}
                 className="flex h-full items-center gap-2 whitespace-nowrap rounded-l-full pl-3 pr-1.5 text-[13.5px] font-semibold"
                 title={othersOn ? "Hide your other calendars" : "Show your other calendars"}
               >
@@ -232,7 +247,23 @@ export function CalendarLayers({
               Calendars{hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ""}
             </p>
             {row("Quests you scheduled", layers.quests, () => set({ quests: !layers.quests }))}
-            {calendars.map((c) => row(c.name, !layers.hidden.includes(c.id), () => toggleCal(c.id), c.color))}
+            <CalendarList
+              calendars={calendars}
+              hidden={layers.hidden}
+              order={layers.order}
+              archived={layers.archived}
+              isAdventure={isAdventure}
+              onToggle={toggleCal}
+              onOrder={(order) => set({ order })}
+              onArchive={(id, archive) =>
+                set(
+                  archive
+                    ? { archived: [...layers.archived.filter((x) => x !== id), id], hidden: [...layers.hidden.filter((x) => x !== id), id], order: [...layers.order.filter((x) => x !== id), id] }
+                    : { archived: layers.archived.filter((x) => x !== id), hidden: layers.hidden.filter((x) => x !== id) }
+                )
+              }
+            />
+            {layers.archived.length > 0 && <p className="m-0 px-2 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>Restoring one loads it on the next visit.</p>}
             <button type="button" onClick={() => set({ quests: true, hidden: calendars.map((c) => c.id) })} className="mx-2 mt-1 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
               Just my quests
             </button>
@@ -300,6 +331,7 @@ export function CalendarLayers({
       {(view === "3day" || view === "days" || view === "week" || view === "next7") && <WeekView dayKeys={widen(dayKeys, BUFFER)} visible={dayKeys.length} buffer={BUFFER} tasks={shownTasks} events={shownEvents} theme={theme} portraits={layers.portraits} card={layers.card} daily={daily} essentials={layers.essentials} habitLook={layers.habits} />}
       {view === "month" && <MonthView monthKey={monthKey} todayKey={todayKey} tasks={shownTasks} events={shownEvents} theme={theme} />}
     </div>
+    </AgendaContext.Provider>
   );
 }
 

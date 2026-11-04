@@ -51,7 +51,8 @@ export type Cleaning = {
 };
 
 export const MESS_STYLES: { key: MessStyle; label: string; mark: string; glyphs: [string, string, string]; words: [string, string, string] }[] = [
-  { key: "weather", mark: "⛅", label: "Weather", glyphs: ["✨☀️", "⛅", "⛈️"], words: ["Fresh and clear", "Cloudy", "Stormy"] },
+  // Plain words (owner, Nov 3: no weather metaphors). The key stays "weather" so saved choices still read.
+  { key: "weather", mark: "🧹", label: "Plain words", glyphs: ["✨", "🧺", "🧺🧺"], words: ["Tidy", "A bit messy", "Needs a clean"] },
   { key: "jars", mark: "🫙", label: "Jars & bottles", glyphs: ["✨🫙", "🫙🍶🧴", "🫙🍶🧴🍾🥫🫙"], words: ["Spotless shelf", "A few bottles", "A crowded shelf"] },
   { key: "garden", mark: "🌿", label: "Garden", glyphs: ["🌱✨", "🌿🌾", "🌳🌿🍃🌾"], words: ["Neat and tidy", "Overgrown", "Jungle"] },
   { key: "critters", mark: "👺", label: "Critters", glyphs: ["🫧✨", "👺", "🐉"], words: ["Squeaky clean", "Grumpy gremlin", "Mess dragon"] },

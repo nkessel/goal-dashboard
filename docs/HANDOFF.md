@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-03, `main` @ see `git log` (Plan my day; welcome toucan, habits, sleep ruler; faster first screen)
+- **Last updated:** 2026-11-03 (night), `main` @ see `git log` (Plan my day; welcome toucan, habits, sleep ruler; faster first screen)
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** ~86 notes (the app's count, Nov 2 afternoon; query in section 3; the owner's own notes also read at /journal › App feedback when no DB connector). Not marked shipped this push (no database access from that session). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
 
@@ -150,6 +150,8 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 ## 6. Recently shipped
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
+
+- Nov 3 (night): Today scrolls smoothly on laptops: the forest background is painted by one fixed layer (`[data-app-bg]` in AppShell) instead of `background-attachment: fixed` on the scrolling shell. Google calendars: every calendar (Google-hidden ones too; unticked ones start hidden), drag to reorder, archive (skipped when loading, `cal-skip` cookie; `calendar/CalendarList.tsx`, preview `/dev-preview/calendars`). A quest on the calendar shows the quests waiting behind it as its "Agenda" (`listWaitingBehind`, `AgendaContext`). Mess check-in: coloured icons at the bars' ends, plain words ("Tidy / A bit messy / Needs a clean") instead of the weather ones. The cleaning habit's editor lists its spaces and chores (`CleaningParts`). Toucan notes: × really hides the bubble (the arrival animation's fill held it visible), an "Answer him…" line in every note, and "🌙 Evening routine" in the evening prep note.
 
 - Nov 3: Settings › Visual Effects › Scale colours: a colour per scale (importance, urgency, difficulty, energy) for the bars on cards and in the editor (`scale-colors` in localStorage, `fillFor`/`useScaleColors` in `ui/LevelScales.tsx`).
 

@@ -9,7 +9,7 @@ import { CreateFab } from "@/components/create/CreateFab";
 import { ScreenArrange } from "@/components/ui/ScreenArrange";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getProfileById } from "@/lib/data/profiles";
-import { listCalendarTasksForOwner } from "@/lib/data/tasks";
+import { listCalendarTasksForOwner, listWaitingBehind } from "@/lib/data/tasks";
 import { listEventsAllCalendars, type GoogleCalendarEvent, type GoogleCalendarInfo } from "@/lib/google-calendar";
 import { CalendarLayers } from "@/components/calendar/CalendarLayers";
 import { listRites } from "@/lib/data/rites";
@@ -134,7 +134,7 @@ export default async function CalendarPage({
   // A failure is shown, not swallowed (owner, Nov 3: "the google calendars are still not showing"): it says why and offers to reconnect.
   let googleProblem: string | null = null;
   const googleP = session.googleAccessToken
-    ? listEventsAllCalendars(session.googleAccessToken, rangeStart, rangeEnd).catch((err) => {
+    ? listEventsAllCalendars(session.googleAccessToken, rangeStart, rangeEnd, decodeURIComponent((await cookies()).get("cal-skip")?.value ?? "").split("|").filter(Boolean)).catch((err) => {
         console.warn("Failed to load Google Calendar events:", err);
         googleProblem = googleProblemWords(err);
         return null;
@@ -146,6 +146,8 @@ export default async function CalendarPage({
     getSchedulingFolders(session.user.id),
     googleP,
   ]);
+  // The quests waiting behind each quest on the calendar: its agenda (a visit's to-talk-about list).
+  const agenda = await listWaitingBehind(session.user.id, tasks.filter((t) => t.status !== "completed").map((t) => t.id)).catch(() => ({}));
   const todayHref = `/calendar?view=${view}&date=${formatDateParam(today)}`;
 
   // Real Google Calendar appointments, layered onto the same view — separate
@@ -328,6 +330,7 @@ export default async function CalendarPage({
                 <>
               <CalendarSlide slideKey={`${view}|${nDays}|${formatDateParam(rangeStart)}`}>
               <CalendarLayers
+                agenda={agenda}
                 view={view}
                 dayKeys={
                   view === "day"

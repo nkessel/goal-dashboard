@@ -30,8 +30,11 @@ export function RiteEditorDialog({
   defaultCore = true,
   slot = rite?.slot === "day" ? "day" : "evening",
   startWithSub = false,
+  extraSubs,
   onClose,
 }: {
+  /** More of this habit's parts shown with its sub-habits (the cleaning habit's spaces and chores). */
+  extraSubs?: React.ReactNode;
   /** Opened from "Add a sub-habit": straight to a new sub-habit. */
   startWithSub?: boolean;
   rite?: RiteView;
@@ -206,6 +209,7 @@ export function RiteEditorDialog({
         {isHabit && (
           <div data-mi="subs" className="relative z-[1] flex flex-col gap-1">
             <span className="text-[14.5px] font-semibold">Sub-habits</span>
+            {extraSubs}
             <SubHabitList list={subs} onChange={setSubs} autoFocus={focusSub} />
             {subs.length > 0 && (
               <p className="m-0 pl-2 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>

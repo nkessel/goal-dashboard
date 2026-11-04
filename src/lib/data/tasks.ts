@@ -797,3 +797,23 @@ export async function setTaskInAdditional(taskId: string, ownerId: string, value
   if (error && /in_additional/.test(error.message)) throw new Error("Taking quests off the Today screen needs a quick database update first.");
   if (error) throw new Error(`Failed to update the quest: ${error.message}`);
 }
+
+/**
+ * The open quests waiting behind each of these quests (its sequence), by quest id: on the calendar they
+ * read as the visit's agenda (owner, Nov 3: once time with Dad is on the calendar, the quests behind it are agenda options).
+ */
+export async function listWaitingBehind(ownerId: string, ids: string[]): Promise<Record<string, { id: string; title: string }[]>> {
+  if (!ids.length) return {};
+  const { data, error } = await supabaseAdmin()
+    .from("tasks")
+    .select("id, title, locked_by_task_id, sort_order")
+    .eq("owner_id", ownerId)
+    .neq("status", "completed")
+    .in("locked_by_task_id", ids.slice(0, 200));
+  if (error || !data) return {};
+  const out: Record<string, { id: string; title: string }[]> = {};
+  for (const t of (data as { id: string; title: string; locked_by_task_id: string; sort_order: number | null }[]).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))) {
+    (out[t.locked_by_task_id] ??= []).push({ id: t.id, title: t.title });
+  }
+  return out;
+}

@@ -75,6 +75,9 @@ export async function AppShell({
   return (
     <div data-app-shell data-theme={theme} data-palette={palette} className="flex min-h-screen flex-col items-center">
       {/* Before anything paints: fog, if the day's welcome screen is about to come through it. */}
+      {/* The forest behind everything, on its own fixed layer: a fixed background on this tall div made
+          the browser repaint the whole picture on every scroll step (slow scrolling on laptops, Nov 3). */}
+      <div data-app-bg data-theme={theme} data-palette={palette} aria-hidden />
       {profileId && <script dangerouslySetInnerHTML={{ __html: FOG_SHELL_SCRIPT }} />}
       <ThemeOnBody theme={theme} palette={palette ?? null} />
       {profileId && <SettingsDefaultsSeed />}

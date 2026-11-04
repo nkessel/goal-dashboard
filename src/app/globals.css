@@ -2990,7 +2990,7 @@ html[data-welcome-open] .nav-loader-toucan { display: none; }
 /* While the welcome screen covers everything, what's under it (and the hidden perched toucan) rests instead of animating unseen. */
 html[data-welcome-open] [data-app-shell] *, html[data-welcome-open] [data-perched-owl] * { animation-play-state: paused !important; }
 
-/* The cleaning list's drag bars: calm green on the left, stormy red on the right, a gilded knob. */
+/* The cleaning list's drag bars: calm green on the left, warm red on the right, a gilded knob. */
 .mess-bar { -webkit-appearance: none; appearance: none; background: transparent; }
 .mess-bar::-webkit-slider-runnable-track { height: 8px; border-radius: 9999px; background: linear-gradient(90deg, #8fb86a 0%, #d9b45f 50%, #c0563a 100%); box-shadow: inset 0 1px 2px rgba(60,40,10,.35); }
 .mess-bar::-moz-range-track { height: 8px; border-radius: 9999px; background: linear-gradient(90deg, #8fb86a 0%, #d9b45f 50%, #c0563a 100%); box-shadow: inset 0 1px 2px rgba(60,40,10,.35); }
@@ -3097,4 +3097,19 @@ li:focus-within > .seq-tab,
 .seq-tab:focus-visible {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* The page's background is painted by one fixed layer ([data-app-bg] in AppShell), not by the
+   scrolling shell: a background-attachment: fixed on a scrolling element forces a full repaint
+   on every scroll step. The layer takes the theme's and palette's background rules. */
+[data-app-shell] { background: none !important; }
+[data-app-bg] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100lvh;
+  z-index: -1;
+  pointer-events: none;
+  background-attachment: scroll !important;
 }

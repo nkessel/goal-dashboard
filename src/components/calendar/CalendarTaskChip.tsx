@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
+
+/** The quests waiting behind each quest on the calendar, by quest id: its agenda. */
+export const AgendaContext = createContext<Record<string, { id: string; title: string }[]>>({});
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import type { Task } from "@/lib/data/types";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
@@ -243,6 +246,8 @@ function QuestCard({
 }) {
   const done = task.status === "completed";
   const { w, h } = box;
+  // The quests waiting behind it, as an agenda (owner, Nov 3: time with Dad, then what to bring up).
+  const agenda = useContext(AgendaContext)[task.id] ?? [];
   const line = h < 30;
   // What it pays: XP and coins (done: what it paid). Shown on a line of its own when there's room, else at the end of a one-line card.
   const xpN = done ? (task.xp_awarded ?? task.xp_value) : task.xp_value;
@@ -266,12 +271,14 @@ function QuestCard({
   const doneNote = done && !line && h >= (stack ? 64 : 44);
   const payLine = pays && !line && h >= (stack ? 60 : 40);
   const payInline = pays && line && w >= 120;
-  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? 13 : 0) - (payLine ? 14 : 0)) / (titlePx * 1.12)));
+  const agendaRows = !done && !line && !stack && agenda.length ? Math.max(0, Math.min(agenda.length, 3, Math.floor((h - 8 - (payLine ? 14 : 0) - titlePx * 1.12 - 14) / 13))) : 0;
+  const agendaBadge = !done && agenda.length > 0 && agendaRows === 0 && !line;
+  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? 13 : 0) - (payLine ? 14 : 0) - (agendaRows ? agendaRows * 13 + 13 : 0)) / (titlePx * 1.12)));
 
   return (
     <button
       type="button"
-      title={`Edit "${task.title}"`}
+      title={`Edit "${task.title}"${agenda.length ? `\nAgenda: ${agenda.map((a) => a.title).join("; ")}` : ""}`}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
@@ -333,6 +340,21 @@ function QuestCard({
           </span>
         )}
         {payLine && <Pays xp={show.xp ? xpN : 0} coins={show.coins ? coinN : 0} done={done} center={stack} />}
+        {agendaRows > 0 && (
+          <span className="mt-0.5 block" style={{ fontSize: 10.5, lineHeight: "13px", color: "#5b4520" }}>
+            <span className="block font-semibold" style={{ color: "#7a5a1c" }}>Agenda</span>
+            {agenda.slice(0, agendaRows).map((a, i) => (
+              <span key={a.id} className="block truncate">
+                · {i === agendaRows - 1 && agenda.length > agendaRows ? `${a.title} +${agenda.length - agendaRows}` : a.title}
+              </span>
+            ))}
+          </span>
+        )}
+        {agendaBadge && (
+          <span className="mt-0.5 inline-flex items-center rounded-full px-1.5 font-semibold" style={{ fontSize: 10, lineHeight: "14px", background: "rgba(168,138,63,.18)", color: "#7a5a1c" }}>
+            Agenda {agenda.length}
+          </span>
+        )}
         {show.time && !done && !stack && !line && timeLabel && h >= (payLine ? 66 : 52) && w >= 110 && (
           <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
             {timeLabel}

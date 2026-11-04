@@ -468,7 +468,14 @@ export function ToucanGuide() {
       if (w === "evening") {
         const text = voice.eveningPrep(st);
         const talk = "Help me prepare for tomorrow: what's coming up, and what I can get ready tonight.";
-        say(text, [{ label: "Yes, help me", run: () => talkToToucan(undefined, "talk", talk) }, { label: "All set ✓", run: () => {} }, snoozeFor({ text, until: 0, talk, talkLabel: "Yes, help me" })]);
+        // The evening routine is the way to be ready for tomorrow (owner, Nov 3): offered first when it's on the page.
+        const routine = typeof document !== "undefined" && document.querySelector(".evening-cta");
+        say(text, [
+          ...(routine ? [{ label: "🌙 Evening routine", run: () => document.querySelector<HTMLButtonElement>("button.evening-cta, .evening-cta button")?.click() }] : []),
+          { label: "Yes, help me", run: () => talkToToucan(undefined, "talk", talk) },
+          { label: "All set ✓", run: () => {} },
+          snoozeFor({ text, until: 0, talk, talkLabel: "Yes, help me" }),
+        ]);
         return;
       }
       const dueSoon = dueSoonList(watch.tasks as GuideTask[]);
@@ -830,7 +837,8 @@ function NudgeNote({ text, actions, onClose, instant = false }: { text: string; 
         <ToucanArt size={58} />
       </button>
       <div
-        className={`${instant ? "" : "nudge-bubble"} relative mb-6 flex min-w-0 flex-1 flex-col gap-2 rounded-2xl p-3 pr-8 transition-[opacity,scale] duration-200 ${quiet ? "pointer-events-none scale-95 opacity-0" : ""}`}
+        // The arrival animation fills "both", which held opacity at 1 and so the × never hid the bubble (owner, Nov 3): it goes once he's quiet.
+        className={`${instant || quiet ? "" : "nudge-bubble"} relative mb-6 flex min-w-0 flex-1 flex-col gap-2 rounded-2xl p-3 pr-8 transition-[opacity,scale] duration-200 ${quiet ? "pointer-events-none scale-95 opacity-0" : ""}`}
         aria-hidden={quiet || undefined}
         style={{ background: "linear-gradient(180deg, rgba(14,38,40,.96), rgba(8,22,26,.98))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.3), 0 10px 28px rgba(0,0,0,.5)" }}
       >
@@ -840,6 +848,13 @@ function NudgeNote({ text, actions, onClose, instant = false }: { text: string; 
           ×
         </button>
         <p className="m-0 text-[14px] leading-snug">{text}</p>
+        <NoteReply
+          onSend={(words) => {
+            acted.current = true;
+            setQuiet(true);
+            talkToToucan(undefined, "talk", `You said: “${text}”\nMe: ${words}`);
+          }}
+        />
         <span className="flex flex-wrap gap-1.5">
           {(actions.length ? actions : [{ label: "OK", run: () => {} }]).map((a, i) => (
             <button
@@ -861,6 +876,43 @@ function NudgeNote({ text, actions, onClose, instant = false }: { text: string; 
       </div>
     </div>,
     document.body
+  );
+}
+
+/** Answer him in your own words, right in his note (owner, Nov 3): Enter sends, and the talk opens with it. */
+function NoteReply({ onSend }: { onSend: (words: string) => void }) {
+  const [words, setWords] = useState("");
+  const send = () => {
+    const w = words.trim();
+    if (!w) return;
+    setWords("");
+    onSend(w);
+  };
+  return (
+    <span className="flex items-center gap-1.5">
+      <input
+        value={words}
+        onChange={(e) => setWords(e.target.value.slice(0, 400))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            send();
+          }
+        }}
+        enterKeyHint="send"
+        placeholder="Answer him…"
+        aria-label="Answer the toucan in your own words"
+        className="h-8 min-w-0 flex-1 rounded-full px-3 text-[16px] sm:text-[13.5px]"
+        style={{ background: words ? "rgba(232,255,248,.92)" : "rgba(140,240,220,.1)", border: "1px solid rgba(140,240,220,.45)", color: words ? "#0a2a26" : "#e8fff8" }}
+      />
+      {words.trim() && (
+        <button type="button" onClick={send} aria-label="Send" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "linear-gradient(180deg, #8cf0dc, #4fbfa9)", color: "#0a2a26" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M4 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+    </span>
   );
 }
 

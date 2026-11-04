@@ -121,15 +121,16 @@ export type GoogleCalendarEvent = {
 
 export type RsvpAnswer = "accepted" | "tentative" | "declined";
 
-export type GoogleCalendarInfo = { id: string; name: string; color: string | null; primary: boolean; writable?: boolean };
+export type GoogleCalendarInfo = { id: string; name: string; color: string | null; primary: boolean; writable?: boolean; /** Ticked in Google's own list (false = a subscription kept but not shown there). */ selected?: boolean };
 
 /** The calendars in the person's Google list (their own, shared ones, holidays…). */
 export async function listCalendars(accessToken: string): Promise<GoogleCalendarInfo[]> {
   const calendar = calendarClient(accessToken);
-  const res = await calendar.calendarList.list({ maxResults: 50 });
+  // Every calendar, subscribed and hidden-in-Google ones too (owner, Nov 3: "all your calendars").
+  const res = await calendar.calendarList.list({ maxResults: 100, showHidden: true });
   return (res.data.items ?? [])
-    .filter((c) => c.id && !c.deleted && !c.hidden)
-    .map((c) => ({ id: c.id!, name: c.summaryOverride || c.summary || c.id!, color: c.backgroundColor ?? null, primary: !!c.primary, writable: c.accessRole === "owner" || c.accessRole === "writer" }))
+    .filter((c) => c.id && !c.deleted)
+    .map((c) => ({ id: c.id!, name: c.summaryOverride || c.summary || c.id!, color: c.backgroundColor ?? null, primary: !!c.primary, writable: c.accessRole === "owner" || c.accessRole === "writer", selected: !c.hidden && c.selected !== false }))
     .sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name));
 }
 
@@ -194,8 +195,8 @@ export async function listEvents(
     .filter((e): e is GoogleCalendarEvent => e !== null);
 }
 
-/** Events from every calendar in the list (up to 12), each tagged with its calendar. */
-export async function listEventsAllCalendars(accessToken: string, timeMin: Date, timeMax: Date): Promise<{ calendars: GoogleCalendarInfo[]; events: GoogleCalendarEvent[] }> {
+/** Events from every calendar in the list (up to 20, archived ones skipped), each tagged with its calendar. */
+export async function listEventsAllCalendars(accessToken: string, timeMin: Date, timeMax: Date, /** Archived calendars: listed, not loaded. */ skip: string[] = []): Promise<{ calendars: GoogleCalendarInfo[]; events: GoogleCalendarEvent[] }> {
   let calendars: GoogleCalendarInfo[] = [];
   try {
     calendars = await listCalendars(accessToken);
@@ -203,7 +204,7 @@ export async function listEventsAllCalendars(accessToken: string, timeMin: Date,
     // Older grants may not cover the calendar list: fall back to the main calendar.
     return { calendars: [{ id: "primary", name: "My calendar", color: null, primary: true }], events: await listEvents(accessToken, timeMin, timeMax) };
   }
-  const lists = await Promise.all(calendars.slice(0, 12).map((c) => listEvents(accessToken, timeMin, timeMax, { id: c.id, name: c.name, color: c.color, writable: c.writable }).catch(() => [] as GoogleCalendarEvent[])));
+  const lists = await Promise.all(calendars.filter((c) => !skip.includes(c.id)).slice(0, 20).map((c) => listEvents(accessToken, timeMin, timeMax, { id: c.id, name: c.name, color: c.color, writable: c.writable }).catch(() => [] as GoogleCalendarEvent[])));
   const primaryId = calendars.find((c) => c.primary)?.id;
   // The same meeting can sit on several calendars; show it once.
   const seen = new Set<string>();
