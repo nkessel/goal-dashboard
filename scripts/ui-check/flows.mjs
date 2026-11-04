@@ -377,6 +377,25 @@ export const FLOWS = [
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
       await h.settle(400);
       await h.check("day");
+      // A non-negotiable's menu (owner, Nov 4): right-click a meal hold that's on screen for keep / edit / remove.
+      {
+        const spot = await h.page.evaluate(() => {
+          const n = [...document.querySelectorAll("[data-hold-key=lunch]")].find((el) => { const r = el.getBoundingClientRect(); return r.left >= 40 && r.right <= innerWidth + 40 && r.width > 60; });
+          if (!n) return null;
+          n.scrollIntoView({ block: "center", inline: "nearest" });
+          const r = n.getBoundingClientRect();
+          return { x: Math.max(r.left + 80, r.left + r.width * 0.6), y: r.top + Math.min(r.height / 2, 20) };
+        });
+        if (spot) {
+          await h.settle(300);
+          await h.page.mouse.click(spot.x, spot.y, { button: "right" });
+          await h.settle(400);
+          if (!(await h.page.locator("[role=menu][aria-label=Lunch]").count())) h.record({ kind: "no-menu", severity: "error", target: "essential's menu", detail: "Right-click on a meal hold opened no menu" });
+          await h.check("essential's menu");
+          await h.page.keyboard.press("Escape");
+          await h.settle(300);
+        }
+      }
       await h.page.locator("[title^='Edit \"Take out the trash']").first().evaluate((el) => el.scrollIntoView({ block: "center", inline: "nearest" })).catch(() => {});
       await h.settle(400);
       await h.check("day: the mini-quest at 4:30");

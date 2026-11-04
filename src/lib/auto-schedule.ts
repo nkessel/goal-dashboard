@@ -28,7 +28,12 @@ export type SchedulerSettings = {
   meals?: Meals;
   /** Days ("YYYY-MM-DD") that also keep breakfast free, when breakfast is off by default. */
   breakfastDays?: string[];
+  /** One day's changes to its non-negotiables (meals by key, timed habits as "h:<id>"): kept at a time, or left out that day. */
+  essentialDays?: Record<string, Record<string, DayHold>>;
 };
+
+/** A non-negotiable on one day: kept at `at` (minutes after midnight, for `minutes`), or `off` for that day. */
+export type DayHold = { at?: number; minutes?: number; off?: boolean };
 
 /** Daily essentials kept free: meals, the wind-down, the after-dinner tidy. */
 export type MealKey = "breakfast" | "lunch" | "dinner" | "winddown" | "tidy";
@@ -48,13 +53,23 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 export const localDayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
 /** The meals kept free on a day: each one's range on that day, in ms. */
-export function mealsOn(day: Date, s: SchedulerSettings): { key: MealKey; from: number; to: number; minutes: number; ideal: number | null }[] {
+export function mealsOn(day: Date, s: SchedulerSettings): { key: MealKey; from: number; to: number; minutes: number; ideal: number | null; kept?: boolean }[] {
   const saved = (s.meals ?? {}) as Partial<Meals>;
   const k = localDayKey(day);
+  const today = s.essentialDays?.[k] ?? {};
   return (Object.keys(MEAL_DEFAULTS) as MealKey[])
     .map((key) => [key, { ...MEAL_DEFAULTS[key], ...(saved[key] ?? {}) }] as const)
-    .filter(([key, m]) => m.on || (key === "breakfast" && (s.breakfastDays ?? []).includes(k)))
-    .map(([key, m]) => ({ key, from: at(day, m.from).getTime(), to: at(day, m.to).getTime(), minutes: Math.max(15, m.minutes), ideal: m.ideal != null ? at(day, m.ideal).getTime() : null }));
+    .filter(([key, m]) => (m.on || (key === "breakfast" && (s.breakfastDays ?? []).includes(k))) && !today[key]?.off)
+    .map(([key, m]) => {
+      const o = today[key];
+      const minutes = Math.max(15, o?.minutes ?? m.minutes);
+      // Kept by hand at a time that day: it holds exactly there.
+      if (o?.at != null) {
+        const from = at(day, o.at).getTime();
+        return { key, from, to: from + minutes * 60_000, minutes, ideal: from, kept: true };
+      }
+      return { key, from: at(day, m.from).getTime(), to: at(day, m.to).getTime(), minutes, ideal: m.ideal != null ? at(day, m.ideal).getTime() : null };
+    });
 }
 
 /** Where a hold would sit: the free stretch closest to its ideal time (or the first one), or null when crowded out. */

@@ -3,7 +3,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
-import { scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
+import { saveSchedulerSettingsAction, scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE, type Carried } from "@/lib/schedule-carry";
 import { WeatherLocation, useWeatherPlaceName } from "@/components/ui/WeatherLocation";
 import Link from "next/link";
@@ -25,8 +25,9 @@ import { showsOnCalendar } from "@/lib/calendar-task-window";
 import type { CardShow } from "./CalendarLayers";
 import { GoogleEventChip } from "./GoogleEventChip";
 import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
-import { SCHEDULER_DEFAULTS, holdAt, mealsOn, MEAL_ICONS, MEAL_NAMES } from "@/lib/auto-schedule";
+import { SCHEDULER_DEFAULTS, holdAt, localDayKey, mealsOn, MEAL_ICONS, MEAL_NAMES, type DayHold, type SchedulerSettings } from "@/lib/auto-schedule";
 import { habitBlocksOn } from "@/lib/timed-habits";
+import { fromFeedback } from "@/lib/from-feedback";
 
 /** Hour height: condensed by default; drag the times on the left to zoom. */
 const DEFAULT_HOUR_PX = 36;
@@ -185,6 +186,8 @@ export function WeekView({
     return new Date(d.getTime() + minutes * 60_000);
   };
   function pickDown(e: React.PointerEvent<HTMLDivElement>, dayIndex: number) {
+    // Only the main button picks a time (a right-click is for a hold's menu).
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     const m = minuteAt(e);
     if (carried) {
       e.preventDefault();
@@ -227,6 +230,12 @@ export function WeekView({
     } else if (!p.mouse && p.moved) {
       setSel(null);
       return; // a scroll, not a tap
+    }
+    // A second tap on a meal or habit hold opens its menu instead (owner, Nov 4: "double-tap").
+    if (!p.moved && holdMenuAt(day, e.clientX, e.clientY, "tap", e.timeStamp)) {
+      setSel(null);
+      setAddRange(null);
+      return;
     }
     setSel({ dayIndex, lo, hi });
     setAddRange({ start: minuteDate(day, lo), end: minuteDate(day, hi) });
@@ -945,6 +954,20 @@ export function WeekView({
             }}
             onPointerUp={(e) => pickUp(e, dayIndex)}
             onPointerCancel={() => (pick.current = null, setSel(null))}
+            // Right-click or double-click a meal or habit hold: its menu.
+            onContextMenu={(e) => {
+              if (days[dayIndex] && holdMenuAt(days[dayIndex], e.clientX, e.clientY, "menu", e.timeStamp)) {
+                e.preventDefault();
+                setSel(null);
+                setAddRange(null);
+              }
+            }}
+            onDoubleClick={(e) => {
+              if (days[dayIndex] && holdMenuAt(days[dayIndex], e.clientX, e.clientY, "menu", e.timeStamp)) {
+                setSel(null);
+                setAddRange(null);
+              }
+            }}
           >
             {carried && ghost && ghost.dayIndex === dayIndex && (
               <div
@@ -1110,35 +1133,244 @@ function TodayCrest() {
  * room for them, quieter than quests; and habits with a set time (Gym at 7),
  * which look like quests unless you choose otherwise.
  */
+/** Asks the day's holds whether one sits at this point and opens its menu (a tap needs a second one soon after). */
+function holdMenuAt(day: Date, x: number, y: number, kind: "tap" | "menu", t: number): boolean {
+  const ev = new CustomEvent("hold-menu", { cancelable: true, detail: { dayKey: localDayKey(day), x, y, kind, t } });
+  window.dispatchEvent(ev);
+  return ev.defaultPrevented;
+}
+
+// The scheduler settings as last saved from here (the page's copy is stale until it refreshes).
+let savedSettings: Record<string, unknown> | null = null;
+/** Keep, move or leave out a non-negotiable for one day; null lets it float again. */
+async function saveDayHold(base: Record<string, unknown> | null, dayKey: string, key: string, hold: DayHold | null) {
+  const cur = { ...(savedSettings ?? base ?? {}) } as Record<string, unknown> & { essentialDays?: Record<string, Record<string, DayHold>> };
+  const days = { ...(cur.essentialDays ?? {}) };
+  // Only a week back is kept.
+  const cutoff = localDayKey(new Date(Date.now() - 7 * 86_400_000));
+  for (const k of Object.keys(days)) if (k < cutoff) delete days[k];
+  const day = { ...(days[dayKey] ?? {}) };
+  if (hold) day[key] = hold;
+  else delete day[key];
+  days[dayKey] = day;
+  const next = { ...cur, essentialDays: days };
+  savedSettings = next;
+  try {
+    const local = JSON.parse(window.localStorage.getItem("auto-schedule") || "{}");
+    window.localStorage.setItem("auto-schedule", JSON.stringify({ ...local, essentialDays: days }));
+  } catch {
+    /* storage unavailable */
+  }
+  await saveSchedulerSettingsAction(next);
+}
+
+// Each non-negotiable's own look, when it differs from the calendar's setting ("quest" card or dashed "hold").
+const LOOKS_KEY = "hold-looks";
+let looksCache: { raw: string | null; val: Record<string, "quest" | "hold"> } = { raw: null, val: {} };
+function readLooks(): Record<string, "quest" | "hold"> {
+  try {
+    const raw = window.localStorage.getItem(LOOKS_KEY);
+    if (raw !== looksCache.raw) looksCache = { raw, val: raw ? JSON.parse(raw) : {} };
+    return looksCache.val;
+  } catch {
+    return {};
+  }
+}
+const noLooks: Record<string, "quest" | "hold"> = {};
+function subscribeLooks(cb: () => void) {
+  window.addEventListener("hold-looks", cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener("hold-looks", cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+function setLook(key: string, look: "quest" | "hold" | null) {
+  const next = { ...readLooks() };
+  if (look) next[key] = look;
+  else delete next[key];
+  try {
+    window.localStorage.setItem(LOOKS_KEY, JSON.stringify(next));
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event("hold-looks"));
+}
+/** All of them at once: the calendar's own setting for meals and timed habits (the per-item choices are cleared). */
+function setAllLooks(quest: boolean) {
+  try {
+    const cur = JSON.parse(window.localStorage.getItem("calendar-layers") || "{}");
+    window.localStorage.setItem("calendar-layers", JSON.stringify({ ...cur, essentials: quest ? "quest" : "dashed", habits: quest ? "quest" : "dashed", v: 2 }));
+    window.localStorage.removeItem(LOOKS_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event("calendar-layers"));
+  window.dispatchEvent(new Event("hold-looks"));
+}
+
+type HoldTarget = { key: string; label: string; at: number; minutes: number; kept: boolean; crowded: boolean; meal: boolean };
+
+/**
+ * The day's non-negotiables: meals and the like float inside their ranges around everything else, and a
+ * timed habit (Gym 7–10) takes the first free stretch of its window. When there's no room left in the range,
+ * it shows in a muted red (owner, Nov 4). Right-click or double-tap one for its menu: keep it where it is
+ * (the red goes), move it or change its length, or leave it out today.
+ */
 function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventure }: { day: Date; daily: DailyLayer; essentials: EssentialsLook; habitLook: HabitLook; busy: { start: number; end: number }[]; topOf: (d: Date) => number; isAdventure: boolean }) {
-  const placed = habitBlocksOn(daily.habits, day, busy);
+  const router = useRouter();
+  const dayKey = localDayKey(day);
+  const looks = useSyncExternalStore(subscribeLooks, readLooks, () => noLooks);
+  // Changes made here show at once, before the page catches up.
+  const [mine, setMine] = useState<Record<string, DayHold | null>>({});
+  const [menu, setMenu] = useState<HoldTarget | null>(null);
+  const [edit, setEdit] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const lastTap = useRef<{ key: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const away = (e: PointerEvent) => {
+      if (fromFeedback(e) || (menuRef.current && menuRef.current.contains(e.target as Node))) return;
+      setMenu(null);
+    };
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", key);
+    };
+  }, [menu]);
+  const base = { ...SCHEDULER_DEFAULTS, ...((savedSettings ?? daily.settings) ?? {}) } as SchedulerSettings;
+  const dayHolds: Record<string, DayHold> = { ...(base.essentialDays?.[dayKey] ?? {}) };
+  for (const [k, v] of Object.entries(mine)) {
+    if (v) dayHolds[k] = v;
+    else delete dayHolds[k];
+  }
+  const settings = { ...base, essentialDays: { ...(base.essentialDays ?? {}), [dayKey]: dayHolds } };
+  const placed = habitBlocksOn(daily.habits, day, busy, dayHolds);
   const habits = habitLook === "hidden" ? [] : placed;
   const taken = [...busy, ...placed];
   const holds =
     essentials === "hidden"
       ? []
-      : mealsOn(day, { ...SCHEDULER_DEFAULTS, ...(daily.settings ?? {}) }).flatMap((m) => {
-          const at = holdAt(m.from, m.to, m.minutes, taken, m.ideal);
-          if (at === null) return [];
-          taken.push({ start: at, end: at + m.minutes * 60_000 });
-          return [{ ...m, at }];
+      : mealsOn(day, settings).map((m) => {
+          const at = m.kept ? m.from : holdAt(m.from, m.to, m.minutes, taken, m.ideal);
+          // Crowded out: it shows where it would best go, in red, until it's kept, moved or left out.
+          const shown = at ?? m.ideal ?? m.from;
+          taken.push({ start: shown, end: shown + m.minutes * 60_000 });
+          return { ...m, at: shown, crowded: at === null };
         });
+
+  const pick = (t: HoldTarget) => {
+    setEdit(false);
+    setMenu(t);
+  };
+  // The holds let clicks through (a quest can be dragged or added over them); the grid asks them instead.
+  const targets: Record<string, HoldTarget> = {};
+  const handlers = (t: HoldTarget) => {
+    targets[t.key] = t;
+    return { "data-hold-day": dayKey, "data-hold-key": t.key };
+  };
+  const onHoldMenu = useEffectEvent((e: Event) => {
+    const d = (e as CustomEvent<{ dayKey: string; x: number; y: number; kind: "tap" | "menu"; t: number }>).detail;
+    if (d.dayKey !== dayKey) return;
+    const el = [...document.querySelectorAll<HTMLElement>(`[data-hold-day="${dayKey}"]`)].find((n) => {
+      const r = n.getBoundingClientRect();
+      return d.x >= r.left && d.x <= r.right && d.y >= r.top && d.y <= r.bottom;
+    });
+    const t = el ? targets[el.dataset.holdKey ?? ""] : undefined;
+    if (!t) return;
+    if (d.kind === "tap") {
+      const last = lastTap.current;
+      if (!(last && last.key === t.key && d.t - last.at < 360)) {
+        lastTap.current = { key: t.key, at: d.t };
+        return;
+      }
+      lastTap.current = null;
+    }
+    e.preventDefault();
+    pick(t);
+  });
+  useEffect(() => {
+    const on = (e: Event) => onHoldMenu(e);
+    window.addEventListener("hold-menu", on);
+    return () => window.removeEventListener("hold-menu", on);
+  }, []);
+  const save = (key: string, hold: DayHold | null) => {
+    setMine((m) => ({ ...m, [key]: hold }));
+    saveDayHold(daily.settings, dayKey, key, hold)
+      .then(() => router.refresh())
+      .catch(() => setMine((m) => {
+        const n = { ...m };
+        delete n[key];
+        return n;
+      }));
+  };
+  const minsOf = (ms: number) => {
+    const d = new Date(ms);
+    return d.getHours() * 60 + d.getMinutes();
+  };
+  const keepAt = (t: HoldTarget, at: number, minutes = t.minutes) => {
+    save(t.key, { at: minsOf(at), minutes });
+    setMenu({ ...t, at, minutes, kept: true, crowded: false });
+  };
+  const red: React.CSSProperties = { background: "rgba(178,84,66,.13)", border: "1.5px dashed rgba(160,70,52,.6)", borderRadius: 6, color: "#8a3f2c" };
+
   // The grid is parchment in every theme: a soft brown ink reads on it.
   const ink = isAdventure ? "#6b5631" : "var(--t-ink-soft)";
+  const clock = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const chip = "h-8 rounded-full px-2.5 text-[12.5px] font-semibold";
   return (
     <>
       {holds.map((h) => {
         const top = topOf(new Date(h.at));
         const height = Math.max(16, topOf(new Date(h.at + h.minutes * 60_000)) - top - 2);
-        const look: React.CSSProperties =
-          essentials === "soft"
+        const look: React.CSSProperties = h.crowded
+          ? red
+          : essentials === "soft"
             ? { background: "rgba(168,138,63,.16)", borderRadius: 6 }
             : essentials === "line"
               ? { borderLeft: "3px solid rgba(139,112,64,.55)" }
-              : { border: "1.5px dashed rgba(139,112,64,.6)", borderRadius: 6 };
+              : { border: `1.5px ${h.kept ? "solid" : "dashed"} rgba(139,112,64,.6)`, borderRadius: 6 };
+        const t: HoldTarget = { key: h.key, label: MEAL_NAMES[h.key], at: h.at, minutes: h.minutes, kept: !!h.kept, crowded: h.crowded, meal: true };
+        const asQuest = (looks[h.key] ?? (essentials === "quest" ? "quest" : "hold")) === "quest";
+        if (asQuest) {
+          // Like a quest: a storybook card with its emoji.
+          return (
+            <div
+              key={h.key}
+              {...handlers(t)}
+              title={`${MEAL_NAMES[h.key]}${h.crowded ? ": no free time left for it here" : ""} · right-click or double-tap`}
+              className="quest-card absolute inset-x-0.5 flex items-center gap-1.5 overflow-hidden"
+              style={{ top: top + 1, height, zIndex: menu?.key === h.key ? 3 : 0, padding: height >= 26 ? "3px 6px 3px 4px" : "1px 6px", borderRadius: 14, ...(h.crowded ? { background: "linear-gradient(rgba(178,84,66,.2), rgba(178,84,66,.2)), linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1.5px dashed rgba(160,70,52,.7)" } : {}) }}
+            >
+              <span aria-hidden className="shrink-0" style={{ fontSize: Math.min(20, Math.max(12, height - 10)), lineHeight: 1 }}>
+                {MEAL_ICONS[h.key]}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="font-display block truncate" style={{ color: h.crowded ? "#8a3f2c" : "#3a2a14", fontSize: 12.5, lineHeight: 1.15 }}>
+                  {MEAL_NAMES[h.key]}
+                </span>
+                {height >= 34 && (
+                  <span className="block truncate" style={{ color: h.crowded ? "#8a3f2c" : "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
+                    {h.crowded ? "no room in its time" : clock(h.at)}
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+        }
         return (
-          <div key={h.key} title={`${MEAL_NAMES[h.key]}: kept free (floats as things are planned)`} className="absolute inset-x-0.5 overflow-hidden px-1.5 py-0.5 text-[11px] italic leading-tight" style={{ top: top + 1, height, color: ink, opacity: 0.9, zIndex: 0, ...look }}>
+          <div
+            key={h.key}
+            {...handlers(t)}
+            title={h.crowded ? `${MEAL_NAMES[h.key]}: no free time left for it here (right-click or double-tap)` : `${MEAL_NAMES[h.key]}: ${h.kept ? "kept here" : "kept free (floats as things are planned)"} · right-click or double-tap`}
+            className="absolute inset-x-0.5 overflow-hidden px-1.5 py-0.5 text-[11px] italic leading-tight"
+            style={{ top: top + 1, height, color: ink, opacity: 0.9, zIndex: menu?.key === h.key ? 3 : 0, ...look }}
+          >
             <span aria-hidden>{MEAL_ICONS[h.key]}</span> {MEAL_NAMES[h.key]}
+            {h.crowded && height >= 28 && <span className="block not-italic text-[10.5px] font-semibold">no room in its time</span>}
           </div>
         );
       })}
@@ -1146,14 +1378,16 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
         const top = topOf(new Date(b.start));
         const height = Math.max(18, topOf(new Date(b.end)) - top - 2);
         const time = new Date(b.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-        const quest = habitLook === "quest";
+        const quest = (looks[`h:${b.habit.id}`] ?? (habitLook === "quest" ? "quest" : "hold")) === "quest";
+        const t: HoldTarget = { key: `h:${b.habit.id}`, label: b.habit.title, at: b.start, minutes: Math.round((b.end - b.start) / 60_000), kept: !!b.kept, crowded: !!b.crowded, meal: false };
+        const crowdedLook: React.CSSProperties = b.crowded ? { background: "linear-gradient(rgba(178,84,66,.2), rgba(178,84,66,.2)), linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1.5px dashed rgba(160,70,52,.7)" } : {};
         if (quest && isAdventure) {
           // Like a quest: a storybook card with the habit's portrait beside its name (owner's mockup, Nov 3).
           // Tall enough: the portrait stands above the name (so a narrow week column still shows both); else beside it.
           const tall = height >= 50;
           const art = tall ? Math.min(height - 24, 34) : height >= 26 ? Math.min(height - 8, 30) : 0;
           return (
-            <div key={b.habit.id} className={`quest-card absolute inset-x-0.5 flex overflow-hidden ${tall ? "flex-col items-center justify-center gap-0.5 text-center" : "items-center gap-1.5"}`} title={`${b.habit.title}: a daily habit, ${time}`} style={{ top: top + 1, height, zIndex: 1, padding: tall ? "3px 3px" : height >= 26 ? "3px 6px 3px 4px" : "1px 6px", borderRadius: 14 }}>
+            <div key={b.habit.id} {...handlers(t)} className={`quest-card absolute inset-x-0.5 flex overflow-hidden ${tall ? "flex-col items-center justify-center gap-0.5 text-center" : "items-center gap-1.5"}`} title={`${b.habit.title}: a daily habit, ${time}${b.crowded ? " (no free time left in its window)" : ""} · right-click or double-tap`} style={{ top: top + 1, height, zIndex: menu?.key === t.key ? 3 : 1, padding: tall ? "3px 3px" : height >= 26 ? "3px 6px 3px 4px" : "1px 6px", borderRadius: 14, ...crowdedLook }}>
               {art >= 16 ? (
                 <span className="quest-art flex shrink-0 items-center justify-center overflow-hidden" style={{ width: art, height: art, borderRadius: art > 30 ? 8 : 5 }}>
                   {b.habit.icon_key ? (
@@ -1165,12 +1399,12 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
                 </span>
               ) : null}
               <span className={tall ? "w-full min-w-0" : "min-w-0 flex-1"}>
-                <span className="font-display block truncate" style={{ color: "#3a2a14", fontSize: 12.5, lineHeight: 1.15 }}>
+                <span className="font-display block truncate" style={{ color: b.crowded ? "#8a3f2c" : "#3a2a14", fontSize: 12.5, lineHeight: 1.15 }}>
                   {b.habit.title}
                 </span>
                 {height >= (tall ? 76 : 34) && (
-                  <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
-                    {time}
+                  <span className="block truncate" style={{ color: b.crowded ? "#8a3f2c" : "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
+                    {b.crowded ? "no room in its time" : time}
                   </span>
                 )}
               </span>
@@ -1180,26 +1414,95 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
         return (
           <div
             key={b.habit.id}
+            {...handlers(t)}
             className="absolute inset-x-0.5 flex items-start gap-1 overflow-hidden px-1.5 py-0.5 text-[11.5px] leading-tight"
             style={{
               top: top + 1,
               height,
-              zIndex: 1,
+              zIndex: menu?.key === t.key ? 3 : 1,
               borderRadius: 6,
               color: quest ? "#2a1c10" : ink,
               ...(quest
                 ? { background: "linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1px solid #a88a3f", boxShadow: "0 1px 3px rgba(0,0,0,.25)" }
-                : { border: "1.5px dashed rgba(80,120,60,.7)", background: "rgba(120,160,90,.08)" }),
+                : { border: `1.5px ${b.kept ? "solid" : "dashed"} rgba(139,112,64,.6)`, fontStyle: "italic" }),
+              ...(b.crowded ? red : {}),
             }}
           >
             <span aria-hidden>🌱</span>
             <span className="min-w-0">
               <b className="block truncate">{b.habit.title}</b>
-              {height >= 30 && <span className="opacity-70">{time}</span>}
+              {height >= 30 && <span className="opacity-70">{b.crowded ? "no room in its time" : time}</span>}
             </span>
           </div>
         );
       })}
+      {menu && (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label={menu.label}
+          className="card-pop-in parchment pointer-events-auto absolute left-0.5 z-[30] flex w-[min(230px,calc(100vw-24px))] flex-col gap-1 p-2 text-[13px]"
+          style={{ top: topOf(new Date(menu.at + menu.minutes * 60_000)) + 2, borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 10px 24px rgba(0,0,0,.3)", color: "#2a1c10" }}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span className="relative z-[1] px-1 font-display text-[14.5px] leading-snug">
+            {menu.label}
+            <span className="block font-sans text-[12px] tabular-nums" style={{ color: menu.crowded ? "#8a3f2c" : "#6b5631" }}>
+              {clock(menu.at)} · {menu.minutes}m{menu.crowded ? " · no room in its time" : menu.kept ? " · kept here" : ""}
+            </span>
+          </span>
+          {!menu.kept && (
+            <button type="button" role="menuitem" onClick={() => (keepAt(menu, menu.at), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left font-semibold hover:bg-black/[.05]">
+              ✓ Keep it here
+            </button>
+          )}
+          <button type="button" role="menuitem" aria-expanded={edit} onClick={() => setEdit((v) => !v)} className="relative z-[1] h-9 rounded-lg px-2 text-left font-semibold hover:bg-black/[.05]" style={{ background: edit ? "rgba(217,180,95,.2)" : undefined }}>
+            ✎ Edit time and length
+          </button>
+          {edit && (
+            <div className="reveal relative z-[1] flex flex-col gap-1 rounded-lg px-1.5 py-1.5" style={{ background: "rgba(120,90,40,.08)" }}>
+              <span className="flex items-center gap-1">
+                <button type="button" onClick={() => keepAt(menu, menu.at - 15 * 60_000)} className={chip} style={{ border: "1px solid #b39a6a" }} aria-label="15 minutes earlier">
+                  −15
+                </button>
+                <span className="min-w-[64px] flex-1 text-center font-bold tabular-nums">{clock(menu.at)}</span>
+                <button type="button" onClick={() => keepAt(menu, menu.at + 15 * 60_000)} className={chip} style={{ border: "1px solid #b39a6a" }} aria-label="15 minutes later">
+                  +15
+                </button>
+              </span>
+              <span className="flex flex-wrap gap-1">
+                {[15, 30, 45, 60, 90].map((m) => (
+                  <button key={m} type="button" onClick={() => keepAt(menu, menu.at, m)} aria-pressed={m === menu.minutes} className={chip} style={m === menu.minutes ? { background: "var(--t-gold, #e2bb5c)", border: "1px solid #8a6116" } : { border: "1px solid #b39a6a" }}>
+                    {m < 60 ? `${m}m` : m === 90 ? "1½h" : "1h"}
+                  </button>
+                ))}
+              </span>
+            </div>
+          )}
+          {menu.kept && (
+            <button type="button" role="menuitem" onClick={() => (save(menu.key, null), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]">
+              ↺ Let it float again
+            </button>
+          )}
+          {(() => {
+            const isQuest = (looks[menu.key] ?? ((menu.meal ? essentials : habitLook) === "quest" ? "quest" : "hold")) === "quest";
+            return (
+              <>
+                <button type="button" role="menuitem" onClick={() => (setLook(menu.key, isQuest ? "hold" : "quest"), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]">
+                  {isQuest ? "◌ Show this one as a hold" : "▣ Show this one as a quest card"}
+                </button>
+                <button type="button" role="menuitem" onClick={() => (setAllLooks(!isQuest), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left text-[12.5px] hover:bg-black/[.05]" style={{ color: "#6b5631" }}>
+                  {isQuest ? "Show all of them as holds" : "Show all of them as quest cards"}
+                </button>
+              </>
+            );
+          })()}
+          <button type="button" role="menuitem" onClick={() => (save(menu.key, { off: true }), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]" style={{ color: "#8a3f2c" }}>
+            Remove for today
+          </button>
+        </div>
+      )}
     </>
   );
 }

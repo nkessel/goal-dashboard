@@ -24,3 +24,16 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - Martin-care quests as a follow-up to scheduling time with Dad (with the agenda feature above).
 - (Nov 3, built: the forest background is a fixed layer, no repaint on scroll.) Confirm on the laptop.
 - (Nov 3, built: a quest on the calendar lists the quests waiting behind it as "Agenda".) Left: Martin-care quests added behind the Dad quest (which ones: ask). Original ask: Agenda for a visit (owner, Nov 3): once "Schedule time to be with my dad" is on the calendar, the quests waiting behind it (parents' calendars, Dad's computer, Martin-care quests) show as agenda options for that visit. The quests are set up as its sequence (Family board).
+
+## New notes (Nov 3 evening, read Nov 4)
+- Welcome screen: take out "Add for today ↗" (sleep factors) and "Log sleep times for other nights"; a journal button beside Tag / event to explain the ratings; the Habits button's contents editable; a fade-in through the mist the first time the screen appears; past emotional check-in hidden by default (a button that opens the check-in graph, with "log a check-in now").
+- Check-in: log a supplement taken (name, dose, time), also in Insights (Nov 3 morning). Anti-habits: owner asked how to mark one during check-in (answered in chat; build per the answer).
+- Evening routine button: no "hide" link; swipe left reveals Snooze (1 hour, till tomorrow evening, custom).
+- Tomorrow's quests: no order badges; a Choose all at the top, each quest's icon a checkbox, and "Confirm N quests" beside it (grey at none). The feedback box blocked scrolling the page behind it (jumped back).
+- Done items: a checkmark is enough, no crossed-out text. Swipe left: Snooze (with a "Snooze until tomorrow?" confirmation) instead of Delete.
+- The mini-quests button should look different from the evening ritual button.
+- Morning routines: read book with Tiffany, walk Chester, make breakfast (for Tiffany and me) (data + a morning routine like Evening Rites).
+- Portraits: tapping the avatar opens the painter directly (no extra button); clearer what you're looking at; the description highlighted on opening; a style selector (reward, quest, evening/morning routine…).
+- Drag events (not only tap) in Plan tomorrow's day.
+- Boards: custom colours with a wheel picker (Nov 3).
+- Calendars of interest list for weekly and monthly planning (Temple Beth Elohim, TBZ): brainstorm sent to the owner Nov 4, waiting on his pick.

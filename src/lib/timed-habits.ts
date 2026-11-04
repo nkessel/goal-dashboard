@@ -1,5 +1,5 @@
 import { occurrenceOn, type Repeat } from "./habit-repeat";
-import { freeStretch } from "./auto-schedule";
+import { freeStretch, type DayHold } from "./auto-schedule";
 
 /** A daily habit with a set time (like Gym at 7 AM): it holds that time on the calendar. */
 export type TimedHabit = { id: string; title: string; days: number[] | null; due_time: string; /** End of its window ("10:00"): it floats from due_time to here. */ window_to?: string | null; minutes: number; repeat: Repeat | null; icon_key?: string | null };
@@ -15,21 +15,33 @@ export function habitOnDay(h: Pick<TimedHabit, "days" | "repeat">, day: Date): b
 
 /** Each timed habit's block on this day: start and end in ms. A habit with a window
  * (Gym 7–10) takes the first free stretch inside it, around `busy`; else its start. */
-export function habitBlocksOn(habits: TimedHabit[], day: Date, busy: { start: number; end: number }[] = []): { habit: TimedHabit; start: number; end: number }[] {
-  return habits.flatMap((h) => {
+export function habitBlocksOn(habits: TimedHabit[], day: Date, busy: { start: number; end: number }[] = [], /** That day's changes by hand ("h:<id>"): kept at a time, or off. */ holds: Record<string, DayHold> = {}): { habit: TimedHabit; start: number; end: number; crowded?: boolean; kept?: boolean }[] {
+  type Block = { habit: TimedHabit; start: number; end: number; crowded?: boolean; kept?: boolean };
+  return habits.flatMap((h): Block[] => {
     const m = /^(\d{1,2}):(\d{2})/.exec(h.due_time);
     if (!m || !habitOnDay(h, day)) return [];
+    const o = holds[`h:${h.id}`];
+    if (o?.off) return [];
+    const need = Math.max(15, o?.minutes ?? h.minutes) * 60_000;
+    if (o?.at != null) {
+      const k = new Date(day);
+      k.setHours(0, o.at, 0, 0);
+      return [{ habit: h, start: k.getTime(), end: k.getTime() + need, kept: true }];
+    }
     const s = new Date(day);
     s.setHours(Number(m[1]), Number(m[2]), 0, 0);
-    const need = Math.max(15, h.minutes) * 60_000;
     let start = s.getTime();
+    let crowded = false;
     const w = h.window_to ? /^(\d{1,2}):(\d{2})/.exec(h.window_to) : null;
     if (w) {
       const e = new Date(day);
       e.setHours(Number(w[1]), Number(w[2]), 0, 0);
-      start = freeStretch(s.getTime(), e.getTime(), need / 60_000, busy) ?? start;
+      const free = freeStretch(s.getTime(), e.getTime(), need / 60_000, busy);
+      // No room left in its window: it stays at its start, marked crowded (shown in a muted red).
+      crowded = free === null;
+      start = free ?? start;
     }
-    return [{ habit: h, start, end: start + need }];
+    return [{ habit: h, start, end: start + need, crowded }];
   });
 }
 

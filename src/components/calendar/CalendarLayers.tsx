@@ -19,13 +19,14 @@ export type DailyLayer = { settings: Partial<SchedulerSettings> | null; habits: 
 
 const KEY = "calendar-layers";
 /** How daily essentials (meal time, wind-down…) and habits with a set time look. */
-export type EssentialsLook = "dashed" | "soft" | "line" | "hidden";
+export type EssentialsLook = "dashed" | "soft" | "line" | "quest" | "hidden";
 export type HabitLook = "quest" | "dashed" | "hidden";
 /** What a quest card on the calendar shows (owner, Nov 3: "options to customize what shows on quest cards"). */
 export type CardShow = { art: boolean; time: boolean; xp: boolean; coins: boolean };
 export const CARD_SHOW_DEFAULT: CardShow = { art: true, time: true, xp: true, coins: true };
 type Layers = { hidden: string[]; /** The calendars' own order (owner, Nov 3). */ order: string[]; /** Archived: not shown, not loaded (the server reads the cal-skip cookie). */ archived: string[]; /** Calendars met before (ones unticked in Google start hidden the first time). */ seen: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
-const DEFAULTS: Layers = { hidden: [], order: [], archived: [], seen: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "quest", card: CARD_SHOW_DEFAULT };
+// Timed habits (Gym) show like the other non-negotiables by default (owner, Nov 4).
+const DEFAULTS: Layers = { hidden: [], order: [], archived: [], seen: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "dashed", card: CARD_SHOW_DEFAULT };
 
 const subscribe = (cb: () => void) => {
   window.addEventListener("storage", cb);
@@ -40,7 +41,12 @@ function read(): Layers {
   try {
     const raw = window.localStorage.getItem(KEY);
     if (raw !== cache.raw) {
-      const got = raw ? (JSON.parse(raw) as Partial<Layers>) : {};
+      const got = raw ? (JSON.parse(raw) as Partial<Layers> & { v?: number }) : {};
+      // Saved before Nov 4: timed habits move to the non-negotiables' look once.
+      if (got.v !== 2) {
+        got.habits = "dashed";
+        got.v = 2;
+      }
       cache = { raw, val: { ...DEFAULTS, ...got, card: { ...CARD_SHOW_DEFAULT, ...(got.card ?? {}) } } };
     }
     return cache.val;
@@ -50,7 +56,7 @@ function read(): Layers {
 }
 function write(next: Layers) {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(next));
+    window.localStorage.setItem(KEY, JSON.stringify({ ...next, v: 2 }));
     // The server skips archived calendars (no wasted calls to Google).
     document.cookie = `cal-skip=${encodeURIComponent(next.archived.join("|"))}; path=/; max-age=31536000; samesite=lax`;
   } catch {
@@ -302,6 +308,7 @@ export function CalendarLayers({
               value={layers.essentials}
               options={[
                 ["dashed", "Dashed"],
+                ["quest", "Like quests"],
                 ["soft", "Soft"],
                 ["line", "A line"],
                 ["hidden", "Hide"],
