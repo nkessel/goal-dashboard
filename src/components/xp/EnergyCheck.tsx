@@ -631,7 +631,8 @@ export function EnergyCheck({
                     </button>
                   </>
                 )}
-                {sleepLink && !addNights && (
+                {/* No "Log sleep & wake times for other nights" link (owner, Nov 3). */}
+                {false && sleepLink && !addNights && (
                   <Link href="/insights#sleep-log" className="self-center text-[13px] underline decoration-[rgba(217,180,95,.5)] underline-offset-[3px] hover:decoration-current" style={{ color: "var(--ec-soft, rgba(239,230,204,.8))" }}>
                     <span aria-hidden style={{ color: "var(--t-gold)" }}>☾</span> Log sleep &amp; wake times for other nights
                   </Link>

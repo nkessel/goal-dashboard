@@ -23,7 +23,7 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { completeRiteAction, setTomorrowQueueAction, removeRiteAction, reorderRitesAction, restoreRiteAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
-import { SwipeToDelete } from "@/components/ui/SwipeToDelete";
+import { Fold } from "@/components/ui/Fold";
 import { RecentWins } from "./RecentWins";
 import { DayPlanner } from "./DayPlanner";
 import { GoldRule, Leaf } from "@/components/ui/Ornaments";
@@ -34,7 +34,7 @@ import { useFlipToEvening } from "./DayNightFlip";
 import { useLocalDay } from "./evening-clock";
 import { TomorrowQuests } from "./TomorrowQuests";
 import { RiteGlyph, RiteMedallion, TrophyAvatar, glyphFor } from "./RiteGlyph";
-import { SwipeReveal } from "@/components/ui/SwipeReveal";
+import { SwipeActions } from "@/components/ui/SwipeActions";
 import type { Task } from "@/lib/data/types";
 import { fromFeedback } from "@/lib/from-feedback";
 
@@ -188,6 +188,7 @@ export function EveningRites({
   const [editing, setEditing] = useState<RiteView | { new: true; core: boolean } | null>(null);
   const [miniOpen, setMiniOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [snoozeAsk, setSnoozeAsk] = useState<string | null>(null);
   // "Done in part": the rite and how much of it got done.
   const [partFor, setPartFor] = useState<{ id: string; pct: number } | null>(null);
   const [pop, setPop] = useState<{ id: string; xp: number } | null>(null);
@@ -453,7 +454,7 @@ export function EveningRites({
           title={special ? (open ? "Fold away" : "Open") : "Edit rite"}
           className="relative z-[1] min-w-0 flex-1 text-left"
         >
-          <span className="block break-words text-[18px] font-semibold leading-tight" style={{ color: "var(--t-ink)", textDecoration: done ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)" }}>
+          <span className="block break-words text-[18px] font-semibold leading-tight" style={{ color: "var(--t-ink)", opacity: done ? 0.75 : 1 }}>
             {r.title}
           </span>
           {r.description && (
@@ -591,11 +592,27 @@ export function EveningRites({
       </div>
       </div>
     );
-    // Swipe right to snooze it for tonight.
+    // Swipe right to skip it tonight; swipe left to snooze it until tomorrow, after a quick "sure?" (owner, Nov 3: no delete on a swipe).
     const face = overlay ? inner : (
-      <SwipeReveal side="left" label="Skip tonight" icon={<SnoozeIcon />} background="linear-gradient(180deg,#3a3f7a,#232655)" color="#f2d27e" onAction={() => setAwayFor(r.id, "skip")}>
-        {inner}
-      </SwipeReveal>
+      <div className="flex flex-col">
+        <SwipeActions
+          left={{ label: "Skip tonight", icon: <SnoozeIcon />, background: "linear-gradient(180deg,#3a3f7a,#232655)", color: "#f2d27e", onAction: () => setAwayFor(r.id, "skip") }}
+          right={{ label: "Snooze", icon: <SnoozeIcon />, background: "linear-gradient(180deg,#3a3f7a,#232655)", color: "#f2d27e", onAction: () => setSnoozeAsk(r.id) }}
+        >
+          {inner}
+        </SwipeActions>
+        <Fold open={snoozeAsk === r.id}>
+          <div className="flex items-center justify-center gap-2 py-1.5 text-[14px]" style={{ color: "#f6ecd2" }}>
+            Snooze until tomorrow?
+            <button type="button" onClick={() => (setSnoozeAsk(null), setAwayFor(r.id, "skip"))} className="h-8 rounded-full px-3.5 text-[13.5px] font-bold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+              Snooze
+            </button>
+            <button type="button" onClick={() => setSnoozeAsk(null)} className="h-8 rounded-full px-3 text-[13.5px]" style={{ color: "#f6ecd2" }}>
+              Keep it
+            </button>
+          </div>
+        </Fold>
+      </div>
     );
     // Special rites slide a tray out from under the card: today's wins on
     // parchment (like Victories Today); tomorrow's quests and the day plan on
@@ -638,7 +655,7 @@ export function EveningRites({
     ) : (
       face
     );
-    return overlay || special ? withTray : <SwipeToDelete label={r.title} onDelete={() => remove(r)}>{face}</SwipeToDelete>;
+    return withTray;
   }
 
   const active = activeId ? byId.get(activeId) : null;
@@ -742,10 +759,12 @@ export function EveningRites({
                 type="button"
                 onClick={() => setMiniOpen((v) => !v)}
                 aria-expanded={miniOpen}
-                className="hover-glow evening-bar relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-11 py-2.5"
+                // Not the evening routine's starry bar (owner, Nov 3): a quieter parchment-edged tray bar.
+                className="hover-glow relative flex min-h-[48px] w-full items-center justify-center rounded-2xl px-11 py-2"
+                style={{ background: "linear-gradient(180deg, rgba(40,34,20,.55), rgba(24,20,12,.6))", border: "1.5px dashed rgba(217,180,95,.55)" }}
               >
-                <span className="font-display flex items-center gap-2.5 text-[19px] sm:text-[21px]" style={{ color: "#f1ead2" }}>
-                  <Moon size={26} />
+                <span className="font-display flex items-center gap-2 text-[17px] sm:text-[19px]" style={{ color: "#f1ead2" }}>
+                  <span aria-hidden style={{ color: "var(--t-gold)" }}>✦</span>
                   Additional Mini-Quests
                   <span className="text-[15px] font-normal" style={{ color: "var(--t-gold)" }}>
                     ({mini.length})

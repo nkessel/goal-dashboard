@@ -1200,15 +1200,15 @@ export async function exportAccountDataAction(): Promise<AccountExport> {
   return exportAccountData(ownerId);
 }
 
-export async function generateTaskIconAction(taskId: string, prompt: string) {
+export async function generateTaskIconAction(taskId: string, prompt: string, style: "monster" | "treasure" | "routine" = "monster") {
   const ownerId = await requireProfileId();
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe the monster/icon you want first.");
   assertFamilyFriendly(trimmed);
 
   // A concrete picture of the task, in the same painted storybook style as imports.
-  // Quest portraits keep their painted scene behind them.
-  const url = await generateAndStoreImage(buildQuestScenePrompt(await visualSubjectFor(trimmed)), `tasks/${taskId}-${Date.now()}.jpg`);
+  // Quest portraits keep their painted scene behind them; a reward is a treasure, a routine a gentle daily scene.
+  const url = await generateAndStoreImage(await portraitPromptFor(trimmed, style), `tasks/${taskId}-${Date.now()}.jpg`);
   await tasksData.setTaskIcon(taskId, ownerId, { iconKey: url, iconSource: "ai" });
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: trimmed });
   revalidatePath("/");
@@ -1368,15 +1368,19 @@ export async function paintNextTodayArtAction(): Promise<{ painted: string | nul
 
 /** Generate a quest portrait without attaching it to a quest yet (the create
  * dialog, before the quest exists). Added to the shared icon library. */
-export async function generateQuestIconImageAction(prompt: string, artStyle: "monster" | "treasure" = "monster"): Promise<string> {
+/** The painting prompt for a portrait style (owner, Nov 3: choose the style — quest, reward, routine). */
+async function portraitPromptFor(subject: string, style: "monster" | "treasure" | "routine") {
+  if (style === "treasure") return buildTreasureIconPrompt(subject);
+  if (style === "routine") return buildQuestScenePrompt(`a calm, cozy daily ritual: ${await visualSubjectFor(subject)}, warm lamplight, peaceful`);
+  return buildQuestScenePrompt(await visualSubjectFor(subject));
+}
+
+export async function generateQuestIconImageAction(prompt: string, artStyle: "monster" | "treasure" | "routine" = "monster"): Promise<string> {
   const ownerId = await requireProfileId();
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe the monster/icon you want first.");
   assertFamilyFriendly(trimmed);
-  const url =
-    artStyle === "treasure"
-      ? await generateAndStoreImage(buildTreasureIconPrompt(trimmed), `rewards/draft-${ownerId}-${Date.now()}.jpg`)
-      : await generateAndStoreImage(buildQuestScenePrompt(await visualSubjectFor(trimmed)), `tasks/draft-${ownerId}-${Date.now()}.jpg`);
+  const url = await generateAndStoreImage(await portraitPromptFor(trimmed, artStyle), `${artStyle === "treasure" ? "rewards" : "tasks"}/draft-${ownerId}-${Date.now()}.jpg`);
   await taskIconLibraryData.addTaskIconToLibrary({ imageUrl: url, createdBy: ownerId, prompt: trimmed });
   return url;
 }

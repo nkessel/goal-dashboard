@@ -108,6 +108,15 @@ export function hideEveningPrompt() {
   }
   window.dispatchEvent(new Event(PROMPT_EVENT));
 }
+/** Snooze the invitation until a time (owner, Nov 3: 1 hour, till tomorrow evening, or your own). */
+export function snoozeEveningPrompt(until: number) {
+  try {
+    window.localStorage.setItem("evening-prompt-snooze", String(until));
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event(PROMPT_EVENT));
+}
 const subscribePrompt = (cb: () => void) => {
   const t = setInterval(cb, 30_000);
   window.addEventListener(PROMPT_EVENT, cb);
@@ -127,6 +136,7 @@ export function useEveningPrompt(): boolean {
       if (at === "off") return false;
       try {
         if (window.localStorage.getItem(PROMPT_HIDDEN_KEY) === eveningDayKey()) return false;
+        if (Number(window.localStorage.getItem("evening-prompt-snooze") || 0) > Date.now()) return false;
       } catch {
         /* storage unavailable */
       }

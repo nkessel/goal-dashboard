@@ -50,6 +50,10 @@ export function TomorrowQuests({
   onCountChange?: (n: number) => void;
 }) {
   const [local, setLocal] = useState<{ rank: string[]; seq: string[] } | null>(null);
+  // Which shown quests are ticked for tomorrow (owner, Nov 3: a checkbox each, "Confirm N quests"); null = as saved.
+  const [ticked, setTicked] = useState<Set<string> | null>(null);
+  const [rowsLocal, setRowsLocal] = useState<string[] | null>(null);
+  const [confirmed, setConfirmed] = useState<number | null>(null);
   const [seen, setSeen] = useState(queued);
   const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState<TaskWithCategory | null>(null);
@@ -58,6 +62,8 @@ export function TomorrowQuests({
   if (seen !== queued) {
     setSeen(queued);
     setLocal(null);
+    setTicked(null);
+    setRowsLocal(null);
   }
 
   const sensors = useSensors(
@@ -76,7 +82,26 @@ export function TomorrowQuests({
     local?.seq ??
     (fromToday.length ? fromToday : [...queued].sort((a, b) => (a.queue_seq ?? a.queue_rank ?? 0) - (b.queue_seq ?? b.queue_rank ?? 0)).map((t) => t.id));
   // One list, in the order you'll do them (anything not yet placed goes last).
-  const ordered = [...seq.filter((id) => rank.includes(id)), ...rank.filter((id) => !seq.includes(id))];
+  const savedOrder = [...seq.filter((id) => rank.includes(id)), ...rank.filter((id) => !seq.includes(id))];
+  // Shown: what's chosen plus anything unticked here (it stays until you leave), in order.
+  const ordered = (rowsLocal ?? savedOrder).filter((id) => byId.has(id));
+  // Saved quests start ticked; ones only suggested from Today start unticked.
+  const tick = ticked ?? new Set(fromToday.length ? [] : savedOrder);
+  const count = ordered.filter((id) => tick.has(id)).length;
+  const toggle = (id: string) => {
+    const n = new Set(tick);
+    if (n.has(id)) n.delete(id);
+    else n.add(id);
+    setTicked(n);
+    setConfirmed(null);
+    if (!rowsLocal) setRowsLocal(ordered);
+  };
+  const allOn = ordered.length > 0 && ordered.every((id) => tick.has(id));
+  const confirm = () => {
+    const chosen = ordered.filter((id) => tick.has(id));
+    save(chosen, chosen);
+    setConfirmed(chosen.length);
+  };
 
   function save(nextRank: string[], nextSeq: string[]) {
     setLocal({ rank: nextRank, seq: nextSeq });
@@ -100,7 +125,9 @@ export function TomorrowQuests({
     if (from < 0 || to < 0) return;
     // Importance follows the same order now that there's one list.
     const moved = arrayMove(ordered, from, to);
-    save(moved, moved);
+    setRowsLocal(moved);
+    const chosen = moved.filter((id) => tick.has(id));
+    if (!fromToday.length || ticked) save(chosen, chosen);
   }
 
   const isAdventure = theme === "adventure";
@@ -120,15 +147,26 @@ export function TomorrowQuests({
         </div>
       )}
 
-      {fromToday.length > 0 && (
+      {fromToday.length > 0 && !ticked && (
         <p className="m-0 px-1 text-[12.5px] italic" style={{ color: soft }}>
-          Starting from what&apos;s on Today now.
+          Today&apos;s quests, to choose from. Tick the ones for tomorrow.
         </p>
       )}
-      {rank.length > 1 && (
-        <p className="m-0 px-1 text-[13px]" style={{ color: soft }}>
-          Drag into the order you&apos;ll do them. Today&apos;s Quests follow this order.
-        </p>
+      {ordered.length > 0 && (
+        <div className="flex items-center gap-2 px-1">
+          <button type="button" onClick={() => (setTicked(new Set(allOn ? [] : ordered)), setRowsLocal(ordered), setConfirmed(null))} className="h-9 rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1px solid rgba(168,138,63,.7)", color: ink }}>
+            {allOn ? "Clear all" : "Choose all"}
+          </button>
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={count === 0}
+            className="ml-auto h-9 rounded-full px-4 text-[14px] font-bold transition-colors disabled:cursor-default"
+            style={count === 0 ? { background: "rgba(200,200,200,.2)", color: "rgba(241,234,210,.6)", border: "1px solid rgba(200,200,200,.35)" } : { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10", boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
+          >
+            {confirmed !== null && confirmed === count ? `✓ ${count} for tomorrow` : `Confirm ${count} ${count === 1 ? "quest" : "quests"}`}
+          </button>
+        </div>
       )}
 
       {error && (
@@ -143,14 +181,7 @@ export function TomorrowQuests({
             {ordered.map((id, i) => {
               const t = byId.get(id);
               return (
-                <SlotCard
-                  key={id}
-                  id={id}
-                  n={i + 1}
-                  task={t}
-                  onEdit={t ? () => setEditing(t) : undefined}
-                  onRemove={() => save(rank.filter((x) => x !== id), seq.filter((x) => x !== id))}
-                />
+                <SlotCard key={id} id={id} n={i + 1} task={t} checked={tick.has(id)} onToggle={() => toggle(id)} onEdit={t ? () => setEditing(t) : undefined} />
               );
             })}
             <li>
@@ -170,14 +201,6 @@ export function TomorrowQuests({
         </SortableContext>
       </DndContext>
 
-      {/* Confirm at the end of the list, once you've looked them over. */}
-      {fromToday.length > 0 && (
-        <div className="flex justify-end">
-          <button type="button" onClick={() => save(rank, seq)} className="h-10 rounded-full px-4 text-[14px] font-semibold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10", boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}>
-            ✓ Keep these for tomorrow
-          </button>
-        </div>
-      )}
 
       {picking && (
         <QuestPickerSheet
@@ -185,7 +208,15 @@ export function TomorrowQuests({
           theme={theme}
           title="Add to Tomorrow's Quests"
           hint="Or pick one of your quests:"
-          onPick={(id) => save([...rank, id], [...seq.filter((x) => x !== id), id])}
+          onPick={(id) => {
+            // Added here: on the list, ticked, and saved with the others ticked.
+            const rows = [...ordered.filter((x) => x !== id), id];
+            const t = new Set(tick).add(id);
+            setRowsLocal(rows);
+            setTicked(t);
+            const chosen = rows.filter((x) => t.has(x));
+            save(chosen, chosen);
+          }}
           onClose={() => setPicking(false)}
         />
       )}
@@ -194,32 +225,35 @@ export function TomorrowQuests({
   );
 }
 
-/** A gilded round seal with the quest's place in the order. */
-function OrderSeal({ n }: { n: number }) {
+/** A gilded round checkbox: on tomorrow's list or not. */
+function TickBox({ checked, onToggle, label }: { checked: boolean; onToggle: () => void; label: string }) {
   return (
-    <span
-      aria-hidden
-      className="font-display flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[16px] font-bold"
-      style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10", boxShadow: "0 1px 3px rgba(0,0,0,.35)" }}
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      onClick={onToggle}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
     >
-      {n}
-    </span>
+      <span
+        aria-hidden
+        className="flex h-[26px] w-[26px] items-center justify-center rounded-full transition-all duration-200"
+        style={checked ? { background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "1.5px solid #4a3913", boxShadow: "0 0 8px rgba(242,210,126,.55)" } : { background: "rgba(255,250,238,.85)", border: "1.5px solid #b39a6a" }}
+      >
+        {checked && (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="gold-check-draw">
+            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#3a2a10" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </span>
+    </button>
   );
 }
 
-function SlotCard({
-  id,
-  n,
-  task,
-  onEdit,
-  onRemove,
-}: {
-  id: string;
-  n: number;
-  task?: TaskWithCategory;
-  onEdit?: () => void;
-  onRemove: () => void;
-}) {
+function SlotCard({ id, n, task, checked, onToggle, onEdit }: { id: string; n: number; task?: TaskWithCategory; checked: boolean; onToggle: () => void; onEdit?: () => void }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
   const art = task && (task.icon_source === "ai" || task.icon_source === "library") ? task.icon_key : null;
   return (
@@ -227,18 +261,19 @@ function SlotCard({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className="board-sortable parchment moonlit relative flex cursor-grab touch-manipulation items-center gap-3 rounded-2xl px-3 py-2.5 active:cursor-grabbing"
+      className="board-sortable parchment moonlit relative flex cursor-grab touch-manipulation items-center gap-2.5 rounded-2xl px-2.5 py-2.5 transition-opacity active:cursor-grabbing"
       style={{
         borderRadius: 16,
         transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 5 : undefined,
         boxShadow: isDragging ? "0 12px 28px rgba(0,0,0,.5)" : undefined,
+        opacity: checked ? 1 : 0.78,
       }}
-      aria-label={`Step ${n}: ${task?.title ?? "quest"} — drag to reorder`}
+      aria-label={`${task?.title ?? "quest"}${checked ? ", for tomorrow" : ""} (number ${n}) — drag to reorder`}
     >
       <span className="relative z-[1]">
-        <OrderSeal n={n} />
+        <TickBox checked={checked} onToggle={onToggle} label={`${checked ? "Take" : "Put"} ${task?.title ?? "this quest"} ${checked ? "off" : "on"} tomorrow's list`} />
       </span>
       <span className="relative z-[1] flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ border: "1.5px solid #a58c66", background: "#f3e6c8" }}>
         {art ? (
@@ -255,17 +290,6 @@ function SlotCard({
         <span className="block truncate text-[12.5px]" style={{ color: "#5a4a30" }}>
           {[task?.categoryLabel, task?.estimate_minutes ? `${task.estimate_minutes}m` : null].filter(Boolean).join(" · ")}
         </span>
-      </button>
-      <button
-        type="button"
-        onMouseDown={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
-        onClick={onRemove}
-        aria-label={`Take ${task?.title ?? "this quest"} out of tomorrow`}
-        className="relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] leading-none"
-        style={{ color: "#5a4a30" }}
-      >
-        ×
       </button>
     </li>
   );

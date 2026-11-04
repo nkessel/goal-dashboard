@@ -380,10 +380,6 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day,
               <span className="text-[11px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--ec-gold, #f2d27e)" }}>
                 Right effort
               </span>
-              {/* Today's own right effort is logged on the Wheel of Time (a new tab, so this screen stays). */}
-              <a href="/insights#wheel-of-time" target="_blank" rel="noopener" className="ml-auto mr-8 text-[11.5px] underline underline-offset-2" style={{ color: SOFT }}>
-                Add for today ↗
-              </a>
             </span>
             <div className="flex flex-wrap gap-1.5">
               {effort.map((name) => {

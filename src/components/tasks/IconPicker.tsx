@@ -69,6 +69,17 @@ export function IconPicker({
   const [open, setOpen] = useState(false);
   // With the keyboard up, the picker sits in the strip above it (owner's recording, Nov 3).
   const kb = useFitAboveKeyboard(open);
+  // Opened: the description is selected, ready to type over (owner, Nov 3).
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => {
+      const f = document.getElementById("portrait-prompt") as HTMLTextAreaElement | null;
+      if (!f) return;
+      f.focus({ preventScroll: true });
+      f.select();
+    }, 320);
+    return () => window.clearTimeout(t);
+  }, [open]);
   // Shows a new pick right away (the quest prop only updates after a refresh).
   const [override, setOverride] = useState<{ icon: string | null; source: "monster" | "library" | "ai" } | null>(null);
   const router = useRouter();
@@ -106,6 +117,8 @@ export function IconPicker({
     });
   };
   const [shelf, setShelf] = useState<"all" | "quest" | "reward" | "character">(artStyle === "treasure" ? "reward" : "all");
+  // What it's painted as (owner, Nov 3): a quest scene, a reward's treasure, or a routine's calm scene.
+  const [paintStyle, setPaintStyle] = useState<"monster" | "treasure" | "routine">(artStyle === "treasure" ? "treasure" : /rite|habit|routine/i.test(taskTitle ?? "") ? "routine" : "monster");
   const [library, setLibrary] = useState<TaskIconLibraryEntry[] | null>(null);
   const [isPending, startTransition] = useTransition();
   const [aiPrompt, setAiPrompt] = useState(taskTitle);
@@ -123,10 +136,10 @@ export function IconPicker({
       try {
         let url: string | undefined;
         if (onDraftChange) {
-          url = await generateQuestIconImageAction(aiPrompt, artStyle);
+          url = await generateQuestIconImageAction(aiPrompt, paintStyle);
           onDraftChange(url, "ai");
         } else if (taskId) {
-          url = await generateTaskIconAction(taskId, aiPrompt);
+          url = await generateTaskIconAction(taskId, aiPrompt, paintStyle);
           if (url) setOverride({ icon: url, source: "ai" });
           router.refresh();
         }
@@ -325,7 +338,7 @@ export function IconPicker({
           <div className="relative z-[1]">
           <div className="mb-2 flex items-center gap-2 text-xs">
             <span className="text-[12.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
-              ✨ Paint
+              ✨ Paint a new one
             </span>
             <span className="ml-auto flex items-center gap-2">
               {shownIcon && (
@@ -351,7 +364,7 @@ export function IconPicker({
 
             <div className="flex flex-col gap-2">
               <label className="text-[11.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }} htmlFor="portrait-prompt">
-                Painted from this description — change it or clear it
+                What to paint (type over it)
               </label>
               <div className="relative">
                 <textarea
@@ -384,6 +397,20 @@ export function IconPicker({
                   </button>
                 )}
               </div>
+              <span className="flex flex-wrap items-center gap-1" role="radiogroup" aria-label="Paint it as">
+                <span className="mr-0.5 text-[11.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+                  As a
+                </span>
+                {([
+                  ["monster", "Quest"],
+                  ["treasure", "Reward"],
+                  ["routine", "Routine"],
+                ] as const).map(([k, label]) => (
+                  <button key={k} type="button" role="radio" aria-checked={paintStyle === k} onClick={() => setPaintStyle(k)} className="h-7 rounded-full px-2.5 text-[12px] font-semibold" style={paintStyle === k ? { background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" } : { border: "1px solid var(--t-panel-border, rgba(139,112,64,.45))", color: "var(--t-ink)" }}>
+                    {label}
+                  </button>
+                ))}
+              </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"

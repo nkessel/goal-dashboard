@@ -1,6 +1,10 @@
 "use client";
 
-import { hideEveningPrompt, useEveningPrompt, useIsAfternoon } from "./evening-clock";
+import { snoozeEveningPrompt, useEveningPrompt, useIsAfternoon } from "./evening-clock";
+import { useState } from "react";
+import { SwipeActions } from "@/components/ui/SwipeActions";
+import { Fold } from "@/components/ui/Fold";
+import { SnoozeIcon } from "@/components/ui/Icons";
 import { useFlipToEvening } from "./DayNightFlip";
 import { useVisualFx, type VisualFx } from "@/lib/visual-fx";
 
@@ -127,14 +131,51 @@ export function EveningPromptOr({ children }: { children?: React.ReactNode }) {
   const fx = useVisualFx();
   if (!showing) return <>{children}</>;
   const { className, ...data } = fxProps(fx);
+  // No "hide" on it (owner, Nov 3): swipe it left (or right-click) to snooze, the choices open in place.
+  return <SnoozableEvening className={className} data={data} onOpen={() => flip(true)} />;
+}
+
+function SnoozableEvening({ className, data, onOpen }: { className: string; data: Record<string, string | undefined>; onOpen: () => void }) {
+  const [choosing, setChoosing] = useState(false);
+  const [hours, setHours] = useState(3);
+  const tomorrowEvening = () => {
+    const d = new Date();
+    if (d.getHours() >= 5) d.setDate(d.getDate() + 1);
+    d.setHours(17, 0, 0, 0);
+    return d.getTime();
+  };
+  const snooze = (until: number) => {
+    setChoosing(false);
+    snoozeEveningPrompt(until);
+  };
+  const chip = "h-9 rounded-full px-3.5 text-[13.5px] font-semibold";
+  const chipStyle = { background: "rgba(14,18,40,.75)", border: "1px solid rgba(242,210,126,.55)", color: "#f6ecd2" };
   return (
-    <div className="relative">
-      <button type="button" onClick={() => flip(true)} className={`hover-glow ${className}`} {...data}>
-        <Face />
-      </button>
-      <button type="button" onClick={hideEveningPrompt} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full px-2 py-1 text-[12.5px] underline underline-offset-2" style={{ color: "rgba(246,236,210,.8)" }} title="Hide until tomorrow evening">
-        hide
-      </button>
+    <div className="flex flex-col gap-1.5" onContextMenu={(e) => (e.preventDefault(), setChoosing((v) => !v))}>
+      <SwipeActions right={{ label: "Snooze", icon: <SnoozeIcon />, background: "linear-gradient(180deg,#3a3f7a,#232655)", color: "#f2d27e", onAction: () => setChoosing(true) }}>
+        <button type="button" onClick={onOpen} className={`hover-glow ${className}`} {...data}>
+          <Face />
+        </button>
+      </SwipeActions>
+      <Fold open={choosing}>
+        <div className="flex flex-wrap items-center justify-center gap-1.5 py-0.5" role="group" aria-label="Snooze the evening routine">
+          <button type="button" onClick={() => snooze(Date.now() + 3_600_000)} className={chip} style={chipStyle}>
+            1 hour
+          </button>
+          <button type="button" onClick={() => snooze(tomorrowEvening())} className={chip} style={chipStyle}>
+            Till tomorrow evening
+          </button>
+          <span className="flex items-center gap-1">
+            <input type="number" min={1} max={48} value={hours} onChange={(e) => setHours(Math.max(1, Math.min(48, Number(e.target.value) || 1)))} aria-label="Hours to snooze" className="h-9 w-14 rounded-full border px-2 text-center text-[16px] sm:text-[14px]" style={{ ...chipStyle, borderColor: "rgba(242,210,126,.55)" }} />
+            <button type="button" onClick={() => snooze(Date.now() + hours * 3_600_000)} className={chip} style={chipStyle}>
+              hours
+            </button>
+          </span>
+          <button type="button" onClick={() => setChoosing(false)} aria-label="Close" className="h-9 w-9 rounded-full text-[18px]" style={{ color: "#f6ecd2" }}>
+            ×
+          </button>
+        </div>
+      </Fold>
     </div>
   );
 }
