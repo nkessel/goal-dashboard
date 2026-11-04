@@ -128,6 +128,10 @@ export function DayPlanner({
   const [plan, setPlan] = useState<DayPlan | null>(null);
   const [quick, setQuick] = useState<QuickEvent[] | null>(null);
   const [carry, setCarry] = useState<Carry | null>(null);
+  // Drag a quest on the plan to move it (owner, Nov 3): a mouse after a few pixels, a finger after a short hold.
+  const [dragged, setDragged] = useState<{ id: string; dy: number } | null>(null);
+  const qdrag = useRef<{ id: string; title: string; start: number; minutes: number; y0: number; active: boolean; touch: boolean; timer?: number } | null>(null);
+  const justDragged = useRef(false);
   const [ghost, setGhost] = useState<number | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [editingQuick, setEditingQuick] = useState(false);
@@ -258,8 +262,8 @@ export function DayPlanner({
     return Math.max(FIRST_HOUR * 60, Math.min(LAST_HOUR * 60 + 60 - minutes, snapped));
   };
 
-  function place(startMin: number) {
-    const c = carry;
+  function place(startMin: number, given?: Carry) {
+    const c = given ?? carry;
     if (!c || !dayStart) return;
     const start = new Date(dayStart.getTime() + startMin * 60_000);
     const end = new Date(start.getTime() + c.minutes * 60_000);
@@ -517,12 +521,73 @@ export function DayPlanner({
           }
           const art = it.icon_source === "ai" || it.icon_source === "library" ? it.icon_key : null;
           return (
-            <div key={`q-${it.id}`} className="absolute" style={{ top, height: h, left, width }}>
+            <div key={`q-${it.id}`} className="absolute" style={{ top, height: h, left, width, zIndex: dragged?.id === it.id ? 20 : undefined, transform: dragged?.id === it.id ? `translateY(${dragged.dy}px)` : undefined }}>
               <button
                 type="button"
+                onPointerDown={(e) => {
+                  if (carry || e.button > 0 || it.id.startsWith("temp-")) return;
+                  const touch = e.pointerType !== "mouse";
+                  const d = { id: it.id, title: it.title, start: it.start, minutes: Math.max(SNAP_MIN, it.end - it.start), y0: e.clientY, active: false, touch };
+                  qdrag.current = d;
+                  if (touch) {
+                    (d as { timer?: number }).timer = window.setTimeout(() => {
+                      if (qdrag.current !== d) return;
+                      d.active = true;
+                      setMenu(null);
+                      setDragged({ id: d.id, dy: 0 });
+                      navigator.vibrate?.(10);
+                    }, 260);
+                  }
+                  const move = (ev: PointerEvent) => {
+                    const q = qdrag.current;
+                    if (!q) return;
+                    const dy = ev.clientY - q.y0;
+                    if (!q.active) {
+                      if (q.touch) {
+                        if (Math.abs(dy) > 8) {
+                          window.clearTimeout(q.timer);
+                          qdrag.current = null;
+                        }
+                        return;
+                      }
+                      if (Math.abs(dy) < 5) return;
+                      q.active = true;
+                      setMenu(null);
+                    }
+                    setDragged({ id: q.id, dy });
+                  };
+                  // A held finger mustn't scroll the plan while it drags.
+                  const noScroll = (ev: TouchEvent) => qdrag.current?.active && ev.preventDefault();
+                  const up = (ev: PointerEvent) => {
+                    window.removeEventListener("pointermove", move);
+                    window.removeEventListener("pointerup", up);
+                    window.removeEventListener("pointercancel", up);
+                    window.removeEventListener("touchmove", noScroll);
+                    const q = qdrag.current;
+                    qdrag.current = null;
+                    if (!q) return;
+                    window.clearTimeout(q.timer);
+                    setDragged(null);
+                    if (!q.active) return;
+                    justDragged.current = true;
+                    const dyMin = ((ev.clientY - q.y0) / HOUR_PX) * 60;
+                    const startMin = Math.round((q.start + dyMin) / SNAP_MIN) * SNAP_MIN;
+                    const clamped = Math.max(FIRST_HOUR * 60, Math.min(LAST_HOUR * 60 + 60 - q.minutes, startMin));
+                    if (clamped !== q.start) place(clamped, { kind: "move", id: q.id, title: q.title, minutes: q.minutes });
+                  };
+                  window.addEventListener("pointermove", move);
+                  window.addEventListener("pointerup", up);
+                  window.addEventListener("pointercancel", up);
+                  window.addEventListener("touchmove", noScroll, { passive: false });
+                }}
+                onContextMenu={(e) => qdrag.current?.touch && e.preventDefault()}
                 onClick={(e) => {
                   if (carry) return;
                   e.stopPropagation();
+                  if (justDragged.current) {
+                    justDragged.current = false;
+                    return;
+                  }
                   setMenu(menu === it.id ? null : it.id);
                 }}
                 className="flex h-full w-full items-start gap-1.5 overflow-hidden rounded-lg px-1.5 py-1 text-left text-[13px] font-semibold leading-tight"

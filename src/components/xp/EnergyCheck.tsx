@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { splitEvents, splitOn } from "@/lib/event-split";
-import { addCheckNoteAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
+import { addCheckNoteAction, addJournalEntryAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
 import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft, MoonIcon, SunIcon, TimeToken } from "./NightFields";
 import { DateField } from "@/components/ui/DateField";
 import { shiftDay } from "@/lib/wheel-of-time";
@@ -132,6 +132,30 @@ export function EnergyCheck({
   const [sessionIds, setSessionIds] = useState<Set<string>>(new Set());
   const [peek, setPeek] = useState(false);
   const [noting, setNoting] = useState(false);
+  const [journaling, setJournaling] = useState(false);
+  const [journalText, setJournalText] = useState("");
+  const [journalSaved, setJournalSaved] = useState(false);
+  const [supping, setSupping] = useState(false);
+  const [supp, setSupp] = useState({ name: "", dose: "", time: "" });
+  const [suppSaved, setSuppSaved] = useState<string | null>(null);
+  const [recentSupps, setRecentSupps] = useState<{ name: string; dose: string }[]>([]);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+      setRecentSupps(JSON.parse(window.localStorage.getItem("recent-supplements") || "[]"));
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const rememberSupp = (name: string, dose: string) => {
+    const next = [{ name, dose }, ...recentSupps.filter((r) => !(r.name.toLowerCase() === name.toLowerCase() && r.dose === dose))].slice(0, 8);
+    setRecentSupps(next);
+    try {
+      window.localStorage.setItem("recent-supplements", JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+  };
   const [noteText, setNoteText] = useState("");
   // #tags typed in the box become pills as soon as a space follows them.
   const [pendingTags, setPendingTags] = useState<string[]>([]);
@@ -541,8 +565,8 @@ export function EnergyCheck({
                 })}
 
                 {/* Beneath the metrics: add another, or log an event / #tag. */}
-                {!adding && !noting && (
-                  <div className="flex items-center gap-2">
+                {!adding && !noting && !journaling && !supping && (
+                  <div className="flex flex-wrap items-center gap-2">
                     {!(simple && full) && <span aria-hidden className="w-5 shrink-0" />}
                     {metrics.length < MAX_METRICS && (
                       <button
@@ -564,8 +588,120 @@ export function EnergyCheck({
                     >
                       <span aria-hidden style={{ color: "var(--t-gold)" }}>+</span> Tag / event
                     </button>
+                    {/* Why the ratings are what they are, in your own words (owner, Nov 3): saved to the journal. */}
+                    <button
+                      type="button"
+                      onClick={() => (setJournaling(true), setJournalSaved(false))}
+                      className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
+                      style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
+                      title="Write why you gave these ratings (saved to your journal)"
+                    >
+                      <span aria-hidden style={{ color: "var(--t-gold)" }}>✎</span> Journal
+                    </button>
+                    {/* A supplement taken: name, dose and time, logged as an event (owner, Nov 3). */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        setSupp((v) => ({ ...v, time: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` }));
+                        setSupping(true);
+                        setSuppSaved(null);
+                      }}
+                      className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold"
+                      style={{ border: "1px solid rgba(217,180,95,.6)", color: "var(--t-cream)" }}
+                      title="Log a supplement you took: name, dose and time"
+                      aria-label="Log a supplement"
+                    >
+                      <span aria-hidden>💊</span>
+                      <span className="hidden sm:inline">Supplement</span>
+                    </button>
+                    {suppSaved && <span className="confirm-pop text-[12.5px]" style={{ color: "var(--ec-gold, #f2d27e)" }}>✓ {suppSaved}</span>}
+                    {journalSaved && <span className="confirm-pop text-[12.5px]" style={{ color: "var(--ec-gold, #f2d27e)" }}>✓ In your journal</span>}
                   </div>
                 )}
+                <Fold open={supping}>
+                  <div className="flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }}>
+                    {recentSupps.length > 0 && (
+                      <span className="flex flex-wrap gap-1">
+                        {recentSupps.map((r) => (
+                          <button key={`${r.name}|${r.dose}`} type="button" onClick={() => setSupp((v) => ({ ...v, name: r.name, dose: r.dose }))} className="h-7 rounded-full px-2.5 text-[12.5px]" style={{ border: "1px solid rgba(217,180,95,.5)", color: "var(--t-cream)", background: supp.name === r.name && supp.dose === r.dose ? "rgba(217,180,95,.3)" : undefined }}>
+                            💊 {r.name}
+                            {r.dose ? ` · ${r.dose}` : ""}
+                          </button>
+                        ))}
+                      </span>
+                    )}
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <input value={supp.name} onChange={(e) => setSupp((v) => ({ ...v, name: e.target.value.slice(0, 40) }))} placeholder="Supplement" aria-label="Supplement name" className="h-9 min-w-0 flex-[2_1_120px] rounded-lg border px-2.5 text-[16px] sm:text-[14px]" style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a", color: "#2a1c10" }} />
+                      <input value={supp.dose} onChange={(e) => setSupp((v) => ({ ...v, dose: e.target.value.slice(0, 20) }))} placeholder="Dose (e.g. 200mg)" aria-label="Dose" className="h-9 min-w-0 flex-[1_1_90px] rounded-lg border px-2.5 text-[16px] sm:text-[14px]" style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a", color: "#2a1c10" }} />
+                      <input type="time" value={supp.time} onChange={(e) => setSupp((v) => ({ ...v, time: e.target.value }))} aria-label="Time taken" className="time-field h-9 w-[110px] rounded-lg px-2 text-[16px] sm:text-[14px]" />
+                    </span>
+                    <span className="flex items-center justify-end gap-2">
+                      <button type="button" onClick={() => setSupping(false)} className="h-8 rounded-full px-3 text-[13px]" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!supp.name.trim()}
+                        onClick={() => {
+                          const name = supp.name.trim();
+                          const dose = supp.dose.trim();
+                          const [hh, mm] = (supp.time || "").split(":").map(Number);
+                          const at = new Date();
+                          if (Number.isFinite(hh) && Number.isFinite(mm)) at.setHours(hh, mm, 0, 0);
+                          if (at.getTime() > Date.now() + 60_000) at.setDate(at.getDate() - 1);
+                          addCheckNoteAction(`💊 ${name}${dose ? ` ${dose}` : ""} #supplement`, at.toISOString())
+                            .then(() => {
+                              rememberSupp(name, dose);
+                              setSupping(false);
+                              setSuppSaved(`${name} logged`);
+                            })
+                            .catch(() => setSuppSaved(null));
+                        }}
+                        className="h-8 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"
+                        style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                      >
+                        Log it
+                      </button>
+                    </span>
+                  </div>
+                </Fold>
+                <Fold open={journaling}>
+                  <div className="flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }}>
+                    <textarea
+                      value={journalText}
+                      onChange={(e) => setJournalText(e.target.value.slice(0, 4000))}
+                      rows={3}
+                      placeholder="Why these ratings? What's behind them today…"
+                      aria-label="Journal about this check-in"
+                      className="w-full resize-none rounded-lg border px-2.5 py-1.5 text-[16px] sm:text-[14px]"
+                      style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a", color: "#2a1c10" }}
+                    />
+                    <span className="flex items-center justify-end gap-2">
+                      <button type="button" onClick={() => setJournaling(false)} className="h-8 rounded-full px-3 text-[13px]" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!journalText.trim()}
+                        onClick={() => {
+                          const text = journalText.trim();
+                          addJournalEntryAction(`Check-in: ${text}`, null)
+                            .then(() => {
+                              setJournalText("");
+                              setJournaling(false);
+                              setJournalSaved(true);
+                            })
+                            .catch(() => setJournalSaved(false));
+                        }}
+                        className="h-8 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50"
+                        style={{ background: "var(--t-gold)", color: "#2a1c10" }}
+                      >
+                        Save to journal
+                      </button>
+                    </span>
+                  </div>
+                </Fold>
 
                 <Fold open={!!adding}>
                   <div className="flex flex-col gap-1.5 rounded-xl p-2" style={{ background: "rgba(0,0,0,.22)", border: "1px solid var(--ec-line, rgba(217,180,95,.3))" }}>

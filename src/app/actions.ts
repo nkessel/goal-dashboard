@@ -4326,3 +4326,25 @@ export async function saveKeepInTouchAction(list: import("@/lib/keep-in-touch").
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
+
+/** The check-in chart's data for the last month (Today's check-in button opens it, owner Nov 3). */
+export async function checkInChartAction() {
+  const uid = await requireProfileId();
+  const since = new Date(Date.now() - 31 * 86_400_000).toISOString();
+  const [energy, checks, metrics, wins, notes] = await Promise.all([
+    energyData.listEnergySince(uid, since),
+    energyData.listCheckInsSince(uid, since),
+    energyData.getCheckMetrics(uid),
+    winsData.listWinsSince(uid, since),
+    energyData.listCheckNotesSince(uid, since),
+  ]);
+  const chartChecks = checks.filter((c) => !c.metric.startsWith("◎ "));
+  return {
+    metrics: ["Energy", ...metrics],
+    readings: [...energy.map((e) => ({ metric: "Energy", level: e.level, at: e.created_at })), ...chartChecks.map((c) => ({ metric: c.metric, level: c.level, at: c.created_at }))],
+    wins: [
+      ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null })),
+      ...notes.map((n) => ({ kind: "note", at: n.created_at, xp: 0, title: n.body, details: n.details ?? null, tone: n.tone ?? null })),
+    ],
+  };
+}

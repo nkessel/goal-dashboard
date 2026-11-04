@@ -26,11 +26,11 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 - (Nov 3, built: a quest on the calendar lists the quests waiting behind it as "Agenda".) Left: Martin-care quests added behind the Dad quest (which ones: ask). Original ask: Agenda for a visit (owner, Nov 3): once "Schedule time to be with my dad" is on the calendar, the quests waiting behind it (parents' calendars, Dad's computer, Martin-care quests) show as agenda options for that visit. The quests are set up as its sequence (Family board).
 
 ## New notes (Nov 3 evening, read Nov 4)
-- Welcome screen: a journal button beside Tag / event to explain the ratings; the Habits button's contents editable; a fade-in through the mist the first time the screen appears; past emotional check-in hidden by default (a button that opens the check-in graph, with "log a check-in now").
-- Check-in: log a supplement taken (name, dose, time), also in Insights (Nov 3 morning). Anti-habits: owner asked how to mark one during check-in (answered in chat; build per the answer).
+- Welcome screen: the Habits button's contents editable; a fade-in through the mist the first time the screen appears. (Journal button and the check-in button + graph built Nov 4.)
+- (Supplements built Nov 4: 💊 in the check-in, charted as events.) Anti-habits: owner asked how to mark one during check-in (answered in chat; build per the answer).
 - The feedback box blocked scrolling the page behind it (jumped back) — still to look at.
-- Morning routines: read book with Tiffany, walk Chester, make breakfast (for Tiffany and me) (data + a morning routine like Evening Rites).
-- Drag events (not only tap) in Plan tomorrow's day.
+- Morning routines: made as a habit with sub-habits (Nov 4). A Morning Rites screen like the evening's is still open if the owner wants one.
+- (Dragging quests in Plan tomorrow's day built Nov 4; Google events there stay fixed.)
 - Boards: custom colours with a wheel picker (Nov 3).
 - (Nov 4, built: calendars of interest, feeds + links; keep in touch list.) Owner to add the temples' feed links if he finds them.
 - Anti-habits: like events, tracked with their timing. Owner didn't like the chip idea; more ideas sent Nov 4, waiting on his pick.
