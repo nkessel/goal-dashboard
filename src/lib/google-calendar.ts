@@ -213,7 +213,7 @@ export async function listEventsAllCalendars(accessToken: string, timeMin: Date,
     // Older grants may not cover the calendar list: fall back to the main calendar.
     return { calendars: [{ id: "primary", name: "My calendar", color: null, primary: true }], events: await listEvents(accessToken, timeMin, timeMax) };
   }
-  const lists = await Promise.all(calendars.filter((c) => !skip.includes(c.id)).slice(0, 20).map((c) => listEvents(accessToken, timeMin, timeMax, { id: c.id, name: c.name, color: c.color, writable: c.writable }).catch(() => [] as GoogleCalendarEvent[])));
+  const lists = await Promise.all(calendars.filter((c) => !skip.includes(c.id)).slice(0, 40).map((c) => listEvents(accessToken, timeMin, timeMax, { id: c.id, name: c.name, color: c.color, writable: c.writable }).catch(() => [] as GoogleCalendarEvent[])));
   const primaryId = calendars.find((c) => c.primary)?.id;
   // The same meeting can sit on several calendars; show it once.
   const seen = new Set<string>();
@@ -223,7 +223,8 @@ export async function listEventsAllCalendars(accessToken: string, timeMin: Date,
     seen.add(k);
     return true;
   });
-  return { calendars: calendars.slice(0, 12).map((c) => (c.id === primaryId ? { ...c, id: c.id } : c)), events };
+  // Every calendar is listed, so any of them can be hidden (it was cut at 12, owner Nov 4: the 13th on, "CSSC Building Use" and others, filled the grid with no way to hide them).
+  return { calendars: calendars.map((c) => (c.id === primaryId ? { ...c, id: c.id } : c)), events };
 }
 
 /**
