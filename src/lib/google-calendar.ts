@@ -127,8 +127,17 @@ export type GoogleCalendarInfo = { id: string; name: string; color: string | nul
 export async function listCalendars(accessToken: string): Promise<GoogleCalendarInfo[]> {
   const calendar = calendarClient(accessToken);
   // Every calendar, subscribed and hidden-in-Google ones too (owner, Nov 3: "all your calendars").
-  const res = await calendar.calendarList.list({ maxResults: 100, showHidden: true });
-  return (res.data.items ?? [])
+  // Google can answer a page at a time even under maxResults: follow every page (owner, Nov 4: a calendar
+  // past the first page, "CSSC Building Use", filled the grid but never appeared in the list to hide it).
+  const items: import("googleapis").calendar_v3.Schema$CalendarListEntry[] = [];
+  let pageToken: string | undefined;
+  for (let i = 0; i < 10; i++) {
+    const res: { data: import("googleapis").calendar_v3.Schema$CalendarList } = await calendar.calendarList.list({ maxResults: 250, showHidden: true, pageToken });
+    items.push(...(res.data.items ?? []));
+    pageToken = res.data.nextPageToken ?? undefined;
+    if (!pageToken) break;
+  }
+  return items
     .filter((c) => c.id && !c.deleted)
     .map((c) => ({ id: c.id!, name: c.summaryOverride || c.summary || c.id!, color: c.backgroundColor ?? null, primary: !!c.primary, writable: c.accessRole === "owner" || c.accessRole === "writer", owned: c.accessRole === "owner", selected: !c.hidden && c.selected !== false }))
     .sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name));
