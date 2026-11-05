@@ -33,6 +33,22 @@ Still to do (each the owner's words, shortened):
 - All Quests: list views in order made (default), last modified, and others (3:10 PM).
 - Settings: screens without a tray (like Notifications) slide in from the right, all inside the one settings box (3:14 PM; done for Secret Missions).
 
+## Nov 4 evening – Nov 5 notes (owner, read from the database Nov 5), not built yet
+
+Built Nov 5 (UI check thread): clicking the bird no longer makes it jump (f99d1d48; the global press "give" shrank anything placed by a transform toward the screen corner); the toucan logging "Adderall 11am" after midnight no longer fails with "React error #441" (66ed9816; it logs the 11am that has passed, and errors say what went wrong).
+
+Still to do (id prefix, owner's words shortened):
+- Right-click "N items to sort" › Hide › for 30 min / tomorrow / other (f45ec532). Same for the Due soon button (0519a404) and the Evening routine button, plus its visual settings (c5de37c6).
+- Toucan settings: "His look" header doesn't collapse on every click (44f887f0); the bird cage is gone, bring it back (15a1be5f).
+- **Bounty List** banner right of the Evening routine; a purse icon (iterate it until it looks high quality) puts a quest/habit/reward on it with +50 coins, then +100 per press (3c1d887a).
+- Calendar: days wider/narrower as a smooth 1–14 slider with partial days (070f6e4d); wrong calendars showing (a038910b, and 59474700 "10/10 top priority": the reschedule tool shows unwanted calendars, let the user choose); temperature under the time (b41a11d3); "Keep it here" on lunch made it disappear (d097fb6f); Gym not clickable, Breakfast not draggable (93380777); "Skip for today" instead of "Remove for today", position draggable (8b9e4b9c); daily staples clickable (2b6d36d1); edit personal Google events in place (1a19edb3); show proposed/confirmed daily habits like meals (7d40055a); auto-schedule shows a tentative outline with Confirm / Change (drag to any slot) (5ec031b1); today's quests at the top of auto-schedule, its button says "Schedule next quest" (be1eafb7); rescheduling from Today put it in the wrong place (a5f87cf1); show when past quests were completed (e300999d); iterate this screen several times, edit and reorder (05a2411d, 3746ef9c).
+- Quest editor: when it was made, in no extra space, tap for edit history (055fa52c, 8a4b38d3); gear icons misshapen (11275375); due date picker doesn't work on a board (18c30fb8); XP pill opens too slowly (ef27a8c4); portrait painting offers 3 to choose from (c6c7aeef); edit sub-quest completion in the editor (e9421b64); "Archive" instead of "Delete quest" (fe7c7f39).
+- Completing: "Claim your reward", a little wider, rounder buttons (2c9bbf43); choose: complete all sub-quests, partial XP, or complete and leave sub-quests (9144f5cb); completed cards stay on Today until moved to Victories (74b32130); tapping a victory shows its quest card (d7e26713); a button by Celebrate today's wins makes an XP celebration screen (ebb671ef).
+- A board's quests ordered manually, by due date or other (ffef2c0d).
+- Evening: "Skip for today" on a tomorrow quest skipped the whole rite, not the quest (424c3879).
+- Feedback box: tapping "Feedback submitted" closes it at once (5f0e6b0a); the screenshot still isn't working (66ed9816).
+- Insights: can't edit an event-log entry (6fb5abb2); the graph waits for a button press (a9e80702).
+
 ## Habits and the habit editor (repeat ask 15)
 - (Nov 3, built: sub-habits in view and draggable, XP/coins, simpler repeats, Other minutes, Close→Save, details as pills, a sub-habit's menu on the card.)
 - (Nov 3, built: the cleaning habit's editor lists its spaces and chores from the mess check-in, with a link to change them.)

@@ -37,6 +37,7 @@ Exit code 1 means there are errors not in `scripts/ui-check/known-issues.json`.
 | `field-under-keyboard` | error | The field being typed in is behind the (simulated) keyboard or above the screen. |
 | `under-keyboard` | warn | A control in a non-scrolling floating layer is behind the keyboard. |
 | `moved-on-tap` | error / warn | What you tapped jumped (>6px) or bounced afterwards: the whole screen re-laid out. Steps that are meant to move pass `expectMove`. |
+| `press-jump` | warn | A button placed by a stylesheet `transform` leaps when pressed (the global press `scale` shrinks its transform too). Inline transforms are exempt; prefer the `translate` property. |
 | `layout-shift` | error (>0.08) / warn | The page jumped with no tap (late content pushing things down). |
 | `not-restored` | warn | Opening and closing a section left the rest of the screen somewhere else. |
 | `console-error`, `page-error`, `server-error` | error | Includes React hydration errors (#418) and 5xx responses. |

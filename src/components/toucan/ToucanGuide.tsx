@@ -19,7 +19,7 @@ import {
   coachLogNightAction,
   coachUndoNightAction,
   coachShipFeedbackAction,
-  addCheckNoteAction,
+  logEventAction,
   deleteCheckNoteAction,
   deleteTaskAction,
   coachPromiseAction,
@@ -1369,7 +1369,13 @@ function MadeCard({ action: a }: { action: Made & { auto?: boolean } }) {
         const id = await coachNewQuestAction(a.title, a.minutes, a.due ? stampISO(a.due) : null);
         undo.current = () => deleteTaskAction(id);
       } else if (a.type === "event") {
-        const note = await addCheckNoteAction(a.text, a.at ? stampISO(a.at) : null);
+        // "11am" said just after midnight means the 11am that has passed, not later today
+        // (Nov 5: it was refused as in the future and showed a bare React error code).
+        let at = a.at ? stampISO(a.at) : null;
+        if (at && Date.parse(at) > Date.now() + 5 * 60_000 && Date.parse(at) - 86_400_000 > Date.now() - 2 * 86_400_000) at = new Date(Date.parse(at) - 86_400_000).toISOString();
+        const r = await logEventAction({ title: a.text, at });
+        if (!r.ok) throw new Error(r.error);
+        const note = r.note;
         undo.current = () => deleteCheckNoteAction(note.id);
       } else if (a.type === "checkin") {
         const ref = await coachCheckInAction(a.energy, a.metrics);

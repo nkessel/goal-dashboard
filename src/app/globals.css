@@ -2946,10 +2946,13 @@ html[data-welcome-open] .nav-loader-toucan { display: none; }
 /* A popup on its way out (useLinger): it fades and sinks instead of vanishing. */
 .pop-leave { animation: card-pop-out 170ms ease both !important; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .pop-leave { animation-duration: 1ms !important; } }
-/* Every button answers a press: a small give under the finger (uses `scale`, so it
-   never fights an element's own transform). */
+/* Every button answers a press: a small give under the finger. `scale` is applied
+   before an element's own `transform`, so on anything placed by an inline transform
+   (the perched bird, a window you dragged) it shrank the translate too and the thing
+   leapt toward the screen's corner on every press (owner, Nov 5: "clicking on the
+   bird makes it jump"). Those are left out. */
 @layer base {
-  button:not(:disabled):active, [role="button"]:not([aria-disabled="true"]):active { scale: 0.97; transition: scale 60ms ease-out; }
+  button:not(:disabled):not([style*="transform"]):active, [role="button"]:not([aria-disabled="true"]):not([style*="transform"]):active { scale: 0.97; transition: scale 60ms ease-out; }
 }
 @media (prefers-reduced-motion: reduce) { button:active, [role="button"]:active { scale: none !important; } }
 /* The toucan's respond line: one slim line that only grows downward as you write. */

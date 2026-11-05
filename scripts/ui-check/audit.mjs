@@ -153,6 +153,19 @@ export function auditPage(opts) {
     }
   }
 
+  // 2b. Press jump: the global press "give" (`scale: .97`) is applied before an element's own
+  //     transform, so a button placed by a transform (not the `translate` property) leaps
+  //     toward the screen's corner on every press (the perched bird, Nov 5). Inline
+  //     transforms are left out by the CSS; this catches ones set from a stylesheet.
+  for (const el of shown) {
+    if (!el.matches("button:not(:disabled), [role=button]") || (el.getAttribute("style") || "").includes("transform")) continue;
+    const t = style(el).transform;
+    if (!t || t === "none") continue;
+    const m = new DOMMatrix(t);
+    const shift = Math.hypot(m.m41, m.m42) * 0.03;
+    if (shift > 4) add("press-jump", "warn", el, `jumps ${Math.round(shift)}px when pressed (scale on :active shrinks its transform); give it an inline transform or use \`translate\``);
+  }
+
   // 3. Covered: something floating sits on a button or text.
   //    A fixed/sticky thing (bar, floating button, foot) only counts when the
   //    page (or the box it's in) can't be scrolled to bring the item out from
@@ -169,6 +182,7 @@ export function auditPage(opts) {
   const canScroll = (sc, down) => (down ? sc.scrollTop + sc.clientHeight < sc.scrollHeight - 4 : sc.scrollTop > 4);
   const groups = new Map();
   const behind = new Map();
+  const stickies = new Map();
   for (const el of meaningful) {
     const r = el.getBoundingClientRect();
     if (r.bottom < 0 || r.top > H || r.right < 0 || r.left > W) continue;
@@ -180,8 +194,18 @@ export function auditPage(opts) {
       [r.left + r.width * 0.8, r.top + r.height * 0.7],
     ].filter(([x, y]) => x >= 0 && x < W && y >= 0 && y < H);
     if (!pts.length) continue;
+    // Text already scrolled out of view inside its own box (past the box's edge,
+    // or under a sticky band of that box, like the welcome card's pinned top)
+    // is hidden by design: whatever floats over that spot isn't covering it.
+    const sc = scrollerOf(el);
+    const scR = sc !== document.scrollingElement ? sc.getBoundingClientRect() : null;
+    if (scR && !stickies.has(sc)) stickies.set(sc, [...sc.querySelectorAll("*")].filter((n) => style(n).position === "sticky"));
+    const bands = scR ? stickies.get(sc).filter((n) => !n.contains(el)).map((n) => n.getBoundingClientRect()) : [];
+    const hiddenAt = (x, y) =>
+      scR && (y < scR.top || y > scR.bottom || x < scR.left || x > scR.right || bands.some((b) => x >= b.left && x <= b.right && y >= b.top && y <= b.bottom));
     let hits = 0, who = null;
     for (const [x, y] of pts) {
+      if (hiddenAt(x, y)) continue;
       const h = document.elementFromPoint(x, y);
       if (!h || el.contains(h) || h.contains(el) || isIgnored(h)) continue;
       const dlg = h.closest("[role=dialog],[role=menu],[role=listbox],[role=alertdialog],[aria-modal=true],[popover]");
