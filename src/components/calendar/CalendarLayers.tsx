@@ -27,7 +27,7 @@ export type HabitLook = "quest" | "dashed" | "hidden";
 /** What a quest card on the calendar shows (owner, Nov 3: "options to customize what shows on quest cards"). */
 export type CardShow = { art: boolean; time: boolean; xp: boolean; coins: boolean };
 export const CARD_SHOW_DEFAULT: CardShow = { art: true, time: true, xp: true, coins: true };
-type Layers = { hidden: string[]; /** The calendars' own order (owner, Nov 3). */ order: string[]; /** Archived: not shown, not loaded (the server reads the cal-skip cookie). */ archived: string[]; /** Calendars met before (ones unticked in Google start hidden the first time). */ seen: string[]; /** Other people's calendars hidden once (owner, Nov 4: "filled with a calendar that isn't mine"). */ mineOnly?: boolean; /** Second pass (owner, Nov 4 night): only the main calendar shows until others are ticked on. */ mainOnly?: boolean; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
+type Layers = { hidden: string[]; /** The calendars' own order (owner, Nov 3). */ order: string[]; /** Archived: not shown, not loaded (the server reads the cal-skip cookie). */ archived: string[]; /** Calendars met before (ones unticked in Google start hidden the first time). */ seen: string[]; /** Other people's calendars hidden once (owner, Nov 4: "filled with a calendar that isn't mine"). */ mineOnly?: boolean; /** Second pass (owner, Nov 4 night): only the main calendar shows until others are ticked on. */ mainOnly?: boolean; /** What was showing before the Google switch went off: switching it on brings back just those (owner, Nov 4: it brought back all 65). */ shownBefore?: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
 // Timed habits (Gym) show like the other non-negotiables by default (owner, Nov 4).
 const DEFAULTS: Layers = { hidden: [], order: [], archived: [], seen: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "dashed", card: CARD_SHOW_DEFAULT };
 
@@ -222,7 +222,7 @@ export function CalendarLayers({
                 type="button"
                 role="switch"
                 aria-checked={othersOn}
-                onClick={() => set({ hidden: othersOn ? calendars.map((c) => c.id) : layers.archived })}
+                onClick={() => (othersOn ? set({ hidden: calendars.map((c) => c.id), shownBefore: calendars.filter((c) => !layers.hidden.includes(c.id)).map((c) => c.id) }) : set({ hidden: calendars.filter((c) => !(layers.shownBefore?.length ? layers.shownBefore.includes(c.id) : c.primary)).map((c) => c.id) }))}
                 className="flex h-full items-center gap-2 whitespace-nowrap rounded-l-full pl-3 pr-1.5 text-[13.5px] font-semibold"
                 title={othersOn ? "Hide your other calendars" : "Show your other calendars"}
               >

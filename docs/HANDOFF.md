@@ -151,6 +151,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 4 (late night, 2): The Google calendar list was cut at 12 in `listEventsAllCalendars` (events loaded from up to 20), so 53 of the owner's 65 calendars (e.g. CSSC Building Use, 144 events) filled the grid with no way to hide them; now all are listed (events from up to 40, list paged) and start hidden. The Google switch: off remembers what was showing (`shownBefore`), on brings back just that (else only the main calendar).
 - Nov 4 (late night): Only the main Google calendar shows at first (`mainOnly` one-time pass in `calendar-layers`; new calendars start hidden): the owner's own event-idea calendars (Boston area fun, Aikido of Amherst…) filled the week and counted as busy for the auto-scheduler. The Auto-scheduler pill reads "✨ Auto" below 1024px (it was pushed off the left edge).
 - Nov 4 (night): Calendars that aren't the owner's (not primary and not owned: other people's, even shared for editing; subscriptions; holidays) start hidden, and once (`mineOnly` in `calendar-layers`) any already showing are hidden, so free time shows and the auto-scheduler doesn't count them as busy (it skips hidden calendars). Tick one back on under the caret beside "Google calendars". `GoogleCalendarInfo.owned` (accessRole owner). The laptop browser pane showed "Your Google calendars aren't coming through" (permission expired): the owner reconnects.
 
