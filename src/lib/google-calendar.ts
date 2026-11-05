@@ -121,7 +121,7 @@ export type GoogleCalendarEvent = {
 
 export type RsvpAnswer = "accepted" | "tentative" | "declined";
 
-export type GoogleCalendarInfo = { id: string; name: string; color: string | null; primary: boolean; writable?: boolean; /** Ticked in Google's own list (false = a subscription kept but not shown there). */ selected?: boolean };
+export type GoogleCalendarInfo = { id: string; name: string; color: string | null; primary: boolean; writable?: boolean; /** You own it (made it yourself); shared ones you can edit are writable but not yours. */ owned?: boolean; /** Ticked in Google's own list (false = a subscription kept but not shown there). */ selected?: boolean };
 
 /** The calendars in the person's Google list (their own, shared ones, holidays…). */
 export async function listCalendars(accessToken: string): Promise<GoogleCalendarInfo[]> {
@@ -130,7 +130,7 @@ export async function listCalendars(accessToken: string): Promise<GoogleCalendar
   const res = await calendar.calendarList.list({ maxResults: 100, showHidden: true });
   return (res.data.items ?? [])
     .filter((c) => c.id && !c.deleted)
-    .map((c) => ({ id: c.id!, name: c.summaryOverride || c.summary || c.id!, color: c.backgroundColor ?? null, primary: !!c.primary, writable: c.accessRole === "owner" || c.accessRole === "writer", selected: !c.hidden && c.selected !== false }))
+    .map((c) => ({ id: c.id!, name: c.summaryOverride || c.summary || c.id!, color: c.backgroundColor ?? null, primary: !!c.primary, writable: c.accessRole === "owner" || c.accessRole === "writer", owned: c.accessRole === "owner", selected: !c.hidden && c.selected !== false }))
     .sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name));
 }
 

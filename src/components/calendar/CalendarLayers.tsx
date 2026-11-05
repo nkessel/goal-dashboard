@@ -27,7 +27,7 @@ export type HabitLook = "quest" | "dashed" | "hidden";
 /** What a quest card on the calendar shows (owner, Nov 3: "options to customize what shows on quest cards"). */
 export type CardShow = { art: boolean; time: boolean; xp: boolean; coins: boolean };
 export const CARD_SHOW_DEFAULT: CardShow = { art: true, time: true, xp: true, coins: true };
-type Layers = { hidden: string[]; /** The calendars' own order (owner, Nov 3). */ order: string[]; /** Archived: not shown, not loaded (the server reads the cal-skip cookie). */ archived: string[]; /** Calendars met before (ones unticked in Google start hidden the first time). */ seen: string[]; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
+type Layers = { hidden: string[]; /** The calendars' own order (owner, Nov 3). */ order: string[]; /** Archived: not shown, not loaded (the server reads the cal-skip cookie). */ archived: string[]; /** Calendars met before (ones unticked in Google start hidden the first time). */ seen: string[]; /** Other people's calendars hidden once (owner, Nov 4: "filled with a calendar that isn't mine"). */ mineOnly?: boolean; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
 // Timed habits (Gym) show like the other non-negotiables by default (owner, Nov 4).
 const DEFAULTS: Layers = { hidden: [], order: [], archived: [], seen: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "dashed", card: CARD_SHOW_DEFAULT };
 
@@ -138,12 +138,18 @@ export function CalendarLayers({
   const toggleCal = (id: string) => set({ hidden: layers.hidden.includes(id) ? layers.hidden.filter((x) => x !== id) : [...layers.hidden, id] });
   const hiddenCount = layers.hidden.filter((id) => !layers.archived.includes(id)).length + (layers.quests ? 0 : 1);
   // Calendars unticked in Google (subscriptions you keep but don't look at) start hidden here, once.
+  // Calendars that aren't yours (other people's, even ones shared for editing; subscriptions; holidays) start hidden too, and,
+  // once, any already showing: they filled the grid so free time couldn't be seen (owner, Nov 4). Tick one
+  // back on under the caret beside "Google calendars".
+  const notMine = (c: (typeof calendars)[number]) => !c.primary && (c.owned === undefined ? !c.writable : !c.owned);
   const unseen = calendars.filter((c) => !layers.seen.includes(c.id));
+  const sweep = !layers.mineOnly && calendars.length > 0;
   useEffect(() => {
-    if (!unseen.length) return;
-    const off = unseen.filter((c) => c.selected === false).map((c) => c.id);
-    write({ ...layers, seen: [...layers.seen, ...unseen.map((c) => c.id)], hidden: [...layers.hidden, ...off.filter((id) => !layers.hidden.includes(id))] });
-  }, [unseen, layers]);
+    if (!unseen.length && !sweep) return;
+    const off = [...unseen.filter((c) => c.selected === false || notMine(c)), ...(sweep ? calendars.filter(notMine) : [])].map((c) => c.id);
+    write({ ...layers, mineOnly: layers.mineOnly || calendars.length > 0, seen: [...layers.seen, ...unseen.map((c) => c.id)], hidden: [...layers.hidden, ...off.filter((id, i) => !layers.hidden.includes(id) && off.indexOf(id) === i)] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- notMine is a pure helper
+  }, [unseen, layers, sweep, calendars]);
   const chip = { background: isAdventure ? "rgba(14,18,10,.55)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "#f6ecd2" : "var(--t-ink)" };
   const popup = { background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, boxShadow: "0 12px 30px rgba(0,0,0,.35)" };
 
