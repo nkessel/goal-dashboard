@@ -27,7 +27,7 @@ export type HabitLook = "quest" | "dashed" | "hidden";
 /** What a quest card on the calendar shows (owner, Nov 3: "options to customize what shows on quest cards"). */
 export type CardShow = { art: boolean; time: boolean; xp: boolean; coins: boolean };
 export const CARD_SHOW_DEFAULT: CardShow = { art: true, time: true, xp: true, coins: true };
-type Layers = { hidden: string[]; /** The calendars' own order (owner, Nov 3). */ order: string[]; /** Archived: not shown, not loaded (the server reads the cal-skip cookie). */ archived: string[]; /** Calendars met before (ones unticked in Google start hidden the first time). */ seen: string[]; /** Other people's calendars hidden once (owner, Nov 4: "filled with a calendar that isn't mine"). */ mineOnly?: boolean; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
+type Layers = { hidden: string[]; /** The calendars' own order (owner, Nov 3). */ order: string[]; /** Archived: not shown, not loaded (the server reads the cal-skip cookie). */ archived: string[]; /** Calendars met before (ones unticked in Google start hidden the first time). */ seen: string[]; /** Other people's calendars hidden once (owner, Nov 4: "filled with a calendar that isn't mine"). */ mineOnly?: boolean; /** Second pass (owner, Nov 4 night): only the main calendar shows until others are ticked on. */ mainOnly?: boolean; quests: boolean; done: boolean; allDay: boolean; portraits: boolean; essentials: EssentialsLook; habits: HabitLook; card: CardShow };
 // Timed habits (Gym) show like the other non-negotiables by default (owner, Nov 4).
 const DEFAULTS: Layers = { hidden: [], order: [], archived: [], seen: [], quests: true, done: true, allDay: true, portraits: false, essentials: "dashed", habits: "dashed", card: CARD_SHOW_DEFAULT };
 
@@ -141,13 +141,15 @@ export function CalendarLayers({
   // Calendars that aren't yours (other people's, even ones shared for editing; subscriptions; holidays) start hidden too, and,
   // once, any already showing: they filled the grid so free time couldn't be seen (owner, Nov 4). Tick one
   // back on under the caret beside "Google calendars".
-  const notMine = (c: (typeof calendars)[number]) => !c.primary && (c.owned === undefined ? !c.writable : !c.owned);
+  // Only your main calendar shows at first: the others (event-idea lists like "Boston area fun", other people's,
+  // subscriptions) filled the week so no free time could be seen, and the auto-scheduler counted them as busy.
+  const notMine = (c: (typeof calendars)[number]) => !c.primary;
   const unseen = calendars.filter((c) => !layers.seen.includes(c.id));
-  const sweep = !layers.mineOnly && calendars.length > 0;
+  const sweep = !layers.mainOnly && calendars.length > 0;
   useEffect(() => {
     if (!unseen.length && !sweep) return;
     const off = [...unseen.filter((c) => c.selected === false || notMine(c)), ...(sweep ? calendars.filter(notMine) : [])].map((c) => c.id);
-    write({ ...layers, mineOnly: layers.mineOnly || calendars.length > 0, seen: [...layers.seen, ...unseen.map((c) => c.id)], hidden: [...layers.hidden, ...off.filter((id, i) => !layers.hidden.includes(id) && off.indexOf(id) === i)] });
+    write({ ...layers, mineOnly: true, mainOnly: layers.mainOnly || calendars.length > 0, seen: [...layers.seen, ...unseen.map((c) => c.id)], hidden: [...layers.hidden, ...off.filter((id, i) => !layers.hidden.includes(id) && off.indexOf(id) === i)] });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- notMine is a pure helper
   }, [unseen, layers, sweep, calendars]);
   const chip = { background: isAdventure ? "rgba(14,18,10,.55)" : "var(--t-card)", border: `1.5px solid ${isAdventure ? "rgba(217,180,95,.55)" : "var(--t-card-border)"}`, color: isAdventure ? "#f6ecd2" : "var(--t-ink)" };
@@ -175,7 +177,7 @@ export function CalendarLayers({
   return (
     <AgendaContext.Provider value={agenda}>
     <div className="flex flex-col gap-2">
-      <div ref={panel} className={`relative ${open ? "z-[45]" : "z-[25]"} -mt-1 flex items-center justify-end gap-1.5 sm:gap-2`}>
+      <div ref={panel} className={`relative ${open ? "z-[45]" : "z-[25]"} -mt-1 flex min-w-0 items-center justify-end gap-1.5 sm:gap-2`}>
         {/* Top-left: the scheduling list, as a calendar button with its count. */}
         <button
           type="button"
@@ -190,12 +192,14 @@ export function CalendarLayers({
             boxShadow: "0 6px 14px rgba(0,0,0,.4)",
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="hidden lg:block">
             <rect x="3.5" y="5" width="17" height="15.5" rx="2.2" stroke="currentColor" strokeWidth="1.9" />
             <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
             <path d="M8 13.5h4M8 16.8h7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           </svg>
-          <span className={isAdventure ? "font-display tracking-wide" : ""}>✨ Auto-scheduler</span>
+          {/* Short on narrower screens, so the toolbar never pushes it off the left edge (owner, Nov 4). */}
+          <span className={`hidden lg:inline ${isAdventure ? "font-display tracking-wide" : ""}`}>✨ Auto-scheduler</span>
+          <span className={`lg:hidden ${isAdventure ? "font-display tracking-wide" : ""}`}>✨ Auto</span>
           {toSchedule > 0 && (
             <span className="absolute -right-1.5 -top-1.5 flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-1 text-[11px] font-bold tabular-nums" style={{ background: "#2a1c10", color: "#f6dc8e", border: "1px solid #d9b45f" }}>
               {toSchedule}
