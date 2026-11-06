@@ -9,7 +9,8 @@ const isMoreButton = (el: Element) =>
 /**
  * Right-click anywhere on a card opens the same menu as its ⋯ button, across
  * the app. Cards that handle right-click themselves are left alone, and so
- * are text fields and links (their own browser menu is more useful there).
+ * are text fields and links (their own browser menu is more useful there), and the search
+ * stops at `[data-menu-scope]` (a tray under a card keeps its own right-click).
  */
 export function ContextMenuBridge() {
   useEffect(() => {
@@ -26,6 +27,8 @@ export function ContextMenuBridge() {
           buttons[0].click();
           return;
         }
+        // A tray of its own things (tomorrow's quests under their rite) never borrows the card's menu above it (owner, Nov 5).
+        if (el.hasAttribute("data-menu-scope")) return;
       }
     };
     document.addEventListener("contextmenu", onMenu);

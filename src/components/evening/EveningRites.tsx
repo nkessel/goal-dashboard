@@ -628,6 +628,7 @@ export function EveningRites({
                   ? { borderTopLeftRadius: 4, borderTopRightRadius: 4 }
                   : { background: "linear-gradient(180deg, rgba(6,8,24,.78), rgba(10,12,32,.62))", border: "1px solid rgba(217,180,95,.22)", borderTop: "none", boxShadow: "inset 0 10px 14px -10px rgba(0,0,0,.8), inset 0 -6px 10px -6px rgba(0,0,0,.6)" }
               }
+              data-menu-scope=""
               // Its own controls (buttons, inner drag, scrolling) shouldn't start dragging the rite card.
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}

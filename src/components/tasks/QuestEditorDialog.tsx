@@ -56,6 +56,7 @@ import { freshKey, loadDrafts, removeDraft, saveDraft, type QuestDraftSave } fro
 import { addOptimisticQuest, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { CoinIcon } from "@/components/ui/Icons";
 import { StatSplitEditor } from "./StatSplitEditor";
+import { statAbbr } from "@/lib/stats";
 import { LevelScales, useScaleStyle, type ScaleItem } from "@/components/ui/LevelScales";
 import { QuestPicker, SequenceDialog } from "./Sequence";
 import { coinsForXp, XP_PER_COIN } from "@/lib/coins";
@@ -339,6 +340,26 @@ export function QuestEditorDialog({
   const boardLabel = boardId ? (boardOptions?.find((o) => o.id === boardId)?.label.split(" › ").pop() ?? null) : null;
   const [alsoOn, setAlsoOn] = useState<string[]>(task?.also_on ?? []);
   const [stepMenu, setStepMenu] = useState<string | null>(null);
+  // A sub-quest's ⋯ menu closes on a click outside it or Escape (it stayed open; owner, Nov 5).
+  useEffect(() => {
+    if (!stepMenu) return;
+    const down = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest?.("[data-step-menu]") || t?.closest?.("[data-feedback-root]")) return;
+      setStepMenu(null);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setStepMenu(null);
+    };
+    document.addEventListener("pointerdown", down, true);
+    document.addEventListener("keydown", key, true);
+    return () => {
+      document.removeEventListener("pointerdown", down, true);
+      document.removeEventListener("keydown", key, true);
+    };
+  }, [stepMenu]);
   // Quest templates: ready-made quests to start from (new quests), and saving one (existing quests).
   const [templates, setTemplates] = useState<QuestTemplate[] | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -1020,8 +1041,8 @@ export function QuestEditorDialog({
 
   /** An existing quest: save what's changed, then complete it (the Quest complete party plays). */
   /**
-   * Marks it done but stays open: the celebration waits for Done, so the last
-   * touches (XP included) are in it.
+   * Saves what's changed (XP included), completes it and plays the celebration straight away
+   * (owner, Nov 5: "when I hit complete, it should trigger the celebration screen"; it used to wait for Done).
    */
   function completeExisting() {
     if (!task) return;
@@ -1032,7 +1053,19 @@ export function QuestEditorDialog({
         const fd = new FormData();
         fd.set("taskId", task.id);
         const res = await completeTaskAction(fd);
-        setCompletedNow({ xp, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
+        deleted.current = true; // nothing more to save or pay out as it closes
+        celebrateQuest({
+          taskId: task.id,
+          title,
+          description,
+          xp: Math.max(0, xp - Math.round((xp * initialProgress) / 100)),
+          iconSrc: task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null,
+          totalXp: res?.totalXp ?? null,
+          coinsEarned: res?.coinsEarned ?? 0,
+        });
+        setPhase("closing");
+        setTimeout(onClose, embedded ? 0 : 180);
+        router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't complete it.");
       }
@@ -1353,7 +1386,9 @@ export function QuestEditorDialog({
                             onChange={(e) => pickEstimate(e.target.value)}
                             placeholder="—"
                             aria-label="Minutes to complete"
-                            className="h-7 w-14 rounded-full border-0 bg-transparent px-1 text-center text-[16px] tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            // One colour inside the pill: no field wash behind the number (owner, Nov 5).
+                            style={{ background: "transparent", boxShadow: "none" }}
+                            className="bare-input h-7 w-14 rounded-full border-0 bg-transparent px-1 text-center text-[16px] tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                           <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
                             min
@@ -1649,7 +1684,7 @@ export function QuestEditorDialog({
                               {Math.round((wOf.get(st.key) ?? 0) * xp) + (st.xp ?? 0)} XP
                             </span>
                           )}
-                          <span className="relative shrink-0">
+                          <span className="relative shrink-0" data-step-menu>
                             <button
                               type="button"
                               onClick={() => setStepMenu(stepMenu === st.key ? null : st.key)}
@@ -1800,7 +1835,12 @@ export function QuestEditorDialog({
                     {/* Under the title: send some of the XP to character stats (the tray opens below the XP bar). */}
                     {!doingNow && (
                       <button type="button" onClick={() => setStatsOpen((o) => !o)} aria-expanded={statsOpen} className="flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: statsOpen ? "rgba(217,180,95,.3)" : "rgba(255,250,235,.35)" }}>
-                        {statTotal > 0 ? `${Math.round((xp * statTotal) / 100)} XP to stats` : "＋ Add to stats"}
+                        {statTotal > 0
+                          ? Object.entries(statSplit)
+                              .filter(([, p]) => p > 0)
+                              .map(([k, p]) => `${statAbbr(k)} ${Math.round((xp * p) / 100)}`)
+                              .join(" · ") + " XP"
+                          : "＋ Add to stats"}
                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: statsOpen ? "rotate(90deg)" : undefined }}>
                           <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
@@ -1815,6 +1855,7 @@ export function QuestEditorDialog({
                     )}
                   </span>
                 </div>
+                {!doingNow && <StatSplitEditor xp={xp} split={statSplit} onChange={changeStatSplit} isAdventure={isAdventure} open={statsOpen} onOpenChange={setStatsOpen} />}
                 <div className="flex items-center gap-2">
                   {/* −5 and +5 either side of the bar, the amount to its right. */}
                   <button type="button" onClick={() => (setXp(Math.max(0, xp - 5)), setXpOwn(true))} aria-label="5 XP less" title="−5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
@@ -1889,7 +1930,7 @@ export function QuestEditorDialog({
     stats: (
       <>
               {/* Character stats: a share of the XP can build stats instead of your level */}
-              {!doingNow && <StatSplitEditor xp={xp} split={statSplit} onChange={changeStatSplit} isAdventure={isAdventure} open={statsOpen} onOpenChange={setStatsOpen} />}
+              {/* Shown under its button in the XP part now (owner, Nov 5: "open under the button, not under the sub-quests"). */}
       </>
     ),
     tags: (
@@ -2138,11 +2179,10 @@ export function QuestEditorDialog({
     f === "showsIn"
       ? `${placement === "today" ? "Primary" : placement === "additional" ? "Secondary" : "Backlog"}`
       : f === "time"
-        ? estimate.trim()
-          ? `${estimate.trim()} min${slot ? " · scheduled" : ""}`
-          : slot
-            ? "Scheduled"
-            : "Time"
+        ? // Only how long it takes: scheduling has its own calendar pill (owner, Nov 5).
+          estimate.trim()
+          ? `${estimate.trim()} min`
+          : "Time"
         : f === "xp"
           ? `${xp} XP`
           : (boardOptions?.find((o) => o.id === boardId)?.label ?? "Category");
@@ -2735,8 +2775,12 @@ export function QuestEditorDialog({
                   </button>
                   {moreMenu && (
                     <span className="card-pop-in absolute bottom-11 left-0 z-10 flex min-w-[160px] flex-col rounded-xl p-1 shadow-xl" style={{ background: "var(--t-card, #fffaf0)", border: "1px solid rgba(139,112,64,.4)" }}>
-                      <button type="button" onClick={() => (setMoreMenu(false), setConfirmingDelete(true))} className="flex h-10 items-center rounded-lg px-3 text-left text-[14px] font-semibold hover:bg-black/[.05]" style={{ color: "var(--t-warn)" }}>
-                        Delete {noun}
+                      {/* Archive first (owner, Nov 5: "replace delete quest with archive"); deleting for good asks. */}
+                      <button type="button" onClick={() => (setMoreMenu(false), remove(true))} className="flex h-10 items-center rounded-lg px-3 text-left text-[14px] font-semibold hover:bg-black/[.05]" style={{ color: "var(--t-ink)" }}>
+                        Archive {noun}
+                      </button>
+                      <button type="button" onClick={() => (setMoreMenu(false), setConfirmingDelete(true))} className="flex h-9 items-center rounded-lg px-3 text-left text-[12.5px] hover:bg-black/[.05]" style={{ color: "var(--t-warn)" }}>
+                        Delete for good…
                       </button>
                     </span>
                   )}

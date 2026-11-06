@@ -398,3 +398,6 @@ function googleProblemWords(err: unknown): string {
   if (code === 403 || /insufficient|permission|scope/i.test(raw)) return "Google says the app isn't allowed to read your calendars.";
   return `Google didn't answer this time (${raw.slice(0, 120)}).`;
 }
+
+// The browser tab names the screen you are on (owner, Nov 5).
+export const metadata = { title: "Calendar" };

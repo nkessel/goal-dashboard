@@ -79,6 +79,12 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
       /* storage unavailable */
     }
   }, []);
+  // On the calendar its toolbar pill already opens it, so a minimized window leaves no second chip there (owner, Nov 5).
+  const [hasPill, setHasPill] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the toolbar is only findable after it mounts
+    setHasPill(!!document.querySelector("[data-scheduling-pill]"));
+  }, []);
   function minimize(v: boolean) {
     setMin(v);
     try {
@@ -140,7 +146,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
   // The calendar button on the calendar's top-left corner opens (or closes) it.
   useEffect(() => {
     // A minimized list comes back up rather than closing.
-    const on = () => (open && min && wide ? minimize(false) : toggle(!open));
+    const on = () => (open && min ? minimize(false) : toggle(!open));
     window.addEventListener("open-scheduling", on);
     return () => window.removeEventListener("open-scheduling", on);
   });
@@ -554,7 +560,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
   return (
     <>
       {/* A floating window on every screen (owner, Nov 3): moved by its title, resized from its corner, minimized to a chip. */}
-      {open && (
+      {open && !(min && hasPill) && (
         <FloatingWindow
           storageKey="scheduling-window"
           width={wide ? 320 : 280}

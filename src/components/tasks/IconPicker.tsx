@@ -376,6 +376,14 @@ export function IconPicker({
                     setPromptEdited(true);
                     onPromptChange?.(e.target.value);
                   }}
+                  // Ctrl/⌘+Enter paints (owner, Nov 5); it doesn't reach the editor's save behind.
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!isGeneratingIcon && aiPrompt.trim()) generateIcon();
+                    }
+                  }}
                   placeholder="Describe the portrait to paint…"
                   className="w-full resize-none rounded border py-1 pl-2 pr-8 text-[13px] leading-snug"
                   style={fieldStyle}

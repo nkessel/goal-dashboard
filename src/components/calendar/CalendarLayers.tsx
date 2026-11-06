@@ -182,6 +182,7 @@ export function CalendarLayers({
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event("open-scheduling"))}
+          data-scheduling-pill=""
           aria-label={`Auto-scheduler (${toSchedule})`}
           title="Auto-scheduler: your list of quests to place"
           // A labelled pill that sticks out over the calendar's top-left corner.

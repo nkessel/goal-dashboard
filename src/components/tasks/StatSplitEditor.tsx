@@ -140,7 +140,8 @@ export function StatSplitEditor({
                   }}
                   maxLength={24}
                   placeholder="Name it, e.g. Creativity"
-                  className="h-9 min-w-0 flex-1 rounded-full border px-3.5 text-[15px] placeholder:italic placeholder:text-[rgba(243,231,203,.45)]"
+                  // bare-input: the parchment field look (a light wash) made this dark tray's field unreadable (owner, Nov 5).
+                  className="bare-input h-9 min-w-0 flex-1 rounded-full border px-3.5 text-[15px] placeholder:italic placeholder:text-[rgba(243,231,203,.45)]"
                   style={{ borderColor: "#8a6c2c", background: "rgba(0,0,0,.25)", color: "#f3e7cb", boxShadow: "inset 0 1px 3px rgba(0,0,0,.5)" }}
                 />
                 <button type="button" onClick={add} disabled={!name.trim()} className="h-9 rounded-full px-3.5 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
@@ -169,11 +170,13 @@ export function StatSplitEditor({
               </button>
             )}
           </div>
-          {/* A caret at the bottom folds the tray back up. */}
-          <button type="button" onClick={() => setOpen(false)} aria-label="Close the stats tray" title="Close" className="-mb-1 flex h-7 w-full items-center justify-center rounded-full hover:bg-white/[.06]" style={{ color: "#d9b45f" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M6 15l6-6 6 6" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          {/* What's left goes to your level, so the shares needn't add up to 100 (owner, Nov 5: "why doesn't it add up to 100?"). */}
+          <p className="m-0 text-[12.5px]" style={{ color: soft }}>
+            {total >= 100 ? "All of it goes to your stats: raising one now takes from the others." : `${100 - total}% left to share · it goes to your level (${xp - toStats} XP)`}
+          </p>
+          {/* Save closes the tray; the button above then names what each stat gets (owner, Nov 5). */}
+          <button type="button" onClick={() => setOpen(false)} className="h-8 self-end rounded-full px-4 text-[13.5px] font-bold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+            Save
           </button>
         </div>
       </Fold>
@@ -189,7 +192,8 @@ function StatRow({ stat, pct, xp, isAdventure, onPct }: { stat: string; pct: num
       <span className="font-display w-8 shrink-0 text-center text-[11px] font-bold tracking-wide" style={{ color: "#d9b45f" }} title={stat}>
         {statAbbr(stat)}
       </span>
-      <span className="w-[76px] shrink-0 truncate text-[14px]" style={{ color: "var(--t-ink)" }}>
+      {/* The whole name, wrapping if it must (it was cut off; owner, Nov 5). */}
+      <span className="w-[92px] shrink-0 text-[14px] leading-tight [overflow-wrap:anywhere]" style={{ color: "var(--t-ink)" }}>
         {stat}
       </span>
       <button type="button" onClick={() => onPct(pct - 5)} disabled={pct <= 0} aria-label={`Less XP to ${stat}`} className={step} style={stepStyle}>

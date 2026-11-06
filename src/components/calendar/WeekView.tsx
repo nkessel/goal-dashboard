@@ -11,6 +11,7 @@ import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import {
   HOUR_START,
+  DAY_FROM,
   HOUR_END,
   formatDateParam,
   formatHourLabel,
@@ -294,6 +295,17 @@ export function WeekView({
     if (h.parentElement) ro.observe(h.parentElement);
     return () => ro.disconnect();
   }, [seamless]);
+  // The grid holds the whole day; open it at 7 AM (once, and only if the page hasn't been scrolled).
+  const openedAt = useRef(false);
+  useLayoutEffect(() => {
+    const h = firstHourRef.current;
+    if (!h || openedAt.current) return;
+    openedAt.current = true;
+    if (window.scrollY > 10) return;
+    const y = h.getBoundingClientRect().top + window.scrollY + (DAY_FROM - HOUR_START) * HOUR_PX - 96;
+    if (y > 0) window.scrollTo({ top: y });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the hours are first laid out
+  }, []);
   const [colWidth, setColWidth] = useState(0);
   useLayoutEffect(() => {
     const el = boxRef.current;
@@ -539,6 +551,9 @@ export function WeekView({
   function startItemDrag(e: React.PointerEvent, key: string, span: Span, item: { kind: "task"; task: Task } | { kind: "event"; event: GoogleCalendarEvent }) {
     if (carried) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    // A popup opened from this card (the quest editor, a menu) is portalled out of it but its
+    // pointer events still bubble here through React: dragging inside it moved the quest (owner, Nov 5).
+    if (!(e.currentTarget as HTMLElement).contains(e.target as Node)) return;
     const kind = (e.target as HTMLElement).closest("[data-resize]") ? "resize" : "move";
     const touch = e.pointerType !== "mouse";
     const d = { key, kind, pointerId: e.pointerId, touch, x0: e.clientX, y0: e.clientY, from: span, to: span, active: false, timer: undefined as number | undefined, item } as NonNullable<typeof drag.current>;
@@ -834,6 +849,26 @@ export function WeekView({
                   {day.getDate()}
                 </span>
               </span>
+              {/* The day's running XP: what its quests have paid so far, or what they'd pay (owner, Nov 5). */}
+              {(() => {
+                let won = 0;
+                let ahead = 0;
+                for (const it of items) {
+                  if (it.kind !== "task" || it.dayIndex !== i) continue;
+                  if (it.task.status === "completed") won += it.task.xp_awarded ?? it.task.xp_value ?? 0;
+                  else ahead += it.task.xp_value ?? 0;
+                }
+                if (!won && !ahead) return null;
+                return (
+                  <span
+                    className="mt-0.5 whitespace-nowrap text-[11px] font-semibold leading-tight tabular-nums"
+                    style={{ color: won ? "var(--t-xp, #8a6c2c)" : "var(--t-ink-soft)" }}
+                    title={won ? `${won} XP won this day${ahead ? ` · ${ahead} more to win` : ""}` : `${ahead} XP to win this day`}
+                  >
+                    ✦ {won ? `${won} XP` : `${ahead} XP ahead`}
+                  </span>
+                );
+              })()}
               {!single && weather && (() => {
                 const w = daySummary(weather[dayKeys[i]]);
                 if (!w) return null;
@@ -1483,7 +1518,7 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
             );
           })()}
           <button type="button" role="menuitem" onClick={() => (save(menu.key, { off: true }), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]" style={{ color: "#8a3f2c" }}>
-            Remove for today
+            Skip for today
           </button>
         </div>
       )}

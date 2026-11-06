@@ -1219,7 +1219,8 @@ html[data-fog-lift]::after { animation: fog-lift 0.9s ease forwards; }
   .quest-step .step-remove { opacity: 0; }
   .quest-step:hover .step-remove, .quest-step:focus-within .step-remove { opacity: 1; }
 }
-.quest-step input:focus, .quest-step textarea:focus { background: rgba(255, 250, 235, 0.6); border-color: rgba(138, 108, 44, 0.45); }
+/* Editing text in place keeps its look: no wash behind it while you type (owner, Nov 5, "for all text editing fields app-wide"); a thin line under it says where you are. */
+.quest-step input:focus, .quest-step textarea:focus { background: transparent; border-color: transparent; border-bottom-color: rgba(138, 108, 44, 0.45); }
 
 /* ── Slide-out menu ─────────────────────────────────────────────────── */
 .drawer-slide-in { animation: drawer-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
@@ -2258,7 +2259,7 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 
 /* Quest steps: the share is a quiet number until touched; progress is a slim gold slider. */
 .step-worth { border-bottom: 1px dotted rgba(139,112,64,.5); border-radius: 0; }
-.step-worth:focus { border-bottom-color: #8a6116; background: rgba(255,250,235,.6); }
+.step-worth:focus { border-bottom-color: #8a6116; background: transparent; }
 .step-progress { -webkit-appearance: none; appearance: none; display: block; height: 14px; background: transparent; cursor: url("/design/cursor-hand.svg") 11 3, pointer; }
 .step-progress::-webkit-slider-runnable-track { height: 4px; border-radius: 9999px; background: linear-gradient(90deg, #d9b45f var(--p, 0%), rgba(20,26,19,.25) var(--p, 0%)); }
 .step-progress::-moz-range-track { height: 4px; border-radius: 9999px; background: linear-gradient(90deg, #d9b45f var(--p, 0%), rgba(20,26,19,.25) var(--p, 0%)); }

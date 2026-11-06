@@ -365,7 +365,6 @@ export function Backpack({ initial }: { initial: Inventory }) {
         >
           <span aria-hidden className="mb-1 inline-block">🏠</span>
           Bring from home
-          {inv.bring.items.some((i) => !i.done) && <span aria-hidden className="mt-1 inline-block h-2 w-2 rounded-full" style={{ background: "#7a2e16", boxShadow: "0 0 0 1.5px rgba(255,240,200,.8)" }} />}
         </button>
       </div>
 

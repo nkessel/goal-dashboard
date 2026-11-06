@@ -93,3 +93,6 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
     </AppShell>
   );
 }
+
+// The browser tab names the screen you are on (owner, Nov 5).
+export const metadata = { title: "Plan" };

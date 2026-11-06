@@ -5,6 +5,9 @@ import { createContext, useContext, useState } from "react";
 /** The quests waiting behind each quest on the calendar, by quest id: its agenda. */
 export const AgendaContext = createContext<Record<string, { id: string; title: string }[]>>({});
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
+import { completeTaskAction } from "@/app/actions";
+import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
+import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
@@ -44,7 +47,31 @@ export function CalendarTaskChip({
 }) {
   const isAdventure = theme === "adventure";
   const [editing, setEditing] = useState(false);
+  const router = useRouter();
   const isCompleted = task.status === "completed";
+  // Tapping a quest's portrait completes it, with the celebration (owner, Nov 5).
+  const [completing, setCompleting] = useState(false);
+  function complete() {
+    if (completing || isCompleted) return;
+    setCompleting(true);
+    const fd = new FormData();
+    fd.set("taskId", task.id);
+    completeTaskAction(fd)
+      .then((res) => {
+        celebrateQuest({
+          taskId: task.id,
+          title: task.title,
+          description: task.description ?? null,
+          xp: task.xp_value,
+          iconSrc: task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null,
+          totalXp: res?.totalXp ?? null,
+          coinsEarned: res?.coinsEarned ?? 0,
+        });
+        router.refresh();
+      })
+      .catch(() => {})
+      .finally(() => setCompleting(false));
+  }
   const isWarned = !isCompleted && task.reschedule_count >= 3;
   const tint = !isCompleted ? rescheduleRedness(task.reschedule_count) : undefined;
 
@@ -72,6 +99,7 @@ export function CalendarTaskChip({
           portrait={portrait}
           show={show}
           onOpen={() => setEditing(true)}
+          onComplete={complete}
         />
         {editing && <EditTaskModal task={task} theme={theme} onClose={() => setEditing(false)} />}
       </>
@@ -232,7 +260,9 @@ function QuestCard({
   portrait,
   show,
   onOpen,
+  onComplete,
 }: {
+  onComplete?: () => void;
   show: CardShow;
   task: Task;
   box: { w: number; h: number };
@@ -299,7 +329,19 @@ function QuestCard({
           </svg>
         </span>
       ) : showArt ? (
-        <span className="quest-art flex shrink-0 items-center justify-center overflow-hidden" style={{ width: artPx, height: artPx, borderRadius: artPx > 30 ? 8 : 5 }}>
+        <span
+          className="quest-art flex shrink-0 items-center justify-center overflow-hidden"
+          style={{ width: artPx, height: artPx, borderRadius: artPx > 30 ? 8 : 5, cursor: onComplete ? "pointer" : undefined }}
+          title={onComplete ? "Tap the portrait to complete it" : undefined}
+          onClick={
+            onComplete
+              ? (e) => {
+                  e.stopPropagation();
+                  onComplete();
+                }
+              : undefined
+          }
+        >
           {art ? (
             // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL or a static /design/ creature
             <img

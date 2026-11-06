@@ -992,6 +992,15 @@ function GuideSheet({
   const [error, setError] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const said = useRef(false);
+  const talkInput = useRef<HTMLInputElement>(null);
+  // On a computer, typing goes straight into the talk line when the chat opens (owner, Nov 5).
+  // Not on phones: focusing there would throw the keyboard up unasked.
+  useEffect(() => {
+    if (hidden || plan || mode !== "talk") return;
+    if (!window.matchMedia?.("(pointer: fine)").matches) return;
+    const id = window.setTimeout(() => talkInput.current?.focus({ preventScroll: true }), 60);
+    return () => window.clearTimeout(id);
+  }, [hidden, plan, mode]);
 
   useEffect(() => {
     let live = true;
@@ -1303,6 +1312,7 @@ function GuideSheet({
             }}
           >
             <input
+              ref={talkInput}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Tell me what's on your mind…"

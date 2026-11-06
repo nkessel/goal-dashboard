@@ -53,7 +53,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Goal Dashboard",
+  title: { default: "Goal Dashboard", template: "%s · Goal Dashboard" },
   description: "Personal + social goal & task dashboard",
 };
 

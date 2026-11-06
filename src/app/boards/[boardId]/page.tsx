@@ -22,3 +22,6 @@ export default async function BoardDetailPage({ params }: { params: Promise<{ bo
     </AppShell>
   );
 }
+
+// The browser tab names the screen you are on (owner, Nov 5).
+export const metadata = { title: "Quest board" };

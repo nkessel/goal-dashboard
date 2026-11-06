@@ -31,3 +31,6 @@ export default async function ForumThreadPage({ params }: { params: Promise<{ th
     </AppShell>
   );
 }
+
+// The browser tab names the screen you are on (owner, Nov 5).
+export const metadata = { title: "Guild Hall" };

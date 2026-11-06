@@ -50,3 +50,6 @@ export default async function SummitPage({ searchParams }: { searchParams: Promi
     </AppShell>
   );
 }
+
+// The browser tab names the screen you are on (owner, Nov 5).
+export const metadata = { title: "Summit" };

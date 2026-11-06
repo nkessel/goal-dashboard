@@ -60,3 +60,6 @@ export default async function BoardsPage() {
     </AppShell>
   );
 }
+
+// The browser tab names the screen you are on (owner, Nov 5).
+export const metadata = { title: "All Quests" };

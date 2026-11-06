@@ -125,7 +125,10 @@ export function QuestActionMenu({
       : []),
     ...(onBoard && !isReward ? [{ key: "nextstep" as const, icon: <Glyph d="M5 12h12M13 7l5 5-5 5" />, label: "Make it the board's next step" }] : []),
     ...(!isReward ? [{ key: "earlier" as const, icon: <Glyph d="M12 7v5l3 2M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3h3" />, label: "Already completed…" }] : []),
-    { key: "delete", icon: <Glyph d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, label: isReward ? "Delete reward" : isAdventure ? "Delete quest" : "Delete task" },
+    // Archive, not delete (owner, Nov 5): it waits under Boards › Archived quests; deleting for good is in the editor's ⋯.
+    isReward
+      ? { key: "delete", icon: <Glyph d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, label: "Delete reward" }
+      : { key: "archive", icon: <Glyph d="M4 7h16v3H4zM6 10v9h12v-9M10 13.5h4" />, label: isAdventure ? "Archive quest" : "Archive task" },
   ];
 
   const items = arrangeMenu(allItems, layout);

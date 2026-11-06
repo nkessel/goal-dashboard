@@ -335,3 +335,6 @@ async function InsightsView({ ownerId, card, cardStyle, h2 }: ViewProps) {
     </section>
   );
 }
+
+// The browser tab names the screen you are on (owner, Nov 5).
+export const metadata = { title: "Party member" };

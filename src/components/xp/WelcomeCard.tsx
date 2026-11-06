@@ -97,6 +97,26 @@ export function WelcomeCard({
   const [holdEl, setHoldEl] = useState<WelcomeEl | null>(null);
   // Your verdict on the day's wise line: liked lines come back often, disliked ones never.
   const [verdict, setVerdict] = useState<"like" | "dislike" | null>(() => (line && typeof window !== "undefined" && likedLines().has(line) ? "like" : null));
+  // More wise lines with ‹ › (the day's line first; each › brings one you haven't seen this visit).
+  const [moreLines, setMoreLines] = useState<string[]>([]);
+  const [lineAt, setLineAt] = useState(0);
+  const shownLine = lineAt === 0 ? line : (moreLines[lineAt - 1] ?? line);
+  const stepLine = (d: number) => {
+    let next = lineAt + d;
+    if (next < 0) return;
+    if (next > moreLines.length) {
+      const seen = new Set([line, ...moreLines]);
+      let pick = "";
+      for (let i = 0; i < 12 && (!pick || seen.has(pick)); i++) pick = lineForDay(`more-${line}-${moreLines.length}-${i}`);
+      if (!pick || seen.has(pick)) return;
+      setMoreLines((m) => [...m, pick]);
+      next = moreLines.length + 1;
+    }
+    const to = next === 0 ? line : (moreLines[next - 1] ?? null);
+    setLineAt(next);
+    setVerdict(to && likedLines().has(to) ? "like" : null);
+    setLineWhy(null);
+  };
   // Thumbs down asks why; the speech bubble beside the thumbs takes any other note.
   const [lineWhy, setLineWhy] = useState<"down" | "note" | null>(null);
   const [lineSaid, setLineSaid] = useState<string | null>(null);
@@ -437,25 +457,33 @@ export function WelcomeCard({
     sleep: <SleepCheckIn register={(f) => (savers.current.sleep = f)} />,
     streak: award && award.streak > 0 ? (
       <p className="m-0 text-[14.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
-        {award.streak > 1 ? `🔥 ${award.streak}-day streak — keep it going` : "Day one of a new streak"}
+        {award.streak > 1 ? `🔥 ${award.streak}-day login streak — keep it going` : "Day one of a new login streak"}
       </p>
     ) : null,
     reflect: reflectQuestions(fx).length ? <ReflectLine questions={reflectQuestions(fx)} /> : null,
     habits: <WelcomeHabits fx={fx} />,
-    line: line ? (
+    line: shownLine ? (
       <div className="flex w-full flex-col items-center gap-0.5">
-        {/* Quiet thumbs right after the line's last word (no reserved columns, so it never wraps for nothing). */}
+        {/* ‹ › either side for more wise lines (owner, Nov 5); quiet thumbs right after the line's last word. */}
+        <div className="flex w-full items-center gap-1">
+        <button type="button" onClick={() => stepLine(-1)} disabled={lineAt === 0} aria-label="The wise line before" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[18px] leading-none disabled:opacity-25" style={{ color: "#8a6a2c" }}>
+          ‹
+        </button>
         <p onClick={(e) => !(e.target as HTMLElement).closest("button") && setLineTools((v) => !v)} className={`m-0 text-center text-[16px] leading-snug [text-wrap:pretty] ${verdict === "dislike" ? "line-through opacity-50" : ""}`} style={{ color: "var(--t-ink)" }}>
-          {line}
+          {shownLine}
           <span data-show={lineTools || !!lineWhy ? "true" : "false"} className="touch-tools ml-1 inline-flex items-center gap-0.5 whitespace-nowrap align-middle no-underline" style={{ textDecoration: "none" }}>
-            <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(line, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"), setLineSaid(verdict === "like" ? "Taken back" : "Saved: it'll come back more often"))} />
-            <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(line, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"), setLineWhy(verdict === "dislike" ? null : "down"), setLineSaid(verdict === "dislike" ? "It's back in the rotation" : "Got it: it won't come back"))} />
+            <LineVote kind="like" on={verdict === "like"} onClick={() => (likeLine(shownLine, verdict !== "like"), setVerdict(verdict === "like" ? null : "like"), setLineSaid(verdict === "like" ? "Taken back" : "Saved: it'll come back more often"))} />
+            <LineVote kind="dislike" on={verdict === "dislike"} onClick={() => (retireLine(shownLine, verdict !== "dislike"), setVerdict(verdict === "dislike" ? null : "dislike"), setLineWhy(verdict === "dislike" ? null : "down"), setLineSaid(verdict === "dislike" ? "It's back in the rotation" : "Got it: it won't come back"))} />
             <NoteButton on={lineWhy === "note"} onClick={() => setLineWhy((w) => (w === "note" ? null : "note"))} />
           </span>
         </p>
+        <button type="button" onClick={() => stepLine(1)} aria-label="Another wise line" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "#8a6a2c" }}>
+          ›
+        </button>
+        </div>
         {/* Every press says it landed. */}
         <Confirm text={lineSaid} onDone={() => setLineSaid(null)} />
-        {lineWhy && <WhyBox key={lineWhy} saying={line} source="Wise line" down={lineWhy === "down"} onDone={(sent) => (setLineWhy(null), sent && setLineSaid("Thanks, your feedback was sent"))} />}
+        {lineWhy && <WhyBox key={lineWhy} saying={shownLine} source="Wise line" down={lineWhy === "down"} onDone={(sent) => (setLineWhy(null), sent && setLineSaid("Thanks, your feedback was sent"))} />}
       </div>
     ) : null,
     bar: award ? (
@@ -696,9 +724,10 @@ export function WelcomeCard({
             <ArrangeList fx={fx} order={allEls} parts={parts} empty={EMPTY} focusEl={holdEl} />
           ) : (
             order.map((el) => (
-              <PartHold key={el} onHold={() => (setHoldEl(el), setArranging(true))}>
+              // No long press to arrange: only the gear opens the screen's settings (owner, Nov 5).
+              <div key={el} className="flex w-full flex-col items-center">
                 {parts[el]}
-              </PartHold>
+              </div>
             ))
           )}
           <div ref={spacerRef} aria-hidden className="w-full shrink-0" style={{ height: 0, marginTop: -12 }} />
@@ -1492,7 +1521,13 @@ function TopPriority({ question, register, arranging = false }: { last: { text: 
         void save(text, filled);
       }}
     >
-      <label htmlFor="welcome-priority" className="text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
+      <label htmlFor="welcome-priority" className="flex items-center gap-1.5 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
+        {/* A target beside the question (owner, Nov 5). */}
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+          <circle cx="12" cy="12" r="9.5" fill="#f6e3a8" stroke="#8a6116" strokeWidth="1.5" />
+          <circle cx="12" cy="12" r="6" fill="#fffaf0" stroke="#a3412a" strokeWidth="1.5" />
+          <circle cx="12" cy="12" r="2.4" fill="#a3412a" />
+        </svg>
         {question}
       </label>
       <div className="relative pb-4">
@@ -1595,41 +1630,6 @@ function CheckinPanel({ fx, metrics, onSaved, submit }: { fx: FxSettings; metric
         How are you arriving today?
       </p>
       <EnergyCheck full={fx.welcomeMetrics !== false} noSleep today={null} metrics={metrics} onSaved={onSaved} submit={submit} simple />
-    </div>
-  );
-}
-
-/**
- * A part of the welcome screen as it shows: a steady press on it (phones), away from its
- * fields, arranges the screen with this part's options open, instead of a ✎ on every part.
- * The tap that ends a long press doesn't also press the button under the finger.
- */
-function PartHold({ onHold, children }: { onHold: () => void; children: React.ReactNode }) {
-  const hold = useLongPress(() => {
-    navigator.vibrate?.(10);
-    onHold();
-  }, 550);
-  const field = (t: EventTarget) => !!(t as HTMLElement).closest?.("input, textarea, select, [contenteditable='true'], [data-no-hold]");
-  return (
-    <div
-      className="flex w-full flex-col items-center [-webkit-touch-callout:none]"
-      onPointerDown={(e) => {
-        // Touch only: a mouse has the gear (and right-click stays the browser's own here).
-        if (e.pointerType === "mouse" || field(e.target)) return;
-        hold.handlers.onPointerDown(e);
-      }}
-      onPointerMove={hold.handlers.onPointerMove}
-      onPointerUp={hold.handlers.onPointerUp}
-      onPointerLeave={hold.handlers.onPointerLeave}
-      onPointerCancel={hold.handlers.onPointerCancel}
-      onClickCapture={(e) => {
-        if (hold.wasLong()) {
-          e.stopPropagation();
-          e.preventDefault();
-        }
-      }}
-    >
-      {children}
     </div>
   );
 }

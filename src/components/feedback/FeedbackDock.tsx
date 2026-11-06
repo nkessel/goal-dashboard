@@ -370,7 +370,9 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       /* storage unavailable */
     }
   }, [open, loaded]);
-  const waiting = drafts.filter((d) => d.id !== openId && !d.deleted && hasContent(d));
+  // The note being sent isn't "waiting": it showed as a red "1" on the button for a moment after Submit (owner, Nov 5).
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const waiting = drafts.filter((d) => d.id !== openId && d.id !== sendingId && !d.deleted && hasContent(d));
   // The screen height when this note opened: Safari's bars coming and going while you scroll mustn't resize the box.
   const [baseH, setBaseH] = useState<{ id: string; h: number } | null>(null);
   if (open && vp && baseH?.id !== open.id) setBaseH({ id: open.id, h: vp.innerH });
@@ -440,6 +442,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     const xp = xpOf(d);
     setCelebrate({ key: Date.now(), kind: d.kind, xp, x: shown.x + shown.w / 2, y: shown.y + Math.min(shown.h, 260) / 2, style: loadFx().feedbackStyle ?? "seal" });
     setOpenId(null);
+    setSendingId(d.id);
     startSaving(async () => {
       try {
         // Let the "submitted" card draw in smoothly first: packing up the note and its
@@ -459,6 +462,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       } catch (e) {
         // It didn't go: bring the note back, just as it was.
         setCelebrate(null);
+        setSendingId(null);
         setDrafts((ds) => ds.map((x) => (x.id === d.id ? { ...d, deleted: false, updatedAt: Date.now() } : x)));
         setOpenId(d.id);
         setError(e instanceof Error ? e.message : "Couldn't send it. Check your connection and try again.");
@@ -819,7 +823,8 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
     const hold = typeof window === "undefined" ? 2.2 : (loadFx().feedbackHold ?? 2.2);
     return (
       <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[97] flex items-center justify-center p-6" style={{ ["--fb-pace" as string]: String(paceNow()), ["--fb-hold" as string]: `${hold || 2.2}s` }}>
-        <div className={`${hold === 0 ? "fb-done fb-done-stay" : "fb-done"} relative flex w-[min(300px,100%)] flex-col items-center gap-2 rounded-3xl px-6 pb-5 pt-6 text-center`} style={isAdventure ? { background: "linear-gradient(180deg,#f6ecd2,#ead7aa)", border: "2px solid #a88a3f", color: "#2a1c10", boxShadow: "0 18px 40px rgba(0,0,0,.45)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: "var(--t-ink)", boxShadow: "0 18px 40px rgba(0,0,0,.25)" }}>
+        {/* A tap on the card closes it at once (owner, Nov 5). */}
+        <div onClick={onClose} className={`${hold === 0 ? "fb-done fb-done-stay" : "fb-done"} pointer-events-auto cursor-pointer relative flex w-[min(300px,100%)] flex-col items-center gap-2 rounded-3xl px-6 pb-5 pt-6 text-center`} style={isAdventure ? { background: "linear-gradient(180deg,#f6ecd2,#ead7aa)", border: "2px solid #a88a3f", color: "#2a1c10", boxShadow: "0 18px 40px rgba(0,0,0,.45)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: "var(--t-ink)", boxShadow: "0 18px 40px rgba(0,0,0,.25)" }}>
           {closeBtn(false)}
           <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden>
             <circle className="fb-done-ring" cx="38" cy="38" r="33" fill="none" stroke={isAdventure ? "#3f6a2c" : "var(--t-accent)"} strokeWidth="5" strokeLinecap="round" />

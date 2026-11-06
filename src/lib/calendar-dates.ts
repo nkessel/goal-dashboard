@@ -4,8 +4,10 @@
 // local server time and the user's wall-clock time are the same, and we
 // don't need any timezone conversion.
 
-export const HOUR_START = 7; // 7 AM
-export const HOUR_END = 22; // 10 PM (last displayed hour row, to 11 PM: room for "before bed")
+// The whole day (owner, Nov 5: "can't see before 7am", "cannot see past 10pm"); the calendar opens scrolled to DAY_FROM.
+export const HOUR_START = 0; // midnight
+export const HOUR_END = 23; // 11 PM (last displayed hour row, to midnight)
+export const DAY_FROM = 7; // where the calendar opens
 
 export const WEEKDAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
