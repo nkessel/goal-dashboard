@@ -526,6 +526,9 @@ export const FLOWS = [
       if (await h.tap((p) => p.getByRole("button", { name: /^feedback \(f\)$/i }).first(), "open feedback", { optional: true, expectMove: true })) {
         await h.settle(600);
         await h.check("feedback box");
+        // With the keyboard up the page under it is painted dark (owner, Nov 6: a parchment band showed
+        // through iPhone's see-through keyboard); the phone shot shows the dark ground below the box.
+        await h.typeIn((p) => p.locator("[data-feedback-root] textarea").first(), "feedback writing");
         await h.tap((p) => p.getByRole("button", { name: /add a picture of this screen/i }).first(), "screen picture", { optional: true });
         await h.page.keyboard.type("Typing right after the picture").catch(() => {});
         await h.settle(1500);

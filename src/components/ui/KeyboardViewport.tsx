@@ -26,6 +26,13 @@ import { useEffect } from "react";
  *   html[data-typing]  a text field has focus on a touch screen (bottom bar,
  *                      + button and feedback button step aside)
  * Inside [data-kb-self] the popup makes its own room; fields are only scrolled.
+ *
+ * Under the keyboard: iPhone's keyboard (and Chrome's bar above it) is see-through, so whatever
+ * the page has under it (a parchment quest card, the bottom bar) tinted the keyboard and showed
+ * as a band behind Chrome's key/card/pin bar (owner's recording, Nov 6). While typing, a dark
+ * layer fills everything below the visible strip ([data-kb-cover], html[data-kb-cover], --kb-top),
+ * so the keyboard always sits on the same dark ground. It's placed from the raw viewport on every
+ * event (never the settled one), and on focus before the keyboard reports, from where it last ended.
  */
 export function KeyboardViewport() {
   useEffect(() => {
@@ -34,6 +41,29 @@ export function KeyboardViewport() {
     const touch = window.matchMedia("(pointer: coarse)").matches;
 
     const kbUp = () => !!vv && vv.scale < 1.1 && window.innerHeight - vv.height * vv.scale > 120;
+
+    // ── The dark ground under the keyboard ──────────────────────────────────
+    let lastKbH = 0; // the visible height the last time the keyboard was up
+    const coverAt = (top: number) => {
+      root.style.setProperty("--kb-top", `${Math.round(top)}px`);
+      root.setAttribute("data-kb-cover", "");
+    };
+    const uncover = () => root.removeAttribute("data-kb-cover");
+    let seenUp = false; // the keyboard has reported its size since the cover went down
+    let guess: number | undefined;
+    const placeCover = () => {
+      if (!vv || !touch) return;
+      if (kbUp()) {
+        seenUp = true;
+        window.clearTimeout(guess);
+        lastKbH = vv.height;
+        if (isTextField(document.activeElement)) coverAt(vv.offsetTop + vv.height);
+      } else if (seenUp) {
+        // The keyboard went down (or the page was pinch-zoomed): nothing to fill.
+        seenUp = false;
+        uncover();
+      }
+    };
 
     // Applied once the keyboard has settled, not on every frame of its slide
     // (and small scroll nudges while it's up don't move anything).
@@ -61,6 +91,7 @@ export function KeyboardViewport() {
       }
     };
     const update = () => {
+      placeCover();
       window.clearTimeout(quiet);
       quiet = window.setTimeout(apply, 120);
     };
@@ -249,6 +280,19 @@ export function KeyboardViewport() {
       if (touch) {
         if (!kbUp()) holdLayers();
         root.setAttribute("data-typing", "");
+        // The keyboard is on its way: lay the ground where it ended last time (it's corrected
+        // as soon as the keyboard reports its size).
+        if (vv && vv.scale < 1.1) {
+          if (kbUp()) coverAt(vv.offsetTop + vv.height);
+          else if (lastKbH) {
+            coverAt(vv.offsetTop + lastKbH);
+            // No keyboard after all (a hardware one): take the guess away.
+            window.clearTimeout(guess);
+            guess = window.setTimeout(() => {
+              if (!kbUp()) uncover();
+            }, 900);
+          }
+        }
         // Moving between fields with the keyboard's arrows: same steadying as a tap.
         if (steadied(el)) focusSteady(el);
       }
@@ -260,6 +304,7 @@ export function KeyboardViewport() {
       window.setTimeout(() => {
         if (!isTextField(document.activeElement)) {
           root.removeAttribute("data-typing");
+          uncover();
           if (!kbUp()) releaseLayers();
         }
         // No keyboard ever came up (or it's already down): let go of the page now.
@@ -279,6 +324,7 @@ export function KeyboardViewport() {
     }
     return () => {
       window.clearTimeout(quiet);
+      window.clearTimeout(guess);
       vv?.removeEventListener("resize", update);
       vv?.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
@@ -293,7 +339,8 @@ export function KeyboardViewport() {
       unpin();
       root.removeAttribute("data-kb");
       root.removeAttribute("data-typing");
+      uncover();
     };
   }, []);
-  return null;
+  return <div data-kb-cover aria-hidden />;
 }
