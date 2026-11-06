@@ -14,6 +14,7 @@ import {
   coachClearAction,
   coachForgetAction,
   coachNewQuestAction,
+  coachSetDueAction,
   coachCheckInAction,
   coachUndoCheckInAction,
   coachLogNightAction,
@@ -1021,7 +1022,9 @@ function GuideSheet({
     if (!lite) coachStateAction()
       .then((c) => {
         if (!live) return;
-        setMsgs(c.history.slice(-12).map((m) => ({ role: m.role, content: m.content })));
+        // Keep what was said since opening (a reply typed in his note is asked at once, and this
+        // used to land after it and wipe it from the chat; owner, Nov 6).
+        setMsgs((cur) => [...c.history.slice(-12).map((m) => ({ role: m.role, content: m.content })), ...cur]);
         setNotes(c.notes);
         setPromises(c.promises);
         setDue(c.due);
@@ -1277,7 +1280,7 @@ function GuideSheet({
               {msgs.map((m, i) => (
                 <div key={i} className={`flex flex-col gap-1.5 ${m.role === "user" ? "items-end" : "items-start"}`}>
                   <p className="m-0 max-w-[88%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-[14.5px] leading-snug" style={m.role === "user" ? { background: "rgba(242,210,126,.92)", color: "#2a1c10" } : { background: "rgba(140,240,220,.1)", border: "1px solid rgba(140,240,220,.25)" }}>
-                    {m.role === "assistant" ? <Digest text={m.content} /> : m.content}
+                    {m.role === "assistant" ? <Digest text={m.content} /> : <UserWords text={m.content} />}
                   </p>
                   {m.remembered?.map((n) => (
                     <span key={n.id} className="text-[12px] italic" style={{ color: "rgba(140,240,220,.8)" }}>
@@ -1287,7 +1290,7 @@ function GuideSheet({
                       </button>
                     </span>
                   ))}
-                  {m.actions?.map((a, k) => <ActionCard key={k} action={a} onPlan={setPlan} onPromise={(p) => setPromises((ps) => [...ps, p])} />)}
+                  {m.actions?.map((a, k) => <ActionCard key={k} action={a} onPlan={setPlan} onPromise={(p) => setPromises((ps) => [...ps, p])} onAsk={(w) => void ask(w)} />)}
                 </div>
               ))}
               {thinking && (
@@ -1342,14 +1345,28 @@ function GuideSheet({
   );
 }
 
-/** One thing the toucan offers to do: nothing happens until you tap it. */
-function ActionCard({ action: a, onPlan, onPromise }: { action: CoachAction & { auto?: boolean }; onPlan: (p: PlanTarget) => void; onPromise: (p: CoachPromise) => void }) {
-  if (a.type === "newquest" || a.type === "event" || a.type === "checkin" || a.type === "wheel") return <MadeCard action={a} />;
-  if (a.type === "ship") return <ShipCard action={a} />;
-  return <OfferCard action={a} onPlan={onPlan} onPromise={onPromise} />;
+/** Your words in the chat. An answer typed in his note carries what he said: shown small above yours. */
+function UserWords({ text }: { text: string }) {
+  const m = text.match(/^You said: “([\s\S]*)”\nMe: ([\s\S]*)$/);
+  if (!m) return <>{text}</>;
+  return (
+    <>
+      <span className="mb-0.5 block text-[12px] italic leading-snug" style={{ opacity: 0.7 }}>
+        ↩ “{m[1].length > 90 ? `${m[1].slice(0, 89)}…` : m[1]}”
+      </span>
+      {m[2]}
+    </>
+  );
 }
 
-type Made = Extract<CoachAction, { type: "newquest" | "event" | "checkin" | "wheel" }>;
+/** One thing the toucan offers to do: nothing happens until you tap it. */
+function ActionCard({ action: a, onPlan, onPromise, onAsk }: { action: CoachAction & { auto?: boolean }; onPlan: (p: PlanTarget) => void; onPromise: (p: CoachPromise) => void; onAsk?: (words: string) => void }) {
+  if (a.type === "newquest" || a.type === "due" || a.type === "event" || a.type === "checkin" || a.type === "wheel") return <MadeCard action={a} />;
+  if (a.type === "ship") return <ShipCard action={a} />;
+  return <OfferCard action={a} onPlan={onPlan} onPromise={onPromise} onAsk={onAsk} />;
+}
+
+type Made = Extract<CoachAction, { type: "newquest" | "due" | "event" | "checkin" | "wheel" }>;
 /** Local wall time from the toucan ("2026-10-30" = end of that day) as an ISO stamp. */
 const stampISO = (v: string) => new Date(v.length === 10 ? `${v}T23:59` : v).toISOString();
 const clock12 = (t: string) => {
@@ -1374,7 +1391,9 @@ function MadeCard({ action: a }: { action: Made & { auto?: boolean } }) {
   const label =
     a.type === "newquest"
       ? { icon: "⚔️", kind: "Quest", what: `“${short(a.title)}”${a.due ? ` · due ${when(a.due)}` : ""}${a.minutes ? ` · ${a.minutes} min` : ""}` }
-      : a.type === "event"
+      : a.type === "due"
+        ? { icon: "📅", kind: "Due date", what: `“${short(a.quest)}” · ${a.due ? `due ${when(a.due)}` : "no due date"}` }
+        : a.type === "event"
         ? { icon: "🏷", kind: "Event", what: `“${short(a.text, 60)}”${a.at ? ` · ${when(a.at)}` : ""}` }
         : a.type === "checkin"
           ? { icon: "💠", kind: "Check-in", what: [...(a.energy !== null ? [`Energy ${a.energy}`] : []), ...a.metrics.map((m) => `${m.metric} ${m.level}`)].join(" · ") }
@@ -1389,6 +1408,9 @@ function MadeCard({ action: a }: { action: Made & { auto?: boolean } }) {
       if (a.type === "newquest") {
         const id = await coachNewQuestAction(a.title, a.minutes, a.due ? stampISO(a.due) : null);
         undo.current = () => deleteTaskAction(id);
+      } else if (a.type === "due") {
+        const r = await coachSetDueAction(a.questId, a.due ? stampISO(a.due) : null);
+        undo.current = () => coachSetDueAction(a.questId, r.was);
       } else if (a.type === "event") {
         // "11am" said just after midnight means the 11am that has passed, not later today
         // (Nov 5: it was refused as in the future and showed a bare React error code).
@@ -1432,7 +1454,7 @@ function MadeCard({ action: a }: { action: Made & { auto?: boolean } }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the reply arrives
   }, []);
-  const verb = a.type === "newquest" ? "Add" : "Log";
+  const verb = a.type === "newquest" ? "Add" : a.type === "due" ? "Change" : "Log";
   return (
     <div className="flex w-[88%] flex-col gap-1.5 rounded-2xl p-3" style={{ background: "rgba(140,240,220,.07)", border: "1px solid rgba(140,240,220,.3)" }}>
       <span className="text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: "rgba(140,240,220,.85)" }}>
@@ -1443,7 +1465,7 @@ function MadeCard({ action: a }: { action: Made & { auto?: boolean } }) {
       </span>
       {state === "done" ? (
         <span className="flex items-center gap-2 text-[12.5px]" style={{ color: "#bff7ea" }}>
-          {a.type === "newquest" ? "Added ✓" : "Logged ✓"}
+          {a.type === "newquest" ? "Added ✓" : a.type === "due" ? "Changed ✓" : "Logged ✓"}
           <button type="button" className="underline" onClick={() => void takeBack()}>
             Undo
           </button>
@@ -1461,7 +1483,7 @@ function MadeCard({ action: a }: { action: Made & { auto?: boolean } }) {
         </span>
       ) : (
         <Pill strong onClick={() => void make()}>
-          {state === "busy" ? (a.type === "newquest" ? "Adding…" : "Logging…") : a.type === "newquest" ? "＋ Add this quest" : "Log this"}
+          {state === "busy" ? (a.type === "newquest" ? "Adding…" : a.type === "due" ? "Changing…" : "Logging…") : a.type === "newquest" ? "＋ Add this quest" : a.type === "due" ? "Change the due date" : "Log this"}
         </Pill>
       )}
     </div>
@@ -1533,7 +1555,96 @@ function ShipCard({ action: a }: { action: Extract<CoachAction, { type: "ship" }
   );
 }
 
-function OfferCard({ action: a, onPlan, onPromise }: { action: CoachAction; onPlan: (p: PlanTarget) => void; onPromise: (p: CoachPromise) => void }) {
+/**
+ * A promise he offers. Not take-it-or-leave-it (owner, Nov 6: "I should be able to make a
+ * counter-request"): "Counter…" opens his words in place to rewrite, then promise your
+ * version or send it back to him as your answer.
+ */
+function PromiseOffer({ action: a, box, onPromise, onAsk }: { action: Extract<CoachAction, { type: "promise" }>; box: { background: string; border: string }; onPromise: (p: CoachPromise) => void; onAsk?: (words: string) => void }) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "busy" | "done" | "error" | "countered">("idle");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [counter, setCounter] = useState<string | null>(null);
+  async function make(text: string) {
+    setState("busy");
+    try {
+      const list = await coachPromiseAction({ add: { text, when: a.when ? new Date(a.when).toISOString() : null, next: a.next, questId: a.questId } });
+      const added = list[list.length - 1];
+      if (added) onPromise(added);
+      window.dispatchEvent(new Event("toucan-promises"));
+      setState("done");
+      setMsg(a.when ? "Saved. I'll remind you when it's time ✓" : a.next ? `Saved. I'll remind you next time you see ${a.next} ✓` : "Saved. I'll keep it in mind ✓");
+      router.refresh();
+    } catch (e) {
+      setState("error");
+      setMsg(e instanceof Error ? e.message : "That didn't work.");
+    }
+  }
+  const words = counter?.trim() ?? "";
+  return (
+    <div className="flex w-[88%] flex-col gap-1.5 rounded-2xl p-3" style={{ ...box, border: "1px solid rgba(242,210,126,.45)" }}>
+      {counter === null ? (
+        <span className="text-[14px] leading-snug">
+          “{a.text}”
+          <span style={{ color: "rgba(232,255,248,.6)" }}> · {a.when ? when(a.when) : a.next ? `next time: ${a.next}` : "I'll bring it up when you open the app"}</span>
+        </span>
+      ) : (
+        <textarea
+          value={counter}
+          autoFocus
+          rows={2}
+          onChange={(e) => setCounter(e.target.value.slice(0, 400))}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setCounter(null);
+            }
+          }}
+          aria-label="Your counter-request"
+          className="bare-input w-full resize-none bg-transparent text-[16px] leading-snug sm:text-[14px]"
+          style={{ color: "#e8fff8", borderBottom: "1px solid rgba(242,210,126,.55)" }}
+        />
+      )}
+      {state === "done" || state === "error" || state === "countered" ? (
+        <span className="text-[12.5px]" style={{ color: state === "error" ? "#ffb4a8" : "#bff7ea" }}>
+          {msg}
+        </span>
+      ) : counter === null ? (
+        <span className="flex flex-wrap items-center gap-2">
+          <Pill strong onClick={() => void make(a.text)}>
+            {state === "busy" ? "Saving…" : /^when\b/i.test(a.text) ? "Make this promise" : "🔔 Remind me"}
+          </Pill>
+          <button type="button" className="text-[12.5px] underline" style={{ color: "rgba(232,255,248,.75)" }} onClick={() => setCounter(a.text)}>
+            Counter…
+          </button>
+        </span>
+      ) : (
+        <span className="flex flex-wrap items-center gap-2">
+          <Pill strong onClick={() => words && void make(words)}>
+            {state === "busy" ? "Saving…" : "Promise this instead"}
+          </Pill>
+          {onAsk && (
+            <Pill
+              onClick={() => {
+                if (!words) return;
+                setState("countered");
+                setMsg("Sent to him ✓");
+                onAsk(`Instead of “${a.text}”: ${words}`);
+              }}
+            >
+              Tell him
+            </Pill>
+          )}
+          <button type="button" className="text-[12.5px] underline" style={{ color: "rgba(232,255,248,.65)" }} onClick={() => setCounter(null)}>
+            Back
+          </button>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function OfferCard({ action: a, onPlan, onPromise, onAsk }: { action: CoachAction; onPlan: (p: PlanTarget) => void; onPromise: (p: CoachPromise) => void; onAsk?: (words: string) => void }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
   const [msg, setMsg] = useState<string | null>(null);
@@ -1593,32 +1704,7 @@ function OfferCard({ action: a, onPlan, onPromise }: { action: CoachAction; onPl
         )}
       </div>
     );
-  if (a.type === "promise")
-    return (
-      <div className="flex w-[88%] flex-col gap-1.5 rounded-2xl p-3" style={{ ...box, border: "1px solid rgba(242,210,126,.45)" }}>
-        <span className="text-[14px] leading-snug">
-          “{a.text}”
-          <span style={{ color: "rgba(232,255,248,.6)" }}> · {a.when ? when(a.when) : a.next ? `next time: ${a.next}` : "I'll bring it up when you open the app"}</span>
-        </span>
-        {state === "idle" || state === "busy" ? (
-          <Pill
-            strong
-            onClick={() =>
-              void run(async () => {
-                const list = await coachPromiseAction({ add: { text: a.text, when: a.when ? new Date(a.when).toISOString() : null, next: a.next, questId: a.questId } });
-                const added = list[list.length - 1];
-                if (added) onPromise(added);
-                window.dispatchEvent(new Event("toucan-promises"));
-              }, a.when ? "Saved. I'll remind you when it's time ✓" : a.next ? `Saved. I'll remind you next time you see ${a.next} ✓` : "Saved. I'll keep it in mind ✓")
-            }
-          >
-            {/^when\b/i.test(a.text) ? "Make this promise" : "🔔 Remind me"}
-          </Pill>
-        ) : (
-          doneLine
-        )}
-      </div>
-    );
+  if (a.type === "promise") return <PromiseOffer action={a} box={box} onPromise={onPromise} onAsk={onAsk} />;
   if (a.type === "journal")
     return state === "done" || state === "error" ? (
       doneLine

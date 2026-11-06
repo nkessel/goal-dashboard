@@ -17,6 +17,7 @@ export type CoachAction =
   | { type: "start"; questId: string; quest: string; minutes: number }
   | { type: "promise"; text: string; when: string | null; next: string | null; questId: string | null }
   | { type: "newquest"; title: string; minutes: number | null; due: string | null }
+  | { type: "due"; questId: string; quest: string; due: string | null }
   | { type: "event"; text: string; at: string | null }
   | { type: "checkin"; energy: number | null; metrics: { metric: string; level: number }[] }
   | { type: "wheel"; day: string | null; bed: string | null; wake: string | null; effort: string[]; hindrances: string[] }
@@ -25,11 +26,11 @@ export type CoachAction =
   | { type: "ship"; pending: number };
 
 /** Entries the toucan can make itself when asked: these carry `auto` when the message asked for them. */
-export const MAKES = ["newquest", "event", "checkin", "wheel"] as const;
+export const MAKES = ["newquest", "due", "event", "checkin", "wheel"] as const;
 
 /** Does the message ask the toucan to make or log something (vs. just talking)? */
 export function asksToMake(message: string) {
-  return /\b(add|log|create|make|put|record|track|note|enter|save|set|schedule|mark|new|remind)\b|\b(slept|went to bed|woke|bedtime|check me in|check[- ]in)\b/i.test(message);
+  return /\b(add|log|create|make|put|record|track|note|enter|save|set|schedule|reschedule|mark|new|remind|change|move|push|postpone|due)\b|\b(slept|went to bed|woke|bedtime|check me in|check[- ]in)\b/i.test(message);
 }
 
 /** Does the message ask to build the app feedback ("implement my feedback", "ship the feedback")? Only the app's owner can. */
@@ -103,6 +104,10 @@ export function parseReply(raw: string, quests: { id: string; title: string }[],
       const due = s(o.due, 30);
       if (title && !quests.some((q) => q.title.trim().toLowerCase() === title.toLowerCase()))
         out.push({ type, title, minutes: Number(o.minutes) > 0 ? Math.min(480, Math.round(Number(o.minutes))) : null, due: localStamp(due) });
+    } else if (type === "due") {
+      const q = matchQuest(s(o.quest), quests);
+      const due = s(o.due, 30);
+      if (q) out.push({ type, questId: q.id, quest: q.title, due: localStamp(due) });
     } else if (type === "event") {
       const text = s(o.text, 200);
       if (text) out.push({ type, text, at: localStamp(s(o.at, 30)) });
@@ -128,7 +133,10 @@ export function parseReply(raw: string, quests: { id: string; title: string }[],
       if (note) out.push({ type, note });
     }
   }
-  return { text, actions: out.slice(0, 5) };
+  // A due date moved is the answer in itself: no "When Monday, I will…" promise for that quest too (owner, Nov 6).
+  const moved = new Set(out.flatMap((a) => (a.type === "due" ? [a.questId] : [])));
+  const kept = moved.size ? out.filter((a) => !(a.type === "promise" && (!a.questId || moved.has(a.questId)))) : out;
+  return { text, actions: kept.slice(0, 5) };
 }
 
 /** "2026-10-30" or "2026-10-30T15:00" as given (local wall time), else null. */
@@ -224,12 +232,13 @@ export function coachSystemPrompt(o: {
 {"type":"start","quest":"<exact title>","minutes":10}  (begin together now)
 {"type":"promise","text":"When …, I will …","when":"YYYY-MM-DDTHH:MM","next":"","quest":"<exact title or empty>"}  (also for every "remind me…" / "don't let me forget…", one promise per thing. "when": if they gave a time. "next": for "next time I see/visit/am at X", the one word for X as it would appear on their calendar, e.g. "Dad" or "Tiffany". Neither? Leave both empty: it's kept in mind and brought up when they open the app. The card is the confirmation, so don't ask "shall I?")
 {"type":"newquest","title":"…","minutes":20,"due":"YYYY-MM-DD or YYYY-MM-DDTHH:MM or empty"}  (a new quest they named that isn't in the list)
+{"type":"due","quest":"<exact title>","due":"YYYY-MM-DD or YYYY-MM-DDTHH:MM or empty to clear it"}  (change an existing quest's due date when they ask to move, push back or change it, e.g. "make it due Monday". This is the whole answer: don't also offer a promise for it)
 {"type":"event","text":"… #tag","at":"YYYY-MM-DDTHH:MM or empty for now"}  (log an event or #tag in their check-in log: something that happened, e.g. "Headache #sleep". Never in the future)
 {"type":"checkin","energy":7,"metrics":{"<metric>":6}}  (log a check-in, each 1–10; energy may be null. Metrics they track: ${o.metrics?.length ? o.metrics.join(", ") : "none besides energy"})
 {"type":"wheel","day":"","bed":"23:40","wake":"07:10","effort":["<exact Right Effort>"],"hindrances":["<exact Hindrance>"]}  (log a night on their Wheel of Time: last night's bedtime and this morning's wake time, and which Right Effort and Hindrances were part of the day before. "day": empty for last night, or the YYYY-MM-DD morning it's for. Leave out what they didn't say. Right Effort: ${o.effort?.join("; ") || "none"}. Hindrances: ${o.hindrances?.join("; ") || "none"})
 {"type":"journal","text":"…"}  (save a reflection they wrote, in their words)
 {"type":"remember","note":"…"}  (a lasting fact about them: values, what helps, what's hard. Never for reminders, errands or to-dos)
-When they tell you to add, log or create a quest, event, check-in or night, do it with that action (one per entry) and say in a few words what you made; the app makes it for them and offers an undo, so don't ask "shall I?". Today is ${o.todayKey ?? "today"}: work out dates like "Friday" from that.
+When they tell you to add, log or create a quest, event, check-in or night, or to change a quest's due date, do it with that action (one per entry) and say in a few words what you made; the app makes it for them and offers an undo, so don't ask "shall I?". Today is ${o.todayKey ?? "today"}: work out dates like "Friday" from that.
 Offer actions only when they fit; often none. Omit the ACTIONS line when there are none.`,
     ...(o.style?.length ? [block("How they like to be checked in (they told you this; follow it closely)", o.style)] : []),
     ...(o.priorities?.length ? [block("Their top priority, in their words (they name it on the welcome screen; newest first). It's what really matters to them: let it lead what you suggest, and in your check-ins through the day, the week and the month, come back to it: how it's going, what would move it forward, whether it's still the one. When planning, put quests that serve it first. The “other priorities” are important but not urgent: they matter just as much in the long run, but support for them must be gentle and well timed. Bring one up only when they seem to have space (little overdue, a light calendar, decent energy, or they say they're free), never when they're overloaded; then one small, inviting step is enough. Help them make that space too: notice when the urgent things are handled, and when there's room, say so. You are learning together how to keep both kinds on track: now and then ask what helps, and remember what works (a “remember” action)", o.priorities)] : []),

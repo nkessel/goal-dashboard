@@ -3745,6 +3745,19 @@ export async function coachNewQuestAction(title: string, minutes: number | null,
   return task.id;
 }
 
+/** The toucan moves a quest's due date when asked ("make it due Monday"); returns the old one for Undo. */
+export async function coachSetDueAction(taskId: string, dueISO: string | null) {
+  const ownerId = await requireProfileId();
+  const due = dueISO && Number.isFinite(Date.parse(dueISO)) ? new Date(dueISO).toISOString() : null;
+  const db = supabaseAdmin();
+  const { data: was, error: readErr } = await db.from("tasks").select("due_at").eq("id", taskId).eq("owner_id", ownerId).maybeSingle();
+  if (readErr || !was) throw new Error("Couldn't find that quest.");
+  const { error } = await db.from("tasks").update({ due_at: due }).eq("id", taskId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't change the due date: ${error.message}`);
+  revalidatePath("/");
+  return { was: (was as { due_at: string | null }).due_at };
+}
+
 /** Start building the owner's app feedback (the toucan's "ship" card). Only the app's owner can. */
 export async function coachShipFeedbackAction() {
   const ownerId = await requireProfileId();
