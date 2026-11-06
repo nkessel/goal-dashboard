@@ -126,6 +126,38 @@ export function useToucanMode(): GuideMode {
 
 /** Opens the toucan's guide sheet (optionally straight to planning one quest, or to the coursework catch-up). */
 /** Runs it now, or once the welcome screen (which has its own toucan) has closed: one toucan at a time. */
+/**
+ * Waits until you're free: no popup open, not typing, and nothing touched for a little while
+ * (owner, Nov 6: "be more responsive to my inquiries rather than bothering me when I'm trying to do something else").
+ */
+let lastActive = 0;
+let watchingActivity = false;
+function busyNow() {
+  if (typeof document === "undefined") return true;
+  const root = document.documentElement;
+  if (root.hasAttribute("data-welcome-open") || root.hasAttribute("data-fog")) return true;
+  if (document.querySelector('[role="dialog"]:not([hidden]), [aria-modal="true"]:not([hidden])')) return true;
+  const el = document.activeElement as HTMLElement | null;
+  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return true;
+  return Date.now() - lastActive < 20_000;
+}
+function whenFree(fn: () => void) {
+  if (!watchingActivity && typeof window !== "undefined") {
+    watchingActivity = true;
+    const mark = () => {
+      lastActive = Date.now();
+    };
+    for (const ev of ["pointerdown", "keydown", "wheel", "touchmove", "input"]) window.addEventListener(ev, mark, { passive: true, capture: true });
+    lastActive = Date.now();
+  }
+  if (!busyNow()) return fn();
+  const t = setInterval(() => {
+    if (busyNow()) return;
+    clearInterval(t);
+    fn();
+  }, 4000);
+}
+
 function whenNoWelcome(fn: () => void) {
   const open = () => document.documentElement.hasAttribute("data-welcome-open");
   if (!open()) return fn();
@@ -143,6 +175,22 @@ function whenNoWelcome(fn: () => void) {
  * (his notes can't show before then anyway), so the first screen opens first.
  */
 const watchCache = new Map<string, { at: number; p: Promise<Awaited<ReturnType<typeof toucanWatchAction>> | null> }>();
+// A quest changed (done, a new due date from the chat…): what he knew is stale.
+if (typeof window !== "undefined") {
+  window.addEventListener("toucan-refresh", () => watchCache.clear());
+  window.addEventListener("toucan-tasks-changed", () => watchCache.clear());
+}
+/** Is this quest still open and due later today? Asked fresh, just before he says so (his note once said "due today" about a quest moved to Monday). */
+async function stillDueToday(id: string) {
+  const w = await toucanWatchAction({ guesses: false }).catch(() => null);
+  const t = (w?.tasks as GuideTask[] | undefined)?.find((x) => x.id === id);
+  return !!(t?.due_at && afternoonCheckAt(t.due_at));
+}
+/** Is this quest still open? */
+async function stillOpen(id: string) {
+  const w = await toucanWatchAction({ guesses: false }).catch(() => null);
+  return !!(w?.tasks as GuideTask[] | undefined)?.some((x) => x.id === id);
+}
 function sharedWatch(opts: { guesses?: boolean } = {}) {
   const key = opts.guesses === false ? "plain" : "guesses";
   const hit = watchCache.get(key);
@@ -219,7 +267,17 @@ export function ToucanGuide() {
    * (the snooze choices): it shows at once, no flight and no waiting for the perched bird.
    * `onClose`: closing it (× or Esc) goes back there instead of dropping the choice.
    */
-  const raise = (text: string, actions: NoteAction[], note = true, opts: { instant?: boolean; onClose?: () => void } = {}) => {
+  const raise = (text: string, actions: NoteAction[], note = true, opts: { instant?: boolean; onClose?: () => void; quiet?: boolean; urgent?: boolean } = {}) => {
+    // Not urgent: he keeps it until you tap him (a glow on him), never flies in. If he isn't on the page, it waits for another day.
+    if (opts.quiet) {
+      window.dispatchEvent(new CustomEvent("toucan-waiting", { cancelable: true, detail: { text, actions } }));
+      return true;
+    }
+    // Urgent: still only once you're free (no popup, not typing, a pause in what you're doing).
+    if (opts.urgent) {
+      whenFree(() => raiseRef.current(text, actions, note, { ...opts, urgent: false }));
+      return note;
+    }
     const send = () => !window.dispatchEvent(new CustomEvent("toucan-nudge", { cancelable: true, detail: { text, actions, onClose: opts.onClose } }));
     // One toucan at a time: while the welcome screen (with its own toucan) is open, wait for it to close.
     const welcomeOpen = () => document.documentElement.hasAttribute("data-welcome-open");
@@ -312,7 +370,13 @@ export function ToucanGuide() {
       const ready = all.find((n) => n.until <= Date.now());
       if (!ready) return;
       writeSnoozed(all.filter((n) => n !== ready));
-      raiseRef.current(ready.text, actionsRef.current(ready));
+      // You asked for it back; it comes once you're free, and only if it's still true (a "due today" note
+      // about a quest since moved to Monday stays quiet).
+      const quest = ready.begin ?? ready.taskId;
+      void (async () => {
+        if (quest && !(ready.begin ? await stillDueToday(quest) : await stillOpen(quest))) return;
+        raiseRef.current(ready.text, actionsRef.current(ready), true, { urgent: true });
+      })();
     };
     const first = setTimeout(check, 2500);
     const t = setInterval(check, 60_000);
@@ -361,7 +425,9 @@ export function ToucanGuide() {
       };
       const done = (p: CoachPromise) => ({ label: "Done ✓", run: () => void coachPromiseAction({ settle: { id: p.id, status: "kept" } }).then(() => window.dispatchEvent(new Event("toucan-promises"))).catch(() => {}) });
       const later = (p: CoachPromise, text: string) => snoozeFor({ text, until: 0, promiseId: p.id });
-      const say = (text: string, actions: NoteAction[]) => raiseRef.current(polish(st, text), actions);
+      // His check-ins wait on him quietly until you tap him (owner, Nov 6); answers to your taps come at once.
+      const say = (text: string, actions: NoteAction[]) => raiseRef.current(polish(st, text), actions, true, { quiet: true });
+      const reply = (text: string, actions: NoteAction[]) => raiseRef.current(polish(st, text), actions, true, { instant: true });
       // "Next time" reminders whose calendar event is near.
       const near = (watch.nextNear as { promise: CoachPromise; event: { title: string; start: string } }[]).find((n) => !shown(n.promise.id));
       if (near) {
@@ -369,7 +435,8 @@ export function ToucanGuide() {
         const start = Date.parse(near.event.start);
         const whenText = start <= Date.now() ? "now" : `at ${new Date(start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${new Date(start).toDateString() === new Date().toDateString() ? "" : " tomorrow"}`;
         const text = `“${near.event.title}” is ${whenText}. Remember: ${near.promise.text}`;
-        say(text, [done(near.promise), later(near.promise, polish(st, text))]);
+        // Time-bound (the event is near): he says it, once you're free.
+        raiseRef.current(polish(st, text), [done(near.promise), later(near.promise, polish(st, text))], true, { urgent: true });
         return;
       }
       // Reminders with no time: kept in mind, brought up once a day.
@@ -420,7 +487,7 @@ export function ToucanGuide() {
               void answerDeadlineGuessAction(guess.taskId, guess.start)
                 .then(() => {
                   router.refresh();
-                  if (soon) say("Done. It's in Due soon at the top of Today. Shall we plan your day around it?", [planDay, { label: "Not now", run: () => {} }]);
+                  if (soon) reply("Done. It's in Due soon at the top of Today. Shall we plan your day around it?", [planDay, { label: "Not now", run: () => {} }]);
                 })
                 .catch(() => {}),
           },
@@ -451,8 +518,8 @@ export function ToucanGuide() {
       if (gymToday && gym.help.includes("after") && afterGym && !used.slots.includes("gym-after")) {
         spend("gym-after");
         say(voice.gymAfter(st), [
-          { label: "I went ✓", run: () => (gym.help.includes("cheer") ? say(voice.gymCheer(st), []) : undefined) },
-          { label: "Not today", run: () => say(voice.gymMissed(st), [{ label: "Talk it through", run: () => talkToToucan(undefined, "talk", "I didn't make it to the gym today.") }, { label: "Okay", run: () => {} }]) },
+          { label: "I went ✓", run: () => (gym.help.includes("cheer") ? reply(voice.gymCheer(st), []) : undefined) },
+          { label: "Not today", run: () => reply(voice.gymMissed(st), [{ label: "Talk it through", run: () => talkToToucan(undefined, "talk", "I didn't make it to the gym today.") }, { label: "Okay", run: () => {} }]) },
         ]);
         return;
       }
@@ -542,12 +609,14 @@ export function ToucanGuide() {
         const wait = ms > 0 ? ms : delay;
         if (ms <= 0) delay += 90_000;
         timers.push(
-          setTimeout(() => {
+          setTimeout(async () => {
+            // Moved to another day, or done, since he last looked? Then there's nothing to say.
+            if (!(await stillDueToday(t.id))) return;
             const st = styleRef.current;
             const due = new Date(t.due_at!);
             const time = due.getHours() === 23 && due.getMinutes() >= 59 ? "" : due.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
             const text = voice.dueToday(st, t.title, time);
-            const seen = raiseRef.current(text, actionsRef.current({ text, until: 0, taskId: t.id, begin: t.id }));
+            const seen = raiseRef.current(text, actionsRef.current({ text, until: 0, taskId: t.id, begin: t.id }), true, { urgent: true });
             if (seen) {
               try {
                 window.localStorage.setItem(key(t.id), day);
@@ -560,10 +629,12 @@ export function ToucanGuide() {
     void arm();
     const rearm = () => void arm();
     window.addEventListener("focus", rearm);
+    window.addEventListener("toucan-tasks-changed", rearm);
     return () => {
       live = false;
       timers.forEach(clearTimeout);
       window.removeEventListener("focus", rearm);
+      window.removeEventListener("toucan-tasks-changed", rearm);
     };
   }, [mode, style.often]);
 
@@ -582,7 +653,7 @@ export function ToucanGuide() {
         const ms = Date.parse(p.due) - Date.now();
         if (ms < -5 * 60_000 || ms > 12 * 3_600_000) continue;
         timers.push(
-          setTimeout(() => whenNoWelcome(() => {
+          setTimeout(() => whenFree(() => {
             const unseen = window.dispatchEvent(
               new CustomEvent("toucan-nudge", {
                 cancelable: true,
@@ -1410,7 +1481,8 @@ function MadeCard({ action: a }: { action: Made & { auto?: boolean } }) {
         undo.current = () => deleteTaskAction(id);
       } else if (a.type === "due") {
         const r = await coachSetDueAction(a.questId, a.due ? stampISO(a.due) : null);
-        undo.current = () => coachSetDueAction(a.questId, r.was);
+        undo.current = () => coachSetDueAction(a.questId, r.was).then(() => window.dispatchEvent(new Event("toucan-tasks-changed")));
+        window.dispatchEvent(new Event("toucan-tasks-changed"));
       } else if (a.type === "event") {
         // "11am" said just after midnight means the 11am that has passed, not later today
         // (Nov 5: it was refused as in the future and showed a bare React error code).

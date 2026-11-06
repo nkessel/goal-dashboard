@@ -137,6 +137,8 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
     return () => window.removeEventListener("toucan-change", h);
   }, []);
   const [say, setSay] = useState<string | null>(null);
+  // Something he'd like to tell you, kept until you tap him (owner, Nov 6: "accost me less"): a soft glow on him, no flight, no bubble.
+  const [waiting, setWaiting] = useState<{ text: string; actions: { label: string; run: () => void }[] } | null>(null);
   // How "Talk with me" shows on the bubble (Settings → Toucan Spirit → His look).
   const talkLook = useSyncExternalStore(subscribeTalkLook, readTalkLook, () => "glow" as const);
   // Buttons under the words (for the line they belong to).
@@ -536,7 +538,18 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
       sayClose.current = d.onClose ?? null;
     };
     window.addEventListener("toucan-nudge", h);
-    return () => window.removeEventListener("toucan-nudge", h);
+    // Not urgent: he keeps it (a glow on him) until you tap him. The newest replaces the last.
+    const wait = (e: Event) => {
+      const d = (e as CustomEvent<{ text: string; actions: { label: string; run: () => void }[] }>).detail;
+      if (!d || !shownRef.current) return;
+      e.preventDefault();
+      setWaiting(d);
+    };
+    window.addEventListener("toucan-waiting", wait);
+    return () => {
+      window.removeEventListener("toucan-nudge", h);
+      window.removeEventListener("toucan-waiting", wait);
+    };
   }, []);
   useEffect(() => {
     if (!wisdom) return;
@@ -639,7 +652,11 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             return;
           }
           if (hidingHere) found();
-          else if (spirit) speak();
+          else if (spirit && waiting) {
+            const w = waiting;
+            setWaiting(null);
+            speakBrief(w.text, 16000, w.actions);
+          } else if (spirit) speak();
           else fly();
         }}
         onPointerDown={(e) => {
@@ -740,7 +757,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             poof();
           }
         }}
-        aria-label={spirit ? "The great toucan spirit — tap for wisdom, hold to return to the owl" : "A snowy owl — tap and it flies to another perch; hold to summon the great toucan spirit"}
+        aria-label={spirit && waiting ? "The great toucan spirit has something for you — tap to hear it" : spirit ? "The great toucan spirit — tap for wisdom, hold to return to the owl" : "A snowy owl — tap and it flies to another perch; hold to summon the great toucan spirit"}
         title={spirit ? "The great toucan spirit" : "Hoo!"}
         className={`owl-perch fixed left-0 top-0 ${over ? "z-[48]" : "z-[45]"} touch-none select-none p-0 ${dragging ? "owl-dragging" : ""} ${hidingHere && !dragging ? "owl-hidden-here" : ""}`}
         style={{
@@ -764,6 +781,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             ) : phase === "perched" || phase === "takeoff" ? <SittingOwl /> : <FlyingOwl />}
           </div>
         </div>
+        {spirit && waiting && <span aria-hidden className="toucan-waiting-dot pointer-events-none absolute right-0 top-0 h-2.5 w-2.5 rounded-full" />}
       </button>
       {say && (
         <div

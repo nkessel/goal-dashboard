@@ -1924,6 +1924,19 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   animation: toucan-wisdom-in 0.25s cubic-bezier(.2,.8,.3,1.2) both;
 }
 /* The speech bubble's tail, pointing back at the bird (below the bubble, or above it when the bubble sits under its feet). */
+/* He has something for you (tap him to hear it): a soft gold glow, breathing slowly. */
+.toucan-waiting-dot {
+  background: radial-gradient(circle at 35% 30%, #fff3c4, #f2d27e 55%, #c9a24a);
+  box-shadow: 0 0 6px 2px rgba(255, 226, 150, 0.7);
+  animation: toucan-waiting 2.6s ease-in-out infinite;
+}
+@keyframes toucan-waiting {
+  0%, 100% { opacity: 0.55; scale: 0.85; }
+  50% { opacity: 1; scale: 1.1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toucan-waiting-dot { animation: none; }
+}
 .owl-say-tail {
   position: absolute;
   left: var(--tail-x, 50%);
