@@ -322,3 +322,37 @@ export async function updateBoardMatrix(
     throw new Error(`Failed to update board: ${error.message}`);
   }
 }
+
+/**
+ * What a board holds, for opening it in place like a folder: its boards
+ * (with their quest counts) and its quests, open first. Empty when the board
+ * isn't the owner's.
+ */
+export async function listBoardFolder(
+  boardId: string,
+  ownerId: string
+): Promise<{ subBoards: { id: string; title: string; questCount: number }[]; quests: Task[]; doneCount: number; aspirationCount: number }> {
+  const db = supabaseAdmin();
+  const [kidsRes, tasksRes] = await Promise.all([
+    db.from("boards").select("id, title").eq("owner_id", ownerId).eq("parent_board_id", boardId).order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
+    db.from("tasks").select("*").eq("owner_id", ownerId).eq("board_id", boardId).order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
+  ]);
+  if (kidsRes.error) throw new Error(`Failed to list sub-boards: ${kidsRes.error.message}`);
+  if (tasksRes.error) throw new Error(`Failed to list board quests: ${tasksRes.error.message}`);
+  const kids = (kidsRes.data ?? []) as { id: string; title: string }[];
+  const counts = new Map<string, number>();
+  if (kids.length) {
+    const { data } = await db.from("tasks").select("board_id, status, is_aspiration").eq("owner_id", ownerId).in("board_id", kids.map((k) => k.id));
+    for (const t of (data ?? []) as { board_id: string; status: string; is_aspiration: boolean | null }[]) {
+      if (t.is_aspiration && t.status === "open") continue;
+      counts.set(t.board_id, (counts.get(t.board_id) ?? 0) + 1);
+    }
+  }
+  const all = (tasksRes.data ?? []) as Task[];
+  return {
+    subBoards: kids.map((k) => ({ id: k.id, title: k.title, questCount: counts.get(k.id) ?? 0 })),
+    quests: all.filter((t) => t.status === "open" && !t.is_aspiration),
+    doneCount: all.filter((t) => t.status === "completed").length,
+    aspirationCount: all.filter((t) => t.status === "open" && t.is_aspiration).length,
+  };
+}

@@ -568,6 +568,12 @@ export async function createBoardFromEditorAction(boardTitle: string, parentBoar
   return { id: board.id, title: board.title };
 }
 
+/** A sub-board's contents, for opening it in place like a folder (boards inside, then its quests). */
+export async function boardFolderAction(boardId: string) {
+  const ownerId = await requireProfileId();
+  return boardsData.listBoardFolder(boardId, ownerId);
+}
+
 /** Quest boards to file a quest under, nested ones labelled "Parent › Child". */
 export async function listBoardOptionsAction() {
   const ownerId = await requireProfileId();

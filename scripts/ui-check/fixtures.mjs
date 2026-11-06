@@ -20,6 +20,10 @@ export function makeFixtures() {
     board("Online learning videos", 3),
   ];
   const [course, errands, home, videos] = boards;
+  // Boards inside Home & garden (one with its own board inside), so a board card's sub-boards open like folders (Nov 6).
+  const beds = board("Garden beds", 0, { parent_board_id: home.id });
+  const seeds = board("Seeds to order", 0, { parent_board_id: beds.id });
+  boards.push(beds, seeds, board("Kitchen", 1, { parent_board_id: home.id }));
 
   let sort = 0;
   const task = (title, extra = {}) => ({
@@ -45,6 +49,8 @@ export function makeFixtures() {
     task("Watch: Facing Fragility", { board_id: videos.id, description: "https://spiraljourneyworkthatreconnects.org/facing-fragility/" }),
     task("Supercalifragilisticexpialidocious-unbroken-long-word-to-test-wrapping", { board_id: home.id }),
     task("Sort the garage shelves", { board_id: home.id, in_additional: true }),
+    task("Turn the compost and top up the raised beds", { board_id: beds.id }),
+    task("Tomatoes, basil and marigolds", { board_id: seeds.id }),
     task("Plan the weekend trip", { in_additional: true, due_at: inHours(170) }),
     task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20 }),
   ];

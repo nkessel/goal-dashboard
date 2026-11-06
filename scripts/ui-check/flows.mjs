@@ -515,6 +515,23 @@ export const FLOWS = [
       await h.page.getByLabel("Find a quest").first().fill("insurance").catch(() => {});
       await h.settle(900);
       await h.check("boards: find a quest");
+      // A board's sub-board opens in place like a folder (Nov 6), with "See board ›".
+      await h.goto("/boards");
+      if (await h.tap((p) => p.locator('[data-fb-name="Sub-board: Garden beds"]').first(), "open a sub-board in place", { optional: true, expectMove: true })) {
+        await h.settle(900);
+        await h.check("boards: sub-board folder");
+        await h.tap((p) => p.locator('[data-fb-name="Sub-board: Seeds to order"]').first(), "open a folder inside it", { optional: true, expectMove: true });
+        await h.settle(900);
+        await h.check("boards: folder in a folder");
+        // "See board ›" opens the board as the popup, and the page behind doesn't run down to its bottom (owner, Nov 6).
+        const before = await h.page.evaluate(() => window.scrollY);
+        if (await h.tap((p) => p.locator("main a", { hasText: /see board/i }).first(), "see board", { optional: true, expectMove: true })) {
+          await h.settle(1500);
+          const y = await h.page.evaluate(() => window.scrollY);
+          if (y - before > 120) h.record({ kind: "page-jumped", severity: "error", target: "board popup", detail: `the page behind the board popup scrolled from ${before}px to ${y}px` });
+          await h.check("board popup from a folder");
+        }
+      }
       // The first board.
       await h.goto("/boards");
       if (await h.tap((p) => p.locator("main a[href^='/boards/']").first(), "open a board", { optional: true, expectMove: true })) {

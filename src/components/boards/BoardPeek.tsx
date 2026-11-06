@@ -97,7 +97,11 @@ export function BoardPeek({
     : { top: "max(10px, 3dvh)", bottom: "max(8px, 2dvh)", left: "max(6px, calc(50% - 390px))", right: "max(6px, calc(50% - 390px))", borderRadius: 18 };
 
   return (
-    <div data-theme={theme} style={{ background: "transparent", minHeight: 0 }}>
+    // No box of its own (`contents`): on opening, Next scrolls the page to the
+    // new segment's first box, and an in-flow wrapper sat at the very end of
+    // the page, so the screen behind jumped to its bottom (owner, Nov 6:
+    // "the screen goes to the bottom"). Without a box Next leaves it alone.
+    <div data-theme={theme} style={{ display: "contents" }}>
       <div className={`fixed inset-0 z-[47] ${closing ? "overlay-fade-out" : opening ? "overlay-fade-in" : ""}`} style={{ background: "rgba(6,9,5,.62)" }} onClick={close} />
       <div
         role="dialog"

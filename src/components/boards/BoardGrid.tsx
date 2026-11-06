@@ -24,7 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { BoardWithStats } from "@/lib/data/boards";
 import { UNCATEGORIZED_ID } from "@/lib/board-ids";
 import type { Task } from "@/lib/data/types";
-import { listBoardOptionsAction, moveTaskToBoardAction, nestBoardAction, reorderBoardsAction, setBoardDreamAction } from "@/app/actions";
+import { boardFolderAction, listBoardOptionsAction, moveTaskToBoardAction, nestBoardAction, reorderBoardsAction, setBoardDreamAction } from "@/app/actions";
 import { QuestCardPopup } from "@/components/tasks/QuestCardPopup";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { CreateSheet } from "@/components/create/CreateSheet";
@@ -32,7 +32,7 @@ import { EditBoardModal } from "./EditBoardModal";
 import { BoardSeal } from "./BoardSeal";
 import { nextActionOf } from "@/lib/next-action";
 import { fromFeedback } from "@/lib/from-feedback";
-import { useClosing } from "@/components/ui/Fold";
+import { Fold, useClosing } from "@/components/ui/Fold";
 
 /** Where the Uncategorized card sits among the boards (it has no saved order of its own). */
 const LOOSE_KEY = "boards-loose-index";
@@ -259,28 +259,11 @@ export function BoardGrid({
           </span>
         </Link>
 
-        {/* Sub-boards first, by name, each with its quest count */}
+        {/* Sub-boards first, by name, each with its quest count; a tap opens one in place like a folder */}
         {board.subBoards.length > 0 && (
           <ul className="-mx-1 flex flex-wrap gap-1 border-t pt-1.5" style={{ borderColor: rule }}>
             {board.subBoards.map((sb) => (
-              <li key={sb.id} className="min-w-0 max-w-full">
-                <Link
-                  href={`/boards/${sb.id}`}
-                  draggable={false}
-                  className="board-quest flex min-h-[26px] min-w-0 items-center gap-1 rounded-md px-1 py-[2px] text-[12.5px]"
-                  style={{ color: "var(--t-ink)" }}
-                >
-                  <span className="shrink-0" style={{ color: soft }}>
-                    <SubBoardsIcon />
-                  </span>
-                  <span className="truncate">{sb.title}</span>
-                  {!(dream && sb.questCount === 0) && (
-                    <span className="shrink-0 tabular-nums" style={{ color: soft }}>
-                      ({sb.questCount})
-                    </span>
-                  )}
-                </Link>
-              </li>
+              <SubBoardFolder key={sb.id} sb={sb} soft={soft} rule={rule} dream={dream} onOpenQuest={setOpenQuest} />
             ))}
           </ul>
         )}
@@ -542,6 +525,149 @@ function SortableBoard({ id, fixed, questTarget, children }: { id: string; fixed
       }}
     >
       {children}
+    </li>
+  );
+}
+
+type FolderContents = Awaited<ReturnType<typeof boardFolderAction>>;
+
+/** A folder's caret: points right when shut, down when open. */
+function FolderCaret({ open }: { open: boolean }) {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 180ms ease" }}>
+      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
+ * A board inside a board card. A tap opens it in place like a folder (owner,
+ * Nov 6): the boards inside it (which open the same way) and its quests as a
+ * list. "See board" beside its name opens the whole board.
+ */
+function SubBoardFolder({
+  sb,
+  soft,
+  rule,
+  dream,
+  onOpenQuest,
+  nested = false,
+}: {
+  sb: { id: string; title: string; questCount: number };
+  soft: string;
+  rule: string;
+  dream: boolean;
+  onOpenQuest: (q: Task) => void;
+  nested?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<FolderContents | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [, startLoad] = useTransition();
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && !data) {
+      setFailed(false);
+      startLoad(async () => {
+        try {
+          setData(await boardFolderAction(sb.id));
+        } catch {
+          setFailed(true);
+        }
+      });
+    }
+  }
+
+  const stop = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation(), onTouchStart: (e: React.TouchEvent) => e.stopPropagation() };
+  const empty = data && data.subBoards.length === 0 && data.quests.length === 0;
+
+  return (
+    <li className={open || nested ? "w-full min-w-0" : "min-w-0 max-w-full"}>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          data-fb-name={`Sub-board: ${sb.title}`}
+          className={`board-quest flex min-h-[26px] min-w-0 items-center gap-1 rounded-md px-1 py-[2px] text-left text-[12.5px]`}
+          style={{ color: "var(--t-ink)", background: open ? (dream ? "rgba(120,150,190,.12)" : "rgba(168,138,63,.14)") : undefined }}
+        >
+          <span className="shrink-0" style={{ color: soft }}>
+            <SubBoardsIcon />
+          </span>
+          <span dir="auto" className={`user-text min-w-0 ${open ? "font-semibold [overflow-wrap:break-word]" : "truncate"}`}>{sb.title}</span>
+          {!(dream && sb.questCount === 0) && (
+            <span className="shrink-0 tabular-nums" style={{ color: soft }}>
+              ({sb.questCount})
+            </span>
+          )}
+          <span className="shrink-0" style={{ color: soft }}>
+            <FolderCaret open={open} />
+          </span>
+        </button>
+        {open && (
+          <Link
+            href={`/boards/${sb.id}`}
+            draggable={false}
+            {...stop}
+            className="reveal shrink-0 whitespace-nowrap rounded-md px-0.5 py-[2px] text-[11.5px] font-semibold underline underline-offset-2"
+            style={{ color: dream ? "#5f87b8" : "#8a6116" }}
+          >
+            See board ›
+          </Link>
+        )}
+      </div>
+      <Fold open={open}>
+        <div className="ml-[7px] border-l pb-1 pl-1.5" style={{ borderColor: rule }}>
+          {!data && !failed && (
+            <p className="m-0 px-1 py-1 text-[12px]" style={{ color: soft, opacity: 0.8 }}>
+              Opening…
+            </p>
+          )}
+          {failed && (
+            <p className="m-0 px-1 py-1 text-[12px]" style={{ color: soft }}>
+              Couldn&apos;t open it.{" "}
+              <Link href={`/boards/${sb.id}`} className="underline">
+                See board
+              </Link>
+            </p>
+          )}
+          {data && (
+            <ul className="due-in flex flex-col">
+              {data.subBoards.map((k) => (
+                <SubBoardFolder key={k.id} sb={k} soft={soft} rule={rule} dream={dream} onOpenQuest={onOpenQuest} nested />
+              ))}
+              {data.quests.map((q) => (
+                <li key={q.id}>
+                  <button
+                    type="button"
+                    {...stop}
+                    onClick={() => onOpenQuest(q)}
+                    className="board-quest flex min-h-[28px] w-full items-center gap-1.5 rounded-md px-1 py-[3px] text-left text-[13px]"
+                    style={{ color: "var(--t-ink)" }}
+                    title={q.title}
+                  >
+                    <QuestDot q={q} size={18} />
+                    <span dir="auto" className="user-text min-w-0 flex-1 truncate">{q.title}</span>
+                  </button>
+                </li>
+              ))}
+              {(data.doneCount > 0 || data.aspirationCount > 0) && (
+                <li className="px-1 pt-0.5 text-[11.5px]" style={{ color: soft }}>
+                  {[data.doneCount > 0 ? `✓ ${data.doneCount} done` : "", data.aspirationCount > 0 ? `✧ ${data.aspirationCount} ${data.aspirationCount === 1 ? "aspiration" : "aspirations"}` : ""].filter(Boolean).join(" · ")}
+                </li>
+              )}
+              {empty && data.doneCount === 0 && data.aspirationCount === 0 && (
+                <li className="px-1 py-0.5 text-[12px]" style={{ color: soft }}>
+                  Nothing here yet.
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+      </Fold>
     </li>
   );
 }
