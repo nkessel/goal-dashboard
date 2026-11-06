@@ -8,9 +8,8 @@ const COOKIE = "last-path";
 const KEEP = /^\/(boards|calendar|feed|friends|insights|journal|matrix|plan|power-ups|rewards|settings|summit)(\/|$|\?)/;
 
 /**
- * Remembers the screen you were on, so signing in carries on where you left
- * off (the sign-in reads the cookie). Opening the app fresh still lands on
- * Today, so the welcome screen keeps its morning moment.
+ * Remembers the screen you were on, so opening the app or signing in carries
+ * on where you left off (Today's page and the sign-in read the cookie).
  */
 export function LastScreen() {
   const path = usePathname();

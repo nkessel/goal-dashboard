@@ -1,4 +1,6 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { auth, signIn } from "@/auth";
 import { DUE_HOURS_COOKIE, byDuePriority, inDueWindow, parseDueHours } from "@/lib/due-soon";
 import { LowLightToggle } from "@/components/evening/LowLightToggle";
@@ -88,9 +90,30 @@ export default async function Home() {
     );
   }
 
+  // Opening the app picks up on the screen you were last on (owner, Nov 6: "I keep opening the app
+  // and it goes to the board view"). Only a fresh page load does this: tapping Today (a client
+  // navigation) or reloading Today stays here, since Today itself is remembered too. The welcome
+  // screen shows on any page, so its morning moment is kept.
+  {
+    const h = await headers();
+    const fresh = !h.get("rsc") && !h.get("next-router-state-tree") && (h.get("sec-fetch-dest") ?? "document") === "document";
+    if (fresh) {
+      let last = (await cookies()).get("last-path")?.value ?? "";
+      try {
+        if (last.startsWith("%2F")) last = decodeURIComponent(last);
+      } catch {}
+      // The calendar opens on today (its view is remembered per device on its own).
+      if (last.startsWith("/calendar")) last = "/calendar";
+      if (last && last !== "/" && /^\/[\w\-/?=&%.]*$/.test(last) && !last.startsWith("//")) redirect(last);
+    }
+  }
+
   // Everything loads at once (each wait used to queue behind the last, which made Today slow to open).
   // Only what last evening's plan changes waits for it to move into Today's Quests first.
   const uid = session.user.id;
+  // Quests and sessions put on the calendar without Google (from a chat with Claude, or offline) reach it.
+  const gToken = session.googleAccessToken;
+  if (gToken) after(() => import("@/lib/data/calendar-sync").then(({ pushMissingGoogleEvents }) => pushMissingGoogleEvents(gToken, uid, new Date(Date.now() + 3 * 86_400_000))).catch(() => {}));
   const promoted = promoteQueuedQuests(uid).catch(() => false);
   const profileP = getProfileById(uid);
   const ritesP = listRites(uid).catch(() => null);

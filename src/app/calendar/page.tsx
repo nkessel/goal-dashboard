@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import type { Task } from "@/lib/data/types";
 import { RememberView } from "@/components/calendar/RememberView";
 import { ConnectCalendar } from "@/components/calendar/ConnectCalendar";
@@ -170,6 +171,17 @@ export default async function CalendarPage({
     interestP,
     interestEventsP,
   ]);
+  // Quests and sessions put on the calendar without Google (from a chat with Claude, or offline) reach it now.
+  if (googleAll && session.googleAccessToken) {
+    const token = session.googleAccessToken;
+    const uid = session.user.id;
+    const rangeEndMs = rangeEnd.getTime();
+    after(() =>
+      import("@/lib/data/calendar-sync")
+        .then(({ pushMissingGoogleEvents }) => pushMissingGoogleEvents(token, uid, new Date(Math.max(rangeEndMs, Date.now() + 14 * 86_400_000))))
+        .catch(() => {})
+    );
+  }
   // The quests waiting behind each quest on the calendar: its agenda (a visit's to-talk-about list).
   const agenda = await listWaitingBehind(session.user.id, tasks.filter((t) => t.status !== "completed").map((t) => t.id)).catch(() => ({}));
   const todayHref = `/calendar?view=${view}&date=${formatDateParam(today)}`;

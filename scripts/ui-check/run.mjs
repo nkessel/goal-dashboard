@@ -327,6 +327,8 @@ async function walk({ browser, device, time, tz, cookie }) {
       ({ welcome }) => {
         const d = new Date(Date.now() - 330 * 60_000);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        // Today opens the screen you were last on; each flow starts where it says instead.
+        document.cookie = "last-path=; path=/; max-age=0";
         if (welcome) {
           for (const k of ["daily-login", "welcome-pending", "daily-login-open", "welcome-back-at", "welcome-toucan-landed"]) localStorage.removeItem(k);
           sessionStorage.clear();
