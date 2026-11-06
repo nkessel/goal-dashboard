@@ -22,7 +22,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { completeRiteAction, setTomorrowQueueAction, removeRiteAction, reorderRitesAction, restoreRiteAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
+import { completeRiteAction, setTomorrowQueueAction, tickRiteStepAction, removeRiteAction, reorderRitesAction, restoreRiteAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
 import { Fold } from "@/components/ui/Fold";
 import { RecentWins } from "./RecentWins";
 import { DayPlanner } from "./DayPlanner";
@@ -169,7 +169,10 @@ export function EveningRites({
   tomorrow = null,
   todayIds = [],
   openQuests = [],
+  stepChecks = [],
 }: {
+  /** Subtasks ticked (rite, subtask, evening day). */
+  stepChecks?: { rite_id: string; step_id: string; day: string }[];
   /** Null when the rites tables haven't been created yet. */
   rites: RiteView[] | null;
   completions: { rite_id: string; day: string }[];
@@ -202,6 +205,9 @@ export function EveningRites({
   const [removed, setRemoved] = useState<RiteView | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
+  // Subtasks ticked tonight, shown at once while saving.
+  const [stepOpt, setStepOpt] = useState<Record<string, boolean>>({});
+  const stepDone = (riteId: string, stepId: string) => stepOpt[`${riteId}|${stepId}`] ?? stepChecks.some((c) => c.rite_id === riteId && c.step_id === stepId && c.day === day);
 
   // Order + which list, kept locally while dragging / saving.
   const [local, setLocal] = useState<{ core: string[]; mini: string[] } | null>(null);
@@ -254,6 +260,33 @@ export function EveningRites({
         else await uncompleteRiteAction(r.id, day);
       } catch (e) {
         setOptimistic((o) => ({ ...o, [r.id]: !next }));
+        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
+
+  /** Tick one subtask; the last one ticked completes the rite (its XP and all), as with sub-habits. */
+  function tickStep(r: RiteView, stepId: string) {
+    if (!day) return;
+    const on = !stepDone(r.id, stepId);
+    const steps = r.steps ?? [];
+    const wasDone = doneTonight(r.id);
+    const allAfter = steps.every((st) => (st.id === stepId ? on : stepDone(r.id, st.id)));
+    setError(null);
+    setStepOpt((o) => ({ ...o, [`${r.id}|${stepId}`]: on }));
+    if (allAfter !== wasDone) {
+      setOptimistic((o) => ({ ...o, [r.id]: allAfter }));
+      if (allAfter && r.xp_value > 0) {
+        setPop({ id: r.id, xp: r.xp_value });
+        setTimeout(() => setPop((p) => (p?.id === r.id ? null : p)), 1500);
+      }
+    }
+    startTransition(async () => {
+      try {
+        await tickRiteStepAction(r.id, stepId, day, on);
+      } catch (e) {
+        setStepOpt((o) => ({ ...o, [`${r.id}|${stepId}`]: !on }));
+        setOptimistic((o) => ({ ...o, [r.id]: wasDone }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
       }
     });
@@ -590,6 +623,39 @@ export function EveningRites({
           </span>
         )}
       </div>
+      {!special && !overlay && (r.steps?.length ?? 0) > 0 && (
+        // Subtasks, always in view under the rite: tap one to tick it.
+        <ul className="relative z-[1] m-0 mt-2 flex list-none flex-col gap-0.5 p-0 pl-[64px]" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+          {r.steps!.map((st) => {
+            const ticked = stepDone(r.id, st.id);
+            return (
+              <li key={st.id}>
+                <button type="button" role="checkbox" aria-checked={ticked} onClick={() => tickStep(r, st.id)} className="flex min-h-8 w-full items-start gap-2 rounded-lg py-1 text-left">
+                  <span
+                    aria-hidden
+                    className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
+                    style={ticked ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116" } : { border: "1.5px solid #8e8aa8", background: "rgba(255,255,255,.35)" }}
+                  >
+                    {ticked && (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#2a1c10" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 break-words text-[14.5px] leading-snug" style={{ color: "var(--t-ink)", opacity: ticked ? 0.6 : 1 }}>
+                    {st.title}
+                  </span>
+                  {(st.xp ?? 0) > 0 && (
+                    <span className="shrink-0 text-[12.5px] font-semibold" style={{ color: "var(--t-xp)" }}>
+                      +{st.xp} XP
+                    </span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       </div>
     );
     // Swipe right to skip it tonight; swipe left to snooze it until tomorrow, after a quick "sure?" (owner, Nov 3: no delete on a swipe).

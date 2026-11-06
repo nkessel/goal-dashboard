@@ -173,7 +173,7 @@ export default async function Home() {
       lookBack.then((from) => listHabitSkips(uid, from)),
       listJournalEntries(uid, 150).catch(() => null),
       listBoardsForOwner(uid).catch(() => []),
-      dayHabitsP.then((hs) => (hs.some((h) => cleanRiteSteps(h.steps).length) ? listRiteStepChecks(uid, daysAgoISO(2).slice(0, 10)).catch(() => null) : [])),
+      ritesP.then((rs) => ((rs ?? []).some((h) => cleanRiteSteps(h.steps).length) ? listRiteStepChecks(uid, daysAgoISO(2).slice(0, 10)).catch(() => null) : [])),
     ]),
   ]);
   // Streak slips (Insights) never show in Today's check-in.
@@ -303,6 +303,7 @@ export default async function Home() {
               rites={eveningRites}
               completions={riteCompletions.map((c) => ({ rite_id: c.rite_id, day: c.day }))}
               theme={theme}
+              stepChecks={stepChecks ?? []}
               tomorrow={tomorrow}
               todayIds={[...dueTasks, ...topPriorities].map((t) => t.id)}
               openQuests={openTasks.filter((t) => !t.reward_id && !t.needs_review)}

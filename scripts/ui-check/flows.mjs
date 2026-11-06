@@ -316,6 +316,13 @@ export const FLOWS = [
       await h.check("evening routine");
       await h.tap(/evening routine/i, "open evening routine", { expectMove: true });
       await h.check("evening routine open");
+      // An evening rite's subtasks: tick one, then the editor's Subtasks list.
+      await h.tap((p) => p.getByRole("checkbox", { name: /morning meetings/i }).first(), "tick a rite subtask", { optional: true });
+      await h.check("rite subtask ticked");
+      if (await h.tap((p) => p.getByRole("button", { name: /^calendar check-in with tiffany/i }).first(), "edit rite with subtasks", { optional: true })) {
+        await h.check("rite editor subtasks");
+        await esc(h);
+      }
       if (await h.tap(/choose tomorrow.s quests/i, "choose tomorrow's quests")) {
         await h.check("tomorrow's quests");
         await h.tap((p) => p.getByRole("button", { name: /add another|choose a quest for tomorrow/i }).first(), "add to tomorrow", { optional: true });

@@ -109,10 +109,10 @@ export function RiteEditorDialog({
         const pending = subs;
         if (rite) {
           await updateRiteAction(rite.id, { title, description, isCore: isHabit ? true : isCore, xpValue: xp, ...schedule });
-          if (isHabit && (subsChanged || pending !== subs)) await setRiteStepsAction(rite.id, pending);
+          if (subsChanged) await setRiteStepsAction(rite.id, pending);
         } else {
           const id = await createRiteAction({ title, description, isCore: isHabit ? true : isCore, xpValue: xp, slot, ...schedule });
-          if (isHabit && pending.length) await setRiteStepsAction(id, pending);
+          if (pending.length) await setRiteStepsAction(id, pending);
         }
         close();
       } catch (e) {
@@ -206,11 +206,12 @@ export function RiteEditorDialog({
           </div>
         </div>
 
-        {isHabit && (
+        {/* Evening rites get subtasks too (owner, Nov 6: "check if Tiffany has any morning meetings…"). The special rites keep their own content. */}
+        {(isHabit || !rite?.kind) && (
           <div data-mi="subs" className="relative z-[1] flex flex-col gap-1">
-            <span className="text-[14.5px] font-semibold">Sub-habits</span>
+            <span className="text-[14.5px] font-semibold">{isHabit ? "Sub-habits" : "Subtasks"}</span>
             {extraSubs}
-            <SubHabitList list={subs} onChange={setSubs} autoFocus={focusSub} />
+            <SubHabitList list={subs} onChange={setSubs} autoFocus={focusSub} noun={isHabit ? "sub-habit" : "subtask"} />
             {subs.length > 0 && (
               <p className="m-0 pl-2 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
                 Drag to reorder · right-click or tap a dot for XP and coins

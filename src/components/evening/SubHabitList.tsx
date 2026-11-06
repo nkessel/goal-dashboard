@@ -17,7 +17,7 @@ const newId = () => Math.random().toString(36).slice(2, 10);
  * and its own little menu (right-click, or tap its dot) for XP, coins and Remove,
  * opening right under the row. A line at the bottom adds one.
  */
-export function SubHabitList({ list, onChange, autoFocus = false }: { list: SubHabit[]; onChange: (next: SubHabit[]) => void; autoFocus?: boolean }) {
+export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-habit" }: { list: SubHabit[]; onChange: (next: SubHabit[]) => void; autoFocus?: boolean; noun?: string }) {
   const [draft, setDraft] = useState("");
   const [menu, setMenu] = useState<string | null>(null);
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }));
@@ -65,8 +65,8 @@ export function SubHabitList({ list, onChange, autoFocus = false }: { list: SubH
           }}
           onBlur={add}
           autoFocus={autoFocus}
-          placeholder={list.length ? "Another sub-habit" : "Add a sub-habit (e.g. Food and water)"}
-          aria-label="Add a sub-habit"
+          placeholder={list.length ? `Another ${noun}` : noun === "sub-habit" ? "Add a sub-habit (e.g. Food and water)" : `Add a ${noun}`}
+          aria-label={`Add a ${noun}`}
           className="h-8 min-w-0 flex-1 rounded-md border border-dashed bg-transparent px-2 text-[16px] sm:text-[15px]"
           style={{ borderColor: "#b39a6a" }}
         />
