@@ -37,6 +37,7 @@ export default async function InventoryPage() {
           <h1 className="font-display text-xl" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}>
             Inventory
           </h1>
+          <div data-modal-tools className="ml-auto flex items-center gap-1" />
         </div>
         <section className="rounded-2xl p-4" style={{ background: isAdventure ? "var(--t-panel)" : "var(--t-card)", border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}` }}>
           <Backpack initial={inventory} />

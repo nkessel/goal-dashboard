@@ -49,9 +49,13 @@ export function RouteModal({ theme, title, children }: { theme: "calm" | "advent
         <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-5">
           <div className="flex items-center justify-between">
             <h2 className={`m-0 ${isAdventure ? "font-display text-[22px]" : "text-lg font-bold"}`}>{title}</h2>
-            <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
-              ×
-            </button>
+            {/* A page's own tools (e.g. its settings gear) sit beside the × instead of taking a row. */}
+            <div className="flex items-center gap-1">
+              <div data-modal-tools className="flex items-center gap-1 empty:hidden" />
+              <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
+                ×
+              </button>
+            </div>
           </div>
           {children}
         </div>

@@ -557,6 +557,36 @@ export const FLOWS = [
     },
   },
   {
+    // Inventory (owner, Nov 6): settings gear beside the title/×, ☰ on the pack opens packing lists (pills, copy, rename),
+    // pockets fold from their title, − / + 4 slots by the title, the bottom seam drags the pocket's height.
+    name: "inventory",
+    async run(h) {
+      await h.goto("/settings/inventory", { name: "inventory" });
+      await h.check("inventory");
+      if (await h.tap((p) => p.getByRole("button", { name: /^inventory settings$/i }).first(), "inventory gear", { optional: true, expectMove: true })) {
+        await h.check("inventory settings");
+        await h.tap((p) => p.getByRole("radio", { name: /^show all$/i }).first(), "pills: show all", { optional: true });
+        await h.tap((p) => p.getByRole("button", { name: /^done$/i }).first(), "settings done", { optional: true, expectMove: true });
+      }
+      if (await h.tap((p) => p.getByRole("button", { name: /^backpack menu$/i }).first(), "backpack menu", { optional: true, expectMove: true })) {
+        await h.check("backpack menu");
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /packing lists/i }).first(), "open packing lists", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.tap((p) => p.getByRole("button", { name: /new list/i }).first(), "new packing list", { optional: true, expectMove: true });
+          await h.page.keyboard.type("Weekend away").catch(() => {});
+          await h.page.keyboard.press("Enter").catch(() => {});
+          await h.page.getByLabel("Add something to pack").first().fill("Toothbrush").catch(() => {});
+          await h.page.getByLabel("Add something to pack").first().press("Enter").catch(() => {});
+          await h.tap((p) => p.getByRole("button", { name: /^copy$/i }).first(), "copy list", { optional: true, expectMove: true });
+          await h.check("packing lists");
+        }
+      }
+      await h.tap((p) => p.getByRole("button", { name: /^add 4 slots to the utility pocket$/i }).first(), "add slots", { optional: true, expectMove: true });
+      await h.tap((p) => p.getByRole("button", { name: /^utility pocket/i }).first(), "fold utility pocket", { optional: true, expectMove: true });
+      await h.check("pocket folded");
+    },
+  },
+  {
     name: "pages",
     async run(h) {
       for (const path of ["/boards", "/calendar", "/rewards", "/feed", "/plan", "/matrix", "/journal", "/notifications", "/settings/inventory", "/power-ups"]) {

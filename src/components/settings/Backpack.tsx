@@ -7,7 +7,8 @@ import { makeRefillQuestAction, paintInventoryItemAction, saveInventoryAction } 
 import { POCKETS, type BringList, type Inventory, type InventoryItem, type ItemStatus, type PocketKey } from "@/lib/inventory";
 import { CHECKIN_STYLES } from "@/lib/celebration-fx";
 import { useEscape } from "@/lib/use-escape";
-import { useClosing } from "@/components/ui/Fold";
+import { Fold, useClosing } from "@/components/ui/Fold";
+import { PILL_MODE_KEY, PackingLists, type PillMode } from "./PackingLists";
 
 const STATUS: { v: ItemStatus; label: string; hint: string }[] = [
   { v: "full", label: "Stocked", hint: "Full and ready" },
@@ -90,24 +91,83 @@ export function Backpack({ initial }: { initial: Inventory }) {
       /* storage unavailable */
     }
   }
-  // How many rows each pocket shows (the rest scroll into view); remembered on this device.
-  const [rows, setRows] = useState<Partial<Record<PocketKey, number>>>({});
+  // Per device: how tall each pocket shows (dragged by its bottom seam; the rest scrolls),
+  // which pockets are folded to their title, the packing lists' pills and whether they're open.
+  const [heights, setHeights] = useState<Partial<Record<PocketKey, number>>>({});
+  const [folded, setFolded] = useState<Partial<Record<PocketKey, boolean>>>({});
+  const [pillMode, setPillMode] = useState<PillMode>("scroll");
+  const [packOpen, setPackOpen] = useState(false);
   useEffect(() => {
     try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
-      setRows(JSON.parse(window.localStorage.getItem("inv-rows") ?? "{}") as Partial<Record<PocketKey, number>>);
+      const ls = window.localStorage;
+      /* eslint-disable react-hooks/set-state-in-effect -- browser storage is only readable after hydration */
+      setHeights(JSON.parse(ls.getItem("inv-heights") ?? "{}") as Partial<Record<PocketKey, number>>);
+      setFolded(JSON.parse(ls.getItem("inv-folded") ?? "{}") as Partial<Record<PocketKey, boolean>>);
+      if (ls.getItem(PILL_MODE_KEY) === "wrap") setPillMode("wrap");
+      if (ls.getItem("inv-pack-open") === "1") setPackOpen(true);
+      /* eslint-enable react-hooks/set-state-in-effect */
     } catch {
       /* storage unavailable */
     }
   }, []);
-  function showRows(pocket: PocketKey, n: number) {
-    const next = { ...rows, [pocket]: n };
-    setRows(next);
+  const store = (key: string, v: unknown) => {
     try {
-      window.localStorage.setItem("inv-rows", JSON.stringify(next));
+      window.localStorage.setItem(key, typeof v === "string" ? v : JSON.stringify(v));
     } catch {
       /* storage unavailable */
     }
+  };
+  function setHeight(pocket: PocketKey, h: number | null) {
+    const next = { ...heights };
+    if (h == null) delete next[pocket];
+    else next[pocket] = h;
+    setHeights(next);
+    store("inv-heights", next);
+  }
+  function toggleFold(pocket: PocketKey) {
+    const next = { ...folded, [pocket]: !folded[pocket] };
+    setFolded(next);
+    store("inv-folded", next);
+  }
+  function choosePills(m: PillMode) {
+    setPillMode(m);
+    store(PILL_MODE_KEY, m);
+  }
+  function openPacking(open: boolean) {
+    setPackOpen(open);
+    store("inv-pack-open", open ? "1" : "0");
+    if (open) setTimeout(() => packRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 320);
+  }
+  const packRef = useRef<HTMLDivElement>(null);
+  // The ☰ menu at the pack's top right.
+  const [packMenu, setPackMenu] = useState<{ x: number; y: number } | null>(null);
+  // The settings gear sits beside the screen's × (or its title on the full page), so it takes no row of its own.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [toolsHost, setToolsHost] = useState<Element | null | undefined>(undefined);
+  useEffect(() => {
+    const host = rootRef.current?.closest('[role="dialog"]')?.querySelector("[data-modal-tools]") ?? document.querySelector("[data-modal-tools]");
+    setToolsHost(host);
+  }, []);
+  // Fewer or more slots (4 at a time). Taking slots away moves what's in them into free slots higher up.
+  const maxSlots = (p: PocketKey) => (p === "top" ? 16 : 32);
+  function canShrink(p: PocketKey) {
+    const n = inv.slots[p] - 4;
+    if (n < 4) return false;
+    const mine = inv.items.filter((i) => i.pocket === p);
+    return mine.filter((i) => i.slot >= n).length <= n - mine.filter((i) => i.slot < n).length;
+  }
+  function changeSlots(p: PocketKey, delta: 4 | -4) {
+    const n = inv.slots[p] + delta;
+    if (delta > 0) {
+      if (n > maxSlots(p)) return;
+      persist({ ...inv, slots: { ...inv.slots, [p]: n } });
+      return;
+    }
+    if (!canShrink(p)) return flash("No room: take something out first");
+    const mine = inv.items.filter((i) => i.pocket === p);
+    const free = Array.from({ length: n }, (_, k) => k).filter((k) => !mine.some((i) => i.slot === k));
+    const moved = new Map(mine.filter((i) => i.slot >= n).map((i, k) => [i.id, free[k]]));
+    persist({ ...inv, slots: { ...inv.slots, [p]: n }, items: inv.items.map((i) => (moved.has(i.id) ? { ...i, slot: moved.get(i.id)! } : i)) });
   }
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
@@ -262,7 +322,7 @@ export function Backpack({ initial }: { initial: Inventory }) {
 
 
   return (
-    <div className="flex flex-col gap-4">
+    <div ref={rootRef} className="flex flex-col gap-4">
       {moving && (
         <p className="fade-in m-0 flex items-center gap-2 text-[13.5px]" style={{ color: "var(--t-ink)" }}>
           Tap a slot to move <b>{moving.name}</b> there.
@@ -272,14 +332,18 @@ export function Backpack({ initial }: { initial: Inventory }) {
         </p>
       )}
 
-      {/* Its gear: this view's settings, in a panel above the pack. */}
-      <div className="-mb-2 flex justify-end">
-        <button type="button" onClick={() => setArranging((v) => !v)} aria-pressed={arranging} aria-label="Inventory settings" title="Inventory settings" className="settings-gear flex h-8 w-8 items-center justify-center rounded-full" style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)", opacity: arranging ? 1 : 0.7 }}>
-          <GearIcon size={16} />
-        </button>
-      </div>
-      {arranging && (
-        <div className="reveal parchment flex flex-col gap-2 rounded-2xl p-3" style={{ border: "1.5px solid #a88a3f", color: "#2a1c10" }}>
+      {/* Its gear: this view's settings, beside the ×; they open in a panel above the pack. */}
+      {(() => {
+        const gear = (
+          <button type="button" onClick={() => setArranging((v) => !v)} aria-pressed={arranging} aria-label="Inventory settings" title="Inventory settings" className="settings-gear flex h-8 w-8 items-center justify-center rounded-full" style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)", opacity: arranging ? 1 : 0.7 }}>
+            <GearIcon size={16} />
+          </button>
+        );
+        // No header slot (shouldn't happen): the gear keeps its old place above the pack.
+        return toolsHost ? createPortal(gear, toolsHost) : toolsHost === null ? <div className="-mb-2 flex justify-end">{gear}</div> : null;
+      })()}
+      <Fold open={arranging}>
+        <div className="parchment flex flex-col gap-2 rounded-2xl p-3" style={{ border: "1.5px solid #a88a3f", color: "#2a1c10" }}>
           <div className="flex items-center gap-3">
             {/* A live sample of the band over a portrait-like square. */}
             <span aria-hidden className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg" style={{ background: "linear-gradient(135deg,#c9a24a,#6b8a4a 55%,#3d5a7a)" }}>
@@ -297,11 +361,22 @@ export function Backpack({ initial }: { initial: Inventory }) {
               <input type="range" min={0.15} max={1} step={0.05} value={refillAlpha} onChange={(e) => changeAlpha(Number(e.target.value))} aria-label="How solid the Refill band is" className="h-7 w-full" style={{ accentColor: "#a88a3f" }} />
             </label>
           </div>
-          <button type="button" onClick={() => setArranging(false)} className="ml-auto h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+          {/* Packing lists' pills: one row that scrolls sideways, or all of them at once. */}
+          <div className="relative z-[1] flex flex-wrap items-center gap-2 text-[13.5px] font-semibold" style={{ borderTop: "1px solid rgba(139,112,64,.25)", paddingTop: 8 }}>
+            Packing list pills
+            <span role="radiogroup" aria-label="Packing list pills" className="ml-auto flex rounded-full p-0.5" style={{ background: "rgba(120,90,40,.12)" }}>
+              {(["scroll", "wrap"] as const).map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={pillMode === m} onClick={() => choosePills(m)} className="h-7 rounded-full px-3 text-[13px] font-semibold" style={pillMode === m ? { background: "var(--t-gold)", color: "#2a1c10" } : { color: "#6b5631" }}>
+                  {m === "scroll" ? "Scroll sideways" : "Show all"}
+                </button>
+              ))}
+            </span>
+          </div>
+          <button type="button" onClick={() => setArranging(false)} className="relative z-[1] ml-auto h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
             Done
           </button>
         </div>
-      )}
+      </Fold>
 
       {/* The pack, with the gilded bring-from-home tab tucked against its right edge (no column of its own) */}
       <div className="relative mx-auto w-full max-w-[460px]">
@@ -309,18 +384,41 @@ export function Backpack({ initial }: { initial: Inventory }) {
         <span aria-hidden className="backpack-strap backpack-strap-l" />
         <span aria-hidden className="backpack-strap backpack-strap-r" />
         <span aria-hidden className="backpack-handle" />
+        {/* ☰ at the pack's top right: packing lists and bring from home. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setPackMenu((m) => (m ? null : { x: r.right, y: r.bottom + 6 }));
+          }}
+          aria-haspopup="menu"
+          aria-expanded={!!packMenu}
+          aria-label="Backpack menu"
+          title="Packing lists and more"
+          className="absolute right-3 top-1.5 z-[2] flex h-7 w-7 items-center justify-center rounded-full"
+          style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+            <path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
         {POCKETS.map((p) => (
           <section key={p.key} aria-label={p.label} className={`backpack-pocket ${p.key === "top" ? "backpack-flap" : "backpack-main"}`}>
-            <div className="mb-2 flex items-baseline justify-between">
-              <h3 className="font-display m-0 text-[15px]" style={{ color: "#f2d27e" }}>
-                {p.label}
-              </h3>
-              <span className="flex items-center gap-1 text-[11.5px]" style={{ color: "rgba(242,210,126,.6)" }}>
-                {inv.items.filter((i) => i.pocket === p.key).length}/{inv.slots[p.key]}
-                <RowStepper total={Math.ceil(inv.slots[p.key] / 4)} shown={rows[p.key]} onChange={(n) => showRows(p.key, n)} />
+            <div className={`flex items-center justify-between gap-2 transition-[margin] ${folded[p.key] ? "" : "mb-2"}`}>
+              {/* Tapping the title folds the pocket down to just its title. */}
+              <button type="button" onClick={() => toggleFold(p.key)} aria-expanded={!folded[p.key]} title={folded[p.key] ? "Open this pocket" : "Fold this pocket away"} className="font-display -ml-1 flex min-h-8 min-w-0 items-center gap-1 rounded-lg px-1 text-[15px]" style={{ color: "#f2d27e" }}>
+                <span className="truncate">{p.label}</span>
+                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden className="shrink-0 transition-transform duration-200" style={{ transform: folded[p.key] ? "rotate(-90deg)" : undefined, opacity: 0.7 }}>
+                  <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <span className="flex shrink-0 items-center gap-1">
+                <SlotButton label="− 4 slots" aria={`Remove 4 slots from the ${p.label.toLowerCase()}`} disabled={!canShrink(p.key)} onClick={() => changeSlots(p.key, -4)} />
+                <SlotButton label="+ 4 slots" aria={`Add 4 slots to the ${p.label.toLowerCase()}`} disabled={inv.slots[p.key] >= maxSlots(p.key)} onClick={() => changeSlots(p.key, 4)} />
               </span>
             </div>
-            <RowWindow rows={rows[p.key]}>
+            <Fold open={!folded[p.key]}>
+            <PocketWindow height={heights[p.key]} onHeight={(h) => setHeight(p.key, h)} label={p.label}>
               {Array.from({ length: inv.slots[p.key] }, (_, slot) => {
                 const item = at(p.key, slot);
                 return (
@@ -342,15 +440,8 @@ export function Backpack({ initial }: { initial: Inventory }) {
                   </div>
                 );
               })}
-            </RowWindow>
-            <button
-              type="button"
-              onClick={() => persist({ ...inv, slots: { ...inv.slots, [p.key]: Math.min(p.key === "top" ? 16 : 32, inv.slots[p.key] + 4) } })}
-              className="mt-1 self-center text-[11.5px] underline underline-offset-2"
-              style={{ color: "rgba(242,210,126,.55)" }}
-            >
-              + Sew on 4 more slots
-            </button>
+            </PocketWindow>
+            </Fold>
           </section>
         ))}
       </div>
@@ -368,9 +459,25 @@ export function Backpack({ initial }: { initial: Inventory }) {
         </button>
       </div>
 
+      <Fold open={packOpen}>
+        <div ref={packRef}>
+          <PackingLists lists={inv.packing} onChange={(packing) => persist({ ...inv, packing })} pillMode={pillMode} onClose={() => openPacking(false)} />
+        </div>
+      </Fold>
+
       <p className="m-0 text-center text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
         Tap an item for its menu · hold and drag to move it
       </p>
+      {packMenu && (
+        <PackMenu
+          x={packMenu.x}
+          y={packMenu.y}
+          packOpen={packOpen}
+          onClose={() => setPackMenu(null)}
+          onPacking={() => (setPackMenu(null), openPacking(!packOpen))}
+          onBring={() => (setPackMenu(null), setBringOpen(true))}
+        />
+      )}
       {drag &&
         createPortal(
           <div aria-hidden className="cursor-grabbing pointer-events-none fixed z-[90] h-16 w-16 overflow-hidden rounded-xl" style={{ left: drag.x - 32, top: drag.y - 40, transform: "scale(1.08) rotate(-4deg)", boxShadow: "0 14px 28px rgba(0,0,0,.55), 0 0 0 2px #f2d27e", background: "#2a1a10" }}>
@@ -743,41 +850,104 @@ function ItemSheet({
   );
 }
 
-/** − / + beside a pocket's count: show fewer or more of its rows (all of them by default). */
-function RowStepper({ total, shown, onChange }: { total: number; shown?: number; onChange: (n: number) => void }) {
-  const n = Math.min(total, shown ?? total);
-  const btn = "flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none disabled:opacity-30";
-  const style = { border: "1px solid rgba(242,210,126,.4)", color: "#f2d27e" };
-  if (total <= 1) return null;
+/** A small labelled pill by a pocket's title: take away or sew on 4 slots. */
+function SlotButton({ label, aria, disabled, onClick }: { label: string; aria: string; disabled: boolean; onClick: () => void }) {
   return (
-    <span className="ml-1 flex items-center gap-0.5" title={`${n} of ${total} rows showing — scroll for the rest`}>
-      <button type="button" className={btn} style={style} disabled={n <= 1} onClick={() => onChange(n - 1)} aria-label="Show one row fewer">
-        −
-      </button>
-      <button type="button" className={btn} style={style} disabled={n >= total} onClick={() => onChange(n + 1)} aria-label="Show one more row">
-        +
-      </button>
-    </span>
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={aria} title={disabled ? (label.startsWith("+") ? "As many as fit" : "No empty slots to take away") : aria} className="flex h-7 items-center whitespace-nowrap rounded-full px-2 text-[11.5px] font-semibold disabled:opacity-35" style={{ border: "1px solid rgba(242,210,126,.45)", color: "#f2d27e", background: "rgba(20,12,4,.25)" }}>
+      {label}
+    </button>
   );
 }
 
-/** The pocket's grid, cut to `rows` rows; the hidden ones scroll into view. */
-function RowWindow({ rows, children }: { rows?: number; children: React.ReactNode }) {
+/** The ☰ menu from the pack's top right corner. */
+function PackMenu({ x, y, packOpen, onClose, onPacking, onBring }: { x: number; y: number; packOpen: boolean; onClose: () => void; onPacking: () => void; onBring: () => void }) {
+  useEscape(onClose);
+  const W = 214;
+  const left = Math.max(8, Math.min(x - W, (typeof window === "undefined" ? 400 : window.innerWidth) - W - 8));
+  const row = "relative z-[1] flex min-h-11 items-center gap-2.5 px-4 text-left text-[15px] hover:bg-black/5";
+  return createPortal(
+    <div className="fixed inset-0 z-[57]" onClick={onClose} onContextMenu={(e) => (e.preventDefault(), onClose())}>
+      <div role="menu" data-menu="backpack" aria-label="Backpack menu" onClick={(e) => e.stopPropagation()} className="card-pop-in parchment fixed flex flex-col overflow-hidden py-1" style={{ left, top: y, width: W, borderRadius: 14, boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}>
+        <button type="button" role="menuitem" onClick={onPacking} className={row} style={{ color: "var(--t-ink)" }}>
+          <span aria-hidden className="w-5 text-center">🧳</span>
+          {packOpen ? "Close packing lists" : "Packing lists"}
+        </button>
+        <button type="button" role="menuitem" onClick={onBring} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
+          <span aria-hidden className="w-5 text-center">🏠</span>
+          Bring from home
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/**
+ * The pocket's grid, shown at the height you drag its bottom seam to (the
+ * slots don't change; the rest scrolls). Dragging past the last row shows it
+ * all again; double-click the seam to reset.
+ */
+function PocketWindow({ height, onHeight, label, children }: { height?: number; onHeight: (h: number | null) => void; label: string; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [rowH, setRowH] = useState<number | null>(null);
-  useEffect(() => {
-    const el = ref.current?.firstElementChild as HTMLElement | null;
-    if (!el) return;
-    const measure = () => setRowH(el.offsetHeight + 8);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const cut = rows && rowH ? rows * rowH - 8 : undefined;
+  const [live, setLive] = useState<number | null>(null);
+  const h = live ?? height ?? null;
+  const bounds = () => {
+    const el = ref.current!;
+    const row = (el.firstElementChild as HTMLElement | null)?.offsetHeight ?? 60;
+    return { min: Math.min(row, el.scrollHeight), full: el.scrollHeight };
+  };
+  function grab(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0 || !ref.current) return;
+    e.preventDefault();
+    const bar = e.currentTarget;
+    const id = e.pointerId;
+    bar.setPointerCapture(id);
+    const y0 = e.clientY;
+    const start = ref.current.getBoundingClientRect().height;
+    const { min, full } = bounds();
+    let last = start;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      last = Math.max(min, Math.min(full, start + ev.clientY - y0));
+      setLive(last);
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      bar.removeEventListener("pointermove", move);
+      bar.removeEventListener("pointerup", end);
+      bar.removeEventListener("pointercancel", end);
+      setLive(null);
+      if (Math.abs(last - start) > 2) onHeight(last >= full - 4 ? null : Math.round(last));
+    };
+    bar.addEventListener("pointermove", move);
+    bar.addEventListener("pointerup", end);
+    bar.addEventListener("pointercancel", end);
+  }
+  function key(e: React.KeyboardEvent) {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    const { min, full } = bounds();
+    const cur = ref.current!.getBoundingClientRect().height;
+    const next = Math.max(min, Math.min(full, cur + (e.key === "ArrowDown" ? 24 : -24)));
+    onHeight(next >= full - 4 ? null : Math.round(next));
+  }
   return (
-    <div ref={ref} className={`grid grid-cols-4 gap-2 ${cut ? "overflow-y-auto overscroll-contain" : ""}`} style={cut ? { maxHeight: cut, scrollSnapType: "y mandatory" } : undefined}>
-      {children}
-    </div>
+    <>
+      <div ref={ref} className="grid grid-cols-4 gap-2 overflow-y-auto overscroll-contain" style={h ? { maxHeight: h } : undefined}>
+        {children}
+      </div>
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={`Drag to show more or less of the ${label.toLowerCase()}`}
+        title="Drag to show more or less · double-click to show all"
+        tabIndex={0}
+        onPointerDown={grab}
+        onDoubleClick={() => onHeight(null)}
+        onKeyDown={key}
+        className="inv-seam"
+        data-dragging={live != null ? "true" : undefined}
+      />
+    </>
   );
 }
