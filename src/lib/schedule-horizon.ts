@@ -63,13 +63,12 @@ export function planByFor(key: HorizonKey, now = new Date()): string | null {
   return horizonEnds(now)[key]!.toISOString();
 }
 
-/** Quick picks when sorting imports (owner, Nov 6: "This week, next week, within 2 weeks, one month, custom"): days from today. */
+/** Quick picks when sorting imports (owner, Nov 6: "schedule within this week, within 2 weeks, 1 month, or other"): days from today. */
 export function quickPlanDays(now = new Date()): { label: string; days: number }[] {
   const toSunday = (7 - now.getDay()) % 7;
   return [
     { label: "This week", days: toSunday },
-    { label: "Next week", days: toSunday + 7 },
     { label: "Within 2 weeks", days: 14 },
-    { label: "One month", days: 30 },
+    { label: "1 month", days: 30 },
   ];
 }

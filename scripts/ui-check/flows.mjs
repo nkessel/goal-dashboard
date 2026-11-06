@@ -360,11 +360,14 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/import", { name: "import" });
       await h.check("one by one");
-      // Schedule within (owner, Nov 6): one tap, and Custom… opens in place.
-      await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^next week$/i }).first(), "rate: next week", { optional: true });
-      if (await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^custom/i }).first(), "rate: custom", { optional: true, expectMove: true })) await h.check("rate: custom open");
-      // Quest details as pills (owner, Nov 6): XP opens its − / + in place, Tiny sets 15 XP, 5 min, ⚡⚡, a coin; the gear picks which show.
-      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /xp$/i }).first(), "attrs: xp", { optional: true, expectMove: true })) await h.check("attrs: xp open");
+      // Schedule within (owner, Nov 6): This week, Within 2 weeks, 1 month, Other… (opens in place).
+      await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^within 2 weeks$/i }).first(), "rate: within 2 weeks", { optional: true });
+      if (await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^other/i }).first(), "rate: other", { optional: true, expectMove: true })) await h.check("rate: other open");
+      // Quest details as the editor's pills (owner, Nov 6): XP & coins in one, Time, Due, ⚡ Tiny, 🔥 Importance (with difficulty and energy), Board.
+      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /xp/i }).first(), "attrs: xp", { optional: true, expectMove: true })) await h.check("attrs: xp open");
+      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^importance/i }).first(), "attrs: importance", { optional: true, expectMove: true })) await h.check("attrs: importance open");
+      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^time$|^\d+m$/i }).first(), "attrs: time", { optional: true, expectMove: true })) await h.check("attrs: time open");
+      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^board/i }).first(), "attrs: board", { optional: true, expectMove: true })) await h.check("attrs: board open");
       await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /tiny/i }).first(), "attrs: tiny", { optional: true });
       if (await h.tap((p) => p.getByRole("button", { name: /^more…$/i }).first(), "attrs: more", { optional: true, expectMove: true })) await h.check("attrs: more open");
       if (await h.tap((p) => p.getByRole("button", { name: /import settings/i }).first(), "import gear", { optional: true, expectMove: true })) {

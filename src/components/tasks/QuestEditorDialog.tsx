@@ -130,7 +130,7 @@ const MORE_NAMES: Partial<Record<EditorPart, string>> = {
   steps: "sub-quests",
 };
 /** The due chip's label: "today", "tomorrow", "Fri", or "Nov 12". */
-function dueChipLabel(day: string) {
+export function dueChipLabel(day: string) {
   const d = new Date(`${day}T12:00`);
   const today = new Date();
   today.setHours(12, 0, 0, 0);
@@ -141,7 +141,7 @@ function dueChipLabel(day: string) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 /** One tap for the usual due dates: today, tomorrow, the end of this week, a week from now. */
-function dueQuickPicks() {
+export function dueQuickPicks() {
   const at = (n: number) => {
     const d = new Date();
     d.setDate(d.getDate() + n);
@@ -188,7 +188,7 @@ function dueIso(date: string, time: string): string | null {
  * once. `origin="fab"` makes it rise out of the + button; inside the + sheet
  * (EmbedHost) it renders in place without its own overlay or header.
  */
-const ESTIMATE_PICKS = [5, 10, 15, 30];
+export const ESTIMATE_PICKS = [5, 10, 15, 30];
 
 export function QuestEditorDialog({
   mode,
