@@ -573,15 +573,35 @@ export const FLOWS = [
       }
       if (await h.tap((p) => p.getByRole("button", { name: /^backpack menu$/i }).first(), "backpack menu", { optional: true, expectMove: true })) {
         await h.check("backpack menu");
-        if (await h.tap((p) => p.getByRole("menuitem", { name: /packing lists/i }).first(), "open packing lists", { optional: true, expectMove: true })) {
-          await h.settle(500);
-          await h.tap((p) => p.getByRole("button", { name: /new list/i }).first(), "new packing list", { optional: true, expectMove: true });
-          await h.page.keyboard.type("Weekend away").catch(() => {});
-          await h.page.keyboard.press("Enter").catch(() => {});
-          await h.page.getByLabel("Add something to pack").first().fill("Toothbrush").catch(() => {});
-          await h.page.getByLabel("Add something to pack").first().press("Enter").catch(() => {});
-          await h.tap((p) => p.getByRole("button", { name: /^copy$/i }).first(), "copy list", { optional: true, expectMove: true });
-          await h.check("packing lists");
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /packing lists/i }).first(), "open packing window", { optional: true, expectMove: true })) {
+          await h.settle(900);
+          const win = () => h.page.locator("[data-packing-window]");
+          await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^new list$/i }).first(), "new packing list", { optional: true, expectMove: true });
+          await win().getByLabel("New list's name").fill("Weekend away").catch(() => {});
+          await win().getByLabel("New list's name").press("Enter").catch(() => {});
+          await h.settle(400);
+          for (const t of ["Toothbrush", "Chargers"]) {
+            await win().getByLabel("+ Add item").first().fill(t).catch(() => {});
+            await win().getByLabel("+ Add item").first().press("Enter").catch(() => {});
+          }
+          await h.check("packing window");
+          await h.typeIn((p) => p.locator("[data-packing-window]").getByLabel("+ Add item").first(), "packing add item", "Socks");
+          if (await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /edit$/i }).first(), "packing: edit", { optional: true, expectMove: true })) {
+            await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /add a sub-item under chargers/i }).first(), "packing: sub-item", { optional: true, expectMove: true });
+            await h.page.keyboard.type("Phone cable").catch(() => {});
+            await h.page.keyboard.press("Enter").catch(() => {});
+            await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^\+ section$/i }).first(), "packing: add section", { optional: true, expectMove: true });
+            await h.page.keyboard.type("Suitcase").catch(() => {});
+            await h.page.keyboard.press("Enter").catch(() => {});
+            await h.check("packing window: editing");
+            await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^done$/i }).first(), "packing: done", { optional: true, expectMove: true });
+          }
+          await h.tap((p) => p.locator("[data-packing-window]").getByRole("checkbox", { name: /toothbrush/i }).first(), "packing: tick", { optional: true });
+          await h.check("packing window: ticked");
+          await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^minimize$/i }).first(), "packing: minimize", { optional: true, expectMove: true });
+          await h.check("packing chip");
+          await h.tap((p) => p.getByRole("button", { name: /open packing lists/i }).first(), "packing: restore", { optional: true, expectMove: true });
+          await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^close$/i }).first(), "packing: close", { optional: true, expectMove: true });
         }
       }
       await h.tap((p) => p.getByRole("button", { name: /^add 4 slots to the utility pocket$/i }).first(), "add slots", { optional: true, expectMove: true });

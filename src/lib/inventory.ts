@@ -19,8 +19,14 @@ export type InventoryItem = {
 /** The bring-from-home list in the backpack's side drawer: things to pack, ticked off as they go in. */
 export type BringItem = { id: string; name: string; done: boolean };
 export type BringList = { place: string; items: BringItem[] };
-/** A named packing list (a weekend away, the gym, a beach day…), opened from the backpack's ☰ menu. */
-export type PackingList = { id: string; name: string; items: BringItem[] };
+/**
+ * Packing lists (owner, Nov 6), opened from the backpack's ☰ menu in a floating window: named
+ * lists (a weekend away, the gym…), each with sections (Suitcase, Backpack…; the first may be
+ * unnamed), each item with its own sub-checklist.
+ */
+export type PackItem = { id: string; name: string; done: boolean; subs: BringItem[] };
+export type PackSection = { id: string; name: string; items: PackItem[] };
+export type PackingList = { id: string; name: string; sections: PackSection[] };
 
 export type Inventory = { slots: Record<PocketKey, number>; items: InventoryItem[]; bring: BringList; packing: PackingList[] };
 
@@ -43,11 +49,29 @@ function normalizeBring(raw: unknown): BringList {
   return { place: typeof r.place === "string" ? r.place.replace(/\s+/g, " ").trim().slice(0, 40) : "", items: normalizeItems(r.items) };
 }
 
-function normalizePacking(raw: unknown): PackingList[] {
+const clip = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
+const idOf = (v: unknown, fallback: string) => (typeof v === "string" && v ? v.slice(0, 40) : fallback);
+
+function normalizePackItems(raw: unknown): PackItem[] {
+  return (Array.isArray(raw) ? raw : [])
+    .filter((i) => !!i && typeof i === "object" && clip((i as PackItem).name, 80))
+    .map((i: PackItem, k) => ({ id: idOf(i.id, `pi${k}`), name: clip(i.name, 80), done: i.done === true, subs: normalizeItems(i.subs).slice(0, 30) }))
+    .slice(0, 80);
+}
+
+export function normalizePacking(raw: unknown): PackingList[] {
   const seen = new Set<string>();
   return (Array.isArray(raw) ? raw : [])
-    .filter((l): l is PackingList => !!l && typeof l.id === "string" && !seen.has(l.id) && !!seen.add(l.id))
-    .map((l) => ({ id: l.id.slice(0, 40), name: (typeof l.name === "string" ? l.name.replace(/\s+/g, " ").trim().slice(0, 40) : "") || "Packing list", items: normalizeItems(l.items) }))
+    .filter((l): l is PackingList & { items?: unknown } => !!l && typeof l.id === "string" && !seen.has(l.id) && !!seen.add(l.id))
+    .map((l) => {
+      // Lists made before sections (Nov 6 morning) kept a flat `items`: they become one unnamed section.
+      const rawSections = (Array.isArray(l.sections) ? l.sections : [{ id: `${l.id}-s`, name: "", items: (l as { items?: unknown }).items }]) as PackSection[];
+      const sections = rawSections
+        .filter((s) => !!s && typeof s === "object")
+        .map((s: PackSection, k) => ({ id: idOf(s.id, `${l.id}-s${k}`), name: clip(s.name, 40), items: normalizePackItems(s.items) }))
+        .slice(0, 20);
+      return { id: l.id.slice(0, 40), name: clip(l.name, 40) || "Packing list", sections: sections.length ? sections : [{ id: `${l.id}-s`, name: "", items: [] }] };
+    })
     .slice(0, 30);
 }
 

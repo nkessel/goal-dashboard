@@ -8,7 +8,7 @@ import { POCKETS, type BringList, type Inventory, type InventoryItem, type ItemS
 import { CHECKIN_STYLES } from "@/lib/celebration-fx";
 import { useEscape } from "@/lib/use-escape";
 import { Fold, useClosing } from "@/components/ui/Fold";
-import { PILL_MODE_KEY, PackingLists, type PillMode } from "./PackingLists";
+import { openPackingWindow } from "./PackingLists";
 
 const STATUS: { v: ItemStatus; label: string; hint: string }[] = [
   { v: "full", label: "Stocked", hint: "Full and ready" },
@@ -95,16 +95,12 @@ export function Backpack({ initial }: { initial: Inventory }) {
   // which pockets are folded to their title, the packing lists' pills and whether they're open.
   const [heights, setHeights] = useState<Partial<Record<PocketKey, number>>>({});
   const [folded, setFolded] = useState<Partial<Record<PocketKey, boolean>>>({});
-  const [pillMode, setPillMode] = useState<PillMode>("scroll");
-  const [packOpen, setPackOpen] = useState(false);
   useEffect(() => {
     try {
       const ls = window.localStorage;
       /* eslint-disable react-hooks/set-state-in-effect -- browser storage is only readable after hydration */
       setHeights(JSON.parse(ls.getItem("inv-heights") ?? "{}") as Partial<Record<PocketKey, number>>);
       setFolded(JSON.parse(ls.getItem("inv-folded") ?? "{}") as Partial<Record<PocketKey, boolean>>);
-      if (ls.getItem(PILL_MODE_KEY) === "wrap") setPillMode("wrap");
-      if (ls.getItem("inv-pack-open") === "1") setPackOpen(true);
       /* eslint-enable react-hooks/set-state-in-effect */
     } catch {
       /* storage unavailable */
@@ -129,16 +125,6 @@ export function Backpack({ initial }: { initial: Inventory }) {
     setFolded(next);
     store("inv-folded", next);
   }
-  function choosePills(m: PillMode) {
-    setPillMode(m);
-    store(PILL_MODE_KEY, m);
-  }
-  function openPacking(open: boolean) {
-    setPackOpen(open);
-    store("inv-pack-open", open ? "1" : "0");
-    if (open) setTimeout(() => packRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 320);
-  }
-  const packRef = useRef<HTMLDivElement>(null);
   // The ☰ menu at the pack's top right.
   const [packMenu, setPackMenu] = useState<{ x: number; y: number } | null>(null);
   // The settings gear sits beside the screen's × (or its title on the full page), so it takes no row of its own.
@@ -361,17 +347,6 @@ export function Backpack({ initial }: { initial: Inventory }) {
               <input type="range" min={0.15} max={1} step={0.05} value={refillAlpha} onChange={(e) => changeAlpha(Number(e.target.value))} aria-label="How solid the Refill band is" className="h-7 w-full" style={{ accentColor: "#a88a3f" }} />
             </label>
           </div>
-          {/* Packing lists' pills: one row that scrolls sideways, or all of them at once. */}
-          <div className="relative z-[1] flex flex-wrap items-center gap-2 text-[13.5px] font-semibold" style={{ borderTop: "1px solid rgba(139,112,64,.25)", paddingTop: 8 }}>
-            Packing list pills
-            <span role="radiogroup" aria-label="Packing list pills" className="ml-auto flex rounded-full p-0.5" style={{ background: "rgba(120,90,40,.12)" }}>
-              {(["scroll", "wrap"] as const).map((m) => (
-                <button key={m} type="button" role="radio" aria-checked={pillMode === m} onClick={() => choosePills(m)} className="h-7 rounded-full px-3 text-[13px] font-semibold" style={pillMode === m ? { background: "var(--t-gold)", color: "#2a1c10" } : { color: "#6b5631" }}>
-                  {m === "scroll" ? "Scroll sideways" : "Show all"}
-                </button>
-              ))}
-            </span>
-          </div>
           <button type="button" onClick={() => setArranging(false)} className="relative z-[1] ml-auto h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
             Done
           </button>
@@ -459,12 +434,6 @@ export function Backpack({ initial }: { initial: Inventory }) {
         </button>
       </div>
 
-      <Fold open={packOpen}>
-        <div ref={packRef}>
-          <PackingLists lists={inv.packing} onChange={(packing) => persist({ ...inv, packing })} pillMode={pillMode} onClose={() => openPacking(false)} />
-        </div>
-      </Fold>
-
       <p className="m-0 text-center text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
         Tap an item for its menu · hold and drag to move it
       </p>
@@ -472,9 +441,8 @@ export function Backpack({ initial }: { initial: Inventory }) {
         <PackMenu
           x={packMenu.x}
           y={packMenu.y}
-          packOpen={packOpen}
           onClose={() => setPackMenu(null)}
-          onPacking={() => (setPackMenu(null), openPacking(!packOpen))}
+          onPacking={() => (setPackMenu(null), openPackingWindow())}
           onBring={() => (setPackMenu(null), setBringOpen(true))}
         />
       )}
@@ -860,7 +828,7 @@ function SlotButton({ label, aria, disabled, onClick }: { label: string; aria: s
 }
 
 /** The ☰ menu from the pack's top right corner. */
-function PackMenu({ x, y, packOpen, onClose, onPacking, onBring }: { x: number; y: number; packOpen: boolean; onClose: () => void; onPacking: () => void; onBring: () => void }) {
+function PackMenu({ x, y, onClose, onPacking, onBring }: { x: number; y: number; onClose: () => void; onPacking: () => void; onBring: () => void }) {
   useEscape(onClose);
   const W = 214;
   const left = Math.max(8, Math.min(x - W, (typeof window === "undefined" ? 400 : window.innerWidth) - W - 8));
@@ -870,7 +838,7 @@ function PackMenu({ x, y, packOpen, onClose, onPacking, onBring }: { x: number; 
       <div role="menu" data-menu="backpack" aria-label="Backpack menu" onClick={(e) => e.stopPropagation()} className="card-pop-in parchment fixed flex flex-col overflow-hidden py-1" style={{ left, top: y, width: W, borderRadius: 14, boxShadow: "0 12px 28px rgba(0,0,0,.45)" }}>
         <button type="button" role="menuitem" onClick={onPacking} className={row} style={{ color: "var(--t-ink)" }}>
           <span aria-hidden className="w-5 text-center">🧳</span>
-          {packOpen ? "Close packing lists" : "Packing lists"}
+          Packing lists
         </button>
         <button type="button" role="menuitem" onClick={onBring} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">🏠</span>

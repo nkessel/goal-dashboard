@@ -3284,9 +3284,33 @@ export async function saveInventoryAction(inventory: unknown) {
   const { normalizeInventory } = await import("@/lib/inventory");
   const clean = normalizeInventory(inventory);
   const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
+  // Packing lists are saved by their own window (below); the backpack never writes over them.
+  const stored = ((cur?.life_wheel ?? {}) as { inventory?: { packing?: unknown } }).inventory?.packing;
+  if (stored !== undefined) (clean as { packing: unknown }).packing = stored;
   const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...(cur?.life_wheel ?? {}), inventory: clean } }).eq("id", ownerId);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   revalidatePath("/settings");
+  return clean;
+}
+
+/** Your packing lists, for the floating packing window. */
+export async function packingListsAction() {
+  const ownerId = await requireProfileId();
+  const { normalizePacking } = await import("@/lib/inventory");
+  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
+  return normalizePacking(((cur?.life_wheel ?? {}) as { inventory?: { packing?: unknown } }).inventory?.packing);
+}
+
+/** Save the packing lists (merged into the backpack's record, nothing else touched). */
+export async function savePackingListsAction(lists: unknown) {
+  const ownerId = await requireProfileId();
+  const { normalizePacking } = await import("@/lib/inventory");
+  const clean = normalizePacking(lists);
+  const { data: cur } = await supabaseAdmin().from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
+  const lw = cur?.life_wheel ?? {};
+  const inventory = { ...((lw as { inventory?: Record<string, unknown> }).inventory ?? {}), packing: clean };
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...lw, inventory } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
 

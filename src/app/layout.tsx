@@ -9,6 +9,7 @@ import { SaveKeys } from "@/components/ui/SaveKeys";
 import { FOG_HEAD_SCRIPT } from "@/lib/welcome-fog";
 import { ExitGhosts } from "@/components/ui/ExitGhosts";
 import { LanguageWindow } from "@/components/xp/LearnLanguage";
+import { PackingWindow } from "@/components/settings/PackingLists";
 import { ClickTrail } from "@/components/ui/ClickTrail";
 import { LastScreen } from "@/components/ui/LastScreen";
 import "./globals.css";
@@ -89,6 +90,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
         <ExitGhosts />
         <LastScreen />
         <LanguageWindow />
+        <PackingWindow />
         <ViewTransitionProvider>
           {children}
           {drawer}

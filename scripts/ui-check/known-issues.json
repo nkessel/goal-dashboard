@@ -18,5 +18,9 @@
   {
     "match": "^calendar\\|floating-overlap\\|<button> \"Feedback \\(F\\)\".*Take it off the list",
     "reason": "The auto-scheduler is a floating window (moves, resizes, minimizes); at its default spot on a phone its last row's × can sit under the always-there feedback button. Moving or shrinking the window uncovers it (Nov 6)."
+  },
+  {
+    "match": "^inventory\\|covered-by-bar\\|.*🧳 Packing",
+    "reason": "The minimized packing window is a floating chip (like the language and auto-scheduler chips): it stays where the window was and floats over the page by design; drag it anywhere, tap to open."
   }
 ]
