@@ -360,9 +360,24 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/import", { name: "import" });
       await h.check("one by one");
-      await h.toggle(/snooze/i, "snooze row");
+      // Schedule within (owner, Nov 6): one tap, and Custom… opens in place.
+      await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^next week$/i }).first(), "rate: next week", { optional: true });
+      if (await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^custom/i }).first(), "rate: custom", { optional: true, expectMove: true })) await h.check("rate: custom open");
+      // Quest details as pills (owner, Nov 6): XP opens its − / + in place, Tiny sets 15 XP, 5 min, ⚡⚡, a coin; the gear picks which show.
+      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /xp$/i }).first(), "attrs: xp", { optional: true, expectMove: true })) await h.check("attrs: xp open");
+      await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /tiny/i }).first(), "attrs: tiny", { optional: true });
+      if (await h.tap((p) => p.getByRole("button", { name: /^more…$/i }).first(), "attrs: more", { optional: true, expectMove: true })) await h.check("attrs: more open");
+      if (await h.tap((p) => p.getByRole("button", { name: /import settings/i }).first(), "import gear", { optional: true, expectMove: true })) {
+        await h.check("import gear open");
+        await h.tap((p) => p.getByRole("button", { name: /import settings/i }).first(), "import gear close", { optional: true });
+      }
+      // Snooze lives in the ⋯ menu one by one (owner, Nov 6).
+      if (await h.tap((p) => p.getByRole("button", { name: /^more choices$/i }).first(), "card menu", { optional: true })) {
+        if (await h.tap((p) => p.getByRole("button", { name: /^snooze…$/i }).first(), "snooze from menu", { optional: true, expectMove: true })) await h.check("snooze row");
+      }
       if (await h.tap((p) => p.getByRole("button", { name: /^list$/i }).first(), "list view", { optional: true })) {
         await h.check("list view");
+        await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^this week$/i }).first(), "list: rate this week", { optional: true });
         await h.tap((p) => p.getByRole("button", { name: /import as|add as|log as/i }).first(), "import from list", { optional: true });
         await h.check("list: import steps");
         if (await h.find((p) => p.getByPlaceholder(/search/i).first()).isVisible().catch(() => false)) await h.typeIn((p) => p.getByPlaceholder(/search/i).first(), "import search");
@@ -438,6 +453,12 @@ export const FLOWS = [
       if (await h.tap((p) => p.getByRole("button", { name: /^auto-scheduler/i }).first(), "open the auto-scheduler", { optional: true, expectMove: true })) {
         await h.settle(500);
         await h.check("auto-scheduler window");
+        // Sections on top (owner, Nov 6): Additional quests opens, the list switches between by-when and folders.
+        if (await h.tap((p) => p.getByRole("button", { name: /^open additional quests$/i }).first(), "auto-scheduler: open additional", { optional: true, expectMove: true })) await h.check("auto-scheduler: additional open");
+        if (await h.tap((p) => p.getByRole("button", { name: /by when|folders/i }).first(), "auto-scheduler: grouping", { optional: true, expectMove: true })) {
+          await h.check("auto-scheduler: other grouping");
+          await h.tap((p) => p.getByRole("button", { name: /by when|folders/i }).first(), "auto-scheduler: grouping back", { optional: true, expectMove: true });
+        }
       }
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
       await h.settle(400);

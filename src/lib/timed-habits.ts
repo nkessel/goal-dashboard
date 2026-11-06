@@ -19,15 +19,18 @@ export function habitBlocksOn(habits: TimedHabit[], day: Date, busy: { start: nu
   type Block = { habit: TimedHabit; start: number; end: number; crowded?: boolean; kept?: boolean };
   return habits.flatMap((h): Block[] => {
     const m = /^(\d{1,2}):(\d{2})/.exec(h.due_time);
-    if (!m || !habitOnDay(h, day)) return [];
     const o = holds[`h:${h.id}`];
     if (o?.off) return [];
+    // A habit without a set time shows only where you placed it that day (from the auto-scheduler, Nov 6).
+    if (!m && o?.at == null) return [];
+    if (m && !habitOnDay(h, day)) return [];
     const need = Math.max(15, o?.minutes ?? h.minutes) * 60_000;
     if (o?.at != null) {
       const k = new Date(day);
       k.setHours(0, o.at, 0, 0);
       return [{ habit: h, start: k.getTime(), end: k.getTime() + need, kept: true }];
     }
+    if (!m) return [];
     const s = new Date(day);
     s.setHours(Number(m[1]), Number(m[2]), 0, 0);
     let start = s.getTime();
@@ -45,9 +48,10 @@ export function habitBlocksOn(habits: TimedHabit[], day: Date, busy: { start: nu
   });
 }
 
-/** Rows from the rites table to timed habits (day habits with a time only). */
+/** Rows from the rites table to timed habits: day habits with a time, and (with an empty time) the rest,
+ * which show on a day only once placed there by hand. */
 export function timedHabitsFrom(rows: { id: string; title: string; slot?: string | null; days?: number[] | null; due_time?: string | null; window_to?: string | null; estimate_minutes?: number | null; repeat?: unknown; icon_key?: string | null; icon_source?: string | null }[], clean: (r: unknown) => Repeat | null): TimedHabit[] {
   return rows
-    .filter((r) => r.slot === "day" && r.due_time)
-    .map((r) => ({ id: r.id, title: r.title, days: r.days ?? null, due_time: r.due_time!, window_to: r.window_to ?? null, minutes: r.estimate_minutes ?? 60, repeat: clean(r.repeat), icon_key: r.icon_source ? r.icon_key : null }));
+    .filter((r) => r.slot === "day" && (r as { kind?: string | null }).kind !== "ritual")
+    .map((r) => ({ id: r.id, title: r.title, days: r.days ?? null, due_time: r.due_time ?? "", window_to: r.window_to ?? null, minutes: r.estimate_minutes ?? (r.due_time ? 60 : 30), repeat: clean(r.repeat), icon_key: r.icon_source ? r.icon_key : null }));
 }

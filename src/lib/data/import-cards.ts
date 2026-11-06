@@ -88,8 +88,9 @@ export async function setImportCardStatus(
 }
 
 /** Change a card before sorting it: its name, notes or kind. */
-export async function editImportCard(ownerId: string, id: string, patch: { title?: string; description?: string | null; kind?: ImportCard["kind"] }): Promise<void> {
+export async function editImportCard(ownerId: string, id: string, patch: { title?: string; description?: string | null; kind?: ImportCard["kind"]; plan_within_days?: number | null }): Promise<void> {
   const row: Record<string, unknown> = {};
+  if (patch.plan_within_days !== undefined) row.plan_within_days = patch.plan_within_days;
   if (patch.title !== undefined) row.title = patch.title;
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.kind !== undefined) row.kind = patch.kind;

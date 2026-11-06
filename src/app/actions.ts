@@ -48,7 +48,7 @@ import {
   listEvents,
 } from "@/lib/google-calendar";
 import { coinsForXp } from "@/lib/coins";
-import { earlyBirdBonus, earlyBirdCoins } from "@/lib/next-action";
+import { earlyBirdBonus, earlyBirdCoins, oneStepPerProject } from "@/lib/next-action";
 
 async function requireProfileId(): Promise<string> {
   const session = await auth();
@@ -3131,6 +3131,59 @@ export async function planDayTasksAction(dayEndISO: string) {
   return all.filter((t) => !t.needs_review && !t.reward_id && (!t.snoozed_until || Date.parse(t.snoozed_until) <= now) && (t.is_manual_priority || (!!t.due_at && Date.parse(t.due_at) < end)));
 }
 
+/** A daily habit as the auto-scheduler lists it. */
+export type SchedHabit = { id: string; title: string; minutes: number; due_time: string | null; window_to: string | null; icon_key: string | null; days: number[] | null; repeat: unknown };
+
+/**
+ * The auto-scheduler's sections on top (owner, Nov 6): Today's quests, Additional quests and today's
+ * habits, each without what's already on the list to schedule. `done` holds the habits done or
+ * skipped on `dayKey` (the browser's day); `settings` the scheduler's (for a habit placed by hand).
+ */
+export async function autoSchedulerSectionsAction(dayKey: string) {
+  const ownerId = await requireProfileId();
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(dayKey) ? dayKey : new Date().toISOString().slice(0, 10);
+  const now = Date.now();
+  const [all, boards, rites, profileRes] = await Promise.all([
+    tasksData.listOpenTasksForOwnerWithCategory(ownerId),
+    boardsData.listBoardsForOwner(ownerId).catch(() => []),
+    ritesData.listRites(ownerId).catch(() => null),
+    supabaseAdmin().from("profiles").select("scheduler").eq("id", ownerId).maybeSingle<{ scheduler: Record<string, unknown> | null }>(),
+  ]);
+  const live = all.filter((t) => !t.needs_review && !t.reward_id && t.schedule_rank == null && (!t.snoozed_until || Date.parse(t.snoozed_until) <= now));
+  const today = live.filter((t) => t.is_manual_priority);
+  const additional = oneStepPerProject(live.filter((t) => !t.is_manual_priority && t.in_additional !== false), boards, all).slice(0, 60);
+  const dayHabits = (rites ?? []).filter((r) => r.slot === "day" && r.kind !== "ritual");
+  const ids = dayHabits.map((r) => r.id);
+  const [done, skips] = await Promise.all([ritesData.listCompletionsFor(ownerId, ids, day).catch(() => []), ritesData.listHabitSkips(ownerId, day).catch(() => [])]);
+  const off = new Set([...done, ...(skips ?? [])].filter((c) => c.day === day).map((c) => c.rite_id));
+  const habits: SchedHabit[] = dayHabits
+    .filter((r) => !off.has(r.id))
+    .map((r) => ({ id: r.id, title: r.title, minutes: r.estimate_minutes ?? (r.due_time ? 60 : 30), due_time: r.due_time ?? null, window_to: r.window_to ?? null, icon_key: r.icon_source ? (r.icon_key ?? null) : null, days: r.days ?? null, repeat: cleanRepeat(r.repeat) }));
+  return { today, additional, habits, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
+}
+
+/** Put a quest on the list to schedule in a group (owner, Nov 6): its plan-by (undefined keeps it) and the list's whole new order. */
+export async function moveToSchedulingAction(taskId: string, planBy: string | null | undefined, order: string[], today?: boolean) {
+  const ownerId = await requireProfileId();
+  const patch: Record<string, unknown> = { schedule_folder: null };
+  if (planBy !== undefined) patch.plan_by = planBy && Number.isFinite(Date.parse(planBy)) ? new Date(planBy).toISOString() : null;
+  const { error } = await supabaseAdmin().from("tasks").update(patch).eq("owner_id", ownerId).eq("id", taskId);
+  if (error) throw new Error(`Couldn't move it: ${error.message}`);
+  if (today !== undefined) await tasksData.setManualPriority(taskId, ownerId, today);
+  await schedulingData.setSchedulingOrder(ownerId, order.slice(0, 200));
+  revalidatePath("/");
+  revalidatePath("/calendar");
+}
+
+/** From the list to schedule back to Today's quests (pinned) or Additional quests. */
+export async function moveOffSchedulingAction(taskId: string, toToday: boolean) {
+  const ownerId = await requireProfileId();
+  await schedulingData.removeFromSchedulingList(ownerId, taskId);
+  await tasksData.setManualPriority(taskId, ownerId, toToday);
+  revalidatePath("/");
+  revalidatePath("/calendar");
+}
+
 /** Remember the scheduler's settings and time-of-day choices (on every device). */
 export async function saveSchedulerSettingsAction(settings: Record<string, unknown>) {
   const ownerId = await requireProfileId();
@@ -4197,7 +4250,7 @@ export async function decideImportCardAction(id: string, choice: { kind: "snooze
 }
 
 /** The card became a quest some other way (the full quest editor): mark it imported. */
-export async function editImportCardAction(id: string, patch: { title?: string; description?: string | null; kind?: importCardsData.ImportCard["kind"] }) {
+export async function editImportCardAction(id: string, patch: { title?: string; description?: string | null; kind?: importCardsData.ImportCard["kind"]; /** How soon it needs a time, in days (owner, Nov 6); null clears it. */ planWithinDays?: number | null }) {
   const ownerId = await requireProfileId();
   const KINDS = ["quest", "habit", "schedule", "reward", "project", "shopping", "done", "ritual"];
   const title = patch.title === undefined ? undefined : patch.title.replace(/\s+/g, " ").trim().slice(0, 200);
@@ -4206,6 +4259,7 @@ export async function editImportCardAction(id: string, patch: { title?: string; 
     title,
     description: patch.description === undefined ? undefined : (patch.description ?? "").trim().slice(0, 2000) || null,
     kind: patch.kind && KINDS.includes(patch.kind) ? patch.kind : undefined,
+    plan_within_days: patch.planWithinDays === undefined ? undefined : patch.planWithinDays === null ? null : Math.max(0, Math.min(999, Math.round(patch.planWithinDays))),
   });
   revalidatePath("/import");
 }
@@ -4240,6 +4294,12 @@ export async function importCardAction(
     /** Habits: weekdays (0 = Sunday), or an interval. Neither = every day. */
     days?: number[] | null;
     repeat?: { every: number; unit: "day" | "week" | "month" | "year"; from: string } | null;
+    /** Quest details picked on the card (owner, Nov 6): every import is 15 XP and a coin unless changed. */
+    xp?: number | null;
+    coins?: number | null;
+    isTiny?: boolean;
+    energyGain?: number | null;
+    effort?: number | null;
   }
 ): Promise<{ kind: "quest" | "habit" | "board" | "reward" | "ritual"; id: string }> {
   const ownerId = await requireProfileId();
@@ -4273,7 +4333,7 @@ export async function importCardAction(
     const board = await boardsData.createBoard(ownerId, { title, description: input.description ?? undefined, parentBoardId: input.boardId ?? null });
     let first: string | null = null;
     for (const st of steps) {
-      const q = await createQuestAction({ title: st.slice(0, 200), importance: 0, urgency: 0, xpValue: 20, boardId: board.id }).catch(() => null);
+      const q = await createQuestAction({ title: st.slice(0, 200), importance: 0, urgency: 0, xpValue: 15, coinValue: 1, boardId: board.id }).catch(() => null);
       first ??= q;
     }
     // Its files go with the first step.
@@ -4294,13 +4354,17 @@ export async function importCardAction(
     if (steps.length) await ritesData.setRiteSteps(ownerId, riteId, steps.map((s, i) => ({ id: `s${i + 1}`, title: s.slice(0, 120) }))).catch(() => null);
     made = { kind: "habit", id: riteId };
   } else {
-    const xpValue = Math.min(150, 20 + (minutes ? Math.round(minutes / 10) * 5 : 0));
+    const n = (v: number | null | undefined, lo: number, hi: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : undefined);
     const taskId = await createQuestAction({
       title,
       description: input.description ?? undefined,
       importance: input.importance ?? 0,
       urgency: input.urgency ?? 0,
-      xpValue,
+      xpValue: n(input.xp, 0, 1000) ?? 15,
+      coinValue: n(input.coins, 0, 100) ?? 1,
+      isTiny: input.isTiny || undefined,
+      energyGain: n(input.energyGain, 0, 5),
+      effort: n(input.effort, 0, 5),
       estimateMinutes: minutes,
       boardId: input.boardId ?? null,
       dueAt: input.dueAt ?? null,

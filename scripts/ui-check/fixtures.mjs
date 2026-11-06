@@ -52,6 +52,11 @@ export function makeFixtures() {
     task("Turn the compost and top up the raised beds", { board_id: beds.id }),
     task("Tomatoes, basil and marigolds", { board_id: seeds.id }),
     task("Plan the weekend trip", { in_additional: true, due_at: inHours(170) }),
+    // On the list to schedule (the auto-scheduler groups them by how soon).
+    task("Week 7 assignment: facilitation journal", { board_id: course.id, due_at: inHours(24 * 40), schedule_rank: 0 }),
+    task("Book the dentist cleaning", { plan_by: inHours(48), schedule_rank: 1 }),
+    task("See Grandma for tea", { plan_by: inHours(24 * 9), schedule_rank: 2, estimate_minutes: 90 }),
+    task("Clear out the shed someday", { schedule_rank: 3 }),
     task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20 }),
   ];
   // The calendar: quests placed on it today and this week, one done, and a mini-quest with a time (Nov 3).

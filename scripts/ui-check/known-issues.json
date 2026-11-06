@@ -8,11 +8,15 @@
     "reason": "Seamless days (Nov 3): the time column stays put while the days scroll sideways under it, so a day header scrolled to the far left slides under the time column's top cell. By design; the day is reachable by scrolling."
   },
   {
-    "match": "covered-by-bar\\|<div .reveal> \"Auto-scheduler",
+    "match": "(covered-by-bar|floating-overlap)\\|<div .reveal> \"Auto-scheduler",
     "reason": "The auto-scheduler is a floating window over the calendar by design (owner, Nov 3): it moves by its title, resizes and minimizes to a chip, so what it covers can always be uncovered."
   },
   {
     "match": "^calendar\\|covered-by-bar\\|<button .owl-perch",
     "reason": "The perched owl sits at the screen's bottom-left on phones; a tap sends it to another perch. It covered the last calendar card's XP in the day view only when scrolled to the very bottom."
+  },
+  {
+    "match": "^calendar\\|floating-overlap\\|<button> \"Feedback \\(F\\)\".*Take it off the list",
+    "reason": "The auto-scheduler is a floating window (moves, resizes, minimizes); at its default spot on a phone its last row's × can sit under the always-there feedback button. Moving or shrinking the window uncovers it (Nov 6)."
   }
 ]

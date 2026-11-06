@@ -3,7 +3,8 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
-import { saveSchedulerSettingsAction, scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
+import { scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
+import { getSavedSettings, saveDayHold } from "@/lib/day-holds";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE, type Carried } from "@/lib/schedule-carry";
 import { WeatherLocation, useWeatherPlaceName } from "@/components/ui/WeatherLocation";
 import Link from "next/link";
@@ -151,7 +152,9 @@ export function WeekView({
     setPlaceError(null);
     setPlacing(true);
     try {
-      await scheduleTaskAction(q.id, start.toISOString(), end.toISOString());
+      // A habit from the auto-scheduler (owner, Nov 6): it holds that time on that day.
+      if (q.id.startsWith("h:")) await saveDayHold(daily?.settings ?? null, localDayKey(start), q.id, { at: start.getHours() * 60 + start.getMinutes(), minutes: q.minutes });
+      else await scheduleTaskAction(q.id, start.toISOString(), end.toISOString());
       router.refresh();
     } catch (e) {
       setPlaceError(e instanceof Error ? e.message : "Couldn't put it on the calendar.");
@@ -1175,29 +1178,6 @@ function holdMenuAt(day: Date, x: number, y: number, kind: "tap" | "menu", t: nu
   return ev.defaultPrevented;
 }
 
-// The scheduler settings as last saved from here (the page's copy is stale until it refreshes).
-let savedSettings: Record<string, unknown> | null = null;
-/** Keep, move or leave out a non-negotiable for one day; null lets it float again. */
-async function saveDayHold(base: Record<string, unknown> | null, dayKey: string, key: string, hold: DayHold | null) {
-  const cur = { ...(savedSettings ?? base ?? {}) } as Record<string, unknown> & { essentialDays?: Record<string, Record<string, DayHold>> };
-  const days = { ...(cur.essentialDays ?? {}) };
-  // Only a week back is kept.
-  const cutoff = localDayKey(new Date(Date.now() - 7 * 86_400_000));
-  for (const k of Object.keys(days)) if (k < cutoff) delete days[k];
-  const day = { ...(days[dayKey] ?? {}) };
-  if (hold) day[key] = hold;
-  else delete day[key];
-  days[dayKey] = day;
-  const next = { ...cur, essentialDays: days };
-  savedSettings = next;
-  try {
-    const local = JSON.parse(window.localStorage.getItem("auto-schedule") || "{}");
-    window.localStorage.setItem("auto-schedule", JSON.stringify({ ...local, essentialDays: days }));
-  } catch {
-    /* storage unavailable */
-  }
-  await saveSchedulerSettingsAction(next);
-}
 
 // Each non-negotiable's own look, when it differs from the calendar's setting ("quest" card or dashed "hold").
 const LOOKS_KEY = "hold-looks";
@@ -1263,7 +1243,7 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
       document.removeEventListener("keydown", key);
     };
   }, [menu]);
-  const base = { ...SCHEDULER_DEFAULTS, ...((savedSettings ?? daily.settings) ?? {}) } as SchedulerSettings;
+  const base = { ...SCHEDULER_DEFAULTS, ...((getSavedSettings() ?? daily.settings) ?? {}) } as SchedulerSettings;
   const dayHolds: Record<string, DayHold> = { ...(base.essentialDays?.[dayKey] ?? {}) };
   for (const [k, v] of Object.entries(mine)) {
     if (v) dayHolds[k] = v;

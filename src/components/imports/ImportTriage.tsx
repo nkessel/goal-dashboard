@@ -1,6 +1,7 @@
 "use client";
 
-import { Fold } from "@/components/ui/Fold";
+import { Fold, useLingerValue } from "@/components/ui/Fold";
+import { GearIcon } from "@/components/ui/Icons";
 
 import { FileChips } from "@/components/ui/FileChips";
 
@@ -14,6 +15,7 @@ import { DateField } from "@/components/ui/DateField";
 import { SnoozePicker, type SnoozeChoice } from "@/components/tasks/SnoozePicker";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import type { Task } from "@/lib/data/types";
+import { quickPlanDays } from "@/lib/schedule-horizon";
 
 /*
  * Sorting imports, one card at a time: Import, Snooze or Skip. Import walks
@@ -50,6 +52,8 @@ type Draft = {
   due: string | null | undefined;
   /** "Plan it within" this many days (0 = today); null = no need to schedule. */
   planDays: number | null | undefined;
+  /** Rated on the card already ("Schedule within…"), so the steps don't ask again. */
+  rated?: boolean;
   urgency: number | null | undefined;
   importance: number | null | undefined;
   minutes: number | null | undefined;
@@ -107,7 +111,8 @@ function draftFor(card: ImportCard): Draft {
     steps: card.steps,
     boardId: undefined,
     due: card.due_on ?? undefined,
-    planDays: card.kind === "schedule" ? (card.plan_within_days ?? undefined) : undefined,
+    planDays: card.kind === "habit" || card.kind === "reward" || card.kind === "done" ? undefined : (card.plan_within_days ?? undefined),
+    rated: card.plan_within_days != null && card.kind !== "habit",
     urgency: undefined,
     importance: undefined,
     minutes: card.minutes ?? undefined,
@@ -150,6 +155,28 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
   const visible = queue.filter((c) => kinds.has(c.kind) && matches(c));
   // One card at a time, or the whole list (each row keeps its buttons).
   const [view, setViewState] = useState<"one" | "list">("one");
+  // Quest details picked on cards (XP, coins, due…), kept on this device until imported; and which pills show (the gear).
+  const [attrs, setAttrsAll] = useState<Record<string, Attrs>>({});
+  const [shownAttrs, setShownAttrs] = useState<AttrKey[]>(ATTR_SHOWN_DEFAULT);
+  const [gear, setGear] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+    setAttrsAll(readJSON(ATTRS_KEY, {}));
+    const saved = readJSON<AttrKey[] | null>(ATTR_LAYOUT_KEY, null);
+    if (Array.isArray(saved)) setShownAttrs(saved.filter((k) => ATTRS.some((a) => a.key === k)));
+  }, []);
+  const attrsOf = (id: string): Attrs => attrs[id] ?? {};
+  function setAttrs(id: string, a: Attrs) {
+    setAttrsAll((m) => {
+      const next = { ...m, [id]: a };
+      writeJSON(ATTRS_KEY, next);
+      return next;
+    });
+  }
+  function setShown(next: AttrKey[]) {
+    setShownAttrs(next);
+    writeJSON(ATTR_LAYOUT_KEY, next);
+  }
   // Remembered: the list stays the list (after adding a card too).
   const setView = (v: "one" | "list") => {
     setViewState(v);
@@ -174,7 +201,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
   const [extra, setExtra] = useState<Step[]>([]);
 
   // "How soon" is asked up front for anything to do (quests and buy lists too, not only "to schedule").
-  const base: Step[] = draft?.kind === "habit" ? ["often", "time"] : draft?.kind === "schedule" || draft?.kind === "quest" || draft?.kind === "shopping" ? ["plan", "board"] : draft?.kind === "ritual" ? ["plan"] : draft?.kind === "reward" ? [] : ["board"];
+  const base: Step[] = (draft?.kind === "habit" ? ["often", "time"] : draft?.kind === "schedule" || draft?.kind === "quest" || draft?.kind === "shopping" ? ["plan", "board"] : draft?.kind === "ritual" ? ["plan"] : draft?.kind === "reward" ? [] : ["board"]).filter((x): x is Step => !(x === "plan" && draft?.rated)) as Step[];
   const steps: Step[] = [...base, ...extra.filter((x) => !base.includes(x)), "review"];
   const step = steps[Math.min(stepAt, steps.length - 1)];
   function jump(s: Step) {
@@ -187,6 +214,11 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     if (!id) return;
     setQueue((q) => q.map((c) => (c.id === id ? { ...c, kind } : c)));
     editImportCardAction(id, { kind }).catch(() => null);
+  }
+  // How soon it needs a time (owner, Nov 6): one tap on the card or its row, kept with it.
+  function rate(id: string, days: number | null) {
+    setQueue((q) => q.map((c) => (c.id === id ? { ...c, plan_within_days: days } : c)));
+    editImportCardAction(id, { planWithinDays: days }).catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't save that."));
   }
   // ✎ on a card: its name and notes, kept before you sort it.
   function rename(id: string, patch: { title: string; description: string }) {
@@ -218,7 +250,8 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     if (!c) return;
     setFocusId(c.id);
     const d = draftFor(c);
-    setDraft({ ...d, boardId: findBoard(boards, c.board_hint)?.id });
+    const a = attrsOf(c.id);
+    setDraft({ ...d, boardId: findBoard(boards, c.board_hint)?.id, minutes: a.minutes === undefined ? d.minutes : a.minutes, due: a.due === undefined ? d.due : a.due, importance: a.importance || d.importance });
     setStepAt(0);
     setExtra([]);
     setMode(all ? "all" : "guided");
@@ -270,7 +303,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     next(c.id);
     start(async () => {
       try {
-        await importCardAction(c.id, { kind: "done", title: c.title, description: c.description, steps: [] });
+        await importCardAction(c.id, { kind: "done", title: c.title, description: c.description, steps: [], ...questExtras(attrsOf(c.id)) });
         say(`Logged “${c.title}” as done ✓`);
         router.refresh();
       } catch (e) {
@@ -318,7 +351,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           importance: d.importance ?? null,
           urgency,
           minutes: d.minutes ?? null,
-          ...(d.kind === "habit" ? habitTiming : {}),
+          ...(d.kind === "habit" ? habitTiming : withAttrs(d.kind) ? questExtras(attrsOf(card.id)) : {}),
         });
         const board = boards.find((b) => b.id === d.boardId);
         const nRewards = d.kind === "shopping" ? d.steps.filter((x) => d.rewards?.includes(x)).length : 0;
@@ -422,6 +455,9 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
         <h1 className="m-0 whitespace-nowrap font-display text-[24px]" style={{ color: isAdventure ? "#f2d27e" : INK }}>
           Sort your imports
         </h1>
+        <button type="button" onClick={() => setGear((v) => !v)} aria-expanded={gear} aria-label="Import settings: which quest details show" title="Which quest details show on each card" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-white/10" style={{ color: isAdventure ? "#f2d27e" : SOFT, background: gear ? "rgba(217,180,95,.3)" : undefined }}>
+          <GearIcon size={18} />
+        </button>
         {visible.length > 0 && (
           <span className="text-[13.5px]" style={{ color: isAdventure ? "rgba(242,226,180,.8)" : SOFT }}>
             {visible.length === 1 ? "the last one" : `${visible.length} to sort`}
@@ -439,6 +475,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           </span>
         )}
       </div>
+      <AttrLayout open={gear} shown={shownAttrs} onChange={setShown} />
       {new Set(queue.map((c) => c.kind)).size > 1 && (
         <div className="-mt-2 flex flex-wrap gap-1.5" role="group" aria-label="What to sort now">
           {KINDS.filter((k) => queue.some((c) => c.kind === k.key)).map((k) => {
@@ -516,9 +553,9 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           )}
         </div>
       ) : view === "list" ? (
-        <ListView cards={visible} frame={frame} active={mode !== "card" && card ? { id: card.id, node: flowNode } : null} onQuick={(c, u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l }, c)} onEdit={(c, p) => rename(c.id, p)} onRetag={(c, k) => retag(k, c.id)} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
+        <ListView cards={visible} frame={frame} active={mode !== "card" && card ? { id: card.id, node: flowNode } : null} onQuick={(c, u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l }, c)} onEdit={(c, p) => rename(c.id, p)} onRetag={(c, k) => retag(k, c.id)} onRate={(c, d) => rate(c.id, d)} attrsOf={attrsOf} shownAttrs={shownAttrs} onAttrs={setAttrs} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
       ) : mode === "card" ? (
-        <CardView key={card.id} card={card} frame={frame} onQuick={(u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l })} onRetag={retag} onEdit={(p) => rename(card.id, p)} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
+        <CardView key={card.id} card={card} frame={frame} onQuick={(u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l })} onRetag={retag} onRate={(d) => rate(card.id, d)} attrs={attrsOf(card.id)} shownAttrs={shownAttrs} onAttrs={(a) => setAttrs(card.id, a)} onEdit={(p) => rename(card.id, p)} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
       ) : draft ? (
         flowNode
       ) : null}
@@ -560,14 +597,15 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
   );
 }
 
-function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onQuick, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
+function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onAttrs, onImport, onSnooze, onQuick, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onRate: (days: number | null) => void; attrs: Attrs; shownAttrs: AttrKey[]; onAttrs: (a: Attrs) => void; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
   const [source, setSource] = useState(false);
   const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [later, setLater] = useState(false);
   // Files kept with the card go with it onto the quest (adding one is in the quest editor's More).
   const files = card.attachments ?? [];
-  const facts = [card.repeat_text, card.due_on ? `Due ${dayLabel(card.due_on)}` : null, card.minutes ? minutesLabel(card.minutes) : null, card.board_hint ? `Board: ${card.board_hint}` : null].filter(Boolean) as string[];
+  const pills = withAttrs(card.kind);
+  const facts = [card.repeat_text, card.due_on && !pills ? `Due ${dayLabel(card.due_on)}` : null, card.minutes && !pills ? minutesLabel(card.minutes) : null, card.board_hint ? `Board: ${card.board_hint}` : null].filter(Boolean) as string[];
   return (
     <div className="card-pop-in parchment relative flex flex-col gap-2.5 rounded-3xl p-4" style={frame} onContextMenu={(e) => (e.preventDefault(), setMenu(true))}>
       <div className="flex items-center gap-2 pr-9">
@@ -580,6 +618,9 @@ function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onQuick, o
       </button>
       {menu && (
         <div className="reveal absolute right-2 top-11 z-[5] flex min-w-[160px] flex-col rounded-xl p-1" style={{ background: "#fbf3df", border: "1px solid #a88a3f", boxShadow: "0 8px 20px rgba(0,0,0,.25)" }}>
+          <button type="button" onClick={() => (setLater(true), setMenu(false))} className="h-9 rounded-lg px-3 text-left text-[14px] hover:bg-black/[.05]" style={{ color: "#2a1c10" }}>
+            Snooze…
+          </button>
           <button type="button" onClick={onDelete} className="h-9 rounded-lg px-3 text-left text-[14px] hover:bg-black/[.05]" style={{ color: "#8b2c1a" }}>
             Delete for good
           </button>
@@ -624,6 +665,8 @@ function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onQuick, o
           ))}
         </ul>
       )}
+      {rateable(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} />}
+      {withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} />}
       {(card.source_label || card.source_text) && (
         <div className="flex flex-col gap-1">
           <button type="button" onClick={() => setSource(!source)} disabled={!card.source_text} aria-expanded={source} className="flex items-center gap-1 self-start text-[12.5px]" style={{ color: "#7a6440" }}>
@@ -640,9 +683,6 @@ function CardView({ card, frame, onEdit, onRetag, onImport, onSnooze, onQuick, o
         </div>
       )}
       <div className="mt-1 flex items-center gap-2">
-        <button type="button" onClick={() => setLater((v) => !v)} aria-expanded={later} className="h-10 rounded-full px-4 text-[14px] font-semibold" style={chip(later)}>
-          Snooze…
-        </button>
         <span className="flex-1" />
         <button type="button" onClick={onImport} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
           {importLabel(card.kind)}
@@ -791,27 +831,51 @@ function KindPicker({ open, kind, onPick }: { open: boolean; kind: Kind; onPick:
 }
 
 /** All of them at once: each row shows what it is and keeps Skip, Snooze… and Import. */
-function ListView({ cards, frame, active, onEdit, onQuick, onRetag, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; /** The card being added: its import flow shows in its row's place. */ active: { id: string; node: React.ReactNode } | null; onQuick: (c: ImportCard, until: Date, label: string) => void; onEdit: (c: ImportCard, p: { title: string; description: string }) => void; onRetag: (c: ImportCard, k: Kind) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
+function ListView({ cards, frame, active, onEdit, onQuick, onRetag, onRate, attrsOf, shownAttrs, onAttrs, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; /** The card being added: its import flow shows in its row's place. */ active: { id: string; node: React.ReactNode } | null; onQuick: (c: ImportCard, until: Date, label: string) => void; onEdit: (c: ImportCard, p: { title: string; description: string }) => void; onRetag: (c: ImportCard, k: Kind) => void; onRate: (c: ImportCard, days: number | null) => void; attrsOf: (id: string) => Attrs; shownAttrs: AttrKey[]; onAttrs: (id: string, a: Attrs) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
   return (
     <ul className="card-pop-in parchment m-0 flex list-none flex-col rounded-3xl p-1.5" style={frame}>
       {cards.map((c, i) => (
         active?.id === c.id ? (
           <li key={c.id} className="list-none p-1">{active.node}</li>
         ) : (
-        <ListRow key={c.id} card={c} first={i === 0} onQuick={(u, l) => onQuick(c, u, l)} onEdit={(p) => onEdit(c, p)} onRetag={(k) => onRetag(c, k)} onImport={() => onImport(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
+        <ListRow key={c.id} card={c} first={i === 0} onQuick={(u, l) => onQuick(c, u, l)} onEdit={(p) => onEdit(c, p)} onRetag={(k) => onRetag(c, k)} onRate={(d) => onRate(c, d)} attrs={attrsOf(c.id)} shownAttrs={shownAttrs} onAttrs={(a) => onAttrs(c.id, a)} onImport={() => onImport(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
         )
       ))}
     </ul>
   );
 }
 
-function ListRow({ card, first, onEdit, onRetag, onImport, onSnooze, onQuick, onSkip, onDelete }: { card: ImportCard; first: boolean; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
+function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAttrs, onImport, onSnooze, onQuick, onSkip, onDelete }: { card: ImportCard; first: boolean; onRate: (days: number | null) => void; attrs: Attrs; shownAttrs: AttrKey[]; onAttrs: (a: Attrs) => void; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
   const [picking, setPicking] = useState(false);
   const [more, setMore] = useState(false);
   const [editing, setEditing] = useState(false);
-  const small = { ...chip(false), minHeight: 32 };
+  // Swipe the row left for Snooze, Archive and Delete (owner, Nov 6); right to put them away. Right-click too.
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const [dx, setDx] = useState(0);
   return (
-    <li className="due-in flex flex-col gap-1 px-2.5 py-2" style={first ? undefined : { borderTop: "1px solid rgba(139,112,64,.22)" }} onContextMenu={(e) => (e.preventDefault(), setMore(true))}>
+    <li
+      className="due-in flex flex-col gap-1 px-2.5 py-2"
+      style={{ ...(first ? {} : { borderTop: "1px solid rgba(139,112,64,.22)" }), transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? "none" : "transform 200ms ease", touchAction: "pan-y" }}
+      onContextMenu={(e) => (e.preventDefault(), setMore(true))}
+      onTouchStart={(e) => (swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY })}
+      onTouchMove={(e) => {
+        const s0 = swipe.current;
+        if (!s0) return;
+        const mx = e.touches[0].clientX - s0.x;
+        const my = e.touches[0].clientY - s0.y;
+        if (Math.abs(my) > Math.abs(mx) + 6) return (swipe.current = null, setDx(0));
+        if (mx < 0 || more) setDx(Math.max(-60, Math.min(more ? 40 : 0, mx / 2)));
+      }}
+      onTouchEnd={(e) => {
+        const s0 = swipe.current;
+        swipe.current = null;
+        setDx(0);
+        if (!s0) return;
+        const mx = e.changedTouches[0].clientX - s0.x;
+        if (mx < -50) setMore(true);
+        else if (mx > 50) setMore(false);
+      }}
+    >
       <div className="flex items-start gap-2">
         <span className="min-w-0 flex-1 pt-0.5 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">
           {card.title}
@@ -828,11 +892,9 @@ function ListRow({ card, first, onEdit, onRetag, onImport, onSnooze, onQuick, on
       {editing && <CardEdit card={card} onDone={(p) => (p && onEdit(p), setEditing(false))} />}
       <FileChips files={card.attachments} />
       <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
-      <div className="flex items-center gap-1.5">
-        <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ ...small, ...(more ? chip(true) : {}) }}>
-          Snooze…
-        </button>
-        <span className="flex-1" />
+      {rateable(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} small />}
+      <div className="flex items-start gap-1.5">
+        <div className="min-w-0 flex-1">{withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} small />}</div>
         <button type="button" onClick={onImport} className="h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
           {importLabel(card.kind)}
         </button>
@@ -1272,18 +1334,77 @@ function SetAside({ cards, onBack, isAdventure }: { cards: ImportCard[]; onBack:
   );
 }
 
-const endOfMonthDays = () => {
-  const d = now();
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return Math.round((new Date(keyOf(last) + "T12:00").getTime() - new Date(keyOf(d) + "T12:00").getTime()) / 86_400_000);
-};
-const planOptions = (): { label: string; days: number }[] => [
-  { label: "Today", days: 0 },
-  { label: "3 days", days: 3 },
-  { label: "1 week", days: 7 },
-  { label: "2 weeks", days: 14 },
-  { label: "This month", days: Math.max(1, endOfMonthDays()) },
-];
+// The same picks as on the card (owner, Nov 6: "This week, next week, within 2 weeks, one month, custom").
+const planOptions = (): { label: string; days: number }[] => quickPlanDays(now());
+// Short words for a list row, so the picks fit on one line.
+const SHORT: Record<string, string> = { "This week": "This wk", "Next week": "Next wk", "Within 2 weeks": "2 wks", "One month": "1 mo" };
+const rateable = (k: Kind) => k !== "habit" && k !== "reward" && k !== "done";
+const ratedLabel = (days: number) => planOptions().find((o) => o.days === days)?.label ?? (days === 0 ? "Today" : `Within ${days} days`);
+
+/**
+ * "Schedule within": how soon it needs a time, one tap on the card or its list row (owner, Nov 6),
+ * so every item lands in the auto-scheduler's right group. Custom… takes days or a date, in place.
+ */
+function SchedRate({ days, onRate, small = false }: { days: number | null | undefined; onRate: (days: number | null) => void; small?: boolean }) {
+  const [custom, setCustom] = useState(false);
+  const [typed, setTyped] = useState("");
+  const opts = planOptions();
+  const isCustom = typeof days === "number" && !opts.some((o) => o.days === days);
+  const h = small ? 28 : 32;
+  const pill = (on: boolean): React.CSSProperties => ({ ...chip(on), minHeight: h, height: h });
+  const setDate = (k: string) => {
+    if (!k) return;
+    const n = Math.round((new Date(`${k}T12:00`).getTime() - new Date(`${inDays(0)}T12:00`).getTime()) / 86_400_000);
+    if (n >= 0) (onRate(n), setCustom(false));
+  };
+  return (
+    <div className="flex flex-col gap-1.5" data-sched-rate>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`${small ? "text-[12px]" : "text-[12.5px]"} font-semibold`} style={{ color: "#6b5631" }} title="Schedule within">
+          {small ? "📅" : "📅 Schedule within"}
+        </span>
+        {opts.map((o) => (
+          <button key={o.label} type="button" aria-label={o.label} aria-pressed={days === o.days} onClick={() => onRate(days === o.days ? null : o.days)} className={`whitespace-nowrap rounded-full font-semibold ${small ? "px-2 text-[12px]" : "px-2.5 text-[12.5px]"}`} style={pill(days === o.days)}>
+            {small ? SHORT[o.label] ?? o.label : o.label}
+          </button>
+        ))}
+        <button type="button" aria-expanded={custom} aria-pressed={isCustom} onClick={() => setCustom((v) => !v)} className={`whitespace-nowrap rounded-full font-semibold ${small ? "px-2 text-[12px]" : "px-2.5 text-[12.5px]"}`} style={pill(isCustom || custom)}>
+          {isCustom ? ratedLabel(days!) : small ? "Other…" : "Custom…"}
+        </button>
+      </div>
+      <div className="drawer-body" data-open={custom || undefined}>
+        <div className="drawer-inner">
+          <div className="flex flex-wrap items-center gap-2 text-[13.5px]" style={{ color: "#4a3a22" }}>
+            Within
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value.replace(/\D/g, "").slice(0, 3))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && Number(typed) > 0) (onRate(Number(typed)), setCustom(false));
+              }}
+              inputMode="numeric"
+              placeholder="45"
+              aria-label="Days"
+              className="h-8 w-14 rounded-lg border px-2 text-center text-[16px]"
+              style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.85)", color: "#2a1c10" }}
+            />
+            days
+            <button type="button" disabled={!(Number(typed) > 0)} onClick={() => (onRate(Number(typed)), setCustom(false))} className="h-8 rounded-full px-3 text-[13px] font-semibold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+              Set
+            </button>
+            <span style={{ color: "#7a6440" }}>or by</span>
+            <DateField value="" min={inDays(0)} onChange={setDate} ariaLabel="Schedule by date" placeholder="a date" className="h-8 rounded-full px-3 text-[13px]" />
+            {typeof days === "number" && (
+              <button type="button" onClick={() => (onRate(null), setCustom(false))} className="text-[12.5px] underline" style={{ color: "#6b5631" }}>
+                clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function planLabel(d: Draft) {
   const parts: string[] = [];
   if (typeof d.planDays === "number") {
@@ -1357,3 +1478,195 @@ function PlanStep({ draft, noted, onChange, onDone }: { draft: Draft; noted: str
 }
 
 const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind === "reward" ? "Add to the Treasure Chest" : d.kind === "project" ? "Make it a board" : d.kind === "done" ? "Log as done ✓" : d.kind === "shopping" ? "Add the buy list" : d.kind === "ritual" ? "Add the ritual" : d.kind === "schedule" || typeof d.planDays === "number" ? "Add to my list to schedule" : "Add the quest");
+
+// ---- Quest details on a card (owner, Nov 6: "easy pills for XP, due date, and other quest attributes … the rest under a button") ----
+
+/** A quest's details picked on the card, before importing. Kept on this device by card id. */
+type Attrs = { xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number };
+type AttrKey = "xp" | "coins" | "due" | "tiny" | "time" | "importance" | "energy" | "effort";
+const ATTRS: { key: AttrKey; label: string }[] = [
+  { key: "xp", label: "XP" },
+  { key: "coins", label: "Coins" },
+  { key: "due", label: "Due date" },
+  { key: "tiny", label: "Tiny task" },
+  { key: "time", label: "Time it takes" },
+  { key: "importance", label: "Importance" },
+  { key: "energy", label: "Energy boost ⚡" },
+  { key: "effort", label: "Effort" },
+];
+const ATTR_SHOWN_DEFAULT: AttrKey[] = ["xp", "coins", "due", "tiny"];
+const ATTRS_KEY = "import-attrs";
+const ATTR_LAYOUT_KEY = "import-attr-shown";
+/** Every import starts at 15 XP and a coin (owner, Nov 6). */
+const XP_DEFAULT = 15;
+const COIN_DEFAULT = 1;
+/** A tiny task: two energy boosts, 15 XP, 5 minutes, a coin (owner, Nov 6). */
+const TINY: Attrs = { tiny: true, energy: 2, xp: 15, minutes: 5, coins: 1 };
+const withAttrs = (k: Kind) => k === "quest" || k === "schedule" || k === "shopping" || k === "done";
+
+function readJSON<T>(key: string, fallback: T): T {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeJSON(key: string, v: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(v));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+const SCALE5 = [1, 2, 3, 4, 5];
+
+/** The pills: the ones you chose show; the rest wait under "More". One opens its editor in place at a time. */
+function AttrPills({ card, attrs, shown, onChange, small = false }: { card: ImportCard; attrs: Attrs; shown: AttrKey[]; onChange: (a: Attrs) => void; small?: boolean }) {
+  const [open, setOpen] = useState<AttrKey | null>(null);
+  const [more, setMore] = useState(false);
+  const xp = attrs.xp ?? XP_DEFAULT;
+  const coins = attrs.coins ?? COIN_DEFAULT;
+  const due = attrs.due === undefined ? (card.due_on ?? null) : attrs.due;
+  const minutes = attrs.minutes === undefined ? (card.minutes ?? null) : attrs.minutes;
+  const h = small ? 28 : 30;
+  const pill = (on: boolean): React.CSSProperties => ({ ...chip(on), minHeight: h, height: h });
+  const text: Record<AttrKey, string> = {
+    xp: `✦ ${xp} XP`,
+    coins: `🪙 ${coins}`,
+    due: due ? `Due ${dayLabel(due)}` : "Due",
+    tiny: attrs.tiny ? "🌱 Tiny ✓" : "🌱 Tiny",
+    time: minutes ? `⏱ ${minutesLabel(minutes)}` : "⏱ Time",
+    importance: attrs.importance ? `❗ ${attrs.importance}/5` : "❗ Importance",
+    energy: attrs.energy ? `${"⚡".repeat(Math.min(5, attrs.energy))}` : "⚡ Boost",
+    effort: attrs.effort ? `💪 ${attrs.effort}/5` : "💪 Effort",
+  };
+  const set = (p: Attrs) => onChange({ ...attrs, ...p });
+  const hidden = ATTRS.map((a) => a.key).filter((k) => !shown.includes(k));
+  const button = (k: AttrKey) => (
+    <button
+      key={k}
+      type="button"
+      aria-expanded={k === "tiny" ? undefined : open === k}
+      aria-pressed={k === "tiny" ? !!attrs.tiny : undefined}
+      onClick={() => {
+        if (k === "tiny") return onChange(attrs.tiny ? { ...attrs, tiny: false } : { ...attrs, ...TINY });
+        setOpen(open === k ? null : k);
+      }}
+      className={`whitespace-nowrap rounded-full font-semibold ${small ? "px-2 text-[12px]" : "px-2.5 text-[12.5px]"}`}
+      style={pill(open === k || (k === "tiny" && !!attrs.tiny))}
+    >
+      {text[k]}
+    </button>
+  );
+  const steps = (v: number, by: number, lo: number, put: (n: number) => void, unit: string) => (
+    <div className="flex items-center gap-1.5 text-[13.5px]">
+      <button type="button" aria-label={`Less ${unit}`} onClick={() => put(Math.max(lo, v - by))} className="h-8 w-8 rounded-full text-[16px] font-bold" style={chip(false)}>
+        −
+      </button>
+      <input value={String(v)} onChange={(e) => put(Math.max(lo, Number(e.target.value.replace(/\D/g, "").slice(0, 4)) || 0))} inputMode="numeric" aria-label={unit} className="bare-input h-8 w-12 bg-transparent text-center text-[16px] font-semibold" style={{ color: "#2a1c10", borderBottom: "1px solid #c8a24a" }} />
+      <button type="button" aria-label={`More ${unit}`} onClick={() => put(v + by)} className="h-8 w-8 rounded-full text-[16px] font-bold" style={chip(false)}>
+        +
+      </button>
+      <span style={{ color: "#6b5631" }}>{unit}</span>
+    </div>
+  );
+  const scale = (v: number | undefined, put: (n: number) => void, icon: string) => (
+    <div className="flex items-center gap-1">
+      {SCALE5.map((n) => (
+        <button key={n} type="button" aria-pressed={v === n} onClick={() => put(v === n ? 0 : n)} className="h-8 min-w-8 rounded-full px-2 text-[13px] font-semibold" style={chip(v === n)}>
+          {icon === "⚡" ? "⚡".repeat(n) : n}
+        </button>
+      ))}
+    </div>
+  );
+  const editor = (k: AttrKey | null) =>
+    k === "xp" ? steps(xp, 5, 0, (n) => set({ xp: n }), "XP")
+    : k === "coins" ? steps(coins, 1, 0, (n) => set({ coins: n }), "coins")
+    : k === "due" ? (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {[0, 1, 7].map((n) => (
+          <button key={n} type="button" onClick={() => (set({ due: inDays(n) }), setOpen(null))} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={chip(due === inDays(n))}>
+            {n === 0 ? "Today" : n === 1 ? "Tomorrow" : "In a week"}
+          </button>
+        ))}
+        <DateField value={due ?? ""} min={inDays(0)} onChange={(d) => (set({ due: d || null }), setOpen(null))} ariaLabel="Due date" placeholder="A date" className="h-8 rounded-full px-3 text-[13px]" />
+        {due && (
+          <button type="button" onClick={() => (set({ due: null }), setOpen(null))} className="text-[12.5px] underline" style={{ color: "#6b5631" }}>
+            no due date
+          </button>
+        )}
+      </div>
+    )
+    : k === "time" ? (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {[5, 15, 30, 60, 120].map((m) => (
+          <button key={m} type="button" onClick={() => (set({ minutes: minutes === m ? null : m }), setOpen(null))} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={chip(minutes === m)}>
+            {minutesLabel(m)}
+          </button>
+        ))}
+      </div>
+    )
+    : k === "importance" ? scale(attrs.importance, (n) => set({ importance: n }), "")
+    : k === "energy" ? scale(attrs.energy, (n) => set({ energy: n }), "⚡")
+    : k === "effort" ? scale(attrs.effort, (n) => set({ effort: n }), "")
+    : null;
+  // The drawer keeps its last editor while it slides shut.
+  const shownEditor = useLingerValue(open, 340);
+  return (
+    <div className="flex flex-col gap-1.5" data-import-attrs>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {shown.map(button)}
+        {hidden.length > 0 && (
+          <button type="button" aria-expanded={more} aria-label={small ? "More details" : undefined} onClick={() => setMore((v) => !v)} className={`whitespace-nowrap rounded-full font-semibold ${small ? "px-2 text-[12px]" : "px-2.5 text-[12.5px]"}`} style={{ ...pill(more), borderStyle: "dashed" }}>
+            {more ? "Less" : small ? "…" : "More…"}
+          </button>
+        )}
+      </div>
+      <div className="drawer-body" data-open={(more && hidden.length > 0) || undefined}>
+        <div className="drawer-inner">
+          <div className="flex flex-wrap items-center gap-1.5">{hidden.map(button)}</div>
+        </div>
+      </div>
+      <div className="drawer-body" data-open={!!open || undefined}>
+        <div className="drawer-inner">
+          <div className="rounded-2xl px-2.5 py-2" style={{ background: "rgba(255,250,238,.55)", border: "1px solid rgba(139,112,64,.3)" }}>
+            {editor(shownEditor.value)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The gear by "Sort your imports": which quest details show on each card; the rest wait under "More…". */
+function AttrLayout({ open, shown, onChange }: { open: boolean; shown: AttrKey[]; onChange: (s: AttrKey[]) => void }) {
+  return (
+    <div className="drawer-body" data-open={open || undefined}>
+      <div className="drawer-inner">
+        <div className="parchment mt-2 flex flex-col gap-1.5 rounded-2xl px-3 py-2.5" style={{ border: "1px solid #b39a6a" }}>
+          <p className="relative z-[1] m-0 text-[13px] font-semibold" style={{ color: "#4a3a22" }}>
+            Quest details on each card · tap to show or tuck under More…
+          </p>
+          <div className="relative z-[1] flex flex-wrap gap-1.5">
+            {ATTRS.map((a) => {
+              const on = shown.includes(a.key);
+              return (
+                <button key={a.key} type="button" aria-pressed={on} onClick={() => onChange(on ? shown.filter((k) => k !== a.key) : [...shown, a.key])} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ ...chip(on), minHeight: 32 }}>
+                  {on ? "✓ " : ""}
+                  {a.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** What the picked details mean for the new quest (defaults: 15 XP, a coin). */
+function questExtras(a: Attrs): { xp: number; coins: number; isTiny?: boolean; energyGain?: number; effort?: number } {
+  return { xp: a.xp ?? XP_DEFAULT, coins: a.coins ?? COIN_DEFAULT, isTiny: a.tiny || undefined, energyGain: a.energy || undefined, effort: a.effort || undefined };
+}

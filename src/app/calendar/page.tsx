@@ -162,7 +162,9 @@ export default async function CalendarPage({
         return lists.flat();
       })
     : Promise.resolve([]);
-  const [tasks, toSchedule, scheduleFolders, googleAll, planToday, interest, interestEvents] = await Promise.all([
+  // The auto-scheduler's sections on top: Today's quests, Additional quests and today's habits (owner, Nov 6).
+  const sectionsP = import("@/app/actions").then(({ autoSchedulerSectionsAction }) => autoSchedulerSectionsAction(todayKey())).catch(() => null);
+  const [tasks, toSchedule, scheduleFolders, googleAll, planToday, interest, interestEvents, schedSections] = await Promise.all([
     listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
     listSchedulingList(session.user.id),
     getSchedulingFolders(session.user.id),
@@ -170,6 +172,7 @@ export default async function CalendarPage({
     planP,
     interestP,
     interestEventsP,
+    sectionsP,
   ]);
   // Quests and sessions put on the calendar without Google (from a chat with Claude, or offline) reach it now.
   if (googleAll && session.googleAccessToken) {
@@ -396,7 +399,7 @@ export default async function CalendarPage({
         />
         <CreateFab kinds={["quest", "habit", "rite", "reward", "journal"]} theme={theme} />
       </div>
-      <SchedulingDrawer tasks={toSchedule} folders={scheduleFolders} theme={theme} today={planToday} />
+      <SchedulingDrawer tasks={toSchedule} folders={scheduleFolders} theme={theme} today={planToday} sections={schedSections as never} />
       </div>
     </AppShell>
   );
