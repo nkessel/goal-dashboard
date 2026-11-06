@@ -1,6 +1,7 @@
 "use client";
 
 import { SnoozeIcon } from "@/components/ui/Icons";
+import { SwipeActions } from "@/components/ui/SwipeActions";
 import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
 import { WelcomeHabits } from "@/components/xp/WelcomeHabits";
 
@@ -18,7 +19,7 @@ import { CHECKIN_STYLES, checkinIconOf, checkinStyleOf, loadFx, patchFx, subscri
 import { addBackGreeting, checkinLabel, pickFor, readPromptVotes, reflectQuestions, toucanPrompts, welcomeOrder, welcomeShows, writePromptVotes, type PromptVotes, type WelcomeEl } from "@/lib/welcome";
 import { useEscape } from "@/lib/use-escape";
 import { useLongPress } from "@/lib/use-long-press";
-import { coachAction, setTopPriorityAction } from "@/app/actions";
+import { coachAction, setTopPriorityAction, welcomePartsXpAction } from "@/app/actions";
 import { Digest, talkToToucan } from "@/components/toucan/ToucanGuide";
 import { GearIcon } from "@/components/ui/Icons";
 import { ArrangeAbove, ArrangeList, CastleEdit, EditButton, GoldCheck, GreetingOptions } from "./WelcomeArrange";
@@ -28,6 +29,8 @@ import { SleepCheckIn } from "./SleepCheckIn";
 import { TodayPlanner } from "./TodayPlanner";
 import { castleOf } from "./CastleArt";
 import { Fold } from "@/components/ui/Fold";
+import { addJournalEntryAction } from "@/app/actions";
+import { cleanXp, journalPrompts, type JournalPrompt } from "@/lib/journal-prompts";
 
 export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
 
@@ -251,7 +254,11 @@ export function WelcomeCard({
     if (min) return;
     const e = document.documentElement;
     e.setAttribute("data-welcome-open", "");
-    return () => e.removeAttribute("data-welcome-open");
+    return () => {
+      e.removeAttribute("data-welcome-open");
+      // The toucan's notes wait a while after this (ToucanGuide's raise reads it).
+      e.dataset.welcomeClosedAt = String(Date.now());
+    };
   }, [min]);
   // Writing: the cursor goes to the end of the greeting itself.
   useEffect(() => {
@@ -301,7 +308,7 @@ export function WelcomeCard({
   // Complete check-in: saves whatever is entered in the check-in, then on into the forest.
   const submitCheckin = useRef<((after: () => void) => void) | null>(null);
   // The top priority and the intention save with it too: nothing typed here is lost on the way out.
-  const savers = useRef<Partial<Record<"focus" | "sleep", () => Promise<boolean>>>>({});
+  const savers = useRef<Partial<Record<"focus" | "sleep" | "journal", () => Promise<boolean>>>>({});
   const [finishing, setFinishing] = useState(false);
   const complete = async () => {
     if (finishing || leaving) return;
@@ -310,8 +317,9 @@ export function WelcomeCard({
     setFinishing(false);
     // A save that failed says so where it is, and the screen stays.
     if (!ok) return;
-    if (checkinOpen && !checkedIn && submitCheckin.current) submitCheckin.current(leave);
-    else leave();
+    const goOn = () => (payParts(), leave());
+    if (checkinOpen && !checkedIn && submitCheckin.current) submitCheckin.current(goOn);
+    else goOn();
   };
   // The check-in starts as a gilded button and opens in its place.
   const [checkinOpen, setCheckinOpen] = useState(false);
@@ -327,6 +335,8 @@ export function WelcomeCard({
   // Keyboard up over a field low on the card (the toucan's respond line, say): the card glides
   // up just enough to show it, and back down when the keyboard goes.
   const [kbLift, setKbLift] = useState(0);
+  // Room added under the card's parts while the keyboard is up, so the card can scroll a low field into view.
+  const [kbRoom, setKbRoom] = useState(0);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
@@ -338,14 +348,22 @@ export function WelcomeCard({
         const inside = !!a?.closest("[data-welcome-root]") && (a instanceof HTMLTextAreaElement || a instanceof HTMLInputElement || !!a?.isContentEditable);
         // Against the held height: Chrome on iPhone shrinks innerHeight with the keyboard, so innerHeight alone never shows it.
         const base = Math.max(window.innerHeight, screenRef.current?.h ?? 0);
-        if (!inside || base - vv.height < 120) return setKbLift(0);
+        if (!inside || base - vv.height < 120) return setKbLift(0), setKbRoom(0);
         setKbLift((cur) => {
           const r = a!.getBoundingClientRect();
           // Where it would sit without the lift.
           const bottom = r.bottom + cur;
           const top = r.top + cur;
-          const need = bottom - (vv.offsetTop + vv.height - 14);
-          return Math.max(0, Math.round(Math.min(need, top - vv.offsetTop - 60)));
+          const need = Math.max(0, Math.round(Math.min(bottom - (vv.offsetTop + vv.height - 14), top - vv.offsetTop - 60)));
+          // Never so far that the toucan perched on the card's top goes off the screen (ui-check, Nov 6: the
+          // Journal's box sits lower): the rest is made up by scrolling the card over a little room at its foot.
+          const cardTop = (cardRef.current?.getBoundingClientRect().top ?? 0) + cur;
+          const most = Math.max(0, Math.round(cardTop - vv.offsetTop - 64));
+          const lift = Math.min(need, most);
+          const rest = need - lift;
+          setKbRoom(rest);
+          if (rest > 0) requestAnimationFrame(() => cardRef.current?.scrollBy({ top: rest, behavior: "smooth" }));
+          return lift;
         });
       });
     };
@@ -428,8 +446,55 @@ export function WelcomeCard({
     return () => cancelAnimationFrame(raf);
   }, [award?.xp]);
 
+  // Buttons you shape yourself (right-click or hold one): words, icon, and the XP a part pays once filled in (owner, Nov 6).
+  const btn = fx.welcomeButtons ?? {};
+  const [filledParts, setFilledParts] = useState<PartKey[]>([]);
+  const filledRef = useRef<PartKey[]>([]);
+  const fillPart = (k: PartKey) => {
+    if (!filledRef.current.includes(k)) filledRef.current = [...filledRef.current, k];
+    setFilledParts((cur) => (cur.includes(k) ? cur : [...cur, k]));
+  };
+  // Journal prompts written this visit, each with its own XP.
+  const journalRef = useRef<{ key: string; xp: number }[]>([]);
+  const [journalFilled, setJournalFilled] = useState<{ key: string; xp: number }[]>([]);
+  const fillJournal = (key: string, xpN: number) => {
+    if (journalRef.current.some((j) => j.key === key)) return;
+    journalRef.current = [...journalRef.current, { key, xp: xpN }];
+    setJournalFilled(journalRef.current);
+  };
+  // Pays each part filled in this visit (once a day each, the server keeps count).
+  const payParts = () => {
+    const list = [...filledRef.current.filter((k) => k !== "focus").map((k) => ({ key: k as string, xp: partXp(k) })), ...journalRef.current].filter((p) => p.xp > 0);
+    if (list.length) void welcomePartsXpAction(list).catch(() => {});
+  };
+  const partXp = (k: PartKey) => Math.max(0, Math.min(50, btn[k]?.xp ?? 5));
+  const [btnEdit, setBtnEdit] = useState<ButtonKey | null>(null);
+  // Swipe a part's button left to snooze it until tomorrow, right to hide it (owner, Nov 6). Snoozes live on this device.
+  const [snoozedParts, setSnoozedParts] = useState<string[]>(() => readSnoozedParts());
+  const snoozePart = (el: WelcomeEl) => {
+    const next = [...new Set([...snoozedParts, el])];
+    setSnoozedParts(next);
+    try {
+      window.localStorage.setItem(SNOOZE_PARTS_KEY, JSON.stringify({ day: localDay(), parts: next }));
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  const hidePart = (el: WelcomeEl) => patchFx({ welcomeHide: [...new Set([...(loadFx().welcomeHide ?? ["due"]), el])] });
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
-    focus: <TopPriority arranging={arranging} register={(f) => (savers.current.focus = f)} last={priority} question={fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} />,
+    // The Journal (owner, Nov 6): a button that opens prompt pills; Top priorities is the first and default.
+    focus: (
+      <WelcomeJournal
+        fx={fx}
+        label={btn.focus?.text?.trim()}
+        icon={btn.focus?.icon}
+        registerJournal={(f) => (savers.current.journal = f)}
+        onWritten={(id, xpN) => fillJournal(`journal-${id}`, xpN)}
+        priorities={(q, xpN) => (
+          <TopPriority arranging={arranging} register={(f) => (savers.current.focus = f)} last={priority} question={q || fx.welcomeFocusQ?.trim() || "What are your top priorities today?"} onFilled={() => fillJournal("focus", xpN)} />
+        )}
+      />
+    ),
     checkin: recent ? null : (
       <div className="flex w-full flex-col items-center">
         {/* The button stays; the check-in slides open beneath it (and closes the same way). */}
@@ -440,7 +505,7 @@ export function WelcomeCard({
           className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]"
           style={checkinStyleOf(fx).style}
         >
-          <CheckinIcon icon={checkinIconOf(fx)} /> {checkedIn ? "Checked in ✓" : checkinLabel(fx)}
+          {btn.checkin?.icon ? <span aria-hidden>{btn.checkin.icon}</span> : <CheckinIcon icon={checkinIconOf(fx)} />} {checkedIn ? "Checked in ✓" : btn.checkin?.text?.trim() || checkinLabel(fx)}
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ opacity: 0.8, transform: checkinOpen && !arranging ? "rotate(180deg)" : undefined }}>
             <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -448,13 +513,13 @@ export function WelcomeCard({
         {!arranging && (
           <div className="drawer-body w-full" data-open={checkinOpen ? "true" : "false"}>
             <div className="drawer-inner" inert={!checkinOpen}>
-              <CheckinPanel fx={fx} metrics={metrics} submit={(f) => (submitCheckin.current = f)} onSaved={() => (setCheckedIn(true), onCheckedIn?.())} />
+              <CheckinPanel fx={fx} metrics={metrics} submit={(f) => (submitCheckin.current = f)} onSaved={() => (setCheckedIn(true), fillPart("checkin"), onCheckedIn?.())} />
             </div>
           </div>
         )}
       </div>
     ),
-    sleep: <SleepCheckIn register={(f) => (savers.current.sleep = f)} />,
+    sleep: <SleepCheckIn register={(f) => (savers.current.sleep = f)} label={btn.sleep?.text?.trim()} icon={btn.sleep?.icon} onFilled={() => fillPart("sleep")} />,
     streak: award && award.streak > 0 ? (
       <p className="m-0 text-[14.5px] italic leading-snug" style={{ color: "#5a4a30" }}>
         {award.streak > 1 ? `🔥 ${award.streak}-day login streak — keep it going` : "Day one of a new login streak"}
@@ -511,10 +576,10 @@ export function WelcomeCard({
     ) : null,
     // A gilded button that opens into a drawer of the quests' cards.
     due: <DueSoonDrawer tasks={due} onOpenChange={setDrawerOpen} />,
-    quests: <TodayPlanner today={today} due={due} />,
+    quests: <TodayPlanner today={today} due={due} label={btn.quests?.text?.trim()} icon={btn.quests?.icon} />,
   };
   const allEls = welcomeOrder(fx);
-  const order = allEls.filter((el) => welcomeShows(fx, el) && parts[el]);
+  const order = allEls.filter((el) => welcomeShows(fx, el) && parts[el] && !snoozedParts.includes(el));
   // Not checked in yet? "Not now" offers to ask again later, or to skip it for today.
   const snoozable = !!onSnooze && !checkedIn && order.includes("checkin");
   const confetti = fx.welcomeConfetti !== false && mode === "day";
@@ -725,12 +790,43 @@ export function WelcomeCard({
           ) : (
             order.map((el) => (
               // No long press to arrange: only the gear opens the screen's settings (owner, Nov 5).
-              <div key={el} className="flex w-full flex-col items-center">
-                {parts[el]}
-              </div>
+              // Right-click or hold a part's button to shape it: its words, icon and XP (owner, Nov 6).
+              <ButtonShell key={el} el={el} onEdit={(k) => setBtnEdit((cur) => (cur === k ? null : k))}>
+                {isButtonKey(el) ? (
+                  <div className="w-full">
+                    <SwipeActions
+                      startOn={(t) => !!(t as HTMLElement | null)?.closest?.("button[aria-expanded]")}
+                      left={{ label: "Hide", background: "linear-gradient(180deg,#6b5631,#4a3913)", color: "#f6e3a8", onAction: () => hidePart(el) }}
+                      right={{ label: "Snooze", icon: <SnoozeIcon />, background: "linear-gradient(180deg,#3a3f7a,#232655)", color: "#f2d27e", onAction: () => snoozePart(el) }}
+                    >
+                      {parts[el]}
+                    </SwipeActions>
+                  </div>
+                ) : (
+                  parts[el]
+                )}
+                {el === "focus" && journalFilled.length > 0 && (
+                  <span className="pointer-events-none mt-0.5 text-[11.5px] font-semibold tabular-nums" style={{ color: "#4e6a35" }}>
+                    ✓ +{journalFilled.reduce((a, j) => a + j.xp, 0)} XP on the way
+                  </span>
+                )}
+                {isPartKey(el) && el !== "focus" && partXp(el) > 0 && (
+                  <span className="pointer-events-none mt-0.5 text-[11.5px] font-semibold tabular-nums" style={{ color: filledParts.includes(el) ? "#4e6a35" : "#8a6a2c", opacity: filledParts.includes(el) ? 1 : 0.75 }}>
+                    {filledParts.includes(el) ? `✓ +${partXp(el)} XP on the way` : `+${partXp(el)} XP when filled in`}
+                  </span>
+                )}
+                {isButtonKey(el) && (
+                  <Fold open={btnEdit === el}>
+                    <ButtonEditor k={el} fx={fx} pays={isPartKey(el) && el !== "focus"} onDone={() => setBtnEdit(null)} onSnooze={() => (setBtnEdit(null), snoozePart(el))} onHide={() => (setBtnEdit(null), hidePart(el))}>
+                      {el === "focus" && <JournalPromptsEditor fx={fx} />}
+                    </ButtonEditor>
+                  </Fold>
+                )}
+              </ButtonShell>
             ))
           )}
           <div ref={spacerRef} aria-hidden className="w-full shrink-0" style={{ height: 0, marginTop: -12 }} />
+          {kbRoom > 0 && <div aria-hidden className="w-full shrink-0" style={{ height: kbRoom }} />}
           {/* The way on stays in reach: pinned to the card's foot while the rest scrolls. */}
           <div ref={footRef} className="welcome-foot sticky -bottom-4 z-[3] -mb-4 flex w-full justify-center pb-4 pt-2">
           {arranging ? (
@@ -1083,7 +1179,8 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
   const item = "flex h-8 w-full items-center rounded-lg px-1.5 text-left font-semibold hover:bg-black/[.05]";
   // His saying can be closed for this visit (×); tapping him brings it back. He's quiet on arrival unless
   // Toucan Spirit › “Speaks when you arrive” is on (owner, Nov 4).
-  const [closed, setClosed] = useState(false); // TODO(owner Nov 4): quiet by default via fx.welcomeToucanTalks — reverted: the ui-check placed his menu off-screen when he starts closed
+  // Quiet by default (owner, Nov 4 and again Nov 6: "the toucan is still bothering me when I log in").
+  const [closed, setClosed] = useState(() => typeof window === "undefined" || !loadFx().welcomeToucanTalks);
   // Rating what he asked: a long press or right-click on his bubble (no ✎ on show; owner, Nov 2).
   const rateHold = useLongPress(() => {
     if (menu || saying || talk) return;
@@ -1427,7 +1524,7 @@ function LineVote({ kind, on, onClick }: { kind: "like" | "dislike"; on: boolean
 const FIELD = { background: "rgba(255,250,238,.92)", border: "1px solid #b39a6a", color: "#2a1c10" };
 
 /** Your top priorities, in your own words: saved for the day, and kept in mind by the app and the toucan. */
-function TopPriority({ question, register, arranging = false }: { last: { text: string; others?: string[]; day: string } | null; question: string; register: (save: () => Promise<boolean>) => void; arranging?: boolean }) {
+function TopPriority({ question, register, arranging = false, icon, onFilled }: { last: { text: string; others?: string[]; day: string } | null; question: string; register: (save: () => Promise<boolean>) => void; arranging?: boolean; /** An emoji in place of the target (welcome button editor). */ icon?: string; /** Saved with words in it (for the welcome screen's XP). */ onFilled?: () => void }) {
   // A fresh mind dump every time (owner, Oct 31): nothing carries over into the box.
   const [saved, setSaved] = useState<{ text: string; others: string[] } | null>(null);
   const [editing, setEditing] = useState(false);
@@ -1443,6 +1540,7 @@ function TopPriority({ question, register, arranging = false }: { last: { text: 
     try {
       const r = await setTopPriorityAction(value, more.filter((o) => o.trim()));
       setSaved({ text: r.text, others: r.others });
+      onFilled?.();
       setEditing(false);
       return true;
     } catch (e) {
@@ -1523,11 +1621,20 @@ function TopPriority({ question, register, arranging = false }: { last: { text: 
     >
       <label htmlFor="welcome-priority" className="flex items-center gap-1.5 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>
         {/* A target beside the question (owner, Nov 5). */}
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
-          <circle cx="12" cy="12" r="9.5" fill="#f6e3a8" stroke="#8a6116" strokeWidth="1.5" />
-          <circle cx="12" cy="12" r="6" fill="#fffaf0" stroke="#a3412a" strokeWidth="1.5" />
-          <circle cx="12" cy="12" r="2.4" fill="#a3412a" />
+        {/* A bullseye with an arrow struck in its heart, fletched (owner, Nov 6: "a better target with an arrow sticking out of it"). */}
+        {icon ? <span aria-hidden className="text-[18px] leading-none">{icon}</span> : (
+        <svg width="22" height="22" viewBox="0 0 28 28" fill="none" aria-hidden className="shrink-0">
+          <circle cx="12" cy="16" r="10.5" fill="#a3412a" stroke="#5e2414" strokeWidth="1.2" />
+          <circle cx="12" cy="16" r="8" fill="#fbf1d6" />
+          <circle cx="12" cy="16" r="5.6" fill="#a3412a" />
+          <circle cx="12" cy="16" r="3.2" fill="#fbf1d6" />
+          <circle cx="12" cy="16" r="1.5" fill="#d9b45f" stroke="#8a6116" strokeWidth=".6" />
+          <path d="M12 16 24.2 3.8" stroke="#5a3d17" strokeWidth="1.7" strokeLinecap="round" />
+          <path d="M20.4 7.6 24 4 22.8 1.8 19.6 4.6Z" fill="#e8d7a8" stroke="#8a6116" strokeWidth=".7" strokeLinejoin="round" />
+          <path d="M20.4 7.6 24 4 26.2 5.2 23.4 8.4Z" fill="#c9a55a" stroke="#8a6116" strokeWidth=".7" strokeLinejoin="round" />
+          <path d="M12.6 15.4 10.6 16.2M12.6 15.4 11.8 17.4" stroke="#3a2a14" strokeWidth=".9" strokeLinecap="round" />
         </svg>
+        )}
         {question}
       </label>
       <div className="relative pb-4">
@@ -1680,4 +1787,281 @@ function revealThroughMist() {
   e.setAttribute("data-mist-reveal", "");
   window.setTimeout(liftFog, 180);
   window.setTimeout(() => e.removeAttribute("data-mist-reveal"), 1400);
+}
+
+type PartKey = "checkin" | "sleep" | "focus";
+type ButtonKey = PartKey | "quests";
+const isPartKey = (el: string): el is PartKey => el === "checkin" || el === "sleep" || el === "focus";
+const isButtonKey = (el: string): el is ButtonKey => isPartKey(el) || el === "quests";
+const BUTTON_NAMES: Record<ButtonKey, string> = { checkin: "Emotional check-in", sleep: "Sleep check-in", focus: "Journal", quests: "Choose today's quests" };
+
+/**
+ * A welcome part whose button can be shaped in place: right-click it, or hold it on a phone, and its
+ * editor folds open under it (no popup). Only presses on the part's own button or label count, so
+ * fields and sliders inside keep their own right-click.
+ */
+function ButtonShell({ el, onEdit, children }: { el: WelcomeEl; onEdit: (k: ButtonKey) => void; children: React.ReactNode }) {
+  const hold = useRef<{ t: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const fired = useRef(false);
+  const onButton = (t: EventTarget | null) => {
+    const n = t as HTMLElement | null;
+    if (!n?.closest || n.closest("input, textarea, [contenteditable='true'], [data-button-editor]")) return false;
+    return !!n.closest("button, label");
+  };
+  const stop = () => {
+    if (hold.current) clearTimeout(hold.current.t);
+    hold.current = null;
+  };
+  if (!isButtonKey(el)) return <div className="flex w-full flex-col items-center">{children}</div>;
+  return (
+    <div
+      className="flex w-full flex-col items-center [-webkit-touch-callout:none]"
+      onContextMenu={(e) => {
+        if (!onButton(e.target)) return;
+        e.preventDefault();
+        onEdit(el);
+      }}
+      onPointerDown={(e) => {
+        fired.current = false;
+        if (e.pointerType === "mouse" || !onButton(e.target)) return;
+        const x = e.clientX;
+        const y = e.clientY;
+        hold.current = {
+          x,
+          y,
+          t: setTimeout(() => {
+            fired.current = true;
+            hold.current = null;
+            navigator.vibrate?.(8);
+            onEdit(el);
+          }, 550),
+        };
+      }}
+      onPointerMove={(e) => {
+        const h = hold.current;
+        if (h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 8) stop();
+      }}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      onClickCapture={(e) => {
+        // The tap that ended a hold doesn't also open the part.
+        if (!fired.current) return;
+        fired.current = false;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** The editor that folds open under a welcome button: its words, an emoji for its icon, and its XP. */
+function ButtonEditor({ k, fx, pays, onDone, children, onSnooze, onHide }: { k: ButtonKey; fx: FxSettings; pays: boolean; onDone: () => void; children?: React.ReactNode; onSnooze?: () => void; onHide?: () => void }) {
+  const cur = fx.welcomeButtons?.[k] ?? {};
+  const set = (patch: { text?: string; icon?: string; xp?: number }) => {
+    const all = { ...(loadFx().welcomeButtons ?? {}) };
+    const next = { ...(all[k] ?? {}), ...patch };
+    for (const key of Object.keys(next) as (keyof typeof next)[]) if (next[key] === undefined || next[key] === "") delete next[key];
+    all[k] = next;
+    patchFx({ welcomeButtons: all });
+  };
+  const field = "bare-input h-8 min-w-0 rounded-none border-0 border-b bg-transparent px-1 text-[14px] focus:outline-none";
+  const line = { borderColor: "#b39a6a", color: "#2a1c10" };
+  return (
+    <div data-button-editor="" className="mt-1.5 flex w-full max-w-[420px] flex-col gap-1.5 rounded-xl px-3 py-2 text-[13px]" style={{ border: "1px solid rgba(139,112,64,.45)", background: "rgba(255,250,238,.75)", color: "#2a1c10" }}>
+      <label className="flex items-center gap-2">
+        <span className="w-12 shrink-0 font-semibold">Words</span>
+        <input defaultValue={cur.text ?? ""} placeholder={BUTTON_NAMES[k]} maxLength={60} onChange={(e) => set({ text: e.target.value })} className={`${field} flex-1`} style={line} />
+      </label>
+      <label className="flex items-center gap-2">
+        <span className="w-12 shrink-0 font-semibold">Icon</span>
+        <input defaultValue={cur.icon ?? ""} placeholder="an emoji, e.g. 🌙" maxLength={4} onChange={(e) => set({ icon: e.target.value.trim() })} className={`${field} w-28`} style={line} />
+      </label>
+      {pays && (
+        <label className="flex items-center gap-2">
+          <span className="w-12 shrink-0 font-semibold">XP</span>
+          <input type="number" inputMode="numeric" min={0} max={50} defaultValue={cur.xp ?? 5} onChange={(e) => set({ xp: Math.max(0, Math.min(50, Math.round(Number(e.target.value) || 0))) })} className={`${field} w-16 tabular-nums`} style={line} />
+          <span style={{ color: "#6b5631" }}>once a day, when you fill it in</span>
+        </label>
+      )}
+      {children}
+      {(onSnooze || onHide) && (
+        <div className="flex items-center gap-3 text-[12.5px]">
+          {onSnooze && (
+            <button type="button" onClick={onSnooze} className="underline underline-offset-2" style={{ color: "#6b5631" }}>
+              Snooze till tomorrow
+            </button>
+          )}
+          {onHide && (
+            <button type="button" onClick={onHide} className="underline underline-offset-2" style={{ color: "#6b5631" }}>
+              Hide it (the gear brings it back)
+            </button>
+          )}
+        </div>
+      )}
+      <div className="flex items-center justify-end gap-3">
+        <button type="button" onClick={() => (set({ text: undefined, icon: undefined, xp: undefined }), onDone())} className="text-[12.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+          Back to how it was
+        </button>
+        <button type="button" onClick={onDone} className="h-8 rounded-full px-4 text-[13px] font-bold" style={GILT}>
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The welcome screen's Journal (owner, Nov 6): a gilded button that opens a row of prompt pills.
+ * Top priorities (the box the app and the toucan remember) is the first and opens by default; the
+ * others (morning pages, gratitude…) are a plain page to write on. What's written is saved to your
+ * journal by the screen's own button, each prompt paying its XP once a day.
+ */
+function WelcomeJournal({ fx, label, icon, priorities, registerJournal, onWritten }: { fx: FxSettings; label?: string; icon?: string; priorities: (question: string, xp: number) => React.ReactNode; registerJournal: (save: () => Promise<boolean>) => void; onWritten: (id: string, xp: number) => void }) {
+  const prompts = journalPrompts(fx);
+  const [open, setOpen] = useState(false);
+  const [pick, setPick] = useState("priorities");
+  const [texts, setTexts] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const current = prompts.find((p) => p.id === pick) ?? prompts[0];
+  const top = prompts.find((p) => p.id === "priorities")!;
+  async function save() {
+    setError(null);
+    try {
+      for (const p of prompts) {
+        const t = (texts[p.id] ?? "").trim();
+        if (p.id === "priorities" || !t || saved[p.id] === t) continue;
+        await addJournalEntryAction(`${p.label}: ${p.prompt}\n\n${t}`, null);
+        setSaved((s) => ({ ...s, [p.id]: t }));
+        onWritten(p.id, cleanXp(p.xp));
+      }
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save your journal.");
+      return false;
+    }
+  }
+  // Saved by the screen's own button on the way out (braces: an effect's return value is its cleanup).
+  useEffect(() => {
+    registerJournal(save);
+  });
+  const written = prompts.filter((p) => p.id !== "priorities" && (texts[p.id] ?? "").trim()).length;
+  return (
+    <div className="flex w-full flex-col items-center">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]" style={GILT}>
+        <span aria-hidden>{icon || "📖"}</span>
+        {label || "Journal"}
+        {written > 0 && !open && <span className="font-sans text-[12.5px] font-semibold opacity-80">· {written} written</span>}
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ opacity: 0.8, transform: open ? "rotate(180deg)" : undefined }}>
+          <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <Fold open={open}>
+        <div className="flex w-full flex-col gap-2 pt-2">
+          <div role="tablist" aria-label="Journal prompts" className="flex flex-wrap justify-center gap-1.5">
+            {prompts.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                role="tab"
+                aria-selected={p.id === current.id}
+                onClick={() => setPick(p.id)}
+                className="h-8 rounded-full px-3 text-[13px] font-semibold"
+                style={p.id === current.id ? { ...GILT } : { background: "rgba(255,250,238,.6)", border: "1px solid #b39a6a", color: "#2a1c10" }}
+              >
+                {p.label}
+                {(p.id === "priorities" ? false : !!(texts[p.id] ?? "").trim()) && " ✓"}
+              </button>
+            ))}
+          </div>
+          {/* Top priorities keeps its own box; it stays mounted so its words are saved even from another pill. */}
+          <div hidden={current.id !== "priorities"}>{priorities(top.prompt, cleanXp(top.xp))}</div>
+          {current.id !== "priorities" && (
+            <div className="flex flex-col gap-1">
+              <p className="m-0 text-[14.5px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
+                {current.prompt}
+              </p>
+              <textarea
+                key={current.id}
+                value={texts[current.id] ?? ""}
+                onChange={(e) => setTexts((t) => ({ ...t, [current.id]: e.target.value }))}
+                rows={current.id === "pages" ? 7 : 3}
+                maxLength={6000}
+                placeholder="Write here…"
+                aria-label={current.prompt}
+                className="w-full resize-y rounded-xl border px-3 py-2 text-[16px] leading-snug focus:outline-none"
+                style={FIELD}
+              />
+              <span className="text-right text-[11.5px]" style={{ color: "#6b5631" }}>
+                +{cleanXp(current.xp)} XP once you write · saved with the screen&rsquo;s button
+              </span>
+            </div>
+          )}
+          {error && (
+            <p className="m-0 text-[13px]" style={{ color: "var(--t-warn)" }}>
+              {error}
+            </p>
+          )}
+        </div>
+      </Fold>
+    </div>
+  );
+}
+
+/** The Journal's prompts, edited under its button (right-click or hold it): name, question, XP; add or remove. */
+function JournalPromptsEditor({ fx }: { fx: FxSettings }) {
+  const [list, setList] = useState<JournalPrompt[]>(() => journalPrompts(fx));
+  const save = (next: JournalPrompt[]) => {
+    setList(next);
+    patchFx({ journalPrompts: next });
+  };
+  const edit = (i: number, patch: Partial<JournalPrompt>) => save(list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  const field = "bare-input h-7 min-w-0 rounded-none border-0 border-b bg-transparent px-1 text-[13.5px] focus:outline-none";
+  const line = { borderColor: "#b39a6a", color: "#2a1c10" };
+  return (
+    <div className="flex flex-col gap-1.5 border-t pt-1.5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
+      <span className="font-semibold">Prompts</span>
+      {list.map((p, i) => (
+        <div key={p.id} className="flex flex-col gap-0.5 rounded-lg px-1.5 py-1" style={{ background: "rgba(255,255,255,.35)" }}>
+          <div className="flex items-center gap-1.5">
+            <input value={p.label} onChange={(e) => edit(i, { label: e.target.value.slice(0, 30) })} aria-label="Pill name" className={`${field} flex-1 font-semibold`} style={line} />
+            <input type="number" inputMode="numeric" min={0} max={50} value={p.xp} onChange={(e) => edit(i, { xp: cleanXp(e.target.value) })} aria-label={`XP for ${p.label}`} className={`${field} w-12 tabular-nums`} style={line} />
+            <span>XP</span>
+            {p.id !== "priorities" && (
+              <button type="button" onClick={() => save(list.filter((_, j) => j !== i))} aria-label={`Remove ${p.label}`} className="flex h-7 w-7 items-center justify-center text-[16px]" style={{ color: "#6b5631" }}>
+                ×
+              </button>
+            )}
+          </div>
+          <input value={p.prompt} onChange={(e) => edit(i, { prompt: e.target.value.slice(0, 240) })} aria-label={`What ${p.label} asks`} className={field} style={line} />
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => save([...list, { id: `p${Date.now().toString(36)}`, label: "New prompt", prompt: "What's on your mind this morning?", xp: 5 }])}
+        className="self-start text-[13px] font-semibold underline underline-offset-2"
+        style={{ color: "#6b5631" }}
+      >
+        + Add a prompt
+      </button>
+    </div>
+  );
+}
+
+const SNOOZE_PARTS_KEY = "welcome-snoozed-parts";
+const localDay = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+};
+/** Parts snoozed today on this device (a new day brings them back). */
+function readSnoozedParts(): string[] {
+  try {
+    if (typeof window === "undefined") return [];
+    const v = JSON.parse(window.localStorage.getItem(SNOOZE_PARTS_KEY) ?? "null") as { day?: string; parts?: string[] } | null;
+    return v?.day === localDay() && Array.isArray(v.parts) ? v.parts : [];
+  } catch {
+    return [];
+  }
 }

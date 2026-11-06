@@ -226,9 +226,17 @@ export function ToucanGuide() {
       const wait = setInterval(() => {
         if (welcomeOpen()) return;
         clearInterval(wait);
-        setTimeout(() => raiseRef.current(text, actions, note, opts), 1500);
+        // Not straight after logging in: he waits a while before bringing it up (owner, Nov 6: "the toucan is still bothering me when I log in").
+        setTimeout(() => raiseRef.current(text, actions, note, opts), 10 * 60_000);
       }, 1000);
       // It will be said once the welcome screen closes: count it as said, or callers raise it again and again.
+      return note;
+    }
+    // Just past the welcome screen: no notes for ten minutes (instant follow-ups to a choice still show).
+    const closedAt = Number(document.documentElement.dataset.welcomeClosedAt ?? 0);
+    const quietLeft = closedAt + 10 * 60_000 - Date.now();
+    if (!opts.instant && closedAt && quietLeft > 0) {
+      setTimeout(() => raiseRef.current(text, actions, note, opts), quietLeft + 500);
       return note;
     }
     if (send()) return true;
@@ -282,6 +290,8 @@ export function ToucanGuide() {
             { label: "1 hour", run: () => inHours(1) },
             { label: "Other…", run: () => setPickTime({ at, back: ask }) },
             { label: "Skip it", run: () => void (n.taskId && snoozeToucanAction(n.taskId, 1).catch(() => {})) },
+            // A way back to what he said (owner, Nov 4: "a back button to the main toucan chat from the snooze options").
+            { label: "‹ Back", run: back },
           ],
           true,
           { instant: true, onClose: back }
@@ -598,6 +608,7 @@ export function ToucanGuide() {
                               { label: "30 min", run: () => push(30) },
                               { label: "1 hour", run: () => push(60) },
                               { label: "Other…", run: () => setPickTime({ at: (when: number) => push(Math.max(1, Math.round((when - Date.now()) / 60_000))), back: ask }) },
+                              { label: "‹ Back", run: () => void back() },
                             ],
                             true,
                             { instant: true, onClose: back }

@@ -256,7 +256,7 @@ export default async function Home() {
             parts={{
               stats,
               plan: <EveningPromptOr>{planNudge}</EveningPromptOr>,
-              imports: importsWaiting > 0 ? <ImportsWaiting count={importsWaiting} /> : null,
+              imports: importsWaiting > 0 ? <ImportsWaiting count={importsWaiting} hideable /> : null,
               chapter: chapter ? <WeekChapter chapter={chapter} theme={profile?.theme ?? "adventure"} /> : null,
               evening: <BeginEveningButton />,
               add: (

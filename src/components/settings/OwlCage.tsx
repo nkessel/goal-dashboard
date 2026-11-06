@@ -41,7 +41,8 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
   const spirit = useSyncExternalStore(subscribe, readSpirit, () => false);
   const [freeing, setFreeing] = useState(false);
   const cageRef = useRef<HTMLButtonElement>(null);
-  if (!caged && !freeing) return null;
+  // An empty cage stays on show (owner, Nov 5: "what happened to the bird cage?? add it back"): drop him on it to let him rest.
+  const empty = !caged && !freeing;
 
   function setFree() {
     if (freeing) return;
@@ -57,10 +58,11 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
     <div
       className={compact ? "parchment flex min-w-0 flex-1 basis-0 cursor-pointer items-center gap-2 rounded-[14px] px-2.5 py-1.5" : "flex items-center gap-3 rounded-2xl px-3 py-2.5"}
       style={compact ? undefined : { background: "rgba(20,14,30,.06)", border: "1px dashed rgba(139,112,64,.5)" }}
-      onClick={compact ? setFree : undefined}
+      onClick={compact && !empty ? setFree : undefined}
+      data-owl-cage=""
     >
-      <button ref={cageRef} type="button" onClick={compact ? undefined : setFree} aria-label="Open the cage and set the bird free" title="Open the cage" className={`owl-cage relative shrink-0 h-20 w-16 ${freeing ? "is-opening" : ""}`} style={compact ? { zoom: 0.625 } as React.CSSProperties : undefined}>
-        {!freeing && spirit && (
+      <button ref={cageRef} type="button" onClick={compact || empty ? undefined : setFree} aria-label={empty ? "The toucan’s cage (empty)" : "Open the cage and set the bird free"} title={empty ? "Drag the toucan here to let him rest" : "Open the cage"} className={`owl-cage relative shrink-0 h-20 w-16 ${freeing ? "is-opening" : ""}`} style={compact ? { zoom: 0.625 } as React.CSSProperties : undefined}>
+        {!freeing && !empty && spirit && (
           // The toucan, in whatever it's wearing, sits behind the bars.
           <span aria-hidden className="pointer-events-none absolute inset-x-0 top-[36px] flex justify-center">
             <span className="cage-bird block">
@@ -84,7 +86,7 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
           <path d="M8 30V72M56 30V72" stroke="url(#cage-gold)" strokeWidth="2.4" />
           <rect x="4" y="70" width="56" height="6" rx="2" fill="url(#cage-gold)" />
           {/* the little prisoner */}
-          {!freeing && !spirit && (
+          {!freeing && !empty && !spirit && (
             <g className="cage-bird">
               <ellipse cx="32" cy="52" rx="9" ry="11" fill="#f2efe6" />
               <circle cx="29" cy="48" r="1.6" fill="#2a1608" />
@@ -100,7 +102,12 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
           </g>
         </svg>
       </button>
-      {compact ? (
+      {empty ? (
+        <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }}>
+          <span className="block font-semibold">His cage</span>
+          Drag the toucan here to let him rest
+        </span>
+      ) : compact ? (
         <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }}>
           <span className="block font-semibold">Your toucan</span>
           Tap the cage to set him free

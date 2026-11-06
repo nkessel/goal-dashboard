@@ -35,7 +35,7 @@ function dueWord(iso: string | null) {
  * Quests below. Drag a due quest down into today (or tap its +), drag today's
  * into order, × takes one off today. Saved as you go.
  */
-export function TodayPlanner({ today: initialToday, due }: { today: Lite[]; due: Lite[] }) {
+export function TodayPlanner({ today: initialToday, due, label, icon }: { today: Lite[]; due: Lite[]; /** The button's own words and emoji (welcome button editor). */ label?: string; icon?: string }) {
   const [open, setOpen] = useState(false);
   const [dueOpen, setDueOpen] = useState(true);
   const [today, setToday] = useState(initialToday);
@@ -94,10 +94,14 @@ export function TodayPlanner({ today: initialToday, due }: { today: Lite[]; due:
   return (
     <div className="flex w-full flex-col items-center">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]" style={GILT}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M4 6.5h11M4 12h16M4 17.5h9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-        </svg>
-        Choose today&rsquo;s quests{today.length ? ` (${today.length})` : ""}
+        {icon ? (
+          <span aria-hidden>{icon}</span>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M4 6.5h11M4 12h16M4 17.5h9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+        )}
+        {label || <>Choose today&rsquo;s quests</>}{today.length ? ` (${today.length})` : ""}
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : undefined }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

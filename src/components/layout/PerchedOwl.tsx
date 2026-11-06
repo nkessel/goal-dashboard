@@ -677,7 +677,8 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
           drag.current = null;
           endHold();
           if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-          const cage = document.querySelector<HTMLElement>("[data-owl-cage]")?.getBoundingClientRect();
+          // Any cage under the pointer (the menu button, or the cage tile in Settings).
+          const cage = [...document.querySelectorAll<HTMLElement>("[data-owl-cage]")].map((el) => el.getBoundingClientRect()).find((r) => r.width > 0 && e.clientX >= r.left - 6 && e.clientX <= r.right + 6 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6) ?? document.querySelector<HTMLElement>("[data-owl-cage]")?.getBoundingClientRect();
           markTab(null);
           const tab = d?.moving ? tabAt(e.clientX, e.clientY) : null;
           if (d?.moving && hidingHere) {

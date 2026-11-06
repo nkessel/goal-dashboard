@@ -73,6 +73,10 @@ export type FxSettings = {
   welcomeHabitIds?: string[];
   /** The Check in button's own words (blank = "Check in"). */
   checkinText?: string;
+  /** Welcome buttons you shape yourself (right-click or hold one, owner Nov 6): its words, an emoji for its icon, and the XP it pays once filled in. */
+  /** The welcome Journal's prompts, as pills (unset = the starter list in lib/journal-prompts.ts). */
+  journalPrompts?: { id: string; label: string; prompt: string; xp: number }[];
+  welcomeButtons?: Partial<Record<"checkin" | "sleep" | "quests" | "focus", { text?: string; icon?: string; xp?: number }>>;
   welcomeIntentionQ?: string;
   welcomeIntentionHint?: string;
   /** Seconds the "Feedback submitted" card stays (0 = until you close it). */

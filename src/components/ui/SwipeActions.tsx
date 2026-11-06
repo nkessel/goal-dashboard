@@ -11,7 +11,7 @@ type Side = { label: string; icon?: React.ReactNode; background: string; color?:
  * swipe right for the `left` action, left for the `right` one. Swipe back
  * or tap the row to close. Vertical scrolling is untouched.
  */
-export function SwipeActions({ left, right, children }: { left?: Side; right?: Side; children: React.ReactNode }) {
+export function SwipeActions({ left, right, children, startOn }: { left?: Side; right?: Side; children: React.ReactNode; /** Only swipes that start on these targets count (e.g. a part's own button, not the sliders in its tray). */ startOn?: (target: EventTarget | null) => boolean }) {
   const [dx, setDx] = useState(0);
   const [open, setOpen] = useState<"left" | "right" | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -50,6 +50,7 @@ export function SwipeActions({ left, right, children }: { left?: Side; right?: S
         style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dragging ? "none" : "transform 200ms cubic-bezier(.2,.8,.2,1)", touchAction: "pan-y" }}
         onPointerDown={(e) => {
           if (e.pointerType !== "touch") return;
+          if (startOn && !open && !startOn(e.target)) return;
           start.current = { x: e.clientX, y: e.clientY, base, dir: null };
         }}
         onPointerMove={(e) => {

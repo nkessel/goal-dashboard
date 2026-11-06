@@ -308,7 +308,7 @@ function QuestCard({
   return (
     <button
       type="button"
-      title={`Edit "${task.title}"${agenda.length ? `\nAgenda: ${agenda.map((a) => a.title).join("; ")}` : ""}`}
+      title={`Edit "${task.title}"${done && task.completed_at ? `\nCompleted ${new Date(task.completed_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}${agenda.length ? `\nAgenda: ${agenda.map((a) => a.title).join("; ")}` : ""}`}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
@@ -378,7 +378,8 @@ function QuestCard({
         </span>
         {doneNote && (
           <span className="block truncate" style={{ color: "#4e6a35", fontSize: 10.5, fontStyle: "italic", lineHeight: 1.2 }}>
-            Completed
+            {/* When it was done (owner, Nov 5: "show when I completed quests in the past days"). */}
+            {task.completed_at ? `Done ${new Date(task.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase() + "m")}` : "Completed"}
           </span>
         )}
         {payLine && <Pays xp={show.xp ? xpN : 0} coins={show.coins ? coinN : 0} done={done} center={stack} />}

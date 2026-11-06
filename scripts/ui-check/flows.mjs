@@ -22,6 +22,21 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/", { welcome: true, name: "welcome" });
       await h.check("shown");
+      // He's quiet on arrival (owner, Nov 4 and Nov 6): no saying until he's tapped.
+      await h.settle(3400);
+      const early = await h.page.locator(".toucan-bubble").count();
+      if (early) throw new Error(`toucan: he spoke on arrival (${early} bubble), he should wait to be tapped`);
+      await h.tap(/^the toucan:/i, "toucan tapped: his saying", { optional: true });
+      // Right-click a part's button to shape it (words, icon, XP), folding open under it (owner, Nov 6).
+      const sleepBtn = h.page.getByRole("button", { name: /^sleep/i }).first();
+      if (await sleepBtn.count()) {
+        await sleepBtn.click({ button: "right" });
+        await h.settle(500);
+        if (!(await h.page.locator("[data-button-editor]").count())) throw new Error("welcome: right-clicking the Sleep button didn't open its editor");
+        await h.check("button editor");
+        await h.page.locator("[data-button-editor]").getByRole("button", { name: /^done$/i }).click();
+        await h.settle(500);
+      }
       await h.toggle(/emotional check-in/i, "emotional check-in");
       await h.toggle(/^sleep/i, "sleep");
       // Sleep and wake on one line; each opens its time ruler right under it (no popup, no keyboard).
@@ -36,6 +51,12 @@ export const FLOWS = [
       await h.tap((p) => p.getByRole("button", { name: /^done$/i }).first(), "ruler done", { optional: true, expectMove: true });
       await h.tap(/^sleep/i, "sleep close", { expectMove: true });
       await h.toggle(/^habits/i, "habits");
+      // Top priorities sit behind the Journal button, its first pill (owner, Nov 6).
+      await h.tap((p) => p.locator("button[aria-expanded]", { hasText: /journal/i }).first(), "journal open", { expectMove: true }); // the check-in's "✎ Journal" button shares the name
+      await h.check("journal open");
+      await h.tap((p) => p.getByRole("tab", { name: /morning pages/i }).first(), "morning pages pill", { optional: true });
+      await h.typeIn((p) => p.getByPlaceholder(/write here/i).first(), "morning pages");
+      await h.tap((p) => p.getByRole("tab", { name: /top priorities/i }).first(), "top priorities pill", { optional: true });
       await h.typeIn((p) => p.getByPlaceholder(/most important/i).first(), "top priority");
       await h.toggle(/other priorities/i, "other priorities");
       await h.toggle(/choose today.s quests/i, "choose today's quests");
@@ -48,6 +69,7 @@ export const FLOWS = [
       });
       await h.goto("/", { welcome: true, name: "welcome-toucan-right" });
       await h.check("toucan at right edge");
+      await h.tap(/^the toucan:/i, "toucan saying", { optional: true });
       await h.tap(/^the toucan:/i, "toucan menu", { optional: true });
       await h.check("toucan menu");
       await esc(h);

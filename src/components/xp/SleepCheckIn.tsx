@@ -38,7 +38,7 @@ function Face({ mouth, color }: { mouth: string; color: string }) {
  * lists editable right here), a sleep-quality row of five faces, and other
  * nights. Saved by the screen's own button (registered like the top priority).
  */
-export function SleepCheckIn({ register }: { register: (save: () => Promise<boolean>) => void }) {
+export function SleepCheckIn({ register, label, icon, onFilled }: { register: (save: () => Promise<boolean>) => void; /** The button's own words and emoji (welcome button editor). */ label?: string; icon?: string; /** Something was entered and saved (for the welcome screen's XP). */ onFilled?: () => void }) {
   const [open, setOpen] = useState(false);
   const [lists, setLists] = useState<{ effort: string[]; hindrances: string[] } | null>(null);
   const [night, setNight] = useState<NightDraft>(EMPTY_NIGHT);
@@ -80,6 +80,7 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
       for (const n of filled) await saveNightAction({ day: n.day, bed: n.bed || null, wake: n.wake || null, effort: [], hindrances: [], keep: true });
       if (touched) await saveNightToo(night);
       if (qualityNew) await saveCheckInAction(null, [{ metric: "Sleep quality", level: quality * 2 }]);
+      if (filled.length || touched || qualityNew) onFilled?.();
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your sleep.");
@@ -133,8 +134,8 @@ export function SleepCheckIn({ register }: { register: (save: () => Promise<bool
   return (
     <div className="flex w-full flex-col items-center">
       <button key={stamp} type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className={`font-display flex h-10 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-5 text-[16px] ${stamp ? "sleep-stamp" : ""}`} style={GILT}>
-        <MoonIcon />
-        Sleep check-in{logged && !dirty ? " ✓" : ""}
+        {icon ? <span aria-hidden>{icon}</span> : <MoonIcon />}
+        {label || "Sleep check-in"}{logged && !dirty ? " ✓" : ""}
         {summary && !open && <span className="truncate font-sans text-[12.5px] font-semibold tabular-nums opacity-80">· {summary}</span>}
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ transform: open ? "rotate(180deg)" : undefined }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />

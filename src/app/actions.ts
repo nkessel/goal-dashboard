@@ -4458,3 +4458,32 @@ export async function checkInChartAction() {
     ],
   };
 }
+
+/**
+ * XP for each part of the welcome screen you fill in (owner, Nov 6): the sleep check-in, the emotional
+ * check-in, your top priorities. Each part pays once a day, its own amount (0–50, set by right-clicking
+ * or holding its button; 5 by default). Recorded in `life_wheel.welcomeXp` so a second visit doesn't pay again.
+ */
+export async function welcomePartsXpAction(partsIn: { key: string; xp: number }[]) {
+  const ownerId = await requireProfileId();
+  // checkin, sleep, focus (the top priorities), and each Journal prompt written ("journal-<id>").
+  const allowed = new Set(["checkin", "sleep", "focus"]);
+  const parts = (Array.isArray(partsIn) ? partsIn : [])
+    .filter((p) => p && (allowed.has(String(p.key)) || /^journal-[a-z0-9-]{1,40}$/.test(String(p.key))))
+    .slice(0, 12)
+    .map((p) => ({ key: String(p.key), xp: Math.max(0, Math.min(50, Math.round(Number(p.xp) || 0))) }));
+  const extras = await readExtras(ownerId);
+  const day = tomorrowData.appDayKey();
+  const was = extras.welcomeXp as { day?: string; paid?: string[] } | undefined;
+  const paid = was?.day === day && Array.isArray(was.paid) ? was.paid.map(String) : [];
+  const fresh = parts.filter((p) => !paid.includes(p.key) && p.xp > 0);
+  if (!fresh.length) return { xp: 0, totalXp: null as number | null };
+  const amount = fresh.reduce((a, p) => a + p.xp, 0);
+  const { error } = await supabaseAdmin()
+    .from("profiles")
+    .update({ life_wheel: { ...extras, welcomeXp: { day, paid: [...paid, ...fresh.map((p) => p.key)] } } })
+    .eq("id", ownerId);
+  if (error) throw new Error(`Couldn't record that: ${error.message}`);
+  const res = await xp.awardXp(ownerId, amount, "daily_check_in");
+  return { xp: amount, totalXp: res.totalXp as number | null };
+}
