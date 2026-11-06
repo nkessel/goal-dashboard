@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { createQuestAction, unscheduleTaskAction } from "@/app/actions";
+import { addTaskSessionAction, createQuestAction, unscheduleTaskAction } from "@/app/actions";
+import { SlotPickerDialog } from "@/components/tasks/SlotPickerDialog";
+import { sessionRef } from "@/lib/calendar-task-window";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import type { Task } from "@/lib/data/types";
 import { fromFeedback } from "@/lib/from-feedback";
@@ -22,19 +24,21 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
   const [minutes, setMinutes] = useState(15);
   const [title, setTitle] = useState(`Follow up: ${target.kind === "task" ? target.task.title : target.title}`.slice(0, 120));
   const [editing, setEditing] = useState<Task | null>(null);
+  /** Picking a time for another session of this quest (owner, Nov 5: one quest in several calendar spots). */
+  const [another, setAnother] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    const down = (e: PointerEvent) => !fromFeedback(e) && ref.current && !ref.current.contains(e.target as Node) && !editing && onClose();
-    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && !editing && onClose();
+    const down = (e: PointerEvent) => !fromFeedback(e) && ref.current && !ref.current.contains(e.target as Node) && !editing && !another && onClose();
+    const key = (e: KeyboardEvent) => !fromFeedback(e) && e.key === "Escape" && !editing && !another && onClose();
     window.addEventListener("pointerdown", down);
     window.addEventListener("keydown", key);
     return () => {
       window.removeEventListener("pointerdown", down);
       window.removeEventListener("keydown", key);
     };
-  }, [onClose, editing]);
+  }, [onClose, editing, another]);
 
   function addFollowUp() {
     setError(null);
@@ -68,6 +72,34 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
   const item = "relative z-[1] min-h-10 px-3.5 text-left text-[14.5px] hover:bg-black/[.06]";
 
   if (editing) return <EditTaskModal task={editing} theme={theme} onClose={() => (setEditing(null), onClose())} />;
+  if (another && target.kind === "task") {
+    const len = Math.round((target.end.getTime() - target.start.getTime()) / 60_000);
+    const next = new Date(target.start);
+    next.setDate(next.getDate() + 1);
+    return (
+      <SlotPickerDialog
+        heading="Another session"
+        questTitle={target.task.title}
+        durationMinutes={Math.max(15, Math.min(240, len || 60))}
+        initial={next.toISOString()}
+        isAdventure={theme === "adventure"}
+        placing={pending}
+        onPick={(slot) =>
+          startTransition(async () => {
+            try {
+              await addTaskSessionAction(sessionRef(target.task), slot.start, slot.end);
+              router.refresh();
+              onClose();
+            } catch (e) {
+              setAnother(false);
+              setError(e instanceof Error ? e.message : "Couldn't add the session.");
+            }
+          })
+        }
+        onClose={() => (setAnother(false), onClose())}
+      />
+    );
+  }
   return createPortal(
     <div ref={ref} role="menu" data-menu="calendar-item" className="parchment fixed z-[80] flex flex-col overflow-hidden py-1" style={{ left, top, width: W, borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 30px rgba(0,0,0,.35)" }}>
       {mode === "menu" ? (
@@ -86,13 +118,16 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
                 disabled={pending}
                 onClick={() =>
                   startTransition(async () => {
-                    await unscheduleTaskAction(target.task.id).catch(() => {});
+                    await unscheduleTaskAction(sessionRef(target.task)).catch(() => {});
                     router.refresh();
                     onClose();
                   })
                 }
               >
-                Take off the calendar
+                {target.task.session_id ? "Take this session off" : "Take off the calendar"}
+              </button>
+              <button type="button" role="menuitem" data-mi="another" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setAnother(true)}>
+                ＋ Another session…
               </button>
             </>
           )}
@@ -111,6 +146,11 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
             <img src="/design/icon-followup.svg" alt="" width={20} height={20} />
             Schedule a follow-up quest
           </button>
+          {error && (
+            <p className="relative z-[1] m-0 px-3.5 pb-1 text-[12.5px]" style={{ color: "var(--t-warn)" }}>
+              {error}
+            </p>
+          )}
         </>
       ) : (
         <div className="relative z-[1] flex flex-col gap-2 px-3 py-2">

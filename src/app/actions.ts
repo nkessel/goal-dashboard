@@ -5,6 +5,7 @@ import { auth, signIn, CALENDAR_AUTH_PARAMS } from "@/auth";
 import * as boardsData from "@/lib/data/boards";
 import * as goalsData from "@/lib/data/goals";
 import * as tasksData from "@/lib/data/tasks";
+import { sessionIdOf, sessionRef } from "@/lib/calendar-task-window";
 import * as friendshipsData from "@/lib/data/friendships";
 import * as invitesData from "@/lib/data/invites";
 import * as activityData from "@/lib/data/activity";
@@ -811,11 +812,63 @@ export async function scheduleTaskAction(
   endISO: string
 ) {
   const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const sid = sessionIdOf(taskId);
+  if (sid) {
+    await moveSession(accessToken, profileId, sid, new Date(startISO), new Date(endISO));
+    revalidatePath("/");
+    revalidatePath("/calendar");
+    return;
+  }
 
   const task = await tasksData.getTask(taskId, profileId);
   if (!task) throw new Error("Task not found");
 
   await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO));
+  revalidatePath("/");
+  revalidatePath("/calendar");
+}
+
+/** Move one of a quest's further sessions (and its Google event; one is made if it had none). */
+async function moveSession(accessToken: string | null, profileId: string, sessionId: string, start: Date, end: Date) {
+  const s = await tasksData.getTaskSession(sessionId, profileId);
+  if (!s) throw new Error("That session isn't on the calendar anymore.");
+  let eventId = s.google_calendar_event_id;
+  if (accessToken) {
+    try {
+      if (eventId) await updateCalendarEvent(accessToken, eventId, { start, end });
+      else {
+        const t = await tasksData.getTask(s.task_id, profileId);
+        if (t) eventId = await createCalendarEvent(accessToken, { title: t.title, description: t.description ?? undefined, start, end });
+      }
+    } catch {
+      /* the app's own calendar still moves */
+    }
+  }
+  await tasksData.updateTaskSession(sessionId, profileId, { starts_at: start.toISOString(), ends_at: end.toISOString(), google_calendar_event_id: eventId ?? null });
+}
+
+/**
+ * One quest in another calendar spot (owner, Nov 5: a quest ran long, "I need to do more of it
+ * tomorrow morning"). The quest keeps its first slot; this adds a further session with its own
+ * Google event. A quest not on the calendar yet simply goes there.
+ */
+export async function addTaskSessionAction(taskId: string, startISO: string, endISO: string) {
+  const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const start = new Date(startISO);
+  const end = new Date(endISO);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) throw new Error("Pick a time first.");
+  // Called from a session's own card too: the quest is that session's.
+  const sid = sessionIdOf(taskId);
+  const questId = sid ? (await tasksData.getTaskSession(sid, profileId))?.task_id : taskId;
+  const task = questId ? await tasksData.getTask(questId, profileId) : null;
+  if (!task) throw new Error("That quest isn't here anymore.");
+  if (!task.is_on_calendar || !task.scheduled_start) {
+    await attachCalendarEvent(accessToken, profileId, task, start, end);
+  } else {
+    let eventId: string | null = null;
+    if (accessToken) eventId = await createCalendarEvent(accessToken, { title: task.title, description: task.description ?? undefined, start, end }).catch(() => null);
+    await tasksData.addTaskSession(profileId, task.id, start.toISOString(), end.toISOString(), eventId);
+  }
   revalidatePath("/");
   revalidatePath("/calendar");
 }
@@ -1948,13 +2001,20 @@ export async function getDayPlanAction(startISO: string, endISO: string): Promis
     events: events.filter((e) => !linked.has(e.id)).map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, isAllDay: e.isAllDay, location: e.location ?? null, description: e.description ? e.description.slice(0, 600) : null, calendarName: e.calendarName ?? null })),
     quests: tasks
       .filter((t) => t.scheduled_start && t.scheduled_end)
-      .map((t) => ({ id: t.id, title: t.title, start: t.scheduled_start!, end: t.scheduled_end!, icon_key: t.icon_key ?? null, icon_source: t.icon_source ?? null, status: t.status })),
+      .map((t) => ({ id: sessionRef(t), title: t.title, start: t.scheduled_start!, end: t.scheduled_end!, icon_key: t.icon_key ?? null, icon_source: t.icon_source ?? null, status: t.status })),
   };
 }
 
 /** Place (or move) a quest in a day plan. Planning moves don't count as reschedules. */
 export async function planQuestAtAction(taskId: string, startISO: string, endISO: string) {
   const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  const sid = sessionIdOf(taskId);
+  if (sid) {
+    await moveSession(accessToken, profileId, sid, new Date(startISO), new Date(endISO));
+    revalidatePath("/");
+    revalidatePath("/calendar");
+    return;
+  }
   const task = await tasksData.getTask(taskId, profileId);
   if (!task) throw new Error("That quest isn't here anymore.");
   await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO), false);
@@ -1992,6 +2052,16 @@ export async function planQuickEventAction(input: { title: string; startISO: str
  */
 export async function unscheduleTaskAction(taskId: string) {
   const { profileId, accessToken } = await requireSessionMaybeGoogle();
+  // One of a quest's further sessions: only that session comes off.
+  const sid = sessionIdOf(taskId);
+  if (sid) {
+    const sess = await tasksData.getTaskSession(sid, profileId);
+    if (sess?.google_calendar_event_id && accessToken) await deleteCalendarEvent(accessToken, sess.google_calendar_event_id).catch(() => {});
+    await tasksData.deleteTaskSession(sid, profileId);
+    revalidatePath("/");
+    revalidatePath("/calendar");
+    return;
+  }
   const { data: t } = await supabaseAdmin().from("tasks").select("plan_xp, status").eq("id", taskId).eq("owner_id", profileId).maybeSingle<{ plan_xp: number | null; status: string }>();
   const eventId = await tasksData.unscheduleTask(taskId, profileId);
   if (eventId && accessToken) await deleteCalendarEvent(accessToken, eventId).catch(() => {});

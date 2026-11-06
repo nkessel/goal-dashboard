@@ -703,7 +703,58 @@ export async function listCalendarTasksForOwner(
   for (const t of scheduledRes.data ?? []) byId.set(t.id, t);
   for (const t of completedRes.data ?? []) byId.set(t.id, t);
   for (const t of miniRes.data ?? []) if (!byId.has(t.id) && !t.locked_by_task_id) byId.set(t.id, t);
-  return [...byId.values()];
+  // A quest's further sessions (it ran long; more of it tomorrow morning): a copy of the quest per session.
+  const sessions = await listTaskSessionsAsTasks(ownerId, rangeStart, rangeEnd).catch(() => []);
+  return [...byId.values(), ...sessions];
+}
+
+export type TaskSession = { id: string; task_id: string; starts_at: string; ends_at: string; google_calendar_event_id: string | null };
+
+/** Each further session in the range as a copy of its quest, at the session's time. */
+export async function listTaskSessionsAsTasks(ownerId: string, rangeStart: Date, rangeEnd: Date): Promise<Task[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("task_sessions")
+    .select("id, task_id, starts_at, ends_at, google_calendar_event_id")
+    .eq("owner_id", ownerId)
+    .lt("starts_at", rangeEnd.toISOString())
+    .gt("ends_at", rangeStart.toISOString());
+  if (error || !data?.length) return [];
+  const rows = data as TaskSession[];
+  const { data: tasks } = await db.from("tasks").select("*").eq("owner_id", ownerId).in("id", [...new Set(rows.map((r) => r.task_id))]);
+  const byId = new Map(((tasks ?? []) as Task[]).map((t) => [t.id, t]));
+  const out: Task[] = [];
+  for (const r of rows) {
+    const t = byId.get(r.task_id);
+    if (!t) continue;
+    out.push({ ...t, session_id: r.id, is_on_calendar: true, scheduled_start: r.starts_at, scheduled_end: r.ends_at, google_calendar_event_id: r.google_calendar_event_id });
+  }
+  return out;
+}
+
+export async function getTaskSession(sessionId: string, ownerId: string): Promise<TaskSession | null> {
+  const { data } = await supabaseAdmin().from("task_sessions").select("id, task_id, starts_at, ends_at, google_calendar_event_id").eq("id", sessionId).eq("owner_id", ownerId).maybeSingle();
+  return (data as TaskSession | null) ?? null;
+}
+
+export async function addTaskSession(ownerId: string, taskId: string, startISO: string, endISO: string, googleEventId: string | null): Promise<TaskSession> {
+  const { data, error } = await supabaseAdmin()
+    .from("task_sessions")
+    .insert({ owner_id: ownerId, task_id: taskId, starts_at: startISO, ends_at: endISO, google_calendar_event_id: googleEventId })
+    .select("id, task_id, starts_at, ends_at, google_calendar_event_id")
+    .single();
+  if (error) throw new Error(`Couldn't add the session: ${error.message}`);
+  return data as TaskSession;
+}
+
+export async function updateTaskSession(sessionId: string, ownerId: string, patch: { starts_at?: string; ends_at?: string; google_calendar_event_id?: string | null }): Promise<void> {
+  const { error } = await supabaseAdmin().from("task_sessions").update(patch).eq("id", sessionId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't move the session: ${error.message}`);
+}
+
+export async function deleteTaskSession(sessionId: string, ownerId: string): Promise<void> {
+  const { error } = await supabaseAdmin().from("task_sessions").delete().eq("id", sessionId).eq("owner_id", ownerId);
+  if (error) throw new Error(`Couldn't take the session off: ${error.message}`);
 }
 
 export async function markReminderSent(taskId: string): Promise<void> {

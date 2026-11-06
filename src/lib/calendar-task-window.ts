@@ -30,3 +30,7 @@ export function showsOnCalendar(task: Task): boolean {
   if (task.status === "completed") return true;
   return timedMiniQuest(task) !== null;
 }
+
+/** A further session of a quest travels as "s:<session id>" wherever a quest id is expected (drag, plan, take off). */
+export const sessionRef = (t: Pick<Task, "id" | "session_id">) => (t.session_id ? `s:${t.session_id}` : t.id);
+export const sessionIdOf = (ref: string) => (ref.startsWith("s:") ? ref.slice(2) : null);

@@ -58,6 +58,9 @@ export type Task = {
   scheduled_start: string | null;
   scheduled_end: string | null;
   google_calendar_event_id: string | null;
+  /** Set on a calendar copy of this quest for one of its further sessions (task_sessions.id):
+   *  the copy's scheduled_start/end and Google event are that session's. */
+  session_id?: string | null;
   is_manual_priority: boolean;
   status: "open" | "completed";
   /** Set on a secret-mission step (hidden until sent to Today). */

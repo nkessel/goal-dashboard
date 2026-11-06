@@ -89,11 +89,11 @@ export function MonthView({
                   {isAdventure
                     ? dots.slice(0, 2).map((t) =>
                         t.status === "completed" ? (
-                          <span key={t.id} className="quest-seal block h-3.5 w-3.5 rounded-full" title={t.title} />
+                          <span key={t.session_id ?? t.id} className="quest-seal block h-3.5 w-3.5 rounded-full" title={t.title} />
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL or a static /design/ creature
                           <img
-                            key={t.id}
+                            key={t.session_id ?? t.id}
                             src={questArt(t)}
                             alt=""
                             title={t.title}
@@ -107,7 +107,7 @@ export function MonthView({
                       )
                     : dots.map((t) => (
                     <span
-                      key={t.id}
+                      key={t.session_id ?? t.id}
                       className="block h-1.5 w-1.5 rounded-full"
                       style={{
                         background:

@@ -58,6 +58,9 @@ export function makeFixtures() {
     task("Rune puzzle: fix the printer", at(-19, 30)),
     task("Take out the trash", { is_tiny: true, is_manual_priority: true, due_at: inHours(8), estimate_minutes: 15 }),
   );
+  // One quest in two calendar spots (owner, Nov 5): the registration continues tomorrow.
+  const goblin = tasks.find((t) => t.title.startsWith("Goblin paperwork"));
+  const task_sessions = [{ id: randomUUID(), owner_id: OWNER_ID, task_id: goblin.id, starts_at: inHours(26.5), ends_at: inHours(27.5), google_calendar_event_id: null }];
   const [reading] = tasks;
   // A quest waiting behind another (a sequence): hidden until the reading is done.
   tasks.push(task("Post the reflection link in the course chat", { board_id: course.id, locked_by_task_id: reading.id }));
@@ -132,6 +135,7 @@ export function makeFixtures() {
     friendships: [{ id: randomUUID(), requester_id: OWNER_ID, addressee_id: FRIEND_ID, status: "accepted" }],
     boards,
     tasks,
+    task_sessions,
     quest_steps: steps,
     rites,
     rewards,

@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file says what to work on next and how to ship it. It is kept current by whoever ships: see "Keeping this file current" at the bottom. If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-05 (morning), `main` @ see `git log` (bird no longer jumps when pressed; toucan event logging after midnight; Nov 4–5 notes recorded in `docs/FEEDBACK-OPEN.md`). **Next session: start with `docs/FEEDBACK-OPEN.md`** › "Nov 4 evening – Nov 5 notes" and "Nov 4 notes".
+- **Last updated:** 2026-11-06 (night), `main` @ see `git log` (one quest in several calendar spots: `task_sessions`). **Next session: start with `docs/FEEDBACK-OPEN.md`** › "Nov 4 evening – Nov 5 notes" and "Nov 4 notes".
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** ~86 notes (the app's count, Nov 2 afternoon; query in section 3; the owner's own notes also read at /journal › App feedback when no DB connector). Not marked shipped this push (no database access from that session). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
 
@@ -78,7 +78,7 @@ Each item is the owner's own ask. Take them top to bottom; mark done here and mo
 - Data layer: `src/lib/data/*.ts` (all `server-only`).
 - Pure logic: `src/lib/*.ts`.
 - UI: `src/components/<area>/`.
-- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0083_import_cards_ritual.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
+- Migrations: `supabase/migrations/NNNN_*.sql`. Latest is `0084_task_sessions.sql`. All have been run on production. Number new ones after the latest on `main`, and apply them before or with the deploy.
 - `profiles.life_wheel` (jsonb) is a catch-all for per-profile extras, read through `readExtras()` in `actions.ts`. **Always merge into it, never overwrite it.**
 - `app_defaults` table holds "default for all accounts" settings plus server-only `secret.*` keys (never shown as settings).
 
@@ -151,6 +151,7 @@ The owner's standing rule: **ship straight to the live app. Don't wait for an OK
 
 Newest first. Keep about 10 lines; `git log origin/main` is the full record.
 
+- Nov 6: **One quest in several calendar spots** (owner: "have the same quest show up in multiple calendar spots"; a quest ran long): table `task_sessions` (migration 0084, applied) holds a quest's further sessions, each with its own Google event. `listCalendarTasksForOwner` returns a copy of the quest per session (`session_id` set), so the calendar, busy times and the planner see them; a session travels as `s:<id>` (`sessionRef`/`sessionIdOf` in `lib/calendar-task-window.ts`) through `scheduleTaskAction`, `unscheduleTaskAction`, `planQuestAtAction`, so dragging or taking one off touches only that session. Add one from a calendar card's right-click/long-press menu ("＋ Another session…", WhenPicker dialog) or a quest's Schedule on calendar ("Move it" | "＋ Another session", the latter preselected once its time has passed). Data: Openthink follow-up has a session Nov 6 8:30–10 AM ET (added in the DB, so no Google event until it's moved once). ui-check: calendar flow opens the menu and the picker.
 - Nov 5: Pressing anything placed by an inline transform (the perched bird/toucan, dragged windows) no longer makes it leap toward the screen corner: the global press `scale: .97` is skipped on `[style*="transform"]` (it scaled the translate too; owner: "clicking on the bird makes it jump"). The UI check flags the stylesheet-transform version as `press-jump`, and skips text already scrolled under its own box's sticky band. The toucan logs an event said after midnight ("11am") as the 11am that has passed, through `logEventAction` (it was refused as future and showed "React error #441").
 - Nov 4 (late night, 2): The Google calendar list was cut at 12 in `listEventsAllCalendars` (events loaded from up to 20), so 53 of the owner's 65 calendars (e.g. CSSC Building Use, 144 events) filled the grid with no way to hide them; now all are listed (events from up to 40, list paged) and start hidden. The Google switch: off remembers what was showing (`shownBefore`), on brings back just that (else only the main calendar).
 - Nov 4 (late night): Only the main Google calendar shows at first (`mainOnly` one-time pass in `calendar-layers`; new calendars start hidden): the owner's own event-idea calendars (Boston area fun, Aikido of Amherst…) filled the week and counted as busy for the auto-scheduler. The Auto-scheduler pill reads "✨ Auto" below 1024px (it was pushed off the left edge).

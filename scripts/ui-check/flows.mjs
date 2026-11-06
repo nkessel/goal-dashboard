@@ -421,6 +421,20 @@ export const FLOWS = [
         await h.tap((p) => p.getByRole("button", { name: /^creature$/i }).first(), "show creature", { optional: true });
         await esc(h);
       }
+      // Another session of a quest (owner, Nov 5: one quest in several calendar spots): right-click its card.
+      {
+        const card = h.page.locator("[title^='Edit \"Goblin']").first();
+        if (await card.count()) {
+          await card.click({ button: "right" }).catch(() => {});
+          await h.settle(400);
+          await h.check("quest menu: another session");
+          if (await h.tap((p) => p.getByRole("menuitem", { name: /another session/i }).first(), "another session", { optional: true, expectMove: true })) {
+            await h.settle(900);
+            await h.check("another session picker");
+            await esc(h);
+          } else await esc(h);
+        }
+      }
       // Seamless days (repeat ask 12): scroll sideways part of a day; it stays where it's left.
       await h.page.evaluate(() => document.querySelector(".cal-days-scroll")?.scrollBy({ left: 130 })).catch(() => {});
       await h.settle(900);

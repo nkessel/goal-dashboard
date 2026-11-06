@@ -1,5 +1,6 @@
 "use client";
 
+import { sessionRef } from "@/lib/calendar-task-window";
 import { InlineNumber } from "@/components/ui/InlineNumber";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
@@ -677,7 +678,7 @@ export function QuestEditorDialog({
         savedPlacement.current = newPlacement;
       }
       if (newSlot) {
-        await scheduleTaskAction(task.id, newSlot.start, newSlot.end);
+        await scheduleTaskAction(sessionRef(task), newSlot.start, newSlot.end);
         savedSlotStart.current = newSlot.start;
       }
       if (sendSteps && stepsRef.current) {

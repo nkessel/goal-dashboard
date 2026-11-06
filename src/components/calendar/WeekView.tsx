@@ -21,7 +21,7 @@ import {
 import { CalendarAddPopup } from "./CalendarAddPopup";
 import { CalendarItemMenu, type MenuTarget } from "./CalendarItemMenu";
 import { CalendarTaskChip, getTaskDisplayWindow } from "./CalendarTaskChip";
-import { showsOnCalendar } from "@/lib/calendar-task-window";
+import { sessionRef, showsOnCalendar } from "@/lib/calendar-task-window";
 import type { CardShow } from "./CalendarLayers";
 import { GoogleEventChip } from "./GoogleEventChip";
 import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
@@ -601,7 +601,7 @@ export function WeekView({
     setPlaceError(null);
     void (async () => {
       try {
-        if (d.item.kind === "task") await scheduleTaskAction(d.item.task.id, start, end);
+        if (d.item.kind === "task") await scheduleTaskAction(sessionRef(d.item.task), start, end);
         else await updateGoogleEventAction(d.item.event.id, d.item.event.calendarId ?? "primary", { startISO: start, endISO: end });
         router.refresh();
       } catch (err) {
@@ -663,7 +663,7 @@ export function WeekView({
     const top = offset(start, days[dayIndex]);
     // A short quest (a 15-minute mini-quest) still gets room for its card: at least ~30px tall.
     const minMins = Math.max(20, (30 / HOUR_PX) * 60);
-    items.push({ kind: "task", key: `t-${task.id}`, dayIndex, top, bottom: Math.max(top + minMins, offset(end, days[dayIndex])), start, end, task });
+    items.push({ kind: "task", key: `t-${sessionRef(task)}`, dayIndex, top, bottom: Math.max(top + minMins, offset(end, days[dayIndex])), start, end, task });
   }
 
   // An item being dragged (or just dropped, until fresh data arrives) shows at its new spot.
