@@ -92,7 +92,10 @@ function OfflinePill() {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(0);
   const waiting = s.ops.length;
-  const justSynced = now - s.syncedAt < 2600;
+  // "✓ All synced" only after being offline here: a save quietly retried after a blip needs no news.
+  const [wasOffline, setWasOffline] = useState(false);
+  if (!s.online && !wasOffline) setWasOffline(true);
+  const justSynced = wasOffline && now - s.syncedAt < 2600;
   useEffect(() => {
     if (!s.syncedAt) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- show "Synced" for a moment after it happens
@@ -139,7 +142,7 @@ function OfflinePill() {
       data-offline-pill
       data-hide-when-typing
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 z-[120] flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 z-[45] flex justify-center px-4"
       style={{ top: "calc(env(safe-area-inset-top, 0px) + 6px)" }}
     >
       <div
