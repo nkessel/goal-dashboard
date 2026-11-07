@@ -115,7 +115,22 @@ export const FLOWS = [
         await h.check("quest editor");
         // The extra pills (no "More" fold): open the scales, then the due panel with scheduling and early bonus.
         if (await h.tap((p) => p.getByRole("button", { name: /importance & effort/i }).first(), "editor: scales pill", { optional: true, expectMove: true })) await h.check("quest editor: scales");
-        if (await h.tap((p) => p.getByRole("button", { name: /^due date$/i }).first(), "editor: due", { optional: true, expectMove: true })) await h.check("quest editor: due panel");
+        // The due pill reads "Due today", "Due Fri · Thu 3pm" or "Due date".
+        if (await h.tap((p) => p.locator("[role=dialog] button.qe-fact", { hasText: /^(Due|Plan:)/ }).first(), "editor: due", { optional: true, expectMove: true })) {
+          await h.check("quest editor: due panel");
+          // The month calendar (owner, Nov 7: "the due date picker isn't working"; it opened off screen in the adventure theme).
+          if (await h.tap((p) => p.locator('[role=dialog] button[aria-label="Due date"]').first(), "editor: due date calendar", { optional: true, expectMove: true })) {
+            await h.check("quest editor: due date calendar");
+            const cal = h.page.locator('[role=dialog][aria-label="Due date"]').last();
+            const box = await cal.boundingBox().catch(() => null);
+            const vh = h.page.viewportSize()?.height ?? 844;
+            if (!box || box.y < 0 || box.y + box.height > vh + 1) throw new Error(`quest editor: the due date calendar isn't on screen (${JSON.stringify(box)})`);
+            await cal.locator("button", { hasText: /^20$/ }).first().click();
+            await h.settle(300);
+          }
+          // The day drawn in place to find a time (no popup).
+          if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^(Find a time|Change)$/ }).first(), "editor: find a time", { optional: true, expectMove: true })) await h.check("quest editor: find a time");
+        }
         await h.typeIn((p) => p.locator("[role=dialog] input, [role=dialog] textarea").first(), "quest editor title");
         // The portrait picker with the keyboard up: it sits above the keyboard (owner's recording, Nov 3).
         if (await h.tap((p) => p.getByTitle("Change the portrait").first(), "portrait picker", { optional: true, expectMove: true })) {

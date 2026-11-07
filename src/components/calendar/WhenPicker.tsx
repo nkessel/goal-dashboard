@@ -8,6 +8,16 @@ import { freeStretch } from "@/lib/auto-schedule";
 type Busy = { start: number; end: number; title?: string; habit?: boolean };
 export type PickedSlot = { start: string; end: string };
 
+/** The calendars hidden on the calendar screen (its layers, kept on this device). */
+function hiddenCalendars(): string[] {
+  try {
+    const raw = window.localStorage.getItem("calendar-layers");
+    return raw ? ((JSON.parse(raw) as { hidden?: string[] }).hidden ?? []) : [];
+  } catch {
+    return [];
+  }
+}
+
 const PX15 = 13; // px per 15 minutes on the timeline: an hour is 52px
 const DAYS = 7;
 
@@ -43,7 +53,8 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
     let live = true;
     const to = new Date(today);
     to.setDate(to.getDate() + DAYS + 1);
-    schedulerContextAction(new Date(now).toISOString(), to.toISOString())
+    // Only the calendars you show on the calendar screen (owner, Nov 6: other calendars filled the day).
+    schedulerContextAction(new Date(now).toISOString(), to.toISOString(), hiddenCalendars())
       .then((ctx) => {
         if (!live) return;
         const list: Busy[] = [...ctx.busy];

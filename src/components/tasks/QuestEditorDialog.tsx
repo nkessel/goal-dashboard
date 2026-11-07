@@ -34,7 +34,9 @@ import {
   reopenTaskAction,
   saveQuestStepsAction,
   scheduleTaskAction,
-  setSchedulingAction,
+  addTaskSessionAction,
+  unscheduleTaskAction,
+  setTaskPlanByAction,
   setTaskStatSplitAction,
   setTaskPrivateAction,
   sequenceLinkAction,
@@ -48,7 +50,9 @@ import {
 import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { IconPicker } from "./IconPicker";
 import { CheckMark } from "./TaskRow";
-import { SlotPickerDialog } from "./SlotPickerDialog";
+import { WhenPicker } from "@/components/calendar/WhenPicker";
+import { Fold } from "@/components/ui/Fold";
+import { ScheduleWithin, withinLabel } from "./ScheduleWithin";
 import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
 import { useEditorToolbar, useIsEmbedded, usePortalTarget } from "@/components/ui/EmbedHost";
@@ -141,21 +145,19 @@ export function dueChipLabel(day: string) {
   if (days > 1 && days < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
-/** One tap for the usual due dates: today, tomorrow, the end of this week, a week from now. */
+/** One tap for the usual due dates: today, tomorrow, a week and two weeks from now. */
 export function dueQuickPicks() {
   const at = (n: number) => {
     const d = new Date();
     d.setDate(d.getDate() + n);
     return localDate(d.toISOString());
   };
-  const dow = new Date().getDay();
-  // This Friday; on Friday or the weekend, it's next Friday.
-  const toFri = dow < 5 ? 5 - dow : 12 - dow;
+  // No "Next Friday"; two weeks instead (owner, Nov 7).
   return [
     { label: "Today", day: at(0) },
     { label: "Tomorrow", day: at(1) },
-    { label: dow < 5 ? "This Friday" : "Next Friday", day: at(toFri) },
     { label: "In a week", day: at(7) },
+    { label: "In 2 weeks", day: at(14) },
   ].filter((q, i, all) => all.findIndex((x) => x.day === q.day) === i);
 }
 function FactCaret({ open }: { open: boolean }) {
@@ -171,6 +173,26 @@ function localTime(iso: string | null | undefined) {
   const d = new Date(iso);
   const t = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   return t === "23:59" ? "" : t;
+}
+/** "3:30pm". */
+function shortTime(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AaPp])\.?\s?[Mm]\.?$/, (_, p: string) => `${p.toLowerCase()}m`);
+}
+/** "Sat 3–3:30pm" this week, "Nov 20 3–3:30pm" further off. */
+function slotWords(s: { start: string; end: string }) {
+  const d = new Date(s.start);
+  const days = (d.getTime() - Date.now()) / 86_400_000;
+  const day = days > -1 && days < 6 ? d.toLocaleDateString(undefined, { weekday: "short" }) : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const a = shortTime(s.start).replace(":00", "");
+  const b = shortTime(s.end).replace(":00", "");
+  return `${day} ${a.slice(-2) === b.slice(-2) ? a.slice(0, -2) : a}–${b}`;
+}
+/** The plan-by for "Schedule within N days": the end of that day. */
+function planByIn(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(23, 59, 0, 0);
+  return d.toISOString();
 }
 function dueIso(date: string, time: string): string | null {
   if (!date) return null;
@@ -279,7 +301,6 @@ export function QuestEditorDialog({
   const coarsePointer = useSyncExternalStore(noSubscribe, () => window.matchMedia("(pointer: coarse)").matches, () => false);
   // Which of the extra pills (what used to sit under "More") is open.
   const [morePick, setMorePick] = useState<string | null>(null);
-  const schedRef = useRef<HTMLDivElement>(null);
   const [stepsReload, setStepsReload] = useState(0);
   const [savedTick, setSavedTick] = useState(false);
   /** Where a new quest sits in a sequence: after (waits for) or before (unlocks) other quests. */
@@ -315,25 +336,54 @@ export function QuestEditorDialog({
   }
   // The scheduling priority list beside the calendar.
   const [toSchedule, setToSchedule] = useState(task?.schedule_rank != null);
-  const [schedOpen, setSchedOpen] = useState(false);
   const [isPriv, setIsPriv] = useState(!!task?.is_private);
   function changePrivate(v: boolean) {
     setIsPriv(v);
     if (task) void setTaskPrivateAction(task.id, v).catch(() => setIsPriv(!v));
   }
-  const [schedPlace, setSchedPlace] = useState<"top" | "unordered" | "bottom">("top");
   const [schedNote, setSchedNote] = useState<string | null>(null);
-  /** Existing quests join or leave the list at once; new ones when created. */
-  function applyScheduling(on: boolean, place: "top" | "unordered" | "bottom") {
-    setToSchedule(on);
-    setSchedPlace(place);
+  // The day drawn in place: to move its time, or to add another session.
+  const [whenOpen, setWhenOpen] = useState<"move" | "more" | null>(null);
+  const [addingSession, setAddingSession] = useState(false);
+  const [sessionNote, setSessionNote] = useState<string | null>(null);
+  function pickWhen(picked: { start: string; end: string }) {
+    if (whenOpen !== "more" || !task) {
+      setSlot(picked);
+      setWhenOpen(null);
+      return;
+    }
+    setAddingSession(true);
+    addTaskSessionAction(sessionRef(task), picked.start, picked.end)
+      .then(() => (setSessionNote(`Another session: ${slotWords(picked)}`), setWhenOpen(null)))
+      .catch((e) => setSessionNote(e instanceof Error ? e.message : "Couldn't add that session."))
+      .finally(() => setAddingSession(false));
+  }
+  function takeOffCalendar() {
+    setWhenOpen(null);
+    if (!task || slot !== initialSlot || !initialSlot) return setSlot(null);
+    setSlot(null);
+    unscheduleTaskAction(sessionRef(task))
+      .then(() => (savedSlotStart.current = null))
+      .catch((e) => (setSlot(initialSlot), setSessionNote(e instanceof Error ? e.message : "Couldn't take it off the calendar.")));
+  }
+  // "Schedule within": days from today to its plan-by, while it's on the list to schedule.
+  const [planDays, setPlanDays] = useState<number | null>(() => {
+    if (task?.schedule_rank == null || !task.plan_by) return null;
+    const d = new Date(task.plan_by);
+    d.setHours(12, 0, 0, 0);
+    const t = new Date();
+    t.setHours(12, 0, 0, 0);
+    return Math.max(0, Math.round((d.getTime() - t.getTime()) / 86_400_000));
+  });
+  function rateWithin(days: number | null) {
+    setPlanDays(days);
+    setToSchedule(days !== null);
     if (!task) return;
     setSchedNote(null);
-    setSchedulingAction(task.id, on ? place : null)
-      .then(() => setSchedNote(on ? "On the scheduling list" : "Off the scheduling list"))
+    setTaskPlanByAction(task.id, days === null ? null : planByIn(days))
+      .then(() => setSchedNote(days === null ? "Off the list to schedule" : "On the list to schedule"))
       .catch((e) => setSchedNote(e instanceof Error ? e.message : "Couldn't update the list."));
   }
-  const [pickingSlot, setPickingSlot] = useState(false);
   const initialBoard = task ? (task.board_id ?? null) : (create?.boardId ?? null);
   const [boardId, setBoardId] = useState<string | null>(initialBoard);
   const [boardOptions, setBoardOptions] = useState<{ id: string; label: string }[] | null>(null);
@@ -641,8 +691,6 @@ export function QuestEditorDialog({
   const est = estimate.trim() ? Math.max(0, Math.round(Number(estimate))) : null;
   const chunkMinutes = chunk.trim() && Number(chunk) > 0 ? Math.round(Number(chunk)) : null;
   const dueAt = dueIso(dueDate, dueTime);
-  const hasSchedule = Boolean(dueDate || fixedSchedule || slot || toSchedule || aspiration);
-  const onCalendar = Boolean(fixedSchedule || slot);
   const place = useQuestPlace(task?.id);
 
   // ---- Saving as you go (existing quests) ----------------------------------
@@ -1004,7 +1052,7 @@ export function QuestEditorDialog({
         finished.current = true;
         if (draftIdRef.current) removeDraft(draftIdRef.current);
         if (tags.length) await setTaskTagsAction(id, tags).catch(() => {});
-        if (toSchedule) await setSchedulingAction(id, schedPlace).catch(() => {});
+        if (planDays !== null) await setTaskPlanByAction(id, planByIn(planDays)).catch(() => {});
         if (Object.keys(statSplit).length) await setTaskStatSplitAction(id, statSplit).catch(() => {});
         if (isPriv) await setTaskPrivateAction(id, true).catch(() => {});
         for (const l of seqLinks) {
@@ -1191,129 +1239,88 @@ export function QuestEditorDialog({
     if (!run.length) return null;
     return <LevelScales items={run.map((x) => SCALES[x])} renderRow={(it) => <IconScale label={it.label} icon={it.icon} hint={it.hint} value={it.value} onChange={it.onChange} />} />;
   };
-  // Putting it on the calendar, the scheduling list or "not actionable yet": opened from the Due panel (owner, Nov 3: "scheduling goes with the due date").
-  const schedulingBlock = (
-    <>
-              {/* Scheduling: due date, a calendar slot, the scheduling list, the matrix and "not actionable yet" — folded away until wanted */}
-              {!doingNow && (schedOpen || hasSchedule) && (
-                <div ref={schedRef} className="flex flex-col gap-2">
-                  <button type="button" onClick={() => setSchedOpen((o) => !o)} aria-expanded={schedOpen} className="flex min-h-8 items-center gap-1.5 text-left">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition-transform" style={{ transform: schedOpen ? "rotate(90deg)" : undefined, color: "var(--t-ink-soft)" }}>
-                      <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
-                    <img src="/design/ui-calendar.png" alt="" width={16} height={16} className="h-4 w-4 shrink-0" />
-                    <span className="text-[14px] font-semibold" style={{ color: "var(--t-ink)" }}>
-                      Scheduling
-                    </span>
-                    <span className="ml-auto min-w-0 truncate text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                      {[
-                        (fixedSchedule || slot) && new Date((fixedSchedule?.startISO ?? slot?.start)!).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }),
-                        toSchedule && "on the scheduling list",
-                        aspiration && "not actionable yet",
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "not scheduled"}
-                    </span>
-                  </button>
-                  {schedOpen && (
-                    <div className="reveal flex flex-col gap-2.5 pb-1">
-              {/* Calendar slot */}
-              {!doingNow && (
-                <div className="flex items-center gap-2.5">
-                  <span aria-hidden className="w-[18px] shrink-0" />
-                  <span className={`${labelCls} w-[58px] shrink-0`}>Calendar</span>
-                  {fixedSchedule || slot ? (
-                    <span className="min-w-0 flex-1 truncate text-[13px]">
-                      {new Date((fixedSchedule?.startISO ?? slot?.start)!).toLocaleString(undefined, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  ) : (
-                    <span className="min-w-0 flex-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-                      Not scheduled
-                    </span>
-                  )}
-                  {!fixedSchedule && (
-                    <>
-                      {slot && slot !== initialSlot && (
-                        <button type="button" onClick={() => setSlot(initialSlot)} className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
-                          Undo
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setPickingSlot(true)}
-                        className="hover-glow h-8 shrink-0 rounded-full border px-3 text-xs font-semibold"
-                        style={{ borderColor: chipBorder, color: "var(--t-ink)" }}
-                      >
-                        {slot ? "Change" : "Find a time"}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-              {/* Scheduling priority list */}
-              {!doingNow && !fixedSchedule && (
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex min-h-9 cursor-pointer items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={toSchedule}
-                      onChange={(e) => applyScheduling(e.target.checked, schedPlace)}
-                      className="h-[18px] w-[18px] shrink-0 accent-[#7a5f2a]"
-                    />
-                    <span className="text-[14px]" style={{ color: "var(--t-ink)" }}>
-                      Add to the scheduling list
-                    </span>
-                    {schedNote && (
-                      <span className="ml-auto text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-                        {schedNote}
-                      </span>
-                    )}
-                  </label>
-                  {toSchedule && (
-                    <div role="radiogroup" aria-label="Where on the scheduling list" className="reveal ml-7 flex flex-wrap gap-1.5">
-                      {(
-                        [
-                          ["top", "Top"],
-                          ["unordered", "Top of unnumbered"],
-                          ["bottom", "Bottom"],
-                        ] as const
-                      ).map(([v, label]) => {
-                        const on = schedPlace === v;
-                        return (
-                          <button
-                            key={v}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => applyScheduling(true, v)}
-                            className="h-8 rounded-full px-3 text-[12.5px] font-semibold"
-                            style={{
-                              border: `1px solid ${on ? "#7a5f2a" : chipBorder}`,
-                              background: on ? "#7a5f2a" : "transparent",
-                              color: on ? "#fbf3df" : "var(--t-ink)",
-                            }}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-                    </div>
-                  )}
-                </div>
-              )}
-    </>
+  // When to do it, right under when it's due (owner, Nov 7: "make the due date / scheduling tools more
+  // integrated"): a time on the calendar picked from the day itself (in place, no popup), another
+  // session for a quest that's already placed, and "Schedule within" for the auto-scheduler's list.
+  const shownSlot = fixedSchedule ? { start: fixedSchedule.startISO, end: fixedSchedule.endISO ?? fixedSchedule.startISO } : slot;
+  // The pill says it all at a glance: "Due Fri · Thu 3pm", "Due today", "Plan: This week".
+  const dueChipWords =
+    [
+      dueDate && `Due ${dueChipLabel(dueDate)}`,
+      shownSlot && `${new Date(shownSlot.start).toLocaleDateString(undefined, { weekday: "short" })} ${shortTime(shownSlot.start).replace(":00", "")}`,
+      !dueDate && !shownSlot && planDays !== null && `Plan: ${withinLabel(planDays)}`,
+    ]
+      .filter(Boolean)
+      .join(" · ") || "Due date";
+  const schedulingBlock = doingNow ? null : (
+    <div className="flex flex-col gap-2">
+      <div className="flex min-h-8 items-center gap-2">
+        {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
+        <img src="/design/ui-calendar.png" alt="" width={15} height={15} className="h-[15px] w-[15px] shrink-0" />
+        <span className={`${labelCls} shrink-0`}>Calendar</span>
+        <span className="min-w-0 flex-1 truncate text-[13px] tabular-nums" style={{ color: shownSlot ? "var(--t-ink)" : "var(--t-ink-soft)" }}>
+          {shownSlot ? slotWords(shownSlot) : "Not on it yet"}
+        </span>
+        {!fixedSchedule && (
+          <>
+            {slot && slot !== initialSlot && (
+              <button type="button" onClick={() => (setSlot(initialSlot), setWhenOpen(null))} className="text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
+                Undo
+              </button>
+            )}
+            <button type="button" onClick={() => setWhenOpen((o) => (o === "move" ? null : "move"))} aria-expanded={whenOpen === "move"} className="qe-fact flex h-8 shrink-0 items-center rounded-full px-3 text-[12.5px] font-semibold" data-open={whenOpen === "move" ? "true" : undefined}>
+              {slot ? "Change" : "Find a time"}
+            </button>
+            {slot && (
+              <button type="button" onClick={takeOffCalendar} aria-label="Take it off the calendar" title="Take it off the calendar" className="h-8 w-6 shrink-0 text-[17px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
+                ×
+              </button>
+            )}
+          </>
+        )}
+      </div>
+      {/* A quest already on the calendar can get another session (it ran long; more of it tomorrow). */}
+      {task && initialSlot && slot === initialSlot && !fixedSchedule && (
+        <button type="button" onClick={() => setWhenOpen((o) => (o === "more" ? null : "more"))} aria-expanded={whenOpen === "more"} className="qe-fact flex h-8 items-center self-start rounded-full px-3 text-[12.5px] font-semibold" data-open={whenOpen === "more" ? "true" : undefined}>
+          ＋ Another session
+        </button>
+      )}
+      {sessionNote && (
+        <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }} role="status">
+          {sessionNote}
+        </span>
+      )}
+      <Fold open={whenOpen !== null}>
+        {whenOpen !== null && (
+          <div className="pt-1">
+            <WhenPicker
+              key={whenOpen}
+              minutes={Math.max(15, Number(estimate) || 30)}
+              title={title.trim() || "This quest"}
+              isAdventure={isAdventure}
+              initial={whenOpen === "move" ? (slot?.start ?? null) : null}
+              placing={addingSession}
+              onPick={pickWhen}
+            />
+          </div>
+        )}
+      </Fold>
+      {/* How soon it needs a time: puts it on the auto-scheduler's list in that group. */}
+      <ScheduleWithin days={planDays} onRate={rateWithin} />
+      {toSchedule && planDays == null && (
+        <span className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+          On the list to schedule
+          <button type="button" onClick={() => rateWithin(null)} className="underline underline-offset-2">
+            Take it off
+          </button>
+        </span>
+      )}
+      {schedNote && (
+        <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }} role="status">
+          {schedNote}
+        </span>
+      )}
+    </div>
   );
   const partNodes: Record<EditorPart, React.ReactNode> = {
     showsIn: (
@@ -2622,7 +2629,7 @@ export function QuestEditorDialog({
                       <button type="button" onClick={() => setFactOpen((o) => (o === "due" ? null : "due"))} aria-expanded={factOpen === "due"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "due" ? "true" : undefined}>
                         {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
                         <img src="/design/ui-calendar.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />
-                        <span className="max-w-[170px] truncate">{dueDate ? `Due ${dueChipLabel(dueDate)}` : onCalendar ? "On the calendar" : "Due date"}{dueDate && onCalendar ? " · on the calendar" : ""}</span>
+                        <span className="max-w-[210px] truncate">{dueChipWords}</span>
                         <FactCaret open={factOpen === "due"} />
                       </button>
                     )}
@@ -2657,9 +2664,9 @@ export function QuestEditorDialog({
                   )}
                   {factOpen === "due" && (
                     <div key="due" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1">
                         {dueQuickPicks().map((q) => (
-                          <button key={q.label} type="button" onClick={() => setDueDate(q.day)} className="h-9 rounded-full px-3 text-[13.5px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: dueDate === q.day ? "rgba(217,180,95,.45)" : "rgba(255,250,235,.35)" }}>
+                          <button key={q.label} type="button" aria-pressed={dueDate === q.day} onClick={() => setDueDate(q.day)} className="qe-fact h-8 rounded-full px-2.5 text-[13px] font-semibold" data-open={dueDate === q.day ? "true" : undefined}>
                             {q.label}
                           </button>
                         ))}
@@ -2688,22 +2695,12 @@ export function QuestEditorDialog({
                           <EarlyBonusFields value={{ xp: earlyBonus, coins: earlyCoins, perDay: earlyPerDay }} onChange={(v) => (setEarlyBonus(v.xp), setEarlyCoins(v.coins), setEarlyPerDay(v.perDay))} chipBorder={chipBorder} />
                         </div>
                       )}
-                      {/* A time on the calendar, the scheduling list, "not actionable yet". */}
-                      <div className="flex flex-col gap-1.5 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.22)" }}>
-                        {!schedOpen && !hasSchedule && (
-                          <button
-                            type="button"
-                            onClick={() => setSchedOpen(true)}
-                            className="hover-glow flex h-8 items-center gap-1.5 self-start rounded-full px-3 text-[13px] font-semibold"
-                            style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
-                            <img src="/design/ui-calendar.png" alt="" width={15} height={15} className="h-[15px] w-[15px]" />
-                            Add to calendar
-                          </button>
-                        )}
-                        {schedulingBlock}
-                      </div>
+                      {/* When to do it: the calendar and the list to schedule. */}
+                      {schedulingBlock && (
+                        <div className="border-t pt-2" style={{ borderColor: "rgba(139,112,64,.22)" }}>
+                          {schedulingBlock}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2719,17 +2716,6 @@ export function QuestEditorDialog({
           })}
           {!arranging && morePills}
 
-          {pickingSlot && (
-            <SlotPickerDialog
-              durationMinutes={Math.max(15, Number(estimate) || 30)}
-              isAdventure={isAdventure}
-              onPick={(picked) => {
-                setSlot(picked);
-                setPickingSlot(false);
-              }}
-              onClose={() => setPickingSlot(false)}
-            />
-          )}
 
           {isCompleted && task && (
             // A victory seal: what was won and when, with a quiet way to take it back.

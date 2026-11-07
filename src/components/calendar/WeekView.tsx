@@ -777,7 +777,7 @@ export function WeekView({
           </div>
         </div>
       )}
-      <div ref={scrollRef} onScroll={seamless ? onDaysScroll : undefined} className={`relative ${seamless ? "cal-days-scroll overflow-x-auto overflow-y-hidden" : "overflow-hidden"}`}>
+      <div ref={scrollRef} onScroll={seamless ? onDaysScroll : undefined} data-cal-days className={`relative ${seamless ? "cal-days-scroll overflow-x-auto overflow-y-hidden" : "overflow-hidden"}`}>
       <div
         className="grid"
         style={{

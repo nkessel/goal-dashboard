@@ -3175,6 +3175,25 @@ export async function moveToSchedulingAction(taskId: string, planBy: string | nu
   revalidatePath("/calendar");
 }
 
+/**
+ * The quest editor's "Schedule within" (owner, Nov 7: due date and scheduling together): a plan-by
+ * date puts the quest on the list to schedule in its place by date; null takes it off the list.
+ */
+export async function setTaskPlanByAction(taskId: string, planBy: string | null) {
+  const ownerId = await requireProfileId();
+  const task = await tasksData.getTask(taskId, ownerId);
+  if (!task) throw new Error("That quest isn't here anymore.");
+  const when = planBy && Number.isFinite(Date.parse(planBy)) ? new Date(planBy).toISOString() : null;
+  if (when) await importCardsData.queueToSchedule(ownerId, taskId, when);
+  else {
+    const { error } = await supabaseAdmin().from("tasks").update({ plan_by: null }).eq("owner_id", ownerId).eq("id", taskId);
+    if (error) throw new Error(`Couldn't take it off the list: ${error.message}`);
+    await schedulingData.removeFromSchedulingList(ownerId, taskId);
+  }
+  revalidatePath("/");
+  revalidatePath("/calendar");
+}
+
 /** From the list to schedule back to Today's quests (pinned) or Additional quests. */
 export async function moveOffSchedulingAction(taskId: string, toToday: boolean) {
   const ownerId = await requireProfileId();

@@ -95,7 +95,8 @@ export function DateField({
               role="dialog"
               aria-label={ariaLabel}
               className="card-pop-in parchment parchment-framed fixed z-[91] w-[280px] rounded-2xl p-3"
-              style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999, color: "var(--t-ink)", border: "1.5px solid #a88a3f", boxShadow: "0 14px 34px rgba(0,0,0,.4)" }}
+              // position inline: the adventure theme sets .parchment-framed { position: relative }, which put the calendar at the foot of the page (off screen; owner, Nov 7).
+              style={{ position: "fixed", left: pos?.left ?? -9999, top: pos?.top ?? -9999, color: "var(--t-ink)", border: "1.5px solid #a88a3f", boxShadow: "0 14px 34px rgba(0,0,0,.4)" }}
             >
               <div className="relative z-[1] mb-2 flex items-center">
                 <button type="button" onClick={() => step(-1)} aria-label="Previous month" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/[.06]">
