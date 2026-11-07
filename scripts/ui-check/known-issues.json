@@ -22,5 +22,13 @@
   {
     "match": "^inventory\\|covered-by-bar\\|.*🧳 Packing",
     "reason": "The minimized packing window is a floating chip (like the language and auto-scheduler chips): it stays where the window was and floats over the page by design; drag it anywhere, tap to open."
+  },
+  {
+    "match": "^offline\\|console-error\\|.*(ERR_INTERNET_DISCONNECTED|ERR_FAILED)",
+    "reason": "The offline flow cuts the connection on purpose (Nov 7): the browser logs the requests it couldn't make (prefetches, the server-side reload). The flow itself fails if the screens don't open or the changes don't sync."
+  },
+  {
+    "match": "^offline\\|(covered-by-bar|floating-overlap)\\|<div .inset-x-0.px-4> \"Offline",
+    "reason": "The offline pill's short explanation (opened by tapping the pill) floats over the page header for as long as it's open; tapping the pill again closes it. By design (no popup screen)."
   }
 ]

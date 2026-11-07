@@ -1,5 +1,6 @@
 "use client";
 
+import { keyboardUp } from "@/lib/keyboard-up";
 import { useEffect } from "react";
 
 /**
@@ -40,7 +41,7 @@ export function KeyboardViewport() {
     const vv = window.visualViewport;
     const touch = window.matchMedia("(pointer: coarse)").matches;
 
-    const kbUp = () => !!vv && vv.scale < 1.1 && window.innerHeight - vv.height * vv.scale > 120;
+    const kbUp = () => !!vv && keyboardUp();
 
     // ── The dark ground under the keyboard ──────────────────────────────────
     let lastKbH = 0; // the visible height the last time the keyboard was up

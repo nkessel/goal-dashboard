@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BringItem, PackItem, PackSection, PackingList } from "@/lib/inventory";
-import { packingListsAction, savePackingListsAction } from "@/app/actions";
+import { packingListsAction } from "@/app/actions";
+import { isNetworkError, isOffline, offlineOwner, pendingFor, saveOrQueue } from "@/lib/offline";
 import { FloatingWindow } from "@/components/ui/FloatingWindow";
 import { Fold } from "@/components/ui/Fold";
 import { CloseIcon, GearIcon } from "@/components/ui/Icons";
@@ -37,6 +38,9 @@ function write(key: string, v: unknown) {
   }
 }
 
+const keptKey = () => `offline-packing:${offlineOwner() ?? ""}`;
+const keep = (lists: PackingList[]) => write(keptKey(), lists);
+
 /** Opens the packing window (from the backpack's ☰ menu). */
 export const openPackingWindow = () => window.dispatchEvent(new Event("packing-window"));
 
@@ -59,10 +63,11 @@ export function PackingWindow() {
     clearTimeout(timer.current);
     const next = pending.current;
     pending.current = null;
-    if (next) savePackingListsAction(next).then(() => setError(null), () => setError("Couldn't save just now; it'll try again with your next change."));
+    if (next) saveOrQueue("savePacking", next, "packing").then(() => setError(null), () => setError("Couldn't save just now; it'll try again with your next change."));
   };
   const change = (next: PackingList[]) => {
     setLists(next);
+    keep(next);
     pending.current = next;
     clearTimeout(timer.current);
     timer.current = setTimeout(flush, 600);
@@ -72,15 +77,32 @@ export function PackingWindow() {
     setModeState(m);
     write(MODE_KEY, m);
   };
+  // Offline (owner, Nov 6), the lists come from this device: what's waiting to sync, else the copy
+  // kept the last time they were open.
+  const kept = () => pendingFor<PackingList[]>("packing") ?? read<PackingList[] | null>(keptKey(), null);
   const load = () => {
-    packingListsAction().then(setLists, () => setError("Couldn't load your lists."));
+    if (isOffline()) return setLists(kept() ?? []);
+    packingListsAction().then(
+      (server) => {
+        const waiting = pendingFor<PackingList[]>("packing");
+        setLists(waiting ?? server);
+        keep(waiting ?? server);
+      },
+      (e) => {
+        const local = kept();
+        if (isNetworkError(e)) setLists(local ?? []);
+        else if (local) setLists(local);
+        else setError("Couldn't load your lists.");
+      }
+    );
   };
 
   useEffect(() => {
     const m = read<Mode>(MODE_KEY, null);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- restore the window as it was left (browser storage, after hydration)
     setModeState(m === "open" || m === "min" ? m : null);
-    if (m === "open" || m === "min") load();
+    // After AppShell has said whose lists these are (its effect runs after this one).
+    if (m === "open" || m === "min") setTimeout(load, 0);
     const open = () => {
       setModeState("open");
       write(MODE_KEY, "open");

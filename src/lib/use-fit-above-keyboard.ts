@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { keyboardUp } from "@/lib/keyboard-up";
 
 /**
  * While the on-screen keyboard is up, the strip of screen above it ({ top, height }, in the
@@ -19,7 +20,7 @@ export function useFitAboveKeyboard(active = true): { top: number; height: numbe
     const update = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        const up = vv.scale < 1.1 && window.innerHeight - vv.height > 120;
+        const up = keyboardUp();
         if (up) {
           clearTimeout(closing);
           closing = 0;

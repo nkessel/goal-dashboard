@@ -53,7 +53,8 @@ import { BoardPicker } from "./BoardPicker";
 import { useEscape } from "@/lib/use-escape";
 import { useEditorToolbar, useIsEmbedded, usePortalTarget } from "@/components/ui/EmbedHost";
 import { freshKey, loadDrafts, removeDraft, saveDraft, type QuestDraftSave } from "@/lib/quest-drafts";
-import { addOptimisticQuest, resolveOptimisticQuest } from "@/lib/optimistic-quests";
+import { isNetworkError, isOffline, queueOffline, saveOrQueue } from "@/lib/offline";
+import { addOptimisticQuest, markOptimisticQueued, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { CoinIcon } from "@/components/ui/Icons";
 import { StatSplitEditor } from "./StatSplitEditor";
 import { statAbbr } from "@/lib/stats";
@@ -693,21 +694,25 @@ export function QuestEditorDialog({
     setSaveState("saving");
     const run = async () => {
       if (deleted.current) return;
-      await updateTaskAction(task.id, input);
+      // Offline (or the connection drops), the change waits on this device and syncs later.
+      await saveOrQueue("updateQuest", { id: task.id, input }, `quest:${task.id}`);
       if (newPlacement) {
-        await setTaskPlacementAction(task.id, newPlacement);
+        await saveOrQueue("placeQuest", { id: task.id, placement: newPlacement }, `place:${task.id}`);
         savedPlacement.current = newPlacement;
       }
-      if (newSlot) {
+      if (newSlot && !isOffline()) {
         await scheduleTaskAction(sessionRef(task), newSlot.start, newSlot.end);
         savedSlotStart.current = newSlot.start;
       }
       if (sendSteps && stepsRef.current) {
         const list = stepsRef.current;
-        const res = await saveQuestStepsAction(
-          task.id,
-          stepPayload(list).map((st, i) => ({ ...st, id: st.id ?? stepIds.current.get(list[i].key) }))
+        const out = await saveOrQueue(
+          "questSteps",
+          { id: task.id, steps: stepPayload(list).map((st, i) => ({ ...st, id: st.id ?? stepIds.current.get(list[i].key) })) },
+          `steps:${task.id}`
         );
+        if (out.queued) return;
+        const res = out.result;
         if (res.xpEarned > 0) {
           setStepXpPop(res.xpEarned);
           setTimeout(() => setStepXpPop(null), 1600);
@@ -952,9 +957,7 @@ export function QuestEditorDialog({
             setTimeout(onClose, 180);
           }
         }
-        let id: string;
-        try {
-          id = await createQuestAction({
+        const createInput = {
           title,
           description,
           importance,
@@ -974,8 +977,26 @@ export function QuestEditorDialog({
           coinValue,
           earlyBonusXp: earlyBonus, earlyBonusCoins: earlyBonus === null ? null : earlyCoins, earlyBonusPerDay: earlyBonus === null ? null : earlyPerDay,
           isTiny: tiny,
-          });
+        };
+        // Offline (owner, Nov 6): the new quest waits on this device (its card stays on Today) and is
+        // made once the connection is back. Its tags and sub-quests go with it.
+        const waitOffline = () => {
+          const offlineSteps = (steps ?? []).filter((st) => st.title.trim());
+          queueOffline("createQuest", { tempId: tempId ?? "", input: createInput, tags, steps: stepPayload(offlineSteps).map(({ id: _id, ...st }) => st) }); // eslint-disable-line @typescript-eslint/no-unused-vars
+          if (tempId) markOptimisticQueued(tempId);
+          finished.current = true;
+          if (draftIdRef.current) removeDraft(draftIdRef.current);
+          if (!tempId) {
+            setPhase("closing");
+            setTimeout(onClose, embedded ? 0 : 180);
+          }
+        };
+        if (isOffline() && !completeNow) return waitOffline();
+        let id: string;
+        try {
+          id = await createQuestAction(createInput);
         } catch (e) {
+          if (!completeNow && isNetworkError(e)) return waitOffline();
           if (tempId) resolveOptimisticQuest(tempId, null, e instanceof Error ? e.message : "Couldn't save that quest.");
           throw e;
         }

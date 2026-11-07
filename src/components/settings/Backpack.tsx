@@ -3,7 +3,8 @@
 import { GearIcon } from "@/components/ui/Icons";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { makeRefillQuestAction, paintInventoryItemAction, saveInventoryAction } from "@/app/actions";
+import { paintInventoryItemAction } from "@/app/actions";
+import { isOffline, pendingFor, saveOrQueue } from "@/lib/offline";
 import { POCKETS, type BringList, type Inventory, type InventoryItem, type ItemStatus, type PocketKey } from "@/lib/inventory";
 import { CHECKIN_STYLES } from "@/lib/celebration-fx";
 import { useEscape } from "@/lib/use-escape";
@@ -68,6 +69,12 @@ function Slot({ item, painting, onTap, moving, at, onGrab, lifted = false, refil
  */
 export function Backpack({ initial }: { initial: Inventory }) {
   const [inv, setInv] = useState(initial);
+  // Changed offline and not synced yet: this device's backpack wins over the (kept) page's.
+  useEffect(() => {
+    const waiting = pendingFor<Inventory>("inventory");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the waiting offline copy lives in browser storage, read after hydration
+    if (waiting) setInv(waiting);
+  }, []);
   const [editing, setEditing] = useState<{ item: InventoryItem; isNew: boolean } | null>(null);
   const [painting, setPainting] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState<InventoryItem | null>(null);
@@ -228,7 +235,7 @@ export function Backpack({ initial }: { initial: Inventory }) {
     setInv(next);
     start(async () => {
       try {
-        await saveInventoryAction(next);
+        await saveOrQueue("saveInventory", next, "inventory");
       } catch (e) {
         setInv(prev);
         setError(e instanceof Error ? e.message : "Couldn't save the backpack.");
@@ -270,12 +277,14 @@ export function Backpack({ initial }: { initial: Inventory }) {
     if (!item.icon || paintReq) paint({ ...withDates, icon: null }, next, paintReq?.description?.trim() || undefined);
   }
   function paint(item: InventoryItem, base: Inventory, description?: string) {
+    // Painting needs the connection; the item keeps its plain look until it's painted later.
+    if (isOffline()) return;
     setPainting((p) => new Set(p).add(item.id));
     paintInventoryItemAction(item.name, description ?? null)
       .then((url) => {
         setInv((cur) => {
           const next = { ...cur, items: cur.items.map((i) => (i.id === item.id ? { ...i, icon: url } : i)) };
-          void saveInventoryAction(next).catch(() => {});
+          void saveOrQueue("saveInventory", next, "inventory").catch(() => {});
           return next;
         });
       })
@@ -298,8 +307,8 @@ export function Backpack({ initial }: { initial: Inventory }) {
   function refillQuest(item: InventoryItem) {
     start(async () => {
       try {
-        await makeRefillQuestAction(item.name);
-        flash("Added to your quests");
+        const r = await saveOrQueue("refillQuest", item.name);
+        flash(r.queued ? "Added to your quests once you're online" : "Added to your quests");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't add that quest.");
       }

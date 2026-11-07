@@ -1,3 +1,4 @@
+import { OfflineSync } from "@/components/ui/OfflineSync";
 import { after } from "next/server";
 import { countUnread, syncImportsNotification } from "@/lib/data/notifications";
 import { getProfileById } from "@/lib/data/profiles";
@@ -83,6 +84,7 @@ export async function AppShell({
       {profileId && <SettingsDefaultsSeed />}
       {profileId && <DailyLogin levelCap={cap} />}
       {profileId && <OwnWordsSync />}
+      {profileId && <OfflineSync profileId={profileId} />}
       {profileId && (
         <Suspense fallback={null}>
           <MissingPortraits profileId={profileId} />

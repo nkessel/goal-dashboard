@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
+import { useOfflineQuest, saveOrQueue } from "@/lib/offline";
 import { completeTaskAction, deleteTaskAction, archiveTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, snoozeQuestUntilAction, undoSnoozeUntilAction, setNextStepAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
@@ -78,7 +79,7 @@ function formatEstimate(minutes: number): string {
 }
 
 export function TaskRow({
-  task,
+  task: givenTask,
   theme = "calm",
   categoryLabel,
   draggable,
@@ -135,6 +136,8 @@ export function TaskRow({
     isDragging: boolean;
   };
 }) {
+  // Edited offline and not synced yet: show it as edited (the screen may be the copy kept on the device).
+  const task = useOfflineQuest(givenTask);
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   // A quest with steps: a tap slides out its checklist instead of opening the editor.
@@ -335,9 +338,8 @@ export function TaskRow({
           setDone(true);
           // Save in the background; celebrate as soon as the check has landed
           // (the real totals fill in when the server answers).
-          const fd = new FormData();
-          fd.set("taskId", task.id);
-          const req = completeTaskAction(fd);
+          // Offline, the check waits on this device and the server pays it once it's back.
+          const req = saveOrQueue("completeQuest", { id: task.id, at: new Date().toISOString() }).then((r) => (r.queued ? null : r.result));
           await new Promise((r) => setTimeout(r, 520));
           celebrateQuest({
             taskId: task.id,
@@ -352,7 +354,7 @@ export function TaskRow({
           });
           try {
             const res = await req;
-            updateQuestCelebration({ taskId: task.id, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
+            if (res) updateQuestCelebration({ taskId: task.id, totalXp: res.totalXp ?? null, coinsEarned: res.coinsEarned ?? 0 });
             // A stand-in stays: it moves on to the next assignment.
             if (task.stand_in) {
               setDone(false);

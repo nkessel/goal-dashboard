@@ -560,6 +560,68 @@ export const FLOWS = [
     },
   },
   {
+    // Offline (owner, Nov 6): the backpack and packing lists keep working without a connection,
+    // the parchment pill says so, and everything syncs once the connection is back.
+    name: "offline",
+    async run(h) {
+      await h.goto("/settings/inventory", { name: "offline" });
+      const ctx = h.page.context();
+      await ctx.setOffline(true);
+      await h.settle(600);
+      if (!(await h.page.getByRole("button", { name: /^offline/i }).count())) throw new Error("offline: no Offline pill after the connection dropped");
+      await h.check("offline pill");
+      await h.tap((p) => p.getByRole("button", { name: /^offline/i }).first(), "offline pill: why", { optional: true, expectMove: true });
+      await h.check("offline pill: open");
+      await h.tap((p) => p.getByRole("button", { name: /^offline/i }).first(), "offline pill: close", { optional: true, expectMove: true });
+      await h.tap((p) => p.getByRole("button", { name: /^add 4 slots to the utility pocket$/i }).first(), "offline: add slots", { optional: true, expectMove: true });
+      if (await h.tap((p) => p.getByRole("button", { name: /^backpack menu$/i }).first(), "offline: backpack menu", { optional: true, expectMove: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /packing lists/i }).first(), "offline: packing window", { optional: true, expectMove: true })) {
+          await h.settle(900);
+          const win = h.page.locator("[data-packing-window]");
+          await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^new list$/i }).first(), "offline: new list", { optional: true, expectMove: true });
+          await win.getByLabel("New list's name").fill("Offline trip").catch(() => {});
+          await win.getByLabel("New list's name").press("Enter").catch(() => {});
+          await win.getByLabel("+ Add item").first().fill("Offline socks").catch(() => {});
+          await win.getByLabel("+ Add item").first().press("Enter").catch(() => {});
+          await h.settle(1200);
+          await h.check("offline: packing window");
+        }
+      }
+      const waiting = await h.page.evaluate(() => JSON.parse(localStorage.getItem("offline-queue-v1") || "[]").length);
+      if (!waiting) throw new Error("offline: changes made offline weren't kept on the device");
+      await ctx.setOffline(false);
+      await h.settle(3000);
+      const left = await h.page.evaluate(() => JSON.parse(localStorage.getItem("offline-queue-v1") || "[]").length);
+      if (left) throw new Error(`offline: ${left} change(s) still waiting after the connection came back`);
+      await h.check("back online");
+      await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^close$/i }).first(), "offline: close packing", { optional: true, expectMove: true });
+      // The app opens offline: turn the offline helper on (it's off for automated browsers), let it keep
+      // the main screens, then open them with the connection gone.
+      await h.page.evaluate(() => localStorage.setItem("ui-check-sw", "1"));
+      await h.page.reload();
+      await h.page.waitForFunction(() => navigator.serviceWorker?.controller || navigator.serviceWorker?.ready.then(() => true), null, { timeout: 15000 }).catch(() => {});
+      await h.settle(9000);
+      await ctx.setOffline(true);
+      try {
+        for (const path of ["/settings/inventory", "/boards"]) {
+          await h.page.goto(`http://localhost:${new URL(h.page.url()).port}${path}`, { waitUntil: "domcontentloaded" }).catch((e) => {
+            throw new Error(`offline: ${path} didn't open without a connection (${e.message.split("\n")[0]})`);
+          });
+          await h.settle(1500);
+          if (!(await h.page.locator("[data-app-shell]").count())) throw new Error(`offline: ${path} opened without the app (kept copy missing)`);
+        }
+        await h.check("opened offline");
+      } finally {
+        await ctx.setOffline(false);
+        await h.page.evaluate(async () => {
+          localStorage.removeItem("ui-check-sw");
+          for (const r of (await navigator.serviceWorker?.getRegistrations()) ?? []) await r.unregister();
+          for (const k of await caches.keys()) await caches.delete(k);
+        }).catch(() => {});
+      }
+    },
+  },
+  {
     // Inventory (owner, Nov 6): settings gear beside the title/×, ☰ on the pack opens packing lists (pills, copy, rename),
     // pockets fold from their title, − / + 4 slots by the title, the bottom seam drags the pocket's height.
     name: "inventory",

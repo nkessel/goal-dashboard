@@ -31,6 +31,7 @@ import { SectionStack } from "./SectionStack";
 import { readTodayLayout, saveTodayLayout, serverTodayLayout, subscribeTodayLayout, type TodayPart } from "@/lib/today-layout";
 import { DEFAULT_DUE_HOURS, dueWindowLabel, saveDueHours } from "@/lib/due-soon";
 import { DueWindowPicker } from "./DueWindowPicker";
+import { useOfflineDone } from "@/lib/offline";
 import { settleOptimisticQuests, takeOptimisticFailure, useOptimisticQuests, type OptimisticQuest } from "@/lib/optimistic-quests";
 import { Fold } from "@/components/ui/Fold";
 
@@ -410,9 +411,11 @@ export function TodayTaskBoard({
   const isLocked = (t: TaskWithCategory) => !!t.locked_by_task_id && openIds.has(t.locked_by_task_id);
   const lockedBehind = new Map<string, TaskWithCategory>();
   for (const t of [...dueTasks, ...priorityTasks, ...otherTasks]) if (isLocked(t)) lockedBehind.set(t.locked_by_task_id!, t);
-  const due = dueTasks.filter((t) => !isLocked(t));
-  const priority = (localPriority ?? priorityTasks).filter((t) => !isLocked(t));
-  const other = (localOther ?? otherTasks).filter((t) => !isLocked(t));
+  // Ticked off offline and not synced yet: gone from the lists already (the screen may be a kept copy).
+  const doneOffline = useOfflineDone();
+  const due = dueTasks.filter((t) => !isLocked(t) && !doneOffline.has(t.id));
+  const priority = (localPriority ?? priorityTasks).filter((t) => !isLocked(t) && !doneOffline.has(t.id));
+  const other = (localOther ?? otherTasks).filter((t) => !isLocked(t) && !doneOffline.has(t.id));
   // Quests just created elsewhere, until the real ones arrive.
   const pendingAll = useOptimisticQuests();
   const pending = pendingAll.filter((q) => !q.realId || !openIds.has(q.realId));
