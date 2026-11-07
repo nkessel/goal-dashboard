@@ -30,5 +30,9 @@
   {
     "match": "^offline\\|(covered-by-bar|floating-overlap)\\|<div .inset-x-0.px-4> \"Offline",
     "reason": "The offline pill's short explanation (opened by tapping the pill) floats over the page header for as long as it's open; tapping the pill again closes it. By design (no popup screen)."
+  },
+  {
+    "match": "^inventory\\|moved-on-tap\\|.*packing: tick",
+    "reason": "Packing lists (owner, Nov 7, like Listry): a packed item waits about a second with its tick showing, then glides to the bottom of its section. By design; Settings › Packed things › Stay put keeps it in place."
   }
 ]

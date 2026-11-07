@@ -648,17 +648,24 @@ export const FLOWS = [
           }
           await h.check("packing window");
           await h.typeIn((p) => p.locator("[data-packing-window]").getByLabel("+ Add item").first(), "packing add item", "Socks");
-          if (await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /edit$/i }).first(), "packing: edit", { optional: true, expectMove: true })) {
-            await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /add a sub-item under chargers/i }).first(), "packing: sub-item", { optional: true, expectMove: true });
-            await h.page.keyboard.type("Phone cable").catch(() => {});
-            await h.page.keyboard.press("Enter").catch(() => {});
-            await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^\+ section$/i }).first(), "packing: add section", { optional: true, expectMove: true });
+          // Listry-like (owner, Nov 7): commas add several; the name opens details (how many, note, sub-items, section).
+          await win().getByLabel("+ Add item").first().fill("Hat, Sunscreen").catch(() => {});
+          await win().getByLabel("+ Add item").first().press("Enter").catch(() => {});
+          if (await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^chargers: details$/i }).first(), "packing: item details", { optional: true, expectMove: true })) {
+            await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^one more$/i }).first(), "packing: quantity +", { optional: true });
+            await win().getByLabel("↳ Add a sub-item").first().fill("Phone cable").catch(() => {});
+            await win().getByLabel("↳ Add a sub-item").first().press("Enter").catch(() => {});
+            await h.check("packing window: item details");
+            await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^done$/i }).first(), "packing: details done", { optional: true, expectMove: true });
+          }
+          if (await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /add a section/i }).first(), "packing: add section", { optional: true, expectMove: true })) {
             await h.page.keyboard.type("Suitcase").catch(() => {});
             await h.page.keyboard.press("Enter").catch(() => {});
-            await h.check("packing window: editing");
-            await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^done$/i }).first(), "packing: done", { optional: true, expectMove: true });
           }
-          await h.tap((p) => p.locator("[data-packing-window]").getByRole("checkbox", { name: /toothbrush/i }).first(), "packing: tick", { optional: true });
+          await win().getByLabel("+ Add item").last().focus().catch(() => {});
+          await h.settle(400);
+          await h.check("packing window: suggestions");
+          await h.tap((p) => p.locator("[data-packing-window]").getByRole("checkbox", { name: /pack toothbrush/i }).first(), "packing: tick", { optional: true });
           await h.check("packing window: ticked");
           await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^minimize$/i }).first(), "packing: minimize", { optional: true, expectMove: true });
           await h.check("packing chip");

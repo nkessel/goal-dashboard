@@ -24,7 +24,7 @@ export type BringList = { place: string; items: BringItem[] };
  * lists (a weekend away, the gym…), each with sections (Suitcase, Backpack…; the first may be
  * unnamed), each item with its own sub-checklist.
  */
-export type PackItem = { id: string; name: string; done: boolean; subs: BringItem[] };
+export type PackItem = { id: string; name: string; done: boolean; subs: BringItem[]; /** How many (shown as ×N when more than one). */ qty?: number; /** A short note (which charger, whose…). */ note?: string };
 export type PackSection = { id: string; name: string; items: PackItem[] };
 export type PackingList = { id: string; name: string; sections: PackSection[] };
 
@@ -55,7 +55,11 @@ const idOf = (v: unknown, fallback: string) => (typeof v === "string" && v ? v.s
 function normalizePackItems(raw: unknown): PackItem[] {
   return (Array.isArray(raw) ? raw : [])
     .filter((i) => !!i && typeof i === "object" && clip((i as PackItem).name, 80))
-    .map((i: PackItem, k) => ({ id: idOf(i.id, `pi${k}`), name: clip(i.name, 80), done: i.done === true, subs: normalizeItems(i.subs).slice(0, 30) }))
+    .map((i: PackItem, k) => {
+      const qty = Math.max(1, Math.min(99, Math.round(Number(i.qty) || 1)));
+      const note = typeof i.note === "string" ? i.note.replace(/\s+/g, " ").trim().slice(0, 120) : "";
+      return { id: idOf(i.id, `pi${k}`), name: clip(i.name, 80), done: i.done === true, subs: normalizeItems(i.subs).slice(0, 30), ...(qty > 1 ? { qty } : {}), ...(note ? { note } : {}) };
+    })
     .slice(0, 80);
 }
 
