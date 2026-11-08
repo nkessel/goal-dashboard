@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { TaskRow } from "./TaskRow";
 import { useEscape } from "@/lib/use-escape";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * A quest shown as its own card in a popup — the same card as on Today, so
@@ -62,7 +63,7 @@ export function QuestCardPopup({
             className="flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none"
             style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink)" }}
           >
-            ×
+            <CloseIcon size={13} />
           </button>
         </div>
         <ul className="m-0 list-none p-0">

@@ -1,6 +1,6 @@
 "use client";
 
-import { GearIcon } from "@/components/ui/Icons";
+import { GearIcon, CloseIcon } from "@/components/ui/Icons";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { paintInventoryItemAction } from "@/app/actions";
@@ -553,7 +553,7 @@ function BringDrawer({ list, onChange, onClose }: { list: BringList; onChange: (
             </label>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -567,7 +567,7 @@ function BringDrawer({ list, onChange, onClose }: { list: BringList; onChange: (
                 </span>
               </label>
               <button type="button" onClick={() => onChange({ ...list, items: list.items.filter((i) => i.id !== it.id) })} aria-label={`Take ${it.name} off the list`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[16px] opacity-50 hover:bg-black/[.06] hover:opacity-100" style={{ color: "#9a3b26" }}>
-                ✕
+                <CloseIcon size={10} />
               </button>
             </li>
           ))}
@@ -747,7 +747,7 @@ function ItemSheet({
             <input ref={nameRef} value={item.name} onChange={(e) => setItem({ ...item, name: e.target.value })} onKeyDown={(e) => e.key === "Enter" && item.name.trim() && onSave(item, wantsPaint ? { description } : null)} placeholder="What's in this slot?" maxLength={48} className={`${field} mt-1 font-semibold`} style={fieldStyle} aria-label="Item name" />
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={14} />
           </button>
         </div>
 

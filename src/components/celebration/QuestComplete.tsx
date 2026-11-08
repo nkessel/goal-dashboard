@@ -8,7 +8,7 @@ import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction, r
 import { celebrateReward } from "./RewardCelebration";
 import type { Task } from "@/lib/data/types";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
-import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
+import { CoinIcon, DiamondIcon, CloseIcon } from "@/components/ui/Icons";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import {
   barDust,
@@ -230,7 +230,7 @@ export function QuestComplete(props: QuestCompleteProps) {
         className="absolute left-[max(10px,env(safe-area-inset-left))] top-[max(10px,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full text-[28px] leading-none"
         style={{ color: "#efe6cc", background: "rgba(20,26,18,.55)", border: "1px solid rgba(217,180,95,.45)" }}
       >
-        ×
+        <CloseIcon size={17} />
       </button>
       {/* Its mirror on the right: how big the celebration is, in Settings. */}
       {!preview && (

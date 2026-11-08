@@ -34,6 +34,7 @@ import { DueWindowPicker } from "./DueWindowPicker";
 import { useOfflineDone } from "@/lib/offline";
 import { settleOptimisticQuests, takeOptimisticFailure, useOptimisticQuests, type OptimisticQuest } from "@/lib/optimistic-quests";
 import { Fold } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /** A just-created quest, drawn like the rest while it saves (blank checkbox until its portrait is ready). */
 function asTask(q: OptimisticQuest): TaskWithCategory {
@@ -329,7 +330,7 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind, onHide }: 
                         </svg>
                       </button>
                       <button type="button" onClick={() => snooze(task.id)} aria-label={`Take “${task.title}” out of Due soon for good`} title="Out of Due soon" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none" style={{ border: "1.5px solid rgba(240,150,90,.6)", color: ink, background: "rgba(0,0,0,.18)" }}>
-                        ×
+                        <CloseIcon size={11} />
                       </button>
                     </span>
                   </li>
@@ -801,7 +802,7 @@ export function TodayTaskBoard({
               </button>
             )}
             <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "rgba(241,234,210,.7)" }}>
-              ×
+              <CloseIcon size={11} />
             </button>
           </div>,
           document.body

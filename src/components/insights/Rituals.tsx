@@ -6,6 +6,7 @@ import { sinceLabel, type Ritual } from "@/lib/rituals";
 import { Fold } from "@/components/ui/Fold";
 import { DateField } from "@/components/ui/DateField";
 import { freshKey } from "@/lib/quest-drafts";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const INK = "#3b2a14";
 const SOFT = "#6b5631";
@@ -135,7 +136,7 @@ function RitualRow({ r, today, open, onToggle, onLog, onUnlog, onRename, onDelet
                 <li key={k} className="due-in flex h-7 items-center gap-1 rounded-full pl-2.5 pr-1 text-[12.5px]" style={{ background: "rgba(201,162,74,.18)", color: INK }}>
                   {nice(k, today)}
                   <button type="button" onClick={() => onUnlog(k)} aria-label={`Remove ${nice(k, today)}`} className="flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none" style={{ color: SOFT }}>
-                    ×
+                    <CloseIcon size={9} />
                   </button>
                 </li>
               ))}

@@ -9,6 +9,7 @@ import { formatTimeRange } from "@/lib/calendar-dates";
 import { rsvpGoogleEventAction, updateGoogleEventAction } from "@/app/actions";
 import { cleanEventDescription } from "@/lib/event-text";
 import { useEscape } from "@/lib/use-escape";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const HIDDEN_KEY = "hidden-gcal-events-v1";
 
@@ -267,7 +268,7 @@ export function GoogleEventChip({
                 className="text-lg leading-none"
                 style={{ color: "var(--t-ink-soft)" }}
               >
-                ×
+                <CloseIcon size={11} />
               </button>
             </div>
             <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>

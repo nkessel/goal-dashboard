@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 import { useClosing } from "@/components/ui/Fold";
 import { WhenPicker } from "@/components/calendar/WhenPicker";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Slot = { start: string; end: string };
 
@@ -54,7 +55,7 @@ export function SlotPickerDialog({
         <div className="flex items-center justify-between">
           <h4 className={isAdventure ? "font-display text-base" : "text-base font-bold"}>{heading}</h4>
           <button type="button" onClick={onClose} aria-label="Close" className="h-8 w-8 text-xl" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={12} />
           </button>
         </div>
         <WhenPicker minutes={durationMinutes} title={questTitle} isAdventure={isAdventure} initial={initial ? new Date(initial).toISOString() : null} placing={placing} onPick={onPick} />

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const DRAFT_KEY = "invite-draft";
 
@@ -190,7 +191,7 @@ export function InviteComposer({ url, inviterName, canShare, theme, onClose }: {
               Write your invite
             </h2>
             <button type="button" onClick={close} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[20px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-              ×
+              <CloseIcon size={12} />
             </button>
           </div>
 

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { processSeedsAction, saveLifeWheelAction } from "@/app/actions";
+import { CloseIcon } from "@/components/ui/Icons";
 
 export type Focus = { area: string; from: number | null; target: number; quests: { id: string; title: string }[] };
 type Quest = { id: string; title: string; board: string | null };
@@ -215,7 +216,7 @@ function FocusQuests({ quests, open, onChange, area }: { quests: { id: string; t
                 {x.title}
               </span>
               <button type="button" onClick={() => onChange(quests.filter((y) => y.id !== x.id))} aria-label={`Remove “${x.title}”`} className="flex h-8 w-8 items-center justify-center rounded-full text-[17px] hover:bg-black/10" style={{ color: SOFT }}>
-                ×
+                <CloseIcon size={10} />
               </button>
             </li>
           ))}

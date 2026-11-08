@@ -166,13 +166,26 @@ export const FLOWS = [
         await h.check("quest menu");
         await esc(h);
       }
-      // Snooze from a quest's ⋯: a small menu beside the card (Tomorrow, 2 days, Other; owner, Nov 3).
+      // Snooze from a quest's ⋯: a small menu beside the card (1 hour, Tomorrow, Other; owner, Nov 4).
       if (await h.tap((p) => p.locator("li", { hasText: "Pick up medication" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for snooze", { optional: true })) {
         if (await h.tap((p) => p.getByRole("menuitem", { name: /snooze/i }).first(), "snooze menu", { optional: true, expectMove: true })) {
           await h.check("snooze menu");
           await h.tap("text=Other…", "snooze other", { optional: true, expectMove: true });
           await h.check("snooze menu: other");
         }
+        await esc(h);
+        await esc(h);
+      }
+      // Move… on a quest in Today's Quests: Additional Quests or a board, inside the menu (owner, Nov 4).
+      if (await h.tap((p) => p.locator("li", { hasText: "Pick up medication" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for move", { optional: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^move/i }).first(), "move", { optional: true, expectMove: true })) {
+          await h.check("move menu");
+          if (await h.tap((p) => p.getByRole("menuitem", { name: /quest board/i }).first(), "move to a board", { optional: true, expectMove: true })) {
+            await h.settle(600);
+            await h.check("move menu: boards");
+          }
+        }
+        await esc(h);
         await esc(h);
         await esc(h);
       }

@@ -4,32 +4,29 @@ The owner's notes that aren't built yet, grouped by area. They were read from `/
 
 ## Nov 4 notes (owner, from /journal › App feedback), not built yet
 
+Built Nov 8: button audit (typed × → `CloseIcon` everywhere, 104 buttons), toucan respond field holds one look under a resting mouse, Snooze = 1 hour / Tomorrow / Other…, Move… (Additional Quests or a board, in the menu), blank-circle default portrait, no browser right-click menu.
+
 Built Nov 4 (afternoon): sequencer as quest cards you drag; Settings search + reorganised (Visual settings holds Theme, Layout and effects; Account holds Calendar sync; Secret Missions a half-width tile that slides in; Account & more quieter; Mess check-in out of Settings); evening routine start time Other… (default 4:30pm); Today's gear moved to Settings › Visual settings › Layout › Arrange Today; menu × centred (`CloseIcon`); new quests 15 XP + 1 coin; "Category" for no board; "Primary" without "Priority ·"; sub-quest menu Skip / Remove / Failed (black); "Auto-schedule" in the quest menu; reward button a third of the width, "Undo quest completion"; quest cards don't move on hover; welcome toucan quiet on arrival (Toucan Spirit › His look › "Speaks when you arrive"); time ruler: no ‹ ›, no "type", tap the time to type in place; welcome habits drag to reorder; Today fades up through the mist after the welcome screen.
 
 Still to do (each the owner's words, shortened):
-- **Toucan respond field flickers (owner's bug video, Nov 4 evening, 3 s, welcome screen on a computer):** with the mouse resting on or moving across "Respond…" under his bubble ("What's most important right now?"), the field keeps switching between off-white and solid gold, once drawing as an empty outline with no fill, and the cursor jumps between the text I-beam, the grabbing hand and the arrow. It should stay one look while hovered (off-white while you can type, per the earlier note) with a steady text cursor. Likely the idle/typing colour rule and the bubble's drag area (hand cursor) fighting over the same spot. Fix it and check it with the mouse resting on the field, not just a click. (The video itself isn't in the repo, which is public; this is what it shows.)
-- **Button audit** (owner: Saturday Nov 7, 10:01pm): every button in the app looks right (× centred in its circle, consistent sizes, design language). A scheduled task does this.
-- **Morning routine** (Saturday): three UX teams brainstorm a flexible, optional, inspiring, varied, nourishing morning routine and start a design conversation with the owner.
+- **Morning routine**: three UX teams' ideas sent to the owner Nov 8 as 3 options (A: Pick your morning pills, B: Body · Heart · Mind, C: Dawn path + offerings); build the one he picks.
 - **Anti-habits as tracked events**: an "Add tracked event" button below/next to the events/tags input; named anti-habits (tracked events) show as pills; a tap logs one with its time.
-- Snooze button: 1 hr, one day, Other (1:56 PM). A back button from the toucan's snooze options to his main chat (2:39 PM).
-- "Remove from Today's Quests" → one "Move" button: to Additional Quests or a quest board (1:53 PM).
-- Board button at the top of a quest's portrait: a tap gives a small overview of the board with a prominent "See quest in board"; drop "See quest in board" from the menu. **Brainstorm 2–3 ideas first, owner approves** (1:55 PM).
+- Board button at the top of a quest's portrait: a tap gives a small overview of the board with a prominent "See quest in board"; drop "See quest in board" from the menu. **Brainstorm 2–3 ideas first, owner approves** (1:55 PM). Ideas sent Nov 8, waiting on his pick.
 - Stats don't show in the quest editor; check the editor and its view settings all work; 3 agents test (1:50 PM). Location missing from the editor's display menu: 2 agents audit for similar gaps (1:48 PM). Save and Complete quest shouldn't be in the view settings, just a "save settings" button (1:49 PM).
 - Sequence and sub-quests from the same pill (1:45 PM).
 - Editor metrics (importance etc.): a clear gear top right; change how bars display, colours, icons, names; add metrics (1:44 PM). Sub-quest menu icons in the design language (done in part).
 - Swipe a welcome-screen section left to snooze it (or hide if done); finishing a section: a big green check slams down left of its header (1:30 PM).
-- Default portrait a blank circle, not letters; quests made from a Claude chat get real portraits (1:28 PM).
+- Quests made from a Claude chat get real portraits (1:28 PM). (Blank-circle default built Nov 8.)
 - Avatars of quests and mini-quests aligned; 3 agents brainstorm the quest card section's balance; 3 agents brainstorm habits in the day's plan (Today and/or calendar) (1:07 PM).
-- The browser's own right-click menu never shows anywhere: right-click opens the app's menus (12:39 PM).
 - Focusing questions ("What helps me thrive?"): a button left of Today's Quests' title, one question at a time with arrows (10:13 AM).
 - Welcome sleep time field: "make the whole field and section look immaculately beautiful and elegantly simple" (9:00 AM).
 - Drag a toucan into Settings or another screen; once dropped in a zone he doesn't come back on his own (8:41 AM).
 - Sequence peek: "N after this" only on hover/press of the background cards; a click shows simple card previews in order (8:41 AM). Screenshot button showed the last screenshot, not this screen; "When it ships" options: add "Immediately" (not default) and put them in the design language (8:41 AM).
 - Greeting "Good afternoon! Hail, returning hero": only the second sentence is editable (2:57 PM). Check-in button loaded 3 times (2:57 PM). The whole screen refreshed for no reason (2:40 PM).
 - One welcome screen a day (first visit); after 2.5 h away (adjustable) the toucan greets in the mist: "What brings you here today?" with a bigger chat; alternatives and replies like his other phrases (2:56 PM). Never more than one welcome screen a day; snoozed for a day = skipped till tomorrow morning (3:03 PM).
-- XP box: a blinking cursor when typing; a highlighted number isn't blue: **brainstorm options in the design language** (3:00 PM).
+- XP box: a blinking cursor when typing; a highlighted number isn't blue: **brainstorm options in the design language** (3:00 PM). Options sent Nov 8, waiting.
 - Portrait picker: upload an image, and choose "turn into a portrait" or "use as is" (3:01–3:02 PM).
-- Save a little more compelling as the default; Complete quest glorious (golden) but not the first thing you'd press: **3 drafts before building** (3:07 PM).
+- Save a little more compelling as the default; Complete quest glorious (golden) but not the first thing you'd press: **3 drafts before building** (3:07 PM). Drafts sent Nov 8 (in words), waiting.
 - All Quests: list views in order made (default), last modified, and others (3:10 PM).
 - Settings: screens without a tray (like Notifications) slide in from the right, all inside the one settings box (3:14 PM; done for Secret Missions).
 

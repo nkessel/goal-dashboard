@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { deleteJournalEntryAction } from "@/app/actions";
 import { JOURNAL_KINDS, journalKindMeta } from "@/lib/journal-kinds";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Entry = { id: string; body: string; mood: number | null; kind?: string | null; created_at: string; review_status?: string | null };
 
@@ -111,7 +112,7 @@ export function JournalList({ entries, isAdventure }: { entries: Entry[] | null;
                   </span>
                 ) : (
                   <button type="button" onClick={() => setConfirming(e.id)} aria-label="Delete entry" className="ml-auto h-7 w-7 text-[16px] opacity-60 hover:opacity-100">
-                    ×
+                    <CloseIcon size={10} />
                   </button>
                 )}
               </div>

@@ -8,6 +8,7 @@ import { settingsPopupContextAction, toucanPrefsAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 import { GearIcon } from "./Icons";
 import type { SettingsSpot } from "./SettingsGear";
+import { CloseIcon } from "@/components/ui/Icons";
 
 // The same pieces Settings shows, loaded only when a gear is tapped.
 const WelcomeSettings = dynamic(() => import("@/components/settings/CelebrationSettings").then((m) => m.WelcomeSettings));
@@ -137,7 +138,7 @@ export function SettingsPopup({ spot, onClose, beforeLeave }: { spot: SettingsSp
             {TITLES[spot]}
           </h2>
           <button type="button" onClick={onClose} aria-label="Close" className="-mr-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={13} />
           </button>
         </header>
         <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-4 py-3" style={{ color: "var(--t-ink)" }}>

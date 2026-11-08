@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ROTATION, likeLine, likedLines, retireLine, retiredLines, rotationFor } from "@/lib/greetings";
 import { Fold } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * The wise lines in rotation: like one to see it more, × to delete it (the
@@ -25,7 +26,7 @@ export function WiseLines({ own, alwaysOpen = false, extra, ownBox }: { own: str
         {likedSet.has(l) ? "♥" : "♡"}
       </button>
       <button type="button" onClick={() => (retireLine(l, true), bump())} aria-label={`Delete “${l}”`} title="Delete: another line takes its place" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px]" style={{ color: "var(--t-ink-soft)" }}>
-        ×
+        <CloseIcon size={11} />
       </button>
     </li>
   );

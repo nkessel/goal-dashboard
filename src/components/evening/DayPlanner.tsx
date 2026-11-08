@@ -20,6 +20,7 @@ import {
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { fromFeedback } from "@/lib/from-feedback";
 import { findSlot } from "@/components/calendar/place-next";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 type Carry =
@@ -493,7 +494,7 @@ export function DayPlanner({
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button type="button" onClick={() => setMenu(null)} aria-label="Close" className="absolute right-1 top-1 z-[1] flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none" style={{ color: "#6b5631" }}>
-                      ×
+                      <CloseIcon size={10} />
                     </button>
                     <b className="relative z-[1] pr-6 font-display text-[15px] leading-snug">{it.title}</b>
                     <span className="relative z-[1] tabular-nums" style={{ color: "#6b5631" }}>
@@ -1089,7 +1090,7 @@ function QuickEventsEditor({ list, onSave }: { list: QuickEvent[]; onSave: (l: Q
             XP
           </span>
           <button type="button" onClick={() => commit(rows.filter((_, j) => j !== i))} aria-label={`Remove ${r.label}`} className="h-9 w-8 text-[18px] leading-none" style={{ color: "#5a4a30" }}>
-            ×
+            <CloseIcon size={11} />
           </button>
         </div>
       ))}

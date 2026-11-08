@@ -6,6 +6,7 @@ import { getStatsAction, setStatsAction } from "@/app/actions";
 import { DEFAULT_STATS, cleanStatName, statAbbr } from "@/lib/stats";
 import { useEscape } from "@/lib/use-escape";
 import { useLinger } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * Settings' half-width "Stats" tile: your character stats in order. Move
@@ -76,7 +77,7 @@ export function StatsTile({ isAdventure }: { isAdventure: boolean }) {
               style={{ color: "var(--t-ink)", background: isAdventure ? undefined : "var(--t-card)" }}
             >
               <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="absolute right-3 top-3 z-[2] flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-                ×
+                <CloseIcon size={11} />
               </button>
               <div className="relative z-[1] pr-8">
                 <p className={`m-0 text-[19px] ${isAdventure ? "font-display" : "font-bold"}`}>Character stats</p>
@@ -98,7 +99,7 @@ export function StatsTile({ isAdventure }: { isAdventure: boolean }) {
                       ↓
                     </button>
                     <button type="button" aria-label={`Take ${s} off the list`} title="Take it off the list (its XP is kept)" onClick={() => save((stats ?? []).filter((x) => x !== s))} className={btn} style={{ color: "var(--t-warn)" }}>
-                      ×
+                      <CloseIcon size={10} />
                     </button>
                   </li>
                 ))}

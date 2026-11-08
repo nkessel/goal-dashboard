@@ -8,6 +8,7 @@ import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { BoardSeal } from "@/components/boards/BoardSeal";
 import { useEscape } from "@/lib/use-escape";
 import { useClosing } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * "+" in Not yet plotted: bring boards (plotted as one item) and quests that
@@ -92,7 +93,7 @@ export function AddToMatrixSheet({
             Add to the matrix
           </h3>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center text-2xl leading-none" style={{ color: soft }}>
-            ×
+            <CloseIcon size={14} />
           </button>
         </div>
         <input

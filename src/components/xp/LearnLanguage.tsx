@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { translatePhraseAction } from "@/app/actions";
 import { DEFAULT_LANGUAGES, MORE_LANGUAGES, PHRASE_IDEAS, approxNote, type Translation } from "@/lib/languages";
 import { Fold } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const KEY = "learn-language";
 type Saved = { langs: string[]; off: string[] };
@@ -156,7 +157,7 @@ export function LearnLanguage() {
                   Remove
                 </button>
                 <button type="button" onClick={() => setAsking(null)} aria-label="Keep it" className="flex h-6 w-6 items-center justify-center rounded-full" style={{ color: SOFT }}>
-                  ×
+                  <CloseIcon size={10} />
                 </button>
               </span>
             ) : (
@@ -374,7 +375,7 @@ export function LanguageWindow() {
             –
           </button>
           <button type="button" onClick={() => setMode(null)} aria-label="Close" title="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none" style={{ color: "#6b5631" }}>
-            ×
+            <CloseIcon size={12} />
           </button>
         </div>
         {chipEdit && <ChipEditor />}

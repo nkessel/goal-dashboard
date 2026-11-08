@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
 import { createRewardAction, deleteRewardAction, updateRewardAction } from "@/app/actions";
 import { IconPicker } from "@/components/tasks/IconPicker";
-import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
+import { CoinIcon, DiamondIcon, CloseIcon } from "@/components/ui/Icons";
 import { useEscape } from "@/lib/use-escape";
 import { usePortalTarget } from "@/components/ui/EmbedHost";
 import { coinsForXp } from "@/lib/coins";
@@ -140,7 +140,7 @@ export function RewardEditorDialog({
             {review ? `Review import ${review.index} of ${review.total}` : reward ? "Edit reward" : "New reward"}
           </h3>
           <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -445,7 +445,7 @@ function SeqList({ items, onChange, fieldStyle, addLabel, placeholder, start = 1
             />
             {real && (
               <button type="button" onClick={() => drop(i)} aria-label={`Remove quest ${start + i}`} className="flex h-8 w-6 shrink-0 items-center justify-center rounded text-[15px] opacity-50 hover:opacity-100" style={{ color: "var(--t-ink-soft)" }}>
-                ×
+                <CloseIcon size={9} />
               </button>
             )}
           </div>

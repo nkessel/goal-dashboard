@@ -7,6 +7,7 @@ import { EMPTY_NIGHT, NightFields, MoonIcon, SunIcon, TimeToken, clock12, type N
 import { Fold } from "@/components/ui/Fold";
 import { DateField } from "@/components/ui/DateField";
 import { eveningDayKey } from "@/components/evening/evening-clock";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const GILT = { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } as const;
 const SOFT = "#6b5631";
@@ -192,7 +193,7 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
                 <TimeToken value={n.bed} onChange={(v) => setOthers((o) => o.map((x, j) => (j === i ? { ...x, bed: v } : x)))} label="Sleep time" icon={<MoonIcon />} kind="bed" compact placeholder="bedtime" />
                 <TimeToken value={n.wake} onChange={(v) => setOthers((o) => o.map((x, j) => (j === i ? { ...x, wake: v } : x)))} label="Wake time" icon={<SunIcon />} kind="wake" compact placeholder="wake" />
                 <button type="button" onClick={() => setOthers((o) => o.filter((x) => x.id !== n.id))} aria-label="Remove this night" className="ml-auto flex h-8 w-8 items-center justify-center text-[18px] leading-none" style={{ color: SOFT }}>
-                  ×
+                  <CloseIcon size={11} />
                 </button>
               </div>
             ))}

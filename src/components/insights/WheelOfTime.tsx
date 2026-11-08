@@ -8,6 +8,7 @@ import { StoneWheel, WHEEL_STEP } from "@/components/insights/StoneWheel";
 import { DateField } from "@/components/ui/DateField";
 import { MAX_WEIGHT, weightOf, clockFromNight, minutesLabel, nightMinutes, prettyTime, recentAverages, shiftDay, turnings, wheelTurns, type NightLog, type WheelState } from "@/lib/wheel-of-time";
 import { Fold } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const CREAM = "#efe6cc";
 const SOFT = "rgba(239,230,204,.7)";
@@ -458,7 +459,7 @@ function ListEditor({ title, color, items, weights, onChange, onWeight }: { titl
             </button>
           </span>
           <button type="button" onClick={() => onChange(items.filter((x) => x !== i))} aria-label={`Remove ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[16px] hover:bg-white/10" style={{ color: SOFT }}>
-            ×
+            <CloseIcon size={10} />
           </button>
         </span>
       ))}

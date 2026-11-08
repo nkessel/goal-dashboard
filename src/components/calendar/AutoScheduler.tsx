@@ -10,6 +10,7 @@ import { useEscape } from "@/lib/use-escape";
 import { habitBlocksOn, habitOnDay } from "@/lib/timed-habits";
 import type { Repeat } from "@/lib/habit-repeat";
 import { Fold, useClosing } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const LOCAL_KEY = "auto-schedule";
 const TIMES: { v: TimeOfDay; label: string; hint: string }[] = [
@@ -285,7 +286,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = fal
             </svg>
           </button>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: soft }}>
-            ×
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -746,7 +747,7 @@ function OptionalAndHabits({ optional, kept, habits, isAdventure, onKeep, onDele
                         ✓
                       </button>
                       <button type="button" onClick={() => del(o)} aria-label={`Delete ${o.title} from your calendar`} title="Delete it from your calendar" className={round} style={{ border: "1.5px solid #a3412a", color: "#a3412a", background: "rgba(163,65,42,.08)" }}>
-                        ×
+                        <CloseIcon size={10} />
                       </button>
                     </>
                   )}

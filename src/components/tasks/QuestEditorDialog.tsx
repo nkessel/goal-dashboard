@@ -12,7 +12,7 @@ import type { FileRef } from "@/lib/file-refs";
 
 import { TimeToken } from "@/components/xp/NightFields";
 import { NumberInput } from "@/components/ui/NumberInput";
-import { GearIcon } from "@/components/ui/Icons";
+import { GearIcon, CloseIcon } from "@/components/ui/Icons";
 import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -1273,7 +1273,7 @@ export function QuestEditorDialog({
             </button>
             {slot && (
               <button type="button" onClick={takeOffCalendar} aria-label="Take it off the calendar" title="Take it off the calendar" className="h-8 w-6 shrink-0 text-[17px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                ×
+                <CloseIcon size={10} />
               </button>
             )}
           </>
@@ -1481,7 +1481,7 @@ export function QuestEditorDialog({
                                 {l.pick.title}
                               </span>
                               <button type="button" onClick={() => setSeqLinks((ls) => ls.filter((_, j) => j !== i))} aria-label={`Remove ${l.pick.title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-                                ×
+                                <CloseIcon size={9} />
                               </button>
                             </li>
                           ))}
@@ -1970,7 +1970,7 @@ export function QuestEditorDialog({
                     <span key={t} className="flex h-7 items-center gap-0.5 rounded-full pl-2.5 pr-0.5" style={{ background: "rgba(217,180,95,.22)", border: "1px solid rgba(139,112,64,.45)", color: "var(--t-ink)" }}>
                       #{t}
                       <button type="button" onClick={() => commitTags(tags.filter((x) => x !== t))} aria-label={`Remove the tag ${t}`} className="flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-                        ×
+                        <CloseIcon size={9} />
                       </button>
                     </span>
                   ))}
@@ -2141,7 +2141,7 @@ export function QuestEditorDialog({
                     <span key={id} className="flex h-7 items-center gap-0.5 rounded-full pl-2.5 pr-0.5" style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}>
                       ↗ {boardOptions?.find((o) => o.id === id)?.label ?? "a board"}
                       <button type="button" onClick={() => saveAlsoOn(alsoOn.filter((x) => x !== id))} aria-label="Unlink from this board" className="flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-                        ×
+                        <CloseIcon size={9} />
                       </button>
                     </span>
                   ))}
@@ -2383,7 +2383,7 @@ export function QuestEditorDialog({
               <GearIcon size={18} />
             </button>
             <button type="button" onClick={requestClose} aria-label="Close" className="-mr-1.5 flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-              ×
+              <CloseIcon size={13} />
             </button>
           </div>
 
@@ -2535,7 +2535,7 @@ export function QuestEditorDialog({
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]"
                         style={{ color: "var(--t-ink-soft)" }}
                       >
-                        ×
+                        <CloseIcon size={10} />
                       </button>
                     </li>
                   ))}
@@ -2590,7 +2590,7 @@ export function QuestEditorDialog({
                     </span>
                   </button>
                   <button type="button" onClick={() => removeDraft(d.id)} aria-label="Throw this draft away" title="Throw this draft away" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-                    ×
+                    <CloseIcon size={10} />
                   </button>
                 </li>
               ))}
@@ -2657,7 +2657,7 @@ export function QuestEditorDialog({
                       />
                       {place && (
                         <button type="button" onClick={() => (void saveQuestPlace(task.id, null).catch(() => {}), setFactOpen(null))} aria-label="No place" className="h-9 w-7 shrink-0 text-[18px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                          ×
+                          <CloseIcon size={11} />
                         </button>
                       )}
                     </div>
@@ -2678,7 +2678,7 @@ export function QuestEditorDialog({
                           <>
                             <TimeToken value={dueTime} onChange={setDueTime} label="Due time (optional)" kind="any" compact />
                             <button type="button" onClick={() => (setDueDate(""), setDueTime(""))} aria-label="Clear the due date" title="No due date" className="h-9 w-7 shrink-0 text-[18px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                              ×
+                              <CloseIcon size={11} />
                             </button>
                           </>
                         )}

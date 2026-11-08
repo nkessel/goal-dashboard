@@ -11,6 +11,7 @@ import { WeekView } from "@/components/calendar/WeekView";
 import { SchedulingDrawer } from "@/components/calendar/SchedulingList";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Who = "me" | "them";
 type Pair<T> = { me: T; them: T };
@@ -561,7 +562,7 @@ function Sweep({ items, onChange, mine, label }: { items: Item[]; onChange: (i: 
               </span>
               {!it.made && (
                 <button type="button" onClick={() => onChange(items.filter((x) => x.id !== it.id))} aria-label={`Remove “${it.text}”`} className="h-7 w-7 shrink-0 rounded-full text-[15px] hover:bg-black/10" style={{ color: SOFT }}>
-                  ×
+                  <CloseIcon size={9} />
                 </button>
               )}
             </div>
@@ -625,7 +626,7 @@ function Rocks({ who, rocks, woop, sweep, open, onRocks, onWoop }: { who: Who; r
             <li key={r.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "rgba(217,180,95,.25)" }}>
               <span className="font-display text-[17px]" style={{ color: "#8a6116" }}>{i + 1}</span>
               <span className="min-w-0 flex-1 text-[14.5px] font-semibold" style={{ color: INK }}>{r.text}</span>
-              <button type="button" onClick={() => onRocks(rocks.filter((x) => x.id !== r.id))} aria-label={`Remove “${r.text}”`} className="h-7 w-7 rounded-full text-[15px] hover:bg-black/10" style={{ color: SOFT }}>×</button>
+              <button type="button" onClick={() => onRocks(rocks.filter((x) => x.id !== r.id))} aria-label={`Remove “${r.text}”`} className="h-7 w-7 rounded-full text-[15px] hover:bg-black/10" style={{ color: SOFT }}><CloseIcon size={10} /></button>
             </li>
           ))}
         </ol>

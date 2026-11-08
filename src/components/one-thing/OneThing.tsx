@@ -17,6 +17,7 @@ import { MONSTER_ICONS } from "@/lib/monster-icons";
 import { useEscape } from "@/lib/use-escape";
 import { rankOneThing, whyThisOne } from "@/lib/one-thing";
 import { adoptFocusTask, canPopOutWindow, getFocusTimer, popOutFocusTimer, resetFocusTimer, setFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /** `habit` marks a daily habit shown as a quest (focus mode for a habit). */
 type TaskWithCategory = Task & { categoryLabel?: string | null; habit?: { riteId: string; day: string } };
@@ -278,7 +279,7 @@ function OneThingView({
           className="flex h-11 w-11 items-center justify-center rounded-full text-[28px] leading-none"
           style={{ color: "var(--ot-soft)" }}
         >
-          ×
+          <CloseIcon size={17} />
         </button>
         <span className="font-display flex-1 text-center text-[19px]" style={{ color: "var(--ot-gold)" }}>
           {focus ? "Focus mode" : "Your one thing"}

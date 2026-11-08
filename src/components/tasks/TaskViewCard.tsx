@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Task } from "@/lib/data/types";
 import { EditTaskModal } from "./EditTaskModal";
 import { useEscape } from "@/lib/use-escape";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * A quick, read-only view of a task/quest — opened by clicking its dot on
@@ -65,7 +66,7 @@ export function TaskViewCard({
           className="absolute left-3 top-3 text-lg leading-none"
           style={{ color: "var(--t-ink-soft)" }}
         >
-          ×
+          <CloseIcon size={11} />
         </button>
         <button
           type="button"

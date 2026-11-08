@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { deleteTaskAction, reopenTaskAction } from "@/app/actions";
 import type { Task } from "@/lib/data/types";
-import { CoinIcon, DiamondIcon } from "@/components/ui/Icons";
+import { CoinIcon, DiamondIcon, CloseIcon } from "@/components/ui/Icons";
 import { coinsForXp } from "@/lib/coins";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { useLongPress } from "@/lib/use-long-press";
@@ -322,7 +322,7 @@ function VictoryPreview({ task, coins, note, onEdit, onClose }: { task: Task; co
     <div role="dialog" aria-modal="true" aria-label={task.title} onClick={onClose} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6">
       <div onClick={(e) => e.stopPropagation()} className="parchment parchment-framed relative flex w-full max-w-sm flex-col gap-3 rounded-2xl p-5" style={{ color: "var(--t-ink)" }}>
         <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-2.5 cursor-pointer text-xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
-          ×
+          <CloseIcon size={12} />
         </button>
         <div className="flex items-start gap-3 pr-5">
           <Seal kind="check" />

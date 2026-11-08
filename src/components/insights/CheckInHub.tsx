@@ -8,6 +8,7 @@ import { saveCheckInAction } from "@/app/actions";
 import { DateField } from "@/components/ui/DateField";
 import { useEscape } from "@/lib/use-escape";
 import { TrackingChart } from "./TrackingChart";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Reading = { metric: string; level: number; at: string };
 type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null };
@@ -162,7 +163,7 @@ function AddEntry({ metrics, onClose }: { metrics: string[]; onClose: () => void
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] leading-none hover:bg-black/[.06]"
                     style={{ color: INK_SOFT }}
                   >
-                    ×
+                    <CloseIcon size={10} />
                   </button>
                 )}
               </li>

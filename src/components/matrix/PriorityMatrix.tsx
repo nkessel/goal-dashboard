@@ -17,6 +17,7 @@ import { collapseBoardOnMatrixAction, confirmImportAction, expandBoardOnMatrixAc
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { BoardMatrixDialog } from "./BoardMatrixDialog";
 import { AddToMatrixSheet } from "./AddToMatrixSheet";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Mode = "priority" | "impact";
 type Lot = "map" | "unplotted" | "later";
@@ -518,7 +519,7 @@ export function PriorityMatrix({
             className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[24px] leading-none"
             style={{ color: "var(--t-ink-soft)" }}
           >
-            ×
+            <CloseIcon size={14} />
           </button>
           {plotItem ? (
             <>

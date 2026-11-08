@@ -6,6 +6,7 @@ import { setEarlyBonusAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
 import { useRouter } from "next/navigation";
 import { useClosing } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /** A quest's early bonus: automatic (xp null), none (0), or your own XP, coins and extra XP per day early. */
 export type EarlyBonus = { xp: number | null; coins: number | null; perDay: number | null };
@@ -92,7 +93,7 @@ export function EarlyBonusPopup({ taskId, initial, onClose: closeNow }: { taskId
     <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[80] flex items-center justify-center p-4`} style={{ background: "var(--t-overlay, rgba(10,8,4,.55))" }} onClick={(e) => (e.stopPropagation(), onClose())} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.key !== "Escape" && e.stopPropagation()}>
       <div role="dialog" aria-modal="true" aria-label="Early-completion reward" className="card-pop-in parchment relative flex w-full max-w-[340px] flex-col gap-2.5 rounded-2xl p-4" style={{ background: "linear-gradient(180deg,#fbf3df,#f1e3c0)", border: "1.5px solid #a88a3f", boxShadow: "0 16px 40px rgba(0,0,0,.45)", color: "#2a1c10" }} onClick={(e) => e.stopPropagation()}>
         <button type="button" onClick={onClose} aria-label="Close" className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none" style={{ color: SOFT }}>
-          ×
+          <CloseIcon size={12} />
         </button>
         <h3 className="m-0 font-display text-[18px]" style={{ color: "#2a1c10" }}>
           Early-completion reward

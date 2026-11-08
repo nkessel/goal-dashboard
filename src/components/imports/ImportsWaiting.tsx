@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Fold } from "@/components/ui/Fold";
 import { useLongPress } from "@/lib/use-long-press";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const HIDE_KEY = "imports-hidden-until";
 const readHidden = () => {
@@ -112,7 +113,7 @@ export function ImportsWaiting({ count, hideable = false }: { count: number; /**
               </button>
             )}
             <button type="button" onClick={() => (setAsking(false), setOther(false))} aria-label="Keep it showing" className="ml-auto flex h-8 w-8 items-center justify-center text-[17px]" style={{ color: "var(--t-ink-soft, #6b5631)" }}>
-              ×
+              <CloseIcon size={10} />
             </button>
           </div>
         </Fold>

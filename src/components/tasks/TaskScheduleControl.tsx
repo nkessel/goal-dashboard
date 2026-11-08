@@ -6,6 +6,7 @@ import { addTaskSessionAction, scheduleTaskAction, unscheduleTaskAction } from "
 import { sessionRef } from "@/lib/calendar-task-window";
 import { WhenPicker } from "@/components/calendar/WhenPicker";
 import { useEscape } from "@/lib/use-escape";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Slot = { start: string; end: string };
 
@@ -104,7 +105,7 @@ export function TaskScheduleControl({
           When for &ldquo;{task.title}&rdquo;?
         </p>
         <button type="button" onClick={finish} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[20px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-          ×
+          <CloseIcon size={12} />
         </button>
       </div>
       {placed && (

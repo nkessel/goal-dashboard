@@ -12,6 +12,7 @@ import { useEscape } from "@/lib/use-escape";
 import type { SequenceItem } from "@/lib/data/sequences";
 import { useClosing } from "@/components/ui/Fold";
 import type { Task } from "@/lib/data/types";
+import { CloseIcon } from "@/components/ui/Icons";
 
 // Loaded on demand (the editor imports this file too).
 const EditTaskModal = lazy(() => import("./EditTaskModal").then((m) => ({ default: m.EditTaskModal })));
@@ -344,7 +345,7 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
             –
           </button>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/5" style={{ color: ink }}>
-            ×
+            <CloseIcon size={11} />
           </button>
         </span>
         <div data-drag-handle className="relative z-[1] flex cursor-grab touch-none select-none flex-col gap-0.5 pr-16 active:cursor-grabbing" title="Drag to move">

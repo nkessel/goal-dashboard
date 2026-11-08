@@ -1,7 +1,7 @@
 "use client";
 
 import { Fold, useLingerValue } from "@/components/ui/Fold";
-import { GearIcon } from "@/components/ui/Icons";
+import { GearIcon, CloseIcon } from "@/components/ui/Icons";
 
 import { FileChips } from "@/components/ui/FileChips";
 
@@ -1198,7 +1198,7 @@ function StepsList({ steps, onChange, kind, rewards = [], onRewards }: { steps: 
             </button>
           )}
           <button type="button" onClick={() => onChange(steps.filter((_, j) => j !== i))} aria-label={`Remove step ${i + 1}`} className="flex h-8 w-8 items-center justify-center rounded-full text-[16px] hover:bg-black/[.05]" style={{ color: "#7a6440" }}>
-            ×
+            <CloseIcon size={10} />
           </button>
         </div>
       ))}
@@ -1647,7 +1647,7 @@ function AttrPills({ card, attrs, shown, onChange, small = false }: { card: Impo
             <DateField value={due ?? ""} onChange={(d) => set({ due: d || null })} ariaLabel="Due date" placeholder="No due date" className="h-8 min-w-0 flex-1 rounded-lg border px-2 text-[15px]" style={fieldStyle} />
             {due && (
               <button type="button" onClick={() => set({ due: null })} aria-label="Clear the due date" title="No due date" className="h-8 w-7 shrink-0 text-[18px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                ×
+                <CloseIcon size={11} />
               </button>
             )}
           </div>

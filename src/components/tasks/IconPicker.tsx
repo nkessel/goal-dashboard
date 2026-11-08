@@ -16,6 +16,7 @@ import type { TaskIconLibraryEntry } from "@/lib/data/types";
 import { useEscape } from "@/lib/use-escape";
 import { useLongPress } from "@/lib/use-long-press";
 import { useFitAboveKeyboard } from "@/lib/use-fit-above-keyboard";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const LIB_KEY = "portrait-library-shown";
 
@@ -356,7 +357,7 @@ export function IconPicker({
                 className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none hover:bg-black/5"
                 style={{ color: "var(--t-ink-soft)" }}
               >
-                ×
+                <CloseIcon size={11} />
               </button>
             </span>
           </div>
@@ -401,7 +402,7 @@ export function IconPicker({
                     className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-[15px] leading-none"
                     style={{ color: "var(--t-ink-soft)" }}
                   >
-                    ×
+                    <CloseIcon size={9} />
                   </button>
                 )}
               </div>
@@ -543,7 +544,7 @@ export function IconPicker({
                         className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold opacity-0 shadow transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100"
                         style={{ background: "#2f2a1f", color: "#fff", border: "1.5px solid var(--t-panel)" }}
                       >
-                        ×
+                        <CloseIcon size={9} />
                       </button>
                       )}
                     </div>

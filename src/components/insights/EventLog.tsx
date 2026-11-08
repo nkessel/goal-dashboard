@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { deleteCheckNoteAction, logEventAction, updateCheckNoteAction } from "@/app/actions";
 import { setSplitOn, splitEvents, splitOn } from "@/lib/event-split";
 import { DateField } from "@/components/ui/DateField";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Note = { id: string; body: string; created_at: string; details?: string | null; tone?: number | null };
 
@@ -181,7 +182,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
               <span key={t} className="flex h-6 items-center gap-0.5 rounded-full pl-2 pr-0.5 text-[13px] font-semibold" style={{ background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10" }}>
                 #{t}
                 <button type="button" onClick={() => setTags((x) => x.filter((y) => y !== t))} aria-label={`Remove #${t}`} className="flex h-5 w-5 items-center justify-center rounded-full text-[13px] leading-none hover:bg-black/10">
-                  ×
+                  <CloseIcon size={9} />
                 </button>
               </span>
             ))}

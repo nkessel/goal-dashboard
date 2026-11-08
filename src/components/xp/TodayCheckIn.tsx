@@ -7,6 +7,7 @@ import { checkInChartAction } from "@/app/actions";
 import { Fold } from "@/components/ui/Fold";
 import { CheckinIcon } from "./CheckinIcon";
 import { FX_DEFAULTS, checkinIconOf, checkinStyleOf, loadFx, type FxSettings } from "@/lib/celebration-fx";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * Today's check-in: a gilded Check in button that opens into the check-in
@@ -35,7 +36,7 @@ export function TodayCheckIn(props: React.ComponentProps<typeof EnergyCheck>) {
           <EnergyCheck {...props} />
           {/* Not now: fold it back into the button. */}
           <button type="button" onClick={() => setOpen(false)} aria-label="Close the check-in" title="Close" className="absolute -top-2 right-0 z-[2] flex h-7 w-7 items-center justify-center rounded-full text-[16px] leading-none" style={{ background: "rgba(20,26,19,.85)", border: "1px solid rgba(217,180,95,.6)", color: "var(--t-gold)" }}>
-            ×
+            <CloseIcon size={10} />
           </button>
         </div>
       </Fold>

@@ -1,6 +1,6 @@
 "use client";
 
-import { SnoozeIcon } from "@/components/ui/Icons";
+import { SnoozeIcon, CloseIcon } from "@/components/ui/Icons";
 import { SwipeActions } from "@/components/ui/SwipeActions";
 import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
 import { WelcomeHabits } from "@/components/xp/WelcomeHabits";
@@ -1696,7 +1696,7 @@ function TopPriority({ question, register, arranging = false, icon, onFilled }: 
               />
               {o && (
                 <button type="button" onClick={() => setOthers((all) => (all.length > 1 ? all.filter((_, j) => j !== i) : [""]))} aria-label="Remove" className="h-9 w-6 shrink-0 text-[16px]" style={{ color: "#6b5631" }}>
-                  ×
+                  <CloseIcon size={10} />
                 </button>
               )}
             </div>
@@ -2031,7 +2031,7 @@ function JournalPromptsEditor({ fx }: { fx: FxSettings }) {
             <span>XP</span>
             {p.id !== "priorities" && (
               <button type="button" onClick={() => save(list.filter((_, j) => j !== i))} aria-label={`Remove ${p.label}`} className="flex h-7 w-7 items-center justify-center text-[16px]" style={{ color: "#6b5631" }}>
-                ×
+                <CloseIcon size={10} />
               </button>
             )}
           </div>

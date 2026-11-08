@@ -8,6 +8,7 @@ import { addToTopOfTodayAction, reorderTasksAction, toggleManualPriorityAction }
 import { dueSoonList } from "@/lib/toucan-guide";
 import { dueWindowLabel, readDueHours, saveDueHours } from "@/lib/due-soon";
 import { DueWindowPicker } from "@/components/tasks/DueWindowPicker";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Lite = { id: string; title: string; due_at: string | null; icon?: string | null; xp?: number; board?: string | null };
 
@@ -251,7 +252,7 @@ function TodayRow({ q, onRemove }: { q: Lite; onRemove: () => void }) {
     >
       <CardBody q={q} meta={q.due_at ? <span>due {dueWord(q.due_at)}</span> : null} />
       <button type="button" onClick={onRemove} onPointerDown={(e) => e.stopPropagation()} aria-label={`Take “${q.title}” off today`} title="Off today" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] leading-none hover:bg-black/[.06]" style={{ color: SOFT }}>
-        ×
+        <CloseIcon size={10} />
       </button>
     </div>
   );

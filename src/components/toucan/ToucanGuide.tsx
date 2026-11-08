@@ -44,7 +44,7 @@ import type { CoachAction, CoachNote, CoachPromise } from "@/lib/coach";
 import { AHEAD_DAYS, catchUpOrder, catchUpPlan, looksLikeCourse, type CourseItem } from "@/lib/catch-up";
 import { SCHEDULER_DEFAULTS, planSchedule, type Busy, type SchedulerSettings } from "@/lib/auto-schedule";
 import { openFocusMode } from "@/lib/focus-timer";
-import { GearIcon } from "@/components/ui/Icons";
+import { GearIcon, CloseIcon } from "@/components/ui/Icons";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import { ToucanArt } from "./ToucanArt";
 import { useEscape } from "@/lib/use-escape";
@@ -928,7 +928,7 @@ function NudgeNote({ text, actions, onClose, instant = false }: { text: string; 
         {/* The bubble's tail points back at his bill. */}
         <span aria-hidden className="absolute -left-[7px] bottom-4 h-3 w-3 rotate-45" style={{ background: "rgba(10,28,32,.98)", borderLeft: "1.5px solid rgba(140,240,220,.55)", borderBottom: "1.5px solid rgba(140,240,220,.55)" }} />
         <button type="button" onClick={() => setQuiet(true)} aria-label="Close what he said" title="Close" className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(232,255,248,.75)" }}>
-          ×
+          <CloseIcon size={11} />
         </button>
         <p className="m-0 text-[14px] leading-snug">{text}</p>
         <NoteReply
@@ -1252,7 +1252,7 @@ function GuideSheet({
                 <span key={n.id} className="flex items-start gap-2 text-[13.5px] leading-snug">
                   <span className="flex-1">{n.text}</span>
                   <button type="button" aria-label="Forget this" title="Forget this" onClick={() => (setNotes((x) => x.filter((y) => y.id !== n.id)), void coachForgetAction(n.id).catch(() => {}))} className="shrink-0 px-1 opacity-70 hover:opacity-100">
-                    ×
+                    <CloseIcon size={10} />
                   </button>
                 </span>
               ))}

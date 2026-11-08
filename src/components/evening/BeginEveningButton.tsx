@@ -4,7 +4,7 @@ import { snoozeEveningPrompt, useEveningPrompt, useIsAfternoon } from "./evening
 import { useState } from "react";
 import { SwipeActions } from "@/components/ui/SwipeActions";
 import { Fold } from "@/components/ui/Fold";
-import { SnoozeIcon } from "@/components/ui/Icons";
+import { SnoozeIcon, CloseIcon } from "@/components/ui/Icons";
 import { useFlipToEvening } from "./DayNightFlip";
 import { useVisualFx, type VisualFx } from "@/lib/visual-fx";
 
@@ -172,7 +172,7 @@ function SnoozableEvening({ className, data, onOpen }: { className: string; data
             </button>
           </span>
           <button type="button" onClick={() => setChoosing(false)} aria-label="Close" className="h-9 w-9 rounded-full text-[18px]" style={{ color: "#f6ecd2" }}>
-            ×
+            <CloseIcon size={11} />
           </button>
         </div>
       </Fold>

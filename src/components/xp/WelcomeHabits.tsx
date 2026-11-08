@@ -10,6 +10,7 @@ import { HABIT_PILLS, openLanguageWindow } from "@/components/xp/LearnLanguage";
 import { Fold } from "@/components/ui/Fold";
 import { Confirm } from "@/components/toucan/SayingFeedback";
 import { patchFx, type FxSettings } from "@/lib/celebration-fx";
+import { CloseIcon } from "@/components/ui/Icons";
 
 export type WelcomeHabit = { id: string; title: string; xp: number; today: boolean; done: boolean };
 
@@ -53,7 +54,7 @@ function AddHabit({ onAdded, height = 36 }: { onAdded: (id: string) => void; hei
         {busy ? "Adding…" : "Add ✦"}
       </button>
       <button type="button" onClick={() => (setOpen(false), setName(""))} aria-label="Never mind" className="h-9 w-7 shrink-0 text-[18px] leading-none" style={{ color: SOFT }}>
-        ×
+        <CloseIcon size={11} />
       </button>
       {err && <span className="w-full text-[12px]" style={{ color: "#a33" }}>{err}</span>}
     </form>

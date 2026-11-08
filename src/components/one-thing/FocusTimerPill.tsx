@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FOCUS_POP_OUT, closeFocusMode, focusPipApi, openFocusMode, resetFocusTimer, spentSeconds, toggleFocusTimer, useFocusTimer } from "@/lib/focus-timer";
 import { FocusMode } from "./OneThing";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const POS_KEY = "focus-pill-pos";
 
@@ -128,7 +129,7 @@ export function FocusTimerPill({ theme }: { theme: "calm" | "adventure" }) {
         {running ? "Pause" : "Resume"}
       </button>
       <button type="button" onClick={resetFocusTimer} aria-label="Stop the timer" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none" style={{ color: "rgba(241,234,210,.75)" }}>
-        ×
+        <CloseIcon size={11} />
       </button>
     </div>
   );

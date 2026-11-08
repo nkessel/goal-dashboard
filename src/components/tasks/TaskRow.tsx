@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { useOfflineQuest, saveOrQueue } from "@/lib/offline";
-import { completeTaskAction, deleteTaskAction, archiveTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, snoozeQuestUntilAction, undoSnoozeUntilAction, setNextStepAction } from "@/app/actions";
+import { completeTaskAction, deleteTaskAction, archiveTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, snoozeQuestUntilAction, undoSnoozeUntilAction, setNextStepAction, moveTaskToBoardAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
 import { earlyBirdBonus, earlyBirdCoins, roomToFinishEarly } from "@/lib/next-action";
@@ -277,6 +277,30 @@ export function TaskRow({
     });
   }
 
+  /** Move › a quest board: off Today, filed under that board. */
+  function moveToBoard(boardId: string, label: string) {
+    setMenu(null);
+    setError(null);
+    startTransition(async () => {
+      if (listMoves) {
+        await slideOut(liRef.current);
+        listMoves.move(null);
+      }
+      try {
+        await moveTaskToBoardAction(task.id, boardId);
+        await setTaskPlacementAction(task.id, "none");
+        const prev = task.board_id ?? null;
+        listMoves?.notify?.({ text: `Moved to ${label}: ${task.title}`, undo: async () => (await moveTaskToBoardAction(task.id, prev), await setTaskPlacementAction(task.id, "today")) });
+        if (!listMoves) router.refresh();
+      } catch (e) {
+        if (listMoves) {
+          resetSlide(liRef.current);
+          listMoves.revert(e instanceof Error ? e.message : "Couldn't move that quest — try again.");
+        } else setError(e instanceof Error ? e.message : "Couldn't move that quest.");
+      }
+    });
+  }
+
   function pick(action: QuestAction, fromMenu = true) {
     setMenu(null);
     setError(null);
@@ -385,6 +409,7 @@ export function TaskRow({
       align={align}
       anchor={menuAnchor}
       onPick={pick}
+      onMoveToBoard={task.is_manual_priority ? moveToBoard : undefined}
       onClose={() => setMenu(null)}
     />
   );

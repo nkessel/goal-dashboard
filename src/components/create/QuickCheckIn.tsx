@@ -4,6 +4,7 @@ import { snapTo, useSliderStep } from "@/lib/use-slider-step";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getCheckMetricsAction, quickCheckInAction } from "@/app/actions";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 const TAG = /(^|\s)#([\p{L}\p{N}_-]{1,24})(?=\s|$)/gu;
@@ -138,7 +139,7 @@ export function QuickCheckIn({ isAdventure, onDone }: { isAdventure: boolean; on
           <span key={t} className="flex h-6 items-center gap-0.5 rounded-full pl-2 pr-0.5 text-[13px] font-semibold" style={{ background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10" }}>
             #{t}
             <button type="button" onClick={() => setTags((x) => x.filter((y) => y !== t))} aria-label={`Remove #${t}`} className="flex h-5 w-5 items-center justify-center rounded-full text-[13px] leading-none hover:bg-black/10">
-              ×
+              <CloseIcon size={9} />
             </button>
           </span>
         ))}

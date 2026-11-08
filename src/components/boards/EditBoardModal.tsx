@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import type { Board } from "@/lib/data/types";
 import { setBoardDreamAction, setBoardPrivateAction, setBoardSharedAction, updateBoardAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const COLORS = [null, "#fde8d0", "#dcefe0", "#e0e7fb", "#fbe0e6", "#fff4c2"];
 
@@ -72,7 +73,7 @@ export function EditBoardModal({
             Edit {isAdventure ? "campaign" : "board"}
           </h3>
           <button type="button" onClick={onClose} aria-label="Close" className="text-lg leading-none" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={11} />
           </button>
         </div>
 

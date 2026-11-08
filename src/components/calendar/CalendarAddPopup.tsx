@@ -7,6 +7,7 @@ import { listSchedulableTasksAction, scheduleTaskAction } from "@/app/actions";
 import { formatTimeRange } from "@/lib/calendar-dates";
 import { useEscape } from "@/lib/use-escape";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * Opened by dragging (or tapping) a time range on the Day/Week calendar —
@@ -118,7 +119,7 @@ export function CalendarAddPopup({
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="text-lg leading-none" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={11} />
           </button>
         </div>
 

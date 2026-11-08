@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { cleanToucan, type ToucanState } from "@/lib/toucan";
 import { fromFeedback } from "@/lib/from-feedback";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /** What it says while you carry it, and when you set it down. */
 // Only the toucan spirit speaks; the owl keeps its silence.
@@ -836,7 +837,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
                 className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full not-italic leading-none"
                 style={{ color: spirit ? "rgba(232,255,248,.75)" : "#6b5631", fontSize: 16 }}
               >
-                ×
+                <CloseIcon size={10} />
               </button>
             )}
             {say}

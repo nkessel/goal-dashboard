@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 import { useLinger } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 export type BoardOption = { id: string; label: string };
 
@@ -125,7 +126,7 @@ export function BoardPicker({
               <div className="relative z-[1] flex items-center gap-2 px-4 pb-2 pt-3.5">
                 <h3 className={`flex-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>Choose a board</h3>
                 <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                  ×
+                  <CloseIcon size={14} />
                 </button>
               </div>
               {(options?.length ?? 0) > 7 && (

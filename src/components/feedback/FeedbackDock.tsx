@@ -7,6 +7,7 @@ import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 import { noteSaved, subscribeUploads, uploadFor, uploadsNow, uploadsServer } from "@/lib/feedback-uploads";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /** Ask the dock to start (or bring back) feedback from anywhere, e.g. the + sheet. */
 export const OPEN_FEEDBACK_EVENT = "open-feedback";
@@ -809,7 +810,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
         className="pointer-events-auto absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-[18px] leading-none hover:bg-black/10"
         style={{ color: dark ? "#e8fff8" : isAdventure ? "#6b5631" : "var(--t-ink-soft)" }}
       >
-        ×
+        <CloseIcon size={11} />
       </button>
     );
   const where = kind === "future" ? "Saved in your future ideas" : kind === "refill" ? "Saved for when credits refill" : "It goes into the next update";
@@ -868,7 +869,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
             {xpTag}
             {onClose && (
               <button type="button" onClick={onClose} aria-label="Close" className="pointer-events-auto absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-[17px] leading-none hover:bg-white/10" style={{ color: "#e8fff8" }}>
-                ×
+                <CloseIcon size={10} />
               </button>
             )}
           </span>
@@ -1198,7 +1199,7 @@ function Composer({
               <img src={a.url} alt="" className="h-full w-full object-cover" />
             </button>
             <button type="button" onClick={a.remove} aria-label={`Remove ${a.label.toLowerCase()}`} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[13px] leading-none" style={{ background: "rgba(40,28,12,.85)", color: "#f6ecd2" }}>
-              ×
+              <CloseIcon size={9} />
             </button>
           </span>
         ))}
@@ -1268,7 +1269,7 @@ function Composer({
             {/* eslint-disable-next-line @next/next/no-img-element -- attachment, full size */}
             <img src={viewing} alt="Attachment, full size" className="max-h-full max-w-full rounded-lg object-contain" style={{ boxShadow: "0 12px 40px rgba(0,0,0,.6)" }} />
             <button type="button" onClick={() => setViewing(null)} aria-label="Close" className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-[22px]" style={{ background: "rgba(255,255,255,.15)", color: "#fff" }}>
-              ×
+              <CloseIcon size={13} />
             </button>
           </div>,
           document.body
@@ -1389,7 +1390,7 @@ export function UploadBar() {
           </button>
         )}
         <button type="button" onClick={() => setHiddenFor(key)} aria-label="Hide (it keeps sending)" title="Hide (it keeps sending)" className="flex h-6 w-6 items-center justify-center rounded-full text-[16px] leading-none" style={{ color: "rgba(241,234,210,.75)" }}>
-          ×
+          <CloseIcon size={10} />
         </button>
       </div>
       {!failed.length && (

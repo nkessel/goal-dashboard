@@ -12,6 +12,7 @@ import { SchedulingDrawer } from "@/components/calendar/SchedulingList";
 import type { Task } from "@/lib/data/types";
 import { FocusFollowUp, FocusPlanner, type Focus } from "./FocusPlanner";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Kind = "week" | "month";
 type Seed = { id: string; text: string; fate: SeedFate | null; made?: string | null };
@@ -400,7 +401,7 @@ export function PlanRitual(props: {
                           {r?.title ?? "A quest"}
                         </span>
                         <button type="button" onClick={() => set({ rocks: d.rocks.filter((x) => x !== id) })} aria-label="Remove" className="h-8 w-8 rounded-full text-[18px]" style={{ color: SOFT }}>
-                          ×
+                          <CloseIcon size={11} />
                         </button>
                       </li>
                     );
@@ -581,7 +582,7 @@ function MindSweep({ seeds, onChange, cls, style }: { seeds: Seed[]; onChange: (
               <span className="truncate">{s.text}</span>
               {!s.made && (
                 <button type="button" onClick={() => onChange(seeds.filter((x) => x.id !== s.id))} aria-label={`Remove “${s.text}”`} className="flex h-6 w-6 items-center justify-center rounded-full text-[15px] leading-none hover:bg-black/10" style={{ color: SOFT }}>
-                  ×
+                  <CloseIcon size={9} />
                 </button>
               )}
             </li>

@@ -10,7 +10,7 @@ import { addCheckNoteAction, addJournalEntryAction, addToTopOfTodayAction, delet
 import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft, MoonIcon, SunIcon, TimeToken } from "./NightFields";
 import { DateField } from "@/components/ui/DateField";
 import { shiftDay } from "@/lib/wheel-of-time";
-import { BoltIcon } from "@/components/ui/Icons";
+import { BoltIcon, CloseIcon } from "@/components/ui/Icons";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
 import { eveningDayKey } from "@/components/evening/evening-clock";
@@ -397,7 +397,7 @@ export function EnergyCheck({
             )}
           </span>
           <button type="button" onClick={() => dropNote(n.id)} aria-label={`Remove “${n.body}”`} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[15px] leading-none hover:bg-white/10" style={{ color: "var(--ec-soft, rgba(239,230,204,.7))" }}>
-            ×
+            <CloseIcon size={9} />
           </button>
         </li>
       ))}
@@ -432,7 +432,7 @@ export function EnergyCheck({
           <span key={t} className="flex h-6 items-center gap-0.5 rounded-full pl-2 pr-0.5 text-[13px] font-semibold" style={{ background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10" }}>
             #{t}
             <button type="button" onClick={() => setPendingTags((x) => x.filter((y) => y !== t))} aria-label={`Remove #${t}`} className="flex h-5 w-5 items-center justify-center rounded-full text-[13px] leading-none hover:bg-black/10">
-              ×
+              <CloseIcon size={9} />
             </button>
           </span>
         ))}
@@ -456,7 +456,7 @@ export function EnergyCheck({
         Add
       </button>
       <button type="button" onClick={() => setNoting(false)} aria-label="Cancel" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
-        ×
+        <CloseIcon size={11} />
       </button>
     </div>
   ) : null;
@@ -730,7 +730,7 @@ export function EnergyCheck({
                         Add
                       </button>
                       <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
-                        ×
+                        <CloseIcon size={11} />
                       </button>
                     </div>
                     {ideas.length > 0 && (
@@ -758,7 +758,7 @@ export function EnergyCheck({
                         <TimeToken value={n.bed} onChange={(v) => setNight2(i, { bed: v })} label="Sleep time" icon={<MoonIcon />} kind="bed" compact />
                         <TimeToken value={n.wake} onChange={(v) => setNight2(i, { wake: v })} label="Wake time" icon={<SunIcon />} kind="wake" compact />
                         <button type="button" onClick={() => setOtherNights((o) => o.filter((x) => x.id !== n.id))} aria-label="Remove this night" className="ml-auto flex h-8 w-8 items-center justify-center text-[18px] leading-none" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
-                          ×
+                          <CloseIcon size={11} />
                         </button>
                       </div>
                     ))}
@@ -981,7 +981,7 @@ function TakeoffSheet({ onClose: closeNow, onHide }: { onClose: () => void; onHi
             +
           </button>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={14} />
           </button>
         </div>
         {naming && (

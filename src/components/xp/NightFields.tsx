@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import type { Hindrance } from "@/lib/wheel-of-time";
 import { Fold, useLingerValue } from "@/components/ui/Fold";
 import { TimeRuler } from "./TimeRuler";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /** `today`: the factors picked are today's (for tonight's sleep), not yesterday's (owner, Nov 3: a one-tap switch). */
 export type NightDraft = { bed: string; wake: string; effort: string[]; hindrances: Hindrance[]; today?: boolean };
@@ -388,7 +389,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day,
                   <span key={name} className="factor-chip reveal">
                     {name}
                     <button type="button" onClick={() => onLists?.({ effort: effort.filter((x) => x !== name), hindrances })} aria-label={`Remove ${name}`} className="ml-0.5 text-[14px] leading-none opacity-70 hover:opacity-100">
-                      ×
+                      <CloseIcon size={9} />
                     </button>
                   </span>
                 ) : (
@@ -425,7 +426,7 @@ export function NightFields({ value, onChange, effort, hindrances, onLists, day,
                   <span key={name} className="factor-chip factor-warn reveal">
                     {name}
                     <button type="button" onClick={() => onLists?.({ effort, hindrances: hindrances.filter((x) => x !== name) })} aria-label={`Remove ${name}`} className="ml-0.5 text-[14px] leading-none opacity-70 hover:opacity-100">
-                      ×
+                      <CloseIcon size={9} />
                     </button>
                   </span>
                 ) : (

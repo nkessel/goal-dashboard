@@ -9,7 +9,7 @@ import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { RewardEditorDialog } from "@/components/rewards/RewardEditorDialog";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
 import { Moon } from "@/components/evening/BeginEveningButton";
-import { BoltIcon, DiamondIcon } from "@/components/ui/Icons";
+import { BoltIcon, DiamondIcon, CloseIcon } from "@/components/ui/Icons";
 import { QuestShield } from "@/components/ui/Ornaments";
 import { useEscape } from "@/lib/use-escape";
 import { QuickCheckIn } from "./QuickCheckIn";
@@ -264,7 +264,7 @@ export function CreateSheet({
               </div>
             )}
             <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[22px] leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
-              ×
+              <CloseIcon size={13} />
             </button>
           </div>
         )}

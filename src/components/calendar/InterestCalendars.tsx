@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { findFeedAction, saveInterestCalendarsAction } from "@/app/actions";
 import { cleanUrl, looksLikeFeed, INTEREST_COLORS, type InterestCalendar } from "@/lib/interest-calendars";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * Calendars of interest (owner, Nov 4), beside the Google calendars: ones with a feed the app reads
@@ -79,7 +80,7 @@ export function InterestCalendars({ initial, isAdventure }: { initial: InterestC
             </span>
           </button>
           <button type="button" onClick={() => save(list.filter((x) => x.id !== c.id))} aria-label={`Remove ${c.name}`} title="Remove" className={small} style={{ color: soft }}>
-            ×
+            <CloseIcon size={10} />
           </button>
         </div>
       ))}
@@ -98,7 +99,7 @@ export function InterestCalendars({ initial, isAdventure }: { initial: InterestC
             {looking === c.id ? "Looking…" : "Look for a feed"}
           </button>
           <button type="button" onClick={() => save(list.filter((x) => x.id !== c.id))} aria-label={`Remove ${c.name}`} title="Remove" className={small} style={{ color: soft }}>
-            ×
+            <CloseIcon size={10} />
           </button>
         </div>
       ))}

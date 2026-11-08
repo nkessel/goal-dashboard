@@ -11,6 +11,7 @@ import { IconScale } from "@/components/tasks/QuestEditorDialog";
 import { BoardSeal } from "@/components/boards/BoardSeal";
 import { useEscape } from "@/lib/use-escape";
 import { useClosing } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * A board as one item on the Priority Matrix (e.g. a course instead of each
@@ -95,7 +96,7 @@ export function BoardMatrixDialog({
             Board on the matrix
           </h3>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={14} />
           </button>
         </div>
 

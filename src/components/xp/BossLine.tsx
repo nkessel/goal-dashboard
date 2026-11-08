@@ -9,6 +9,7 @@ import { celebrateProgress, celebrateQuest } from "@/components/celebration/Ques
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { useEscape } from "@/lib/use-escape";
 import { talkToToucan } from "@/components/toucan/ToucanGuide";
+import { CloseIcon } from "@/components/ui/Icons";
 
 export type BossView = { id: string; level: number; title: string; target: number; progress: number };
 
@@ -118,7 +119,7 @@ function FinalBossPortal({ boss, level, onEnter, onClose }: { boss: BossView | n
         <span aria-hidden className="fbp-swirl absolute left-1/2 top-1/2 h-[150%] w-[150%] -translate-x-1/2 -translate-y-1/2 rounded-full" />
         <span aria-hidden className="fbp-core absolute left-1/2 top-1/2 h-[70%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-[50%]" />
         <button type="button" onClick={onClose} aria-label="Not yet" className="absolute right-3 top-3 z-[2] flex h-9 w-9 items-center justify-center rounded-full text-[20px] leading-none hover:bg-white/10" style={{ color: "#e9dcff" }}>
-          ×
+          <CloseIcon size={12} />
         </button>
         <div className="relative z-[1] flex flex-col items-center gap-1.5">
           <span className="text-[11px] font-bold uppercase tracking-[.28em]" style={{ color: "#f2d27e" }}>
@@ -233,7 +234,7 @@ function BossDialog({ boss, level, onClose }: { boss: BossView | null; level: nu
         {/* The royal banner across the top. */}
         <div className="final-boss-banner relative z-[1] flex flex-col items-center gap-0.5 px-5 pb-4 pt-4 text-center">
           <button type="button" onClick={onClose} aria-label="Leave the Final Boss level" className="absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-full text-2xl leading-none hover:bg-white/10" style={{ color: "#e9dcff" }}>
-            ×
+            <CloseIcon size={14} />
           </button>
           <span className="text-[11px] font-bold uppercase tracking-[.26em]" style={{ color: "#f2d27e" }}>
             Level {level} · The Final Boss
@@ -454,7 +455,7 @@ function BossSessions({ boss, progress, onStep, busy, onDone }: { boss: BossView
                   className="h-8 w-7 text-[18px] leading-none"
                   style={{ color: "var(--t-ink-soft)" }}
                 >
-                  ×
+                  <CloseIcon size={11} />
                 </button>
               </div>
             );

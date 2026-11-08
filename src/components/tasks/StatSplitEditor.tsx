@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getStatsAction, setStatsAction } from "@/app/actions";
 import { DEFAULT_STATS, cleanStatName, setShare, statAbbr, type StatSplit } from "@/lib/stats";
 import { Fold } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * "Stats" under a quest's XP reward: slide a share of the XP to each
@@ -148,7 +149,7 @@ export function StatSplitEditor({
                   Add
                 </button>
                 <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="flex h-9 w-7 items-center justify-center text-[17px]" style={{ color: soft }}>
-                  ×
+                  <CloseIcon size={10} />
                 </button>
               </span>
             ) : (

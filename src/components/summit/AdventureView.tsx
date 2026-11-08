@@ -12,6 +12,7 @@ import type { TaskWithCategory } from "@/lib/data/tasks";
 import { useEscape } from "@/lib/use-escape";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { MountainClouds, MountainScene, SCENE_H, SCENE_W, SUMMIT } from "./MountainScene";
+import { CloseIcon } from "@/components/ui/Icons";
 
 
 /** A small wanderer with a cloak, a staff and a lantern. */
@@ -735,7 +736,7 @@ export function AdventureView({
                   className="absolute -right-2 -top-2 z-[5] flex h-7 w-7 items-center justify-center rounded-full text-[16px] leading-none"
                   style={{ background: "rgba(42,28,16,.88)", color: "#f2d27e", border: "1.5px solid rgba(242,210,126,.7)" }}
                 >
-                  ×
+                  <CloseIcon size={10} />
                 </button>
                 {card ? (
                   <ul className="m-0 list-none p-0">
@@ -802,7 +803,7 @@ export function AdventureView({
           <div className="mb-2 flex items-center justify-between">
             <span className="font-display text-[16px]">A new stop here</span>
             <button type="button" onClick={() => setAdding(null)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none hover:bg-black/[.06]">
-              ×
+              <CloseIcon size={12} />
             </button>
           </div>
           <div className="flex gap-1.5">
@@ -859,7 +860,7 @@ export function AdventureView({
                 className="absolute -top-11 right-0 flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none"
                 style={{ background: "rgba(20,14,30,.7)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.5)" }}
               >
-                ×
+                <CloseIcon size={13} />
               </button>
               {cards[open.id] ? (
                 <ul className="m-0 list-none p-0">

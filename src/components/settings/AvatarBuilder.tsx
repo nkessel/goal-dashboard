@@ -12,6 +12,7 @@ import {
 import { SAMPLE_AVATAR_PROMPTS, AVATAR_STYLE_OPTIONS, DEFAULT_AVATAR_STYLE } from "@/lib/avatar-prompts";
 import type { AvatarLibraryEntry } from "@/lib/data/types";
 import { useLingerValue } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * Avatar editor: generate an AI portrait (background on/off, an optional
@@ -340,7 +341,7 @@ export function AvatarBuilder({
                   className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold opacity-0 shadow transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
                   style={{ background: isAdventure ? "#2f2a1f" : "var(--t-ink)", color: "#fff", border: "1.5px solid var(--t-panel)" }}
                 >
-                  ×
+                  <CloseIcon size={9} />
                 </button>
               </div>
             ))}

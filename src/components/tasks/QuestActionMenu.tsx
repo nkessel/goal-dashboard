@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 import { GearIcon } from "@/components/ui/Icons";
+import { listBoardOptionsAction } from "@/app/actions";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -27,8 +28,11 @@ export function QuestActionMenu({
   align,
   anchor,
   onPick,
+  onMoveToBoard,
   onClose,
 }: {
+  /** "Move" › To a quest board: takes it off Today and files it under that board. */
+  onMoveToBoard?: (boardId: string, label: string) => void;
   /** Offer "Snooze until tomorrow" (quests on the Today screen). */
   canSnooze?: boolean;
   /** On a board: offer making it that project's next step. */
@@ -54,6 +58,8 @@ export function QuestActionMenu({
   const [confirmDelete, setConfirmDelete] = useState(false);
   // The menu's own gear arranges it in place: drag items, hide them with the eye on the right.
   const [arranging, setArranging] = useState(false);
+  // "Move" opens its two places right here (owner, Nov 4: one Move button instead of "Remove from Today's Quests").
+  const [moving, setMoving] = useState<null | "where" | "board">(null);
   // Order and hidden items, as chosen in Settings.
   const layout = useSyncExternalStore(subscribeMenuLayout, readMenuLayout, serverMenuLayout);
 
@@ -77,9 +83,9 @@ export function QuestActionMenu({
       window.removeEventListener("scroll", place, true);
       window.removeEventListener("resize", place);
     };
-  }, [anchor, align, confirmDelete, arranging]);
+  }, [anchor, align, confirmDelete, arranging, moving]);
 
-  useEscape(() => (arranging ? setArranging(false) : onClose()));
+  useEscape(() => (arranging ? setArranging(false) : moving ? setMoving(moving === "board" ? "where" : null) : onClose()));
 
   useEffect(() => {
     function onDown(e: PointerEvent) {
@@ -104,14 +110,8 @@ export function QuestActionMenu({
     { key: "focus", icon: <Glyph d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 3.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />, label: "Focus mode" },
     {
       key: "battle",
-      icon: inBattle ? <Glyph d="M6 6l12 12M18 6L6 18" /> : <Glyph d="M5 19l9-9M14 5l5 0 0 5-9 9-5 0 0-5zM15 15l4 4" />,
-      label: isAdventure
-        ? inBattle
-          ? "Remove from Today's Quests"
-          : "Add to Today's Quests"
-        : inBattle
-          ? "Remove from Today's Focus"
-          : "Add to Today's Focus",
+      icon: inBattle ? <Glyph d="M4 12h13M13 7l5 5-5 5M4 5v14" /> : <Glyph d="M5 19l9-9M14 5l5 0 0 5-9 9-5 0 0-5zM15 15l4 4" />,
+      label: inBattle ? "Move…" : isAdventure ? "Add to Today's Quests" : "Add to Today's Focus",
     },
     ...(canSnooze ? [{ key: "snooze" as const, icon: <SnoozeGlyph />, label: "Snooze…" }] : []),
     // In Additional Quests, taking it out of that list takes it off the Today screen.
@@ -148,7 +148,16 @@ export function QuestActionMenu({
         color: "var(--t-ink)",
       }}
     >
-      {confirmDelete ? (
+      {moving ? (
+        <MoveRows
+          step={moving}
+          isAdventure={isAdventure}
+          onBack={() => setMoving(moving === "board" ? "where" : null)}
+          onAdditional={() => onPick("battle")}
+          onBoards={onMoveToBoard ? () => setMoving("board") : undefined}
+          onBoard={(id, label) => onMoveToBoard?.(id, label)}
+        />
+      ) : confirmDelete ? (
         <div className="flex flex-col gap-2 p-3 text-sm">
           <p className="font-semibold">{isAdventure ? "Archive this quest, or delete it for good?" : "Archive this task, or delete it for good?"}</p>
           <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -198,7 +207,7 @@ export function QuestActionMenu({
             key={it.key}
             type="button"
             role="menuitem"
-            onClick={() => (it.key === "delete" ? setConfirmDelete(true) : onPick(it.key))}
+            onClick={() => (it.key === "delete" ? setConfirmDelete(true) : it.key === "battle" && inBattle ? setMoving("where") : onPick(it.key))}
             className={`flex min-h-11 items-center gap-3 px-3.5 text-left text-[15px] hover:bg-black/5 ${it.key === "delete" ? "border-t" : ""}`}
             style={{
               color: it.key === "delete" ? "var(--t-warn)" : undefined,
@@ -222,6 +231,73 @@ export function QuestActionMenu({
       )}
     </div>,
     document.body
+  );
+}
+
+/** Move: to Additional Quests, or to a quest board (found by typing), in the menu itself. */
+function MoveRows({ step, isAdventure, onBack, onAdditional, onBoards, onBoard }: { step: "where" | "board"; isAdventure: boolean; onBack: () => void; onAdditional: () => void; onBoards?: () => void; onBoard: (id: string, label: string) => void }) {
+  const [boards, setBoards] = useState<{ id: string; label: string }[] | null>(null);
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    if (step !== "board" || boards) return;
+    let live = true;
+    listBoardOptionsAction().then((b) => live && setBoards(b), () => live && setBoards([]));
+    return () => {
+      live = false;
+    };
+  }, [step, boards]);
+  const row = "flex min-h-11 items-center gap-3 px-3.5 text-left text-[15px] hover:bg-black/5";
+  const words = q.trim().toLowerCase();
+  const shown = (boards ?? []).filter((b) => !words || b.label.toLowerCase().includes(words)).slice(0, 8);
+  return (
+    <div key={step} className="reveal flex flex-col">
+      <div className="flex items-center gap-1 px-1.5 pb-0.5 pt-1">
+        <button type="button" onClick={onBack} aria-label="Back" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+          ‹
+        </button>
+        <span className="font-display text-[15px]">{step === "where" ? "Move to…" : "Which board?"}</span>
+      </div>
+      {step === "where" ? (
+        <>
+          <button type="button" role="menuitem" onClick={onAdditional} className={row}>
+            <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
+              <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />
+            </span>
+            {isAdventure ? "Additional Quests" : "More tasks"}
+          </button>
+          {onBoards && (
+            <button type="button" role="menuitem" onClick={onBoards} className={row}>
+              <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
+                <Glyph d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z" />
+              </span>
+              A quest board…
+            </button>
+          )}
+        </>
+      ) : (
+        <>
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && shown[0] && onBoard(shown[0].id, shown[0].label)}
+            placeholder="Find a board"
+            aria-label="Find a board"
+            className="bare-input mx-3.5 mb-1 h-9 border-b bg-transparent text-[16px] outline-none"
+            style={{ borderColor: "rgba(168,138,63,.6)" }}
+          />
+          {!boards && <span className="px-3.5 py-2 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>Finding your boards…</span>}
+          {boards && !shown.length && <span className="px-3.5 py-2 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>No board by that name.</span>}
+          <div className="flex max-h-[260px] flex-col overflow-y-auto">
+            {shown.map((b) => (
+              <button key={b.id} type="button" role="menuitem" onClick={() => onBoard(b.id, b.label)} className="flex min-h-10 items-center px-3.5 text-left text-[14.5px] hover:bg-black/5">
+                <span className="truncate">{b.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

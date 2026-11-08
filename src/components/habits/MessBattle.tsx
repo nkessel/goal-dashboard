@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { fightMessAction } from "@/app/actions";
 import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 import { MESS_XP_DAY_CAP, battleXp, battleXpToday, styleOf, tenWords, type Cleaning, type Space } from "@/lib/cleaning";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const MINUTES = [10, 20, 30, 60];
 
@@ -58,7 +59,7 @@ export function MessBattle({ c, space, day, startBefore, onLogged, onClose }: { 
           ⚔ Fight back the mess · {space.icon} {space.name}
         </span>
         <button type="button" onClick={onClose} aria-label="Close" className="ml-auto flex h-7 w-7 items-center justify-center rounded-full text-[17px]" style={{ color: "var(--t-ink-soft)" }}>
-          ×
+          <CloseIcon size={10} />
         </button>
       </div>
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * Your reflection questions: edit one in place, × removes it, drag a row to
@@ -88,7 +89,7 @@ function Row({ id, value, onSave, onRemove }: { id: string; value: string; onSav
         style={{ color: "var(--t-ink)" }}
       />
       <button type="button" onClick={onRemove} onPointerDown={(e) => e.stopPropagation()} aria-label="Remove this question" title="Remove" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[15px] hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
-        ×
+        <CloseIcon size={9} />
       </button>
     </div>
   );

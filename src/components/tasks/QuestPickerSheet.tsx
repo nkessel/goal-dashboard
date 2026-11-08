@@ -6,6 +6,7 @@ import { toggleManualPriorityAction } from "@/app/actions";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { QuestEditorDialog } from "./QuestEditorDialog";
 import { QuestMonogram } from "./QuestMonogram";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 type Step = "choose" | "create";
@@ -107,7 +108,7 @@ function Header({
         className="flex h-9 w-9 items-center justify-center text-2xl leading-none"
         style={{ color: "var(--t-ink-soft)" }}
       >
-        ×
+        <CloseIcon size={14} />
       </button>
     </div>
   );

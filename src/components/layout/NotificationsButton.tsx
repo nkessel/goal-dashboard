@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { CloseSettingsButton } from "@/components/settings/CloseSettingsButton";
 import { markNotificationReadAction, recentNotificationsAction } from "@/app/actions";
 import { useEscape } from "@/lib/use-escape";
+import { CloseIcon } from "@/components/ui/Icons";
 
 const ICONS: Record<string, string> = {
   friend_request: "🤝",
@@ -112,7 +113,7 @@ function BellPreview({ anchor: r, isAdventure, onClose }: { anchor: DOMRect; isA
         <div className="relative z-[1] flex items-center justify-between px-4 pb-1.5 pt-3">
           <span className={isAdventure ? "font-display text-[19px]" : "text-[15px] font-bold"}>Notifications</span>
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-[22px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-            ×
+            <CloseIcon size={13} />
           </button>
         </div>
         <ul className="relative z-[1] m-0 flex min-h-0 list-none flex-col overflow-y-auto p-0">

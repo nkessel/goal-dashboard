@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEscape } from "@/lib/use-escape";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /**
  * A page shown as a centered popup over a dimmed screen (an intercepted
@@ -53,7 +54,7 @@ export function RouteModal({ theme, title, children }: { theme: "calm" | "advent
             <div className="flex items-center gap-1">
               <div data-modal-tools className="flex items-center gap-1 empty:hidden" />
               <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                ×
+                <CloseIcon size={14} />
               </button>
             </div>
           </div>

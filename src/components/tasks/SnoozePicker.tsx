@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 import { useClosing } from "@/components/ui/Fold";
+import { CloseIcon } from "@/components/ui/Icons";
 
 /** How long to snooze: a time it comes back (`until`), or "tomorrow" (to the top of tomorrow's plan). */
 export type SnoozeChoice = { tomorrow: true } | { until: Date; label: string };
@@ -14,7 +15,7 @@ const clock = () => Date.now();
 const SOFT = "#6b5631";
 
 /**
- * Snooze a quest: 30 minutes, 2 hours, tomorrow, or Other… (this evening,
+ * Snooze a quest: 1 hour, tomorrow, or Other… (30 minutes, 2 hours, 2 days, this evening,
  * 4 hours, a number of days, or a time you pick). Other always has a way back; closing changes
  * nothing.
  */
@@ -63,7 +64,7 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
         onClick={(e) => e.stopPropagation()}
       >
         <button type="button" onClick={onClose} aria-label="Close" className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none" style={{ color: SOFT }}>
-          ×
+          <CloseIcon size={12} />
         </button>
         <div className="flex items-center gap-1.5 pr-8">
           {other && (
@@ -80,15 +81,16 @@ export function SnoozePicker({ title, onPick, onClose: closeNow, tomorrowHint = 
         )}
         {!other ? (
           <div key="main" className="reveal flex flex-col gap-1">
-            {/* Tomorrow, 2 days, Other (owner, Nov 3); the short snoozes wait under Other. */}
+            {/* 1 hour, one day, Other (owner, Nov 4: "Snooze button: 1 hr, one day, Other"); the rest wait under Other. */}
+            {choice("1 hour", () => onPick(inMin(60, "for an hour")), hm(new Date(clock() + 60 * 60_000)))}
             {choice("Tomorrow", () => onPick({ tomorrow: true }), small ? undefined : tomorrowHint)}
-            {choice("2 days", () => onPick({ until: daysOn(2), label: "for 2 days" }), daysOn(2).toLocaleDateString(undefined, { weekday: "short" }))}
             {choice("Other…", () => setOther(true))}
           </div>
         ) : (
           <div key="other" className="reveal flex flex-col gap-1">
             {choice("30 minutes", () => onPick(inMin(30, "for 30 minutes")), hm(new Date(clock() + 30 * 60_000)))}
             {choice("2 hours", () => onPick(inMin(120, "for 2 hours")), hm(new Date(clock() + 120 * 60_000)))}
+            {choice("2 days", () => onPick({ until: daysOn(2), label: "for 2 days" }), daysOn(2).toLocaleDateString(undefined, { weekday: "short" }))}
             {evening().getTime() - clock() > 30 * 60_000 && choice("This evening", () => onPick({ until: evening(), label: "until this evening" }), hm(evening()))}
             {choice("4 hours", () => onPick(inMin(240, "for 4 hours")), hm(new Date(clock() + 240 * 60_000)))}
             <div className="mt-1 flex flex-col gap-1 text-[12.5px] font-semibold" style={{ color: SOFT }}>

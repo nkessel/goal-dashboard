@@ -43,6 +43,7 @@ import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE } from "@/lib/schedule-carry";
 import { fromFeedback } from "@/lib/from-feedback";
 import { FloatingWindow } from "@/components/ui/FloatingWindow";
+import { CloseIcon } from "@/components/ui/Icons";
 
 type Folder = { name: string; open: boolean };
 
@@ -638,7 +639,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
             </svg>
           </button>
           <button type="button" onClick={() => toggle(false)} aria-label="Close the auto-scheduler" title="Close" className="flex h-8 w-8 items-center justify-center rounded-full text-[20px] leading-none hover:bg-black/[.06]" style={{ color: soft }}>
-            ×
+            <CloseIcon size={12} />
           </button>
         </div>
         {/* Its tools, quietly on one line. */}
@@ -654,7 +655,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
         </div>
       </div>
 
-      <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2.5 pb-20 lg:pb-8">
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2.5 pb-32 lg:pb-8">
         {error && (
           <p className="m-0 px-1 text-[13px]" style={{ color: "var(--t-warn)" }}>
             {error}

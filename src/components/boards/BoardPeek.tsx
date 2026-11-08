@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useEscape } from "@/lib/use-escape";
 import { setFabTarget } from "@/lib/fab-target";
+import { CloseIcon } from "@/components/ui/Icons";
 
 // Which boards this peek has walked through (so × can step all the way back
 // out) and how deep the last one was (so moving down zooms in, up zooms out).
@@ -146,7 +147,7 @@ export function BoardPeek({
             className="hover-glow flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[26px] leading-none"
             style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)" }}
           >
-            ×
+            <CloseIcon size={16} />
           </button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">

@@ -11,6 +11,7 @@ import { ExitGhosts } from "@/components/ui/ExitGhosts";
 import { LanguageWindow } from "@/components/xp/LearnLanguage";
 import { PackingWindow } from "@/components/settings/PackingLists";
 import { ClickTrail } from "@/components/ui/ClickTrail";
+import { NoBrowserMenu } from "@/components/ui/NoBrowserMenu";
 import { LastScreen } from "@/components/ui/LastScreen";
 import "./globals.css";
 
@@ -87,6 +88,7 @@ export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
         <MenuLayoutStyles />
         <SaveKeys />
         <ClickTrail />
+        <NoBrowserMenu />
         <ExitGhosts />
         <LastScreen />
         <LanguageWindow />
