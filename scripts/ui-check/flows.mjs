@@ -843,6 +843,14 @@ export const FLOWS = [
         h.screen = "board";
         await h.settle(1500);
         await h.check("board");
+        // A board's quests in an order you pick (owner, Nov 5): My order, Due soonest, Newest, Most XP, A–Z.
+        if (await h.tap((p) => p.getByRole("button", { name: /my order|due soonest|newest|most xp|a–z/i }).first(), "board: order", { optional: true })) {
+          await h.settle(400);
+          await h.check("board: order choices");
+          await h.tap((p) => p.getByRole("radio", { name: /due soonest/i }).first(), "board: due soonest", { optional: true });
+          await h.settle(500);
+          await h.check("board: by due date");
+        }
       }
     },
   },

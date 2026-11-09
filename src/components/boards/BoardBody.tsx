@@ -42,7 +42,10 @@ export function BoardBody({
   onDark = true,
   arrange = false,
   mist = true,
+  order,
 }: {
+  /** How this board lists its quests (saved per board). */
+  order?: unknown;
   data: Awaited<ReturnType<typeof loadBoard>>;
   theme: "calm" | "adventure";
   onDark?: boolean;
@@ -96,7 +99,7 @@ export function BoardBody({
           </section>
         ) : null,
     },
-    { key: "quests", label: "Quests", hint: "The board's quests", keep: true, node: <BoardQuestList tasks={allTasks} boardId={board.id} boardTitle={board.title} nextTaskId={board.next_task_id ?? null} theme={theme} mist={mist} /> },
+    { key: "quests", label: "Quests", hint: "The board's quests", keep: true, node: <BoardQuestList tasks={allTasks} boardId={board.id} boardTitle={board.title} nextTaskId={board.next_task_id ?? null} theme={theme} mist={mist} order={order} /> },
   ];
 
   return (

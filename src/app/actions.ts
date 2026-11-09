@@ -3544,6 +3544,21 @@ export async function setBoardMistAction(boardId: string, mist: boolean) {
   revalidatePath(`/boards/${boardId}`);
 }
 
+/** How a board's quests are listed: your own drag order, or by due date, newest, XP or name (kept per board on the account). */
+export async function saveBoardOrderAction(boardId: string, order: { by: string; ids?: string[] }) {
+  const ownerId = await requireProfileId();
+  if (!/^[0-9a-f-]{36}$/i.test(boardId)) throw new Error("Unknown board.");
+  const { normalizeBoardOrder } = await import("@/lib/board-order");
+  const extras = await readExtras(ownerId);
+  const all = (extras.boardOrders && typeof extras.boardOrders === "object" ? (extras.boardOrders as Record<string, unknown>) : {}) as Record<string, unknown>;
+  const next = { ...all, [boardId]: normalizeBoardOrder(order) };
+  // Keep the newest 200 boards' choices.
+  const keys = Object.keys(next);
+  if (keys.length > 200) for (const k of keys.slice(0, keys.length - 200)) delete next[k];
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, boardOrders: next } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+}
+
 export async function listQuestTemplatesAction() {
   const ownerId = await requireProfileId();
   const { normalizeTemplates } = await import("@/lib/quest-templates");

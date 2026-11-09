@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { setBoardMistAction } from "@/app/actions";
+import { DndContext, DragOverlay, MouseSensor, TouchSensor, KeyboardSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { saveBoardOrderAction, setBoardMistAction } from "@/app/actions";
+import { BOARD_ORDERS, normalizeBoardOrder, orderQuests, type BoardOrder } from "@/lib/board-order";
+import { Fold } from "@/components/ui/Fold";
 import { nextActionOf } from "@/lib/next-action";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 
@@ -18,7 +23,10 @@ export function BoardQuestList({
   boardTitle = null,
   theme,
   mist = true,
+  order: savedOrder,
 }: {
+  /** How this board lists its quests (lib/board-order.ts). */
+  order?: unknown;
   tasks: Task[];
   boardId?: string;
   /** The step chosen as this board's next action, if any. */
@@ -30,7 +38,15 @@ export function BoardQuestList({
   mist?: boolean;
 }) {
   const isAdventure = theme === "adventure";
-  const open = tasks.filter((t) => t.status === "open" && !t.is_aspiration);
+  const [order, setOrder] = useState<BoardOrder>(() => normalizeBoardOrder(savedOrder));
+  const [ordering, setOrdering] = useState(false);
+  const [, startOrder] = useTransition();
+  const saveOrder = (next: BoardOrder) => {
+    const before = order;
+    setOrder(next);
+    if (boardId) startOrder(() => void saveBoardOrderAction(boardId, next).catch(() => setOrder(before)));
+  };
+  const open = orderQuests(tasks.filter((t) => t.status === "open" && !t.is_aspiration), order);
   const dreams = tasks.filter((t) => t.status === "open" && t.is_aspiration);
   const done = tasks.filter((t) => t.status === "completed");
   const [editing, setEditing] = useState<Task | null>(null);
@@ -66,6 +82,23 @@ export function BoardQuestList({
   };
   const foggy = mistOn && open.length > 2 && !!next;
   const rest = foggy ? open.filter((t) => t.id !== next!.id) : open;
+  // My order: hold a card (or drag it with the mouse) to move it; the order is kept for this board.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const dragOn = order.by === "mine" && !!boardId && rest.length > 1;
+  function onDragEnd(e: DragEndEvent) {
+    if (!e.over || e.active.id === e.over.id) return;
+    const ids = rest.map((t) => t.id);
+    const moved = arrayMove(ids, ids.indexOf(String(e.active.id)), ids.indexOf(String(e.over.id)));
+    saveOrder({ by: "mine", ids: foggy ? [next!.id, ...moved] : moved });
+  }
+  const [dragId, setDragId] = useState<string | null>(null);
+  const dragTask = dragId ? rest.find((t) => t.id === dragId) : null;
+  const orderLabel = BOARD_ORDERS.find((o) => o.by === order.by)?.label ?? "My order";
+  const soft = isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)";
   return (
     <div className="flex flex-col gap-3">
       {foggy && (
@@ -112,14 +145,63 @@ export function BoardQuestList({
           {mistOn ? "No mist on this board" : "🌫 Use the mist on this board"}
         </button>
       )}
+      {boardId && open.length > 1 && (!foggy || revealed) && (
+        <div className="flex flex-col gap-1.5">
+          <button type="button" onClick={() => setOrdering((v) => !v)} aria-expanded={ordering} className="flex items-center gap-1.5 self-end text-[12.5px] font-semibold" style={{ color: soft, opacity: 0.8 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {orderLabel}
+            {order.by === "mine" && rest.length > 1 && <span className="font-normal opacity-75">· hold a card to move it</span>}
+          </button>
+          <Fold open={ordering}>
+            <div role="radiogroup" aria-label="Order the quests" className="flex flex-wrap justify-end gap-1.5 pb-1">
+              {BOARD_ORDERS.map((o) => (
+                <button
+                  key={o.by}
+                  type="button"
+                  role="radio"
+                  aria-checked={order.by === o.by}
+                  onClick={() => {
+                    saveOrder(o.by === "mine" ? { by: "mine", ids: order.ids } : { by: o.by, ids: order.ids });
+                    setOrdering(false);
+                  }}
+                  className="qe-fact flex h-8 items-center rounded-full px-3 text-[12.5px] font-semibold"
+                  data-open={order.by === o.by ? "true" : undefined}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </Fold>
+        </div>
+      )}
       {open.length > 0 ? (
-        (!foggy || revealed) && (
+        (!foggy || revealed) &&
+        (dragOn ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={(e) => (window.getSelection()?.removeAllRanges(), setDragId(String(e.active.id)))} onDragCancel={() => setDragId(null)} onDragEnd={(e) => (setDragId(null), onDragEnd(e))}>
+            <SortableContext items={rest.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+              <ul className={`flex flex-col gap-3 ${foggy ? "fade-in" : ""}`}>
+                {rest.map((t) => (
+                  <SortableQuest key={t.id} task={t} theme={theme} categoryLabel={linkTag(t)} />
+                ))}
+              </ul>
+            </SortableContext>
+            <DragOverlay dropAnimation={{ duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }}>
+              {dragTask ? (
+                <ul className="m-0 list-none p-0" style={{ transform: "scale(1.02)", filter: "drop-shadow(0 12px 18px rgba(0,0,0,.45))" }}>
+                  <TaskRow task={dragTask} theme={theme} categoryLabel={linkTag(dragTask)} />
+                </ul>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        ) : (
           <ul className={`flex flex-col gap-3 ${foggy ? "fade-in" : ""}`}>
             {rest.map((t) => (
               <TaskRow key={t.id} task={t} theme={theme} categoryLabel={linkTag(t)} />
             ))}
           </ul>
-        )
+        ))
       ) : (
         <p
           className="rounded-2xl border-2 border-dashed px-5 py-5 text-center text-[15.5px]"
@@ -174,5 +256,24 @@ export function BoardQuestList({
         </section>
       )}
     </div>
+  );
+}
+
+/** A quest card that can be held and dragged into place (a board in "My order"). */
+function SortableQuest({ task, theme, categoryLabel }: { task: Task; theme: "calm" | "adventure"; categoryLabel?: string }) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: task.id });
+  return (
+    <TaskRow
+      task={task}
+      theme={theme}
+      categoryLabel={categoryLabel}
+      sortable={{
+        setNodeRef,
+        attributes: attributes as unknown as React.HTMLAttributes<HTMLElement>,
+        listeners,
+        isDragging,
+        style: { transform: CSS.Translate.toString(transform), transition },
+      }}
+    />
   );
 }

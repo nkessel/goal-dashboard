@@ -20,7 +20,7 @@ export default async function BoardPeekRoute({ params }: { params: Promise<{ boa
       canAdd={boardId !== UNCATEGORIZED_ID}
       trail={<BoardTrail ancestors={data.head.ancestors} current={data.head.title} isAdventure={theme === "adventure"} />}
     >
-      <BoardBody data={data} theme={theme} />
+      <BoardBody data={data} theme={theme} mist={!(profile?.life_wheel?.clearBoards ?? []).includes(boardId)} order={profile?.life_wheel?.boardOrders?.[boardId]} />
     </BoardPeek>
   );
 }
