@@ -44,8 +44,8 @@ export function revealSetting(row: string, group?: string) {
   const toggle = box.querySelector<HTMLButtonElement>("[data-settings-toggle]");
   if (toggle?.getAttribute("aria-expanded") === "false") toggle.click();
   window.setTimeout(() => {
-    const g = group ? box.querySelector<HTMLDetailsElement>(`[data-settings-group="${group}"]`) : null;
-    if (g) g.open = true;
+    const g = group ? box.querySelector<HTMLElement>(`[data-settings-group="${group}"]`) : null;
+    g?.dispatchEvent(new Event("settings-group-open"));
     const target = g ?? box;
     target.scrollIntoView({ block: "start", behavior: "smooth" });
     target.classList.remove("settings-spotlight");

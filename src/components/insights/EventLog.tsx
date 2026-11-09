@@ -150,19 +150,31 @@ export function EventLog({ notes }: { notes: Note[] }) {
   const todays = all.filter((n) => new Date(n.created_at).toDateString() === todayKey);
   const earlier = all.filter((n) => new Date(n.created_at).toDateString() !== todayKey);
   const visible = showEarlier ? all : todays;
-  function saveEdit(id: string, v: string) {
+  // Edits shown at once while they save (the page refreshes after).
+  const [detailsOf, setDetailsOf] = useState<Record<string, string | null>>({});
+  const [tones, setTonesOf] = useState<Record<string, number | null>>({});
+  const [times, setTimesOf] = useState<Record<string, string>>({});
+  function saveFull(id: string, e: { text: string; details: string | null; tone: -1 | 0 | 1 | null; at: string }) {
     setEditingNote(null);
-    const text = v.trim();
-    const before = edits[id] ?? notes.find((n) => n.id === id)?.body ?? "";
-    if (!text || text === before) return;
-    setEdits((e) => ({ ...e, [id]: text }));
+    const n = notes.find((x) => x.id === id);
+    const text = e.text.trim();
+    if (!text) return;
+    setEdits((x) => ({ ...x, [id]: text }));
+    setDetailsOf((x) => ({ ...x, [id]: e.details }));
+    setTonesOf((x) => ({ ...x, [id]: e.tone }));
+    setTimesOf((x) => ({ ...x, [id]: e.at }));
     startTransition(async () => {
       try {
-        await updateCheckNoteAction(id, text);
+        await updateCheckNoteAction(id, { text, details: e.details, tone: e.tone, at: e.at });
         router.refresh();
-      } catch (e) {
-        setEdits((x) => ({ ...x, [id]: before }));
-        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      } catch (err) {
+        if (n) {
+          setEdits((x) => ({ ...x, [id]: n.body }));
+          setDetailsOf((x) => ({ ...x, [id]: n.details ?? null }));
+          setTonesOf((x) => ({ ...x, [id]: n.tone ?? null }));
+          setTimesOf((x) => ({ ...x, [id]: n.created_at }));
+        }
+        setError(err instanceof Error ? err.message : "Couldn't save that.");
       }
     });
   }
@@ -287,6 +299,9 @@ export function EventLog({ notes }: { notes: Note[] }) {
           {visible.map((n) => {
             const tag = /^#\S+$/.test(n.body);
             const body = edits[n.id] ?? n.body;
+            if (detailsOf[n.id] !== undefined) n = { ...n, details: detailsOf[n.id] };
+            if (tones[n.id] !== undefined) n = { ...n, tone: tones[n.id] };
+            if (times[n.id]) n = { ...n, created_at: times[n.id] };
             return (
               <li key={n.id} className="relative max-w-full">
                 <button
@@ -308,26 +323,10 @@ export function EventLog({ notes }: { notes: Note[] }) {
                 {openNote === n.id && (
                   <div role="dialog" aria-label="Event" className="card-pop-in absolute left-0 top-8 z-20 flex w-[min(300px,80vw)] flex-col gap-2 rounded-xl p-3" style={{ background: "#fbf3df", border: "1.5px solid #b39a6a", boxShadow: "0 10px 24px rgba(0,0,0,.25)" }}>
                     {editingNote === n.id ? (
-                      <textarea
-                        autoFocus
-                        defaultValue={body}
-                        maxLength={400}
-                        rows={Math.min(6, body.split("\n").length + 1)}
-                        onKeyDown={(e) => {
-                          // Enter saves; Shift+Enter starts a new line.
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            saveEdit(n.id, e.currentTarget.value);
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            setEditingNote(null);
-                          }
-                        }}
-                        onBlur={(e) => saveEdit(n.id, e.currentTarget.value)}
-                        aria-label="Edit this event"
-                        className="event-input resize-none rounded-lg px-2.5 py-2 text-[16px] leading-snug"
-                        style={{ color: INK }}
+                      <EventEdit
+                        note={{ ...n, body, details: n.details, tone: n.tone, created_at: n.created_at }}
+                        onCancel={() => setEditingNote(null)}
+                        onSave={(e) => saveFull(n.id, e)}
                       />
                     ) : (
                       <div className="flex items-start gap-2">
@@ -384,5 +383,62 @@ function EventGlyph() {
       <path d="M6 21V4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
       <path d="M6 4.5h10.5l-2.2 3.6 2.2 3.6H6" fill="currentColor" fillOpacity=".35" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+/** Editing an event in place: its title, details, how it felt and when it happened (owner, Nov 5). */
+function EventEdit({ note, onSave, onCancel }: { note: Note; onSave: (e: { text: string; details: string | null; tone: -1 | 0 | 1 | null; at: string }) => void; onCancel: () => void }) {
+  const [text, setText] = useState(note.body);
+  const [more, setMore] = useState(note.details ?? "");
+  const [tone, setTone] = useState<number | null>(note.tone ?? null);
+  const pad = (x: number) => String(x).padStart(2, "0");
+  const d0 = new Date(note.created_at);
+  const [when, setWhen] = useState(`${d0.getFullYear()}-${pad(d0.getMonth() + 1)}-${pad(d0.getDate())}T${pad(d0.getHours())}:${pad(d0.getMinutes())}`);
+  const save = () => {
+    const at = new Date(when);
+    onSave({ text, details: more.trim() || null, tone: tone === -1 || tone === 0 || tone === 1 ? tone : null, at: Number.isFinite(at.getTime()) ? at.toISOString() : note.created_at });
+  };
+  return (
+    <div
+      className="flex flex-col gap-2"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onCancel();
+        }
+        if ((e.key === "Enter" && (e.ctrlKey || e.metaKey)) || (e.key === "s" && (e.ctrlKey || e.metaKey))) {
+          e.preventDefault();
+          save();
+        }
+      }}
+    >
+      <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} maxLength={400} rows={Math.min(4, text.split("\n").length + 1)} aria-label="What happened" className="event-input resize-none rounded-lg px-2.5 py-2 text-[16px] leading-snug" style={{ color: INK }} />
+      <textarea value={more} onChange={(e) => setMore(e.target.value)} maxLength={400} rows={2} placeholder="Details (optional)" aria-label="Details" className="event-input resize-none rounded-lg px-2.5 py-1.5 text-[15px] leading-snug" style={{ color: INK }} />
+      <div className="flex items-center gap-1.5">
+        <span className="text-[13px] font-semibold" style={{ color: INK_SOFT }}>
+          Felt
+        </span>
+        {TONES.map((t) => {
+          const on = tone === t.v;
+          return (
+            <button key={t.v} type="button" role="radio" aria-checked={on} aria-label={t.name} title={t.name} onClick={() => setTone(on ? null : t.v)} className="flex h-8 w-10 items-center justify-center rounded-full text-[17px] font-bold leading-none" style={{ color: on ? "#fff" : t.color, background: on ? t.color : t.bg, border: `1.5px solid ${t.color}` }}>
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      <label className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: INK_SOFT }}>
+        When
+        <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="time-field min-w-0 flex-1 rounded-lg px-2 py-1 text-[15px]" style={{ color: INK }} />
+      </label>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="h-8 rounded-full px-3 text-[13.5px]" style={{ color: INK_SOFT }}>
+          Close
+        </button>
+        <button type="button" onClick={save} className="h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+          Save
+        </button>
+      </div>
+    </div>
   );
 }

@@ -170,10 +170,25 @@ export async function listCheckNotesSince(ownerId: string, sinceISO: string): Pr
   return (data ?? []) as CheckNote[];
 }
 
-export async function updateCheckNote(ownerId: string, id: string, text: string): Promise<CheckNote> {
-  const body = tidyNote(text);
-  if (!body) throw new Error("Write something first.");
-  const { data, error } = await supabaseAdmin().from("check_in_notes").update({ body, tags: tagsIn(body) }).eq("owner_id", ownerId).eq("id", id).select("id, body, tags, created_at").single();
+export async function updateCheckNote(ownerId: string, id: string, edit: string | { text?: string; details?: string | null; tone?: -1 | 0 | 1 | null; at?: string }): Promise<CheckNote> {
+  const e = typeof edit === "string" ? { text: edit } : edit;
+  const patch: Record<string, unknown> = {};
+  if (e.text !== undefined) {
+    const body = tidyNote(e.text);
+    if (!body) throw new Error("Write something first.");
+    patch.body = body;
+    patch.tags = tagsIn(body);
+  }
+  if (e.details !== undefined) patch.details = e.details?.trim().slice(0, 400) || null;
+  if (e.tone !== undefined) patch.tone = e.tone === -1 || e.tone === 0 || e.tone === 1 ? e.tone : null;
+  if (e.at !== undefined) {
+    const t = Date.parse(e.at);
+    if (!Number.isFinite(t)) throw new Error("That time doesn't look right.");
+    if (t > Date.now() + 5 * 60_000) throw new Error("That's in the future.");
+    patch.created_at = new Date(t).toISOString();
+  }
+  if (!Object.keys(patch).length) throw new Error("Nothing to change.");
+  const { data, error } = await supabaseAdmin().from("check_in_notes").update(patch).eq("owner_id", ownerId).eq("id", id).select("id, body, tags, created_at").single();
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   return data as CheckNote;
 }

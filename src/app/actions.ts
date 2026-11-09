@@ -3462,9 +3462,9 @@ export async function inventoryPhotoAction(formData: FormData) {
 }
 
 /** Edit a logged event or #tag. */
-export async function updateCheckNoteAction(id: string, text: string) {
+export async function updateCheckNoteAction(id: string, edit: string | { text?: string; details?: string | null; tone?: -1 | 0 | 1 | null; at?: string }) {
   const ownerId = await requireProfileId();
-  const note = await energyData.updateCheckNote(ownerId, id, text);
+  const note = await energyData.updateCheckNote(ownerId, id, edit);
   revalidatePath("/insights");
   revalidatePath("/");
   return note;
