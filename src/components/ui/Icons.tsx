@@ -117,3 +117,15 @@ export function CloseIcon({ size = 14, strokeWidth = 2.4 }: { size?: number; str
     </svg>
   );
 }
+
+/** The magic calendar (owner's pick, Nov 9: "Bd"): a calendar with a star and a dot of time. For Auto-schedule and Plan my day. */
+export function MagicCalendarIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+      <rect x="3" y="5" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M3 9.5h18M8 3v3.5M16 3v3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M11 11.6l1.2 2.7 2.7 1.2-2.7 1.2-1.2 2.7-1.2-2.7-2.7-1.2 2.7-1.2z" fill="currentColor" />
+      <circle cx="17.2" cy="13" r="1" fill="currentColor" />
+    </svg>
+  );
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import { MagicCalendarIcon } from "@/components/ui/Icons";
 import { PaintTodayArt } from "./PaintTodayArt";
 import { openPlanMyDay } from "./PlanMyDay";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -193,14 +194,10 @@ export function CalendarLayers({
             boxShadow: "0 6px 14px rgba(0,0,0,.4)",
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="hidden lg:block">
-            <rect x="3.5" y="5" width="17" height="15.5" rx="2.2" stroke="currentColor" strokeWidth="1.9" />
-            <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-            <path d="M8 13.5h4M8 16.8h7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-          </svg>
+          <MagicCalendarIcon size={18} />
           {/* Short on narrower screens, so the toolbar never pushes it off the left edge (owner, Nov 4). */}
-          <span className={`hidden lg:inline ${isAdventure ? "font-display tracking-wide" : ""}`}>✨ Auto-scheduler</span>
-          <span className={`lg:hidden ${isAdventure ? "font-display tracking-wide" : ""}`}>✨ Auto</span>
+          <span className={`hidden lg:inline ${isAdventure ? "font-display tracking-wide" : ""}`}>Auto-scheduler</span>
+          <span className={`lg:hidden ${isAdventure ? "font-display tracking-wide" : ""}`}>Auto</span>
           {toSchedule > 0 && (
             <span className="absolute -right-1.5 -top-1.5 flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-1 text-[11px] font-bold tabular-nums" style={{ background: "#2a1c10", color: "#f6dc8e", border: "1px solid #d9b45f" }}>
               {toSchedule}
@@ -209,10 +206,7 @@ export function CalendarLayers({
         </button>
         {/* Plan my day: today's quests placed in today's free time (beside the week/month scheduling list). */}
         <button type="button" onClick={openPlanMyDay} aria-label="Plan my day" title="Plan my day" className="hover-glow flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[13.5px] font-semibold sm:px-3" style={chip}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: isAdventure ? "#e8c56c" : "var(--t-accent)" }}>
-            <path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z" fill="currentColor" />
-            <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" fill="currentColor" />
-          </svg>
+          <span style={{ color: isAdventure ? "#e8c56c" : "var(--t-accent)", display: "flex" }}><MagicCalendarIcon size={16} /></span>
           <span className="hidden sm:inline">Plan my day</span>
         </button>
         {calendars.length > 0 && (() => {

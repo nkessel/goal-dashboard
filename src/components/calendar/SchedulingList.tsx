@@ -1,5 +1,6 @@
 "use client";
 
+import { MagicCalendarIcon } from "@/components/ui/Icons";
 import { talkToToucan } from "@/components/toucan/ToucanGuide";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
@@ -646,7 +647,7 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
         <div className="flex items-center gap-1.5">
           {next && (
             <button type="button" onClick={() => autoPlace([next], "next")} disabled={!!placing} className="hover-glow h-8 whitespace-nowrap rounded-full px-3 text-[12.5px] font-bold disabled:opacity-60" style={gold} title={`Put “${nameOf(next)}” in the first free time (open sections in order, the list soonest first); then drag it on the calendar to change it`}>
-              {placing === "next" ? "Finding a time…" : "✨ Auto-schedule"}
+              {placing === "next" ? "Finding a time…" : <span className="flex items-center gap-1.5"><MagicCalendarIcon size={15} /> Auto-schedule</span>}
             </button>
           )}
           <button type="button" onClick={() => talkToToucan(undefined, "catchup")} className="h-8 whitespace-nowrap rounded-full px-2.5 text-[12.5px] font-semibold hover:bg-black/[.06]" style={{ color: ink, border: "1px solid rgba(139,112,64,.45)" }} title="Coursework catch-up: coming up first, then missed ones from the beginning">

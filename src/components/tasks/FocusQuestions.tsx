@@ -9,10 +9,12 @@ import { CloseIcon } from "@/components/ui/Icons";
 export function FocusQuestionsButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <button type="button" onClick={onToggle} aria-expanded={open} aria-label="Focusing questions" title="Focusing questions" className="today-head-btn flex h-8 w-8 items-center justify-center rounded-full">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path d="M9 3h6M10 3v2M14 3v2M7 8.5C7 6.6 9.2 5 12 5s5 1.6 5 3.5V16c0 1.7-2.2 3-5 3s-5-1.3-5-3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        <path d="M12 9.5c1.3 1.3 1.3 3.2 0 4.5-1.3-1.3-1.3-3.2 0-4.5z" fill="currentColor" />
-        <path d="M10 19v2h4v-2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      {/* A compass (owner's pick, Nov 9: "L3a"): questions that point the way. */}
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9.2" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M12 2.8v1.6M12 19.6v1.6M2.8 12h1.6M19.6 12h1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M15.8 8.2l-2.3 5.3-5.3 2.3 2.3-5.3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M15.8 8.2l-5.3 2.3 3 3z" fill="currentColor" />
       </svg>
     </button>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { MagicCalendarIcon } from "@/components/ui/Icons";
 import { useWeatherRange, type HourWeather } from "@/lib/use-weather";
 import { WeatherLocation } from "@/components/ui/WeatherLocation";
 
@@ -838,7 +839,7 @@ export function DayPlanner({
                   className="hover-glow h-8 shrink-0 rounded-full px-3 text-[12.5px] font-bold disabled:opacity-60"
                   style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1.5px solid #8a6116", color: "#2a1c10" }}
                 >
-                  ✨ Auto-schedule
+                  <span className="flex items-center gap-1.5"><MagicCalendarIcon size={15} /> Auto-schedule</span>
                 </button>
               </li>
               {toPlace.map((t) => {
