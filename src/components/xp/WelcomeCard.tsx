@@ -29,7 +29,7 @@ import { SleepCheckIn } from "./SleepCheckIn";
 import { TodayPlanner } from "./TodayPlanner";
 import { castleOf } from "./CastleArt";
 import { Fold } from "@/components/ui/Fold";
-import { addJournalEntryAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
 import { cleanXp, journalPrompts, type JournalPrompt } from "@/lib/journal-prompts";
 import { DawnPath } from "@/components/dawn/DawnPath";
 
@@ -1936,7 +1936,7 @@ function WelcomeJournal({ fx, label, icon, priorities, registerJournal, onWritte
       for (const p of prompts) {
         const t = (texts[p.id] ?? "").trim();
         if (p.id === "priorities" || !t || saved[p.id] === t) continue;
-        await addJournalEntryAction(`${p.label}: ${p.prompt}\n\n${t}`, null);
+        await saveOrQueue("journal", { body: `${p.label}: ${p.prompt}\n\n${t}`, mood: null, kind: null });
         setSaved((s) => ({ ...s, [p.id]: t }));
         onWritten(p.id, cleanXp(p.xp));
       }

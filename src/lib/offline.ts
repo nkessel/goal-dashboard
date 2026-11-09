@@ -10,6 +10,7 @@ import {
   makeRefillQuestAction,
   saveCheckInAction,
   saveInventoryAction,
+  saveNightAction,
   savePackingListsAction,
   saveQuestStepsAction,
   setTaskPlacementAction,
@@ -19,6 +20,8 @@ import {
   updateTaskAction,
 } from "@/app/actions";
 import { resolveOptimisticQuest } from "@/lib/optimistic-quests";
+import { saveNightToo } from "@/components/xp/save-night";
+import type { NightDraft } from "@/components/xp/NightFields";
 
 /**
  * Working offline (owner, Nov 6: "so the user can add and edit lists, inventory items, and even
@@ -65,6 +68,8 @@ const RUNNERS = {
     if (!r.ok) throw new Error(r.error);
     return r;
   },
+  saveNight: (n: NightDraft) => saveNightToo(n),
+  saveNightDay: (a: Parameters<typeof saveNightAction>[0]) => saveNightAction(a),
   journal: (a: { body: string; mood: number | null; kind: string | null }) => addJournalEntryAction(a.body, a.mood, a.kind),
 };
 
@@ -184,6 +189,8 @@ const WHAT: Record<OfflineKind, string> = {
   tickStep: "Sub-habit",
   saveCheckIn: "Check-in",
   logEvent: "Event",
+  saveNight: "Sleep",
+  saveNightDay: "Sleep",
   journal: "Journal note",
 };
 

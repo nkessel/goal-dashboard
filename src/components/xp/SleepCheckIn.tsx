@@ -1,8 +1,8 @@
 "use client";
 
-import { saveNightToo } from "./save-night";
 import { useEffect, useState } from "react";
-import { saveCheckInAction, saveNightAction, setWheelOfTimeAction, wheelOfTimeAction } from "@/app/actions";
+import { setWheelOfTimeAction, wheelOfTimeAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
 import { EMPTY_NIGHT, NightFields, MoonIcon, SunIcon, TimeToken, clock12, type NightDraft } from "./NightFields";
 import { Fold } from "@/components/ui/Fold";
 import { DateField } from "@/components/ui/DateField";
@@ -78,9 +78,10 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
     if (!dirty) return true;
     setError(null);
     try {
-      for (const n of filled) await saveNightAction({ day: n.day, bed: n.bed || null, wake: n.wake || null, effort: [], hindrances: [], keep: true });
-      if (touched) await saveNightToo(night);
-      if (qualityNew) await saveCheckInAction(null, [{ metric: "Sleep quality", level: quality * 2 }]);
+      // Offline, each part waits on the device and is sent when you're back online.
+      for (const n of filled) await saveOrQueue("saveNightDay", { day: n.day, bed: n.bed || null, wake: n.wake || null, effort: [], hindrances: [], keep: true }, `night:${n.day}`);
+      if (touched) await saveOrQueue("saveNight", night, `night:${night.today ? "today" : "last"}`);
+      if (qualityNew) await saveOrQueue("saveCheckIn", { energy: null, metrics: [{ metric: "Sleep quality", level: quality * 2 }], at: new Date().toISOString() });
       if (filled.length || touched || qualityNew) onFilled?.();
       return true;
     } catch (e) {
