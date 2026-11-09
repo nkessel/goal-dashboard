@@ -14,7 +14,7 @@ import { nextActionOf } from "@/lib/next-action";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { useEscape } from "@/lib/use-escape";
 import { collapseBoardOnMatrixAction, confirmImportAction, expandBoardOnMatrixAction, placeOnMatrixAction, setMatrixStateAction } from "@/app/actions";
-import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { BoardMatrixDialog } from "./BoardMatrixDialog";
 import { AddToMatrixSheet } from "./AddToMatrixSheet";
 import { CloseIcon } from "@/components/ui/Icons";

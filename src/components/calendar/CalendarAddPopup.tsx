@@ -6,7 +6,7 @@ import type { Task } from "@/lib/data/types";
 import { listSchedulableTasksAction, scheduleTaskAction } from "@/app/actions";
 import { formatTimeRange } from "@/lib/calendar-dates";
 import { useEscape } from "@/lib/use-escape";
-import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { CloseIcon } from "@/components/ui/Icons";
 
 /**

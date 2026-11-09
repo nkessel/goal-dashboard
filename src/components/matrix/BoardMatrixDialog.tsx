@@ -7,7 +7,7 @@ import Link from "next/link";
 import type { Board } from "@/lib/data/types";
 import { setMatrixStateAction, updateBoardMatrixAction } from "@/app/actions";
 import { IconPicker } from "@/components/tasks/IconPicker";
-import { IconScale } from "@/components/tasks/QuestEditorDialog";
+import { IconScale } from "@/components/tasks/IconScale";
 import { BoardSeal } from "@/components/boards/BoardSeal";
 import { useEscape } from "@/lib/use-escape";
 import { useClosing } from "@/components/ui/Fold";

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import type { Task } from "@/lib/data/types";
 import { toggleManualPriorityAction } from "@/app/actions";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { QuestEditorDialog } from "./QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { QuestMonogram } from "./QuestMonogram";
 import { CloseIcon } from "@/components/ui/Icons";
 

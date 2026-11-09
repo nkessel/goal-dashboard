@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { dismissOfflineFailures, flushOffline, setOfflineOwner, setOnline, useOfflineState } from "@/lib/offline";
 import { Fold, useLinger } from "@/components/ui/Fold";
+import { warmQuestEditor } from "@/components/tasks/LazyQuestEditorDialog";
 
 /** The main screens kept on the device in the background, so they open offline even if not visited yet. */
 const WARM_PATHS = ["/", "/settings/inventory", "/boards", "/settings", "/insights"];
@@ -45,6 +46,10 @@ function registerWorker() {
  */
 export function OfflineSync({ profileId }: { profileId: string }) {
   const router = useRouter();
+  // Fetch the quest editor's code while the browser is idle, so the first open is instant.
+  useEffect(() => {
+    warmQuestEditor();
+  }, []);
   useEffect(() => {
     setOfflineOwner(profileId);
     setOnline(navigator.onLine !== false);

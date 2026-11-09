@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { ImportItem } from "@/lib/data/rewards";
 import { generateNextImportIconAction, listImportsAction } from "@/app/actions";
-import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { RewardEditorDialog } from "@/components/rewards/RewardEditorDialog";
 
 const itemId = (it: ImportItem) => (it.kind === "quest" ? it.task.id : it.reward.id);

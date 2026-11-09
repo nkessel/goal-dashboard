@@ -1,7 +1,7 @@
 "use client";
 
 import type { Task } from "@/lib/data/types";
-import { QuestEditorDialog } from "./QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 
 /** Edit an existing quest — the shared quest editor in edit mode. */
 export function EditTaskModal({

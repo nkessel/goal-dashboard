@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CreateFab } from "@/components/create/CreateFab";
 import type { CreateKind } from "@/components/create/CreateSheet";
-import { QuestEditorDialog } from "./QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 
 /**
  * "Add quest": the floating + button (top level, opening the create sheet)

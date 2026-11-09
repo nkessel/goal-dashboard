@@ -7,7 +7,7 @@ import type { Reward } from "@/lib/data/types";
 import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction, reopenTaskAction } from "@/app/actions";
 import { celebrateReward } from "./RewardCelebration";
 import type { Task } from "@/lib/data/types";
-import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { CoinIcon, DiamondIcon, CloseIcon } from "@/components/ui/Icons";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import {

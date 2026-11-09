@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { getQuestForEditAction, listRecentWinsAction } from "@/app/actions";
-import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { useLongPress } from "@/lib/use-long-press";
 import type { Task } from "@/lib/data/types";
 import { journalKindMeta } from "@/lib/journal-kinds";

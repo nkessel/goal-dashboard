@@ -9,7 +9,7 @@ import type { Task } from "@/lib/data/types";
 import { useRouter } from "next/navigation";
 import { completeRiteAction, completeTaskAction, listQuestStepsAction, saveQuestStepsAction, updateTaskAction } from "@/app/actions";
 import { IconPicker } from "@/components/tasks/IconPicker";
-import { IconScale } from "@/components/tasks/QuestEditorDialog";
+import { IconScale } from "@/components/tasks/IconScale";
 import { celebrateProgress, celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";

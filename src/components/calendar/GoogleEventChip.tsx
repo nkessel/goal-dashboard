@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
-import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { formatTimeRange } from "@/lib/calendar-dates";
 import { deleteGoogleEventAction, rsvpGoogleEventAction, updateGoogleEventAction } from "@/app/actions";
 import { cleanEventDescription } from "@/lib/event-text";

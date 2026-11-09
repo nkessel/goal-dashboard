@@ -6,7 +6,7 @@ import Link from "next/link";
 import { addJournalEntryAction, createBoardAction } from "@/app/actions";
 import { saveOrQueue } from "@/lib/offline";
 import { EditorToolbarContext, EmbedHostContext } from "@/components/ui/EmbedHost";
-import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
+import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { RewardEditorDialog } from "@/components/rewards/RewardEditorDialog";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
 import { Moon } from "@/components/evening/BeginEveningButton";
