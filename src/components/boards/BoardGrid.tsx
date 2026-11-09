@@ -316,7 +316,7 @@ export function BoardGrid({
             {/* The next step, with a clear way to add a quest to this board. */}
             <div className="-mx-1 flex flex-col border-t pt-1" style={{ borderColor: rule }}>
               <div className="flex items-center gap-1 px-1 pt-0.5">
-                <span className="flex-1 text-[10.5px] font-bold uppercase tracking-[.12em]" style={{ color: ink }}>
+                <span className="min-w-0 flex-1 truncate whitespace-nowrap text-[10.5px] font-bold uppercase tracking-[.1em]" style={{ color: ink }}>
                   {nextStep ? "Next step" : done.length ? "Done" : "Quests"}
                 </span>
                 {!board.isVirtual && (
@@ -326,10 +326,10 @@ export function BoardGrid({
                     onClick={() => setAddingTo(board.id)}
                     aria-label={`Add a quest to ${board.title}`}
                     title={`Add a quest to ${board.title}`}
-                    className="board-add flex h-7 items-center gap-1 rounded-full pl-1.5 pr-2.5 text-[12px] font-semibold"
+                    className="board-add flex h-6 shrink-0 items-center gap-0.5 rounded-full pl-1 pr-2 text-[11.5px] font-semibold"
                   >
-                    <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full" aria-hidden>
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full" aria-hidden>
+                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
                         <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                       </svg>
                     </span>
@@ -349,11 +349,6 @@ export function BoardGrid({
               {/* The rest of the board's quests, listed in place (completed ones when nothing is open). */}
               {restList.length > 0 && (
                 <>
-                  <Fold open={isMore}>
-                    <ul className="flex flex-col">
-                      {restList.map((q) => (restDone ? <DoneRow key={q.id} q={q} onOpen={() => setOpenQuest(q)} /> : <QuestPreview key={q.id} q={q} disabled={dragging} onOpen={() => setOpenQuest(q)} />))}
-                    </ul>
-                  </Fold>
                   <button
                     type="button"
                     {...stop}
@@ -365,6 +360,11 @@ export function BoardGrid({
                     {isMore ? "Show less" : `Show ${restList.length} more ${restDone ? "completed" : restList.length === 1 ? "quest" : "quests"}`}
                     <FolderCaret open={isMore} />
                   </button>
+                  <Fold open={isMore}>
+                    <ul className="flex flex-col">
+                      {restList.map((q) => (restDone ? <DoneRow key={q.id} q={q} onOpen={() => setOpenQuest(q)} /> : <QuestPreview key={q.id} q={q} disabled={dragging} onOpen={() => setOpenQuest(q)} />))}
+                    </ul>
+                  </Fold>
                 </>
               )}
               {isMore && !board.isVirtual && (
@@ -620,18 +620,18 @@ function SubBoardFolder({
           onClick={toggle}
           aria-expanded={open}
           data-fb-name={`Sub-board: ${sb.title}`}
-          className={`board-quest flex min-h-[26px] min-w-0 items-center gap-1 rounded-md px-1 py-[2px] text-left text-[12.5px]`}
+          className={`board-quest flex min-h-[32px] w-full min-w-0 items-center gap-1 rounded-md px-1 py-[2px] text-left text-[12.5px]`}
           style={{ color: "var(--t-ink)", background: open ? (dream ? "rgba(120,150,190,.12)" : "rgba(168,138,63,.14)") : undefined }}
         >
           <span className="shrink-0" style={{ color: soft }}>
             <SubBoardsIcon />
           </span>
-          <span dir="auto" className={`user-text min-w-0 ${open ? "font-semibold [overflow-wrap:break-word]" : "truncate"}`}>{sb.title}</span>
-          {(sb.questCount > 0 || (sb.boardCount ?? 0) > 0) && (
-            <span className="shrink-0 text-[11.5px] tabular-nums" style={{ color: soft }}>
-              {[sb.questCount ? `${sb.questCount} ${sb.questCount === 1 ? "quest" : "quests"}` : "", sb.boardCount ? `${sb.boardCount} ${sb.boardCount === 1 ? "board" : "boards"}` : ""].filter(Boolean).join(" · ")}
+          <span className="flex min-w-0 flex-col">
+            <span dir="auto" className={`user-text min-w-0 ${open ? "font-semibold [overflow-wrap:break-word]" : "truncate"}`}>{sb.title}</span>
+            <span className="text-[11px] leading-tight tabular-nums" style={{ color: soft }}>
+              {[sb.questCount ? `${sb.questCount} ${sb.questCount === 1 ? "quest" : "quests"}` : "", sb.boardCount ? `${sb.boardCount} ${sb.boardCount === 1 ? "board" : "boards"}` : ""].filter(Boolean).join(" · ") || "empty"}
             </span>
-          )}
+          </span>
           <span className="shrink-0" style={{ color: soft }}>
             <FolderCaret open={open} />
           </span>
