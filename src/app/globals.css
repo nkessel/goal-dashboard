@@ -1772,10 +1772,10 @@ html[data-kb] [data-feedback-hide] {
   transition: opacity 160ms ease, visibility 0s linear 160ms;
 }
 /* The feedback button never changes size anywhere (owner, Nov 9). With a popup open on a phone it
-   glides up, clear of the popup's own buttons (it sat on the quest editor's Save), and glides back
-   after; while typing in a popup it steps out of the way (fades), then comes back as it was. */
+   fades out of the way (it sat on the quest editor's Save; moved up it covered the editor's own
+   parts) and fades back, as it was, when the popup closes. */
 @media (pointer: coarse) {
-  html.scroll-locked:not([data-welcome-open]) [data-feedback-btn]:not([data-dragging]) { translate: 0 -76px; }
+  html.scroll-locked:not([data-welcome-open]) [data-feedback-btn]:not([aria-expanded="true"]) { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 200ms ease, visibility 0s linear 200ms; }
   html.scroll-locked:not([data-welcome-open])[data-typing] [data-feedback-hide]:not([data-feedback-open]) { opacity: 0; visibility: hidden; pointer-events: none; }
 }
 /* The welcome screen isn't a popup over buttons: there the feedback button sits full size in the
