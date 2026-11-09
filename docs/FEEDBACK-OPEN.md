@@ -13,7 +13,7 @@ Built Nov 8 (night): tracked events (pills under the events box in Insights and 
 Still to do (each the owner's words, shortened):
 - Welcome: check-in button loaded 3 times (2:57 PM); the whole screen refreshed for no reason (2:40 PM).
 - **Morning routine**: three UX teams' ideas sent to the owner Nov 8 as 3 options (A: Pick your morning pills, B: Body · Heart · Mind, C: Dawn path + offerings); owner liked A + C most and asked for more ideas and a review of the brief; round 2 (mockups) sent Nov 9, waiting.
-- Board button at the top of a quest's portrait: a tap gives a small overview of the board with a prominent "See quest in board"; drop "See quest in board" from the menu. **Brainstorm 2–3 ideas first, owner approves** (1:55 PM). Owner liked 1 + 2 together; four blends sent Nov 9, waiting.
+- Board button at the top of a quest's portrait: a tap gives a small overview of the board with a prominent "See quest in board"; drop "See quest in board" from the menu. **Brainstorm 2–3 ideas first, owner approves** (1:55 PM). Built Nov 9 (owner picked blend A + D).
 - Stats don't show in the quest editor; check the editor and its view settings all work; 3 agents test (1:50 PM). Location missing from the editor's display menu: 2 agents audit for similar gaps (1:48 PM). Save and Complete quest shouldn't be in the view settings, just a "save settings" button (1:49 PM).
 - Sequence and sub-quests from the same pill (1:45 PM).
 - Editor metrics (importance etc.): a clear gear top right; change how bars display, colours, icons, names; add metrics (1:44 PM). Sub-quest menu icons in the design language (done in part).

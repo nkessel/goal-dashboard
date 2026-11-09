@@ -113,6 +113,16 @@ export const FLOWS = [
       // Quest editor from the first quest card.
       if (await h.tap("text=Pick up medication", "open quest editor", { expectMove: true })) {
         await h.check("quest editor");
+        // The board label on the portrait folds open its card (owner, Nov 9: board idea A + D).
+        if (await h.tap((p) => p.getByTitle(/see it, move it/).first(), "editor: board card", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("quest editor: board card");
+          if (await h.tap((p) => p.getByRole("button", { name: /move to another board/i }).first(), "board card: move", { optional: true, expectMove: true })) {
+            await h.settle(500);
+            await h.check("quest editor: board card move");
+          }
+          await h.tap((p) => p.getByTitle(/see it, move it/).first(), "editor: board card shut", { optional: true, expectMove: true });
+        }
         // The XP amount: no box; tapping it selects and pulses the number, with a gold bar for a cursor (owner, Nov 9).
         if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill", { optional: true, expectMove: true })) {
           if (await h.tap((p) => p.getByLabel("XP amount").first(), "editor: XP amount", { optional: true })) await h.check("quest editor: XP typed");

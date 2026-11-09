@@ -2,6 +2,7 @@
 
 import { sessionRef } from "@/lib/calendar-task-window";
 import { InlineNumber } from "@/components/ui/InlineNumber";
+import { BoardCard } from "./BoardCard";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, type ProgressUnit } from "@/lib/progress-units";
@@ -242,6 +243,7 @@ export function QuestEditorDialog({
   const scaleStyle = useScaleStyle();
   // Which quick-detail chip is open (one at a time).
   const [factOpen, setFactOpen] = useState<EditorPart | "due" | "bonus" | "place" | null>(null);
+  const [boardCard, setBoardCard] = useState(false);
   const isAdventure = theme === "adventure";
   const task = mode.kind === "edit" ? mode.task : null;
   const create = mode.kind === "create" ? mode : null;
@@ -2406,10 +2408,21 @@ export function QuestEditorDialog({
           <div className="flex items-start gap-3">
             <div className="relative flex shrink-0 flex-col items-center gap-1">
               {/* The board, on the avatar like the quest card's tag. */}
+              {/* The board, on the avatar like the quest card's tag; tapping it folds the board card open below (owner, Nov 9). */}
               {boardLabel && (
-                <span className="pointer-events-none absolute -top-1.5 left-1/2 z-[2] max-w-[84px] -translate-x-1/2 whitespace-nowrap truncate rounded-md px-1.5 py-[1px] text-[11px] font-semibold" style={{ background: "#f6ecd2", border: "1px solid #a58c66", color: "#3b2a14", boxShadow: "0 1px 2px rgba(0,0,0,.25)" }} title={boardLabel}>
-                  {boardLabel}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setBoardCard((o) => !o)}
+                  aria-expanded={boardCard}
+                  title={`${boardLabel}: see it, move it`}
+                  className="absolute -top-1.5 left-1/2 z-[2] flex max-w-[92px] -translate-x-1/2 items-center gap-0.5 whitespace-nowrap rounded-md px-1.5 py-[1px] text-[11px] font-semibold"
+                  style={{ background: "#f6ecd2", border: "1px solid #a58c66", color: "#3b2a14", boxShadow: boardCard ? "0 0 0 2px #f3d98d, 0 1px 2px rgba(0,0,0,.25)" : "0 1px 2px rgba(0,0,0,.25)" }}
+                >
+                  <span className="truncate">{boardLabel}</span>
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0" style={{ transform: boardCard ? "rotate(180deg)" : undefined, transition: "transform 160ms" }}>
+                    <path d="M5 9l7 7 7-7" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
               )}
               {task ? (
                 <>
@@ -2511,6 +2524,25 @@ export function QuestEditorDialog({
               ) : null}
             </div>
           </div>
+          {boardId && boardLabel && (
+            <Fold open={boardCard}>
+              <BoardCard
+                boardId={boardId}
+                label={boardOptions?.find((o) => o.id === boardId)?.label ?? boardLabel}
+                taskId={task?.id ?? null}
+                onSeeInBoard={() => {
+                  const to = `/boards/${boardId}${task ? `?q=${task.id}` : ""}`;
+                  close();
+                  setTimeout(() => router.push(to), embedded ? 0 : 200);
+                }}
+                onMove={(id, label) => {
+                  setBoardOptions((opts) => (opts?.some((o) => o.id === id) ? opts : [...(opts ?? []), { id, label }]));
+                  setBoardId(id);
+                }}
+                onAlsoOn={() => (setBoardCard(false), setFactOpen("board"))}
+              />
+            </Fold>
+          )}
 
           {/* Templates and quick sets, opened from the 📜 button at the top (new quests only). */}
           {create && !doingNow && showTemplates && (

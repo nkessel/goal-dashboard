@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useEscape } from "@/lib/use-escape";
 import { setFabTarget } from "@/lib/fab-target";
 import { CloseIcon } from "@/components/ui/Icons";
+import { Suspense } from "react";
+import { QuestSpotlight } from "./QuestSpotlight";
 
 // Which boards this peek has walked through (so × can step all the way back
 // out) and how deep the last one was (so moving down zooms in, up zooms out).
@@ -103,6 +105,9 @@ export function BoardPeek({
     // the page, so the screen behind jumped to its bottom (owner, Nov 6:
     // "the screen goes to the bottom"). Without a box Next leaves it alone.
     <div data-theme={theme} style={{ display: "contents" }}>
+      <Suspense fallback={null}>
+        <QuestSpotlight />
+      </Suspense>
       <div className={`fixed inset-0 z-[47] ${closing ? "overlay-fade-out" : opening ? "overlay-fade-in" : ""}`} style={{ background: "rgba(6,9,5,.62)" }} onClick={close} />
       <div
         role="dialog"

@@ -5,6 +5,8 @@ import { BoardFabMenu } from "@/components/boards/BoardFabMenu";
 import { BoardBody, loadBoard } from "@/components/boards/BoardBody";
 import { BoardTrail } from "@/components/boards/BoardTrail";
 import { UNCATEGORIZED_ID } from "@/lib/board-ids";
+import { Suspense } from "react";
+import { QuestSpotlight } from "@/components/boards/QuestSpotlight";
 
 export default async function BoardDetailPage({ params }: { params: Promise<{ boardId: string }> }) {
   const { boardId } = await params;
@@ -15,6 +17,9 @@ export default async function BoardDetailPage({ params }: { params: Promise<{ bo
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
       <div className="flex flex-col gap-4">
+        <Suspense fallback={null}>
+          <QuestSpotlight />
+        </Suspense>
         <BoardTrail ancestors={data.head.ancestors} current={data.head.title} isAdventure={theme === "adventure"} />
         <BoardBody data={data} theme={theme} arrange mist={!(profile?.life_wheel?.clearBoards ?? []).includes(boardId)} />
         {boardId !== UNCATEGORIZED_ID && <BoardFabMenu boardId={boardId} theme={theme} />}
