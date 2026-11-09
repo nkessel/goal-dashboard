@@ -597,12 +597,14 @@ export function TodayTaskBoard({
               <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
                 <div className="today-head relative">
                 {isAdventure ? (
-                  <div className={`flex items-center gap-2 px-1 ${todayOpen ? "max-sm:px-[84px]" : ""}`}>
+                  <div className={`flex items-center gap-2 px-1 ${todayOpen ? "max-sm:pl-[40px] max-sm:pr-[84px]" : ""}`}>
                     <span className="hidden flex-1 sm:flex">
                       <GoldRule dir="left" />
                     </span>
                     <span className="flex-1 sm:hidden" />
-                    <Leaf flip />
+                    <span className={todayOpen ? "max-sm:hidden" : ""}>
+                      <Leaf flip />
+                    </span>
                     <h2 className="font-display m-0 whitespace-nowrap text-[23px] leading-none sm:text-[27px]" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
                       <button type="button" onClick={() => setTodayOpen((v) => !v)} aria-expanded={todayOpen} className="cursor-pointer select-none">
                         Today&apos;s Quests
