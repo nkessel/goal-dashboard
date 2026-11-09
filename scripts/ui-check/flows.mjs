@@ -219,6 +219,13 @@ export const FLOWS = [
         await h.check("progress stepper");
         await h.tap((p) => p.getByTitle("Log progress").first(), "close progress stepper", { optional: true, expectMove: true });
       }
+      // Focusing questions: the lantern left of Today's Quests (owner, Nov 4).
+      await h.page.hover("text=Today's Quests").catch(() => {});
+      if (await h.tap((p) => p.getByRole("button", { name: /^focusing questions$/i }).first(), "focusing questions", { optional: true, expectMove: true })) {
+        await h.settle(600);
+        await h.check("focusing questions");
+        await h.tap((p) => p.getByRole("button", { name: /^focusing questions$/i }).first(), "focusing questions close", { optional: true, expectMove: true });
+      }
       // ✨ Plan my day from Today's Quests header (owner, Nov 2): today's quests placed around the day.
       await h.page.hover("text=Today's Quests").catch(() => {});
       if (await h.tap((p) => p.getByRole("button", { name: /^plan my day$/i }).first(), "plan my day", { optional: true, expectMove: true })) {
@@ -721,7 +728,7 @@ export const FLOWS = [
   {
     name: "pages",
     async run(h) {
-      for (const path of ["/boards", "/calendar", "/rewards", "/feed", "/plan", "/matrix", "/journal", "/notifications", "/settings/inventory", "/power-ups"]) {
+      for (const path of ["/boards", "/quests", "/calendar", "/rewards", "/feed", "/plan", "/matrix", "/journal", "/notifications", "/settings/inventory", "/power-ups"]) {
         await h.goto(path);
         await h.check("loaded");
       }

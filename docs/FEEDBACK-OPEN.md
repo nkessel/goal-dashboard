@@ -8,9 +8,11 @@ Built Nov 8: button audit (typed × → `CloseIcon` everywhere, 104 buttons), to
 
 Built Nov 4 (afternoon): sequencer as quest cards you drag; Settings search + reorganised (Visual settings holds Theme, Layout and effects; Account holds Calendar sync; Secret Missions a half-width tile that slides in; Account & more quieter; Mess check-in out of Settings); evening routine start time Other… (default 4:30pm); Today's gear moved to Settings › Visual settings › Layout › Arrange Today; menu × centred (`CloseIcon`); new quests 15 XP + 1 coin; "Category" for no board; "Primary" without "Priority ·"; sub-quest menu Skip / Remove / Failed (black); "Auto-schedule" in the quest menu; reward button a third of the width, "Undo quest completion"; quest cards don't move on hover; welcome toucan quiet on arrival (Toucan Spirit › His look › "Speaks when you arrive"); time ruler: no ‹ ›, no "type", tap the time to type in place; welcome habits drag to reorder; Today fades up through the mist after the welcome screen.
 
+Built Nov 8 (night): tracked events (pills under the events box in Insights and the check-in: a tap logs one now, Undo; "+ Add tracked event"; hold or right-click a pill to remove it), focusing questions (a lantern left of Today's Quests: one question at a time, ‹ ›, ✎ edits the list), the whole welcome greeting editable (Good morning! too), All Quests › List (Newest by default, Last changed, Due soonest, Most XP, A–Z). The evening "Skip" note was fixed Nov 6 (right-clicks in tomorrow's tray stay with the quest).
+
 Still to do (each the owner's words, shortened):
+- Welcome: check-in button loaded 3 times (2:57 PM); the whole screen refreshed for no reason (2:40 PM).
 - **Morning routine**: three UX teams' ideas sent to the owner Nov 8 as 3 options (A: Pick your morning pills, B: Body · Heart · Mind, C: Dawn path + offerings); build the one he picks.
-- **Anti-habits as tracked events**: an "Add tracked event" button below/next to the events/tags input; named anti-habits (tracked events) show as pills; a tap logs one with its time.
 - Board button at the top of a quest's portrait: a tap gives a small overview of the board with a prominent "See quest in board"; drop "See quest in board" from the menu. **Brainstorm 2–3 ideas first, owner approves** (1:55 PM). Ideas sent Nov 8, waiting on his pick.
 - Stats don't show in the quest editor; check the editor and its view settings all work; 3 agents test (1:50 PM). Location missing from the editor's display menu: 2 agents audit for similar gaps (1:48 PM). Save and Complete quest shouldn't be in the view settings, just a "save settings" button (1:49 PM).
 - Sequence and sub-quests from the same pill (1:45 PM).
@@ -18,7 +20,6 @@ Still to do (each the owner's words, shortened):
 - Swipe a welcome-screen section left to snooze it (or hide if done); finishing a section: a big green check slams down left of its header (1:30 PM).
 - Quests made from a Claude chat get real portraits (1:28 PM). (Blank-circle default built Nov 8.)
 - Avatars of quests and mini-quests aligned; 3 agents brainstorm the quest card section's balance; 3 agents brainstorm habits in the day's plan (Today and/or calendar) (1:07 PM).
-- Focusing questions ("What helps me thrive?"): a button left of Today's Quests' title, one question at a time with arrows (10:13 AM).
 - Welcome sleep time field: "make the whole field and section look immaculately beautiful and elegantly simple" (9:00 AM).
 - Drag a toucan into Settings or another screen; once dropped in a zone he doesn't come back on his own (8:41 AM).
 - Sequence peek: "N after this" only on hover/press of the background cards; a click shows simple card previews in order (8:41 AM). Screenshot button showed the last screenshot, not this screen; "When it ships" options: add "Immediately" (not default) and put them in the design language (8:41 AM).
@@ -27,7 +28,6 @@ Still to do (each the owner's words, shortened):
 - XP box: a blinking cursor when typing; a highlighted number isn't blue: **brainstorm options in the design language** (3:00 PM). Options sent Nov 8, waiting.
 - Portrait picker: upload an image, and choose "turn into a portrait" or "use as is" (3:01–3:02 PM).
 - Save a little more compelling as the default; Complete quest glorious (golden) but not the first thing you'd press: **3 drafts before building** (3:07 PM). Drafts sent Nov 8 (in words), waiting.
-- All Quests: list views in order made (default), last modified, and others (3:10 PM).
 - Settings: screens without a tray (like Notifications) slide in from the right, all inside the one settings box (3:14 PM; done for Secret Missions).
 
 ## Nov 4 evening – Nov 5 notes (owner, read from the database Nov 5), not built yet
@@ -42,7 +42,6 @@ Still to do (id prefix, owner's words shortened):
 - Quest editor: when it was made, in no extra space, tap for edit history (055fa52c, 8a4b38d3); gear icons misshapen (11275375); due date picker doesn't work on a board (18c30fb8); XP pill opens too slowly (ef27a8c4); portrait painting offers 3 to choose from (c6c7aeef); edit sub-quest completion in the editor (e9421b64); "Archive" instead of "Delete quest" (fe7c7f39).
 - Completing: "Claim your reward", a little wider, rounder buttons (2c9bbf43); choose: complete all sub-quests, partial XP, or complete and leave sub-quests (9144f5cb); completed cards stay on Today until moved to Victories (74b32130); tapping a victory shows its quest card (d7e26713); a button by Celebrate today's wins makes an XP celebration screen (ebb671ef).
 - A board's quests ordered manually, by due date or other (ffef2c0d).
-- Evening: "Skip for today" on a tomorrow quest skipped the whole rite, not the quest (424c3879).
 - Feedback box: tapping "Feedback submitted" closes it at once (5f0e6b0a); the screenshot still isn't working (66ed9816).
 - Insights: can't edit an event-log entry (6fb5abb2); the graph waits for a button press (a9e80702).
 

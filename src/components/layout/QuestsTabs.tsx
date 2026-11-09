@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 /** All Quests: the same quests, seen as boards or weighed by priority. */
-export function QuestsTabs({ active, isAdventure }: { active: "boards" | "priority"; isAdventure: boolean }) {
+export function QuestsTabs({ active, isAdventure }: { active: "boards" | "list" | "priority"; isAdventure: boolean }) {
   const tabs = [
     { key: "boards", href: "/boards", label: "Boards" },
+    { key: "list", href: "/quests", label: "List" },
     { key: "priority", href: "/matrix", label: "Priority" },
   ] as const;
   return (

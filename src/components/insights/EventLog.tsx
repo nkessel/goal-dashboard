@@ -7,6 +7,7 @@ import { deleteCheckNoteAction, logEventAction, updateCheckNoteAction } from "@/
 import { setSplitOn, splitEvents, splitOn } from "@/lib/event-split";
 import { DateField } from "@/components/ui/DateField";
 import { CloseIcon } from "@/components/ui/Icons";
+import { TrackedEvents } from "./TrackedEvents";
 
 type Note = { id: string; body: string; created_at: string; details?: string | null; tone?: number | null };
 
@@ -171,6 +172,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
 
   return (
     <div className="relative z-[1] flex flex-col gap-2">
+      <TrackedEvents onLogged={() => router.refresh()} />
       {!open ? (
         <button type="button" onClick={() => setOpen(true)} className="hover-glow flex h-10 items-center justify-center gap-1.5 self-start rounded-full px-4 text-[14px] font-bold" style={chip(true)}>
           <span aria-hidden>🏷</span> Log an event or #tag

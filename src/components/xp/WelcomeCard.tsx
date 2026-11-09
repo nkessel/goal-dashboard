@@ -276,7 +276,7 @@ export function WelcomeCard({
   function finishWriting() {
     const t = (writing ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
     setWriting(null);
-    if (!t || t === greeting) return;
+    if (!t || t === greeting || t === (hello + greeting).trim()) return;
     setKeepAsk({ text: t, was: greeting, keep: true, retire: true });
     setGreeting(t);
   }
@@ -734,7 +734,8 @@ export function WelcomeCard({
                 className={`font-display m-0 leading-tight outline-none [text-wrap:balance] ${writing !== null ? "cursor-text" : ""}`}
                 style={{ color: "var(--t-ink)", fontSize: greetingSize(writing ?? hello + greeting), caretColor: "#8a6116", outline: "none" }}
               >
-                {writing === null && hello}
+                {/* The whole greeting is yours to write over, "Good morning!" too (owner, Nov 4). */}
+                {hello}
                 {greeting}
                 {/* Its ✎ and quiet thumbs, right after the last word. */}
                 {writing === null && (
@@ -743,7 +744,7 @@ export function WelcomeCard({
                       <EditButton
                         open={arranging && greetingOpen}
                         onClick={() => {
-                          setWriting(greeting);
+                          setWriting(hello + greeting);
                           if (arranging) setGreetingOpen(true);
                         }}
                         label="Edit the greeting"

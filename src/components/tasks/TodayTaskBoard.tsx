@@ -35,6 +35,7 @@ import { useOfflineDone } from "@/lib/offline";
 import { settleOptimisticQuests, takeOptimisticFailure, useOptimisticQuests, type OptimisticQuest } from "@/lib/optimistic-quests";
 import { Fold } from "@/components/ui/Fold";
 import { CloseIcon } from "@/components/ui/Icons";
+import { FocusQuestions, FocusQuestionsButton } from "@/components/tasks/FocusQuestions";
 
 /** A just-created quest, drawn like the rest while it saves (blank checkbox until its portrait is ready). */
 function asTask(q: OptimisticQuest): TaskWithCategory {
@@ -393,6 +394,7 @@ export function TodayTaskBoard({
   const [startList, setStartList] = useState<ListName | null>(null);
   const [otherOpen, setOtherOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(true);
+  const [focusOpen, setFocusOpen] = useState(false);
   const [dragError, setDragError] = useState<string | null>(null);
   // A quick move from a card's menu: drop the local copy on the next fresh props.
   const [softLocal, setSoftLocal] = useState(false);
@@ -595,7 +597,7 @@ export function TodayTaskBoard({
               <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
                 <div className="today-head relative">
                 {isAdventure ? (
-                  <div className={`flex items-center gap-2 px-1 ${todayOpen ? "max-sm:pr-[84px]" : ""}`}>
+                  <div className={`flex items-center gap-2 px-1 ${todayOpen ? "max-sm:px-[84px]" : ""}`}>
                     <span className="hidden flex-1 sm:flex">
                       <GoldRule dir="left" />
                     </span>
@@ -624,6 +626,10 @@ export function TodayTaskBoard({
                     </h2>
                   </div>
                 )}
+                {/* Focusing questions (owner, Nov 4): a lantern left of the title. */}
+                <span className="today-head-actions absolute left-0.5 top-1/2 flex -translate-y-1/2 items-center" data-open={todayOpen || focusOpen ? "true" : "false"}>
+                  <FocusQuestionsButton open={focusOpen} onToggle={() => setFocusOpen((v) => !v)} />
+                </span>
                 {/* Plan my day and a new quest straight into Today's Quests: on hover (always while the section is open on touch screens). */}
                 <span className="today-head-actions absolute right-0.5 top-1/2 flex -translate-y-1/2 items-center gap-1.5" data-open={todayOpen ? "true" : "false"}>
                   <button type="button" onClick={openPlanMyDay} aria-label="Plan my day" title="Plan my day: find today's quests a time" className="today-head-btn flex h-8 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold">
@@ -640,6 +646,7 @@ export function TodayTaskBoard({
                   </button>
                 </span>
                 </div>
+                <FocusQuestions open={focusOpen} />
                 {adding && <CreateSheet kinds={["quest"]} initial="quest" pinToToday theme={theme} onClose={() => setAdding(false)} />}
 
                 {dragError && (

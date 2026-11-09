@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { splitEvents, splitOn } from "@/lib/event-split";
+import { TrackedEvents } from "@/components/insights/TrackedEvents";
 import { addCheckNoteAction, addJournalEntryAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
 import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft, MoonIcon, SunIcon, TimeToken } from "./NightFields";
 import { DateField } from "@/components/ui/DateField";
@@ -426,7 +427,8 @@ export function EnergyCheck({
     </ul>
   );
   const noteInput = noting ? (
-    <div className="reveal flex w-full items-center gap-1.5">
+    <div className="reveal flex w-full flex-col gap-1.5">
+    <div className="flex w-full items-center gap-1.5">
       <div className="flex min-h-9 min-w-0 flex-1 flex-wrap items-center gap-1 rounded-lg border px-1.5 py-1" style={{ background: "rgba(255,250,238,.92)", borderColor: "#b39a6a" }}>
         {pendingTags.map((t) => (
           <span key={t} className="flex h-6 items-center gap-0.5 rounded-full pl-2 pr-0.5 text-[13px] font-semibold" style={{ background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10" }}>
@@ -458,6 +460,9 @@ export function EnergyCheck({
       <button type="button" onClick={() => setNoting(false)} aria-label="Cancel" className="flex h-9 w-8 shrink-0 items-center justify-center text-[18px] leading-none" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }}>
         <CloseIcon size={11} />
       </button>
+    </div>
+    {/* Tracked events (anti-habits): one tap logs it now (owner, Nov 4). */}
+    <TrackedEvents />
     </div>
   ) : null;
   // On the welcome screen each slider has its own − and + right beside it, for an exact value.

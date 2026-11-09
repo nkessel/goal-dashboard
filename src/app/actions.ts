@@ -4621,3 +4621,42 @@ export async function welcomePartsXpAction(partsIn: { key: string; xp: number }[
   const res = await xp.awardXp(ownerId, amount, "daily_check_in");
   return { xp: amount, totalXp: res.totalXp as number | null };
 }
+
+
+/** Tracked events (anti-habits and the like, owner Nov 4): names logged with one tap, kept on the account. */
+function cleanTracked(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const out: string[] = [];
+  for (const x of list) {
+    const t = String(x ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
+    if (t && !out.some((o) => o.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out.slice(0, 30);
+}
+export async function trackedEventsAction(): Promise<string[]> {
+  const ownerId = await requireProfileId();
+  return cleanTracked((await readExtras(ownerId)).trackedEvents);
+}
+export async function saveTrackedEventsAction(list: string[]): Promise<string[]> {
+  const ownerId = await requireProfileId();
+  const clean = cleanTracked(list);
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, trackedEvents: clean } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return clean;
+}
+
+/** Focusing questions on Today (owner, Nov 4: "What helps me thrive?"), shown one at a time beside Today's Quests. */
+export async function focusQuestionsAction(): Promise<string[]> {
+  const ownerId = await requireProfileId();
+  const raw = (await readExtras(ownerId)).focusQuestions;
+  return raw === undefined ? ["What helps me thrive?"] : cleanTracked(raw).map((q) => q.slice(0, 160));
+}
+export async function saveFocusQuestionsAction(list: string[]): Promise<string[]> {
+  const ownerId = await requireProfileId();
+  const clean = (Array.isArray(list) ? list : []).map((q) => String(q ?? "").trim().replace(/\s+/g, " ").slice(0, 160)).filter(Boolean).slice(0, 40);
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, focusQuestions: clean } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return clean;
+}
