@@ -159,13 +159,33 @@ export async function saveOrQueue<K extends OfflineKind>(kind: K, args: ArgsOf<K
     return { queued: true };
   }
   try {
-    const result = (await (RUNNERS[kind] as (a: ArgsOf<K>) => Promise<ResultOf<K>>)(args)) as ResultOf<K>;
+    const run = (RUNNERS[kind] as (a: ArgsOf<K>) => Promise<ResultOf<K>>)(args);
+    // A quest's completion still being sent: "Undo quest completion" waits for it (see settleCompletion).
+    const id = kind === "completeQuest" ? (args as { id: string }).id : null;
+    if (id) completing.set(id, run.catch(() => undefined));
+    const result = (await run.finally(() => id && completing.delete(id))) as ResultOf<K>;
     return { queued: false, result };
   } catch (e) {
     if (!isNetworkError(e)) throw e;
     queueOffline(kind, args, key);
     return { queued: true };
   }
+}
+
+const completing = new Map<string, Promise<unknown>>();
+
+/**
+ * Before a quest's completion is undone: waits for a completion that's still being sent (the
+ * celebration plays at once, so Undo could reach the server first and be overwritten), and drops a
+ * completion still waiting offline. True when it was only waiting here (nothing to undo on the server).
+ */
+export async function settleCompletion(id: string): Promise<boolean> {
+  load();
+  await completing.get(id);
+  const waiting = state.ops.filter((o) => o.kind === "completeQuest" && (o.args as { id: string }).id === id);
+  if (!waiting.length) return false;
+  set({ ops: state.ops.filter((o) => !waiting.includes(o)) });
+  return true;
 }
 
 /** The newest waiting change for `key` (e.g. the backpack as last edited offline), if any. */

@@ -2,6 +2,8 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { isNetworkError, settleCompletion } from "@/lib/offline";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
 import { claimRewardAction, getQuestForEditAction, listAvailableRewardsAction, reopenTaskAction } from "@/app/actions";
@@ -150,7 +152,9 @@ export function QuestComplete(props: QuestCompleteProps) {
       })
       .catch(() => {});
   }
+  const router = useRouter();
   const [undoing, startUndo] = useTransition();
+  const [undoError, setUndoError] = useState<string | null>(null);
   const [reduce] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const [p, setP] = useState(reduce ? 1 : 0);
   const [playing, setPlaying] = useState(false);
@@ -486,8 +490,16 @@ export function QuestComplete(props: QuestCompleteProps) {
               disabled={undoing}
               onClick={() =>
                 startUndo(async () => {
-                  await reopenTaskAction(taskId).catch(() => {});
-                  onClose();
+                  setUndoError(null);
+                  try {
+                    // Wait for the completion to land first (or cancel it if it was still waiting offline).
+                    const onlyHere = await settleCompletion(taskId);
+                    if (!onlyHere) await reopenTaskAction(taskId);
+                    router.refresh();
+                    onClose();
+                  } catch (e) {
+                    setUndoError(isNetworkError(e) ? "You're offline: try again once you're back." : e instanceof Error ? e.message : "Couldn't undo that.");
+                  }
                 })
               }
               className="-mt-1 cursor-pointer text-[13.5px] underline underline-offset-2 disabled:opacity-50"
@@ -495,6 +507,11 @@ export function QuestComplete(props: QuestCompleteProps) {
             >
               {undoing ? "Undoing…" : "Undo quest completion"}
             </button>
+          )}
+          {undoError && (
+            <p role="alert" className="-mt-1 m-0 text-center text-[13px]" style={{ color: "#f0b4a0" }}>
+              {undoError}
+            </p>
           )}
           </>
           )}
