@@ -300,7 +300,27 @@ export function KeyboardViewport() {
       // Already up (moving between fields): bring the new one into sight now.
       if (kbUp()) window.setTimeout(reveal, 60);
     };
+    // Safety net (owner's recording, Nov 8: a sheet stayed stretched after the keyboard closed, once
+    // focus had moved to a file picker): with no text field focused, held layers are let go a moment
+    // later whatever the keyboard reports, and again when the app comes back to the front.
+    let sweep: number | undefined;
+    const sweepSoon = () => {
+      window.clearTimeout(sweep);
+      sweep = window.setTimeout(() => {
+        if (isTextField(document.activeElement)) return;
+        root.removeAttribute("data-typing");
+        if (!kbUp()) root.removeAttribute("data-kb");
+        uncover();
+        releaseLayers();
+      }, 700);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") sweepSoon();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", sweepSoon);
     const onFocusOut = () => {
+      sweepSoon();
       // Moving straight to another field keeps the typing state.
       window.setTimeout(() => {
         if (!isTextField(document.activeElement)) {
@@ -326,6 +346,9 @@ export function KeyboardViewport() {
     return () => {
       window.clearTimeout(quiet);
       window.clearTimeout(guess);
+      window.clearTimeout(sweep);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", sweepSoon);
       vv?.removeEventListener("resize", update);
       vv?.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);

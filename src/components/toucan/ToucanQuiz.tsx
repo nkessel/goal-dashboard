@@ -8,6 +8,7 @@ import { QUESTIONS, type Question, type ToucanStyle } from "@/lib/toucan-style";
 import { readStyle, storeStyle } from "@/lib/toucan-style-store";
 import { useEscape } from "@/lib/use-escape";
 import { ToucanArt } from "./ToucanArt";
+import { useFitAboveKeyboard } from "@/lib/use-fit-above-keyboard";
 
 const SPIRIT = { background: "linear-gradient(180deg, rgba(14,38,40,.98), rgba(8,22,26,.99))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8" };
 const CHIP_ON = { background: "rgba(140,240,220,.24)", border: "1.5px solid rgba(140,240,220,.85)", color: "#e8fff8" };
@@ -99,9 +100,10 @@ export function ToucanQuiz({ onClose }: { onClose: () => void }) {
     else setStep((n) => n + 1);
   };
 
+  const kb = useFitAboveKeyboard(true);
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/55 p-3 sm:items-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="How you like to be checked in" onClick={(e) => e.stopPropagation()} className="card-pop-in flex max-h-[88vh] w-full max-w-[440px] flex-col gap-3 overflow-y-auto rounded-3xl p-4" style={{ ...SPIRIT, boxShadow: "0 0 24px rgba(120,230,210,.25), 0 14px 36px rgba(0,0,0,.55)" }}>
+    <div data-kb-fit data-kb-self className={`fixed inset-0 z-[70] flex justify-center bg-black/55 p-3 ${kb ? "items-start" : "items-end sm:items-center"}`} style={kb ? { top: kb.top, height: kb.height, bottom: "auto" } : undefined} onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="How you like to be checked in" onClick={(e) => e.stopPropagation()} className="card-pop-in flex max-h-[88vh] w-full max-w-[440px] flex-col gap-3 overflow-y-auto rounded-3xl p-4" style={{ ...SPIRIT, boxShadow: "0 0 24px rgba(120,230,210,.25), 0 14px 36px rgba(0,0,0,.55)", ...(kb ? { maxHeight: kb.height - 24 } : {}) }}>
         <div className="flex items-center justify-between text-[12.5px]" style={{ color: "rgba(232,255,248,.7)" }}>
           <span>
             {step + 1} of {questions.length}

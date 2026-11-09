@@ -9,6 +9,7 @@ import { DateField } from "@/components/ui/DateField";
 import { useEscape } from "@/lib/use-escape";
 import { TrackingChart } from "./TrackingChart";
 import { CloseIcon } from "@/components/ui/Icons";
+import { useFitAboveKeyboard } from "@/lib/use-fit-above-keyboard";
 
 type Reading = { metric: string; level: number; at: string };
 type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null };
@@ -115,14 +116,15 @@ function AddEntry({ metrics, onClose }: { metrics: string[]; onClose: () => void
     });
   }
 
+  const kb = useFitAboveKeyboard(true);
   return createPortal(
-    <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/45 p-3 sm:items-center" onClick={onClose}>
+    <div data-kb-fit data-kb-self className={`fixed inset-0 z-[85] flex justify-center bg-black/45 p-3 ${kb ? "items-start" : "items-end sm:items-center"}`} style={kb ? { top: kb.top, height: kb.height, bottom: "auto" } : undefined} onClick={onClose}>
       <div
         role="dialog"
         aria-label="Add an entry"
         onClick={(e) => e.stopPropagation()}
         className="card-pop-in parchment parchment-framed relative flex max-h-[88dvh] w-full max-w-[420px] flex-col gap-3 overflow-y-auto rounded-2xl p-4"
-        style={{ color: INK, border: "1.5px solid #a88a3f", boxShadow: "0 18px 40px rgba(0,0,0,.45)" }}
+        style={{ color: INK, border: "1.5px solid #a88a3f", boxShadow: "0 18px 40px rgba(0,0,0,.45)", ...(kb ? { maxHeight: kb.height - 24 } : {}) }}
       >
         <h3 className="font-display relative z-[1] m-0 text-[19px]">Add an entry</h3>
         <div className="relative z-[1] flex flex-wrap items-center gap-2">

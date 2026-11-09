@@ -8,6 +8,7 @@ import { isOffline, pendingFor, saveOrQueue } from "@/lib/offline";
 import { POCKETS, type BringList, type Inventory, type InventoryItem, type ItemStatus, type PocketKey } from "@/lib/inventory";
 import { CHECKIN_STYLES } from "@/lib/celebration-fx";
 import { useEscape } from "@/lib/use-escape";
+import { useFitAboveKeyboard } from "@/lib/use-fit-above-keyboard";
 import { Fold, useClosing } from "@/components/ui/Fold";
 import { openPackingWindow } from "./PackingLists";
 
@@ -22,7 +23,7 @@ const REFILL_ALPHA = 0.6;
 const ALPHA_KEY = "inv-refill-alpha";
 
 /** One slot: an item's portrait, or an empty leather square to fill. */
-function Slot({ item, painting, onTap, moving, at, onGrab, lifted = false, refillAlpha = REFILL_ALPHA }: { item: InventoryItem | null; painting: boolean; onTap: (rect: DOMRect) => void; moving: boolean; at: string; onGrab?: (e: React.PointerEvent) => void; lifted?: boolean; refillAlpha?: number }) {
+function Slot({ item, painting, failed = false, onTap, moving, at, onGrab, lifted = false, refillAlpha = REFILL_ALPHA }: { item: InventoryItem | null; painting: boolean; failed?: boolean; onTap: (rect: DOMRect) => void; moving: boolean; at: string; onGrab?: (e: React.PointerEvent) => void; lifted?: boolean; refillAlpha?: number }) {
   const empty = item?.status === "empty";
   return (
     <button
@@ -42,8 +43,18 @@ function Slot({ item, painting, onTap, moving, at, onGrab, lifted = false, refil
             // eslint-disable-next-line @next/next/no-img-element -- item portrait
             <img src={item.icon} alt="" draggable={false} decoding="async" className="h-full w-full object-cover transition-[filter] duration-300" style={empty ? { filter: "grayscale(.6) brightness(.75)" } : undefined} />
           ) : (
-            <span className={`flex h-full w-full items-center justify-center px-1 text-center text-[12px] font-semibold leading-tight ${painting ? "inv-painting" : ""}`} style={{ color: "#f2d27e" }}>
-              {painting ? "Painting…" : item.name}
+            <span className={`flex h-full w-full flex-col items-center justify-center gap-0.5 px-1 text-center text-[12px] font-semibold leading-tight ${painting ? "inv-painting" : ""}`} style={{ color: "#f2d27e" }}>
+              {painting ? (
+                <>
+                  <span aria-hidden>🖌</span>
+                  Painting…
+                </>
+              ) : (
+                <>
+                  {item.name}
+                  {failed && <span className="text-[10.5px] font-bold uppercase tracking-[.05em]" style={{ color: "#e8c873" }}>↻ paint again</span>}
+                </>
+              )}
             </span>
           )}
           {empty && (
@@ -77,10 +88,14 @@ export function Backpack({ initial }: { initial: Inventory }) {
   }, []);
   const [editing, setEditing] = useState<{ item: InventoryItem; isNew: boolean } | null>(null);
   const [painting, setPainting] = useState<Set<string>>(new Set());
+  // Portraits that could not be painted (offline or failed): the slot says so and the menu offers to try again.
+  const [failed, setFailed] = useState<Set<string>>(new Set());
   const [moving, setMoving] = useState<InventoryItem | null>(null);
   // Tapping an item opens a small menu by it.
   const [menu, setMenu] = useState<{ item: InventoryItem; x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [undo, setUndo] = useState<(() => void) | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [bringOpen, setBringOpen] = useState(false);
   // The view's own settings, opened from its gear (above the pack).
   const [arranging, setArranging] = useState(false);
@@ -243,9 +258,11 @@ export function Backpack({ initial }: { initial: Inventory }) {
     });
   }
   const at = (pocket: PocketKey, slot: number) => inv.items.find((i) => i.pocket === pocket && i.slot === slot) ?? null;
-  const flash = (t: string) => {
+  const flash = (t: string, undoFn?: () => void) => {
+    clearTimeout(toastTimer.current);
     setToast(t);
-    setTimeout(() => setToast(null), 2200);
+    setUndo(() => undoFn ?? null);
+    toastTimer.current = setTimeout(() => (setToast(null), setUndo(null)), undoFn ? 5000 : 3000);
   };
 
   function tapSlot(pocket: PocketKey, slot: number, rect?: DOMRect) {
@@ -274,11 +291,21 @@ export function Backpack({ initial }: { initial: Inventory }) {
     const next = { ...inv, items };
     persist(next);
     setEditing(null);
-    if (!item.icon || paintReq) paint({ ...withDates, icon: null }, next, paintReq?.description?.trim() || undefined);
+    // Only a brand-new item, or a portrait asked for, is painted: toggling Refill must never start a paint.
+    if ((isNew && !item.icon) || paintReq) paint({ ...withDates, icon: null }, next, paintReq?.description?.trim() || undefined);
   }
   function paint(item: InventoryItem, base: Inventory, description?: string) {
     // Painting needs the connection; the item keeps its plain look until it's painted later.
-    if (isOffline()) return;
+    if (isOffline()) {
+      setFailed((f) => new Set(f).add(item.id));
+      flash("No connection: its picture can be painted once you're back online");
+      return;
+    }
+    setFailed((f) => {
+      const n = new Set(f);
+      n.delete(item.id);
+      return n;
+    });
     setPainting((p) => new Set(p).add(item.id));
     paintInventoryItemAction(item.name, description ?? null)
       .then((url) => {
@@ -288,7 +315,10 @@ export function Backpack({ initial }: { initial: Inventory }) {
           return next;
         });
       })
-      .catch(() => flash("Couldn't paint a portrait just now."))
+      .catch(() => {
+        setFailed((f) => new Set(f).add(item.id));
+        flash("The painter dropped the brush. Tap the slot, then “Paint a picture”, to try again.");
+      })
       .finally(() => setPainting((p) => {
         const n = new Set(p);
         n.delete(item.id);
@@ -411,6 +441,7 @@ export function Backpack({ initial }: { initial: Inventory }) {
                       item={item}
                       at={`${p.key}:${slot}`}
                       painting={!!item && painting.has(item.id)}
+                      failed={!!item && failed.has(item.id)}
                       moving={!!moving || (!!drag && drag.over === `${p.key}:${slot}` && drag.item.id !== item?.id)}
                       lifted={!!drag && drag.item.id === item?.id}
                       onGrab={(e) => grab(e, item)}
@@ -475,8 +506,13 @@ export function Backpack({ initial }: { initial: Inventory }) {
         </p>
       )}
       {toast && (
-        <div role="status" className="card-pop-in fixed bottom-24 left-1/2 z-[80] -translate-x-1/2 rounded-full px-4 py-2 text-[14px]" style={{ background: "rgba(20,14,6,.92)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.5)" }}>
+        <div role="status" className="card-pop-in fixed bottom-24 left-1/2 z-[80] flex w-max max-w-[92vw] -translate-x-1/2 items-center rounded-full px-4 py-2 text-[14px]" style={{ background: "rgba(20,14,6,.92)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.5)" }}>
           {toast}
+          {undo && (
+            <button type="button" onClick={() => (undo(), setToast(null), setUndo(null))} className="ml-3 rounded-full px-2.5 py-0.5 text-[13px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
+              Undo
+            </button>
+          )}
         </div>
       )}
       {menu && (
@@ -492,11 +528,12 @@ export function Backpack({ initial }: { initial: Inventory }) {
             setStatus(it, it.status === "full" ? "empty" : "full");
           }}
           onQuest={() => (setMenu(null), refillQuest(menu.item))}
+          onPaint={() => (paint(menu.item, inv), setMenu(null))}
           onGone={() => {
             const it = menu.item;
             setMenu(null);
             remove(it);
-            flash(`${it.name} taken out`);
+            flash(`${it.name} taken out`, () => persist({ ...inv, items: [...inv.items.filter((i) => i.id !== it.id), it] }));
           }}
         />
       )}
@@ -552,7 +589,7 @@ function BringDrawer({ list, onChange, onClose }: { list: BringList; onChange: (
               <input value={place} onChange={(e) => setPlace(e.target.value)} onBlur={savePlace} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur())} placeholder="where? (e.g. Natick)" maxLength={40} aria-label="Where you're bringing it" autoComplete="off" className="bare-input place-input h-8 min-w-0 flex-1 px-1 text-[16px] font-semibold" style={{ color: "var(--t-ink)" }} />
             </label>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+          <button type="button" onClick={onClose} aria-label="Close" className="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
             <CloseIcon size={14} />
           </button>
         </div>
@@ -597,11 +634,11 @@ function BringDrawer({ list, onChange, onClose }: { list: BringList; onChange: (
 }
 
 /** The little menu by a tapped item: edit it, mark it refilled or empty, or make it a quest. */
-function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest, onGone }: { item: InventoryItem; x: number; y: number; onClose: () => void; onEdit: () => void; onToggle: () => void; onQuest: () => void; onGone: () => void }) {
+function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest, onGone, onPaint }: { item: InventoryItem; x: number; y: number; onClose: () => void; onEdit: () => void; onToggle: () => void; onQuest: () => void; onGone: () => void; onPaint?: () => void }) {
   useEscape(onClose);
   const W = 196;
   const left = Math.max(8, Math.min(x - W / 2, (typeof window === "undefined" ? 400 : window.innerWidth) - W - 8));
-  const top = Math.min(y, (typeof window === "undefined" ? 800 : window.innerHeight) - 220);
+  const top = Math.min(y, (typeof window === "undefined" ? 800 : window.innerHeight) - 270);
   const empty = item.status !== "full";
   const row = "relative z-[1] flex min-h-11 items-center gap-2.5 px-4 text-left text-[15px] hover:bg-black/5";
   return createPortal(
@@ -618,6 +655,12 @@ function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest, onGone }: { 
           <span aria-hidden className="w-5 text-center">＋</span>
           Make it a quest
         </button>
+        {!item.icon && onPaint && (
+          <button type="button" role="menuitem" data-mi="paint" onClick={onPaint} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
+            <span aria-hidden className="w-5 text-center">🖌</span>
+            Paint a picture
+          </button>
+        )}
         <button type="button" role="menuitem" data-mi="edit" onClick={onEdit} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">✎</span>
           Edit
@@ -674,8 +717,11 @@ function ItemSheet({
   const [photoError, setPhotoError] = useState<string | null>(null);
   // A new portrait is wanted: none yet, or asked for with "Paint a new one".
   const [repaint, setRepaint] = useState(false);
-  // The picture settings fold away behind the portrait (tap it to open them).
-  const [picturing, setPicturing] = useState(false);
+  // The description box opens from "Paint it"; the note stays folded until asked for.
+  const [describing, setDescribing] = useState(false);
+  const [noting, setNoting] = useState(!!initial.note);
+  // The sheet sits in the strip above the on-screen keyboard, so it can't be covered or stretched.
+  const kb = useFitAboveKeyboard(true);
   const field = "h-11 w-full rounded-lg border px-3 text-[16px]";
   const fieldStyle = { borderColor: "#b39a6a", background: "rgba(255,250,238,.75)", color: "var(--t-ink)" };
   const pocket = POCKETS.find((p) => p.key === item.pocket)!;
@@ -699,13 +745,17 @@ function ItemSheet({
       setBusy(null);
     }
   }
+  // Put the keyboard away before iOS shows its file menu; otherwise it comes back up when the menu closes.
+  const dropKeyboard = () => {
+    const a = document.activeElement;
+    if (a instanceof HTMLElement && a !== document.body) a.blur();
+  };
   const pick = (mode: "photo" | "illustrate") => (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (f) void fromPhoto(f, mode);
   };
-  const chip = "flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold";
-  const chipStyle = { border: "1px solid #b39a6a", color: "var(--t-ink)", background: "rgba(255,250,238,.5)" };
+  const chip = "flex h-11 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold";
   const wantsPaint = !item.icon || repaint;
   // Bring the keyboard up only once the sheet has slid in, so the two don't fight.
   const nameRef = useRef<HTMLInputElement>(null);
@@ -716,70 +766,57 @@ function ItemSheet({
   }, [isNew]);
 
   return createPortal(
-    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[56] flex items-end justify-center overscroll-contain sm:items-center sm:p-4`} style={{ background: "rgba(10,8,4,.3)" }} onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={isNew ? "Add an item" : item.name} onClick={(e) => e.stopPropagation()} className="sheet-up parchment parchment-framed flex max-h-[92svh] w-full max-w-md flex-col gap-3 overflow-y-auto overscroll-contain rounded-t-2xl p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:rounded-2xl">
+    <div data-kb-fit data-kb-self className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[56] flex justify-center overscroll-contain ${kb ? "items-start p-2" : "items-end sm:items-center sm:p-4"}`} style={{ background: "rgba(10,8,4,.3)", ...(kb ? { top: kb.top, height: kb.height, bottom: "auto" } : {}) }} onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label={isNew ? "Add an item" : item.name} onClick={(e) => e.stopPropagation()} className={`${kb ? "" : "sheet-up max-h-[92svh]"} parchment parchment-framed flex w-full max-w-md flex-col gap-3 overflow-y-auto overscroll-contain ${kb ? "rounded-2xl" : "rounded-t-2xl sm:rounded-2xl"} p-4 pb-[max(16px,env(safe-area-inset-bottom))]`} style={kb ? { maxHeight: kb.height - 16 } : undefined}>
         <div className="relative z-[1] flex items-start gap-3">
-          <button
-            type="button"
-            onClick={() => setPicturing((v) => !v)}
-            aria-expanded={picturing}
-            title="Change the picture"
-            aria-label="Change the picture"
-            className="inv-slot relative h-20 w-20 shrink-0 cursor-pointer overflow-hidden rounded-full"
-          >
+          <span className="inv-slot relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full" aria-hidden>
             {item.icon && !repaint ? (
               // eslint-disable-next-line @next/next/no-img-element -- item portrait
               <img src={item.icon} alt="" className="h-full w-full object-cover" />
             ) : (
               <span className={`flex h-full w-full items-center justify-center px-1 text-center text-[11.5px] ${busy ? "inv-painting" : ""}`} style={{ color: "rgba(242,210,126,.75)" }}>
-                {busy === "illustrate" ? "Painting your photo…" : busy === "photo" ? "Adding…" : "A portrait is painted when you save"}
+                {busy === "illustrate" ? "Painting your photo…" : busy === "photo" ? "Adding…" : "🖌 Painted when you save"}
               </span>
             )}
-            {/* A small brush says the portrait opens its picture settings. */}
-            <span aria-hidden className="absolute bottom-0.5 right-0.5 flex h-6 w-6 items-center justify-center rounded-full text-[12px]" style={{ background: "rgba(20,14,6,.82)", boxShadow: "0 0 0 1.5px #d9b45f" }}>
-              🖌
-            </span>
-          </button>
+          </span>
           <div className="min-w-0 flex-1">
             <span className="block text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color: "#8a6116" }}>
               {pocket.label} · slot {item.slot + 1}
             </span>
             <input ref={nameRef} value={item.name} onChange={(e) => setItem({ ...item, name: e.target.value })} onKeyDown={(e) => e.key === "Enter" && item.name.trim() && onSave(item, wantsPaint ? { description } : null)} placeholder="What's in this slot?" maxLength={48} className={`${field} mt-1 font-semibold`} style={fieldStyle} aria-label="Item name" />
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
+          <button type="button" onClick={onClose} aria-label="Close" className="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[24px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
             <CloseIcon size={14} />
           </button>
         </div>
 
-        {/* The picture (opened by tapping the portrait): a photo as it is, a photo painted as an illustration, or painted from words. */}
-        {picturing && <div className="reveal relative z-[1] flex flex-col gap-1.5 rounded-xl p-2.5" style={{ background: "rgba(120,90,40,.08)", border: "1px solid rgba(139,112,64,.3)" }}>
-          <span className="text-[13px] font-semibold" style={{ color: "var(--t-ink)" }}>
-            The portrait
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            <label className={chip} style={chipStyle} title="Use your photo as the picture">
-              📷 Use my photo
+        {/* The picture, always in view: painted from its name, painted from your words, your photo as it is, or your photo painted. */}
+        <div className="relative z-[1] flex flex-col gap-1.5">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="The picture">
+            <button type="button" data-open={wantsPaint ? "true" : "false"} onClick={() => (setRepaint(true), setDescribing((v) => (wantsPaint ? !v : true)))} className={`qe-fact ${chip}`} title="Paint a picture from its name (or describe it)">
+              ✨ Paint it
+            </button>
+            <label className={`qe-fact ${chip}`} title="Use your photo as the picture" onPointerDown={dropKeyboard}>
+              📷 My photo
               <input type="file" accept="image/*" className="sr-only" onChange={pick("photo")} disabled={!!busy} />
             </label>
-            <label className={chip} style={chipStyle} title="Paint your photo as an illustration">
+            <label className={`qe-fact ${chip}`} title="Paint your photo as an illustration" onPointerDown={dropKeyboard}>
               🎨 Paint my photo
               <input type="file" accept="image/*" className="sr-only" onChange={pick("illustrate")} disabled={!!busy} />
             </label>
-            {item.icon && !repaint && (
-              <button type="button" onClick={() => setRepaint(true)} className={chip} style={chipStyle}>
-                ✨ Paint a new one
-              </button>
-            )}
           </div>
-          {wantsPaint && (
-            <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the picture (optional), e.g. a green pouch of fizzy tablets" maxLength={160} className={field} style={fieldStyle} aria-label="Describe the portrait" />
-          )}
+          <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+            {busy ? (busy === "illustrate" ? "Painting your photo…" : "Adding your photo…") : wantsPaint ? "Painted from its name when you save." : "Keeping this picture."}
+          </span>
+          <Fold open={wantsPaint && describing}>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe it (optional), e.g. a green pouch of fizzy tablets" maxLength={160} className={field} style={fieldStyle} aria-label="Describe the portrait" />
+          </Fold>
           {photoError && (
             <span className="text-[13px] font-semibold" style={{ color: "var(--t-warn)" }}>
               {photoError}
             </span>
           )}
-        </div>}
+        </div>
 
         <div className="relative z-[1] flex flex-col gap-1">
           <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -794,7 +831,7 @@ function ItemSheet({
                 aria-checked={item.status === o.v}
                 title={o.hint}
                 onClick={() => setItem({ ...item, status: o.v })}
-                className="h-9 flex-1 rounded-full text-[13.5px] font-semibold"
+                className="h-11 flex-1 rounded-full text-[13.5px] font-semibold"
                 style={item.status === o.v ? { background: o.v === "empty" ? "#9a3b26" : o.v === "low" ? "#c98a2a" : "var(--t-gold)", color: o.v === "full" ? "#2a1c10" : "#fff" } : { color: "var(--t-ink-soft)" }}
               >
                 {o.label}
@@ -802,16 +839,23 @@ function ItemSheet({
             ))}
           </div>
         </div>
-        <textarea value={item.note ?? ""} onChange={(e) => setItem({ ...item, note: e.target.value })} placeholder="A note (where to buy it, which kind…)" rows={2} maxLength={200} className="relative z-[1] w-full rounded-lg border px-3 py-2 text-[16px]" style={fieldStyle} aria-label="Note" />
+        {!noting && (
+          <button type="button" onClick={() => setNoting(true)} className="relative z-[1] -mt-1 self-start text-[13.5px] underline" style={{ color: "var(--t-ink)" }}>
+            + Add a note
+          </button>
+        )}
+        <Fold open={noting}>
+          <textarea value={item.note ?? ""} onChange={(e) => setItem({ ...item, note: e.target.value })} placeholder="A note (where to buy it, which kind…)" rows={2} maxLength={200} className="relative z-[1] w-full rounded-lg border px-3 py-2 text-[16px]" style={fieldStyle} aria-label="Note" />
+        </Fold>
         {!isNew && (
-          <div className="relative z-[1] flex flex-wrap gap-x-4 gap-y-1 text-[13.5px]">
-            <button type="button" onClick={onMove} className="underline" style={{ color: "var(--t-ink)" }}>
+          <div className="relative z-[1] flex flex-wrap gap-x-4 gap-y-0 text-[13.5px]">
+            <button type="button" onClick={onMove} className="min-h-11 underline" style={{ color: "var(--t-ink)" }}>
               Move to another slot
             </button>
-            <button type="button" onClick={onQuest} className="underline" style={{ color: "var(--t-ink)" }}>
+            <button type="button" onClick={onQuest} className="min-h-11 underline" style={{ color: "var(--t-ink)" }}>
               Make a refill quest
             </button>
-            <button type="button" onClick={onRemove} className="underline" style={{ color: "#9a3b26" }}>
+            <button type="button" onClick={onRemove} className="min-h-11 underline" style={{ color: "#9a3b26" }}>
               Take it out
             </button>
           </div>
@@ -820,6 +864,11 @@ function ItemSheet({
           <button type="button" disabled={!item.name.trim() || !!busy} onClick={() => onSave({ ...item, name: item.name.trim(), icon: repaint ? null : item.icon }, wantsPaint ? { description } : null)} className="hover-glow h-11 rounded-full px-6 text-[15px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
             {isNew ? "Put it in the pack" : "Save"}
           </button>
+        </div>
+        <div className="relative z-[1] -mt-2 flex justify-end">
+          <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
+            {busy ? "One moment, your picture is on its way…" : wantsPaint ? "Its picture is painted in a moment." : ""}
+          </span>
         </div>
       </div>
     </div>,

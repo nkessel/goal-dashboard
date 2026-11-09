@@ -9,6 +9,7 @@ import { BoardSeal } from "@/components/boards/BoardSeal";
 import { useEscape } from "@/lib/use-escape";
 import { useClosing } from "@/components/ui/Fold";
 import { CloseIcon } from "@/components/ui/Icons";
+import { useFitAboveKeyboard } from "@/lib/use-fit-above-keyboard";
 
 /**
  * "+" in Not yet plotted: bring boards (plotted as one item) and quests that
@@ -78,15 +79,16 @@ export function AddToMatrixSheet({
   const ink = "var(--t-ink)";
   const soft = "var(--t-ink-soft)";
 
+  const kb = useFitAboveKeyboard(true);
   return createPortal(
-    <div className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[52] flex items-end justify-center sm:items-center sm:p-4`} style={{ background: "var(--t-overlay)" }} onClick={onClose}>
+    <div data-kb-fit data-kb-self className={`${closing ? "overlay-fade-out pointer-events-none" : "overlay-fade-in"} fixed inset-0 z-[52] flex justify-center ${kb ? "items-start p-2" : "items-end sm:items-center sm:p-4"}`} style={{ background: "var(--t-overlay)", ...(kb ? { top: kb.top, height: kb.height, bottom: "auto" } : {}) }} onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Add to the matrix"
         onClick={(e) => e.stopPropagation()}
         className="create-sheet-in parchment parchment-framed flex max-h-[86svh] w-full max-w-lg flex-col gap-3 rounded-t-3xl p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:rounded-3xl"
-        style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: ink }}
+        style={{ ...(isAdventure ? {} : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: ink }), ...(kb ? { maxHeight: kb.height - 16 } : {}) }}
       >
         <div className="relative z-[1] flex items-center justify-between">
           <h3 className={`m-0 ${isAdventure ? "font-display text-[20px]" : "text-base font-bold"}`} style={{ color: ink }}>

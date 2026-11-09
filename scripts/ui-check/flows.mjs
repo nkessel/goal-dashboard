@@ -720,6 +720,20 @@ export const FLOWS = [
           await h.tap((p) => p.locator("[data-packing-window]").getByRole("button", { name: /^close$/i }).first(), "packing: close", { optional: true, expectMove: true });
         }
       }
+      // Add an item (owner's recording, Nov 8): the sheet sits above the keyboard, the picture choice is in view, a note folds.
+      await h.goto("/settings/inventory", { name: "inventory" });
+      if (await h.tap((p) => p.getByRole("button", { name: /^empty slot: add an item$/i }).first(), "empty slot: add an item", { optional: true, expectMove: true })) {
+        await h.settle(700);
+        await h.check("add item sheet");
+        await h.typeIn((p) => p.getByLabel("Item name").first(), "add item: name", "Thai spoon");
+        await h.check("add item sheet: typing");
+        await h.tap((p) => p.getByRole("button", { name: /paint it$/i }).first(), "add item: paint it", { optional: true, expectMove: true });
+        await h.typeIn((p) => p.getByLabel("Describe the portrait").first(), "add item: describe", "a wooden spoon");
+        await h.check("add item sheet: describing");
+        await h.tap((p) => p.getByRole("button", { name: /^\+ add a note$/i }).first(), "add item: add a note", { optional: true, expectMove: true });
+        await h.check("add item sheet: note");
+        await h.tap((p) => p.getByRole("button", { name: /^close$/i }).last(), "add item: close", { optional: true, expectMove: true });
+      }
       await h.tap((p) => p.getByRole("button", { name: /^add 4 slots to the utility pocket$/i }).first(), "add slots", { optional: true, expectMove: true });
       await h.tap((p) => p.getByRole("button", { name: /^utility pocket/i }).first(), "fold utility pocket", { optional: true, expectMove: true });
       await h.check("pocket folded");

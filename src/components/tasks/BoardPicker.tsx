@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 import { useLinger } from "@/components/ui/Fold";
 import { CloseIcon } from "@/components/ui/Icons";
+import { useFitAboveKeyboard } from "@/lib/use-fit-above-keyboard";
 
 export type BoardOption = { id: string; label: string };
 
@@ -32,6 +33,7 @@ export function BoardPicker({
 }) {
   const [open, setOpen] = useState(false);
   const pop = useLinger(open);
+  const kb = useFitAboveKeyboard(pop.shown);
   const [query, setQuery] = useState("");
   const [newName, setNewName] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -113,7 +115,7 @@ export function BoardPicker({
 
       {pop.shown &&
         createPortal(
-          <div className={`fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4${pop.leaving ? " overlay-fade-out pointer-events-none" : ""}`} onClick={() => setOpen(false)}>
+          <div data-kb-fit data-kb-self className={`fixed inset-0 z-[70] flex justify-center ${kb ? "items-start p-2" : "items-end sm:items-center sm:p-4"}${pop.leaving ? " overlay-fade-out pointer-events-none" : ""}`} style={kb ? { top: kb.top, height: kb.height, bottom: "auto" } : undefined} onClick={() => setOpen(false)}>
             <div className="overlay-fade-in absolute inset-0" style={{ background: "var(--t-overlay)" }} />
             <div
               role="dialog"
@@ -121,7 +123,7 @@ export function BoardPicker({
               aria-label="Choose a quest board"
               onClick={(e) => e.stopPropagation()}
               className="sheet-slide-up-in parchment parchment-framed relative flex max-h-[78dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl shadow-2xl sm:rounded-2xl"
-              style={{ background: "var(--t-panel)", border: "2px solid var(--t-panel-border)", color: "var(--t-ink)" }}
+              style={{ background: "var(--t-panel)", border: "2px solid var(--t-panel-border)", color: "var(--t-ink)", ...(kb ? { maxHeight: kb.height - 16 } : {}) }}
             >
               <div className="relative z-[1] flex items-center gap-2 px-4 pb-2 pt-3.5">
                 <h3 className={`flex-1 ${isAdventure ? "font-display text-[19px]" : "text-base font-bold"}`}>Choose a board</h3>
