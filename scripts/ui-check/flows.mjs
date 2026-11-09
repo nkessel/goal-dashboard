@@ -532,9 +532,16 @@ export const FLOWS = [
           if (!n) return null;
           n.scrollIntoView({ block: "center", inline: "nearest" });
           const r = n.getBoundingClientRect();
-          return { x: Math.max(r.left + 80, r.left + r.width * 0.6), y: r.top + Math.min(r.height / 2, 20) };
+          // A spot on the hold that isn't covered by a floating window (the auto-scheduler list sat over it).
+          for (const fx of [0.6, 0.3, 0.85, 0.15]) {
+            const x = r.left + r.width * fx, y = r.top + Math.min(r.height / 2, 20);
+            const at = document.elementFromPoint(x, y);
+            if (at && at.closest(".cal-days-scroll")) return { x, y };
+          }
+          return { covered: true };
         });
-        if (spot) {
+        if (spot?.covered) h.record({ kind: "covered", severity: "warning", target: "essential's menu", detail: "Every spot on the lunch hold was under a floating window; menu not tried" });
+        else if (spot) {
           await h.settle(300);
           await h.page.mouse.click(spot.x, spot.y, { button: "right" });
           await h.settle(400);
@@ -595,8 +602,13 @@ export const FLOWS = [
       await h.goto("/settings/inventory", { name: "offline" });
       const ctx = h.page.context();
       await ctx.setOffline(true);
-      await h.settle(600);
-      if (!(await h.page.getByRole("button", { name: /^offline/i }).count())) throw new Error("offline: no Offline pill after the connection dropped");
+      // Wait for the pill rather than a fixed pause (it was flaky in the full run), and never leave the
+      // browser offline if this flow fails: the next flows' page loads all crashed with ERR_INTERNET_DISCONNECTED.
+      const pill = await h.page.getByRole("button", { name: /^offline/i }).first().waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false);
+      if (!pill) {
+        await ctx.setOffline(false);
+        throw new Error("offline: no Offline pill after the connection dropped");
+      }
       await h.check("offline pill");
       await h.tap((p) => p.getByRole("button", { name: /^offline/i }).first(), "offline pill: why", { optional: true, expectMove: true });
       await h.check("offline pill: open");
@@ -616,7 +628,7 @@ export const FLOWS = [
         }
       }
       const waiting = await h.page.evaluate(() => JSON.parse(localStorage.getItem("offline-queue-v1") || "[]").length);
-      if (!waiting) throw new Error("offline: changes made offline weren't kept on the device");
+      if (!waiting) { await ctx.setOffline(false); throw new Error("offline: changes made offline weren't kept on the device"); }
       await ctx.setOffline(false);
       await h.settle(3000);
       const left = await h.page.evaluate(() => JSON.parse(localStorage.getItem("offline-queue-v1") || "[]").length);

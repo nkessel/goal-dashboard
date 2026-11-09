@@ -57,6 +57,9 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: { default: "Goal Dashboard", template: "%s · Goal Dashboard" },
   description: "Personal + social goal & task dashboard",
+  // Added to the iPhone Home Screen it opens on its own, full screen, and works offline (owner, Nov 8).
+  appleWebApp: { capable: true, title: "Quests", statusBarStyle: "default" },
+  icons: { apple: [{ url: "/app-icon/180", sizes: "180x180", type: "image/png" }] },
 };
 
 // The on-screen keyboard slides over the page on Android too (as it always does

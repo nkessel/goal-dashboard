@@ -376,6 +376,8 @@ async function walk({ browser, device, time, tz, cookie }) {
       record({ kind: "flow-crashed", severity: "error", target: flow.name, detail: e.message.split("\n")[0].slice(0, 300) });
       await page.screenshot({ path: `${OUT}shots/${String(++shotN).padStart(3, "0")}-${device}-${time}-${flow.name}-CRASH.png` }).catch(() => {});
     }
+    // A flow that went offline never leaves the next flows without a connection.
+    await page.context().setOffline(false).catch(() => {});
     await flushErrors().catch(() => {});
     process.stdout.write(`  ${device} ${time} ${flow.name}: done\n`);
   }
