@@ -28,12 +28,7 @@ import { useEffect } from "react";
  *                      + button and feedback button step aside)
  * Inside [data-kb-self] the popup makes its own room; fields are only scrolled.
  *
- * Under the keyboard: iPhone's keyboard (and Chrome's bar above it) is see-through, so whatever
- * the page has under it (a parchment quest card, the bottom bar) tinted the keyboard and showed
- * as a band behind Chrome's key/card/pin bar (owner's recording, Nov 6). While typing, a dark
- * layer fills everything below the visible strip ([data-kb-cover], html[data-kb-cover], --kb-top),
- * so the keyboard always sits on the same dark ground. It's placed from the raw viewport on every
- * event (never the settled one), and on focus before the keyboard reports, from where it last ended.
+ * Under the keyboard: nothing of ours (owner, Nov 9). An earlier dark ground there (Nov 6) is gone.
  */
 export function KeyboardViewport() {
   useEffect(() => {
@@ -45,9 +40,10 @@ export function KeyboardViewport() {
 
     // ── The dark ground under the keyboard ──────────────────────────────────
     let lastKbH = 0; // the visible height the last time the keyboard was up
+    // No ground under the keyboard, ever (owner, Nov 9: "the green thing behind the keyboard shouldn't
+    // ever show up"): the keyboard sits on whatever the page has under it, as iOS draws it.
     const coverAt = (top: number) => {
-      root.style.setProperty("--kb-top", `${Math.round(top)}px`);
-      root.setAttribute("data-kb-cover", "");
+      void top;
     };
     const uncover = () => root.removeAttribute("data-kb-cover");
     let seenUp = false; // the keyboard has reported its size since the cover went down
@@ -371,5 +367,5 @@ export function KeyboardViewport() {
       uncover();
     };
   }, []);
-  return <div data-kb-cover aria-hidden />;
+  return null;
 }

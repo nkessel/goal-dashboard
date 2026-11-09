@@ -1782,20 +1782,6 @@ html[data-kb] [data-feedback-hide] {
    sky at the top right (FeedbackDock), clear of the card. While only the mist is up (before the
    welcome screen or Today shows) it waits out of sight, so it never floats over the fog alone. */
 html[data-fog]:not([data-welcome-open]) [data-feedback-hide] { opacity: 0; visibility: hidden; pointer-events: none; }
-/* Under the keyboard: a dark ground below the visible strip while typing on a phone, so the
-   see-through keyboard never shows a parchment card or the bottom bar through it (KeyboardViewport). */
-div[data-kb-cover] { display: none; }
-html[data-kb-cover] div[data-kb-cover] {
-  display: block;
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: var(--kb-top, 100lvh);
-  height: 100lvh;
-  z-index: 2147483000;
-  pointer-events: none;
-  background: #1b2119;
-}
 /* The feedback box's scroll bar: slim and quiet. */
 .feedback-scroll { scrollbar-width: thin; scrollbar-color: rgba(139, 112, 64, 0.45) transparent; }
 
