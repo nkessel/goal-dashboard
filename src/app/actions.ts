@@ -4660,3 +4660,102 @@ export async function saveFocusQuestionsAction(list: string[]): Promise<string[]
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return clean;
 }
+
+/* ── Dawn & dusk: the morning routine planned the night before (owner, Nov 9) ─────────── */
+
+async function saveDawn(ownerId: string, dawn: import("@/lib/dawn").Dawn) {
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dawn } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+}
+
+/** Your dawn settings, stones and days; the first time, the stones come from your morning habits. Also which habit-tied stones are done on `day`. */
+export async function dawnAction(day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const { cleanDawn, cleanStone } = await import("@/lib/dawn");
+  const dawn = cleanDawn((await readExtras(ownerId)).dawn);
+  const rites = ((await ritesData.listRites(ownerId).catch(() => null)) ?? []).filter((r) => r.slot === "day" && r.kind !== "ritual");
+  if (!dawn.seeded) {
+    const seed: import("@/lib/dawn").Stone[] = [];
+    const morning = rites.find((r) => /morning (routine|rite|ritual)/i.test(r.title));
+    for (const st of morning ? ritesData.cleanRiteSteps(morning.steps) : []) {
+      const s = cleanStone({ title: st.title, emoji: /chester|walk|dog/i.test(st.title) ? "🐶" : /read|book/i.test(st.title) ? "📖" : /breakfast/i.test(st.title) ? "🍳" : "✦", min: /walk/i.test(st.title) ? 20 : 15, ref: `step:${morning!.id}:${st.id}` });
+      if (s) seed.push(s);
+    }
+    for (const r of rites) {
+      if (morning && r.id === morning.id) continue;
+      if (!/language|gym|meditat|stretch|journal/i.test(r.title)) continue;
+      const s = cleanStone({ title: r.title, emoji: /language/i.test(r.title) ? "🗣" : /gym/i.test(r.title) ? "🏋️" : "✦", min: r.estimate_minutes ?? 15, ref: `rite:${r.id}`, short: /language/i.test(r.title) ? "Say one phrase" : /gym/i.test(r.title) ? "20 push-ups or squats" : undefined });
+      if (s) seed.push(s);
+    }
+    dawn.stones = [...seed, ...dawn.stones];
+    dawn.seeded = true;
+    await saveDawn(ownerId, dawn).catch(() => {});
+  }
+  // Which habit-tied stones are already done today (ticked on Today or elsewhere).
+  const since = day;
+  const [checks, comps] = await Promise.all([ritesData.listRiteStepChecks(ownerId, since).catch(() => null), ritesData.listCompletionsFor(ownerId, rites.map((r) => r.id), since).catch(() => [])]);
+  const doneRefs = new Set<string>([...(checks ?? []).filter((c) => c.day === day).map((c) => `step:${c.rite_id}:${c.step_id}`), ...comps.filter((c) => c.day === day).map((c) => `rite:${c.rite_id}`)]);
+  const doneIds = dawn.stones.filter((s) => s.ref && doneRefs.has(s.ref)).map((s) => s.id);
+  return { dawn, doneIds };
+}
+
+/** Save your dawn settings: which parts you use, your stones, cards, prompts and chapters. */
+export async function saveDawnAction(patch: Partial<Pick<import("@/lib/dawn").Dawn, "on" | "stones" | "cards" | "prompts" | "chapters" | "chapterPinned">>) {
+  const ownerId = await requireProfileId();
+  const { cleanDawn } = await import("@/lib/dawn");
+  const cur = cleanDawn((await readExtras(ownerId)).dawn);
+  const next = cleanDawn({ ...cur, ...patch, on: { ...cur.on, ...(patch.on ?? {}) }, seeded: true });
+  await saveDawn(ownerId, next);
+  return next;
+}
+
+/** Save part of one day's dawn (the stones chosen, wake time, the card, answers…). */
+export async function dawnDayAction(day: string, patch: import("@/lib/dawn").DawnDay) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const { cleanDawn } = await import("@/lib/dawn");
+  const cur = cleanDawn((await readExtras(ownerId)).dawn);
+  const answers = patch.answers ? { ...(cur.days[day]?.answers ?? {}), ...patch.answers } : cur.days[day]?.answers;
+  const next = cleanDawn({ ...cur, days: { ...cur.days, [day]: { ...(cur.days[day] ?? {}), ...patch, ...(answers ? { answers } : {}) } } });
+  await saveDawn(ownerId, next);
+  return next.days[day] ?? {};
+}
+
+/**
+ * Tick a stone (or the offering card, the week's practice) done or not. A stone tied to a habit
+ * ticks that habit (which pays its own XP); your own stones, the card and the week's practice pay
+ * their XP here (5 unless set).
+ */
+export async function tickDawnAction(day: string, what: { stone: string } | { extra: "card" | "week" | "pmCard" }, on: boolean) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const { cleanDawn } = await import("@/lib/dawn");
+  const dawn = cleanDawn((await readExtras(ownerId)).dawn);
+  const d = { ...(dawn.days[day] ?? {}) };
+  let pay = 0;
+  if ("stone" in what) {
+    const s = dawn.stones.find((x) => x.id === what.stone);
+    if (!s) throw new Error("That stone isn't on your path anymore.");
+    const was = (d.done ?? []).includes(s.id);
+    if (s.ref?.startsWith("step:")) {
+      const [, riteId, stepId] = s.ref.split(":");
+      await tickRiteStepAction(riteId, stepId, day, on);
+    } else if (s.ref?.startsWith("rite:")) {
+      const riteId = s.ref.slice(5);
+      if (on) await completeRiteAction(riteId, day).catch(() => null);
+      else await uncompleteRiteAction(riteId, day).catch(() => null);
+    } else if (was !== on) pay = (on ? 1 : -1) * (s.xp ?? 5);
+    d.done = on ? [...new Set([...(d.done ?? []), s.id])] : (d.done ?? []).filter((x) => x !== s.id);
+  } else {
+    const key = what.extra === "card" ? "cardDone" : what.extra === "week" ? "weekDone" : "pmDone";
+    if (!!d[key] !== on) pay = on ? 5 : -5;
+    d[key] = on || undefined;
+  }
+  if (pay) await xp.awardXp(ownerId, pay, "task_completed").catch(() => {});
+  dawn.days[day] = d;
+  await saveDawn(ownerId, dawn);
+  revalidatePath("/");
+  return { day: dawn.days[day], xp: pay };
+}

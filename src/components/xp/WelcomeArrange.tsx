@@ -271,6 +271,7 @@ export function ArrangeList({ fx, order, parts, empty, focusEl }: { fx: FxSettin
 const SHORT: Record<WelcomeEl, string> = {
   checkin: "energy, mood and more",
   sleep: "last night, factors, quality",
+  dawn: "your morning stones",
   focus: "your own words",
   quests: "due soon and today's",
   streak: "days in a row",

@@ -6,11 +6,12 @@
  */
 import type { FxSettings } from "./celebration-fx";
 
-export type WelcomeEl = "checkin" | "sleep" | "focus" | "quests" | "streak" | "line" | "reflect" | "habits" | "bar" | "reward" | "due";
+export type WelcomeEl = "checkin" | "sleep" | "dawn" | "focus" | "quests" | "streak" | "line" | "reflect" | "habits" | "bar" | "reward" | "due";
 
 export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
   { key: "checkin", label: "Check-in", hint: "A gilded Check in button that opens energy, mood and anything else you track, right there (plus last night's sleep and wake times on the day's first visit). Your check-ins feed Insights and tell the toucan how you're doing." },
   { key: "sleep", label: "Sleep", hint: "A gilded Sleep button that opens last night's sleep and wake times, the Wheel of Time (factors of sleep, its lists editable right there), a five-face sleep quality, and other nights." },
+  { key: "dawn", label: "Dawn path", hint: "Your morning stones (chosen last night, or your first few): tap one when it's done, or swipe across them afterwards; one is a gentle dawn. Short on time turns them into 2-minute versions. The habit of the week and an offering card join them; its gear chooses which parts you use." },
   { key: "focus", label: "Your top priority", hint: "Asks “What's your top priority?” with a box to answer in your own words. The app and the toucan keep it in mind, so his check-ins through the day, the week and the month come back to what really matters to you." },
   { key: "quests", label: "Today's quests", hint: "A gilded “Choose today's quests” button that opens Due soon (at the top, within the reach you pick) and Today's Quests below: drag a due quest into today, or tap its +; drag today's into order; × takes one off." },
   { key: "streak", label: "Your streak", hint: "How many days in a row you've shown up. Day's first visit only. Motivating for some; leave it off if streaks feel like pressure." },
@@ -24,13 +25,18 @@ export const WELCOME_ELS: { key: WelcomeEl; label: string; hint: string }[] = [
 
 // "intention" was removed (owner, Oct 31); stored orders drop it.
 // "toucan" (a second, drawn toucan in the card) was removed: one toucan at a time (owner, Oct 31).
-const DEFAULT_ORDER: WelcomeEl[] = ["checkin", "sleep", "focus", "quests", "streak", "line", "reflect", "habits", "bar", "reward", "due"];
+const DEFAULT_ORDER: WelcomeEl[] = ["checkin", "sleep", "dawn", "focus", "quests", "streak", "line", "reflect", "habits", "bar", "reward", "due"];
 const DEFAULT_HIDE: WelcomeEl[] = ["due"];
 const KEYS = new Set<string>(DEFAULT_ORDER);
 
 /** The parts in your order (any new ones join at the end). */
 export function welcomeOrder(fx: FxSettings): WelcomeEl[] {
   const saved = (fx.welcomeOrder ?? []).filter((k): k is WelcomeEl => KEYS.has(k));
+  // The Dawn path (Nov 9) joins a saved order right after Sleep, not at the end.
+  if (saved.length && !saved.includes("dawn")) {
+    const at = saved.indexOf("sleep");
+    saved.splice(at >= 0 ? at + 1 : 0, 0, "dawn");
+  }
   return [...new Set([...saved, ...DEFAULT_ORDER])];
 }
 

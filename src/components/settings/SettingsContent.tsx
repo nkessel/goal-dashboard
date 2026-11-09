@@ -10,6 +10,7 @@ import { EveningRoutineTile } from "./EveningRoutineTile";
 import { StatsTile } from "./StatsTile";
 import { SetAsDefault } from "./SetAsDefault";
 import { PlanningSettings } from "./PlanningSettings";
+import { DawnSettingsPanel } from "@/components/dawn/DawnSettingsPanel";
 import { notFound } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { ImportsInboxRow } from "@/components/imports/ImportsInboxRow";
@@ -360,6 +361,10 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </SettingsRow>
           </SectionItem>
           <SectionItem id="planning">
+          <SettingsRow id="dawn-dusk" theme={profile.theme} defaultOpen={opens("dawn-dusk")} label="Morning & evening routines" rightLabel="Dawn path · planned the night before" icon={<span style={{ fontSize: 14 }}>☀️</span>}>
+            <DawnSettingsPanel />
+          </SettingsRow>
+
           <SettingsRow id="planning" theme={profile.theme} defaultOpen={opens("planning")} label="Planning & evening" rightLabel="Evening routine · planning steps" icon={<span style={{ fontSize: 14 }}>🗺</span>}>
             <PlanningSettings isAdventure={isAdventure} withPair={admin} />
           </SettingsRow>

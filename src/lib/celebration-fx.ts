@@ -76,6 +76,8 @@ export type FxSettings = {
   /** Welcome buttons you shape yourself (right-click or hold one, owner Nov 6): its words, an emoji for its icon, and the XP it pays once filled in. */
   /** The welcome Journal's prompts, as pills (unset = the starter list in lib/journal-prompts.ts). */
   journalPrompts?: { id: string; label: string; prompt: string; xp: number }[];
+  /** 2 once the list was saved knowing the planner prompts (Nov 9), so a removed one stays removed. */
+  journalPromptsV?: number;
   welcomeButtons?: Partial<Record<"checkin" | "sleep" | "quests" | "focus", { text?: string; icon?: string; xp?: number }>>;
   welcomeIntentionQ?: string;
   welcomeIntentionHint?: string;

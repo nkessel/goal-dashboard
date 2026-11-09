@@ -34,6 +34,7 @@ import { Moon } from "./BeginEveningButton";
 import { useFlipToEvening } from "./DayNightFlip";
 import { useLocalDay } from "./evening-clock";
 import { TomorrowQuests } from "./TomorrowQuests";
+import { DuskEvening, DuskPlan } from "@/components/dawn/Dusk";
 import { RiteGlyph, RiteMedallion, TrophyAvatar, glyphFor } from "./RiteGlyph";
 import { SwipeActions } from "@/components/ui/SwipeActions";
 import type { Task } from "@/lib/data/types";
@@ -706,7 +707,10 @@ export function EveningRites({
                 {r.kind === "wins" ? (
                   <RecentWins day={day} onHide={() => toggleOpen(r)} />
                 ) : r.kind === "plan" ? (
-                  <DayPlanner day={day} chosen={tomorrow ?? []} theme={theme} onHide={() => toggleOpen(r)} />
+                  <>
+                    {day && <DuskPlan day={day} />}
+                    <DayPlanner day={day} chosen={tomorrow ?? []} theme={theme} onHide={() => toggleOpen(r)} />
+                  </>
                 ) : (
                   <TomorrowQuests heading={false} queued={tomorrow} todayIds={todayIds} candidates={openQuests} theme={theme} onCountChange={(n) => syncTomorrow(r, n)} />
                 )}
@@ -768,6 +772,9 @@ export function EveningRites({
               {error}
             </p>
           )}
+
+          {/* Tonight's reflections and offering (Dawn & dusk; off in its settings). */}
+          {day && <DuskEvening day={day} />}
 
           {/* The rites themselves, in a subtle section of their own */}
           <section className="rounded-3xl px-2.5 pb-3 pt-3" style={{ background: "rgba(8,10,30,.35)", border: "1px solid rgba(217,180,95,.2)" }}>

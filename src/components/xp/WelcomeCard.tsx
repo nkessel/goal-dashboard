@@ -31,6 +31,7 @@ import { castleOf } from "./CastleArt";
 import { Fold } from "@/components/ui/Fold";
 import { addJournalEntryAction } from "@/app/actions";
 import { cleanXp, journalPrompts, type JournalPrompt } from "@/lib/journal-prompts";
+import { DawnPath } from "@/components/dawn/DawnPath";
 
 export type WelcomeAward = { xp: number; streak: number; coins: number; fromPct: number; toPct: number; caption: string };
 
@@ -527,6 +528,7 @@ export function WelcomeCard({
     ) : null,
     reflect: reflectQuestions(fx).length ? <ReflectLine questions={reflectQuestions(fx)} /> : null,
     habits: <WelcomeHabits fx={fx} />,
+    dawn: <DawnPath />,
     line: shownLine ? (
       <div className="flex w-full flex-col items-center gap-0.5">
         {/* ‹ › either side for more wise lines (owner, Nov 5); quiet thumbs right after the line's last word. */}
@@ -2016,7 +2018,7 @@ function JournalPromptsEditor({ fx }: { fx: FxSettings }) {
   const [list, setList] = useState<JournalPrompt[]>(() => journalPrompts(fx));
   const save = (next: JournalPrompt[]) => {
     setList(next);
-    patchFx({ journalPrompts: next });
+    patchFx({ journalPrompts: next, journalPromptsV: 2 });
   };
   const edit = (i: number, patch: Partial<JournalPrompt>) => save(list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
   const field = "bare-input h-7 min-w-0 rounded-none border-0 border-b bg-transparent px-1 text-[13.5px] focus:outline-none";

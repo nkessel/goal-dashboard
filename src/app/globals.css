@@ -3222,3 +3222,16 @@ html[data-mist-reveal] [data-app-shell] { animation: shell-from-mist 1.1s cubic-
 /* The quest editor's board card (tasks/BoardCard.tsx): grows toward the screen as the board opens. */
 .board-card-grow { animation: board-card-grow 260ms cubic-bezier(.4,0,.2,1) forwards; }
 @keyframes board-card-grow { to { transform: scale(1.18); opacity: 0; } }
+
+/* Dawn path (components/dawn): stones, the sky strip, the wax seal, face-down cards. */
+.dawn-sky { background: linear-gradient(90deg, #a9c1d8, #c8d6e2); box-shadow: inset 0 0 0 1px rgba(138,97,22,.3); overflow: hidden; }
+.dawn-sky > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #f3c76a, #f6dc8e 70%, #fff1bd); box-shadow: 0 0 8px rgba(246,200,90,.8); transition: width 600ms cubic-bezier(.2,.8,.2,1); }
+.dawn-stone { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 999px; font-size: 21px; background: #fffaf0; border: 1.5px solid #b39a6a; box-shadow: 0 2px 4px rgba(60,40,10,.18); transition: background 300ms, box-shadow 300ms, transform 200ms; }
+.dawn-stone-lit { background: radial-gradient(circle at 35% 30%, #fff3c4, #e9c766 60%, #c9a24a); color: #3b2a0a; font-weight: 700; box-shadow: 0 0 12px rgba(240,200,90,.9); border-color: #8a6116; animation: dawn-lit 420ms ease-out; }
+.dawn-stone-week:not(.dawn-stone-lit) { border-style: dashed; border-color: #a8740f; background: #fff6dc; }
+@keyframes dawn-lit { 40% { transform: scale(1.18); } }
+.dawn-path button:active .dawn-stone { transform: scale(.94); }
+.dawn-wax { display: flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border-radius: 999px; color: #f6ead0; background: radial-gradient(circle at 35% 30%, #c44a3e, #8e2b25 65%, #6a1e19); box-shadow: 0 0 0 2px #5a1712, 0 3px 6px rgba(0,0,0,.35); }
+.dawn-facedown { background: repeating-linear-gradient(45deg, #2b4a35 0 6px, #355a40 6px 12px); border: 2px solid #c9a24a; box-shadow: 0 3px 6px rgba(0,0,0,.25); transition: transform 200ms; }
+.dawn-facedown:hover { transform: translateY(-4px) rotate(-2deg); }
+@media (prefers-reduced-motion: reduce) { .dawn-stone-lit { animation: none; } }

@@ -51,6 +51,23 @@ export const FLOWS = [
       await h.tap((p) => p.getByRole("button", { name: /^done$/i }).first(), "ruler done", { optional: true, expectMove: true });
       await h.tap(/^sleep/i, "sleep close", { expectMove: true });
       await h.toggle(/^habits/i, "habits");
+      // The Dawn path (owner, Nov 9): stones, Short on time, the offering card, its gear.
+      if (await h.page.locator(".dawn-sky").count()) {
+        await h.check("dawn path");
+        await h.tap((p) => p.locator("[data-stone]").nth(1), "dawn: tick a stone", { optional: true });
+        await h.tap((p) => p.getByRole("button", { name: /short on time/i }).first(), "dawn: short on time", { optional: true });
+        await h.check("dawn path ticked, short");
+        if (await h.tap((p) => p.getByRole("button", { name: /choose which parts you use/i }).first(), "dawn: gear", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("dawn settings");
+          await h.tap((p) => p.getByRole("button", { name: /close the settings/i }).first(), "dawn: gear shut", { optional: true, expectMove: true });
+        }
+        if (await h.tap((p) => p.getByRole("button", { name: /choose today.s stones|change today.s stones/i }).first(), "dawn: choose stones", { optional: true, expectMove: true })) {
+          await h.tap((p) => p.locator(".dawn-sky").locator("xpath=..").getByRole("button", { name: /＋ more/i }).first(), "dawn: more ideas", { optional: true, expectMove: true });
+          await h.check("dawn: choosing stones");
+          await h.tap((p) => p.getByRole("button", { name: /done choosing/i }).first(), "dawn: done choosing", { optional: true, expectMove: true });
+        }
+      } else throw new Error("welcome: no Dawn path");
       // Top priorities sit behind the Journal button, its first pill (owner, Nov 6).
       await h.tap((p) => p.locator("button[aria-expanded]", { hasText: /journal/i }).first(), "journal open", { expectMove: true }); // the check-in's "✎ Journal" button shares the name
       await h.check("journal open");
@@ -402,7 +419,20 @@ export const FLOWS = [
         await esc(h);
       }
       await h.toggle(/celebrate today.s wins/i, "today's wins");
-      await h.toggle(/prepare for tomorrow/i, "prepare for tomorrow");
+      // Prepare for tomorrow's day opens with Tomorrow's dawn: wake time, room, stones, the seal (owner, Nov 9).
+      if (await h.tap(/prepare for tomorrow/i, "prepare for tomorrow", { expectMove: true })) {
+        await h.settle(800);
+        await h.check("prepare for tomorrow: dawn");
+        await h.tap((p) => p.getByRole("button", { name: /^6:30am$/ }).first(), "dusk: wake 6:30", { optional: true });
+        await h.tap((p) => p.getByRole("button", { name: /fill my time/i }).first(), "dusk: fill my time", { optional: true });
+        await h.check("dusk: wake and stones");
+        await h.tap(/prepare for tomorrow/i, "prepare for tomorrow close", { optional: true, expectMove: true });
+      }
+      // Tonight: reflections and an evening offering.
+      if (await h.tap((p) => p.getByRole("button", { name: /^🌙 tonight/i }).first(), "tonight", { optional: true, expectMove: true })) {
+        await h.check("tonight open");
+        await h.typeIn((p) => p.getByLabel(/what did i do right today/i).first(), "tonight: a reflection");
+      }
     },
   },
   {
