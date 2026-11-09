@@ -6,7 +6,7 @@ import { shownLevel } from "@/lib/shown-level";
 import { useState, useTransition } from "react";
 import { sendFriendRequestAction, removeFriendAction } from "@/app/actions";
 import type { Friendship, Profile } from "@/lib/data/types";
-import { defaultPortraitFor } from "@/components/settings/Avatar";
+import { defaultPortraitFor } from "@/lib/default-portrait";
 
 type Row = { profile: Profile; friendship?: Friendship };
 type Theme = "calm" | "adventure";

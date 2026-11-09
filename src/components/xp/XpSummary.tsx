@@ -3,7 +3,8 @@ import { HonoraryLevel } from "./HonoraryLevel";
 import { InlineNameEditor } from "@/components/settings/InlineNameEditor";
 import type { Profile } from "@/lib/data/types";
 import { xpToNextLevel } from "@/lib/data/xp";
-import { Avatar, defaultPortraitFor } from "@/components/settings/Avatar";
+import { Avatar, PortraitImg } from "@/components/settings/Avatar";
+import { defaultPortraitFor } from "@/lib/default-portrait";
 import { RefillBadge } from "@/components/settings/RefillBadge";
 import { normalizeInventory } from "@/lib/inventory";
 import { BossBadge, FaceBossButton, type BossView } from "./BossLine";
@@ -111,8 +112,7 @@ export function XpSummary({
                 }}
               >
                 <span className="block h-full w-full overflow-hidden rounded-full" style={{ boxShadow: "inset 0 0 0 2px #3a2e14" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL or /design default */}
-                  <img src={profile.avatar_image_url ?? defaultPortraitFor(profile.id)} alt="Avatar" className="h-full w-full object-cover" />
+                  <PortraitImg src={profile.avatar_image_url ?? defaultPortraitFor(profile.id)} fallback={defaultPortraitFor(profile.id)} alt="Avatar" className="h-full w-full object-cover" />
                 </span>
               </Link>
               <RefillBadge inventory={normalizeInventory(profile.life_wheel?.inventory)} />

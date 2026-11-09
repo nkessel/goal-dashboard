@@ -11,7 +11,8 @@
  */
 const PAGES = "gd-pages-v1";
 const ASSETS = "gd-assets-v1";
-const IMAGES = "gd-images-v1";
+// v2: v1 could hold a failed picture kept as an opaque response (it looked fine but never showed).
+const IMAGES = "gd-images-v2";
 const KEEP = [PAGES, ASSETS, IMAGES];
 const MAX_ASSETS = 500;
 const MAX_IMAGES = 160;
@@ -116,9 +117,12 @@ async function cacheFirst(name, req, max) {
 async function staleWhileRevalidate(name, req, max) {
   const cache = await caches.open(name);
   const hit = await cache.match(req, { ignoreVary: true });
-  const fresh = fetch(req)
+  // A picture from another site (Supabase storage) is asked for again in "cors" mode so its status can be read and a failed one is never kept.
+  const ask = new URL(req.url).origin === self.location.origin ? fetch(req) : fetch(req.url, { mode: "cors", credentials: "omit" }).catch(() => fetch(req));
+  const fresh = ask
     .then(async (res) => {
-      if (res.ok || res.type === "opaque") {
+      // Only a picture the server really answered with is kept (an opaque reply can't be checked, so it could be an error).
+      if (res.ok && res.type !== "opaque") {
         await cache.put(req, res.clone());
         trim(name, max);
       }

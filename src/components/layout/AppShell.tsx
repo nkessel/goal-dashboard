@@ -13,7 +13,7 @@ import { DailyLogin } from "@/components/xp/DailyLogin";
 import { OwnWordsSync } from "@/components/settings/OwnWordsSync";
 import { FOG_SHELL_SCRIPT } from "@/lib/welcome-fog";
 import { QuestCelebrationHost } from "@/components/celebration/QuestCelebrationHost";
-import { defaultPortraitFor } from "@/components/settings/Avatar";
+import { defaultPortraitFor } from "@/lib/default-portrait";
 import { countImports, countMissingPortraits } from "@/lib/data/rewards";
 import { runCleanups } from "@/lib/data/cleanups";
 import { PortraitPainter } from "@/components/imports/PortraitPainter";

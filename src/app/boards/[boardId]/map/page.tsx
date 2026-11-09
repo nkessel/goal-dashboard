@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { loadCampaign } from "@/lib/data/campaign";
 import { QuestMap } from "@/components/map/QuestMap";
 import { getProfileById } from "@/lib/data/profiles";
-import { defaultPortraitFor } from "@/components/settings/Avatar";
+import { defaultPortraitFor } from "@/lib/default-portrait";
 
 /** A board as a quest map: one road through every quest in it and the boards inside. */
 export default async function BoardMapPage({ params }: { params: Promise<{ boardId: string }> }) {
