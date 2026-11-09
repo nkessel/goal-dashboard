@@ -1755,7 +1755,7 @@ html {
 /* They fade (not blink) out of the way and back. */
 [data-hide-when-typing],
 [data-feedback-hide] {
-  transition: opacity 160ms ease, visibility 0s linear 0s, transform 150ms, scale 150ms, translate 150ms, background-color 0.16s, border-color 0.16s, color 0.16s, box-shadow 0.16s, filter 0.16s;
+  transition: opacity 160ms ease, visibility 0s linear 0s, transform 150ms, scale 150ms, translate 280ms cubic-bezier(.2,.8,.2,1), background-color 0.16s, border-color 0.16s, color 0.16s, box-shadow 0.16s, filter 0.16s;
 }
 html[data-typing] [data-hide-when-typing],
 html[data-kb] [data-hide-when-typing] {
@@ -1771,9 +1771,11 @@ html[data-kb] [data-feedback-hide] {
   pointer-events: none;
   transition: opacity 160ms ease, visibility 0s linear 160ms;
 }
-/* The feedback button never changes size anywhere (owner, Nov 9). While typing in a popup on a
-   phone it steps out of the way (fades), then comes back as it was. */
+/* The feedback button never changes size anywhere (owner, Nov 9). With a popup open on a phone it
+   glides up, clear of the popup's own buttons (it sat on the quest editor's Save), and glides back
+   after; while typing in a popup it steps out of the way (fades), then comes back as it was. */
 @media (pointer: coarse) {
+  html.scroll-locked:not([data-welcome-open]) [data-feedback-btn]:not([data-dragging]) { translate: 0 -76px; }
   html.scroll-locked:not([data-welcome-open])[data-typing] [data-feedback-hide]:not([data-feedback-open]) { opacity: 0; visibility: hidden; pointer-events: none; }
 }
 /* The welcome screen isn't a popup over buttons: there the feedback button sits full size in the
