@@ -121,6 +121,7 @@ function AddEntry({ metrics, onClose }: { metrics: string[]; onClose: () => void
     <div data-kb-fit data-kb-self className={`fixed inset-0 z-[85] flex justify-center bg-black/45 p-3 ${kb ? "items-start" : "items-end sm:items-center"}`} style={kb ? { top: kb.top, height: kb.height, bottom: "auto" } : undefined} onClick={onClose}>
       <div
         role="dialog"
+        aria-modal="true"
         aria-label="Add an entry"
         onClick={(e) => e.stopPropagation()}
         className="card-pop-in parchment parchment-framed relative flex max-h-[88dvh] w-full max-w-[420px] flex-col gap-3 overflow-y-auto rounded-2xl p-4"

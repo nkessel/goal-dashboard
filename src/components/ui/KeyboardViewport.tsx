@@ -319,6 +319,11 @@ export function KeyboardViewport() {
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", sweepSoon);
+    // A focused field that unmounts fires no focusout, which left the bottom bar hidden:
+    // while "typing", check now and then that a text field really still has focus.
+    const stuckTimer = window.setInterval(() => {
+      if (root.hasAttribute("data-typing") && !isTextField(document.activeElement)) sweepSoon();
+    }, 1500);
     const onFocusOut = () => {
       sweepSoon();
       // Moving straight to another field keeps the typing state.
@@ -354,6 +359,7 @@ export function KeyboardViewport() {
       window.removeEventListener("resize", update);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
+      window.clearInterval(stuckTimer);
       document.removeEventListener("touchstart", onTouchStart, { capture: true });
       document.removeEventListener("touchend", onTouchEnd, { capture: true });
       document.removeEventListener("touchstart", outside, { capture: true });

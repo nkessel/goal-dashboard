@@ -97,6 +97,9 @@ export function CalendarAddPopup({
 
   return createPortal(
     <div
+      aria-modal="true"
+      role="dialog"
+      aria-label="Add to calendar"
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "var(--t-overlay)" }}
       onClick={(e) => {

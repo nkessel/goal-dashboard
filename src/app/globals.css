@@ -1675,6 +1675,7 @@ html[data-kb] [data-feedback-hide] {
    doesn't sit on the popup's own buttons (it covered the editor's Close). Still one tap away. */
 @media (pointer: coarse) {
   html.scroll-locked:not([data-welcome-open]) [data-feedback-hide] { scale: 0.68; opacity: 0.55; }
+  html.scroll-locked:not([data-welcome-open])[data-typing] [data-feedback-hide]:not([data-feedback-open]) { opacity: 0; visibility: hidden; pointer-events: none; }
 }
 /* The welcome screen isn't a popup over buttons: there the feedback button sits full size in the
    sky at the top right (FeedbackDock), clear of the card. While only the mist is up (before the
