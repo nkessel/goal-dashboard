@@ -356,8 +356,8 @@ export function DailyHabits({
             ? {
                 background: "linear-gradient(180deg, #3a3524 0%, #2b281b 55%, #221f15 100%)",
                 border: "2px solid #8d7642",
-                borderBottomColor: open ? "rgba(141,118,66,.45)" : "#8d7642",
-                boxShadow: "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
+                borderBottomColor: open ? "transparent" : "#8d7642",
+                boxShadow: open ? "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16)" : "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
               }
             : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }
         }
@@ -464,10 +464,11 @@ export function DailyHabits({
             className="rounded-b-2xl px-2.5 pb-3 pt-3.5"
             style={{
               // A deep green velvet tray, lit softly from the middle.
-              background: isAdventure ? "radial-gradient(120% 80% at 50% 0%, rgba(74,92,58,.55), rgba(24,32,20,.85) 70%), linear-gradient(180deg, #232c1e, #161c13)" : "var(--t-bg)",
+              // It starts in the header's own colour, so bar and tray read as one piece (no line between).
+              background: isAdventure ? "linear-gradient(180deg, #221f15, rgba(34,31,21,0) 36px), radial-gradient(120% 80% at 50% 20%, rgba(74,92,58,.5), rgba(24,32,20,.85) 70%), linear-gradient(180deg, #232c1e, #161c13)" : "var(--t-bg)",
               border: isAdventure ? "2px solid #8d7642" : "1px solid var(--t-card-border)",
               borderTop: "none",
-              boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)",
+              boxShadow: "inset 0 -6px 10px -6px rgba(0,0,0,.55)",
             }}
           >
           {error && (

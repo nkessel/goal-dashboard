@@ -227,13 +227,15 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind, onHide }: 
           type="button"
           onClick={() => fold(open)}
           aria-expanded={open}
-          className="drawer-header relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-24 py-2.5"
+          className={`drawer-header relative flex min-h-[58px] w-full items-center justify-center px-24 py-2.5 transition-[border-radius] duration-200 ${open ? "rounded-t-2xl" : "rounded-2xl"}`}
           style={
             isAdventure
               ? {
                   background: "linear-gradient(180deg, #5a3320 0%, #43241a 55%, #361c14 100%)",
                   border: "2px solid #8d7642",
-                  boxShadow: "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
+                  // Open, the bar and its tray are one piece: no line between them.
+                  borderBottomColor: open ? "transparent" : "#8d7642",
+                  boxShadow: open ? "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16)" : "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
                 }
               : { background: "var(--t-warn-bg)", border: "1px solid var(--t-card-border)" }
           }
@@ -277,8 +279,8 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind, onHide }: 
         </div>
       </div>
       <div className="drawer-body" data-open={open ? "true" : "false"}>
-        <div className="drawer-inner -mx-2 px-2">
-          <div className="quest-tray mt-2.5 rounded-2xl px-2 pb-3 pt-3" style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }} inert={!open}>
+        <div className="drawer-inner">
+          <div className="quest-tray rounded-b-2xl px-2 pb-3 pt-3" style={{ background: isAdventure ? "linear-gradient(180deg, #2a1712, rgba(14,12,8,.92) 40px, rgba(10,13,8,.85))" : "var(--t-bg)", border: isAdventure ? "2px solid #8d7642" : "1px solid var(--t-card-border)", borderTop: "none", boxShadow: "inset 0 -6px 10px -6px rgba(0,0,0,.55)" }} inert={!open}>
             {/* At the top: everything here onto Today in one tap (or just the ticked ones while editing). */}
             {notToday.length > 0 && (
               <div className="mb-2.5 flex flex-wrap items-center justify-center gap-2">
@@ -715,13 +717,14 @@ export function TodayTaskBoard({
                     data-quest-dropzone="other"
                     aria-expanded={otherOpen}
                     onClick={() => setOtherOpen((v) => !v)}
-                    className="drawer-header relative flex min-h-[58px] w-full items-center justify-center rounded-2xl px-4 py-2.5"
+                    className={`drawer-header relative flex min-h-[58px] w-full items-center justify-center px-4 py-2.5 transition-[border-radius] duration-200 ${otherOpen ? "rounded-t-2xl" : "rounded-2xl"}`}
                     style={
                       isAdventure
                         ? {
                             background: "linear-gradient(180deg, #34412f 0%, #263022 55%, #1f281c 100%)",
                             border: "2px solid #8d7642",
-                            boxShadow: "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
+                            borderBottomColor: otherOpen ? "transparent" : "#8d7642",
+                            boxShadow: otherOpen ? "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16)" : "inset 0 0 0 1px rgba(242,210,126,.18), inset 0 1px 0 rgba(255,235,180,.16), inset 0 -8px 16px rgba(0,0,0,.25), 0 4px 12px rgba(0,0,0,.35)",
                           }
                         : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }
                     }
@@ -739,10 +742,10 @@ export function TodayTaskBoard({
                   </button>
                 </Zone>
                 <div className="drawer-body" data-open={otherOpen ? "true" : "false"}>
-                  <div className="drawer-inner -mx-2 px-2">
+                  <div className="drawer-inner">
                     <div
-                      className="quest-tray mt-2.5 max-h-[min(50vh,350px)] overflow-y-auto overscroll-contain rounded-2xl px-2 pb-3 pt-3"
-                      style={{ background: isAdventure ? "rgba(10,13,8,.35)" : "var(--t-bg)", boxShadow: "inset 0 6px 10px -6px rgba(0,0,0,.55), inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}
+                      className="quest-tray max-h-[min(50vh,350px)] overflow-y-auto overscroll-contain rounded-b-2xl px-2 pb-3 pt-3"
+                      style={{ background: isAdventure ? "linear-gradient(180deg, #1f281c, rgba(12,15,10,.9) 40px, rgba(10,13,8,.85))" : "var(--t-bg)", border: isAdventure ? "2px solid #8d7642" : "1px solid var(--t-card-border)", borderTop: "none", boxShadow: "inset 0 -6px 10px -6px rgba(0,0,0,.55)" }}
                     >
                       {pending.some((q) => q.placement === "additional") && (
                         <ul className="mb-3 flex flex-col gap-3">

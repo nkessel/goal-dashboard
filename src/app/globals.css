@@ -1390,6 +1390,10 @@ html[data-fog-lift]::after { animation: fog-lift 0.9s ease forwards; }
   grid-template-rows: 1fr;
   opacity: 1;
 }
+/* Closing: the height and the fade end together, so no empty gap is left for the page below to jump into (owner, Nov 9). */
+.drawer-body[data-open="false"] {
+  transition: grid-template-rows 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 1, 1);
+}
 .drawer-inner {
   min-height: 0;
   /* Keeps a wide child from stretching the drawer once it stops clipping. */
