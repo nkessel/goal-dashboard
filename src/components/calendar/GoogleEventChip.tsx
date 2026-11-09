@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { formatTimeRange } from "@/lib/calendar-dates";
-import { rsvpGoogleEventAction, updateGoogleEventAction } from "@/app/actions";
+import { deleteGoogleEventAction, rsvpGoogleEventAction, updateGoogleEventAction } from "@/app/actions";
 import { cleanEventDescription } from "@/lib/event-text";
 import { useEscape } from "@/lib/use-escape";
 import { CloseIcon } from "@/components/ui/Icons";
@@ -78,6 +78,10 @@ export function GoogleEventChip({
   const canEdit = event.editable !== false && !event.isAllDay;
   const [answer, setAnswer] = useState(event.response ?? null);
   const [answering, startAnswer] = useTransition();
+  // Delete from Google Calendar (owner, Nov 4): asks in place first; a repeating event offers this day or every repeat.
+  const [askDelete, setAskDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
   const unanswered = answer === "needsAction";
   const description = cleanEventDescription(event.description);
@@ -136,6 +140,20 @@ export function GoogleEventChip({
     writeHidden(ids);
     setHidden(true);
     setOpen(false);
+  }
+
+  async function deleteEvent(series: boolean) {
+    setDeleting(true);
+    setDeleteError(null);
+    const r = await deleteGoogleEventAction(event.calendarId ?? "primary", event.id, series ? event.recurringEventId : null);
+    setDeleting(false);
+    if (!r.ok) {
+      setDeleteError(r.error);
+      return;
+    }
+    setHidden(true);
+    setOpen(false);
+    router.refresh();
   }
 
   function convertToQuest() {
@@ -413,6 +431,15 @@ export function GoogleEventChip({
               )}
               <button
                 type="button"
+                onClick={() => (setAskDelete((v) => !v), setDeleteError(null))}
+                aria-expanded={askDelete}
+                className="hover-glow rounded-full px-3 py-1.5 text-sm"
+                style={{ border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, color: "#9b2c1a" }}
+              >
+                Delete…
+              </button>
+              <button
+                type="button"
                 onClick={hideEvent}
                 className="hover-glow rounded-full px-3 py-1.5 text-sm"
                 style={{ border: `1px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, color: "var(--t-ink-soft)" }}
@@ -428,6 +455,27 @@ export function GoogleEventChip({
                 {isAdventure ? "Make it a quest" : "Add as task"}
               </button>
             </div>
+            {askDelete && (
+              <div className="reveal flex flex-wrap items-center justify-end gap-2 text-sm" style={{ color: "var(--t-ink)" }}>
+                <span className="mr-auto">Delete it from Google Calendar?</span>
+                <button type="button" disabled={deleting} onClick={() => deleteEvent(false)} className="h-8 rounded-full px-3 font-semibold disabled:opacity-50" style={{ background: "#9b2c1a", color: "#fff" }}>
+                  {deleting ? "Deleting…" : event.recurringEventId ? "Just this day" : "Delete"}
+                </button>
+                {event.recurringEventId && (
+                  <button type="button" disabled={deleting} onClick={() => deleteEvent(true)} className="h-8 rounded-full px-3 font-semibold disabled:opacity-50" style={{ border: "1.5px solid #9b2c1a", color: "#9b2c1a" }}>
+                    Every repeat
+                  </button>
+                )}
+                <button type="button" onClick={() => setAskDelete(false)} className="h-8 rounded-full px-3" style={{ color: "var(--t-ink-soft)" }}>
+                  Keep it
+                </button>
+                {deleteError && (
+                  <p role="alert" className="m-0 w-full text-right text-[13px]" style={{ color: "#9b2c1a" }}>
+                    {deleteError}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>,
         document.body

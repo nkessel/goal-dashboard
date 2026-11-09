@@ -115,6 +115,8 @@ export type GoogleCalendarEvent = {
   meetLink?: string | null;
   /** The event in Google Calendar. */
   htmlLink?: string | null;
+  /** The series this is one day of (a repeating event), so the whole series can be deleted. */
+  recurringEventId?: string | null;
   /** Part of a repeating series. */
   recurring?: boolean;
 };
@@ -198,6 +200,7 @@ export async function listEvents(
         guests: (e.attendees ?? []).filter((a) => !a.resource).slice(0, 25).map((a) => ({ name: a.self ? "You" : a.displayName || a.email || "Guest", response: a.responseStatus ?? null, ...(a.self ? { self: true } : {}) })),
         meetLink: e.hangoutLink ?? e.conferenceData?.entryPoints?.find((p) => p.entryPointType === "video")?.uri ?? null,
         htmlLink: e.htmlLink ?? null,
+        recurringEventId: e.recurringEventId ?? null,
         recurring: !!e.recurringEventId,
       };
     })

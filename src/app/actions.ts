@@ -3104,6 +3104,20 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
   return { busy, habits, flexHabits, optional, google, calendars, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
 }
 
+/** Delete an event from the owner's Google Calendar (owner, Nov 4: "delete items from my google calendar"); `series` deletes every repeat. */
+export async function deleteGoogleEventAction(calendarId: string, eventId: string, series?: string | null) {
+  const { accessToken } = await requireSessionMaybeGoogle();
+  if (!accessToken) return { ok: false as const, error: "Connect Google Calendar first." };
+  const g = await import("@/lib/google-calendar");
+  try {
+    await g.deleteCalendarEvent(accessToken, series || eventId, calendarId || "primary");
+    return { ok: true as const };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false as const, error: /forbidden|403|insufficient|permission/i.test(msg) ? "Google won't let the app delete this one (it may be someone else's calendar). Open it in Google Calendar to remove it." : "Google didn't delete it. Try again?" };
+  }
+}
+
 /** An optional [bracketed] calendar event: keep it (its brackets come off, so it holds its time) or delete it. */
 export async function resolveOptionalEventAction(calendarId: string, eventId: string, title: string, keep: boolean) {
   const { accessToken } = await requireSessionMaybeGoogle();
