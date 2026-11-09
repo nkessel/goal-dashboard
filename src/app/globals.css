@@ -2171,6 +2171,8 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   }
 }
 .hover-glow:active:not(:disabled) { transform: scale(0.97); }
+/* Cards never squeeze under a finger (owner, Nov 9: they shrank whenever a scroll began on one). */
+.quest-card.hover-glow:active, .quest-card:active, .habit-row:active, .habit-row button:active { transform: none !important; scale: none !important; }
 details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
   [role="menu"], .pop, .reveal, .fade-in, details > summary ~ * { animation: none !important; }
