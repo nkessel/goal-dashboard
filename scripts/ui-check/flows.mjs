@@ -518,7 +518,7 @@ export const FLOWS = [
       await h.goto("/insights", { name: "insights" });
       await h.check("top");
       // The chart waits behind a plain button (owner, Nov 9).
-      if (await h.tap(/show my check-in chart/i, "show the chart", { optional: true })) {
+      if (await h.tap(/show insights chart/i, "show the chart", { optional: true })) {
         await h.settle(500);
         await h.check("chart open");
       }
