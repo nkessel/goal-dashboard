@@ -8,6 +8,7 @@ import { saveOrQueue } from "@/lib/offline";
 import { DateField } from "@/components/ui/DateField";
 import { useEscape } from "@/lib/use-escape";
 import { TrackingChart } from "./TrackingChart";
+import { Fold } from "@/components/ui/Fold";
 import { CloseIcon } from "@/components/ui/Icons";
 import { useFitAboveKeyboard } from "@/lib/use-fit-above-keyboard";
 
@@ -37,9 +38,26 @@ function groupCheckIns(readings: Reading[]): { at: string; items: Reading[] }[] 
  * Under the fresh check-in at the top of Insights: every check-in from today
  * (newest first), then the tracking chart, with + to add an entry to it.
  */
+const CHART_KEY = "insights-chart";
+
 export function CheckInHub({ readings, metrics, wins }: { readings: Reading[]; metrics: string[]; wins: WinLite[] }) {
   const mounted = useSyncExternalStore(noop, () => true, () => false);
   const [adding, setAdding] = useState(false);
+  const [chartPick, setChartPick] = useState<boolean | null>(null);
+  const savedChart = useSyncExternalStore(noop, () => {
+    try {
+      return localStorage.getItem(CHART_KEY) === "open";
+    } catch {
+      return false;
+    }
+  }, () => false);
+  const chart = chartPick ?? savedChart;
+  const showChart = (v: boolean) => {
+    setChartPick(v);
+    try {
+      localStorage.setItem(CHART_KEY, v ? "open" : "shut");
+    } catch {}
+  };
   const today = mounted ? dayKey(new Date()) : null;
   const todays = today ? groupCheckIns(readings.filter((r) => dayKey(new Date(r.at)) === today)) : [];
   const order = (m: string) => {
@@ -74,9 +92,27 @@ export function CheckInHub({ readings, metrics, wins }: { readings: Reading[]; m
           </ol>
         </div>
       )}
-      <div className="parchment parchment-framed relative flex flex-col gap-2 rounded-2xl px-3 py-3" style={{ borderRadius: 16 }}>
-        <TrackingChart metrics={metrics} readings={readings} wins={wins} onAdd={() => setAdding(true)} />
-      </div>
+      {/* The chart waits behind a plain button (owner, Nov 9): it slides open, and stays open on this device once you've chosen it. */}
+      <button
+        type="button"
+        onClick={() => showChart(!chart)}
+        aria-expanded={chart}
+        className="hover-glow mx-auto flex h-10 items-center gap-2 rounded-full px-4 text-[14.5px] font-semibold"
+        style={{ border: "1.5px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)", background: chart ? "rgba(217,180,95,.18)" : "var(--ec-chip, rgba(0,0,0,.2))" }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M4 19h16M6 15l4-5 3 3 5-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {chart ? "Hide my chart" : "Show my check-in chart"}
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden style={{ transform: chart ? "rotate(180deg)" : undefined, transition: "transform 220ms ease", opacity: 0.7 }}>
+          <path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <Fold open={chart}>
+        <div className="parchment parchment-framed relative flex flex-col gap-2 rounded-2xl px-3 py-3" style={{ borderRadius: 16 }}>
+          <TrackingChart metrics={metrics} readings={readings} wins={wins} onAdd={() => setAdding(true)} />
+        </div>
+      </Fold>
       {adding && <AddEntry metrics={metrics} onClose={() => setAdding(false)} />}
     </div>
   );
