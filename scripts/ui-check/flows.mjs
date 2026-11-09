@@ -97,6 +97,17 @@ export const FLOWS = [
         if (still) throw new Error(`toucan: his bubble is still there after × (${still})`);
       }
       await h.check("toucan bubble closed");
+      // Right-click (a hold on phones) on the Habits button opens its editor: words, icon, which habits (owner, Nov 9).
+      {
+        const hb = h.page.locator("[data-welcome-root] button[aria-expanded]", { hasText: /habits/i }).first();
+        if (await hb.count()) {
+          await hb.click({ button: "right" }).catch(() => {});
+          await h.settle(450);
+          await h.check("habits button editor");
+          await hb.click({ button: "right" }).catch(() => {});
+          await h.settle(300);
+        }
+      }
       await h.page.evaluate(() => localStorage.removeItem("welcome-toucan-at"));
       await h.goto("/", { welcome: true, name: "welcome" });
       await h.tap(/welcome screen settings/i, "arrange welcome", { expectMove: true }); // the "when it opens" panel appears above
@@ -822,7 +833,7 @@ export const FLOWS = [
       }
       // A board scroll (owner, Nov 9): "Show N more quests" lists the rest in place; tapping the title rolls it up.
       await h.goto("/boards");
-      if (await h.tap((p) => p.getByRole("button", { name: /^show \d+ more/i }).first(), "boards: show more quests", { optional: true })) {
+      if (await h.tap((p) => p.getByRole("button", { name: /^and \d+ more/i }).first(), "boards: show more quests", { optional: true })) {
         await h.settle(450);
         await h.check("boards: more quests");
       }

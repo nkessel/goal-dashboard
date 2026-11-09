@@ -326,14 +326,11 @@ export function BoardGrid({
                     onClick={() => setAddingTo(board.id)}
                     aria-label={`Add a quest to ${board.title}`}
                     title={`Add a quest to ${board.title}`}
-                    className="board-add flex h-6 shrink-0 items-center gap-0.5 rounded-full pl-1 pr-2 text-[11.5px] font-semibold"
+                    className="board-add flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
                   >
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full" aria-hidden>
-                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-                        <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                    </span>
-                    Quest
+                    <svg width="11" height="11" viewBox="0 0 10 10" fill="none" aria-hidden>
+                      <path d="M5 1.2v7.6M1.2 5h7.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
                   </button>
                 )}
               </div>
@@ -354,11 +351,11 @@ export function BoardGrid({
                     {...stop}
                     onClick={() => toggleMore(board.id)}
                     aria-expanded={isMore}
-                    className="board-quest mt-0.5 flex min-h-[28px] items-center gap-1 self-start rounded-md px-1 text-[12.5px] font-semibold"
-                    style={{ color: ink }}
+                    className="board-quest flex min-h-[26px] items-center gap-0.5 self-start rounded-md px-1 pl-[26px] text-[12px]"
+                    style={{ color: soft }}
                   >
-                    {isMore ? "Show less" : `Show ${restList.length} more ${restDone ? "completed" : restList.length === 1 ? "quest" : "quests"}`}
-                    <FolderCaret open={isMore} />
+                    {isMore ? "show less" : `and ${restList.length} more${restDone ? " done" : ""}`}
+                    <span aria-hidden className="text-[11px]" style={{ display: "inline-block", transform: isMore ? "rotate(-90deg)" : "rotate(90deg)", transition: "transform 200ms ease" }}>›</span>
                   </button>
                   <Fold open={isMore}>
                     <ul className="flex flex-col">

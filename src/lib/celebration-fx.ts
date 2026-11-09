@@ -78,7 +78,7 @@ export type FxSettings = {
   journalPrompts?: { id: string; label: string; prompt: string; xp: number }[];
   /** 2 once the list was saved knowing the planner prompts (Nov 9), so a removed one stays removed. */
   journalPromptsV?: number;
-  welcomeButtons?: Partial<Record<"checkin" | "sleep" | "quests" | "focus", { text?: string; icon?: string; xp?: number }>>;
+  welcomeButtons?: Partial<Record<"checkin" | "sleep" | "quests" | "focus" | "habits", { text?: string; icon?: string; xp?: number }>>;
   welcomeIntentionQ?: string;
   welcomeIntentionHint?: string;
   /** Seconds the "Feedback submitted" card stays (0 = until you close it). */

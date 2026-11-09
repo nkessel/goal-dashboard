@@ -81,7 +81,7 @@ export function useWelcomeHabits() {
  * today's habits you picked (in edit mode, its ✎), each a button you tap when
  * it's done (tap again to undo); the phrase tool pills sit with them.
  */
-export function WelcomeHabits({ fx }: { fx: FxSettings }) {
+export function WelcomeHabits({ fx, label, icon }: { fx: FxSettings; label?: string; icon?: string }) {
   const { day, list, setList, load } = useWelcomeHabits();
   const [open, setOpen] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
@@ -110,11 +110,15 @@ export function WelcomeHabits({ fx }: { fx: FxSettings }) {
   return (
     <div className="flex w-full flex-col items-center">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="font-display flex h-10 items-center gap-1.5 rounded-full px-5 text-[16px]" style={GILT}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M12 21c-4.5-2.6-7-6-7-9.6A4.4 4.4 0 0 1 12 8.6a4.4 4.4 0 0 1 7 2.8C19 15 16.5 18.4 12 21z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-          <path d="M12 8.6V4.5M12 4.5c1.2-1.3 2.8-1.6 4-1.2-.3 1.6-1.9 2.6-4 1.2z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Habits
+        {icon ? (
+          <span aria-hidden>{icon}</span>
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M12 21c-4.5-2.6-7-6-7-9.6A4.4 4.4 0 0 1 12 8.6a4.4 4.4 0 0 1 7 2.8C19 15 16.5 18.4 12 21z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M12 8.6V4.5M12 4.5c1.2-1.3 2.8-1.6 4-1.2-.3 1.6-1.9 2.6-4 1.2z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+        {label || "Habits"}
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ transform: open ? "rotate(180deg)" : undefined }}>
           <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

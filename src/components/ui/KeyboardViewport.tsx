@@ -51,16 +51,22 @@ export function KeyboardViewport() {
     };
     const uncover = () => root.removeAttribute("data-kb-cover");
     let seenUp = false; // the keyboard has reported its size since the cover went down
-    let guess: number | undefined;
+    // The ground is laid only while a text field has focus AND the keyboard is really on screen, right
+    // under it, and it goes the moment either stops (owner, Nov 9: a dark band stayed after the keyboard
+    // closed, and showed before it arrived). As the keyboard slides down it's taken away at once.
     const placeCover = () => {
       if (!vv || !touch) return;
-      if (kbUp()) {
+      if (kbUp() && isTextField(document.activeElement)) {
+        if (seenUp && vv.height > lastKbH + 80) {
+          // Growing fast: the keyboard is on its way down.
+          lastKbH = vv.height;
+          uncover();
+          return;
+        }
         seenUp = true;
-        window.clearTimeout(guess);
         lastKbH = vv.height;
-        if (isTextField(document.activeElement)) coverAt(vv.offsetTop + vv.height);
-      } else if (seenUp) {
-        // The keyboard went down (or the page was pinch-zoomed): nothing to fill.
+        coverAt(vv.offsetTop + vv.height);
+      } else {
         seenUp = false;
         uncover();
       }
@@ -281,19 +287,9 @@ export function KeyboardViewport() {
       if (touch) {
         if (!kbUp()) holdLayers();
         root.setAttribute("data-typing", "");
-        // The keyboard is on its way: lay the ground where it ended last time (it's corrected
-        // as soon as the keyboard reports its size).
-        if (vv && vv.scale < 1.1) {
-          if (kbUp()) coverAt(vv.offsetTop + vv.height);
-          else if (lastKbH) {
-            coverAt(vv.offsetTop + lastKbH);
-            // No keyboard after all (a hardware one): take the guess away.
-            window.clearTimeout(guess);
-            guess = window.setTimeout(() => {
-              if (!kbUp()) uncover();
-            }, 900);
-          }
-        }
+        // Already up (moving between fields): the ground stays under it. Otherwise it waits for the
+        // keyboard to arrive (no guessing ahead, which showed a band before the keyboard came).
+        if (vv && vv.scale < 1.1 && kbUp()) coverAt(vv.offsetTop + vv.height);
         // Moving between fields with the keyboard's arrows: same steadying as a tap.
         if (steadied(el)) focusSteady(el);
       }
@@ -326,6 +322,10 @@ export function KeyboardViewport() {
     }, 1500);
     const onFocusOut = () => {
       sweepSoon();
+      // Done on the keyboard: the ground goes with it at once.
+      requestAnimationFrame(() => {
+        if (!isTextField(document.activeElement)) uncover();
+      });
       // Moving straight to another field keeps the typing state.
       window.setTimeout(() => {
         if (!isTextField(document.activeElement)) {
@@ -350,7 +350,6 @@ export function KeyboardViewport() {
     }
     return () => {
       window.clearTimeout(quiet);
-      window.clearTimeout(guess);
       window.clearTimeout(sweep);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", sweepSoon);

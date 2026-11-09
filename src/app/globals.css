@@ -1132,10 +1132,9 @@ html[data-evening] [data-theme="adventure"] {
 /* Tap the top roller to roll the scroll up or down. */
 .scroll-rod.scroll-rod-tap { pointer-events: auto; cursor: pointer; }
 .scroll-rod.scroll-rod-tap::after, .scroll-rod.scroll-rod-tap::before { pointer-events: none; }
-/* "+ Quest" beside Next step: a small gilded pill. */
-.board-add { color: #4a3913; background: linear-gradient(180deg, #f6e3a8, #e2c47a); box-shadow: inset 0 0 0 1px #b8913f, 0 1px 2px rgba(60, 40, 10, .25); transition: filter 120ms ease; }
-.board-add > span { background: rgba(255, 250, 235, .7); box-shadow: inset 0 0 0 1px #b8913f; }
-.board-add:hover, .board-add:focus-visible { filter: brightness(1.06); }
+/* The + beside Next step: a quiet ring in the scroll's gold ink, lit on hover. */
+.board-add { color: #8a6116; box-shadow: inset 0 0 0 1.2px rgba(168, 138, 63, .65); transition: background-color 120ms ease, color 120ms ease; }
+.board-add:hover, .board-add:focus-visible { background-color: rgba(168, 138, 63, .16); color: #5a3f10; }
 .board-quest {
   transition: background-color 120ms ease;
 }

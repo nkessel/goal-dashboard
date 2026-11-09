@@ -3,7 +3,7 @@
 import { SnoozeIcon, CloseIcon } from "@/components/ui/Icons";
 import { SwipeActions } from "@/components/ui/SwipeActions";
 import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
-import { WelcomeHabits } from "@/components/xp/WelcomeHabits";
+import { HabitOptions, WelcomeHabits } from "@/components/xp/WelcomeHabits";
 
 import { fogOn, liftFog } from "@/lib/welcome-fog";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -527,7 +527,7 @@ export function WelcomeCard({
       </p>
     ) : null,
     reflect: reflectQuestions(fx).length ? <ReflectLine questions={reflectQuestions(fx)} /> : null,
-    habits: <WelcomeHabits fx={fx} />,
+    habits: <WelcomeHabits fx={fx} label={btn.habits?.text?.trim()} icon={btn.habits?.icon} />,
     dawn: <DawnPath />,
     line: shownLine ? (
       <div className="flex w-full flex-col items-center gap-0.5">
@@ -822,6 +822,8 @@ export function WelcomeCard({
                   <Fold open={btnEdit === el}>
                     <ButtonEditor k={el} fx={fx} pays={isPartKey(el) && el !== "focus"} onDone={() => setBtnEdit(null)} onSnooze={() => (setBtnEdit(null), snoozePart(el))} onHide={() => (setBtnEdit(null), hidePart(el))}>
                       {el === "focus" && <JournalPromptsEditor fx={fx} />}
+                      {/* The Habits button's function: which habits it shows, and adding one (owner, Nov 9). */}
+                      {el === "habits" && <HabitOptions fx={fx} />}
                     </ButtonEditor>
                   </Fold>
                 )}
@@ -1793,10 +1795,10 @@ function revealThroughMist() {
 }
 
 type PartKey = "checkin" | "sleep" | "focus";
-type ButtonKey = PartKey | "quests";
+type ButtonKey = PartKey | "quests" | "habits";
 const isPartKey = (el: string): el is PartKey => el === "checkin" || el === "sleep" || el === "focus";
-const isButtonKey = (el: string): el is ButtonKey => isPartKey(el) || el === "quests";
-const BUTTON_NAMES: Record<ButtonKey, string> = { checkin: "Emotional check-in", sleep: "Sleep check-in", focus: "Journal", quests: "Choose today's quests" };
+const isButtonKey = (el: string): el is ButtonKey => isPartKey(el) || el === "quests" || el === "habits";
+const BUTTON_NAMES: Record<ButtonKey, string> = { checkin: "Emotional check-in", sleep: "Sleep check-in", focus: "Journal", quests: "Choose today's quests", habits: "Habits" };
 
 /**
  * A welcome part whose button can be shaped in place: right-click it, or hold it on a phone, and its
