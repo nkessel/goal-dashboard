@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Reward } from "@/lib/data/types";
 import { createRewardAction, deleteRewardAction, updateRewardAction } from "@/app/actions";
+import { GEMS, Gem, type GemKind } from "@/components/ui/Gem";
+import { saveRewardGem, useRewardGem } from "@/lib/use-reward-gems";
 import { IconPicker } from "@/components/tasks/IconPicker";
 import { CoinIcon, DiamondIcon, CloseIcon } from "@/components/ui/Icons";
 import { useEscape } from "@/lib/use-escape";
@@ -51,6 +53,9 @@ export function RewardEditorDialog({
     if (!icon) setIcon(reward?.icon_key ?? null);
   }
   const [price, setPrice] = useState<number>(reward?.cost_coins ?? 3);
+  const savedGem = useRewardGem(reward?.id);
+  const [gemPick, setGem] = useState<GemKind | null>(null);
+  const gem: GemKind = gemPick ?? savedGem;
   const [prereqXp, setPrereqXp] = useState<number>(reward?.prereq_xp ?? 10);
   // The reward's quest sequence: quests before it (the first is the prerequisite), and quests after it.
   const [before, setBefore] = useState<string[]>(reward?.prereq_title ? [reward.prereq_title, ...(reward.prereq_more ?? [])] : []);
@@ -88,8 +93,10 @@ export function RewardEditorDialog({
       try {
         if (reward) {
           await updateRewardAction(reward.id, { title, description, iconKey: icon, costCoins: price, ...bonusFields(reward), confirmImport: Boolean(review) });
+          if (gem !== savedGem) await saveRewardGem(reward.id, gem);
         } else {
-          await createRewardAction({ title, description, iconKey: icon, costCoins: price, ...bonusFields() });
+          const id = await createRewardAction({ title, description, iconKey: icon, costCoins: price, ...bonusFields() });
+          if (gem !== "diamond" && typeof id === "string") await saveRewardGem(id, gem).catch(() => {});
         }
         if (onSaved) onSaved();
         else close();
@@ -205,8 +212,8 @@ export function RewardEditorDialog({
             <SeqList items={before} onChange={setBefore} fieldStyle={fieldStyle} addLabel={before.length ? "Then another quest" : "A quest to do first"} placeholder="e.g. Completely empty the car" />
             {/* The reward itself, a gold link in the chain. */}
             <div className="flex items-center gap-2 py-0.5">
-              <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px]" style={{ background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
-                ◆
+              <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #fff0bd, #e2bb5c 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
+                <Gem kind={gem} size={12} />
               </span>
               <span className="min-w-0 flex-1 truncate text-[14px] font-semibold" style={{ color: "#6b4a12" }}>
                 {title.trim() || "This reward"}
@@ -220,6 +227,28 @@ export function RewardEditorDialog({
             )}
           </div>
         )}
+
+        {/* Its gem: the mark on its quest's Reward tag (a diamond unless you pick another). */}
+        <div className="flex items-center gap-2" role="radiogroup" aria-label="Its gem">
+          <span className="text-[14px] font-semibold" style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)" }}>
+            Gem
+          </span>
+          {GEMS.map((g) => (
+            <button
+              key={g.kind}
+              type="button"
+              role="radio"
+              aria-checked={gem === g.kind}
+              aria-label={g.label}
+              title={g.label}
+              onClick={() => setGem(g.kind)}
+              className="flex h-9 w-9 items-center justify-center rounded-full"
+              style={{ color: isAdventure ? "#f3e7cb" : "var(--t-ink)", background: gem === g.kind ? "rgba(217,180,95,.28)" : "transparent", boxShadow: gem === g.kind ? "inset 0 0 0 1.5px #d9b45f" : "inset 0 0 0 1px rgba(217,180,95,.3)" }}
+            >
+              <Gem kind={g.kind} size={20} />
+            </button>
+          ))}
+        </div>
 
         {/* Price in coins */}
         <div

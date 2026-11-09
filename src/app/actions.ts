@@ -3532,6 +3532,28 @@ export async function setQuestPlaceAction(taskId: string, place: string | null) 
   return p;
 }
 
+/** The gem each reward wears on its tag (a diamond unless chosen), kept on the account by reward id. */
+export async function rewardGemsAction(): Promise<Record<string, "diamond" | "ruby" | "emerald" | "ink">> {
+  const ownerId = await requireProfileId();
+  const raw = (await readExtras(ownerId)).rewardGems;
+  const ok = ["diamond", "ruby", "emerald", "ink"];
+  const out: Record<string, "diamond" | "ruby" | "emerald" | "ink"> = {};
+  if (raw && typeof raw === "object") for (const [k, v] of Object.entries(raw as Record<string, unknown>)) if (/^[0-9a-f-]{36}$/i.test(k) && typeof v === "string" && ok.includes(v)) out[k] = v as "diamond";
+  return out;
+}
+
+export async function setRewardGemAction(rewardId: string, kind: string) {
+  const ownerId = await requireProfileId();
+  if (!/^[0-9a-f-]{36}$/i.test(rewardId)) throw new Error("Unknown reward.");
+  if (!["diamond", "ruby", "emerald", "ink"].includes(kind)) throw new Error("Unknown gem.");
+  const extras = await readExtras(ownerId);
+  const all = { ...((extras.rewardGems as Record<string, string> | undefined) ?? {}) };
+  if (kind === "diamond") delete all[rewardId];
+  else all[rewardId] = kind;
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, rewardGems: all } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+}
+
 /** A board shown whole (no mist over all but its next step), or misty again. Kept on the account. */
 export async function setBoardMistAction(boardId: string, mist: boolean) {
   const ownerId = await requireProfileId();

@@ -13,6 +13,8 @@ import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { rescheduleRedness } from "@/lib/reschedule-redness";
 import { useOfflineQuest, saveOrQueue } from "@/lib/offline";
+import { Gem } from "@/components/ui/Gem";
+import { useRewardGem } from "@/lib/use-reward-gems";
 import { completeTaskAction, deleteTaskAction, archiveTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, snoozeQuestUntilAction, undoSnoozeUntilAction, setNextStepAction, moveTaskToBoardAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
 import { EditTaskModal } from "./EditTaskModal";
@@ -138,6 +140,7 @@ export function TaskRow({
 }) {
   // Edited offline and not synced yet: show it as edited (the screen may be the copy kept on the device).
   const task = useOfflineQuest(givenTask);
+  const rewardGem = useRewardGem(task.reward_id);
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   // A quest with steps: a tap slides out its checklist instead of opening the editor.
@@ -569,7 +572,8 @@ export function TaskRow({
               className="relative z-[2] -mb-2.5 flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-px text-[11.5px] font-semibold leading-snug sm:px-2 sm:text-[12.5px]"
               style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 60%, #a88a3f)", border: "1px solid #5a4520", color: "#2a1c10", boxShadow: "0 1px 3px rgba(0,0,0,.3)" }}
             >
-              ◆ Reward
+              <Gem kind={rewardGem} size={13} />
+              Reward
             </span>
           ) : categoryLabel ? (
             <span
