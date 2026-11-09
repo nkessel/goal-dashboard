@@ -113,6 +113,11 @@ export const FLOWS = [
       // Quest editor from the first quest card.
       if (await h.tap("text=Pick up medication", "open quest editor", { expectMove: true })) {
         await h.check("quest editor");
+        // The XP amount: no box; tapping it selects and pulses the number, with a gold bar for a cursor (owner, Nov 9).
+        if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill", { optional: true, expectMove: true })) {
+          if (await h.tap((p) => p.getByLabel("XP amount").first(), "editor: XP amount", { optional: true })) await h.check("quest editor: XP typed");
+          await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill shut", { optional: true, expectMove: true });
+        }
         // The extra pills (no "More" fold): open the scales, then the due panel with scheduling and early bonus.
         if (await h.tap((p) => p.getByRole("button", { name: /importance & effort/i }).first(), "editor: scales pill", { optional: true, expectMove: true })) await h.check("quest editor: scales");
         // The due pill reads "Due today", "Due Fri · Thu 3pm" or "Due date".

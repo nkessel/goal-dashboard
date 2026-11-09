@@ -12,8 +12,8 @@ Built Nov 8 (night): tracked events (pills under the events box in Insights and 
 
 Still to do (each the owner's words, shortened):
 - Welcome: check-in button loaded 3 times (2:57 PM); the whole screen refreshed for no reason (2:40 PM).
-- **Morning routine**: three UX teams' ideas sent to the owner Nov 8 as 3 options (A: Pick your morning pills, B: Body · Heart · Mind, C: Dawn path + offerings); build the one he picks.
-- Board button at the top of a quest's portrait: a tap gives a small overview of the board with a prominent "See quest in board"; drop "See quest in board" from the menu. **Brainstorm 2–3 ideas first, owner approves** (1:55 PM). Ideas sent Nov 8, waiting on his pick.
+- **Morning routine**: three UX teams' ideas sent to the owner Nov 8 as 3 options (A: Pick your morning pills, B: Body · Heart · Mind, C: Dawn path + offerings); owner liked A + C most and asked for more ideas and a review of the brief; round 2 (mockups) sent Nov 9, waiting.
+- Board button at the top of a quest's portrait: a tap gives a small overview of the board with a prominent "See quest in board"; drop "See quest in board" from the menu. **Brainstorm 2–3 ideas first, owner approves** (1:55 PM). Owner liked 1 + 2 together; four blends sent Nov 9, waiting.
 - Stats don't show in the quest editor; check the editor and its view settings all work; 3 agents test (1:50 PM). Location missing from the editor's display menu: 2 agents audit for similar gaps (1:48 PM). Save and Complete quest shouldn't be in the view settings, just a "save settings" button (1:49 PM).
 - Sequence and sub-quests from the same pill (1:45 PM).
 - Editor metrics (importance etc.): a clear gear top right; change how bars display, colours, icons, names; add metrics (1:44 PM). Sub-quest menu icons in the design language (done in part).
@@ -25,9 +25,9 @@ Still to do (each the owner's words, shortened):
 - Sequence peek: "N after this" only on hover/press of the background cards; a click shows simple card previews in order (8:41 AM). Screenshot button showed the last screenshot, not this screen; "When it ships" options: add "Immediately" (not default) and put them in the design language (8:41 AM).
 - Greeting "Good afternoon! Hail, returning hero": only the second sentence is editable (2:57 PM). Check-in button loaded 3 times (2:57 PM). The whole screen refreshed for no reason (2:40 PM).
 - One welcome screen a day (first visit); after 2.5 h away (adjustable) the toucan greets in the mist: "What brings you here today?" with a bigger chat; alternatives and replies like his other phrases (2:56 PM). Never more than one welcome screen a day; snoozed for a day = skipped till tomorrow morning (3:03 PM).
-- XP box: a blinking cursor when typing; a highlighted number isn't blue: **brainstorm options in the design language** (3:00 PM). Options sent Nov 8, waiting.
+- XP box: a blinking cursor when typing; a highlighted number isn't blue: built Nov 9 (owner picked option 3: pulse, then type over).
 - Portrait picker: upload an image, and choose "turn into a portrait" or "use as is" (3:01–3:02 PM).
-- Save a little more compelling as the default; Complete quest glorious (golden) but not the first thing you'd press: **3 drafts before building** (3:07 PM). Drafts sent Nov 8 (in words), waiting.
+- Save a little more compelling as the default; Complete quest glorious (golden) but not the first thing you'd press: built Nov 9 (owner picked option 1).
 - Settings: screens without a tray (like Notifications) slide in from the right, all inside the one settings box (3:14 PM; done for Secret Missions).
 
 ## Nov 4 evening – Nov 5 notes (owner, read from the database Nov 5), not built yet

@@ -1903,7 +1903,9 @@ export function QuestEditorDialog({
                   <button type="button" onClick={() => (setXp(Math.min(1000, xp + 5)), setXpOwn(true))} aria-label="5 XP more" title="+5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
                     +5
                   </button>
-                  <span className="flex h-9 shrink-0 items-center rounded-lg border pr-1.5" style={fieldStyle}>
+                  {/* No box (owner, Nov 9: option 3): tap the number and it glows and pulses; what you type replaces it, a gold bar for the cursor. */}
+                  <span className="flex h-9 shrink-0 items-center gap-0.5">
+                  <span className="xp-type flex h-full items-center pr-px">
                     <NumberInput
                       min={0}
                       max={1000}
@@ -1911,9 +1913,10 @@ export function QuestEditorDialog({
                       onValueChange={(v) => (setXp(v), setXpOwn(true))}
                       blankZero
                       aria-label="XP amount"
-                      className="bare-input h-full w-11 bg-transparent px-1 text-right text-[16px] font-bold tabular-nums placeholder:opacity-60 placeholder:text-[var(--t-xp)] focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                      className="bare-input h-full w-11 bg-transparent px-1 text-right text-[18px] font-bold tabular-nums placeholder:opacity-60 placeholder:text-[var(--t-xp)] focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                       style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}
                     />
+                  </span>
                     <span className="text-[12px] font-bold" style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}>
                       XP
                     </span>
@@ -2873,10 +2876,9 @@ export function QuestEditorDialog({
                       onClick={completeExisting}
                       disabled={isSaving || !title.trim()}
                       title={`Complete this ${noun} now`}
-                      className="hover-glow flex h-10 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-[14.5px] font-semibold disabled:cursor-default disabled:opacity-45"
-                      style={{ background: "rgba(255,250,238,.5)", color: "#5a3d12", border: "1.5px solid #b39a6a" }}
+                      className="qe-complete flex h-10 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-[14.5px] font-semibold disabled:cursor-default disabled:opacity-45"
                     >
-                      ✓ Complete {noun}
+                      ✦ Complete {noun}
                     </button>
                   )}
                   {completedNow && (
@@ -2887,13 +2889,9 @@ export function QuestEditorDialog({
                   <button
                     type="button"
                     onClick={close}
-                    className="hover-glow h-10 rounded-full px-5 text-[15px] font-semibold transition-all duration-300"
-                    // Quiet until something changes, then lit up green.
-                    style={
-                      changed || completedNow
-                        ? { background: "linear-gradient(180deg,#9fc488,#6f8f5c)", color: "#fbf6e8", border: "1px solid #56703f", boxShadow: "inset 0 1px 0 rgba(255,255,255,.3), 0 0 0 3px rgba(143,174,122,.35), 0 0 14px rgba(143,200,110,.55)" }
-                        : { background: "rgba(255,250,238,.5)", color: "#56703f", border: "1.5px solid #8fae7a" }
-                    }
+                    // Save is the solid forest-green default (owner, Nov 9: option 1); it glows once something changed.
+                    data-changed={changed || completedNow ? "" : undefined}
+                    className="qe-save h-10 rounded-full px-5 text-[15px] font-semibold"
                   >
                     {completedNow ? "Done" : "Save"}
                   </button>
