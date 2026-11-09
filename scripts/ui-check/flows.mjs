@@ -649,6 +649,16 @@ export const FLOWS = [
           await h.check("offline: packing window");
         }
       }
+      // A journal note written offline waits on the device too.
+      if (await h.tap((p) => p.getByRole("button", { name: /^create something new$/i }).first(), "offline: + button", { optional: true, expectMove: true })) {
+        if (await h.tap((p) => p.getByRole("tab", { name: /journal/i }).first(), "offline: journal tab", { optional: true, expectMove: true })) {
+          await h.page.getByLabel("Journal entry").first().fill("Offline note").catch(() => {});
+          await h.tap((p) => p.getByRole("button", { name: /^save entry$/i }).first(), "offline: save entry", { optional: true, expectMove: true });
+          await h.settle(1200);
+          const kinds = await h.page.evaluate(() => JSON.parse(localStorage.getItem("offline-queue-v1") || "[]").map((o) => o.kind));
+          if (!kinds.includes("journal")) { await ctx.setOffline(false); throw new Error("offline: a journal note written offline wasn't kept on the device"); }
+        }
+      }
       const waiting = await h.page.evaluate(() => JSON.parse(localStorage.getItem("offline-queue-v1") || "[]").length);
       if (!waiting) { await ctx.setOffline(false); throw new Error("offline: changes made offline weren't kept on the device"); }
       await ctx.setOffline(false);

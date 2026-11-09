@@ -2,14 +2,20 @@
 
 import { useSyncExternalStore } from "react";
 import {
+  addJournalEntryAction,
+  completeRiteAction,
   completeTaskAction,
   createQuestAction,
+  logEventAction,
   makeRefillQuestAction,
+  saveCheckInAction,
   saveInventoryAction,
   savePackingListsAction,
   saveQuestStepsAction,
   setTaskPlacementAction,
   setTaskTagsAction,
+  tickRiteStepAction,
+  uncompleteRiteAction,
   updateTaskAction,
 } from "@/app/actions";
 import { resolveOptimisticQuest } from "@/lib/optimistic-quests";
@@ -48,6 +54,18 @@ const RUNNERS = {
     if (new Date(a.at).toDateString() !== new Date().toDateString()) fd.set("completedAt", a.at);
     return completeTaskAction(fd);
   },
+  // Habits, check-ins, events and journal notes (owner, Nov 9: "increase what the user can do while offline").
+  completeRite: (a: { id: string; day: string; pct?: number }) => completeRiteAction(a.id, a.day, a.pct ?? 100),
+  uncompleteRite: (a: { id: string; day: string }) => uncompleteRiteAction(a.id, a.day),
+  tickStep: (a: { id: string; stepId: string; day: string; on: boolean }) => tickRiteStepAction(a.id, a.stepId, a.day, a.on),
+  saveCheckIn: (a: { energy: number | null; metrics: { metric: string; level: number }[]; at: string }) => saveCheckInAction(a.energy, a.metrics, a.at),
+  logEvent: async (a: Parameters<typeof logEventAction>[0]) => {
+    const r = await logEventAction(a);
+    // logEventAction reports problems as a result; a refusal shouldn't retry forever.
+    if (!r.ok) throw new Error(r.error);
+    return r;
+  },
+  journal: (a: { body: string; mood: number | null; kind: string | null }) => addJournalEntryAction(a.body, a.mood, a.kind),
 };
 
 export type OfflineKind = keyof typeof RUNNERS;
@@ -161,6 +179,12 @@ const WHAT: Record<OfflineKind, string> = {
   placeQuest: "Quest's place",
   questSteps: "Sub-quests",
   completeQuest: "Completed quest",
+  completeRite: "Habit done",
+  uncompleteRite: "Habit undone",
+  tickStep: "Sub-habit",
+  saveCheckIn: "Check-in",
+  logEvent: "Event",
+  journal: "Journal note",
 };
 
 let retry: ReturnType<typeof setTimeout> | undefined;

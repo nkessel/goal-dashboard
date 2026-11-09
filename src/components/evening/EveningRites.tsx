@@ -22,7 +22,8 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { completeRiteAction, setTomorrowQueueAction, tickRiteStepAction, removeRiteAction, reorderRitesAction, restoreRiteAction, uncompleteRiteAction, updateRiteAction } from "@/app/actions";
+import { setTomorrowQueueAction, removeRiteAction, reorderRitesAction, restoreRiteAction, updateRiteAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
 import { Fold } from "@/components/ui/Fold";
 import { RecentWins } from "./RecentWins";
 import { DayPlanner } from "./DayPlanner";
@@ -256,8 +257,8 @@ export function EveningRites({
     }
     startTransition(async () => {
       try {
-        if (next) await completeRiteAction(r.id, day, pct);
-        else await uncompleteRiteAction(r.id, day);
+        if (next) await saveOrQueue("completeRite", { id: r.id, day, pct }, `rite:${r.id}:${day}`);
+        else await saveOrQueue("uncompleteRite", { id: r.id, day }, `rite:${r.id}:${day}`);
       } catch (e) {
         setOptimistic((o) => ({ ...o, [r.id]: !next }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
@@ -283,7 +284,7 @@ export function EveningRites({
     }
     startTransition(async () => {
       try {
-        await tickRiteStepAction(r.id, stepId, day, on);
+        await saveOrQueue("tickStep", { id: r.id, stepId, day, on }, `step:${r.id}:${stepId}:${day}`);
       } catch (e) {
         setStepOpt((o) => ({ ...o, [`${r.id}|${stepId}`]: !on }));
         setOptimistic((o) => ({ ...o, [r.id]: wasDone }));

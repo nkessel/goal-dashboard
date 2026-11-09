@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { deleteCheckNoteAction, logEventAction, saveTrackedEventsAction, trackedEventsAction } from "@/app/actions";
+import { deleteCheckNoteAction, saveTrackedEventsAction, trackedEventsAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
 import { Fold } from "@/components/ui/Fold";
 import { CloseIcon } from "@/components/ui/Icons";
 
@@ -28,12 +29,19 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
     saveTrackedEventsAction(next).catch(() => setSaid({ text: "That didn't save. Try again?" }));
   };
   const log = async (name: string) => {
-    const r = await logEventAction({ title: name });
+    // Stamped now, so it keeps its real time when it waits for a connection.
+    const out = await saveOrQueue("logEvent", { title: name, at: new Date().toISOString() }).catch((e) => ({ queued: false as const, result: { ok: false as const, error: e instanceof Error ? e.message : "Couldn't log that." } }));
+    const stamp = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (out.queued) {
+      setSaid({ text: `✓ ${name} · ${stamp} · kept here until you're online` });
+      return;
+    }
+    const r = out.result;
     if (!r.ok) {
       setSaid({ text: r.error });
       return;
     }
-    const at = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const at = stamp;
     const id = r.note?.id;
     setSaid({ text: `✓ ${name} · ${at}`, undo: id ? () => void deleteCheckNoteAction(id).then(() => (setSaid({ text: "Taken back" }), onLogged?.())) : undefined });
     onLogged?.();

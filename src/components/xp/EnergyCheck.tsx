@@ -7,7 +7,8 @@ import { useEffect, useState, useSyncExternalStore, useTransition } from "react"
 import { createPortal } from "react-dom";
 import { splitEvents, splitOn } from "@/lib/event-split";
 import { TrackedEvents } from "@/components/insights/TrackedEvents";
-import { addCheckNoteAction, addJournalEntryAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveCheckInAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
+import { addCheckNoteAction, addJournalEntryAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
 import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft, MoonIcon, SunIcon, TimeToken } from "./NightFields";
 import { DateField } from "@/components/ui/DateField";
 import { shiftDay } from "@/lib/wheel-of-time";
@@ -286,9 +287,15 @@ export function EnergyCheck({
           setNight(EMPTY_NIGHT);
         }
         if (energySet || all.length) {
-          const res = await saveCheckInAction(energySet ? value : null, all);
-          if (res.energy) setSaved(res.energy.level);
-          setSavedAt(res.energy?.created_at ?? new Date().toISOString());
+          const out = await saveOrQueue("saveCheckIn", { energy: energySet ? value : null, metrics: all, at: new Date().toISOString() });
+          if (out.queued) {
+            if (energySet) setSaved(value);
+            setSavedAt(new Date().toISOString());
+          } else {
+            const res = out.result;
+            if (res.energy) setSaved(res.energy.level);
+            setSavedAt(res.energy?.created_at ?? new Date().toISOString());
+          }
         }
         setEnergySet(false);
         setSavedVals(Object.fromEntries(all.map((r) => [r.metric, r.level])));

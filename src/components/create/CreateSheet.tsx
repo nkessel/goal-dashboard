@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { addJournalEntryAction, createBoardAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
 import { EditorToolbarContext, EmbedHostContext } from "@/components/ui/EmbedHost";
 import { QuestEditorDialog } from "@/components/tasks/QuestEditorDialog";
 import { RewardEditorDialog } from "@/components/rewards/RewardEditorDialog";
@@ -321,7 +322,9 @@ function JournalComposer({ feedback = false, isAdventure, onDone }: { feedback?:
     setError(null);
     startSaving(async () => {
       try {
-        await addJournalEntryAction(body, feedback ? null : mood, kind);
+        // A journal note (not feedback) waits on the device when there's no connection.
+        if (feedback) await addJournalEntryAction(body, null, kind);
+        else await saveOrQueue("journal", { body, mood, kind });
         try {
           if (!feedback) window.localStorage.removeItem(JOURNAL_DRAFT_KEY);
         } catch {

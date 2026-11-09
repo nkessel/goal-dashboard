@@ -1121,9 +1121,9 @@ export function QuestEditorDialog({
     startSaving(async () => {
       try {
         await persist(true);
-        const fd = new FormData();
-        fd.set("taskId", task.id);
-        const res = await completeTaskAction(fd);
+        // Offline, the completion waits on the device (the XP total shows once it's sent).
+        const out = await saveOrQueue("completeQuest", { id: task.id, at: new Date().toISOString() });
+        const res = out.queued ? null : out.result;
         deleted.current = true; // nothing more to save or pay out as it closes
         celebrateQuest({
           taskId: task.id,
@@ -1136,7 +1136,7 @@ export function QuestEditorDialog({
         });
         setPhase("closing");
         setTimeout(onClose, embedded ? 0 : 180);
-        router.refresh();
+        if (!out.queued) router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't complete it.");
       }

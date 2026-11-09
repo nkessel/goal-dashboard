@@ -6,7 +6,7 @@ import { dismissOfflineFailures, flushOffline, setOfflineOwner, setOnline, useOf
 import { Fold, useLinger } from "@/components/ui/Fold";
 
 /** The main screens kept on the device in the background, so they open offline even if not visited yet. */
-const WARM_PATHS = ["/", "/settings/inventory", "/boards", "/settings"];
+const WARM_PATHS = ["/", "/settings/inventory", "/boards", "/settings", "/insights"];
 const WARM_KEY = "sw-warm-at";
 const WARM_EVERY = 6 * 3600_000;
 

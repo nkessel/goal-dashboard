@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { completeRiteAction, createRiteAction, reorderRitesAction, uncompleteRiteAction, welcomeHabitsAction } from "@/app/actions";
+import { createRiteAction, reorderRitesAction, welcomeHabitsAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
 import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -101,7 +102,7 @@ export function WelcomeHabits({ fx }: { fx: FxSettings }) {
     const next = !h.done;
     setList((l) => (l ?? []).map((x) => (x.id === h.id ? { ...x, done: next } : x)));
     setSaid(next ? `${h.title.replace(/\s+\S*\p{Extended_Pictographic}\S*$/u, "")} ✓${h.xp ? ` +${h.xp} XP` : ""}` : "Taken back");
-    (next ? completeRiteAction(h.id, day) : uncompleteRiteAction(h.id, day)).catch(() => {
+    (next ? saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`) : saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`)).catch(() => {
       setList((l) => (l ?? []).map((x) => (x.id === h.id ? { ...x, done: !next } : x)));
       setSaid("That didn't save. Try again?");
     });

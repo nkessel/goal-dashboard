@@ -3,7 +3,8 @@
 import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteCheckNoteAction, logEventAction, updateCheckNoteAction } from "@/app/actions";
+import { deleteCheckNoteAction, updateCheckNoteAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
 import { setSplitOn, splitEvents, splitOn } from "@/lib/event-split";
 import { DateField } from "@/components/ui/DateField";
 import { CloseIcon } from "@/components/ui/Icons";
@@ -118,12 +119,12 @@ export function EventLog({ notes }: { notes: Note[] }) {
         // "a, b; c" is three events (unless you keep it as one).
         const parts = splitEvents(words, split);
         for (const w of parts) {
-          const r = await logEventAction({ title: w, details: parts.length > 1 ? null : details, tone, at, allDay });
-          if (!r.ok) throw new Error(r.error);
+          const out = await saveOrQueue("logEvent", { title: w, details: parts.length > 1 ? null : details, tone, at: at ?? new Date().toISOString(), allDay });
+          if (!out.queued && !out.result.ok) throw new Error(out.result.error);
         }
         for (const t of all) {
-          const r = await logEventAction({ title: `#${t}`, details: words ? null : details, tone: words ? null : tone, at, allDay });
-          if (!r.ok) throw new Error(r.error);
+          const out = await saveOrQueue("logEvent", { title: `#${t}`, details: words ? null : details, tone: words ? null : tone, at: at ?? new Date().toISOString(), allDay });
+          if (!out.queued && !out.result.ok) throw new Error(out.result.error);
         }
         setText("");
         setDetails("");

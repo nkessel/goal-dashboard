@@ -6,7 +6,8 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { completeRiteAction, reorderRitesAction, skipHabitAction, tickRiteStepAction, uncompleteRiteAction, unskipHabitAction } from "@/app/actions";
+import { reorderRitesAction, skipHabitAction, unskipHabitAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
 import { useLocalDay } from "@/components/evening/evening-clock";
 import { nextOccurrence, repeatIsUp, repeatLabel } from "@/lib/habit-repeat";
 import { RiteEditorDialog } from "@/components/evening/RiteEditorDialog";
@@ -303,8 +304,9 @@ export function DailyHabits({
     // The habit done doesn't mean every sub-habit was (owner, Nov 2): they keep their own ticks.
     startTransition(async () => {
       try {
-        if (next) await completeRiteAction(h.id, day);
-        else await uncompleteRiteAction(h.id, day);
+        // Done and undone share one key, so only the latest waits when offline.
+        if (next) await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+        else await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);
       } catch (e) {
         setOptimistic((o) => ({ ...o, [h.id]: !next }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
@@ -331,7 +333,7 @@ export function DailyHabits({
     }
     startTransition(async () => {
       try {
-        await tickRiteStepAction(h.id, stepId, day, on);
+        await saveOrQueue("tickStep", { id: h.id, stepId, day, on }, `step:${h.id}:${stepId}:${day}`);
       } catch (e) {
         setStepOpt((o) => ({ ...o, [`${h.id}|${stepId}`]: !on }));
         setOptimistic((o) => ({ ...o, [h.id]: wasDone }));

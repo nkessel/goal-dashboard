@@ -4,7 +4,7 @@ import { TimeToken } from "@/components/xp/NightFields";
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { saveCheckInAction } from "@/app/actions";
+import { saveOrQueue } from "@/lib/offline";
 import { DateField } from "@/components/ui/DateField";
 import { useEscape } from "@/lib/use-escape";
 import { TrackingChart } from "./TrackingChart";
@@ -107,7 +107,7 @@ function AddEntry({ metrics, onClose }: { metrics: string[]; onClose: () => void
       .map(([metric, level]) => ({ metric, level }));
     start(async () => {
       try {
-        await saveCheckInAction(energy, rest, at.toISOString());
+        await saveOrQueue("saveCheckIn", { energy, metrics: rest, at: at.toISOString() });
         router.refresh();
         onClose();
       } catch (e) {

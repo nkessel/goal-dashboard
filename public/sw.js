@@ -92,7 +92,7 @@ async function fromNetworkFirst(event) {
     const path = new URL(req.url).pathname;
     if (path === "/") {
       // "/" opens your last screen: offer whichever screen is kept.
-      for (const p of ["/", "/settings/inventory", "/boards", "/settings"]) {
+      for (const p of ["/", "/settings/inventory", "/boards", "/settings", "/insights"]) {
         const any = await cache.match(new URL(p, req.url).href, { ignoreVary: true });
         if (any) return any;
       }
