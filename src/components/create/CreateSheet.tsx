@@ -44,7 +44,10 @@ export function CreateSheet({
   followUpOf,
   theme = "calm",
   onClose,
+  shut = 0,
 }: {
+  /** Bumped by the + button (now ×) to ask the sheet to close: it fades out like any other close. */
+  shut?: number;
   /** "Add a follow-up quest": the new quest comes right after this one in its sequence. */
   followUpOf?: { id: string; title: string };
   /** Opened from Today's Quests' own +: the new quest goes straight there. */
@@ -74,7 +77,7 @@ export function CreateSheet({
   function close() {
     if (leaving) return;
     setLeaving(true);
-    setTimeout(onClose, 190);
+    setTimeout(onClose, 250);
   }
   /** Taps outside, Escape and ×: an editor with unsaved writing asks first. */
   function requestClose() {
@@ -82,6 +85,13 @@ export function CreateSheet({
     const ev = new Event("qe-request-close", { cancelable: true });
     if (window.dispatchEvent(ev)) close();
   }
+  const closeRef = useRef(requestClose);
+  useEffect(() => {
+    closeRef.current = requestClose;
+  });
+  useEffect(() => {
+    if (shut) closeRef.current();
+  }, [shut]);
   const [toolbar, setToolbar] = useState<HTMLSpanElement | null>(null);
 
   // Switching kinds carries the title and details typed so far into the new editor.
@@ -150,7 +160,7 @@ export function CreateSheet({
   return createPortal(
     <>
       <div
-        className={`fixed inset-0 z-[48] ${leaving ? "overlay-fade-out" : "overlay-fade-in"}`}
+        className={`fixed inset-0 z-[48] ${leaving ? "backdrop-out" : "backdrop-in"}`}
         style={{ background: "rgba(8,6,3,.6)" }}
         onClick={requestClose}
         aria-hidden

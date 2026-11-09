@@ -323,8 +323,11 @@ html[data-transition="nav-back"]::view-transition-new(root) {
   }
 }
 .overlay-fade-in {
-  animation: overlay-fade-in 180ms ease both;
+  animation: overlay-fade-in 240ms ease-out both;
 }
+/* The + menu's dark backdrop: eases in and out over a quarter second (owner, Nov 9: no sudden darkening). */
+.backdrop-in { animation: overlay-fade-in 260ms ease-out both; }
+.backdrop-out { animation: overlay-fade-out 240ms ease-in both; }
 .overlay-fade-out {
   animation: overlay-fade-out 170ms ease both;
 }
@@ -522,8 +525,76 @@ html[data-nav-pending]:not([data-nav-pending="settings-close"]) .nav-loader { an
 .nav-loader-pen { animation: quill-pen 1.6s linear infinite; }
 @keyframes quill-ink { from { stroke-dashoffset: 90; } to { stroke-dashoffset: 0; } }
 @keyframes quill-pen { from { transform: translate(-6px, -2px); } to { transform: translate(70px, -2px); } }
+/* The look and the wise line stack in the middle of the screen. */
+.nav-loader { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+/* Fireflies: lights of different depths drifting on their own paths, each glowing in its own time, over a faint dusk haze. */
+.nav-loader-flies { position: relative; display: block; width: 170px; height: 100px; }
+.nav-loader-flies::before {
+  content: ""; position: absolute; inset: -16px -24px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(20,34,22,.82), rgba(20,34,22,.6) 55%, rgba(20,34,22,.18) 82%, transparent);
+}
+/* A dark meadow edge under them: grass and a fern or two. */
+.nav-loader-flies::after {
+  content: ""; position: absolute; left: -6px; right: -6px; bottom: -10px; height: 26px; opacity: .9;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 26' preserveAspectRatio='none'%3E%3Cpath fill='%23101a0e' d='M0 26V20l6-8 2 9 5-14 3 13 6-10 2 10 7-15 2 15 6-9 3 9 5-12 2 12 8-16 2 16 6-10 3 10 4-13 3 13 7-9 2 9 6-14 2 14 5-8 3 8 6-12 2 12 7-10 2 10 5-15 3 15 6-8 2 8 6-11 2 11 6-6 3 6 4-9 2 9 5-5 1 5V26z'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+}
+.nav-loader-flies i {
+  position: absolute; border-radius: 50%; background: radial-gradient(circle, #fffbe0 0 35%, #ffe27a 60%, #f2b93a);
+  box-shadow: 0 0 9px 4px rgba(255,228,120,.9), 0 0 26px 11px rgba(255,196,70,.36);
+  z-index: 1;
+  animation: var(--d) ease-in-out var(--o) infinite both, firefly-glow var(--g) ease-in-out var(--o) infinite;
+}
+.nav-loader-flies .nlf-path0 { animation-name: firefly-a, firefly-glow; }
+.nav-loader-flies .nlf-path1 { animation-name: firefly-b, firefly-glow; }
+.nav-loader-flies .nlf-path2 { animation-name: firefly-c, firefly-glow; }
+@keyframes firefly-a { 0%, 100% { translate: 0 0; } 30% { translate: 16px -14px; } 60% { translate: 4px -26px; } 80% { translate: -10px -10px; } }
+@keyframes firefly-b { 0%, 100% { translate: 0 0; } 25% { translate: -14px -8px; } 55% { translate: -4px -22px; } 80% { translate: 12px -6px; } }
+@keyframes firefly-c { 0%, 100% { translate: 0 0; } 35% { translate: 10px 10px; } 65% { translate: -12px 4px; } 85% { translate: -4px -12px; } }
+@keyframes firefly-glow { 0%, 100% { scale: .5; opacity: .25; } 45%, 60% { scale: 1; opacity: 1; } }
+/* Page turns: a leather-bound book open on its spine, pages of faint script turning one after another. */
+.nav-loader-book { position: relative; display: block; width: 116px; height: 76px; perspective: 520px; filter: drop-shadow(0 8px 12px rgba(0,0,0,.45)); }
+.nav-loader-book b { position: absolute; display: block; }
+.nav-loader-book .nb-cover { inset: 4px -4px -5px; border-radius: 6px; background: linear-gradient(180deg, #6b4423, #4a2d14); box-shadow: inset 0 0 0 1.5px #c9a24b, inset 0 0 0 3px #4a2d14; }
+.nav-loader-book .nb-page { top: 0; height: 72px; width: 56px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 9px, rgba(90,66,30,.28) 9px 10px) 8px 12px / 40px 50px no-repeat,
+    linear-gradient(90deg, #f3e7c4, #fbf3dc); }
+.nav-loader-book .nb-left { left: 2px; border-radius: 5px 1px 1px 5px; box-shadow: inset -10px 0 12px -8px rgba(90,60,20,.45); }
+.nav-loader-book .nb-right { right: 2px; border-radius: 1px 5px 5px 1px; box-shadow: inset 10px 0 12px -8px rgba(90,60,20,.45); }
+.nav-loader-book .nb-flip { left: 58px; top: 0; width: 56px; height: 72px; transform-origin: left center; transform-style: preserve-3d; animation: page-turn 1.8s cubic-bezier(.45,.05,.4,1) infinite; }
+.nav-loader-book .nb-flip2 { animation-delay: .9s; }
+.nav-loader-book .nb-face { inset: 0; backface-visibility: hidden;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 9px, rgba(90,66,30,.28) 9px 10px) 8px 12px / 40px 50px no-repeat,
+    linear-gradient(90deg, #f6ebcc, #fdf7e6); }
+.nav-loader-book .nb-front { border-radius: 1px 5px 5px 1px; }
+.nav-loader-book .nb-back { border-radius: 5px 1px 1px 5px; transform: rotateY(180deg); background-color: #efe0b8; }
+/* The turning page catches the light, then falls into shadow as it lands. */
+.nav-loader-book .nb-face::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, rgba(80,50,15,.35), transparent 60%); opacity: 0; animation: page-shade 1.8s ease-in-out infinite; animation-delay: inherit; }
+.nav-loader-book .nb-flip2 .nb-face::after { animation-delay: .9s; }
+@keyframes page-shade { 0%, 10% { opacity: 0; } 45% { opacity: 1; } 90%, 100% { opacity: 0; } }
+.nav-loader-book .nb-ribbon { left: 54px; top: 64px; width: 7px; height: 20px; background: #a3302a; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); animation: ribbon-sway 1.8s ease-in-out infinite; transform-origin: top center; }
+@keyframes page-turn {
+  0%, 8% { transform: rotateY(0); }
+  50% { transform: rotateY(-95deg) skewY(-3deg); }
+  92%, 100% { transform: rotateY(-180deg); opacity: 1; }
+}
+@keyframes ribbon-sway { 0%, 100% { rotate: -6deg; } 50% { rotate: 6deg; } }
+/* The wise line: a parchment ribbon that rises in a moment after the look. */
+.nav-loader-tip {
+  display: flex; align-items: baseline; gap: 8px; max-width: min(340px, 86vw); padding: 9px 14px; border-radius: 12px;
+  font: italic 600 15px/1.35 var(--font-display, Georgia, serif); color: #3b2a14; text-align: center; text-wrap: balance;
+  background: linear-gradient(180deg, rgba(250,241,214,.97), rgba(238,222,182,.97)); border: 1.5px solid #b8963f;
+  box-shadow: 0 0 0 3px rgba(42,28,16,.35), 0 8px 18px rgba(0,0,0,.4);
+}
+html[data-nav-pending] .nav-loader-tip { animation: tip-rise 420ms cubic-bezier(.2,.8,.2,1) 520ms both; }
+.nav-loader-tip .nlt-star { color: #b88a1e; font-style: normal; font-size: 11px; flex: none; animation: tip-twinkle 1.8s ease-in-out infinite; }
+.nav-loader-tip .nlt-star:last-child { animation-delay: .9s; }
+@keyframes tip-rise { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
+@keyframes tip-twinkle { 0%, 100% { opacity: .45; scale: .85; } 50% { opacity: 1; scale: 1.15; } }
 @media (prefers-reduced-motion: reduce) {
-  .nav-loader-toucan, .nav-loader-compass, .nav-loader-ink, .nav-loader-pen { animation: none; }
+  .nav-loader-toucan, .nav-loader-compass, .nav-loader-ink, .nav-loader-pen, .nav-loader-flies i, .nav-loader-book .nb-flip, .nav-loader-book .nb-ribbon, .nav-loader-book .nb-face::after, .nav-loader-tip, .nav-loader-tip .nlt-star { animation: none; }
 }
 html[data-enter="nav-forward"] main { animation: nav-enter-right 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 html[data-enter="nav-back"] main { animation: nav-enter-left 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
@@ -1366,7 +1437,7 @@ html[data-fog-lift]::after { animation: fog-lift 0.9s ease forwards; }
    Editors (quest, reward, rite) render inside it in place: their own
    overlay, frame, header and enter/exit animations are switched off. */
 .create-sheet-in { animation: create-sheet-in 300ms cubic-bezier(.2,.8,.2,1) both; transform-origin: 50% 100%; }
-.create-sheet-out { animation: create-sheet-out 200ms ease-in both; transform-origin: 50% 100%; }
+.create-sheet-out { animation: create-sheet-out 230ms ease-in both; transform-origin: 50% 100%; }
 @keyframes create-sheet-in {
   from { opacity: 0; transform: translateY(28px) scale(.96); }
   to { opacity: 1; transform: none; }
@@ -1671,10 +1742,9 @@ html[data-kb] [data-feedback-hide] {
   pointer-events: none;
   transition: opacity 160ms ease, visibility 0s linear 160ms;
 }
-/* A popup open on a phone (quest editor, sheets): the feedback button shrinks and quiets so it
-   doesn't sit on the popup's own buttons (it covered the editor's Close). Still one tap away. */
+/* The feedback button never changes size anywhere (owner, Nov 9). While typing in a popup on a
+   phone it steps out of the way (fades), then comes back as it was. */
 @media (pointer: coarse) {
-  html.scroll-locked:not([data-welcome-open]) [data-feedback-hide] { scale: 0.68; opacity: 0.55; }
   html.scroll-locked:not([data-welcome-open])[data-typing] [data-feedback-hide]:not([data-feedback-open]) { opacity: 0; visibility: hidden; pointer-events: none; }
 }
 /* The welcome screen isn't a popup over buttons: there the feedback button sits full size in the
@@ -2989,6 +3059,7 @@ html[data-welcome-open] .nav-loader-toucan { display: none; }
 .reply-line::placeholder { color: #a08a5c; font-style: italic; opacity: 1; }
 .reply-box:hover, .reply-box:active { transform: none; scale: none; }
 .reply-line:active { scale: none; }
+[data-feedback-btn]:active, [data-feedback-btn]:hover { scale: none !important; }
 .reply-box:focus-within { box-shadow: 0 0 0 1.5px #a88a3f, 0 2px 4px rgba(60, 40, 10, 0.25); }
 .reply-box { background: linear-gradient(180deg, #fffdf6, #f8efd8); transition: height 160ms ease-out, box-shadow 0.12s; }
 .reply-send { background: radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f); color: #2a1c10; box-shadow: 0 0 0 1px #8a6116; }

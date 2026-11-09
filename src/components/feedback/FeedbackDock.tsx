@@ -601,7 +601,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         aria-label={openId ? "Minimize feedback" : "Feedback (F)"}
         title={openId ? "Minimize feedback" : "Feedback (F) — drag to move"}
         aria-expanded={!!openId || choosing}
-        className={`fixed z-[95] flex touch-none select-none items-center justify-center rounded-full ${dragPos ? "cursor-grabbing" : "cursor-pointer transition-transform hover:scale-105 active:scale-95"}`}
+        className={`fixed z-[95] flex touch-none select-none items-center justify-center rounded-full ${dragPos ? "cursor-grabbing" : "cursor-pointer"}`}
         style={{ left: btnPos.x, top: btnPos.y, width: BTN, height: BTN, ...coin }}
       >
         <ChatIcon size={27} />

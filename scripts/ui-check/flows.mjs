@@ -332,6 +332,14 @@ export const FLOWS = [
         }
         await esc(h);
       }
+      // Closing from the + button's × fades the menu and its dark backdrop out (owner, Nov 9: no sudden lightening).
+      await h.settle(500);
+      if (await h.tap(/^create something new$/i, "+ button again", { optional: true, expectMove: true })) {
+        await h.settle(400);
+        await h.tap(/^close$/i, "close with the ×", { optional: true, expectMove: true });
+        await h.settle(400);
+        await h.check("+ closed by ×");
+      }
     },
   },
   {
@@ -489,6 +497,12 @@ export const FLOWS = [
         await h.tap((p) => p.getByRole("button", { name: /while a screen loads/i }).first(), "open loading settings", { optional: true, expectMove: true });
         await h.settle(900);
         await h.check("found: loading");
+        // Several loading looks can be on at once (they take turns at random); wise words switch.
+        if (await h.tap((p) => p.getByRole("button", { name: /^fireflies$/i }).first(), "loading look: fireflies", { optional: true })) {
+          await h.tap((p) => p.getByRole("button", { name: /^page turns$/i }).first(), "loading look: page turns", { optional: true });
+          await h.settle(300);
+          await h.check("loading looks picked");
+        }
       }
       // Secret Missions slides in from the right as its own screen.
       if (await h.tap((p) => p.getByRole("button", { name: /secret missions/i }).first(), "secret missions", { optional: true, expectMove: true })) {

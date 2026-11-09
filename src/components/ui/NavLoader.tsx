@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { useVisualFx, type LoadingLook } from "@/lib/visual-fx";
+import { DAILY_LINES, rotationFor } from "@/lib/greetings";
+import { ownLines } from "@/lib/welcome";
+import { loadFx } from "@/lib/celebration-fx";
 
 /**
  * While the next screen loads (after a short beat, so quick loads show
@@ -12,13 +15,67 @@ import { useVisualFx, type LoadingLook } from "@/lib/visual-fx";
  */
 export function NavLoader() {
   const fx = useVisualFx();
-  if (fx.loadingLook === "bar") return null;
+  const [pick, setPick] = useState<{ n: number; tip: string | null }>({ n: 0, tip: null });
+  // Each wait draws again from the looks that are on, and a fresh wise line from your rotation.
+  useEffect(() => {
+    const html = document.documentElement;
+    let was = html.hasAttribute("data-nav-pending");
+    const mo = new MutationObserver(() => {
+      const now = html.hasAttribute("data-nav-pending");
+      if (now && !was) setPick({ n: Math.floor(Math.random() * 1000), tip: wiseLine() });
+      was = now;
+    });
+    mo.observe(html, { attributes: true, attributeFilter: ["data-nav-pending"] });
+    return () => mo.disconnect();
+  }, []);
+  const looks = fx.loadingLooks;
+  const look = looks[pick.n % looks.length] ?? "toucan";
+  const tip = fx.loadingTips ? pick.tip : null;
+  if (look === "bar" && !tip) return null;
   return (
     <div className="nav-loader" aria-hidden>
-      <LoadingArt look={fx.loadingLook} />
+      {look !== "bar" && <LoadingArt look={look} />}
+      {tip && <LoadingTip line={tip} />}
     </div>
   );
 }
+
+/** A line from the welcome screen's wise lines (your own ones too, none you retired). */
+function wiseLine(): string {
+  try {
+    const { liked, fresh } = rotationFor(new Date().toISOString().slice(0, 10), ownLines(loadFx()));
+    const pool = [...liked, ...fresh];
+    return pool[Math.floor(Math.random() * pool.length)] ?? DAILY_LINES[0];
+  } catch {
+    return DAILY_LINES[Math.floor(Math.random() * DAILY_LINES.length)];
+  }
+}
+
+/** The wise line under the loading look: a parchment ribbon that rises in. */
+export function LoadingTip({ line }: { line: string }) {
+  return (
+    <span className="nav-loader-tip">
+      <span className="nlt-star">✦</span>
+      <span className="nlt-text">{line}</span>
+      <span className="nlt-star">✦</span>
+    </span>
+  );
+}
+
+/** Fireflies' spots in their 170×100 field: left %, top %, size px, depth (0 far … 1 near), path. */
+const FLIES: [number, number, number, number, number][] = [
+  [12, 58, 5, 0.4, 0],
+  [24, 26, 7, 1, 1],
+  [33, 70, 4, 0.2, 2],
+  [44, 40, 8, 1, 0],
+  [52, 14, 4, 0.3, 1],
+  [61, 62, 6, 0.8, 2],
+  [72, 30, 5, 0.5, 0],
+  [80, 74, 7, 0.9, 1],
+  [88, 44, 4, 0.3, 2],
+  [36, 48, 3, 0.1, 1],
+  [66, 86, 3, 0.2, 0],
+];
 
 /** The art for one loading look (also the Settings preview). */
 export function LoadingArt({ look }: { look: LoadingLook }) {
@@ -49,6 +106,46 @@ export function LoadingArt({ look }: { look: LoadingLook }) {
           <path d="M14 40l4 2-6 3z" fill="#2a1c10" />
         </g>
       </svg>
+    );
+  if (look === "fireflies")
+    return (
+      <span className="nav-loader-flies">
+        {FLIES.map(([x, y, size, near, path], i) => (
+          <i
+            key={i}
+            className={`nlf-path${path}`}
+            style={
+              {
+                left: `${x}%`,
+                top: `${y}%`,
+                width: size,
+                height: size,
+                filter: near < 0.35 ? "blur(1px)" : undefined,
+                "--d": `${2.8 + ((i * 7) % 5) * 0.45}s`,
+                "--g": `${1.3 + ((i * 3) % 4) * 0.35}s`,
+                "--o": `${-i * 0.37}s`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </span>
+    );
+  if (look === "pages")
+    return (
+      <span className="nav-loader-book">
+        <b className="nb-cover" />
+        <b className="nb-page nb-left" />
+        <b className="nb-page nb-right" />
+        <b className="nb-flip">
+          <b className="nb-face nb-front" />
+          <b className="nb-face nb-back" />
+        </b>
+        <b className="nb-flip nb-flip2">
+          <b className="nb-face nb-front" />
+          <b className="nb-face nb-back" />
+        </b>
+        <b className="nb-ribbon" />
+      </span>
     );
   return null;
 }

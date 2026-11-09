@@ -20,17 +20,21 @@ export type VisualFx = {
   victoriesShowCount: boolean;
   victoriesShowCoins: boolean;
   victoriesShowLatest: boolean;
-  /** What shows while the next screen loads. */
-  loadingLook: LoadingLook;
+  /** What shows while the next screen loads: one look, or several that take turns at random. */
+  loadingLooks: LoadingLook[];
+  /** A wise line (from the welcome screen's rotation) under the loading look. */
+  loadingTips: boolean;
   /** Quietly load the screens you visit most while nothing is happening. */
   preload: boolean;
 };
 
-export type LoadingLook = "toucan" | "compass" | "quill" | "bar";
+export type LoadingLook = "toucan" | "compass" | "quill" | "fireflies" | "pages" | "bar";
 export const LOADING_LOOKS: { key: LoadingLook; label: string; hint: string }[] = [
   { key: "toucan", label: "Flying toucan", hint: "the Great Toucan Spirit flies across while it loads" },
   { key: "compass", label: "Compass", hint: "a gilded compass rose turning" },
   { key: "quill", label: "Quill", hint: "a quill writing the next page" },
+  { key: "fireflies", label: "Fireflies", hint: "small lights drifting and glowing" },
+  { key: "pages", label: "Page turns", hint: "an open book, its pages turning" },
   { key: "bar", label: "Just the gold bar", hint: "a thin line along the top" },
 ];
 
@@ -43,7 +47,8 @@ export const VISUAL_FX_DEFAULTS: VisualFx = {
   victoriesShowCount: true,
   victoriesShowCoins: false,
   victoriesShowLatest: false,
-  loadingLook: "toucan",
+  loadingLooks: ["toucan"],
+  loadingTips: true,
   preload: true,
 };
 
@@ -54,7 +59,12 @@ const listeners = new Set<() => void>();
 function read(): VisualFx {
   try {
     const raw = window.localStorage.getItem(KEY);
-    return raw ? { ...VISUAL_FX_DEFAULTS, ...(JSON.parse(raw) as Partial<VisualFx>) } : VISUAL_FX_DEFAULTS;
+    if (!raw) return VISUAL_FX_DEFAULTS;
+    const saved = JSON.parse(raw) as Partial<VisualFx> & { loadingLook?: LoadingLook };
+    const known = (k: unknown): k is LoadingLook => LOADING_LOOKS.some((l) => l.key === k);
+    const listed = Array.isArray(saved.loadingLooks) ? saved.loadingLooks.filter(known) : [];
+    const looks = listed.length ? listed : known(saved.loadingLook) ? [saved.loadingLook] : VISUAL_FX_DEFAULTS.loadingLooks;
+    return { ...VISUAL_FX_DEFAULTS, ...saved, loadingLooks: looks };
   } catch {
     return VISUAL_FX_DEFAULTS;
   }

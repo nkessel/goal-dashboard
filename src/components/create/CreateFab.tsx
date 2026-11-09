@@ -26,6 +26,9 @@ export function CreateFab({
 }) {
   const [open, setOpen] = useState(false);
   const [pressed, setPressed] = useState<boolean | null>(null);
+  // Closing from the × asks the sheet to fade out (it unmounts itself when done), instead of vanishing.
+  const [shut, setShut] = useState(0);
+  const [shutting, setShutting] = useState(false);
   useEffect(() => {
     if (!resumeDraft) return;
     try {
@@ -47,11 +50,23 @@ export function CreateFab({
           boardId={target ? target.boardId : boardId}
           todayFull={todayFull}
           theme={theme}
-          onClose={() => setOpen(false)}
+          shut={shut}
+          onClose={() => {
+            setOpen(false);
+            setShutting(false);
+          }}
         />
       )}
       <FloatingActionButton
         onClick={() => {
+          if (open && !shutting) {
+            setShutting(true);
+            setShut((n) => n + 1);
+            // Unsaved writing can keep it open (the editor asks first): then the × comes back.
+            window.setTimeout(() => setShutting(false), 600);
+            return;
+          }
+          if (open) return;
           // The button answers at once; the (heavier) sheet renders right after without holding it up.
           const next = !(pressed ?? open);
           setPressed(next);
@@ -60,9 +75,9 @@ export function CreateFab({
             setPressed(null);
           });
         }}
-        label={(pressed ?? open) ? "Close" : (target?.label ?? label)}
+        label={(pressed ?? (open && !shutting)) ? "Close" : (target?.label ?? label)}
         theme={theme}
-        expanded={pressed ?? open}
+        expanded={pressed ?? (open && !shutting)}
         raised={!!target}
       />
     </>

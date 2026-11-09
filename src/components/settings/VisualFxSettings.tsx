@@ -1,7 +1,7 @@
 "use client";
 
 import { LOADING_LOOKS, setVisualFx, useVisualFx, VISUAL_FX_DEFAULTS, type VisualFx } from "@/lib/visual-fx";
-import { LoadingArt } from "@/components/ui/NavLoader";
+import { LoadingArt, LoadingTip } from "@/components/ui/NavLoader";
 import { EveningButtonPreview } from "@/components/evening/BeginEveningButton";
 
 const EVENING: { k: "eveningStarShimmer" | "eveningStarTwinkle" | "eveningBorderShimmer"; label: string }[] = [
@@ -22,7 +22,9 @@ export function VictoriesValue() {
 }
 export function LoadingValue() {
   const fx = useVisualFx();
-  return <>{LOADING_LOOKS.find((l) => l.key === fx.loadingLook)?.label}</>;
+  const on = LOADING_LOOKS.filter((l) => fx.loadingLooks.includes(l.key));
+  const looks = on.length > 1 ? `${on.length} looks, at random` : on[0]?.label;
+  return <>{fx.loadingTips ? `${looks} · wise words` : looks}</>;
 }
 
 /** Evening Routine button effects, with a live preview. Saved on this device. */
@@ -76,28 +78,41 @@ export function LoadingSettings() {
   const fx = useVisualFx();
   return (
     <div className="flex flex-col gap-2">
-      <div role="radiogroup" aria-label="While a screen loads" className="grid grid-cols-2 gap-2">
+      <p className="text-[12px] opacity-70">Tap as many as you like. With more than one, each wait picks one at random.</p>
+      <div role="group" aria-label="While a screen loads" className="grid grid-cols-2 gap-2">
         {LOADING_LOOKS.map((l) => {
-          const on = fx.loadingLook === l.key;
+          const on = fx.loadingLooks.includes(l.key);
           return (
             <button
               key={l.key}
               type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => setVisualFx({ loadingLook: l.key })}
+              aria-pressed={on}
+              onClick={() => {
+                // Any number can be on; the last one stays (something always shows).
+                const next = on ? fx.loadingLooks.filter((k) => k !== l.key) : [...fx.loadingLooks, l.key];
+                if (next.length) setVisualFx({ loadingLooks: next });
+              }}
               title={l.hint}
               className="flex flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-[13px] font-semibold"
               style={{ border: `1.5px solid ${on ? "var(--t-gold-deep, #8a6116)" : "var(--t-card-border)"}`, background: on ? "rgba(217,180,95,.18)" : "transparent" }}
             >
               <span className="flex h-16 w-full items-center justify-center overflow-hidden">
-                {l.key === "bar" ? <span className="block h-[3px] w-3/4 rounded-full" style={{ background: "linear-gradient(90deg,#a88a3f,#d9b45f)" }} /> : <LoadingArt look={l.key} />}
+                {l.key === "bar" ? <span className="block h-[3px] w-3/4 rounded-full" style={{ background: "linear-gradient(90deg,#a88a3f,#d9b45f)" }} /> : <span style={{ scale: l.key === "fireflies" ? 0.6 : l.key === "pages" ? 0.78 : 1 }}><LoadingArt look={l.key} /></span>}
               </span>
               {l.label}
             </button>
           );
         })}
       </div>
+      <label className="flex min-h-9 items-center gap-2.5 text-sm">
+        <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.loadingTips} onChange={() => setVisualFx({ loadingTips: !fx.loadingTips })} />
+        Wise words with it (a line from your welcome screen&apos;s rotation)
+      </label>
+      {fx.loadingTips && (
+        <div className="flex justify-center rounded-xl py-2" style={{ background: "rgba(42,28,16,.12)" }}>
+          <LoadingTip line="Small steps, taken again and again, move mountains." />
+        </div>
+      )}
       <label className="flex min-h-9 items-center gap-2.5 text-sm">
         <input type="checkbox" className="h-5 w-5 accent-[var(--t-gold-deep)]" checked={fx.preload} onChange={() => setVisualFx({ preload: !fx.preload })} />
         Quietly load the screens I visit most while I&apos;m idle, so they open faster
