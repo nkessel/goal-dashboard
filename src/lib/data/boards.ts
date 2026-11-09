@@ -68,8 +68,8 @@ export type BoardWithStats = Board & {
   subBoardCount: number;
   /** Aspirations kept on the board (not counted as quests). */
   aspirationCount: number;
-  /** The boards directly inside this one, with how many quests each holds. */
-  subBoards: { id: string; title: string; questCount: number }[];
+  /** The boards directly inside this one, with how many open quests and boards each holds. */
+  subBoards: { id: string; title: string; questCount: number; boardCount?: number }[];
   /** The stand-in "Uncategorized" board (quests on no board): not editable or reorderable. */
   isVirtual?: boolean;
 };
@@ -144,16 +144,19 @@ export async function listBoardsWithStatsForOwner(
     if (!current || new Date(t.updated_at) > new Date(current)) lastUpdated.set(boardId, t.updated_at);
   }
 
-  const subBoards = new Map<string, { id: string; title: string; questCount: number }[]>();
+  // Counts are open quests only (owner, Nov 9: completed ones don't count), and each sub-board's own boards.
+  const kidCount = new Map<string, number>();
+  for (const c of childrenRes.data ?? []) kidCount.set(c.parent_board_id as string, (kidCount.get(c.parent_board_id as string) ?? 0) + 1);
+  const subBoards = new Map<string, { id: string; title: string; questCount: number; boardCount?: number }[]>();
   for (const c of childrenRes.data ?? []) {
     const list = subBoards.get(c.parent_board_id as string) ?? [];
-    list.push({ id: c.id as string, title: c.title as string, questCount: stats.get(c.id as string)?.total ?? 0 });
+    list.push({ id: c.id as string, title: c.title as string, questCount: stats.get(c.id as string)?.open.length ?? 0, boardCount: kidCount.get(c.id as string) ?? 0 });
     subBoards.set(c.parent_board_id as string, list);
   }
 
   const toCard = (board: Board): BoardWithStats => {
     const s = stats.get(board.id) ?? { total: 0, done: 0, xp: 0, open: [], finished: [], dreams: 0 };
-    const doneQuests = [...s.finished].sort((a, b) => (b.completed_at ?? "").localeCompare(a.completed_at ?? "")).slice(0, 3);
+    const doneQuests = [...s.finished].sort((a, b) => (b.completed_at ?? "").localeCompare(a.completed_at ?? "")).slice(0, 50);
     return {
       ...board,
       questTotal: s.total,
@@ -331,7 +334,7 @@ export async function updateBoardMatrix(
 export async function listBoardFolder(
   boardId: string,
   ownerId: string
-): Promise<{ subBoards: { id: string; title: string; questCount: number }[]; quests: Task[]; doneCount: number; aspirationCount: number }> {
+): Promise<{ subBoards: { id: string; title: string; questCount: number; boardCount?: number }[]; quests: Task[]; doneCount: number; aspirationCount: number }> {
   const db = supabaseAdmin();
   const [kidsRes, tasksRes] = await Promise.all([
     db.from("boards").select("id, title").eq("owner_id", ownerId).eq("parent_board_id", boardId).order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
@@ -341,16 +344,22 @@ export async function listBoardFolder(
   if (tasksRes.error) throw new Error(`Failed to list board quests: ${tasksRes.error.message}`);
   const kids = (kidsRes.data ?? []) as { id: string; title: string }[];
   const counts = new Map<string, number>();
+  const grandkids = new Map<string, number>();
   if (kids.length) {
-    const { data } = await db.from("tasks").select("board_id, status, is_aspiration").eq("owner_id", ownerId).in("board_id", kids.map((k) => k.id));
+    const ids = kids.map((k) => k.id);
+    const [{ data }, { data: gk }] = await Promise.all([
+      db.from("tasks").select("board_id, status, is_aspiration").eq("owner_id", ownerId).in("board_id", ids),
+      db.from("boards").select("parent_board_id").eq("owner_id", ownerId).in("parent_board_id", ids),
+    ]);
     for (const t of (data ?? []) as { board_id: string; status: string; is_aspiration: boolean | null }[]) {
-      if (t.is_aspiration && t.status === "open") continue;
+      if (t.status !== "open" || t.is_aspiration) continue;
       counts.set(t.board_id, (counts.get(t.board_id) ?? 0) + 1);
     }
+    for (const b of (gk ?? []) as { parent_board_id: string }[]) grandkids.set(b.parent_board_id, (grandkids.get(b.parent_board_id) ?? 0) + 1);
   }
   const all = (tasksRes.data ?? []) as Task[];
   return {
-    subBoards: kids.map((k) => ({ id: k.id, title: k.title, questCount: counts.get(k.id) ?? 0 })),
+    subBoards: kids.map((k) => ({ id: k.id, title: k.title, questCount: counts.get(k.id) ?? 0, boardCount: grandkids.get(k.id) ?? 0 })),
     quests: all.filter((t) => t.status === "open" && !t.is_aspiration),
     doneCount: all.filter((t) => t.status === "completed").length,
     aspirationCount: all.filter((t) => t.status === "open" && t.is_aspiration).length,

@@ -36,6 +36,7 @@ import { Fold, useClosing } from "@/components/ui/Fold";
 
 /** Where the Uncategorized card sits among the boards (it has no saved order of its own). */
 const LOOSE_KEY = "boards-loose-index";
+const FOLDED_KEY = "boards-folded";
 
 /** Two rolled scrolls, one behind the other: boards inside this board. */
 function SubBoardsIcon() {
@@ -128,6 +129,30 @@ export function BoardGrid({
   const [editingBoard, setEditingBoard] = useState<BoardWithStats | null>(null);
   const [openQuest, setOpenQuest] = useState<Task | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null);
+  // Rolled-up scrolls (just the title and counts), kept on this device; "Show N more" lists, for this visit.
+  const [folded, setFolded] = useState<string[]>([]);
+  const [moreOpen, setMoreOpen] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const v = JSON.parse(window.localStorage.getItem(FOLDED_KEY) ?? "[]");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+      if (Array.isArray(v)) setFolded(v.filter((x): x is string => typeof x === "string"));
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  function toggleFold(id: string) {
+    setFolded((f) => {
+      const next = f.includes(id) ? f.filter((x) => x !== id) : [...f, id];
+      try {
+        window.localStorage.setItem(FOLDED_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }
+  const toggleMore = (id: string) => setMoreOpen((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]));
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
@@ -227,14 +252,32 @@ export function BoardGrid({
     const open = questsOn(board);
     // Fog of war: the card shows the board's next step only (the rest is on the board itself).
     const nextStep = nextActionOf(board, open) ?? open[0];
-    const previews = nextStep ? [nextStep] : [];
     const href = `/boards/${board.id}`;
     const rule = dream ? "rgba(120,150,190,.25)" : isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)";
 
+    const isFolded = folded.includes(board.id);
+    const isMore = moreOpen.includes(board.id);
+    const ink = dream ? "#5f87b8" : isAdventure ? "#8a6116" : "var(--t-accent)";
+    // Counts are open quests and boards only (owner, Nov 9): done quests show only when nothing is open.
+    const openCount = open.length;
+    const boardCount = board.subBoards.length;
+    const done = board.doneQuests ?? [];
+    const counts = [openCount ? `${openCount} ${openCount === 1 ? "quest" : "quests"}` : "", boardCount ? `${boardCount} ${boardCount === 1 ? "board" : "boards"}` : ""].filter(Boolean).join(" · ") || (done.length ? "✓ all done" : "");
+    const firstShown = nextStep ?? (openCount === 0 ? done[0] : undefined);
+    const restList = nextStep ? open.filter((q) => q.id !== nextStep.id) : openCount === 0 ? done.slice(1) : [];
+    const restDone = openCount === 0;
+    const stop = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation(), onTouchStart: (e: React.TouchEvent) => e.stopPropagation() };
+
     const body = (
-      <div className="flex h-full flex-col gap-2 px-3 pb-2.5 pt-2.5">
-        {/* Header: seal, title and completed count — opens the board */}
-        <Link href={href} draggable={false} data-fb-name={`Board: ${board.title}`} className="board-title-pad flex items-start gap-1.5 rounded-md">
+      <div className="flex h-full flex-col px-3 pb-2.5 pt-2.5">
+        {/* Header: tap the title (or the scroll's top roller) to roll the scroll up to just its title and counts. */}
+        <button
+          type="button"
+          onClick={() => toggleFold(board.id)}
+          aria-expanded={!isFolded}
+          data-fb-name={`Board: ${board.title}`}
+          className="board-title-pad flex w-full items-start gap-1.5 rounded-md pr-7 text-left"
+        >
           <span className="mt-[2px]">
             <BoardSeal color={board.color} size={18} />
           </span>
@@ -251,105 +294,96 @@ export function BoardGrid({
                 </span>
               )}
             </span>
-            {!dream && (
-              <span className="block text-[12px] tabular-nums" style={{ color: board.isComplete ? "var(--t-good)" : soft }}>
-                {board.questTotal - board.questDone > 0 ? `${board.questTotal - board.questDone} ${board.questTotal - board.questDone === 1 ? "quest" : "quests"}` : board.questTotal > 0 ? "✓ all done" : ""}
+            {counts && (
+              <span className="block text-[12px] tabular-nums" style={{ color: openCount === 0 && done.length ? "var(--t-good)" : soft }}>
+                {counts}
               </span>
             )}
           </span>
-        </Link>
+        </button>
 
-        {/* Sub-boards first, by name, each with its quest count; a tap opens one in place like a folder */}
-        {board.subBoards.length > 0 && (
-          <ul className="-mx-1 flex flex-wrap gap-1 border-t pt-1.5" style={{ borderColor: rule }}>
-            {board.subBoards.map((sb) => (
-              <SubBoardFolder key={sb.id} sb={sb} soft={soft} rule={rule} dream={dream} onOpenQuest={setOpenQuest} />
-            ))}
-          </ul>
-        )}
+        <Fold open={!isFolded} eager>
+          <div className="flex flex-col gap-2 pt-2">
+            {/* Sub-boards, each with how many open quests and boards it holds; a tap opens one in place like a folder. */}
+            {board.subBoards.length > 0 && (
+              <ul className="-mx-1 flex flex-col gap-0.5 border-t pt-1.5" style={{ borderColor: rule }}>
+                {board.subBoards.map((sb) => (
+                  <SubBoardFolder key={sb.id} sb={sb} soft={soft} rule={rule} dream={dream} onOpenQuest={setOpenQuest} />
+                ))}
+              </ul>
+            )}
 
-        {/* Quest previews — tap to open, press and drag onto another board to move */}
-        {previews.length > 0 && (
-          <ul className="-mx-1 flex flex-col border-t pt-1" style={{ borderColor: rule }}>
-            <li aria-hidden className="px-1 pt-0.5 text-[10.5px] font-bold uppercase tracking-[.12em]" style={{ color: dream ? "#5f87b8" : isAdventure ? "#8a6116" : "var(--t-accent)" }}>
-              Next step
-            </li>
-            {previews.map((q) => (
-              <QuestPreview key={q.id} q={q} disabled={dragging} onOpen={() => setOpenQuest(q)} />
-            ))}
-          </ul>
-        )}
-
-        {board.aspirationCount > 0 && (
-          <Link href={href} draggable={false} className="flex items-center gap-1 text-[12px]" style={{ color: soft }}>
-            <span aria-hidden style={{ color: "#a88a3f" }}>
-              ✧
-            </span>
-            {board.aspirationCount} {board.aspirationCount === 1 ? "aspiration" : "aspirations"}
-          </Link>
-        )}
-
-        {previews.length === 0 && board.subBoards.length === 0 && board.aspirationCount === 0 &&
-          ((board.doneQuests ?? []).length > 0 ? (
-            // Nothing open: show what's been done here instead.
-            <ul className="-mx-1 flex flex-col border-t pt-1" style={{ borderColor: rule }}>
-              {(board.doneQuests ?? []).map((q) => (
-                <li key={q.id}>
+            {/* The next step, with a clear way to add a quest to this board. */}
+            <div className="-mx-1 flex flex-col border-t pt-1" style={{ borderColor: rule }}>
+              <div className="flex items-center gap-1 px-1 pt-0.5">
+                <span className="flex-1 text-[10.5px] font-bold uppercase tracking-[.12em]" style={{ color: ink }}>
+                  {nextStep ? "Next step" : done.length ? "Done" : "Quests"}
+                </span>
+                {!board.isVirtual && (
                   <button
                     type="button"
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onClick={() => setOpenQuest(q)}
-                    className="board-quest flex min-h-[28px] w-full items-center gap-1.5 rounded-md px-1 py-[3px] text-left text-[13.5px]"
-                    style={{ color: "var(--t-ink-soft)" }}
-                    title={q.title}
+                    {...stop}
+                    onClick={() => setAddingTo(board.id)}
+                    aria-label={`Add a quest to ${board.title}`}
+                    title={`Add a quest to ${board.title}`}
+                    className="board-add flex h-7 items-center gap-1 rounded-full pl-1.5 pr-2.5 text-[12px] font-semibold"
                   >
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--t-good)" }} aria-hidden>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                        <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                    <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full" aria-hidden>
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                       </svg>
                     </span>
-                    <span className="min-w-0 flex-1 truncate line-through decoration-[rgba(80,60,20,.4)]">{q.title}</span>
+                    Quest
                   </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="m-0 border-t pt-1.5 text-[12.5px]" style={{ borderColor: rule, color: soft }}>
-              {dream ? "Nothing here yet." : "No quests yet."}
-            </p>
-          ))}
+                )}
+              </div>
+              {firstShown ? (
+                <ul className="flex flex-col">
+                  {nextStep ? <QuestPreview q={nextStep} disabled={dragging} onOpen={() => setOpenQuest(nextStep)} /> : <DoneRow q={firstShown} onOpen={() => setOpenQuest(firstShown)} />}
+                </ul>
+              ) : (
+                <p className="m-0 px-1 pt-1 text-[12.5px]" style={{ color: soft }}>
+                  {dream ? "Nothing here yet." : "No quests yet."}
+                </p>
+              )}
+              {/* The rest of the board's quests, listed in place (completed ones when nothing is open). */}
+              {restList.length > 0 && (
+                <>
+                  <Fold open={isMore}>
+                    <ul className="flex flex-col">
+                      {restList.map((q) => (restDone ? <DoneRow key={q.id} q={q} onOpen={() => setOpenQuest(q)} /> : <QuestPreview key={q.id} q={q} disabled={dragging} onOpen={() => setOpenQuest(q)} />))}
+                    </ul>
+                  </Fold>
+                  <button
+                    type="button"
+                    {...stop}
+                    onClick={() => toggleMore(board.id)}
+                    aria-expanded={isMore}
+                    className="board-quest mt-0.5 flex min-h-[28px] items-center gap-1 self-start rounded-md px-1 text-[12.5px] font-semibold"
+                    style={{ color: ink }}
+                  >
+                    {isMore ? "Show less" : `Show ${restList.length} more ${restDone ? "completed" : restList.length === 1 ? "quest" : "quests"}`}
+                    <FolderCaret open={isMore} />
+                  </button>
+                </>
+              )}
+              {isMore && !board.isVirtual && (
+                <Link href={href} draggable={false} {...stop} className="mt-0.5 self-start px-1 text-[12px] underline underline-offset-2" style={{ color: soft }}>
+                  Open the board ›
+                </Link>
+              )}
+            </div>
 
-        {/* Add to this board (and, on touch screens, edit it) */}
-        {!board.isVirtual && (
-          <div className="mt-auto flex gap-1.5">
-            <button
-              type="button"
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              onClick={() => setAddingTo(board.id)}
-              aria-label={`Add a quest or sub-board to ${board.title}`}
-              className="board-quest flex h-9 flex-1 items-center justify-center gap-1 rounded-lg border border-dashed text-[13px] font-semibold"
-              style={{ borderColor: dream ? "rgba(120,150,190,.45)" : isAdventure ? "rgba(120,90,40,.45)" : "var(--t-card-border)", color: soft }}
-            >
-              <span className="text-[16px] leading-none" aria-hidden>
-                +
-              </span>
-              Add
-            </button>
-            <button
-              type="button"
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              onClick={() => setEditingBoard(board)}
-              aria-label={`Edit ${board.title}`}
-              className="board-edit-foot board-quest h-9 w-9 shrink-0 items-center justify-center rounded-lg border"
-              style={{ borderColor: dream ? "rgba(120,150,190,.38)" : isAdventure ? "rgba(120,90,40,.35)" : "var(--t-card-border)", color: soft }}
-            >
-              <PencilIcon />
-            </button>
+            {board.aspirationCount > 0 && (
+              <Link href={href} draggable={false} {...stop} className="flex items-center gap-1 text-[12px]" style={{ color: soft }}>
+                <span aria-hidden style={{ color: "#a88a3f" }}>
+                  ✧
+                </span>
+                {board.aspirationCount} {board.aspirationCount === 1 ? "aspiration" : "aspirations"}
+              </Link>
+            )}
           </div>
-        )}
+        </Fold>
       </div>
     );
 
@@ -361,7 +395,7 @@ export function BoardGrid({
           setMenu({ board, x: e.clientX, y: e.clientY });
         }}
         className={`board-card relative h-full ${scroll ? `board-scroll ${board.isComplete ? "is-complete" : ""}` : ""}`}>
-        {scroll && <span aria-hidden className="scroll-rod top" />}
+        {scroll && <span aria-hidden className="scroll-rod top scroll-rod-tap" onClick={() => toggleFold(board.id)} />}
         <div
           className={dream ? "dream-card" : scroll ? "scroll-sheet" : "h-full rounded-2xl"}
           style={
@@ -382,13 +416,8 @@ export function BoardGrid({
               onClick={() => setEditingBoard(board)}
               title="Edit board"
               aria-label={`Edit ${board.title}`}
-              className="board-edit-btn absolute right-2 top-2 z-[3] flex h-8 w-8 items-center justify-center rounded-full"
-              style={{
-                background: isAdventure ? "rgba(255,248,230,.9)" : "var(--t-card)",
-                border: `1px solid ${isAdventure ? "#b39a6a" : "var(--t-card-border)"}`,
-                color: "var(--t-ink)",
-                boxShadow: "0 1px 3px rgba(0,0,0,.18)",
-              }}
+              className="board-edit-btn absolute right-2 top-2.5 z-[3] flex h-7 w-7 items-center justify-center rounded-full"
+              style={{ color: dream ? "#5f87b8" : isAdventure ? "#8a6116" : "var(--t-ink-soft)" }}
             >
               <PencilIcon />
             </button>
@@ -408,7 +437,7 @@ export function BoardGrid({
       )}
       <DndContext id={dream ? "dnd-DreamGrid" : "dnd-BoardGrid"} sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActive(null)}>
         <SortableContext items={boards.map((b) => BOARD + b.id)} strategy={rectSortingStrategy}>
-          <ul className={`grid gap-x-2 gap-y-3 sm:gap-x-3 ${boards.length === 1 ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3"}`}>
+          <ul className={`grid items-start gap-x-2 gap-y-3 sm:gap-x-3 ${boards.length === 1 ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3"}`}>
             {boards.map((board) => (
               <SortableBoard key={board.id} id={board.id} fixed={false} questTarget={active?.kind === "quest"}>
                 {card(board)}
@@ -553,7 +582,7 @@ function SubBoardFolder({
   onOpenQuest,
   nested = false,
 }: {
-  sb: { id: string; title: string; questCount: number };
+  sb: { id: string; title: string; questCount: number; boardCount?: number };
   soft: string;
   rule: string;
   dream: boolean;
@@ -598,9 +627,9 @@ function SubBoardFolder({
             <SubBoardsIcon />
           </span>
           <span dir="auto" className={`user-text min-w-0 ${open ? "font-semibold [overflow-wrap:break-word]" : "truncate"}`}>{sb.title}</span>
-          {!(dream && sb.questCount === 0) && (
-            <span className="shrink-0 tabular-nums" style={{ color: soft }}>
-              ({sb.questCount})
+          {(sb.questCount > 0 || (sb.boardCount ?? 0) > 0) && (
+            <span className="shrink-0 text-[11.5px] tabular-nums" style={{ color: soft }}>
+              {[sb.questCount ? `${sb.questCount} ${sb.questCount === 1 ? "quest" : "quests"}` : "", sb.boardCount ? `${sb.boardCount} ${sb.boardCount === 1 ? "board" : "boards"}` : ""].filter(Boolean).join(" · ")}
             </span>
           )}
           <span className="shrink-0" style={{ color: soft }}>
@@ -668,6 +697,30 @@ function SubBoardFolder({
           )}
         </div>
       </Fold>
+    </li>
+  );
+}
+
+/** A completed quest's row (shown when a board has nothing open). */
+function DoneRow({ q, onOpen }: { q: Task; onOpen: () => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onClick={onOpen}
+        className="board-quest flex min-h-[28px] w-full items-center gap-1.5 rounded-md px-1 py-[3px] text-left text-[13.5px]"
+        style={{ color: "var(--t-ink-soft)" }}
+        title={q.title}
+      >
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--t-good)" }} aria-hidden>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <span dir="auto" className="user-text min-w-0 flex-1 truncate">{q.title}</span>
+      </button>
     </li>
   );
 }

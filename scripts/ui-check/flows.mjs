@@ -820,6 +820,17 @@ export const FLOWS = [
         await h.goto(path);
         await h.check("loaded");
       }
+      // A board scroll (owner, Nov 9): "Show N more quests" lists the rest in place; tapping the title rolls it up.
+      await h.goto("/boards");
+      if (await h.tap((p) => p.getByRole("button", { name: /^show \d+ more/i }).first(), "boards: show more quests", { optional: true })) {
+        await h.settle(450);
+        await h.check("boards: more quests");
+      }
+      if (await h.tap((p) => p.locator("main .board-card button[aria-expanded=true]").first(), "boards: roll up a scroll", { optional: true })) {
+        await h.settle(450);
+        await h.check("boards: rolled up");
+        await h.tap((p) => p.locator("main .board-card button[aria-expanded=false]").first(), "boards: unroll it", { optional: true });
+      }
       // Find a quest from the boards list.
       await h.goto("/boards");
       await h.page.getByLabel("Find a quest").first().fill("insurance").catch(() => {});
