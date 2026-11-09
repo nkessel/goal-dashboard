@@ -77,7 +77,7 @@ export function CreateSheet({
   function close() {
     if (leaving) return;
     setLeaving(true);
-    setTimeout(onClose, 250);
+    setTimeout(onClose, 280);
   }
   /** Taps outside, Escape and ×: an editor with unsaved writing asks first. */
   function requestClose() {
@@ -670,7 +670,7 @@ function ChoiceButton({ icon, title, hint, special = false, isAdventure, onClick
     <button
       type="button"
       onClick={onClick}
-      className="create-kind choice-float hover-glow flex min-h-[64px] items-center gap-3 rounded-full px-3 py-2.5 text-left"
+      className="create-kind choice-float hover-glow relative flex min-h-[64px] items-center gap-3 overflow-hidden rounded-full px-3 py-2.5 text-left"
       style={{
         background: special
           ? isAdventure

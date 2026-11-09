@@ -494,6 +494,8 @@ export function TodayTaskBoard({
   };
 
   function onDragStart(e: DragStartEvent) {
+    // A long press may have begun a text selection on iPhone: clear it so it can't fight the drag.
+    window.getSelection()?.removeAllRanges();
     const id = String(e.active.id);
     setActiveId(id);
     setStartList(listOf(id));

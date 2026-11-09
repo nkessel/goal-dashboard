@@ -110,7 +110,7 @@ export function FloatingActionButton({
             viewBox="0 0 24 24"
             fill="none"
             aria-hidden
-            style={{ transform: expanded ? "rotate(45deg)" : undefined, transition: "transform 150ms", filter: skin?.glow }}
+            style={{ transform: expanded ? "rotate(45deg)" : undefined, transition: "transform 320ms cubic-bezier(.3,1.5,.5,1)", filter: skin?.glow }}
           >
             {skin?.plus ? (
               <>
