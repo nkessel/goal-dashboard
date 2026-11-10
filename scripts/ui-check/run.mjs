@@ -332,8 +332,17 @@ async function walk({ browser, device, time, tz, cookie }) {
         if (welcome) {
           for (const k of ["daily-login", "welcome-pending", "daily-login-open", "welcome-back-at", "welcome-toucan-landed"]) localStorage.removeItem(k);
           sessionStorage.clear();
+          // In the evening the app offers the evening routine instead (Nov 9); the welcome flows still
+          // check the card, so the invitation is turned off for them. The Dawn path (hidden by default) is on.
+          localStorage.setItem("evening-prompt-at", "off");
+          try {
+            const fx = JSON.parse(localStorage.getItem("goalFxSaved") || "{}");
+            localStorage.setItem("goalFxSaved", JSON.stringify({ ...fx, welcomeDawnOn: true }));
+          } catch {}
         } else {
           localStorage.setItem("daily-login", key);
+          localStorage.removeItem("evening-prompt-at");
+          localStorage.setItem("evening-invited", key);
           localStorage.removeItem("welcome-pending");
           localStorage.setItem("welcome-back-at", String(Date.now()));
         }

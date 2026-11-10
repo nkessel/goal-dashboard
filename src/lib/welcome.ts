@@ -48,6 +48,8 @@ export function welcomeShows(fx: FxSettings, el: WelcomeEl): boolean {
   // Hidden unless turned on (older saved hide lists don't know it).
   if (el === "reflect") return fx.welcomeReflectOn === true;
   if (el === "habits") return fx.welcomeHabitsOn !== false;
+  // The Dawn path is off unless turned on (owner, Nov 9: "I thought we already hid the your dawn section").
+  if (el === "dawn") return fx.welcomeDawnOn === true;
   return !(fx.welcomeHide ?? DEFAULT_HIDE).includes(el);
 }
 
@@ -56,6 +58,7 @@ export function toggleEl(fx: FxSettings, el: WelcomeEl): Partial<FxSettings> {
   const on = welcomeShows(fx, el);
   if (el === "reflect") return { welcomeReflectOn: !on };
   if (el === "habits") return { welcomeHabitsOn: !on };
+  if (el === "dawn") return { welcomeDawnOn: !on };
   const hide = new Set(fx.welcomeHide ?? DEFAULT_HIDE);
   if (on) hide.add(el);
   else hide.delete(el);

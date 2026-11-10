@@ -78,6 +78,8 @@ export type FxSettings = {
   journalPrompts?: { id: string; label: string; prompt: string; xp: number }[];
   /** 2 once the list was saved knowing the planner prompts (Nov 9), so a removed one stays removed. */
   journalPromptsV?: number;
+  /** The welcome screen's Dawn path: hidden unless turned on. */
+  welcomeDawnOn?: boolean;
   welcomeButtons?: Partial<Record<"checkin" | "sleep" | "quests" | "focus" | "habits", { text?: string; icon?: string; xp?: number }>>;
   welcomeIntentionQ?: string;
   welcomeIntentionHint?: string;

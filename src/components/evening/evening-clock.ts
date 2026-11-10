@@ -127,6 +127,18 @@ const subscribePrompt = (cb: () => void) => {
     window.removeEventListener("storage", cb);
   };
 };
+/**
+ * Evening check-in time: from your evening routine's start (Settings, 4:30pm by default) until the
+ * day turns at 5:30am. The morning check-in stays away then and the evening routine is offered
+ * instead (owner, Nov 9). Off when the evening invitation is turned off.
+ */
+export function isEveningCheckInTime(d = new Date()): boolean {
+  const at = readPromptAt();
+  if (at === "off") return false;
+  const m = d.getHours() * 60 + d.getMinutes();
+  return m >= at || m < EVENING_END;
+}
+
 /** True while the evening routine sits at the top of Today: from the chosen time until 5:30am, unless hidden tonight. */
 export function useEveningPrompt(): boolean {
   return useSyncExternalStore(

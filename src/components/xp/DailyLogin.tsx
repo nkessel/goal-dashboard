@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { dailyCheckInAction, welcomeContextAction } from "@/app/actions";
-import { eveningDayKey } from "@/components/evening/evening-clock";
+import { eveningDayKey, isEveningCheckInTime, setEveningMode } from "@/components/evening/evening-clock";
 import { WelcomeCard, type WelcomeAward } from "./WelcomeCard";
 import { xpToNextLevel } from "@/lib/levels";
 import { lineForDay } from "@/lib/greetings";
@@ -132,6 +132,45 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       /* storage unavailable — the server still guards against double awards */
     }
     // Marked before anything loads, so closing the app early still brings it back.
+    // Evening: no morning check-in. Your login still counts, and the toucan offers the evening
+    // routine once tonight instead (owner, Nov 9: "prompt the user to do the evening check-in once
+    // it's time for that instead of the morning check-in").
+    if (isEveningCheckInTime()) {
+      liftFog();
+      setPending(null);
+      if (first) dailyCheckInAction(new Date().getTimezoneOffset()).catch(() => {});
+      let invited = true;
+      try {
+        invited = window.localStorage.getItem("evening-invited") === today;
+        if (!invited) window.localStorage.setItem("evening-invited", today);
+      } catch {}
+      const t = invited
+        ? undefined
+        : window.setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent("toucan-nudge", {
+                cancelable: true,
+                detail: {
+                  text: "The day is winding down. Time for your evening check-in?",
+                  actions: [
+                    {
+                      label: "Begin evening routine",
+                      run: () => {
+                        setEveningMode(true);
+                        if (window.location.pathname !== "/") router.push("/");
+                      },
+                    },
+                    { label: "Later", run: () => {} },
+                  ],
+                },
+              })
+            );
+          }, 1500);
+      return () => {
+        live = false;
+        window.clearTimeout(t);
+      };
+    }
     if (first) setPending({ day: today, mode: "day", at: Date.now() });
     const pending = first ? null : readPending(today);
     const markBack = () => {

@@ -1460,6 +1460,8 @@ const SNOOZE_MAIN: { label: string; ms: number | "tomorrow" }[] = [
   { label: "15 min", ms: 15 * 60_000 },
   { label: "30 min", ms: 30 * 60_000 },
   { label: "1 hr", ms: 3_600_000 },
+  // Tomorrow right on the first line (owner, Nov 9).
+  { label: "Tomorrow", ms: "tomorrow" },
 ];
 /** Other…: longer, this evening (when it's a while off), tomorrow, or a number of minutes. */
 function snoozeOther() {
@@ -1470,7 +1472,6 @@ function snoozeOther() {
     { label: "3 hrs", ms: 3 * 3_600_000 },
   ];
   if (evening > 3.5 * 3_600_000) out.push({ label: "This evening", ms: evening });
-  out.push({ label: "Tomorrow", ms: "tomorrow" });
   return out;
 }
 
