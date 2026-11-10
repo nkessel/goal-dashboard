@@ -481,7 +481,8 @@ export function WelcomeCard({
       /* storage unavailable */
     }
   };
-  const hidePart = (el: WelcomeEl) => patchFx({ welcomeHide: [...new Set([...(loadFx().welcomeHide ?? ["due"]), el])] });
+  const hidePart = (el: WelcomeEl) =>
+    patchFx({ welcomeHide: [...new Set([...(loadFx().welcomeHide ?? ["due"]), el])], ...(el === "dawn" ? { welcomeDawnOn: false } : {}) });
   const parts: Partial<Record<WelcomeEl, React.ReactNode>> = {
     // The Journal (owner, Nov 6): a button that opens prompt pills; Top priorities is the first and default.
     focus: (
@@ -528,7 +529,7 @@ export function WelcomeCard({
     ) : null,
     reflect: reflectQuestions(fx).length ? <ReflectLine questions={reflectQuestions(fx)} /> : null,
     habits: <WelcomeHabits fx={fx} label={btn.habits?.text?.trim()} icon={btn.habits?.icon} />,
-    dawn: <DawnPath />,
+    dawn: <DawnPath label={btn.dawn?.text?.trim()} icon={btn.dawn?.icon} />,
     line: shownLine ? (
       <div className="flex w-full flex-col items-center gap-0.5">
         {/* ‹ › either side for more wise lines (owner, Nov 5); quiet thumbs right after the line's last word. */}
@@ -1054,6 +1055,7 @@ function onScreen(wrap: HTMLElement, at: { x: number; y: number }): { x: number;
 }
 
 function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSettings; /** While the screen is being arranged his bubble rests (the panel above the card needs the room). */ quiet?: boolean; /** Going elsewhere in the app (his settings): the screen tucks itself away first. */ onAway: () => void; /** Arrange this screen (the same as its gear, or a long press on a part). */ onArrange: () => void }) {
+  const [carried, setCarried] = useState(false);
   const [landed, setLanded] = useState(landedBefore);
   const [flyIn] = useState(() => !landedBefore());
   const [menu, setMenu] = useState(false);
@@ -1226,11 +1228,14 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
           const d = drag.current;
           if (!d) return;
           if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+          if (!d.moved) setCarried(true);
           d.moved = true;
           setOff({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y });
         }}
+        onPointerCancel={() => setCarried(false)}
         onPointerUp={() => {
           const d = drag.current;
+          setCarried(false);
           if (d?.moved) {
             settle(off);
             // Let this release's click pass without opening the menu.
@@ -1243,7 +1248,8 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
       >
         <span key={nods} className={nods ? "tc-nod block" : "block"}>
           <span className="owl-idle block">
-            <ToucanArt flying={!landed} size={58} />
+            {/* He flies while you carry him (owner, Nov 10), and settles when you let go. */}
+            <ToucanArt flying={!landed || carried} size={58} />
           </span>
         </span>
       </button>
@@ -1796,10 +1802,10 @@ function revealThroughMist() {
 }
 
 type PartKey = "checkin" | "sleep" | "focus";
-type ButtonKey = PartKey | "quests" | "habits";
+type ButtonKey = PartKey | "quests" | "habits" | "dawn";
 const isPartKey = (el: string): el is PartKey => el === "checkin" || el === "sleep" || el === "focus";
-const isButtonKey = (el: string): el is ButtonKey => isPartKey(el) || el === "quests" || el === "habits";
-const BUTTON_NAMES: Record<ButtonKey, string> = { checkin: "Emotional check-in", sleep: "Sleep check-in", focus: "Journal", quests: "Choose today's quests", habits: "Habits" };
+const isButtonKey = (el: string): el is ButtonKey => isPartKey(el) || el === "quests" || el === "habits" || el === "dawn";
+const BUTTON_NAMES: Record<ButtonKey, string> = { checkin: "Emotional check-in", sleep: "Sleep check-in", focus: "Journal", quests: "Choose today's quests", habits: "Habits", dawn: "Morning routine" };
 
 /**
  * A welcome part whose button can be shaped in place: right-click it, or hold it on a phone, and its

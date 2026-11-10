@@ -57,6 +57,11 @@ export const FLOWS = [
         await h.tap((p) => p.locator("[data-stone]").nth(1), "dawn: tick a stone", { optional: true });
         await h.tap((p) => p.getByRole("button", { name: /short on time/i }).first(), "dawn: short on time", { optional: true });
         await h.check("dawn path ticked, short");
+        // Its title renames in place (owner, Nov 10).
+        if (await h.tap((p) => p.getByRole("button", { name: /morning routine/i }).first(), "morning routine: rename", { optional: true })) {
+          await h.check("morning routine title editing");
+          await h.page.keyboard.press("Escape");
+        }
         if (await h.tap((p) => p.getByRole("button", { name: /choose which parts you use/i }).first(), "dawn: gear", { optional: true, expectMove: true })) {
           await h.settle(500);
           await h.check("dawn settings");

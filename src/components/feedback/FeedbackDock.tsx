@@ -68,6 +68,8 @@ const DRAFTS_KEY = "feedback-drafts";
 const OPEN_KEY = "feedback-open";
 const LEGACY_DRAFT_KEY = "feedback-draft";
 const BUTTON_KEY = "feedback-button-pos";
+/** Where you put the button while the welcome screen is up (owner, Nov 10: it snapped back to the corner). */
+const WELCOME_BUTTON_KEY = "feedback-button-pos-welcome";
 const PANEL_KEY = "feedback-panel";
 /** Phones: how far below the top of the visible screen the box sits. */
 const PHONE_Y_KEY = "feedback-panel-phone-y";
@@ -285,6 +287,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [choosing, setChoosing] = useState(false);
   const [pos, setPos] = useState<Pos | null>(null);
   const [dragPos, setDragPos] = useState<Pos | null>(null);
+  const [welcomePos, setWelcomePos] = useState<Pos | null>(null);
   const [geom, setGeom] = useState<Geom | null>(null);
   const [sized, setSized] = useState(false);
   // Extra height the writing has asked for (per note).
@@ -323,6 +326,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       .then((j: { drafts?: Draft[] }) => setDrafts((ds) => mergeDrafts(ds, j.drafts ?? [])))
       .catch(() => {});
     setPos(readJson<Pos>(BUTTON_KEY));
+    setWelcomePos(readJson<Pos>(WELCOME_BUTTON_KEY));
     setGeom(readJson<Geom>(PANEL_KEY));
     setPhoneY(readJson<number>(PHONE_Y_KEY));
     setLoaded(true);
@@ -509,7 +513,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   // ---- The round button: tap to start (or continue) feedback, drag to put it anywhere.
   const defaultPos: Pos = { x: vp.innerW - BTN - 12, y: vp.innerH - BTN - 92 };
   const placeBtn = (p: Pos): Pos => ({ x: clamp(p.x, 6, vp.innerW - BTN - 6), y: clamp(p.y, 6, vp.innerH - BTN - 6) });
-  const btnPos = welcomeUp && !dragPos ? { x: vp.innerW - BTN - 10, y: 10 } : placeBtn(dragPos ?? parked ?? pos ?? defaultPos);
+  const btnPos = welcomeUp && !dragPos ? placeBtn(welcomePos ?? { x: vp.innerW - BTN - 10, y: 10 }) : placeBtn(dragPos ?? parked ?? pos ?? defaultPos);
 
   function onBtnDown(e: React.PointerEvent<HTMLButtonElement>) {
     const start = btnPos;
@@ -524,9 +528,15 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         if (!moved) return;
         justDragged.current = true;
         setTimeout(() => (justDragged.current = false), 0);
-        setPos(last);
         setDragPos(null);
         setParked(null);
+        // The welcome screen keeps its own spot, so the other screens' spot isn't moved by it.
+        if (welcomeOpenNow()) {
+          setWelcomePos(last);
+          writeJson(WELCOME_BUTTON_KEY, last);
+          return;
+        }
+        setPos(last);
         writeJson(BUTTON_KEY, last);
       },
     });

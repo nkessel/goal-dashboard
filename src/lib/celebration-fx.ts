@@ -80,7 +80,7 @@ export type FxSettings = {
   journalPromptsV?: number;
   /** The welcome screen's Dawn path: hidden unless turned on. */
   welcomeDawnOn?: boolean;
-  welcomeButtons?: Partial<Record<"checkin" | "sleep" | "quests" | "focus" | "habits", { text?: string; icon?: string; xp?: number }>>;
+  welcomeButtons?: Partial<Record<"checkin" | "sleep" | "quests" | "focus" | "habits" | "dawn", { text?: string; icon?: string; xp?: number }>>;
   welcomeIntentionQ?: string;
   welcomeIntentionHint?: string;
   /** Seconds the "Feedback submitted" card stays (0 = until you close it). */

@@ -4507,6 +4507,24 @@ export async function saveOwnWordsAction(words: OwnWords) {
 }
 
 
+/** The welcome screen's layout (order, hidden parts, its buttons), kept on the account so every device shows the same screen. */
+export type WelcomeLayout = Record<string, unknown> & { at?: number };
+const WELCOME_LAYOUT_KEYS = ["welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar"] as const;
+export async function getWelcomeLayoutAction(): Promise<WelcomeLayout | null> {
+  const ownerId = await requireProfileId();
+  const w = (await readExtras(ownerId)).welcomeLayout;
+  return w && typeof w === "object" ? (w as WelcomeLayout) : null;
+}
+export async function saveWelcomeLayoutAction(layout: WelcomeLayout) {
+  const ownerId = await requireProfileId();
+  const clean: WelcomeLayout = { at: Date.now() };
+  for (const k of WELCOME_LAYOUT_KEYS) if (layout[k] !== undefined) clean[k] = layout[k];
+  if (JSON.stringify(clean).length > 8000) throw new Error("Too much to keep.");
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, welcomeLayout: clean } }).eq("id", ownerId);
+  if (error) throw new Error(error.message);
+}
+
 /** Learn a language: one phrase in each chosen language, with how to say it (non-Latin scripts get a transliteration). */
 export async function translatePhraseAction(phrase: string, languages: string[]): Promise<{ results: import("@/lib/languages").Translation[]; error?: string }> {
   await requireProfileId();

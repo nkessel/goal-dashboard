@@ -73,7 +73,7 @@ export function DuskPlan({ day }: { day: string }) {
     <div className="mb-3 flex flex-col gap-2.5 rounded-2xl px-3 pb-3 pt-2" style={{ background: "rgba(255,250,238,.05)", border: "1px solid rgba(217,180,95,.3)", color: CREAM }}>
       <div className="flex items-center gap-2">
         <span className="font-display text-[16px]" style={{ color: "#f3d98d" }}>
-          ☀️ Tomorrow&apos;s dawn
+          ☀️ Tomorrow&apos;s morning routine
         </span>
         {t.sealed && <span className="text-[12.5px]" style={{ color: DIM }}>sealed ✦</span>}
         <span className="ml-auto">
@@ -119,7 +119,7 @@ export function DuskPlan({ day }: { day: string }) {
           </div>
           {room != null && (
             <p className="reveal m-0 text-[14px]" style={{ color: CREAM }}>
-              ✦ About <b>{dur(room)}</b> for your dawn{t.leave ? " before you leave" : first ? ` before ${first.title}` : ""}.
+              ✦ About <b>{dur(room)}</b> for your morning routine{t.leave ? " before you leave" : first ? ` before ${first.title}` : ""}.
             </p>
           )}
         </div>
@@ -166,7 +166,7 @@ export function DuskPlan({ day }: { day: string }) {
               <span className="dawn-wax" style={{ width: 30, height: 30, fontSize: 12 }} aria-hidden>
                 ✦
               </span>
-              {t.sealed ? "Sealed · change it" : "Seal tomorrow's dawn"}
+              {t.sealed ? "Sealed · change it" : "Seal tomorrow's morning"}
             </button>
           </div>
         </div>

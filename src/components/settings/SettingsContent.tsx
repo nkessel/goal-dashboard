@@ -361,7 +361,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </SettingsRow>
           </SectionItem>
           <SectionItem id="planning">
-          <SettingsRow id="dawn-dusk" theme={profile.theme} defaultOpen={opens("dawn-dusk")} label="Morning & evening routines" rightLabel="Dawn path · planned the night before" icon={<span style={{ fontSize: 14 }}>☀️</span>}>
+          <SettingsRow id="dawn-dusk" theme={profile.theme} defaultOpen={opens("dawn-dusk")} label="Morning & evening routines" rightLabel="Morning routine · planned the night before" icon={<span style={{ fontSize: 14 }}>☀️</span>}>
             <DawnSettingsPanel />
           </SettingsRow>
 

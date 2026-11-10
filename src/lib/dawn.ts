@@ -85,11 +85,11 @@ export type Dawn = {
 export const DEFAULT_ON: DawnOn = { plan: true, wake: true, path: true, short: true, offerAm: true, offerPm: true, hand: false, first: false, trace: true, feel: true, week: true, pmPrompts: true };
 
 export const ON_LABELS: { key: keyof DawnOn; label: string; hint: string; group: "Evening" | "Morning" | "Both" }[] = [
-  { key: "plan", group: "Evening", label: "Plan tomorrow's dawn", hint: "Pick tomorrow morning's stones in Prepare for tomorrow's day." },
+  { key: "plan", group: "Evening", label: "Plan tomorrow's morning", hint: "Pick tomorrow morning's stones in Prepare for tomorrow's day." },
   { key: "wake", group: "Evening", label: "Earliest wake time", hint: "Set when you'll rise; see tomorrow's first commitment and the room before it." },
   { key: "pmPrompts", group: "Evening", label: "Evening reflections", hint: "Your planner's prompts: what went right, magical moments…" },
   { key: "offerPm", group: "Evening", label: "An evening offering card", hint: "One small nourishing idea for tonight." },
-  { key: "path", group: "Morning", label: "Dawn path", hint: "Your stones on the welcome screen; one done is a gentle dawn." },
+  { key: "path", group: "Morning", label: "Morning routine on the welcome screen", hint: "Your stones on the welcome screen; one done is a gentle start." },
   { key: "short", group: "Morning", label: "Short on time", hint: "One tap turns every stone into its 2-minute version." },
   { key: "offerAm", group: "Morning", label: "A morning offering card", hint: "One idea hung on a stone you already do." },
   { key: "hand", group: "Both", label: "Deal three cards", hint: "Three face-down cards to pick from, instead of one." },

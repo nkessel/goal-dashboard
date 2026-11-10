@@ -7,6 +7,8 @@ import { supabaseAdmin } from "@/lib/supabase/server";
  */
 const SLEEP_DUPES = "sleep-quality-dupes-2026-11-01";
 const FORMS = "forms-on-cards-2026-11-01";
+const MED_STREAK = "streak-medication-2026-11-10";
+const OWNER = "42ed6196-bfb0-474d-96a9-1a6cd6807b8b";
 // Files uploaded for the owner on Nov 1 (bytes already in `attachments`), put on their import cards.
 const FORM_CARDS: { card: string; files: { id: string; name: string; size: number }[] }[] = [
   { card: "13b3a450-7045-40d6-b27a-0298aa225349", files: [{ id: "d5435823-2ce6-4551-8d86-cd0e293a6502", name: "MA unclaimed money claim form.pdf", size: 95488 }] },
@@ -23,6 +25,17 @@ export async function runCleanups(ownerId: string): Promise<void> {
   const db = supabaseAdmin();
   const { data: prof } = await db.from("profiles").select("life_wheel").eq("id", ownerId).maybeSingle<{ life_wheel: Record<string, unknown> | null }>();
   const done = Array.isArray(prof?.life_wheel?.cleanups) ? (prof!.life_wheel!.cleanups as string[]) : [];
+  // Nov 10 (owner asked in chat): a new streak "Missing my medication", reset the night of Nov 8.
+  if (!done.includes(MED_STREAK) && ownerId === OWNER) {
+    const lw = prof?.life_wheel ?? {};
+    const list = Array.isArray(lw.streaks) ? (lw.streaks as { id: string; name: string }[]) : [];
+    if (!list.some((x) => /missing my medication/i.test(x.name))) {
+      const streaks = [...list, { id: "med-2026-11-10", name: "Missing my medication", word: "missed medication, missed meds, missed my medication", since: "2026-11-09T04:00:00.000Z" }];
+      const { error } = await db.from("profiles").update({ life_wheel: { ...lw, streaks } }).eq("id", ownerId);
+      if (error) return;
+    }
+    await markDone(ownerId, [MED_STREAK]);
+  }
   if (done.includes(SLEEP_DUPES) && done.includes(FORMS)) return;
   const finished: string[] = [];
   if (!done.includes(FORMS)) {

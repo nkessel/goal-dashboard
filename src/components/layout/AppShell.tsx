@@ -11,6 +11,7 @@ import { SettingsDefaultsSeed } from "@/components/settings/SettingsDefaultsSeed
 import { NotificationsButton } from "@/components/layout/NotificationsButton";
 import { DailyLogin } from "@/components/xp/DailyLogin";
 import { OwnWordsSync } from "@/components/settings/OwnWordsSync";
+import { WelcomeLayoutSync } from "@/components/settings/WelcomeLayoutSync";
 import { FOG_SHELL_SCRIPT } from "@/lib/welcome-fog";
 import { QuestCelebrationHost } from "@/components/celebration/QuestCelebrationHost";
 import { defaultPortraitFor } from "@/lib/default-portrait";
@@ -84,6 +85,7 @@ export async function AppShell({
       {profileId && <SettingsDefaultsSeed />}
       {profileId && <DailyLogin levelCap={cap} />}
       {profileId && <OwnWordsSync />}
+      {profileId && <WelcomeLayoutSync />}
       {profileId && <OfflineSync profileId={profileId} />}
       {profileId && (
         <Suspense fallback={null}>

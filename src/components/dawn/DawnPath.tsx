@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useLocalDay } from "@/components/evening/evening-clock";
 import { Fold } from "@/components/ui/Fold";
+import { patchFx, loadFx } from "@/lib/celebration-fx";
 import { chapterFor, clock12, dealt, type Stone } from "@/lib/dawn";
 import { useDawn } from "./useDawn";
 import { DawnSettings } from "./DawnSettings";
@@ -16,13 +17,14 @@ const FACES = ["😞", "😐", "🙂", "😊", "🤩"];
  * 2-minute versions, the habit of the week up front, one offering card, a swipe across the stones
  * to log them afterwards, and one face for how it felt. Each of those can be switched off (gear).
  */
-export function DawnPath() {
+export function DawnPath({ label, icon }: { label?: string; icon?: string }) {
   const day = useLocalDay();
   const { dawn, doneIds, error, patchDay, saveSettings, tick } = useDawn(day);
   const [opened, setOpened] = useState(false);
   const [gear, setGear] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const tracing = useRef(false);
+  const [naming, setNaming] = useState(false);
   if (!day || !dawn || !dawn.on.path) return null;
   const on = dawn.on;
   const d = dawn.days[day] ?? {};
@@ -36,7 +38,13 @@ export function DawnPath() {
   const count = stones.filter((s) => done.has(s.id)).length + (week && d.weekDone ? 1 : 0) + (d.took && d.cardDone ? 1 : 0);
   const total = stones.length + (week ? 1 : 0) + (d.took ? 1 : 0);
   const sky = total ? Math.min(1, count / total) : 0;
-  const words = count === 0 ? "Your dawn" : count >= total ? "A full dawn ✦" : "A gentle dawn ✦";
+  // The title is yours (owner, Nov 10: "it should obvs be called morning routine"); progress sits beside it.
+  const title = label || "Morning routine";
+  const words = count === 0 ? "" : count >= total ? "all done ✦" : "a gentle start ✦";
+  const rename = (t: string) => {
+    const cur = loadFx().welcomeButtons ?? {};
+    patchFx({ welcomeButtons: { ...cur, dawn: { ...(cur.dawn ?? {}), text: t.trim() || undefined } } });
+  };
   const sealed = d.sealed && !opened && count === 0;
   // One stone first: only the first not yet done shows until one is done.
   const shown = on.first && count === 0 ? stones.slice(0, 1) : stones;
@@ -59,7 +67,31 @@ export function DawnPath() {
   return (
     <div className="flex w-full flex-col gap-2 rounded-2xl px-3 pb-3 pt-2" style={{ background: "linear-gradient(180deg,rgba(255,250,238,.75),rgba(246,234,208,.6))", border: "1px solid rgba(168,138,63,.45)", color: INK }}>
       <div className="flex items-center gap-2">
-        <span className="font-display text-[16px]">☀️ {words}</span>
+        {naming ? (
+          <input
+            autoFocus
+            defaultValue={title}
+            maxLength={60}
+            aria-label="Name this part"
+            className="bare-input font-display min-w-0 flex-1 bg-transparent text-[16px] outline-none"
+            style={{ color: INK, borderBottom: "1px solid rgba(168,138,63,.6)" }}
+            onBlur={(e) => (rename(e.currentTarget.value), setNaming(false))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") setNaming(false);
+            }}
+          />
+        ) : (
+          // Tap the title to rename it in place; hold or right-click it for its icon, snooze and hide.
+          <button type="button" onClick={() => setNaming(true)} className="font-display min-w-0 truncate text-left text-[16px]" title="Tap to rename">
+            {icon || "☀️"} {title}
+            {words && (
+              <span className="ml-1.5 font-sans text-[12.5px]" style={{ color: SOFT }}>
+                {words}
+              </span>
+            )}
+          </button>
+        )}
         {d.wake && (
           <span className="text-[12.5px]" style={{ color: SOFT }}>
             up at {clock12(d.wake)}
@@ -91,7 +123,7 @@ export function DawnPath() {
             ✦
           </span>
           <span className="text-[14.5px] leading-snug">
-            Your dawn, sealed last night
+            Your morning, sealed last night
             <span className="block text-[12.5px]" style={{ color: SOFT }}>
               {d.cue ? `“${d.cue}” · ` : ""}tap to break the seal
             </span>
