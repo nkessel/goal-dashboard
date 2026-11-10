@@ -4,8 +4,9 @@ import { loadFx, patchFx } from "@/lib/celebration-fx";
 
 import { FoldGroup } from "./FoldGroup";
 import { useEffect, useState } from "react";
+import { useBubbleStyle } from "@/lib/use-bubble-style";
 import { saveToucanPrefsAction } from "@/app/actions";
-import { FLOURISHES, TALK_LOOKS, readFlourish, readTalkLook, saveFlourish, saveTalkLook, type Flourish, type TalkLook } from "@/lib/toucan-flourish";
+import { BUBBLE_LOOKS, BUBBLE_PAINT, BUBBLE_WAYS, saveBubbleStyle, type BubbleLook, type BubbleWay, FLOURISHES, TALK_LOOKS, readFlourish, readTalkLook, saveFlourish, saveTalkLook, type Flourish, type TalkLook } from "@/lib/toucan-flourish";
 import { flourishClass } from "@/lib/toucan-flourish";
 import { LINE_GROUPS, setRetiredLines } from "@/lib/toucan-lines";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
@@ -201,6 +202,7 @@ export function ToucanLookSettings() {
   return (
     <div className="flex flex-col gap-2.5" style={{ color: "var(--t-ink)" }}>
       <ArrivalTalk />
+      <BubbleStyleSettings />
       <ToucanPreview text="Rivers carve canyons not by force, but by returning." talk={talk} flourish={flourish} play={play} />
       <span className="text-sm font-semibold">“Talk with me” on his speech bubble</span>
       <div role="radiogroup" aria-label="How Talk with me shows" className="flex flex-col gap-1.5">
@@ -271,5 +273,76 @@ function ArrivalTalk() {
       />
       Speaks when you arrive on the welcome screen
     </label>
+  );
+}
+
+/**
+ * His speech bubble, everywhere he speaks (owner, Nov 10: "the user can choose the design and
+ * interaction styles"): its look, and whether choices show at once or after a tap.
+ */
+function BubbleStyleSettings() {
+  const { look, way } = useBubbleStyle();
+  const [open, setOpen] = useState(false);
+  const pick = (on: boolean) => (on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border, rgba(139,112,64,.35))", color: "var(--t-ink)" });
+  const paint = BUBBLE_PAINT[look === "spirit" ? "spirit" : "parchment"];
+  const showRest = way !== "quiet" || open;
+  return (
+    <div className="flex flex-col gap-2.5">
+      {/* A live bubble: tap it in "Words first" to see what a tap shows. */}
+      {/* Held at one height so switching styles never moves the choices under your finger. */}
+      <div className="flex h-[92px] items-start justify-center py-1">
+        <div role="presentation" onClick={() => setOpen(true)} className="flex w-[240px] flex-col gap-1.5 rounded-2xl px-3 py-2 text-[13.5px] leading-snug" style={paint.bubble} data-ui-check="bubble-preview">
+          <span>What would make today feel good?</span>
+          {!showRest && (
+            <span className="self-start text-[16px] leading-none tracking-widest" style={paint.quietBtn}>
+              ⋯
+            </span>
+          )}
+          {showRest && (
+            <span className="fade-in flex flex-wrap gap-1.5">
+              <span className="flex h-7 items-center rounded-full px-2.5 text-[12px] font-bold" style={paint.btn}>
+                Plan my day
+              </span>
+              <span className="flex h-7 items-center rounded-full px-2.5 text-[12px]" style={paint.quietBtn}>
+                Snooze…
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
+      <span className="text-sm font-semibold">His bubble’s look</span>
+      <div role="radiogroup" aria-label="His bubble's look" className="flex flex-col gap-1.5">
+        {BUBBLE_LOOKS.map((t) => (
+          <button key={t.key} type="button" role="radio" aria-checked={look === t.key} onClick={() => saveBubbleStyle({ look: t.key as BubbleLook })} className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left" style={pick(look === t.key)}>
+            <span className="text-[14px] font-bold">{t.label}</span>
+            <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+              {t.hint}
+            </span>
+          </button>
+        ))}
+      </div>
+      <span className="text-sm font-semibold">When he speaks</span>
+      <div role="radiogroup" aria-label="When he speaks" className="flex flex-col gap-1.5">
+        {BUBBLE_WAYS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="radio"
+            aria-checked={way === t.key}
+            onClick={() => {
+              saveBubbleStyle({ way: t.key as BubbleWay });
+              setOpen(false);
+            }}
+            className="flex min-h-11 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left"
+            style={pick(way === t.key)}
+          >
+            <span className="text-[14px] font-bold">{t.label}</span>
+            <span className="text-[12px] leading-snug" style={{ opacity: 0.8 }}>
+              {t.hint}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

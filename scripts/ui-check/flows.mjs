@@ -113,7 +113,28 @@ export const FLOWS = [
           await h.settle(300);
         }
       }
-      await h.page.evaluate(() => localStorage.removeItem("welcome-toucan-at"));
+      // His bubble in the spirit's glow, words first (owner, Nov 10: choose the design and interaction styles).
+      await h.page.evaluate(() => {
+        localStorage.removeItem("welcome-toucan-at");
+        localStorage.setItem("toucan-bubble-look", "spirit");
+        localStorage.setItem("toucan-bubble-way", "quiet");
+      });
+      await h.goto("/", { welcome: true, name: "welcome-toucan-spirit" });
+      await h.tap(/^the toucan:/i, "toucan saying (spirit, words first)", { optional: true });
+      await h.check("toucan spirit bubble, words first");
+      await h.tap(/^respond to him/i, "toucan: show the respond line", { optional: true });
+      await h.check("toucan spirit bubble, respond line");
+      await h.page.evaluate(() => {
+        localStorage.setItem("toucan-bubble-look", "parchment");
+        localStorage.setItem("toucan-bubble-way", "full");
+      });
+      await h.goto("/", { welcome: true, name: "welcome-toucan-full" });
+      await h.tap(/^the toucan:/i, "toucan saying (everything showing)", { optional: true });
+      await h.check("toucan bubble, everything showing");
+      await h.page.evaluate(() => {
+        localStorage.removeItem("toucan-bubble-look");
+        localStorage.removeItem("toucan-bubble-way");
+      });
       await h.goto("/", { welcome: true, name: "welcome" });
       await h.tap(/welcome screen settings/i, "arrange welcome", { expectMove: true }); // the "when it opens" panel appears above
       await h.check("arranging");
@@ -519,6 +540,19 @@ export const FLOWS = [
           await h.settle(300);
           await h.check("loading looks picked");
         }
+      }
+      // His bubble: look and way (owner, Nov 10), found by search.
+      await h.goto("/settings", { name: "settings bubble" });
+      const q2 = h.page.getByRole("searchbox", { name: /search settings/i }).first();
+      if (await q2.isVisible().catch(() => false)) {
+        await q2.fill("bubble");
+        await h.settle(400);
+        await h.tap((p) => p.getByRole("button", { name: /his speech bubble/i }).first(), "open bubble settings", { optional: true, expectMove: true });
+        await h.settle(900);
+        await h.tap((p) => p.getByRole("radio", { name: /spirit glow/i }).first(), "bubble look: spirit glow", { optional: true });
+        await h.tap((p) => p.getByRole("radio", { name: /words first/i }).first(), "bubble way: words first", { optional: true });
+        await h.check("bubble style picked");
+        await h.page.evaluate(() => (localStorage.removeItem("toucan-bubble-look"), localStorage.removeItem("toucan-bubble-way")));
       }
       // Secret Missions slides in from the right as its own screen.
       if (await h.tap((p) => p.getByRole("button", { name: /secret missions/i }).first(), "secret missions", { optional: true, expectMove: true })) {

@@ -83,14 +83,17 @@ export function DawnPath({ label, icon }: { label?: string; icon?: string }) {
           />
         ) : (
           // Tap the title to rename it in place; hold or right-click it for its icon, snooze and hide.
-          <button type="button" onClick={() => setNaming(true)} className="font-display min-w-0 truncate text-left text-[16px]" title="Tap to rename">
-            {icon || "☀️"} {title}
+          <>
+            <button type="button" onClick={() => setNaming(true)} className="font-display min-w-0 truncate text-left text-[16px]" title="Tap to rename">
+              {icon || "☀️"} {title}
+            </button>
+            {/* Progress sits beside the title on one line, so ticking a stone never moves the stones. */}
             {words && (
-              <span className="ml-1.5 font-sans text-[12.5px]" style={{ color: SOFT }}>
+              <span className="fade-in shrink-0 whitespace-nowrap text-[12.5px]" style={{ color: SOFT }}>
                 {words}
               </span>
             )}
-          </button>
+          </>
         )}
         {d.wake && (
           <span className="text-[12.5px]" style={{ color: SOFT }}>

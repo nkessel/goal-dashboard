@@ -346,7 +346,7 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               initialRetired={(profile.life_wheel as { toucanPrefs?: { retired?: string[] } } | null)?.toucanPrefs?.retired ?? []}
             />
             <div className="mt-2 flex flex-col gap-2">
-              <FxGroup title="His look" hint="How “Talk with me” shows, and how he moves when he shares wisdom." isAdventure={isAdventure}>
+              <FxGroup id="his-look" title="His look" hint="His speech bubble’s look and when its choices show, how “Talk with me” shows, and how he moves when he shares wisdom." isAdventure={isAdventure}>
                 <ToucanLookSettings />
               </FxGroup>
               <FxGroup title="His add-ons" hint="Hats, trinkets and the rest, bought with coins." isAdventure={isAdventure}>

@@ -1,5 +1,7 @@
 "use client";
 
+import { BUBBLE_PAINT } from "@/lib/toucan-flourish";
+import { useBubbleStyle } from "@/lib/use-bubble-style";
 import { SnoozeIcon, CloseIcon } from "@/components/ui/Icons";
 import { SwipeActions } from "@/components/ui/SwipeActions";
 import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
@@ -1196,6 +1198,11 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
   });
   const resting = !menu && !saying && !talk && !rate;
   const showBubble = landed && !quiet && (!closed || menu);
+  // His bubble's look and way, chosen in Toucan settings (here "Each place its own" is parchment, words + the respond line).
+  const bubbleStyle = useBubbleStyle();
+  const glow = bubbleStyle.look === "spirit";
+  const [unfolded, setUnfolded] = useState(false);
+  const respondShown = bubbleStyle.way !== "quiet" || unfolded || replying || !!answer || !!talk;
   const showCoin = showBubble && resting && !replying && !answer && prompts.length > 1;
   return (
     <div ref={wrapRef} data-nx={nudge.x} data-ny={nudge.y} className={`${flyIn ? "welcome-toucan" : ""} absolute z-[5]`} style={{ left: 8 + off.x + nudge.x, top: -47 + off.y + nudge.y, transition: settling ? "left 260ms cubic-bezier(.2,.8,.3,1), top 260ms cubic-bezier(.2,.8,.3,1)" : undefined }}>
@@ -1294,8 +1301,14 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
           ref={bubbleRef}
           data-dx={menu ? menuDx : 0}
           // A fixed width, so new words never make it wider or narrower; it grows only downward (his menu, a talk, the rating).
+          onClick={(e) => {
+            // Words first: a tap on his words shows the respond line.
+            if (respondShown || drag.current?.moved || (e.target as HTMLElement).closest("button, input, textarea, a, form")) return;
+            setUnfolded(true);
+          }}
+          data-bubble-look={glow ? "spirit" : undefined}
           className={`toucan-bubble owl-say absolute top-1 left-[60px] cursor-grab select-none touch-none z-[5] w-[min(232px,calc(100vw-128px))] rounded-2xl pb-4 pl-3 pr-7 pt-2 text-left text-[13.5px] leading-snug [-webkit-touch-callout:none]`}
-          style={{ background: "#fffaf0", border: "1.5px solid #b39a6a", color: "#3d2f18", boxShadow: "0 4px 14px rgba(0,0,0,.25)", translate: menu && menuDx ? `${menuDx}px 0` : undefined }}
+          style={{ ...BUBBLE_PAINT[glow ? "spirit" : "parchment"].bubble, translate: menu && menuDx ? `${menuDx}px 0` : undefined }}
         >
           {/* × closes what he's saying for this visit (tap him to see it again); in his menu, it closes the menu. */}
           <button
@@ -1333,7 +1346,7 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
             <span className={menu ? "font-display block text-[14px]" : "block"}>{saying ?? (menu ? "How can I help?" : ask)}</span>
           )}
           <Confirm text={said} onDone={() => setSaid(null)} />
-          {rate && !menu && !saying && (
+          {(rate || bubbleStyle.way === "full") && !menu && !saying && !talk && (
             <span className="fade-in mt-1.5 flex flex-col">
               <span className="flex items-center gap-1">
                 <LineVote kind="like" on={votes.liked.includes(ask)} onClick={() => vote(true)} />
@@ -1397,8 +1410,15 @@ function WelcomeToucan({ fx, quiet = false, onAway, onArrange }: { fx: FxSetting
             </form>
           )}
           {/* The respond line: centred under his words, a quarter of it over the bubble's lower edge. */}
-          {!menu && !saying && (
-            <span className="absolute inset-x-0 top-[calc(100%-7px)] flex justify-center gap-1">
+          {!menu && !saying && !respondShown && (
+            <span className="absolute inset-x-0 top-[calc(100%-9px)] flex justify-center">
+              <button type="button" onClick={() => setUnfolded(true)} aria-label="Respond to him" title="Respond" className="bubble-hang flex h-[18px] items-center rounded-full px-2 text-[13px] leading-none tracking-widest">
+                ⋯
+              </button>
+            </span>
+          )}
+          {!menu && !saying && respondShown && (
+            <span className={`absolute inset-x-0 top-[calc(100%-7px)] flex justify-center gap-1 ${unfolded ? "fade-in" : ""}`}>
               {talk && !talk.thinking && (
                 <button type="button" onClick={() => (talkToToucan(undefined, "talk"), setTalk(null), setReplying(false))} title="Open the full conversation" className="bubble-hang flex h-[26px] items-center rounded-full px-2 text-[11.5px] font-semibold">
                   More

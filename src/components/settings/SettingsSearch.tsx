@@ -18,6 +18,7 @@ const ENTRIES: Entry[] = [
   { label: "Evening Routine button", where: "Visual settings", row: "visual", group: "evening-button", words: "stars glow evening" },
   { label: "The + button", where: "Visual settings", row: "visual", group: "fab", words: "plus fab add button" },
   { label: "Victories Today, when closed", where: "Visual settings", row: "visual", group: "victories", words: "wins completed done header" },
+  { label: "His speech bubble", where: "Toucan Spirit › His look", row: "toucan-spirit", group: "his-look", words: "toucan bubble look parchment spirit glow words first everything showing buttons interaction style design" },
   { label: "Toucan Spirit", where: "Toucan", row: "toucan-spirit", words: "bird guide talk speak voice chat look add-ons hats" },
   { label: "Welcome screen", where: "Welcome screen", row: "welcome-screen", words: "check-in greeting morning castle wise line daily login mist" },
   { label: "Evening routine & planning", where: "Planning & evening", row: "planning", words: "evening start time rites planning walks tomorrow" },

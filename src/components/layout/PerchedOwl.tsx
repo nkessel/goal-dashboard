@@ -1,5 +1,6 @@
 "use client";
 
+import { useBubbleStyle } from "@/lib/use-bubble-style";
 import { FOUND, HIDING, SAY_FLYING, SAY_LANDING, WISDOM, retiredLines } from "@/lib/toucan-lines";
 import { flourishClass, readFlourish, readTalkLook, subscribeTalkLook, type Flourish } from "@/lib/toucan-flourish";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -142,6 +143,9 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
   const [waiting, setWaiting] = useState<{ text: string; actions: { label: string; run: () => void }[] } | null>(null);
   // How "Talk with me" shows on the bubble (Settings → Toucan Spirit → His look).
   const talkLook = useSyncExternalStore(subscribeTalkLook, readTalkLook, () => "glow" as const);
+  // His bubble's look and way, chosen in Toucan settings ("Each place its own" keeps this bubble as it was).
+  const bubbleStyle = useBubbleStyle();
+  const [unfoldedFor, setUnfoldedFor] = useState<string | null>(null);
   // Buttons under the words (for the line they belong to).
   const [sayActions, setSayActions] = useState<{ for: string; list: { label: string; run: () => void; secret?: boolean }[] } | null>(null);
   const sayRef = useRef<HTMLDivElement>(null);
@@ -784,12 +788,15 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         </div>
         {spirit && waiting && <span aria-hidden className="toucan-waiting-dot pointer-events-none absolute right-0 top-0 h-2.5 w-2.5 rounded-full" />}
       </button>
-      {say && (
+      {say && (() => {
+        const glow = bubbleStyle.look === "mixed" ? spirit : bubbleStyle.look === "spirit";
+        const folded = bubbleStyle.way === "quiet" && unfoldedFor !== say;
+        return (
         <div
           ref={sayRef}
           role="status"
           className={`owl-say-wrap fixed left-0 top-0 ${over ? "z-[49]" : "z-[46]"} ${sayActions?.for === say ? "touch-none" : "pointer-events-none"}`}
-          style={{ "--tail-bg": spirit ? "#0c2427" : "#fbf5e6", "--tail-border": spirit ? "rgba(140,240,220,.55)" : "#b39a6a" } as React.CSSProperties}
+          style={{ "--tail-bg": glow ? "#0c2427" : "#fbf5e6", "--tail-border": glow ? "rgba(140,240,220,.55)" : "#b39a6a" } as React.CSSProperties}
           onPointerDown={(e) => {
             if (!pos.current || e.button > 0 || (e.target as HTMLElement).closest("button")) return;
             bubbleDrag.current = { x0: e.clientX, y0: e.clientY, offX: e.clientX - pos.current.x, offY: e.clientY - pos.current.y, moving: false };
@@ -816,7 +823,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             key={say}
             className={`owl-say relative w-max max-w-[260px] rounded-2xl py-1.5 text-center text-[14.5px] font-medium italic leading-snug ${sayActions?.for === say ? "cursor-grab pl-3 pr-7" : "px-3"}`}
             style={
-              spirit
+              glow
                 ? { background: "linear-gradient(180deg, rgba(14,38,40,.94), rgba(8,22,26,.96))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.35), 0 4px 12px rgba(0,0,0,.45)" }
                 : { background: "rgba(251,245,230,.97)", border: "1.5px solid #b39a6a", color: "#2a1c10", boxShadow: "0 4px 12px rgba(0,0,0,.35)" }
             }
@@ -835,7 +842,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
                 aria-label="Close"
                 title="Close"
                 className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full not-italic leading-none"
-                style={{ color: spirit ? "rgba(232,255,248,.75)" : "#6b5631", fontSize: 16 }}
+                style={{ color: glow ? "rgba(232,255,248,.75)" : "#6b5631", fontSize: 16 }}
               >
                 <CloseIcon size={10} />
               </button>
@@ -863,8 +870,14 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
                     </svg>
                   </button>
                 ))}
-            {sayActions?.for === say && sayActions.list.some((a) => !a.secret || talkLook === "words") && (
-              <span className="mt-1.5 flex flex-wrap justify-center gap-1.5">
+            {/* Words first: a tap on ⋯ shows his choices. */}
+            {sayActions?.for === say && folded && (
+              <button type="button" onClick={() => setUnfoldedFor(say)} aria-label="Show his choices" title="Show his choices" className="mt-0.5 block w-full text-[16px] not-italic leading-none tracking-widest" style={{ color: glow ? "rgba(232,255,248,.75)" : "#6b5631" }}>
+                ⋯
+              </button>
+            )}
+            {sayActions?.for === say && !folded && sayActions.list.some((a) => !a.secret || talkLook === "words") && (
+              <span className={`mt-1.5 flex flex-wrap justify-center gap-1.5 ${bubbleStyle.way === "quiet" ? "fade-in" : ""}`}>
                 {sayActions.list.filter((a) => !a.secret || talkLook === "words").map((a) => (
                   <button
                     key={a.label}
@@ -874,7 +887,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
                       a.run();
                     }}
                     className="h-8 rounded-full px-3 text-[12.5px] font-bold"
-                    style={spirit ? { background: "rgba(140,240,220,.18)", border: "1px solid rgba(140,240,220,.6)", color: "#e8fff8" } : { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
+                    style={glow ? { background: "rgba(140,240,220,.18)", border: "1px solid rgba(140,240,220,.6)", color: "#e8fff8" } : { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}
                   >
                     {a.label}
                   </button>
@@ -883,7 +896,8 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
             )}
           </div>
         </div>
-      )}
+      );
+      })()}
       {wisdom && (
         <div
           role="status"
