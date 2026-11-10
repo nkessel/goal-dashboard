@@ -222,11 +222,11 @@ export const FLOWS = [
       }
       // Schedule a quest from its ⋯ menu: the day drawn, tap a time (repeat ask 10).
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for schedule", { optional: true })) {
-        if (await h.tap((p) => p.getByText(/^(re)?schedule on calendar$/i).first(), "schedule picker", { optional: true, expectMove: true })) {
+        if (await h.tap((p) => p.getByText(/^(re)?schedule…$|^(re)?schedule on calendar$/i).first(), "schedule picker", { optional: true, expectMove: true })) {
           await h.settle(1200);
-          await h.check("schedule picker");
+          await h.check("schedule window");
           await h.tap((p) => p.locator("[aria-label^='Your ']").first(), "pick a time", { optional: true });
-          await h.check("schedule picker: time picked");
+          await h.check("schedule window: red line on the time");
           await esc(h);
         } else await esc(h);
       }
@@ -294,6 +294,25 @@ export const FLOWS = [
         await h.settle(600);
         await h.check("focusing questions");
         await h.tap((p) => p.getByRole("button", { name: /^focusing questions$/i }).first(), "focusing questions close", { optional: true, expectMove: true });
+      }
+      // Prioritize today (owner, Nov 10): cards (rate one, snooze row) and the list (dates, snooze).
+      await h.page.hover("text=Today's Quests").catch(() => {});
+      if (await h.tap((p) => p.getByRole("button", { name: /^prioritize today$/i }).first(), "prioritize today", { optional: true, expectMove: true })) {
+        await h.settle(1200);
+        await h.check("prioritize cards");
+        await h.tap((p) => p.locator("[data-prioritize-card]").getByRole("button", { name: /add a due or plan-by date|due|plan/i }).first(), "card dates", { optional: true, expectMove: true });
+        await h.check("prioritize card dates");
+        await h.tap((p) => p.locator("[data-prioritize]").getByRole("radio", { name: /^importance 3$/i }).first(), "rate 3 for today", { optional: true, expectMove: true });
+        await h.settle(500);
+        await h.check("prioritize next card");
+        await h.tap((p) => p.locator("[data-prioritize]").getByRole("button", { name: /snooze/i }).last(), "card snooze", { optional: true, expectMove: true });
+        await h.check("prioritize snooze row");
+        await h.tap((p) => p.getByRole("tab", { name: /^list$/i }).first(), "prioritize list", { optional: true, expectMove: true });
+        await h.check("prioritize list");
+        await h.tap((p) => p.locator("[data-prioritize]").getByRole("button", { name: /due and plan-by dates/i }).first(), "list dates", { optional: true, expectMove: true });
+        await h.check("prioritize list dates");
+        await h.tap((p) => p.getByRole("tab", { name: /^cards$/i }).first(), "back to cards", { optional: true, expectMove: true });
+        await esc(h);
       }
       // ✨ Plan my day from Today's Quests header (owner, Nov 2): today's quests placed around the day.
       await h.page.hover("text=Today's Quests").catch(() => {});
@@ -462,6 +481,11 @@ export const FLOWS = [
         await h.tap((p) => p.getByRole("button", { name: /add another|choose a quest for tomorrow/i }).first(), "add to tomorrow", { optional: true });
         await h.check("tomorrow's quest picker");
         await esc(h);
+        if (await h.tap((p) => p.getByRole("button", { name: /^prioritize tomorrow$/i }).first(), "prioritize tomorrow", { optional: true, expectMove: true })) {
+          await h.settle(1200);
+          await h.check("prioritize tomorrow cards");
+          await esc(h);
+        }
       }
       await h.toggle(/celebrate today.s wins/i, "today's wins");
       // Prepare for tomorrow's day opens with Tomorrow's dawn: wake time, room, stones, the seal (owner, Nov 9).

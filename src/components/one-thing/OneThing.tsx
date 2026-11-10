@@ -3,10 +3,11 @@
 import { progressWords } from "@/lib/progress-words";
 import { FocusSteps as FocusStepsPanel } from "./FocusSteps";
 import { LevelScales } from "@/components/ui/LevelScales";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import type { Task } from "@/lib/data/types";
 import { useRouter } from "next/navigation";
+import { readMenuLayout, serverMenuLayout, subscribeMenuLayout } from "@/lib/quest-menu-layout";
 import { completeRiteAction, completeTaskAction, listQuestStepsAction, saveQuestStepsAction, updateTaskAction } from "@/app/actions";
 import { IconPicker } from "@/components/tasks/IconPicker";
 import { IconScale } from "@/components/tasks/IconScale";
@@ -118,6 +119,10 @@ function OneThingView({
   onReshuffle: () => void;
 }) {
   const [index, setIndex] = useState(0);
+  const [tookMin, setTookMin] = useState("");
+  // Its name as you set it in the quest menu (default "Engage Quest").
+  const menuLayout = useSyncExternalStore(subscribeMenuLayout, readMenuLayout, serverMenuLayout);
+  const focusName = menuLayout.labels?.focus ?? "Engage Quest";
   const [leaving, setLeaving] = useState<"skip" | "done" | null>(null);
   const [closing, setClosing] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -229,6 +234,11 @@ function OneThingView({
         }
         const fd = new FormData();
         fd.set("taskId", t.id);
+        // How long it took: the minutes typed in, else the timer's time on this quest.
+        const ft = getFocusTimer();
+        const timed = ft.task?.id === t.id ? Math.round(spentSeconds(ft, ft.runStart ? Date.now() : 0) / 60) : 0;
+        const took = Number(tookMin) > 0 ? Number(tookMin) : timed;
+        if (took > 0) fd.set("minutesSpent", String(took));
         const res = await completeTaskAction(fd);
         celebrateQuest({
           taskId: t.id,
@@ -260,7 +270,7 @@ function OneThingView({
       data-theme={theme}
       role="dialog"
       aria-modal="true"
-      aria-label={focus ? "Focus mode" : "One thing"}
+      aria-label={focus ? focusName : "One thing"}
       // Clicks here must not reach the quest card this view was opened from
       // (React events bubble through portals). Empty space closes the view.
       onClick={(e) => {
@@ -282,7 +292,7 @@ function OneThingView({
           <CloseIcon size={17} />
         </button>
         <span className="font-display flex-1 text-center text-[19px]" style={{ color: "var(--ot-gold)" }}>
-          {focus ? "Focus mode" : "Your one thing"}
+          {focus ? focusName : "Your one thing"}
         </span>
         <span className="w-11 text-right text-[13px] tabular-nums" style={{ color: "var(--ot-soft)" }}>
           {task && !focus ? `${index + 1}/${live.length}` : ""}
@@ -360,6 +370,22 @@ function OneThingView({
               </p>
             )}
             <FocusTimer key={`timer-${task.id}`} task={task} minutes={task.estimate_minutes && task.estimate_minutes <= 240 ? task.estimate_minutes : 25} onPopOut={popOut} />
+            {focus && !task.habit && (
+              // Already done it? Say how long it took, then complete (owner, Nov 10).
+              <label className="relative z-[1] flex items-center gap-1.5 text-[14px]" style={{ color: "#6b5534" }}>
+                Already did it? It took
+                <input
+                  value={tookMin}
+                  onChange={(e) => setTookMin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  inputMode="numeric"
+                  placeholder="—"
+                  aria-label="Minutes it took"
+                  className="bare-input w-12 border-0 bg-transparent text-center text-[16px] tabular-nums focus:outline-none"
+                  style={{ borderBottom: "1px solid #c8a24a", boxShadow: "none" }}
+                />
+                min
+              </label>
+            )}
             {!task.habit && <FocusStepsPanel key={`steps-${task.id}`} taskId={task.id} progress={task.progress ?? 0} />}
             {error && (
               <p className="relative z-[1] m-0 text-[14px] font-semibold" style={{ color: "var(--t-warn)" }}>

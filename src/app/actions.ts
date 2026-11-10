@@ -381,6 +381,9 @@ export async function completeTaskAction(formData: FormData) {
   const taskId = String(formData.get("taskId") || "");
   const completedAtRaw = String(formData.get("completedAt") || "");
   const completedAt = completedAtRaw ? new Date(completedAtRaw).toISOString() : undefined;
+  // Engage Quest: how long it took (the timer, or minutes typed in).
+  const spent = Math.round(Number(formData.get("minutesSpent") || 0));
+  if (spent > 0 && spent <= 1440) await supabaseAdmin().from("tasks").update({ minutes_spent: spent }).eq("id", taskId).eq("owner_id", ownerId);
   return finishTask(ownerId, taskId, completedAt);
 }
 
@@ -1944,6 +1947,96 @@ export async function deleteJournalEntryAction(id: string) {
 export async function setTomorrowQueueAction(rankIds: string[], seqIds?: string[]) {
   const ownerId = await requireProfileId();
   await tomorrowData.setTomorrowQueue(ownerId, rankIds, seqIds);
+  revalidatePath("/");
+}
+
+/**
+ * The prioritization tool (owner, Nov 10): cards or a list of open quests for today or tomorrow;
+ * swipe one in, rate how important it is for that day (1–5), snooze it, or set its dates.
+ * Ratings are per day in `life_wheel.dayRatings` ({ "2026-11-10": { id: 4 } }, last few days kept).
+ */
+export type PrioritizeItem = { id: string; title: string; due_at: string | null; plan_by: string | null; xp_value: number; estimate_minutes: number | null; icon_key: string | null; icon_source: string | null; board: string | null; snoozed: boolean };
+export async function prioritizeAction(day: "today" | "tomorrow"): Promise<{ items: PrioritizeItem[]; onDay: string[]; ratings: Record<string, number> }> {
+  const ownerId = await requireProfileId();
+  const key = day === "today" ? tomorrowData.appDayKey() : tomorrowData.nextDayKey(tomorrowData.appDayKey());
+  const [open, queue, extras] = await Promise.all([tasksData.listOpenTasksForOwnerWithCategory(ownerId), tomorrowData.listTomorrowQueue(ownerId), readExtras(ownerId)]);
+  const now = Date.now();
+  const live = open.filter((t) => !t.locked_by_task_id && !t.reward_id && !t.mission_id);
+  const onDay = day === "today" ? live.filter((t) => t.is_manual_priority).map((t) => t.id) : (queue ?? []).map((t) => t.id);
+  const ratings = ((extras.dayRatings as Record<string, Record<string, number>> | undefined) ?? {})[key] ?? {};
+  // Due first (soonest, past due at the top), then planned-by, then the rest newest first.
+  const rank = (t: Task) => {
+    const due = t.due_at ? Date.parse(t.due_at) : NaN;
+    const plan = (t as Task & { plan_by?: string | null }).plan_by ? Date.parse((t as Task & { plan_by?: string | null }).plan_by!) : NaN;
+    return Number.isFinite(due) ? due : Number.isFinite(plan) ? plan + 1e12 : 4e12 - Date.parse(t.created_at);
+  };
+  const items = [...live]
+    .sort((a, b) => rank(a) - rank(b))
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      due_at: t.due_at ?? null,
+      plan_by: (t as Task & { plan_by?: string | null }).plan_by ?? null,
+      xp_value: t.xp_value,
+      estimate_minutes: t.estimate_minutes,
+      icon_key: t.icon_key,
+      icon_source: t.icon_source,
+      board: t.categoryLabel ?? null,
+      snoozed: !!(t as Task & { snoozed_until?: string | null }).snoozed_until && Date.parse((t as Task & { snoozed_until?: string | null }).snoozed_until!) > now,
+    }));
+  return { items, onDay, ratings };
+}
+
+/** Put a quest on today's or tomorrow's list, with how important it is for that day (null = just add). Highest first. */
+export async function rateForDayAction(day: "today" | "tomorrow", taskId: string, rating: number | null) {
+  const ownerId = await requireProfileId();
+  const key = day === "today" ? tomorrowData.appDayKey() : tomorrowData.nextDayKey(tomorrowData.appDayKey());
+  const extras = await readExtras(ownerId);
+  const all = (extras.dayRatings as Record<string, Record<string, number>> | undefined) ?? {};
+  const mine = { ...(all[key] ?? {}) };
+  if (rating && rating >= 1 && rating <= 5) mine[taskId] = Math.round(rating);
+  // Keep only the last few days.
+  const kept = Object.fromEntries(Object.entries({ ...all, [key]: mine }).sort(([a], [b]) => b.localeCompare(a)).slice(0, 4));
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dayRatings: kept } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save that: ${error.message}`);
+  // Rated first (highest first), then the rest in their current order.
+  const order = (ids: string[]) => {
+    const pos = new Map(ids.map((id, i) => [id, i]));
+    return [...ids].sort((a, b) => (mine[b] ?? 0) - (mine[a] ?? 0) || (pos.get(a)! - pos.get(b)!));
+  };
+  if (day === "today") {
+    const open = await tasksData.listOpenTasksForOwner(ownerId);
+    const today = open.filter((t) => t.is_manual_priority).map((t) => t.id);
+    if (!today.includes(taskId)) {
+      await tasksData.pinToTopOfToday(taskId, ownerId);
+      today.push(taskId);
+    }
+    await tasksData.updateTaskOrder(ownerId, order(today));
+  } else {
+    const queue = ((await tomorrowData.listTomorrowQueue(ownerId)) ?? []).map((t) => t.id);
+    if (!queue.includes(taskId)) queue.push(taskId);
+    const next = order(queue);
+    await tomorrowData.setTomorrowQueue(ownerId, next, next);
+  }
+  revalidatePath("/");
+}
+
+/** Take a quest off today's or tomorrow's list (the tool's undo). */
+export async function unrateForDayAction(day: "today" | "tomorrow", taskId: string, wasOn: boolean) {
+  const ownerId = await requireProfileId();
+  const key = day === "today" ? tomorrowData.appDayKey() : tomorrowData.nextDayKey(tomorrowData.appDayKey());
+  const extras = await readExtras(ownerId);
+  const all = (extras.dayRatings as Record<string, Record<string, number>> | undefined) ?? {};
+  const mine = { ...(all[key] ?? {}) };
+  delete mine[taskId];
+  await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, dayRatings: { ...all, [key]: mine } } }).eq("id", ownerId);
+  if (!wasOn) {
+    if (day === "today") await tasksData.setManualPriority(taskId, ownerId, false);
+    else {
+      const queue = ((await tomorrowData.listTomorrowQueue(ownerId)) ?? []).map((t) => t.id).filter((id) => id !== taskId);
+      await tomorrowData.setTomorrowQueue(ownerId, queue, queue);
+    }
+  }
   revalidatePath("/");
 }
 

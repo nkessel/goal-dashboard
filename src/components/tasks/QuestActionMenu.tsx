@@ -107,7 +107,7 @@ export function QuestActionMenu({
   const allItems: { key: QuestAction; icon: React.ReactNode; label: string }[] = [
     { key: "edit", icon: <Glyph d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />, label: isReward ? "Edit reward" : isAdventure ? "Edit quest" : "Edit task" },
     { key: "complete", icon: "✓", label: isReward ? "Complete this reward" : isAdventure ? "Complete this quest" : "Complete this task" },
-    { key: "focus", icon: <Glyph d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 3.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />, label: "Focus mode" },
+    { key: "focus", icon: <Glyph d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 3.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />, label: "Engage Quest" },
     {
       key: "battle",
       icon: inBattle ? <Glyph d="M4 12h13M13 7l5 5-5 5M4 5v14" /> : <Glyph d="M5 19l9-9M14 5l5 0 0 5-9 9-5 0 0-5zM15 15l4 4" />,
@@ -116,7 +116,7 @@ export function QuestActionMenu({
     ...(canSnooze ? [{ key: "snooze" as const, icon: <SnoozeGlyph />, label: "Snooze…" }] : []),
     // In Additional Quests, taking it out of that list takes it off the Today screen.
     ...(onToday && !inBattle ? [{ key: "offtoday" as const, icon: <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />, label: isAdventure ? "Remove from Additional Quests" : "Remove from More tasks" }] : []),
-    { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule" : "Auto-schedule" },
+    { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule…" : "Schedule…" },
     // "See quest in its board" left the menu (owner, Nov 4): the board label on the editor's portrait does it.
     ...(!isReward
       ? [
@@ -130,6 +130,8 @@ export function QuestActionMenu({
       ? { key: "delete", icon: <Glyph d="M5 7h14M10 4h4M7 7l1 13h8l1-13M10.5 11v5.5M13.5 11v5.5" />, label: "Delete reward" }
       : { key: "archive", icon: <Glyph d="M4 7h16v3H4zM6 10v9h12v-9M10 13.5h4" />, label: isAdventure ? "Archive quest" : "Archive task" },
   ];
+  // Your own words for an item, set while arranging (tap its name).
+  for (const it of allItems) if (layout.labels?.[it.key]) it.label = layout.labels[it.key]!;
 
   const items = arrangeMenu(allItems, layout);
 
@@ -325,12 +327,12 @@ function ArrangeItems({ items, layout, isAdventure }: { items: { key: QuestActio
   return (
     <div className="reveal flex flex-col pt-1">
       <span className="px-3.5 pb-1 pr-10 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-        Drag to reorder; the eye hides an item.
+        Drag to reorder; tap a name to rename it; the eye hides an item.
       </span>
       <DndContext id="dnd-quest-menu" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={keys} strategy={verticalListSortingStrategy}>
           {list.map((it) => (
-            <ArrangeRow key={it.key} it={it} hidden={layout.hidden.includes(it.key)} canHide={it.key !== "edit"} isAdventure={isAdventure} onToggle={() => toggle(it.key)} />
+            <ArrangeRow key={it.key} it={it} hidden={layout.hidden.includes(it.key)} canHide={it.key !== "edit"} isAdventure={isAdventure} onToggle={() => toggle(it.key)} onRename={(words) => saveMenuLayout({ ...layout, labels: { ...(layout.labels ?? {}), [it.key]: words } })} />
           ))}
         </SortableContext>
       </DndContext>
@@ -339,7 +341,8 @@ function ArrangeItems({ items, layout, isAdventure }: { items: { key: QuestActio
   );
 }
 
-function ArrangeRow({ it, hidden, canHide, isAdventure, onToggle }: { it: { key: QuestAction; icon: React.ReactNode; label: string }; hidden: boolean; canHide: boolean; isAdventure: boolean; onToggle: () => void }) {
+function ArrangeRow({ it, hidden, canHide, isAdventure, onToggle, onRename }: { it: { key: QuestAction; icon: React.ReactNode; label: string }; hidden: boolean; canHide: boolean; isAdventure: boolean; onToggle: () => void; onRename: (words: string) => void }) {
+  const [naming, setNaming] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: it.key });
   return (
     <div
@@ -360,7 +363,30 @@ function ArrangeRow({ it, hidden, canHide, isAdventure, onToggle }: { it: { key:
       <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm" style={{ color: "var(--t-ink-soft)" }}>
         {it.icon}
       </span>
-      <span className={`min-w-0 flex-1 ${hidden ? "line-through" : ""}`}>{it.label}</span>
+      {naming ? (
+        <input
+          autoFocus
+          defaultValue={it.label}
+          maxLength={40}
+          aria-label={`Rename ${it.label}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") setNaming(false);
+          }}
+          onBlur={(e) => {
+            onRename(e.currentTarget.value);
+            setNaming(false);
+          }}
+          className="bare-input min-w-0 flex-1 bg-transparent text-[14.5px] outline-none"
+          style={{ borderBottom: "1px solid #c8a24a" }}
+        />
+      ) : (
+        <button type="button" onClick={() => setNaming(true)} onPointerDown={(e) => e.stopPropagation()} title="Tap to rename" className={`min-w-0 flex-1 text-left ${hidden ? "line-through" : ""}`}>
+          {it.label}
+        </button>
+      )}
       {canHide && (
         <button type="button" onClick={onToggle} onPointerDown={(e) => e.stopPropagation()} aria-label={hidden ? `Show ${it.label}` : `Hide ${it.label}`} title={hidden ? "Show it" : "Hide it"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft)" }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>

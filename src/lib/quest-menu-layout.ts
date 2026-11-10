@@ -7,18 +7,19 @@ import type { QuestAction } from "@/components/tasks/QuestActionMenu";
 export const MENU_ITEMS: { key: QuestAction; label: string }[] = [
   { key: "edit", label: "Edit quest" },
   { key: "complete", label: "Complete this quest" },
-  { key: "focus", label: "Focus mode" },
+  { key: "focus", label: "Engage Quest" },
   { key: "battle", label: "Add to / remove from Today's Quests" },
   { key: "snooze", label: "Snooze…" },
   { key: "offtoday", label: "Remove from Additional Quests" },
-  { key: "calendar", label: "Schedule on calendar" },
+  { key: "calendar", label: "Schedule…" },
   { key: "board", label: "See quest in its board" },
   { key: "sequence", label: "Create a sequence" },
   { key: "nextstep", label: "Make it the board's next step" },
   { key: "earlier", label: "Already completed…" },
   { key: "delete", label: "Delete quest" },
 ];
-export type MenuLayout = { order: QuestAction[]; hidden: QuestAction[] };
+/** `labels`: your own words for an item (owner, Nov 10: rename "Focus mode", e.g. "Engage Quest"). */
+export type MenuLayout = { order: QuestAction[]; hidden: QuestAction[]; labels?: Partial<Record<QuestAction, string>> };
 export const DEFAULT_MENU_LAYOUT: MenuLayout = { order: MENU_ITEMS.map((m) => m.key), hidden: [] };
 
 const KEY = "quest-menu-layout";
@@ -30,7 +31,9 @@ function clean(raw: unknown): MenuLayout {
   const order = (Array.isArray(r.order) ? r.order : []).filter((k): k is QuestAction => known.has(k as QuestAction));
   for (const [i, k] of DEFAULT_MENU_LAYOUT.order.entries()) if (!order.includes(k)) order.splice(Math.min(i, order.length), 0, k);
   const hidden = (Array.isArray(r.hidden) ? r.hidden : []).filter((k): k is QuestAction => known.has(k as QuestAction) && k !== "edit");
-  return { order: [...new Set(order)], hidden: [...new Set(hidden)] };
+  const labels: Partial<Record<QuestAction, string>> = {};
+  for (const [k, v] of Object.entries(r.labels ?? {})) if (known.has(k as QuestAction) && typeof v === "string" && v.trim()) labels[k as QuestAction] = v.trim().slice(0, 40);
+  return { order: [...new Set(order)], hidden: [...new Set(hidden)], labels };
 }
 
 let cache: { raw: string | null; value: MenuLayout } | null = null;

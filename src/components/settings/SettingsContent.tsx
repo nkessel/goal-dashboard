@@ -145,6 +145,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
           </div>
         </section>
 
+        {/* Find a setting, right under your character (owner, Nov 9: "right below the character info at the top"). */}
+        <SettingsSearch isAdventure={isAdventure} />
+
         {/* One "to sort" entry at a time: the cards first, the older inbox once they're sorted. */}
         {importCards > 0 ? <ImportsWaiting count={importCards} /> : <ImportsInboxRow quests={imports.quests} rewards={imports.rewards} theme={profile.theme} />}
 
@@ -268,7 +271,6 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
         </ReorderableTiles>
 
         {/* Expandable settings rows (drag to reorder) */}
-        <SettingsSearch isAdventure={isAdventure} />
         {/* The settings opened most, full size (drag to reorder). */}
         <ReorderableSections>
           <SectionItem id="visual">

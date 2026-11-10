@@ -34,5 +34,9 @@
   {
     "match": "^inventory\\|moved-on-tap\\|.*packing: tick",
     "reason": "Packing lists (owner, Nov 7, like Listry): a packed item waits about a second with its tick showing, then glides to the bottom of its section. By design; Settings › Packed things › Stay put keeps it in place."
+  },
+  {
+    "match": "^today\\|clipped\\|.*cut off by <div> \"Snooze ",
+    "reason": "Prioritize cards (Nov 10): swiping a card left slides it partly out of the deck on purpose to uncover its Snooze button (like SwipeReveal on Today's cards); the deck clips it sideways. Tapping × or the card brings it back whole."
   }
 ]

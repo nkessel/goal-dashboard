@@ -129,3 +129,15 @@ export function MagicCalendarIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+/** Rising bars: how important for the day (the prioritize tool). */
+export function PrioritizeIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="15" width="3.4" height="6" rx="1" fill="currentColor" opacity=".55" />
+      <rect x="8.2" y="11.5" width="3.4" height="9.5" rx="1" fill="currentColor" opacity=".7" />
+      <rect x="13.4" y="8" width="3.4" height="13" rx="1" fill="currentColor" opacity=".85" />
+      <rect x="18.6" y="4" width="3.4" height="17" rx="1" fill="currentColor" />
+    </svg>
+  );
+}

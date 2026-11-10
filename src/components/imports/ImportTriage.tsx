@@ -698,8 +698,10 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
         </div>
       )}
       <div className="mt-1 flex items-center gap-2">
-        <span className="flex-1" />
-        <button type="button" onClick={onImport} className="h-11 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+        <span className="flex-1 text-[12.5px] leading-snug" style={{ color: "#6b5631" }}>
+          {importWhere(card.kind, card.plan_within_days)}
+        </span>
+        <button type="button" onClick={onImport} className="h-11 shrink-0 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
           {importLabel(card.kind)}
         </button>
       </div>
@@ -707,6 +709,30 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
     </div>
   );
 }
+
+/**
+ * Where an import lands, in plain words beside its button (owner, Nov 10: "what does import as a quest
+ * mean? does it go on the scheduling calendar? somewhere else?").
+ */
+const importWhere = (k: Kind, planDays: number | null | undefined) => {
+  const sched = planDays != null && k !== "habit" && k !== "reward" && k !== "done";
+  switch (k) {
+    case "habit":
+      return "Joins your Daily Habits on Today.";
+    case "reward":
+      return "Goes in your Treasure Chest.";
+    case "done":
+      return "Counted as done: its XP now, nothing left open.";
+    case "project":
+      return "Becomes a quest board, a quest for each step.";
+    case "ritual":
+      return sched ? "Joins your rituals in Insights, and a quest goes on the auto-scheduler's list." : "Joins your rituals of connection in Insights.";
+    default:
+      return sched
+        ? "A quest on its board and in Additional Quests, and on the auto-scheduler's list to get a time on your calendar."
+        : "A quest on its board and in Additional Quests. Pick “Schedule within” to also give it a time on your calendar.";
+  }
+};
 
 // What the button does, in its own words (it used to say just "Import").
 const importLabel = (k: Kind) =>
@@ -910,8 +936,11 @@ function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAt
       {rateable(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} small />}
       {/* The pills get the row's whole width; Import sits under them at the right. */}
       {withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} small />}
-      <div className="flex justify-end">
-        <button type="button" onClick={onImport} className="h-8 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+      <div className="flex items-center justify-end gap-2">
+        <span className="min-w-0 flex-1 text-[11.5px] leading-snug" style={{ color: "#6b5631" }}>
+          {importWhere(card.kind, card.plan_within_days)}
+        </span>
+        <button type="button" onClick={onImport} className="h-8 shrink-0 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
           {importLabel(card.kind)}
         </button>
       </div>

@@ -7,7 +7,7 @@ import { FileChips } from "@/components/ui/FileChips";
 import { Linked } from "@/components/ui/Linked";
 
 import { TimeToken } from "@/components/xp/NightFields";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
@@ -17,6 +17,7 @@ import { Gem } from "@/components/ui/Gem";
 import { useRewardGem } from "@/lib/use-reward-gems";
 import { completeTaskAction, deleteTaskAction, archiveTaskAction, toggleManualPriorityAction, setTaskPlacementAction, snoozeQuestAction, undoSnoozeAction, snoozeQuestUntilAction, undoSnoozeUntilAction, setNextStepAction, moveTaskToBoardAction } from "@/app/actions";
 import { TaskScheduleControl } from "./TaskScheduleControl";
+import { FloatingWindow } from "@/components/ui/FloatingWindow";
 import { EditTaskModal } from "./EditTaskModal";
 import { earlyBirdBonus, earlyBirdCoins, roomToFinishEarly } from "@/lib/next-action";
 import { EarlyBonusPopup } from "./EarlyBonusFields";
@@ -35,7 +36,7 @@ import { fillFor, useScaleColors, useScaleStyle, type ScaleKey } from "@/compone
 import { Fold, useClosing } from "@/components/ui/Fold";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, unitLabel, type ProgressUnit } from "@/lib/progress-units";
-import { setTaskProgressAction } from "@/app/actions";
+import { questForEditAction, setTaskProgressAction } from "@/app/actions";
 import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 
 /** Whether a task is overdue: scheduled in the past and not yet completed.
@@ -166,6 +167,8 @@ export function TaskRow({
   const [scheduling, setScheduling] = useState(false);
   const [doneEarlier, setDoneEarlier] = useState(false);
   const [sequencing, setSequencing] = useState(false);
+  // A sequence fans out into all its quests on a tap, and stacks back on the next (owner, Nov 9–10).
+  const [fanned, setFanned] = useState(false);
   const queue = task.behind ?? [];
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -443,7 +446,7 @@ export function TaskRow({
       {/* A locked reward peeks out from behind its prerequisite quest. */}
       {behind && <LockedRewardCard reward={behind} />}
       {/* The quests waiting after this one, stacked underneath. */}
-      {queue.length > 0 && <SequenceStack queue={queue} isAdventure={isAdventure} onEdit={() => setSequencing(true)} />}
+      {queue.length > 0 && !fanned && <SequenceStack queue={queue} isAdventure={isAdventure} onEdit={() => setSequencing(true)} />}
       {/* On Today, swipe right to snooze it until tomorrow. */}
       <SwipeReveal
         side="left"
@@ -455,7 +458,15 @@ export function TaskRow({
         onAction={() => pick("snooze", false)}
       >
       <div
-      onClick={() => (hasSteps && !done ? setTray((t) => !t) : setEditing(true))}
+      onClick={() => {
+        // A sequence fans out (its sub-quests open with it); a quest with sub-quests opens its tray; else the editor.
+        if (queue.length > 0 && !done) {
+          const next = !fanned;
+          setFanned(next);
+          if (hasSteps) setTray(next);
+        } else if (hasSteps && !done) setTray((t) => !t);
+        else setEditing(true);
+      }}
       aria-expanded={hasSteps ? tray : undefined}
       onContextMenu={(e) => {
         // Right-click opens the same menu as ⋯.
@@ -466,7 +477,7 @@ export function TaskRow({
         setMenuAnchor(dots);
         setMenu("dots");
       }}
-      title={hasSteps ? "Click for its sub-quests · right-click for more" : "Click to edit · right-click for more"}
+      title={queue.length > 0 ? "Click to fan out the whole sequence · right-click for more" : hasSteps ? "Click for its sub-quests · right-click for more" : "Click to edit · right-click for more"}
       className={`quest-card hover-glow relative flex cursor-pointer flex-col ${tiny ? "tiny-quest rounded-xl py-1.5 pl-2.5 pr-10" : "rounded-2xl px-3 pb-3 pt-2.5"} ${behind || queue.length ? "z-[1]" : ""} ${task.reward_id ? "reward-quest" : ""} ${
         draggable ? "active:cursor-grabbing" : ""
       } ${isPending ? "opacity-70" : ""}`}
@@ -634,6 +645,16 @@ export function TaskRow({
               <QuestMonogram id={task.id} title={task.title} size={avatarSize} />
             )}
           </button>
+          {/* Times rescheduled: a small seal on the portrait's foot, so it adds no height to the card (owner, Nov 10). */}
+          {task.reschedule_count > 0 && !compact && (
+            <span
+              className="pointer-events-none absolute -bottom-1.5 left-1/2 z-[2] -translate-x-1/2 whitespace-nowrap rounded-full px-1.5 text-[11px] font-semibold tabular-nums leading-[16px]"
+              style={{ background: isAdventure ? "#f3e6c8" : "var(--t-card)", border: `1px solid ${isWarned ? "var(--t-warn)" : isAdventure ? "#a58c66" : "var(--t-card-border)"}`, color: isWarned ? "var(--t-warn)" : "var(--t-ink-soft)" }}
+              title={isWarned ? "Rescheduled often" : `Rescheduled ${task.reschedule_count}×`}
+            >
+              &#8635; {task.reschedule_count}
+            </span>
+          )}
           {menu === "icon" && menuEl("left")}
         </div>
 
@@ -789,11 +810,6 @@ export function TaskRow({
           >
             {isAdventure ? `XP ${task.xp_value}` : `${task.xp_value} pts`}
           </span>
-          {task.reschedule_count > 0 && !compact && (
-            <span className="text-[12px] font-semibold tabular-nums leading-none" style={{ color: isWarned ? "var(--t-warn)" : "var(--t-ink-soft)" }} title={isWarned ? "Rescheduled often" : `Rescheduled ${task.reschedule_count}×`}>
-              &#8635; {task.reschedule_count}
-            </span>
-          )}
           <ScaleRuns
             compact={compact}
             runs={[
@@ -830,22 +846,7 @@ export function TaskRow({
       {/* Dialogs render in portals, but their events still bubble through this
           card in React — keep typing, selecting and Space from starting a card drag. */}
       <div className="contents" onPointerDown={stopBubble} onMouseDown={stopBubble} onTouchStart={stopBubble} onKeyDown={stopKeysButSave} onClick={stopBubble}>
-      {scheduling &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 overlay-fade-in"
-            style={{ background: "var(--t-overlay)" }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setScheduling(false);
-            }}
-          >
-            <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-              <TaskScheduleControl task={task} theme={theme} startOpen onDone={() => setScheduling(false)} />
-            </div>
-          </div>,
-          document.body
-        )}
+      {scheduling && <ScheduleWindow task={task} theme={theme} onClose={() => setScheduling(false)} />}
 
       {editing && (
         <EditTaskModal
@@ -878,6 +879,7 @@ export function TaskRow({
       </div>
     </div>
       </SwipeReveal>
+      {queue.length > 0 && <SequenceFan ids={queue.map((q) => q.id)} open={fanned && !done} theme={theme} />}
       {hasSteps && !done && (
         // Slides open just under the card.
         <div className="drawer-body" data-open={tray ? "true" : "false"} style={{ marginTop: tray ? 6 : 0, transition: "grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 240ms ease, margin-top 320ms ease" }}>
@@ -1224,5 +1226,84 @@ function ProgressLog({ task, unit, isAdventure, onComplete }: { task: Task; unit
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * A sequence fanned out (owner, Nov 10): every waiting quest as its own card under the front one,
+ * in order, each with its own ⋯ / right-click menu. They slide down out of the stack one after
+ * another, and slide back up into it when the front card is tapped again.
+ */
+function SequenceFan({ ids, open, theme }: { ids: string[]; open: boolean; theme: "calm" | "adventure" }) {
+  const [tasks, setTasks] = useState<Task[] | null>(null);
+  const [shown, setShown] = useState(open);
+  const [leaving, setLeaving] = useState(false);
+  const key = ids.join(",");
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  if (open && !shown) {
+    setShown(true);
+    setLeaving(false);
+  }
+  if (!open && shown && !leaving) setLeaving(true);
+  useEffect(() => {
+    if (!leaving) return;
+    const t = window.setTimeout(() => (setShown(false), setLeaving(false)), 60 * Math.min(ids.length, 4) + 260);
+    return () => window.clearTimeout(t);
+  }, [leaving, ids.length]);
+  useEffect(() => {
+    if (!open || loadedFor === key) return;
+    let live = true;
+    Promise.all(key.split(",").map((id) => questForEditAction(id).catch(() => null))).then((list) => {
+      if (!live) return;
+      setTasks(list.filter((t): t is Task => !!t));
+      setLoadedFor(key);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, key, loadedFor]);
+  if (!shown) return null;
+  const list = tasks ?? [];
+  return (
+    <ol className="m-0 mt-2 flex list-none flex-col gap-2 p-0" aria-label="The rest of this sequence" data-seq-fan>
+      {!tasks && (
+        <li className="seq-fan-card text-center text-[13px] italic" style={{ color: "var(--t-ink-soft)", ["--i" as string]: 0 }}>
+          Fanning out…
+        </li>
+      )}
+      {list.map((t, i) => (
+        <li key={t.id} className={leaving ? "seq-fan-out" : "seq-fan-card"} style={{ ["--i" as string]: leaving ? list.length - 1 - i : i, ["--n" as string]: i + 1 }}>
+          <span className="mb-1 block pl-3 text-[11.5px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+            {i === 0 ? "Next" : "Then"}
+          </span>
+          <TaskRow task={t} theme={theme} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * Schedule… from a quest's menu (owner, Nov 10): a floating window you can move or minimize, with the
+ * day and the quest as a card you place on it (a red line marks where it starts) and ✨ Auto-schedule.
+ */
+function ScheduleWindow({ task, theme, onClose }: { task: Task; theme: "calm" | "adventure"; onClose: () => void }) {
+  const [minimized, setMinimized] = useState(false);
+  return createPortal(
+    <FloatingWindow storageKey="schedule-window-at" width={420} z={72} minimized={minimized} onRestore={() => setMinimized(false)} label="Open the scheduler (drag to move)" at={() => ({ x: Math.max(8, (window.innerWidth - 420) / 2), y: Math.min(90, window.innerHeight * 0.1) })} chip={<>📅 Schedule</>}>
+      <div role="dialog" aria-label={`Schedule ${task.title}`} className="card-pop-in parchment parchment-framed relative flex max-h-[calc(100dvh-100px)] w-full flex-col overflow-y-auto rounded-2xl p-1" style={{ boxShadow: "0 18px 44px rgba(0,0,0,.45)" }}>
+        <div data-drag-handle className="flex cursor-grab touch-none select-none items-center gap-1 px-3 pt-2 active:cursor-grabbing" title="Drag to move">
+          <span className="text-[12px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+            Drag here to move
+          </span>
+          <span className="flex-1" />
+          <button type="button" onClick={() => setMinimized(true)} aria-label="Minimize" title="Minimize to a button you can move" className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+            –
+          </button>
+        </div>
+        <TaskScheduleControl task={task} theme={theme} startOpen onDone={onClose} />
+      </div>
+    </FloatingWindow>,
+    document.body
   );
 }

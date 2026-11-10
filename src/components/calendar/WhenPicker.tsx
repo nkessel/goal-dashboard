@@ -135,8 +135,28 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
     return i === 0 ? "Today" : i === 1 ? "Tmrw" : d.toLocaleDateString(undefined, { weekday: "short" });
   };
 
+  const dayChipOf = (ms: number) => dayChip(Math.round((dayStartOf(new Date(ms)).getTime() - today.getTime()) / 86_400_000));
+  // Drag the quest's card along the day; a red line marks where it starts (owner, Nov 10).
+  const dragging = useRef(false);
+  const placeAt = (el: HTMLElement, clientY: number, grabOffset = 0) => {
+    const r = el.getBoundingClientRect();
+    let at = t0 + Math.round((clientY - r.top - grabOffset) / PX15) * 900_000;
+    at = Math.max(t0, Math.min(t1 - len, at));
+    setPick(at);
+  };
+  const grab = useRef(0);
+
   return (
     <div className="flex flex-col gap-2">
+      {/* ✨ Auto-schedule: straight into the first free spot (owner, Nov 10: it lives in this window). */}
+      {suggestions.length > 0 && (
+        <button type="button" disabled={placing} onClick={() => onPick({ start: new Date(suggestions[0]).toISOString(), end: new Date(suggestions[0] + len).toISOString() })} className="flex h-9 items-center justify-center gap-1.5 self-start rounded-full px-4 text-[13.5px] font-bold disabled:opacity-50" style={{ background: gold, border: "1.5px solid #4a3913", color: "#2a1c10" }} title={`Put it in the first free spot: ${dayChipOf(suggestions[0])} ${hm(suggestions[0])}`}>
+          ✨ Auto-schedule
+          <span className="font-semibold" style={{ opacity: 0.75 }}>
+            · {dayChipOf(suggestions[0])} {hm(suggestions[0])}
+          </span>
+        </button>
+      )}
       {/* First free spots, one tap each. */}
       {suggestions.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -169,7 +189,22 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
             Opening your day…
           </p>
         ) : (
-          <div className="relative cursor-pointer select-none" style={{ height }} onClick={tapAt} aria-label={`Your ${dayChip(dayIdx)}: tap a time to put "${title}" there`}>
+          <div
+            className="relative cursor-pointer touch-pan-y select-none"
+            style={{ height }}
+            onClick={(e) => !dragging.current && tapAt(e)}
+            onPointerDown={(e) => {
+              const block = (e.target as HTMLElement).closest("[data-when-block]");
+              if (!block) return;
+              dragging.current = true;
+              grab.current = e.clientY - block.getBoundingClientRect().top;
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => dragging.current && placeAt(e.currentTarget, e.clientY, grab.current)}
+            onPointerUp={() => window.setTimeout(() => (dragging.current = false), 0)}
+            onPointerCancel={() => (dragging.current = false)}
+            aria-label={`Your ${dayChip(dayIdx)}: tap a time or drag the card to put "${title}" there`}
+          >
             {hours.map((m) => (
               <div key={m} className="pointer-events-none absolute inset-x-0 flex items-start" style={{ top: ((m - range.from) / 15) * PX15 }}>
                 <span className="w-10 shrink-0 -translate-y-[7px] pr-1 text-right text-[10.5px] tabular-nums" style={{ color: soft }}>
@@ -191,11 +226,20 @@ export function WhenPicker({ minutes, title, isAdventure, initial, placing, onPi
               </div>
             ))}
             {pick !== null && pick >= t0 && pick < t1 && (
-              <div className="reveal pointer-events-none absolute left-11 right-1 z-[1] flex items-center overflow-hidden rounded-md px-2 text-[12px] font-bold" style={{ top: yOf(pick), height: Math.max(14, yOf(pick + len) - yOf(pick)), background: gold, border: `1.5px solid ${clash ? "#a3412a" : "#4a3913"}`, color: "#2a1c10", boxShadow: "0 2px 6px rgba(0,0,0,.25)" }}>
-                <span className="truncate">
-                  {hm(pick)}–{hm(pick + len)} · {title}
-                </span>
-              </div>
+              <>
+                {/* Where it goes: a red line across the day at its start, with the time. */}
+                <div aria-hidden className="pointer-events-none absolute left-0 right-0 z-[2] flex items-center" style={{ top: yOf(pick) - 1, transition: "top 120ms ease" }}>
+                  <span className="rounded-sm px-1 text-[10.5px] font-bold tabular-nums leading-[14px]" style={{ background: "#c0392b", color: "#fff" }}>
+                    {hm(pick)}
+                  </span>
+                  <span className="h-[2px] flex-1" style={{ background: "#c0392b", boxShadow: "0 0 4px rgba(192,57,43,.5)" }} />
+                </div>
+                <div data-when-block className="reveal absolute left-14 right-1 z-[1] flex cursor-grab touch-none items-center overflow-hidden rounded-md px-2 text-[12px] font-bold active:cursor-grabbing" title="Drag to move it" style={{ top: yOf(pick) + 1, height: Math.max(14, yOf(pick + len) - yOf(pick) - 1), background: gold, border: `1.5px solid ${clash ? "#a3412a" : "#4a3913"}`, color: "#2a1c10", boxShadow: "0 4px 12px rgba(0,0,0,.3)", transition: "top 120ms ease" }}>
+                  <span className="truncate">
+                    {hm(pick)}–{hm(pick + len)} · {title}
+                  </span>
+                </div>
+              </>
             )}
           </div>
         )}

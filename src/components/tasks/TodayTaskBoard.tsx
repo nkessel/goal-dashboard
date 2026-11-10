@@ -1,6 +1,7 @@
 "use client";
 
-import { MagicCalendarIcon } from "@/components/ui/Icons";
+import { MagicCalendarIcon, PrioritizeIcon } from "@/components/ui/Icons";
+import { PrioritizeTool } from "@/components/tasks/PrioritizeTool";
 import { openPlanMyDay } from "@/components/calendar/PlanMyDay";
 import { useCallback, useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -402,6 +403,7 @@ export function TodayTaskBoard({
   // A quick move from a card's menu: drop the local copy on the next fresh props.
   const [softLocal, setSoftLocal] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [prioritizing, setPrioritizing] = useState(false);
   // A short note after a quick move (e.g. a snooze), with Undo.
   const [notice, setNotice] = useState<{ id: number; text: string; undo?: () => Promise<void> } | null>(null);
   const [, startTransition] = useTransition();
@@ -639,6 +641,9 @@ export function TodayTaskBoard({
                 </span>
                 {/* Plan my day and a new quest straight into Today's Quests: on hover (always while the section is open on touch screens). */}
                 <span className="today-head-actions absolute right-0.5 top-1/2 flex -translate-y-1/2 items-center gap-1.5" data-open={todayOpen ? "true" : "false"}>
+                  <button type="button" onClick={() => setPrioritizing(true)} aria-label="Prioritize today" title="Prioritize today: cards or a list" className="today-head-btn flex h-8 w-8 items-center justify-center rounded-full">
+                    <PrioritizeIcon size={15} />
+                  </button>
                   <button type="button" onClick={openPlanMyDay} aria-label="Plan my day" title="Plan my day: find today's quests a time" className="today-head-btn flex h-8 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold">
                     <MagicCalendarIcon size={15} />
                     <span className="hidden sm:inline">Plan my day</span>
@@ -651,6 +656,7 @@ export function TodayTaskBoard({
                 </span>
                 </div>
                 <FocusQuestions open={focusOpen} />
+                {prioritizing && <PrioritizeTool day="today" theme={theme} onClose={() => setPrioritizing(false)} />}
                 {adding && <CreateSheet kinds={["quest"]} initial="quest" pinToToday theme={theme} onClose={() => setAdding(false)} />}
 
                 {dragError && (

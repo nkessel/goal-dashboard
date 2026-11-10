@@ -33,6 +33,9 @@ const MODE_EXAMPLES: Record<ToucanMode, string> = {
  * the "Talk with me" look and a flourish that replays whenever `play` changes.
  */
 export function ToucanPreview({ text, talk, flourish, play = 0 }: { text: string; talk?: TalkLook; flourish?: Flourish; play?: number }) {
+  // The bubble wears the look chosen under "His bubble's look" (it was always the glow).
+  const { look } = useBubbleStyle();
+  const paint = BUBBLE_PAINT[look === "parchment" ? "parchment" : "spirit"];
   return (
     <div className="flex items-end gap-2.5 rounded-2xl p-3" style={{ background: "linear-gradient(180deg, #17302c, #0d1f1d)", border: "1px solid rgba(140,240,220,.3)" }} aria-live="polite">
       <div key={play} className={`shrink-0 ${play && flourish ? (flourishClass(flourish) ?? "") : ""}`}>
@@ -41,12 +44,12 @@ export function ToucanPreview({ text, talk, flourish, play = 0 }: { text: string
       <div
         key={text}
         className="owl-say relative mb-3 rounded-2xl rounded-bl-sm px-3 py-1.5 text-[13.5px] font-medium italic leading-snug"
-        style={{ background: "linear-gradient(180deg, rgba(14,38,40,.94), rgba(8,22,26,.96))", border: "1.5px solid rgba(140,240,220,.55)", color: "#e8fff8", boxShadow: "0 0 14px rgba(120,230,210,.25)" }}
+        style={paint.bubble}
       >
         {text}
         {talk === "words" && (
           <span className="mt-1.5 flex">
-            <span className="h-7 rounded-full px-2.5 text-[12px] font-bold not-italic leading-7" style={{ background: "rgba(140,240,220,.18)", border: "1px solid rgba(140,240,220,.6)" }}>
+            <span className="h-7 rounded-full px-2.5 text-[12px] font-bold not-italic leading-7" style={paint.btn}>
               Talk with me
             </span>
           </span>

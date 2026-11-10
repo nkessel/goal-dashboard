@@ -18,6 +18,8 @@ import { setTomorrowQueueAction } from "@/app/actions";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { QuestPickerSheet } from "@/components/tasks/QuestPickerSheet";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
+import { PrioritizeTool } from "@/components/tasks/PrioritizeTool";
+import { PrioritizeIcon } from "@/components/ui/Icons";
 
 type TaskWithCategory = Task & { categoryLabel?: string | null };
 
@@ -56,6 +58,7 @@ export function TomorrowQuests({
   const [confirmed, setConfirmed] = useState<number | null>(null);
   const [seen, setSeen] = useState(queued);
   const [picking, setPicking] = useState(false);
+  const [prioritizing, setPrioritizing] = useState(false);
   const [editing, setEditing] = useState<TaskWithCategory | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -152,12 +155,16 @@ export function TomorrowQuests({
           Today&apos;s quests, to choose from. Tick the ones for tomorrow.
         </p>
       )}
-      {ordered.length > 0 && (
+      {(
         <div className="flex items-center gap-2 px-1">
-          <button type="button" onClick={() => (setTicked(new Set(allOn ? [] : ordered)), setRowsLocal(ordered), setConfirmed(null))} className="h-9 rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1px solid rgba(168,138,63,.7)", color: ink }}>
-            {allOn ? "Clear all" : "Choose all"}
+          <button type="button" onClick={() => setPrioritizing(true)} aria-label="Prioritize tomorrow" title="Prioritize tomorrow: cards or a list" className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" style={{ border: "1px solid rgba(168,138,63,.7)", color: ink }}>
+            <PrioritizeIcon size={14} />
+            Prioritize
           </button>
-          <button
+          {ordered.length > 0 && <button type="button" onClick={() => (setTicked(new Set(allOn ? [] : ordered)), setRowsLocal(ordered), setConfirmed(null))} className="h-9 rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1px solid rgba(168,138,63,.7)", color: ink }}>
+            {allOn ? "Clear all" : "Choose all"}
+          </button>}
+          {ordered.length > 0 && <button
             type="button"
             onClick={confirm}
             disabled={count === 0}
@@ -165,7 +172,7 @@ export function TomorrowQuests({
             style={count === 0 ? { background: "rgba(200,200,200,.2)", color: "rgba(241,234,210,.6)", border: "1px solid rgba(200,200,200,.35)" } : { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10", boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
           >
             {confirmed !== null && confirmed === count ? `✓ ${count} for tomorrow` : `Confirm ${count} ${count === 1 ? "quest" : "quests"}`}
-          </button>
+          </button>}
         </div>
       )}
 
@@ -221,6 +228,7 @@ export function TomorrowQuests({
         />
       )}
       {editing && <EditTaskModal task={editing} theme={theme} onClose={() => setEditing(null)} />}
+      {prioritizing && <PrioritizeTool day="tomorrow" theme={theme} onClose={() => setPrioritizing(false)} />}
     </section>
   );
 }
