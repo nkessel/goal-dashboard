@@ -4,7 +4,29 @@
 
 - **Last updated:** 2026-11-10 (prioritize tool, Engage Quest, sequence fan-out; toucan bubble look and way are choices; welcome layout synced to the account, Dawn hide fixed, symmetric gear, toucan flaps when carried; Morning routine name; feedback button keeps its welcome spot; medication streak; loading looks rotate, fireflies + page turns + wise words; feedback button fixed size; + menu fades from its ×; avatar fallback; quest editor loads on demand; add-item sheet above the keyboard, painted-portrait retry, keyboard release safety net; tracked events, focusing questions, whole greeting editable, All Quests › List; button audit: every typed × is the centred `CloseIcon`; toucan respond field steady under the mouse; Snooze 1 hour / Tomorrow / Other; Move… on Today's quests; blank default portraits; no browser right-click menu; morning-routine options and three brainstorms sent to the owner, waiting on picks), `main` @ see `git log`. **Bigger asks that need a long, high-effort session are listed in `/mnt/project-files/ui-audit/high-effort-list.md` (Claude project files).** Next session: the rest of `docs/FEEDBACK-OPEN.md` › "Nov 4 notes", then "Nov 4 evening – Nov 5 notes".
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
-- **Pending in-app feedback:** ~86 notes (the app's count, Nov 2 afternoon; query in section 3; the owner's own notes also read at /journal › App feedback when no DB connector). Not marked shipped this push (no database access from that session). Confirm on the owner's iPhone: feedback box keyboard close (no jump), toucan hop-aside, + sheet with keyboard.
+- **Pending in-app feedback:** 277 unshipped notes since Oct 27 (query in section 3, Nov 11; many are already built but were never marked: when you build one, mark it). The Supabase connector was connected on Nov 10; if it's missing, ask the owner to connect it (claude.ai Settings › Connectors).
+
+---
+
+## 0. Start here: top dev priorities (owner, Nov 11: "save our top dev priorities to continue with another account")
+
+Take them in order. Each is the owner's own ask (note id prefix in brackets; read the full note with the section 3 query, `where id::text like 'xxxx%'`).
+
+1. **Bug: adding a quest in "Choose tomorrow's quests" clears the whole list** [2664d546], and the quest creator button there is faulty [234f0d70]. Loses work, so first. (`evening/TomorrowQuests.tsx`: local `ticked`/`rowsLocal` state is likely reset when `queued` changes after the add.)
+2. **Right-click menus open as popup menus, not inline trays** [841971c2] (app-wide; quest card ⋯ / right-click, habits, rites).
+3. **Today's "auto-scheduler"/calendar sheet** [a3fe0686]: movable, the calendars' colours as on the calendar screen, choose which calendars show.
+4. **Sleep check-in**: a sleep-notes field under the faces [d38e5f85]; its Save beside the Sleep quality button, not below [1416c34f].
+5. **Feedback tool**: show the current draft above past feedback, more distinct (on-theme) bubbles for past notes [2cf6858f]; "Cancel" instead of "Keep it as it was" when editing a past note [a5453c54].
+6. **Insights**: a log of today's check-ins with a range drop-down for longer; gears fixed (shape and place: the check-in section's gear vs the Insights page's gear) [388c0f4e]; sleep/wake times and notes on the chart [10a509a0, f3cca214]; thumbs-up a check-in [a4df137c]; the Wheel of Time spun by dragging, no turn count [bb5ca474].
+7. **Toucan Spirit settings** sit with the cage icon [89fd58c4].
+8. **Evening: edit things in Celebrate today's wins** [ef01814f].
+9. **Anti-habits / streaks** (Nov 9 notes): log without saying "slip", show them more like habits [b07ee9eb]; edit the habits shown in Streaks [3d5ccb0e]; add one in the past simply [2388f419]; tracked-event options shown [57384f3c].
+10. **Smaller Nov 9 notes**: archive asks Fail / Archive (default) / Delete [441501e4]; "Remove from Additional Quests" → Move [2dc2a33d]; move icon = folder [457bea7b]; hold a Due soon quest for its menu [144dcaa0]; less space between Due soon and Habits [6a5acc13]; the auto-schedule button movable [3cec60a1]; journal prompts: drop "Last night's dream", add a custom one, hold to delete [64a404e0]; can't remove all stones [5cd3e891]; "+25" should say XP [89c05f2c]; remove a party member [d9a74c0f]; party: XP confirmation after the emotional check-in [b5b83086]; welcome minus button tilts [d454f537]; swipe left shows only snooze [839ff5d5]; smoother quest reordering [14b894f7].
+11. **Brainstorm, report back first (don't build):** character info at the top of Settings and a character screen [98a2c58f].
+12. **Ask the owner before doing anything:** the email to Daniel about his Champion title [13b4b2d4] (sending a message on his behalf needs his OK and wording).
+13. Then `docs/FEEDBACK-OPEN.md` and `docs/REPEAT-ASKS.md`, and section 1 below.
+
+**Needs a real-iPhone look (from Nov 10):** prioritize cards' swipe, the Schedule… window's card drag, sequence fan-out, the welcome feedback button drag, Morning routine title rename.
 
 ---
 
