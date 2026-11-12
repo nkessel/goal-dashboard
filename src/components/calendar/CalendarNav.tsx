@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { useLayoutEffect, useRef } from "react";
 
 /** The direction the next calendar change should slide (set just before navigating). */
-let nextDir: "left" | "right" | "fade" | null = null;
+let nextDir: "left" | "right" | "fade" | "still" | null = null;
+
+/** The next calendar change keeps the picture as it is (the days already moved on screen: a scroll or a zoom). */
+export function holdStill() {
+  nextDir = "still";
+}
 
 /**
  * Keep a picture of what's showing now, so it can slide away while the new
@@ -69,6 +74,7 @@ export function CalendarSlide({ slideKey, children }: { slideKey: string; childr
     if (!box) return;
     const dir = nextDir ?? "fade";
     nextDir = null;
+    if (dir === "still") return;
     const page = box.querySelector<HTMLElement>(":scope > [data-cal-page]");
     const ghost = box.querySelector<HTMLElement>(":scope > [data-cal-ghost]");
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

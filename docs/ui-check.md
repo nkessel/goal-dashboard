@@ -8,6 +8,8 @@ npm run ui-check -- --no-build                     # reuse the last ui-check bui
 npm run ui-check -- --no-build --only evening,today --devices phone --times evening
 ```
 
+Devices: `phone` (390px) and `tablet` (820px) by default; `desktop` (1440×900, mouse, no touch) on request, e.g. `--devices phone,tablet,desktop` for anything that changes the calendar's close-ups or other wide-screen layouts. On a 2–4 GB machine the build needs `NODE_OPTIONS=--max-old-space-size=6144`.
+
 Then read `ui-check-out/report.md` (git-ignored). Every step has a screenshot in `ui-check-out/shots/`, with the problems boxed: red = error, orange = warning. A step whose page had to be scrolled to the bottom to show a problem gets a second `…-bottom.png`.
 
 Exit code 1 means there are errors not in `scripts/ui-check/known-issues.json`.

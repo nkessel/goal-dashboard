@@ -43,7 +43,10 @@ export function GoogleEventChip({
   compact = false,
   timeLabel,
   oneLine = false,
+  scale = 1,
 }: {
+  /** Bigger words on a roomy card (a close-up on a big screen). */
+  scale?: number;
   event: GoogleCalendarEvent;
   theme?: "calm" | "adventure";
   compact?: boolean;
@@ -208,8 +211,8 @@ export function GoogleEventChip({
         </div>
         <div className="min-w-0 flex-1">
           <p
-            className={oneLine ? "truncate leading-tight" : compact ? "line-clamp-2 leading-[1.15] [overflow-wrap:normal] [word-break:normal]" : "truncate leading-tight"}
-            style={{ color: isAdventure ? "#22374a" : "var(--t-ink)", fontSize: compact ? 11.5 : 13.5, fontWeight: 500 }}
+            className={oneLine ? "truncate leading-tight" : compact ? `${scale > 1.15 ? "line-clamp-3" : "line-clamp-2"} leading-[1.15] [overflow-wrap:normal] [word-break:normal]` : "truncate leading-tight"}
+            style={{ color: isAdventure ? "#22374a" : "var(--t-ink)", fontSize: (compact ? 11.5 : 13.5) * scale, fontWeight: 500 }}
           >
             {oneLine && timeLabel ? (
               <>
@@ -221,7 +224,7 @@ export function GoogleEventChip({
             )}
           </p>
           {timeLabel && !oneLine && (
-            <p className="truncate leading-tight" style={{ color: isAdventure ? "#22374a" : "var(--t-ink-soft)", fontSize: 10.5, opacity: 0.8 }}>
+            <p className="truncate leading-tight" style={{ color: isAdventure ? "#22374a" : "var(--t-ink-soft)", fontSize: 10.5 * (1 + (scale - 1) * 0.6), opacity: 0.8 }}>
               {timeLabel}
             </p>
           )}

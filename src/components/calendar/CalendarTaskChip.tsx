@@ -19,6 +19,11 @@ import type { CardShow } from "./CalendarLayers";
 import { getTaskDisplayWindow } from "@/lib/calendar-task-window";
 export { getTaskDisplayWindow };
 
+/** How much a calendar card's words can grow: 1 for an ordinary card, up to 1.55 with room to spare (wide and tall). */
+export function roomyScale(w: number, h: number): number {
+  return Math.max(1, Math.min(1.55, Math.min(w / 170, h / 48)));
+}
+
 export function CalendarTaskChip({
   task,
   theme = "calm",
@@ -137,6 +142,8 @@ export function CalendarTaskChip({
   // Portrait cards need a little height; very short slots fall back to a line.
   const tall = portrait && !oneLine;
   const iconSize = tall ? 46 : compact ? 18 : isAdventure ? 32 : 28;
+  // Roomy cards (a close-up on a big screen) get bigger words.
+  const big = box && !oneLine ? roomyScale(box.w, box.h) : 1;
 
   return (
     <>
@@ -184,7 +191,7 @@ export function CalendarTaskChip({
           className={tall ? "line-clamp-3 leading-[1.15]" : oneLine ? "truncate leading-tight" : compact ? "line-clamp-2 leading-[1.15] [overflow-wrap:normal] [word-break:normal]" : "truncate leading-tight"}
           style={{
             color: "var(--t-ink)",
-            fontSize: compact ? 11.5 : 13.5,
+            fontSize: (compact ? 11.5 : 13.5) * big,
             fontWeight: 600,
             textDecoration: isCompleted && !isAdventure ? "line-through" : undefined,
           }}
@@ -198,9 +205,9 @@ export function CalendarTaskChip({
             task.title
           )}
         </p>
-        {!oneLine && (show.xp || show.coins) && <Pays xp={show.xp ? task.xp_value : 0} coins={show.coins ? (task.coin_value ?? coinsForXp(task.xp_value)) : 0} done={isCompleted} center={tall} />}
+        {!oneLine && (show.xp || show.coins) && <Pays xp={show.xp ? task.xp_value : 0} coins={show.coins ? (task.coin_value ?? coinsForXp(task.xp_value)) : 0} done={isCompleted} center={tall} px={10.5 * (1 + (big - 1) * 0.6)} />}
         {show.time && timeLabel && !oneLine && !tall && (
-          <p className="truncate leading-tight" style={{ color: "var(--t-ink-soft)", fontSize: 10.5 }}>
+          <p className="truncate leading-tight" style={{ color: "var(--t-ink-soft)", fontSize: 10.5 * (1 + (big - 1) * 0.6) }}>
             {timeLabel}
           </p>
         )}
@@ -285,25 +292,30 @@ function QuestCard({
   const pays = (show.xp && xpN > 0) || (show.coins && coinN > 0);
   // Narrow and tall enough: the creature stands above the title; a narrow one-hour card puts it beside, like the mockup.
   const stack = !line && (portrait || w < 130) && h >= 66;
-  const titlePx = w < 52 ? 11 : w < 110 ? (stack ? 12.5 : 11.5) : 14;
+  // With room to spare (a close-up on a big screen), the words and the creature grow with the card (owner, Nov 12:
+  // "the text of a quest should show larger when there's extra space"); the small print grows a little less.
+  const big = line ? 1 : roomyScale(w, h);
+  const smallPx = 10.5 * (1 + (big - 1) * 0.6);
+  const titlePx = (w < 52 ? 11 : w < 110 ? (stack ? 12.5 : 11.5) : 14) * big;
   // Stacked, the creature and the title share the height: the creature gets what the title (at least one line) leaves,
   // so even a narrow one-hour card keeps its creature, like a card in a storybook (owner's mockup, Nov 3).
   const lineH = titlePx * 1.12;
   const wantLines = Math.min(3, Math.max(1, Math.ceil((task.title.length * titlePx * 0.5) / Math.max(1, w - 8))));
-  const stackArt = (keep: number) => Math.max(0, Math.min(w - 10, h - 12 - Math.ceil(lineH * keep), 64));
+  const stackArt = (keep: number) => Math.max(0, Math.min(w - 10, h - 12 - Math.ceil(lineH * keep), 64 * big));
   const artPx = line
     ? Math.max(0, Math.min(h - 6, 22))
     : stack
       ? stackArt(wantLines) >= 30 ? stackArt(wantLines) : stackArt(Math.min(wantLines, 2)) >= 18 ? stackArt(Math.min(wantLines, 2)) : stackArt(1)
-      : Math.max(0, Math.min(h - 10, h >= 80 ? 64 : 52, w < 130 ? w * 0.3 : w * 0.38));
+      : Math.max(0, Math.min(h - 10, (h >= 80 ? 64 : 52) * big, w < 130 ? w * 0.3 : w * 0.38));
   const showArt = show.art && artPx >= 16;
-  const sealPx = Math.min(artPx, stack ? 24 : 26);
+  const sealPx = Math.min(artPx, (stack ? 24 : 26) * big);
+  const smallLine = Math.round(smallPx * 1.3);
   const doneNote = done && !line && h >= (stack ? 64 : 44);
   const payLine = pays && !line && h >= (stack ? 60 : 40);
   const payInline = pays && line && w >= 120;
-  const agendaRows = !done && !line && !stack && agenda.length ? Math.max(0, Math.min(agenda.length, 3, Math.floor((h - 8 - (payLine ? 14 : 0) - titlePx * 1.12 - 14) / 13))) : 0;
+  const agendaRows = !done && !line && !stack && agenda.length ? Math.max(0, Math.min(agenda.length, 3, Math.floor((h - 8 - (payLine ? smallLine : 0) - titlePx * 1.12 - smallLine) / smallLine))) : 0;
   const agendaBadge = !done && agenda.length > 0 && agendaRows === 0 && !line;
-  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? 13 : 0) - (payLine ? 14 : 0) - (agendaRows ? agendaRows * 13 + 13 : 0)) / (titlePx * 1.12)));
+  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? smallLine : 0) - (payLine ? smallLine : 0) - (agendaRows ? agendaRows * smallLine + smallLine : 0)) / (titlePx * 1.12)));
 
   return (
     <button
@@ -377,14 +389,14 @@ function QuestCard({
           {task.title}
         </span>
         {doneNote && (
-          <span className="block truncate" style={{ color: "#4e6a35", fontSize: 10.5, fontStyle: "italic", lineHeight: 1.2 }}>
+          <span className="block truncate" style={{ color: "#4e6a35", fontSize: smallPx, fontStyle: "italic", lineHeight: 1.2 }}>
             {/* When it was done (owner, Nov 5: "show when I completed quests in the past days"). */}
             {task.completed_at ? `Done ${new Date(task.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase() + "m")}` : "Completed"}
           </span>
         )}
-        {payLine && <Pays xp={show.xp ? xpN : 0} coins={show.coins ? coinN : 0} done={done} center={stack} />}
+        {payLine && <Pays xp={show.xp ? xpN : 0} coins={show.coins ? coinN : 0} done={done} center={stack} px={smallPx} />}
         {agendaRows > 0 && (
-          <span className="mt-0.5 block" style={{ fontSize: 10.5, lineHeight: "13px", color: "#5b4520" }}>
+          <span className="mt-0.5 block" style={{ fontSize: smallPx, lineHeight: `${smallLine}px`, color: "#5b4520" }}>
             <span className="block font-semibold" style={{ color: "#7a5a1c" }}>Agenda</span>
             {agenda.slice(0, agendaRows).map((a, i) => (
               <span key={a.id} className="block truncate">
@@ -399,7 +411,7 @@ function QuestCard({
           </span>
         )}
         {show.time && !done && !stack && !line && timeLabel && h >= (payLine ? 66 : 52) && w >= 110 && (
-          <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
+          <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: smallPx, lineHeight: 1.2 }}>
             {timeLabel}
           </span>
         )}
@@ -410,16 +422,16 @@ function QuestCard({
 }
 
 /** What a quest pays, on its calendar card: "+20 XP · 1 🪙" (done: what it paid, in green). */
-function Pays({ xp, coins, done, center = false }: { xp: number; coins: number; done: boolean; center?: boolean }) {
+function Pays({ xp, coins, done, center = false, px = 10.5 }: { xp: number; coins: number; done: boolean; center?: boolean; px?: number }) {
   if (!xp && !coins) return null;
   return (
-    <span className={`flex shrink-0 items-center gap-1 whitespace-nowrap tabular-nums ${center ? "justify-center" : ""}`} style={{ fontSize: 10.5, lineHeight: "14px", fontWeight: 700, color: done ? "#4e6a35" : "#7a5a1c" }}>
+    <span className={`flex shrink-0 items-center gap-1 whitespace-nowrap tabular-nums ${center ? "justify-center" : ""}`} style={{ fontSize: px, lineHeight: `${Math.round(px * 1.33)}px`, fontWeight: 700, color: done ? "#4e6a35" : "#7a5a1c" }}>
       {xp > 0 && <span>+{xp} XP</span>}
       {xp > 0 && coins > 0 && <span aria-hidden style={{ opacity: 0.5 }}>·</span>}
       {coins > 0 && (
         <span className="flex items-center gap-0.5">
           {coins}
-          <CoinIcon size={11} />
+          <CoinIcon size={Math.round(px + 0.5)} />
         </span>
       )}
     </span>

@@ -727,6 +727,32 @@ export const FLOWS = [
       await h.page.evaluate(() => document.querySelector(".cal-days-scroll")?.scrollBy({ left: 130 })).catch(() => {});
       await h.settle(900);
       await h.check("week: scrolled partway");
+      // The days' zoom (owner, Nov 5 and 12: "a slider from 1-14 days… partial days… super smooth"): slide to about
+      // 2½ days (close up, bigger words on the cards), let it settle and load, then glide out a day with the magnifier.
+      {
+        const zoom = h.page.locator("[data-days-zoom] input[type=range]").first();
+        if (await zoom.count()) {
+          await zoom.evaluate((el) => {
+            const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+            set.call(el, String(Math.round((Math.log(2.5) / Math.log(14)) * 1000)));
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+          });
+          await h.settle(1800);
+          await h.check("week: zoomed to 2½ days");
+          const words = await h.page.locator("[data-days-zoom]").first().innerText().catch(() => "");
+          if (!/2½ days/.test(words)) h.record({ kind: "zoom", severity: "error", target: "days zoom", detail: `The slider reads "${words}" after sliding to 2½ days` });
+          await h.tap((p) => p.getByRole("button", { name: /^more days/i }).first(), "zoom out a day", { optional: true });
+          await h.settle(1500);
+          await h.check("week: zoomed out a day");
+          // Back to the week for the steps that follow.
+          await zoom.evaluate((el) => {
+            const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+            set.call(el, String(Math.round((Math.log(7) / Math.log(14)) * 1000)));
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+          });
+          await h.settle(1500);
+        } else h.record({ kind: "zoom", severity: "error", target: "days zoom", detail: "No days zoom slider on the week view" });
+      }
       await h.goto("/calendar?view=day", { name: "calendar" });
       await h.settle(1200);
       await h.page.locator("[title^='Edit \"Goblin']").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});

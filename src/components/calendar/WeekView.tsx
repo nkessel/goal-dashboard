@@ -23,7 +23,8 @@ import {
 } from "@/lib/calendar-dates";
 import { CalendarAddPopup } from "./CalendarAddPopup";
 import { CalendarItemMenu, type MenuTarget } from "./CalendarItemMenu";
-import { CalendarTaskChip, getTaskDisplayWindow } from "./CalendarTaskChip";
+import { CalendarTaskChip, getTaskDisplayWindow, roomyScale } from "./CalendarTaskChip";
+import { holdStill } from "./CalendarNav";
 import { sessionRef, showsOnCalendar } from "@/lib/calendar-task-window";
 import type { CardShow } from "./CalendarLayers";
 import { GoogleEventChip } from "./GoogleEventChip";
@@ -48,6 +49,14 @@ const ADVENTURE_HOUR_PX = 56;
 const MIN_HOUR_PX = 18;
 const MAX_HOUR_PX = 96;
 const ZOOM_KEY = "calendar-hour-px";
+/** How many days the zoom slider shows (partway too), remembered on this device. */
+const SPAN_KEY = "calendar-day-span";
+const MAX_SPAN = 14;
+/** "3 days", "2½ days". */
+function spanWords(s: number): string {
+  const r = Math.round(s * 2) / 2;
+  return `${Math.floor(r)}${r % 1 ? "½" : ""} day${r === 1 ? "" : "s"}`;
+}
 
 /** The current minute, ticking once a minute (0 on the server, so nothing time-dependent renders there). */
 export function useNowMinute() {
@@ -180,6 +189,25 @@ export function WeekView({
   const vis = Math.max(1, Math.min(days.length, visible ?? days.length));
   const seamless = buffer > 0 && days.length > vis;
   const single = vis === 1;
+  // How many days fit on screen, partway too: the zoom slider over the days, or a sideways pinch (owner, Nov 5 and 12:
+  // "a slider from 1-14 days… allow partial days to show… super smooth").
+  const [span, setSpan] = useState<number | null>(null);
+  useEffect(() => {
+    if (!seamless) return;
+    let s: number | null = null;
+    try {
+      const v = Number(window.localStorage.getItem(SPAN_KEY));
+      if (v >= 1 && v <= MAX_SPAN && Math.max(1, Math.ceil(v - 0.01)) === vis) s = v;
+    } catch {
+      /* storage unavailable */
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+    setSpan(s);
+  }, [vis, seamless]);
+  const shown = seamless ? Math.max(1, Math.min(MAX_SPAN, days.length - 1, span ?? vis)) : vis;
+  /** While zooming: which day (and how far into it) stays under the slider's middle or the pointer. */
+  const zoomAnchor = useRef<{ d: number; off: number } | null>(null);
+  const zoomAnim = useRef(0);
   const timeBg = isAdventure ? TIME_BG : "var(--t-card)";
   const nowMinute = useNowMinute();
   const now = nowMinute ? new Date(nowMinute * 60_000) : null;
@@ -280,38 +308,6 @@ export function WeekView({
   useEffect(() => {
     pxNow.current = hourPx;
   }, [hourPx]);
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    let start: { d: number; px: number } | null = null;
-    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-    const onStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) start = { d: dist(e.touches), px: pxNow.current };
-    };
-    const onMove = (e: TouchEvent) => {
-      if (!start || e.touches.length !== 2) return;
-      e.preventDefault();
-      zoomTo(start.px * (dist(e.touches) / start.d));
-    };
-    const onEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) start = null;
-    };
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey) return;
-      e.preventDefault();
-      zoomTo(pxNow.current * Math.exp(-e.deltaY * 0.01));
-    };
-    el.addEventListener("touchstart", onStart, { passive: true });
-    el.addEventListener("touchmove", onMove, { passive: false });
-    el.addEventListener("touchend", onEnd);
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => {
-      el.removeEventListener("touchstart", onStart);
-      el.removeEventListener("touchmove", onMove);
-      el.removeEventListener("touchend", onEnd);
-      el.removeEventListener("wheel", onWheel);
-    };
-  }, []);
   const scrollRef = useRef<HTMLDivElement>(null);
   const firstHourRef = useRef<HTMLDivElement>(null);
   // Where the hours start under the day headers (the time column above the strip lines up with it).
@@ -372,12 +368,12 @@ export function WeekView({
     const el = boxRef.current;
     if (!el) return;
     // Seamless: the days' room is the scroll strip's width less the time column and the gaps between days.
-    const measure = () => setColWidth(seamless && scrollRef.current ? (scrollRef.current.clientWidth - 40 - 2 * vis) / vis : (el.clientWidth - 20 - 40) / vis);
+    const measure = () => setColWidth(seamless && scrollRef.current ? (scrollRef.current.clientWidth - 40 - 2 * shown) / shown : (el.clientWidth - 20 - 40) / vis);
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [vis, seamless]);
+  }, [vis, shown, seamless]);
 
   // Seamless days: the grid scrolls sideways under a fixed time column, stopping wherever you leave it (part of a
   // day too). Past a few days from the middle, the window of loaded days moves along and the spot is kept.
@@ -386,17 +382,18 @@ export function WeekView({
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!seamless || !el || colWidth <= 0) return;
+    // Zooming: the day under the slider's middle (or the pointer) stays where it is while the days widen or narrow.
+    const z = zoomAnchor.current;
     let frac = 0;
-    try {
+    if (!z) try {
       const saved = JSON.parse(window.sessionStorage.getItem("cal-scroll") ?? "null") as { key: string; frac: number } | null;
       if (saved && saved.key === dayKeys[buffer]) frac = saved.frac;
       window.sessionStorage.removeItem("cal-scroll");
     } catch {
       /* storage unavailable */
     }
-    el.scrollLeft = buffer * (colWidth + 2) + frac * (colWidth + 2);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the scroll spot is only known once laid out
-    setFirstIdx(buffer);
+    el.scrollTo({ left: z ? z.d * (colWidth + 2) - z.off : buffer * (colWidth + 2) + frac * (colWidth + 2), behavior: "instant" });
+    if (!z) setFirstIdx(buffer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the loaded days or the column size change
   }, [seamless, colWidth, dayKeys[0], buffer]);
   function onDaysScroll() {
@@ -406,6 +403,7 @@ export function WeekView({
     if (pinRowRef.current) pinRowRef.current.style.transform = `translateX(${-el.scrollLeft}px)`;
     setFirstIdx(Math.floor(at + 0.5));
     clearTimeout(scrollTimer.current);
+    if (zoomAnchor.current) return; // the zoom loads the days around it once it settles
     scrollTimer.current = setTimeout(() => {
       const idx = Math.floor(at);
       if (Math.abs(idx - buffer) < Math.ceil(buffer / 2)) return;
@@ -417,9 +415,117 @@ export function WeekView({
       } catch {
         /* storage unavailable */
       }
-      router.replace(vis === 1 ? `/calendar?view=day&date=${key}` : `/calendar?view=days&n=${vis}&date=${key}`, { scroll: false });
+      const n = Math.max(1, Math.ceil(shown - 0.01));
+      holdStill();
+      router.replace(vis === 1 && n === 1 ? `/calendar?view=day&date=${key}` : `/calendar?view=days&n=${n}&date=${key}`, { scroll: false });
     }, 260);
   }
+
+  // Zoom the days: wider or narrower, smoothly, partway too. The page loads the right days once it settles.
+  function zoomDays(next: number, off?: number) {
+    const el = scrollRef.current;
+    if (!seamless || !el || colWidth <= 0) return;
+    const s = Math.round(Math.max(1, Math.min(MAX_SPAN, days.length - 1, next)) * 100) / 100;
+    if (s === shown) return;
+    if (!zoomAnchor.current) {
+      const o = off ?? (el.clientWidth - 40) / 2;
+      zoomAnchor.current = { d: (el.scrollLeft + o) / (colWidth + 2), off: o };
+    }
+    setSpan(s);
+  }
+  /** Glide to a number of days (the − and + beside the slider). */
+  function zoomDaysTo(target: number) {
+    cancelAnimationFrame(zoomAnim.current);
+    const from = shown;
+    const t0 = performance.now();
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / 260);
+      zoomDays(from + (target - from) * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) zoomAnim.current = requestAnimationFrame(step);
+    };
+    zoomAnim.current = requestAnimationFrame(step);
+  }
+  const commitZoom = useEffectEvent(() => {
+    const el = scrollRef.current;
+    zoomAnchor.current = null;
+    if (!el || colWidth <= 0) return;
+    try {
+      window.localStorage.setItem(SPAN_KEY, String(shown));
+    } catch {
+      /* storage unavailable */
+    }
+    const n = Math.max(1, Math.ceil(shown - 0.01));
+    const at = el.scrollLeft / (colWidth + 2);
+    const idx = Math.max(0, Math.floor(at));
+    if (n === vis && Math.abs(idx - buffer) < Math.ceil(buffer / 2)) return;
+    const key = dayKeys[idx];
+    if (!key) return;
+    try {
+      window.sessionStorage.setItem("cal-scroll", JSON.stringify({ key, frac: at - idx }));
+    } catch {
+      /* storage unavailable */
+    }
+    holdStill();
+    router.replace(`/calendar?view=days&n=${n}&date=${key}`, { scroll: false });
+  });
+  useEffect(() => {
+    if (span == null || !zoomAnchor.current) return;
+    const t = setTimeout(() => commitZoom(), 650);
+    return () => clearTimeout(t);
+  }, [span]);
+  /** Ctrl + wheel (a trackpad pinch) over the day headings zooms the days; over the hours it zooms the hours. */
+  const onDayWheel = useEffectEvent((e: WheelEvent) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    cancelAnimationFrame(zoomAnim.current);
+    zoomDays(shown * Math.exp(e.deltaY * 0.01), Math.max(0, e.clientX - el.getBoundingClientRect().left - 40));
+  });
+  const onDayPinch = useEffectEvent((fromSpan: number, ratio: number, x: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    zoomDays(fromSpan * ratio, Math.max(0, x - el.getBoundingClientRect().left - 40));
+  });
+  const spanNow = useEffectEvent(() => shown);
+  // Pinch to zoom the hours (two fingers on a phone, or a trackpad pinch); spread side by side, the days.
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    // Fingers spread side by side zoom the days; one above the other zoom the hours.
+    let start: { d: number; px: number; days: boolean; span: number } | null = null;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      const dx = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+      const dy = Math.abs(e.touches[0].clientY - e.touches[1].clientY);
+      start = { d: dist(e.touches), px: pxNow.current, days: dx > dy * 1.4, span: spanNow() };
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!start || e.touches.length !== 2) return;
+      e.preventDefault();
+      if (start.days) onDayPinch(start.span, start.d / Math.max(1, dist(e.touches)), (e.touches[0].clientX + e.touches[1].clientX) / 2);
+      else zoomTo(start.px * (dist(e.touches) / start.d));
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) start = null;
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const hoursTop = firstHourRef.current?.getBoundingClientRect().top;
+      if (hoursTop != null && e.clientY < hoursTop) return onDayWheel(e);
+      zoomTo(pxNow.current * Math.exp(-e.deltaY * 0.01));
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("wheel", onWheel);
+    };
+  }, []);
 
   // Fluid days: drag the day headers sideways to move through days, or drag
   // the grip at their right end to make every day wider or narrower (more or
@@ -988,6 +1094,7 @@ export function WeekView({
         </div>
       )}
       <div className="mb-1.5 flex items-center gap-2 px-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+        <span className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
         {weather === undefined ? (
           <>
             <WeatherLocation />
@@ -999,6 +1106,8 @@ export function WeekView({
             <WeatherLocation label="change" />
           </>
         )}
+        </span>
+        {seamless && <DaysZoom span={shown} isAdventure={isAdventure} onChange={(s) => (cancelAnimationFrame(zoomAnim.current), zoomDays(s))} onStep={zoomDaysTo} />}
       </div>
       {/* The day headings, compressed, pinned at the top once the real ones scroll away (owner, Nov 12: "the same bar, just compressed"). */}
       <div aria-hidden={!pinShown} className="pointer-events-none sticky top-0 z-[33] h-0">
@@ -1068,7 +1177,7 @@ export function WeekView({
         <div />
         {/* The grip on the last day's edge: pull it in for narrower days (more of them), out for wider ones. */}
         <div className="pointer-events-none relative z-[3]" style={{ gridColumn: (seamless ? Math.min(days.length, firstIdx + vis) : days.length) + 1, gridRow: 1 }}>
-          <button
+          {!seamless && <button
             type="button"
             onPointerDown={startDayResize}
             aria-label="Drag to show more or fewer days"
@@ -1079,7 +1188,7 @@ export function WeekView({
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M8 7l-5 5 5 5M16 7l5 5-5 5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </button>
+          </button>}
           {fluid?.w && (
             <span className="pointer-events-none absolute right-0 top-0 z-[5] whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-bold" style={{ background: "#2a1c10", color: "#f6dc8e" }}>
               {fluid.n === 1 ? "1 day" : `${fluid.n} days`}
@@ -1303,7 +1412,7 @@ export function WeekView({
                     }}
                   >
                     {it.kind === "event" ? (
-                      <GoogleEventChip event={it.event} theme={theme} compact timeLabel={label} oneLine={oneLine} />
+                      <GoogleEventChip event={it.event} theme={theme} compact timeLabel={label} oneLine={oneLine} scale={colWidth > 0 && !oneLine ? roomyScale(cardW, height) : 1} />
                     ) : (
                       <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} show={card} box={colWidth > 0 ? { w: cardW, h: height } : undefined} />
                     )}
@@ -1338,6 +1447,48 @@ export function WeekView({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * The days' zoom: a gilded slider from 1 day to 14 (log scale, so the close-ups get the room), partway too,
+ * with a magnifier at each end that glides a day in or out.
+ */
+function DaysZoom({ span, isAdventure, onChange, onStep }: { span: number; isAdventure: boolean; onChange: (s: number) => void; onStep: (s: number) => void }) {
+  const LOG = Math.log(MAX_SPAN);
+  const v = Math.round((Math.log(span) / LOG) * 1000);
+  const btn = "flex h-7 w-7 shrink-0 items-center justify-center rounded-full";
+  const ink = isAdventure ? "#6b5531" : "var(--t-ink-soft)";
+  const glass = (plus: boolean) => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M15.5 15.5L20 20M7.5 10.5h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      {plus && <path d="M10.5 7.5v6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />}
+    </svg>
+  );
+  return (
+    <span data-days-zoom className="ml-auto flex shrink-0 items-center gap-1" style={{ color: ink }}>
+      <button type="button" className={btn} aria-label="Fewer days (closer)" title="Fewer days (closer)" onClick={() => onStep(Math.max(1, Math.ceil(span - 0.01) - 1))}>
+        {glass(true)}
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={1000}
+        step={1}
+        value={v}
+        aria-label="Days shown"
+        aria-valuetext={spanWords(span)}
+        title="Slide for more or fewer days"
+        onChange={(e) => onChange(Math.exp((Number(e.target.value) / 1000) * LOG))}
+        className="gilded-range w-24 sm:w-36 lg:w-48"
+        style={{ "--p": `${v / 10}%` } as React.CSSProperties}
+      />
+      <button type="button" className={btn} aria-label="More days (farther)" title="More days (farther)" onClick={() => onStep(Math.min(MAX_SPAN, Math.floor(span + 0.01) + 1))}>
+        {glass(false)}
+      </button>
+      <span className="w-[58px] text-right text-[12.5px] font-semibold tabular-nums">{spanWords(span)}</span>
+    </span>
   );
 }
 

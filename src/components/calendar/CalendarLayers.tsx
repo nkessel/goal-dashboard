@@ -3,7 +3,6 @@
 import { MagicCalendarIcon } from "@/components/ui/Icons";
 import { PaintTodayArt } from "./PaintTodayArt";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import type { GoogleCalendarEvent, GoogleCalendarInfo } from "@/lib/google-calendar";
 import { DayView } from "./DayView";
@@ -84,8 +83,6 @@ export function CalendarLayers({
   events,
   calendars,
   theme,
-  dateKey,
-  nDays,
   toSchedule = 0,
   daily,
   agenda = {},
@@ -100,7 +97,7 @@ export function CalendarLayers({
   /** Quests waiting on the scheduling list (the badge on its calendar button). */
   toSchedule?: number;
   dateKey: string;
-  /** Days on screen (1–7) for the slider. */
+  /** Days on screen (kept for callers; the zoom slider lives over the days). */
   nDays: number;
   view: "day" | "3day" | "days" | "week" | "next7" | "month";
   dayKeys: string[];
@@ -113,8 +110,6 @@ export function CalendarLayers({
 }) {
   const layers = useSyncExternalStore(subscribe, read, () => DEFAULTS);
   const [open, setOpen] = useState<"display" | "calendars" | "interest" | "friends" | null>(null);
-  const router = useRouter();
-  const [days, setDays] = useState(nDays);
   const panel = useRef<HTMLDivElement>(null);
   const isAdventure = theme === "adventure";
   useEffect(() => {
@@ -329,24 +324,6 @@ export function CalendarLayers({
             <p className="m-0 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
               Display
             </p>
-            {view !== "month" && (
-              <label className="flex flex-col gap-1 px-2 py-1.5 text-[14px]" style={{ color: "var(--t-ink)" }}>
-                <span className="flex justify-between">
-                  Days shown <b className="tabular-nums">{days}</b>
-                </span>
-                <input
-                  type="range"
-                  min={1}
-                  max={7}
-                  step={1}
-                  value={days}
-                  onChange={(e) => setDays(Number(e.target.value))}
-                  onPointerUp={() => days !== nDays && router.push(days === 1 ? `/calendar?view=day&date=${dateKey}` : `/calendar?view=days&n=${days}&date=${dateKey}`)}
-                  onKeyUp={() => days !== nDays && router.push(days === 1 ? `/calendar?view=day&date=${dateKey}` : `/calendar?view=days&n=${days}&date=${dateKey}`)}
-                  aria-label="Days shown"
-                />
-              </label>
-            )}
             {row("Quests as portrait cards", layers.portraits, () => set({ portraits: !layers.portraits }))}
             <CardShowPicker value={layers.card} onChange={(card) => set({ card })} />
             <PaintTodayArt />

@@ -53,6 +53,8 @@ const KB = 336; // iPhone keyboard height with the suggestion bar, in CSS px
 const DEVICES = {
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
   tablet: { viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 },
+  // A computer screen (owner, Nov 12: "close up desktop views"); not in the default run, ask for it with --devices desktop.
+  desktop: { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false, deviceScaleFactor: 1 },
 };
 const TIMES = { morning: 8.5, evening: 20.75 };
 const only = opt("only", "").split(",").filter(Boolean);
