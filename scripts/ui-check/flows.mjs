@@ -164,18 +164,20 @@ export const FLOWS = [
       await h.tap(/^check in/i, "open check-in", { expectMove: true });
       await h.check("check-in open");
       await esc(h);
+      // A quest card's board tag opens the board right there: what's on it, and "See quest in board" (owner, Nov 12).
+      if (await h.tap((p) => p.locator("[data-board-tag]:not([disabled])").first(), "card: board tag", { optional: true, expectMove: true })) {
+        await h.settle(700);
+        await h.check("quest card: board popover");
+        await esc(h);
+      }
       // Quest editor from the first quest card.
       if (await h.tap("text=Pick up medication", "open quest editor", { expectMove: true })) {
         await h.check("quest editor");
-        // The board label on the portrait folds open its card (owner, Nov 9: board idea A + D).
-        if (await h.tap((p) => p.getByTitle(/see it, move it/).first(), "editor: board card", { optional: true, expectMove: true })) {
+        // The board tag on the portrait opens the board picker under it (owner, Nov 12).
+        if (await h.tap((p) => p.locator("[role=dialog] [data-board-chip]").first(), "editor: board tag", { expectMove: true })) {
           await h.settle(500);
-          await h.check("quest editor: board card");
-          if (await h.tap((p) => p.getByRole("button", { name: /move to another board/i }).first(), "board card: move", { optional: true, expectMove: true })) {
-            await h.settle(500);
-            await h.check("quest editor: board card move");
-          }
-          await h.tap((p) => p.getByTitle(/see it, move it/).first(), "editor: board card shut", { optional: true, expectMove: true });
+          await h.check("quest editor: board picker");
+          await h.tap((p) => p.locator("[role=dialog] [data-board-chip]").first(), "editor: board picker shut", { optional: true, expectMove: true });
         }
         // The XP amount: no box; tapping it selects and pulses the number, with a gold bar for a cursor (owner, Nov 9).
         if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill", { optional: true, expectMove: true })) {
@@ -636,6 +638,14 @@ export const FLOWS = [
       await h.toggle(/last night/i, "last night", {});
       await h.tap(/did it/i, "ritual did it", { optional: true });
       await h.check("after ritual");
+      // The leaf button by the tracked events (owner, Nov 12): time wheels, now by default, then Log it.
+      if (await h.tap((p) => p.locator("[data-leaf-log]").first(), "leaf button", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("leaf: time wheels");
+        await h.tap((p) => p.getByRole("button", { name: /^log it$/i }).first(), "log it", { optional: true, expectMove: true });
+        await h.settle(700);
+        await h.check("leaf: logged");
+      }
     },
   },
   {

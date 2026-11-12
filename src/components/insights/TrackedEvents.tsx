@@ -5,9 +5,27 @@ import { deleteCheckNoteAction, saveTrackedEventsAction, trackedEventsAction } f
 import { saveOrQueue } from "@/lib/offline";
 import { Fold } from "@/components/ui/Fold";
 import { CloseIcon } from "@/components/ui/Icons";
+import { TimeWheels } from "@/components/ui/TimeWheels";
 
 const INK = "#3b2a14";
 const pill = { background: "rgba(233,212,154,.55)", border: "1px solid #a88a3f", color: "#2a1c10" } as const;
+
+const LEAF_EVENT = "🍃 Cannabis";
+
+function LeafIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+      <g fill="#f3ffe9" stroke="#1f4a1c" strokeWidth=".7" strokeLinejoin="round">
+        <path d="M12 2c1.5 3.2 1.6 7.6 0 12.2C10.4 9.600 10.5 5.2 12 2z" />
+        <path d="M4.300 6.300c3 1.300 5.600 4 7 8.200-3.700-1.300-6.300-4.200-7-8.200z" />
+        <path d="M19.700 6.300c-3 1.300-5.600 4-7 8.200 3.700-1.300 6.300-4.200 7-8.200z" />
+        <path d="M2.500 13.400c3-.5 6.200.300 9 2.200-3.300.9-6.600 0-9-2.200z" />
+        <path d="M21.500 13.400c-3-.5-6.200.300-9 2.200 3.300.9 6.600 0 9-2.200z" />
+      </g>
+      <path d="M12 14.500V22" stroke="#f3ffe9" strokeWidth="1.500" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 /**
  * Tracked events (owner, Nov 4: anti-habits as "events, but ones that I want to track, with timing recorded"):
@@ -28,10 +46,12 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
     setNames(next);
     saveTrackedEventsAction(next).catch(() => setSaid({ text: "That didn't save. Try again?" }));
   };
-  const log = async (name: string) => {
+  // The leaf button (owner, Nov 12): logs it at a time picked on wheels, now by default.
+  const [leaf, setLeaf] = useState<number | null>(null);
+  const log = async (name: string, when?: Date) => {
     // Stamped now, so it keeps its real time when it waits for a connection.
-    const out = await saveOrQueue("logEvent", { title: name, at: new Date().toISOString() }).catch((e) => ({ queued: false as const, result: { ok: false as const, error: e instanceof Error ? e.message : "Couldn't log that." } }));
-    const stamp = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const out = await saveOrQueue("logEvent", { title: name, at: (when ?? new Date()).toISOString() }).catch((e) => ({ queued: false as const, result: { ok: false as const, error: e instanceof Error ? e.message : "Couldn't log that." } }));
+    const stamp = (when ?? new Date()).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     if (out.queued) {
       setSaid({ text: `✓ ${name} · ${stamp} · kept here until you're online` });
       return;
@@ -55,6 +75,21 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          aria-expanded={leaf !== null}
+          aria-label="Log cannabis"
+          title="Log cannabis: pick the time, now by default"
+          onClick={() => {
+            const d = new Date();
+            setLeaf((v) => (v === null ? d.getHours() * 60 + d.getMinutes() : null));
+          }}
+          data-leaf-log
+          className="hover-glow flex h-8 w-8 items-center justify-center rounded-full"
+          style={{ background: "radial-gradient(circle at 35% 30%, #8fd17a, #3f8a3a 70%)", border: "1px solid #2c5f28", boxShadow: leaf !== null ? "0 0 0 2px rgba(63,138,58,.35)" : undefined }}
+        >
+          <LeafIcon />
+        </button>
         {(names ?? []).map((n) => (
           <button
             key={n}
@@ -99,6 +134,33 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
           />
         )}
       </div>
+      <Fold open={leaf !== null}>
+        <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+          <TimeWheels value={leaf ?? 0} onChange={setLeaf} />
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                const at = new Date();
+                const now = at.getHours() * 60 + at.getMinutes();
+                const m = leaf ?? now;
+                at.setHours(Math.floor(m / 60), m % 60, 0, 0);
+                // A time later than now means that time yesterday (nothing is logged in the future).
+                if (m > now + 1) at.setDate(at.getDate() - 1);
+                setLeaf(null);
+                void log(LEAF_EVENT, m === now ? undefined : at);
+              }}
+              className="h-9 rounded-full px-4 text-[13.5px] font-bold"
+              style={{ background: "linear-gradient(180deg,#8fd17a,#4f9a47)", border: "1px solid #2c5f28", color: "#10240e" }}
+            >
+              Log it
+            </button>
+            <button type="button" onClick={() => setLeaf(null)} className="h-7 text-[12.5px] underline underline-offset-2" style={{ color: "inherit", opacity: 0.8 }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Fold>
       <Fold open={!!removing}>
         <div className="flex items-center gap-2 text-[13px]" style={{ color: "inherit" }}>
           <span>Stop tracking “{removing}”? (what&apos;s logged stays)</span>

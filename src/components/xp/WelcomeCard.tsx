@@ -472,7 +472,7 @@ export function WelcomeCard({
   };
   const partXp = (k: PartKey) => Math.max(0, Math.min(50, btn[k]?.xp ?? 5));
   const [btnEdit, setBtnEdit] = useState<ButtonKey | null>(null);
-  // Swipe a part's button left to snooze it until tomorrow, right to hide it (owner, Nov 6). Snoozes live on this device.
+  // Swipe a part's folded button left for its Snooze button (till tomorrow; owner, Nov 6 and 12). Hiding is in its editor (hold it). Snoozes live on this device.
   const [snoozedParts, setSnoozedParts] = useState<string[]>(() => readSnoozedParts());
   const snoozePart = (el: WelcomeEl) => {
     const next = [...new Set([...snoozedParts, el])];
@@ -801,9 +801,10 @@ export function WelcomeCard({
                 {isButtonKey(el) ? (
                   <div className="w-full">
                     <SwipeActions
-                      startOn={(t) => !!(t as HTMLElement | null)?.closest?.("button[aria-expanded]")}
-                      left={{ label: "Hide", background: "linear-gradient(180deg,#6b5631,#4a3913)", color: "#f6e3a8", onAction: () => hidePart(el) }}
-                      right={{ label: "Snooze", icon: <SnoozeIcon />, background: "linear-gradient(180deg,#3a3f7a,#232655)", color: "#f2d27e", onAction: () => snoozePart(el) }}
+                      // Only a folded button slides, and only to its Snooze: a small icon button, no words, no swipe to hide (owner, Nov 12).
+                      compact
+                      startOn={(t) => !!(t as HTMLElement | null)?.closest?.("button[aria-expanded='false']")}
+                      right={{ label: "Snooze till tomorrow", icon: <SnoozeIcon />, background: "linear-gradient(180deg,#3a3f7a,#232655)", color: "#f2d27e", onAction: () => snoozePart(el) }}
                     >
                       {parts[el]}
                     </SwipeActions>

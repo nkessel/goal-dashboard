@@ -25,6 +25,7 @@ import { SnoozePicker, type SnoozeChoice } from "./SnoozePicker";
 import { QuestActionMenu, SnoozeGlyph, type QuestAction } from "./QuestActionMenu";
 import { SequenceDialog, SequenceStack, stackPad } from "./Sequence";
 import { StepsTray } from "./StepsTray";
+import { BoardCard } from "./BoardCard";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { celebrateQuest, updateQuestCelebration } from "@/components/celebration/QuestCelebrationHost";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
@@ -144,6 +145,7 @@ export function TaskRow({
   const rewardGem = useRewardGem(task.reward_id);
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [boardPeek, setBoardPeek] = useState<DOMRect | null>(null);
   // A quest with steps: a tap slides out its checklist instead of opening the editor.
   const [bonusOpen, setBonusOpen] = useState(false);
   // Counted in pages (or anything) instead of percent, and the little stepper to log it from the card.
@@ -587,7 +589,17 @@ export function TaskRow({
               Reward
             </span>
           ) : categoryLabel ? (
-            <span
+            <button
+              type="button"
+              disabled={!task.board_id}
+              aria-label={`Board: ${categoryLabel}. See what's on it`}
+              data-board-tag
+              onClick={(e) => {
+                e.stopPropagation();
+                // The board, opened right here: what's on it and "See quest in board" (owner, Nov 12).
+                const r = e.currentTarget.getBoundingClientRect();
+                setBoardPeek((v) => (v ? null : r));
+              }}
               className={`relative z-[2] -mb-2.5 truncate rounded-md py-px leading-snug ${compact ? "max-w-[60px] px-1.5 text-[11.5px]" : "max-w-[76px] px-2 text-[12.5px] sm:max-w-[88px] sm:px-2.5 sm:text-[13px]"}`}
               style={{
                 background: isAdventure ? "linear-gradient(180deg,#e2cfa6,#ccb588)" : "var(--t-accent-soft)",
@@ -597,7 +609,7 @@ export function TaskRow({
               }}
             >
               {categoryLabel}
-            </span>
+            </button>
           ) : task.board_id ? null : (
             <button
               type="button"
@@ -848,6 +860,7 @@ export function TaskRow({
       <div className="contents" onPointerDown={stopBubble} onMouseDown={stopBubble} onTouchStart={stopBubble} onKeyDown={stopKeysButSave} onClick={stopBubble}>
       {scheduling && <ScheduleWindow task={task} theme={theme} onClose={() => setScheduling(false)} />}
 
+      {boardPeek && task.board_id && categoryLabel && <BoardCard boardId={task.board_id} label={categoryLabel} taskId={task.id} anchor={boardPeek} onClose={() => setBoardPeek(null)} />}
       {editing && (
         <EditTaskModal
           task={task}

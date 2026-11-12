@@ -1,122 +1,107 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { boardFolderAction, listBoardOptionsAction } from "@/app/actions";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import { boardFolderAction } from "@/app/actions";
 
 const INK = "#2a1c10";
 const SOFT = "#6b5631";
 
 /**
- * The quest editor's board card (owner, Nov 9: board button ideas A + D). Tapping the board label
- * on the portrait folds this open right under it: the board's name, how many quests it holds and
- * its next step, a big "See quest in board ›" (the card swells and the board opens over the screen
- * with this quest glowing), and the board's own choices: move it to another board, or also show
- * it on one.
+ * A quest card's board tag, opened (owner, Nov 12): the board's name, what's on it (this quest marked,
+ * its sub-boards counted) and "See quest in board ›", which opens the board with this quest glowing.
+ * Floats under the tag; a tap outside or Escape closes it.
  */
-export function BoardCard({
-  boardId,
-  label,
-  taskId,
-  onSeeInBoard,
-  onMove,
-  onAlsoOn,
-}: {
-  boardId: string;
-  label: string;
-  /** The quest being edited (null while it's new: nothing to show on the board yet). */
-  taskId: string | null;
-  onSeeInBoard: () => void;
-  onMove: (id: string, label: string) => void;
-  onAlsoOn: () => void;
-}) {
-  const [info, setInfo] = useState<{ count: number; next: string | null } | null>(null);
-  const [moving, setMoving] = useState(false);
-  const [boards, setBoards] = useState<{ id: string; label: string }[] | null>(null);
-  const [q, setQ] = useState("");
+export function BoardCard({ boardId, label, taskId, anchor, onClose }: { boardId: string; label: string; taskId: string; anchor: DOMRect; onClose: () => void }) {
+  const router = useRouter();
+  const [info, setInfo] = useState<{ quests: { id: string; title: string }[]; boards: number } | null>(null);
   const [growing, setGrowing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
     let live = true;
     boardFolderAction(boardId).then(
-      (f) => live && setInfo({ count: f.quests.length, next: f.quests.find((t) => t.id !== taskId)?.title ?? null }),
-      () => live && setInfo({ count: 0, next: null })
+      (f) => live && setInfo({ quests: f.quests.map((t) => ({ id: t.id, title: t.title })), boards: f.subBoards.length }),
+      () => live && setInfo({ quests: [], boards: 0 })
     );
     return () => {
       live = false;
     };
-  }, [boardId, taskId]);
+  }, [boardId]);
+
+  // Under the tag, kept on the screen (above it when there's no room below).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const left = Math.max(8, Math.min(window.innerWidth - w - 8, anchor.left));
+    const below = anchor.bottom + 8;
+    const top = below + h > window.innerHeight - 8 && anchor.top - h - 8 > 8 ? anchor.top - h - 8 : Math.min(below, Math.max(8, window.innerHeight - h - 8));
+    setAt({ left, top });
+  }, [anchor, info]);
 
   useEffect(() => {
-    if (!moving || boards) return;
-    let live = true;
-    listBoardOptionsAction().then((b) => live && setBoards(b), () => live && setBoards([]));
-    return () => {
-      live = false;
+    const down = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
     };
-  }, [moving, boards]);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const scroll = () => onClose();
+    document.addEventListener("pointerdown", down, true);
+    document.addEventListener("keydown", key);
+    window.addEventListener("scroll", scroll, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", down, true);
+      document.removeEventListener("keydown", key);
+      window.removeEventListener("scroll", scroll);
+    };
+  }, [onClose]);
 
-  const words = q.trim().toLowerCase();
-  const shown = (boards ?? []).filter((b) => b.id !== boardId && (!words || b.label.toLowerCase().includes(words))).slice(0, 7);
   const name = label.split(" › ").pop() ?? label;
-
-  return (
-    <div ref={ref} className={`board-card relative mt-1 rounded-xl p-2.5 ${growing ? "board-card-grow" : ""}`} style={{ background: "#fff8e6", border: "1px solid #a88a3f", color: INK, transformOrigin: "50% 30%" }}>
-      <span aria-hidden className="absolute -top-[7px] left-[30px] h-3 w-3 rotate-45" style={{ background: "#fff8e6", borderLeft: "1px solid #a88a3f", borderTop: "1px solid #a88a3f" }} />
-      <div className="font-display text-[14.5px] leading-tight">{name}</div>
-      <div className="mb-2 mt-0.5 min-h-[17px] text-[12.5px]" style={{ color: SOFT }}>
-        {info === null ? "…" : `${info.count === 1 ? "1 quest" : `${info.count} quests`}${info.next ? ` · next: ${info.next}` : ""}`}
+  const n = info?.quests.length ?? 0;
+  return createPortal(
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label={`Board: ${name}`}
+      data-board-card
+      onClick={(e) => e.stopPropagation()}
+      className={`board-card card-pop-in fixed z-[70] w-[270px] max-w-[calc(100vw-16px)] rounded-xl p-2.5 ${growing ? "board-card-grow" : ""}`}
+      style={{ left: at?.left ?? anchor.left, top: at?.top ?? anchor.bottom + 8, visibility: at ? "visible" : "hidden", background: "#fff8e6", border: "1px solid #a88a3f", color: INK, boxShadow: "0 10px 28px rgba(0,0,0,.35)", transformOrigin: "20% 0" }}
+    >
+      <div className="font-display text-[15px] leading-tight">{name}</div>
+      <div className="mb-1.5 mt-0.5 min-h-[17px] text-[12.5px]" style={{ color: SOFT }}>
+        {info === null ? "…" : [n === 1 ? "1 quest" : `${n} quests`, info.boards ? (info.boards === 1 ? "1 board" : `${info.boards} boards`) : null].filter(Boolean).join(" · ")}
       </div>
-      {taskId && (
-        <button
-          type="button"
-          onClick={() => {
-            setGrowing(true);
-            setTimeout(onSeeInBoard, 200);
-          }}
-          className="font-display flex h-10 w-full items-center justify-center rounded-full text-[14.5px]"
-          style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: INK }}
-        >
-          See quest in board ›
-        </button>
+      {info && n > 0 && (
+        <ul className="m-0 mb-2 flex max-h-[168px] list-none flex-col overflow-y-auto p-0">
+          {info.quests.map((t) => (
+            <li key={t.id} className="flex min-h-7 items-center gap-1.5 rounded-md px-1.5 text-[13.5px] leading-tight" style={t.id === taskId ? { background: "rgba(242,213,138,.55)", fontWeight: 600 } : undefined}>
+              <span aria-hidden className="text-[9px]" style={{ color: t.id === taskId ? "#8a6116" : "rgba(107,86,49,.6)" }}>
+                ◆
+              </span>
+              <span className="truncate py-1">{t.title}</span>
+            </li>
+          ))}
+        </ul>
       )}
-      <div className="mt-1.5 flex items-center justify-between text-[13px]" style={{ color: SOFT }}>
-        <button type="button" onClick={() => setMoving((m) => !m)} aria-expanded={moving} className="flex h-8 items-center gap-1 rounded-full px-1.5 hover:bg-black/5">
-          ⇄ Move to another board
-        </button>
-        <button type="button" onClick={onAlsoOn} className="flex h-8 items-center gap-1 rounded-full px-1.5 hover:bg-black/5">
-          ＋ Also on…
-        </button>
-      </div>
-      {moving && (
-        <div className="reveal mt-1 flex flex-col">
-          <input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && shown[0]) {
-                e.preventDefault();
-                onMove(shown[0].id, shown[0].label);
-                setMoving(false);
-              }
-            }}
-            placeholder="Find a board"
-            aria-label="Find a board to move it to"
-            className="bare-input mb-1 h-9 border-b bg-transparent px-1 text-[16px] outline-none"
-            style={{ borderColor: "rgba(168,138,63,.6)" }}
-          />
-          {!boards && <span className="px-1 py-1.5 text-[13px]" style={{ color: SOFT }}>Finding your boards…</span>}
-          {boards && !shown.length && <span className="px-1 py-1.5 text-[13px]" style={{ color: SOFT }}>No board by that name.</span>}
-          <div className="flex max-h-[220px] flex-col overflow-y-auto">
-            {shown.map((b) => (
-              <button key={b.id} type="button" onClick={() => (onMove(b.id, b.label), setMoving(false))} className="flex min-h-9 items-center rounded-lg px-1 text-left text-[14px] hover:bg-black/5">
-                <span className="truncate">{b.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      <button
+        type="button"
+        onClick={() => {
+          setGrowing(true);
+          setTimeout(() => {
+            onClose();
+            router.push(`/boards/${boardId}?q=${taskId}`);
+          }, 200);
+        }}
+        className="font-display flex h-10 w-full items-center justify-center rounded-full text-[14.5px]"
+        style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: INK }}
+      >
+        See quest in board ›
+      </button>
+    </div>,
+    document.body
   );
 }

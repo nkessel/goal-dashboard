@@ -3,7 +3,6 @@
 import { IconScale } from "./IconScale";
 import { sessionRef } from "@/lib/calendar-task-window";
 import { InlineNumber } from "@/components/ui/InlineNumber";
-import { BoardCard } from "./BoardCard";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, type ProgressUnit } from "@/lib/progress-units";
@@ -2121,9 +2120,11 @@ export function QuestEditorDialog({
       <>
               {/* A stand-in quest speaks for its board's current assignment. */}
               {task && !review && (
-                <label className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px]" title="Keep this quest's clear name, but follow the board's current assignment: its due date, its priority and its next step">
+                <label className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]" title="Keeps this quest's name, and takes the due date, priority and next step of whichever quest is up next on the board">
                   <input type="checkbox" checked={!!standsFor} onChange={(e) => changeStandsFor(e.target.checked ? (boardId ?? null) : null)} disabled={!boardId && !standsFor} />
-                  <span>Stands for the board&rsquo;s current assignment</span>
+                  <span>
+                    Mirror the board&rsquo;s next quest <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>· takes its due date</span>
+                  </span>
                   {standsFor && (
                     <select value={standsFor} onChange={(e) => changeStandsFor(e.target.value || null)} aria-label="Which board it follows" className="h-7 max-w-[200px] rounded-full border px-2 text-[13px]" style={{ borderColor: "#b39a6a", background: "transparent", color: "var(--t-ink)" }}>
                       {(boardOptions ?? []).map((o) => (
@@ -2208,7 +2209,8 @@ export function QuestEditorDialog({
       {partNodes.alsoOn}
     </>
   );
-  const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp", "board"];
+  // The board is picked from its tag on the portrait (owner, Nov 12), not from a pill in this row.
+  const FACT_KEYS: EditorPart[] = ["showsIn", "time", "xp"];
   const factLabel = (f: EditorPart) =>
     f === "showsIn"
       ? `${placement === "today" ? "Primary" : placement === "additional" ? "Secondary" : "Backlog"}`
@@ -2410,16 +2412,18 @@ export function QuestEditorDialog({
             <div className="relative flex shrink-0 flex-col items-center gap-1">
               {/* The board, on the avatar like the quest card's tag. */}
               {/* The board, on the avatar like the quest card's tag; tapping it folds the board card open below (owner, Nov 9). */}
-              {boardLabel && (
+              {!doingNow && (
                 <button
                   type="button"
                   onClick={() => setBoardCard((o) => !o)}
                   aria-expanded={boardCard}
-                  title={`${boardLabel}: see it, move it`}
+                  aria-label={boardLabel ? `Board: ${boardLabel}. Change it` : "Choose a board"}
+                  title={boardLabel ? `${boardLabel}: change its board` : "Choose a board"}
+                  data-board-chip
                   className="absolute -top-1.5 left-1/2 z-[2] flex max-w-[92px] -translate-x-1/2 items-center gap-0.5 whitespace-nowrap rounded-md px-1.5 py-[1px] text-[11px] font-semibold"
-                  style={{ background: "#f6ecd2", border: "1px solid #a58c66", color: "#3b2a14", boxShadow: boardCard ? "0 0 0 2px #f3d98d, 0 1px 2px rgba(0,0,0,.25)" : "0 1px 2px rgba(0,0,0,.25)" }}
+                  style={{ background: "#f6ecd2", border: boardLabel ? "1px solid #a58c66" : "1px dashed #a58c66", color: "#3b2a14", boxShadow: boardCard ? "0 0 0 2px #f3d98d, 0 1px 2px rgba(0,0,0,.25)" : "0 1px 2px rgba(0,0,0,.25)" }}
                 >
-                  <span className="truncate">{boardLabel}</span>
+                  <span className="truncate">{boardLabel ?? "+ Board"}</span>
                   <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0" style={{ transform: boardCard ? "rotate(180deg)" : undefined, transition: "transform 160ms" }}>
                     <path d="M5 9l7 7 7-7" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -2525,23 +2529,27 @@ export function QuestEditorDialog({
               ) : null}
             </div>
           </div>
-          {boardId && boardLabel && (
+          {/* The board picker, opened from the tag on the portrait (owner, Nov 12): which board, mirroring it, other boards it shows on. */}
+          {!doingNow && (
             <Fold open={boardCard}>
-              <BoardCard
-                boardId={boardId}
-                label={boardOptions?.find((o) => o.id === boardId)?.label ?? boardLabel}
-                taskId={task?.id ?? null}
-                onSeeInBoard={() => {
-                  const to = `/boards/${boardId}${task ? `?q=${task.id}` : ""}`;
-                  close();
-                  setTimeout(() => router.push(to), embedded ? 0 : 200);
-                }}
-                onMove={(id, label) => {
-                  setBoardOptions((opts) => (opts?.some((o) => o.id === id) ? opts : [...(opts ?? []), { id, label }]));
-                  setBoardId(id);
-                }}
-                onAlsoOn={() => (setBoardCard(false), setFactOpen("board"))}
-              />
+              <div className="qe-fact-panel relative mt-1 flex flex-col gap-2 rounded-xl p-3" data-board-panel>
+                <span aria-hidden className="absolute -top-[7px] left-[30px] h-3 w-3 rotate-45" style={{ background: "inherit", borderLeft: "1px solid rgba(139,112,64,.35)", borderTop: "1px solid rgba(139,112,64,.35)" }} />
+                {partNodes.board}
+                {task && boardId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const to = `/boards/${boardId}?q=${task.id}`;
+                      close();
+                      setTimeout(() => router.push(to), embedded ? 0 : 200);
+                    }}
+                    className="self-end text-[13px] font-semibold underline underline-offset-2"
+                    style={{ color: "var(--t-ink-soft)" }}
+                  >
+                    See quest in board ›
+                  </button>
+                )}
+              </div>
             </Fold>
           )}
 
@@ -2638,6 +2646,7 @@ export function QuestEditorDialog({
           {/* Shown parts first (in your order), then the Advanced settings fold with the rest. */}
           {!arranging && layout.order.filter((k) => !layout.folded.includes(k)).map((k) => {
             // Where it shows, its time, its XP and its board: one calm row of chips, each opening its control.
+            if (k === "board") return null;
             if (FACT_KEYS.includes(k)) {
               const facts = layout.order.filter((x) => FACT_KEYS.includes(x) && !layout.folded.includes(x) && partShown[x]);
               if (facts[0] !== k) return null;

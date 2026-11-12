@@ -55,7 +55,8 @@ export function QuestCardPopup({
         onClick={(e) => e.stopPropagation()}
         className={`flex w-full max-w-lg flex-col gap-2 ${closing ? "card-pop-out" : "card-pop-in"}`}
       >
-        <div className="flex">
+        {/* × at the card's top right, like every other popup (it floated alone at the left; owner, Nov 12: "more visual balance"). */}
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={requestClose}
