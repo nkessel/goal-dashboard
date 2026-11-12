@@ -608,6 +608,16 @@ export const FLOWS = [
       await h.goto("/calendar?view=week", { name: "calendar" });
       await h.settle(1200);
       await h.check("week");
+      // 7 AM–10:30 PM by default, the rest behind a button each (owner, Nov 6), and a date pin once scrolled (Nov 12).
+      if (await h.tap((p) => p.locator("[data-hours='early']").first(), "before 7 AM", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("week: early hours open");
+        await h.tap((p) => p.locator("[data-hours='early']").first(), "hide before 7 AM", { optional: true, expectMove: true });
+      }
+      await h.page.evaluate(() => window.scrollTo({ top: 700 }));
+      await h.settle(500);
+      await h.check("week: date pin while scrolled");
+      await h.page.evaluate(() => window.scrollTo({ top: 0 }));
       // Calendars of interest (owner, Nov 4): feeds for week and month, links to open.
       if (await h.tap((p) => p.getByRole("button", { name: /^calendars of interest$/i }).first(), "calendars of interest", { optional: true, expectMove: true })) {
         await h.check("calendars of interest");

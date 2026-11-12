@@ -13,6 +13,7 @@ import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import {
   HOUR_START,
   DAY_FROM,
+  DAY_UNTIL,
   HOUR_END,
   formatDateParam,
   formatHourLabel,
@@ -96,6 +97,11 @@ export function WeekView({
   const isAdventure = theme === "adventure";
   const days = dayKeys.map((k) => parseDateParam(k));
   const [hourPx, setHourPx] = useState(isAdventure ? ADVENTURE_HOUR_PX : DEFAULT_HOUR_PX);
+  // 7 AM–10:30 PM by default; the hours before and after open from a button (owner, Nov 6: "The user should have to click a button to see before 7am and after 10:30pm").
+  const [early, setEarly] = useState(false);
+  const [late, setLate] = useState(false);
+  const H0 = early ? HOUR_START : DAY_FROM;
+  const H1 = late ? HOUR_END + 1 : DAY_UNTIL;
   const [gripY, setGripY] = useState<number | null>(null);
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
   const HOUR_PX = hourPx;
@@ -177,7 +183,9 @@ export function WeekView({
   const timeBg = isAdventure ? TIME_BG : "var(--t-card)";
   const nowMinute = useNowMinute();
   const now = nowMinute ? new Date(nowMinute * 60_000) : null;
-  const hourCount = HOUR_END - HOUR_START + 1;
+  const hourCount = Math.ceil(H1 - H0);
+  const gridMinutes = (H1 - H0) * 60;
+  const lastRowPx = (H1 - H0 - (hourCount - 1)) * HOUR_PX;
 
   // Drag (or tap) a time range on a day's column to open the add-quest
   // popup — either creating a new quest already scheduled there, or
@@ -191,11 +199,11 @@ export function WeekView({
   const minuteAt = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const m = ((e.clientY - r.top) / HOUR_PX) * 60;
-    return Math.max(0, Math.min(hourCount * 60 - SNAP, Math.floor(m / SNAP) * SNAP));
+    return Math.max(0, Math.min(gridMinutes - SNAP, Math.floor(m / SNAP) * SNAP));
   };
   const minuteDate = (day: Date, minutes: number) => {
     const d = new Date(day);
-    d.setHours(HOUR_START, 0, 0, 0);
+    d.setHours(H0, 0, 0, 0);
     return new Date(d.getTime() + minutes * 60_000);
   };
   function pickDown(e: React.PointerEvent<HTMLDivElement>, dayIndex: number) {
@@ -332,7 +340,7 @@ export function WeekView({
       const todayShown = days.some((day) => isSameDay(day, d));
       hour = todayShown ? Math.max(DAY_FROM - 2, d.getHours() + d.getMinutes() / 60 - 1) : DAY_FROM;
     }
-    const y = h.getBoundingClientRect().top + window.scrollY + (hour - HOUR_START) * HOUR_PX - 96;
+    const y = h.getBoundingClientRect().top + window.scrollY + (Math.min(H1, Math.max(H0, hour)) - H0) * HOUR_PX - 96;
     window.scrollTo({ top: Math.max(0, y) });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the hours are first laid out
   }, []);
@@ -345,9 +353,9 @@ export function WeekView({
         const h = firstHourRef.current;
         if (!h) return;
         const top = h.getBoundingClientRect().top + window.scrollY;
-        const hour = HOUR_START + (window.scrollY + 96 - top) / HOUR_PX;
+        const hour = H0 + (window.scrollY + 96 - top) / HOUR_PX;
         try {
-          window.sessionStorage.setItem("cal-hour", JSON.stringify({ hour: Math.max(HOUR_START, hour), at: Date.now() }));
+          window.sessionStorage.setItem("cal-hour", JSON.stringify({ hour: Math.max(H0, hour), at: Date.now() }));
         } catch {
           /* storage unavailable */
         }
@@ -358,7 +366,7 @@ export function WeekView({
       clearTimeout(t);
       window.removeEventListener("scroll", keep);
     };
-  }, [HOUR_PX]);
+  }, [HOUR_PX, H0]);
   const [colWidth, setColWidth] = useState(0);
   useLayoutEffect(() => {
     const el = boxRef.current;
@@ -568,10 +576,52 @@ export function WeekView({
   );
   const gridStart = (d: Date) => {
     const x = new Date(d);
-    x.setHours(HOUR_START, 0, 0, 0);
+    x.setHours(H0, 0, 0, 0);
     return x.getTime();
   };
-  const gridMinutes = hourCount * 60;
+  /** Whether something lies wholly before or after the hours shown (those wait behind the Earlier/Later buttons). */
+  const hidden = { early: 0, late: 0 };
+  // The hour's label, with its temperature beneath it when one day is on screen (owner, Nov 12: "put the temperature beneath/next to the times").
+  const hourLabel = (row: number) => {
+    const w = single ? weather?.[dayKeys[seamless ? Math.max(0, Math.min(days.length - 1, firstIdx)) : 0]]?.[H0 + row] : undefined;
+    const text = HOUR_PX < 30 ? formatHourLabel(H0 + row).replace(/:00/, "").replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase()) : formatHourLabel(H0 + row).replace(" ", "\n");
+    return (
+      <>
+        {text}
+        {w && (
+          <span className="block tabular-nums" style={{ fontSize: 10.5, color: w.rain >= 30 ? "#2f5f99" : "var(--t-ink-soft)", opacity: 0.85 }} title={`${w.temp}° · ${w.rain}% chance of rain`}>
+            {w.temp}°{w.rain >= 30 ? ` ${w.rain}%` : ""}
+          </span>
+        )}
+      </>
+    );
+  };
+  // Line the time column's parchment up with the card's (both tile the same texture from the card's corner).
+  const timeColRef = useRef<HTMLDivElement | null>(null);
+  const [texAt, setTexAt] = useState("0 0");
+  useLayoutEffect(() => {
+    const col = timeColRef.current;
+    const box = boxRef.current;
+    if (!col || !box) return;
+    const place = () => {
+      const c = col.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      const bl = parseFloat(getComputedStyle(box).borderLeftWidth) || 0;
+      const bt = parseFloat(getComputedStyle(box).borderTopWidth) || 0;
+      setTexAt(`${-(c.left - b.left - bl)}px ${-(c.top - b.top - bt)}px`);
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [seamless, early, late]);
+  const outside = (start: Date, end: Date, day: Date) => {
+    const a = (start.getTime() - gridStart(day)) / 60_000;
+    const b = (end.getTime() - gridStart(day)) / 60_000;
+    if (b <= 0) hidden.early++;
+    else if (a >= gridMinutes) hidden.late++;
+    return b <= 0 || a >= gridMinutes;
+  };
   /** Minutes from the top of the grid, clamped to it. */
   const offset = (d: Date, day: Date) => Math.min(gridMinutes, Math.max(0, (d.getTime() - gridStart(day)) / 60_000));
 
@@ -733,6 +783,7 @@ export function WeekView({
     const end = new Date(event.end);
     const dayIndex = days.findIndex((d) => isSameDay(d, start));
     if (dayIndex === -1) continue;
+    if (outside(start, end, days[dayIndex])) continue;
     const top = offset(start, days[dayIndex]);
     items.push({ kind: "event", key: `e-${event.id}`, dayIndex, top, bottom: Math.max(top + 20, offset(end, days[dayIndex])), start, end, event });
   }
@@ -741,6 +792,7 @@ export function WeekView({
     const { start, end } = getTaskDisplayWindow(task);
     const dayIndex = days.findIndex((d) => isSameDay(d, start));
     if (dayIndex === -1) continue;
+    if (outside(start, end, days[dayIndex])) continue;
     const top = offset(start, days[dayIndex]);
     // A short quest (a 15-minute mini-quest) still gets room for its card: at least ~30px tall.
     const minMins = Math.max(20, (30 / HOUR_PX) * 60);
@@ -820,22 +872,23 @@ export function WeekView({
           </>
         )}
       </div>
+      <DatePin days={days.slice(seamless ? Math.max(0, firstIdx) : 0, seamless ? Math.max(0, firstIdx) + vis : days.length)} anchor={scrollRef} />
+      <HoursButton side="early" open={early} hidden={hidden.early} isAdventure={isAdventure} onToggle={() => setEarly((v) => !v)} />
       <div className="relative">
       {seamless && (
         // The time column stays put while the days scroll under it (a sticky cell can't leave its grid cell, so it's its own layer).
-        <div className="pointer-events-none absolute left-0 top-0 z-[30]" style={{ width: 40, height: headTop + hourCount * HOUR_PX, background: timeBg, boxShadow: "4px 0 6px -4px rgba(60,40,10,.25)" }}>
+        // Its parchment is the card's own, lined up with it, so the strip doesn't show as a different colour (owner, Nov 12).
+        <div ref={timeColRef} className="pointer-events-none absolute left-0 top-0 z-[30]" style={{ width: 40, height: headTop + (gridMinutes / 60) * HOUR_PX, ...(isAdventure ? { backgroundColor: "#ecdab4", backgroundImage: "url(/design/tex-parchment-2.jpg)", backgroundSize: "384px 384px", backgroundPosition: texAt } : { background: timeBg }), borderRight: `1px solid ${lineColor}` }}>
           {Array.from({ length: hourCount }, (_, row) => (
             <div
               key={`t-${row}`}
               className="absolute left-0 right-0"
-              style={{ top: headTop + row * HOUR_PX, height: HOUR_PX, fontSize: HOUR_PX < 30 ? 10.5 : 11.5, lineHeight: 1.1, overflow: "hidden", whiteSpace: "pre-line", color: "var(--t-ink-soft)", paddingTop: 2, borderTop: `1px solid ${lineColor}` }}
+              style={{ top: headTop + row * HOUR_PX, height: row === hourCount - 1 ? lastRowPx : HOUR_PX, fontSize: HOUR_PX < 30 ? 10.5 : 11.5, lineHeight: 1.1, overflow: "hidden", whiteSpace: "pre-line", color: "var(--t-ink-soft)", paddingTop: 2, borderTop: `1px solid ${lineColor}` }}
             >
-              {HOUR_PX < 30
-                ? formatHourLabel(HOUR_START + row).replace(/:00/, "").replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase())
-                : formatHourLabel(HOUR_START + row).replace(" ", "\n")}
+              {hourLabel(row)}
             </div>
           ))}
-          <div className="pointer-events-auto absolute left-0 right-0" style={{ top: headTop, height: hourCount * HOUR_PX }}>
+          <div className="pointer-events-auto absolute left-0 right-0" style={{ top: headTop, height: (gridMinutes / 60) * HOUR_PX }}>
             {zoomSlider({ position: "absolute", inset: 0 })}
           </div>
         </div>
@@ -845,7 +898,7 @@ export function WeekView({
         className="grid"
         style={{
           gridTemplateColumns: fluid?.w ? `40px repeat(${days.length}, ${fluid.w}px)` : seamless && colWidth > 0 ? `40px repeat(${days.length}, ${colWidth}px)` : `40px repeat(${days.length}, minmax(0, 1fr))`,
-          gridTemplateRows: `auto repeat(${hourCount}, ${HOUR_PX}px)`,
+          gridTemplateRows: `auto repeat(${hourCount - 1}, ${HOUR_PX}px) ${lastRowPx}px`,
           columnGap: 2,
           transform: fluid?.dx ? `translateX(${fluid.dx}px)` : undefined,
           transition: fluid ? "none" : "transform .25s ease-out",
@@ -992,9 +1045,7 @@ export function WeekView({
               borderTop: `1px solid ${lineColor}`,
             }}
           >
-            {HOUR_PX < 30
-              ? formatHourLabel(HOUR_START + row).replace(/:00/, "").replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase())
-              : formatHourLabel(HOUR_START + row).replace(" ", "\n")}
+            {hourLabel(row)}
           </div>
         ))}
         {Array.from({ length: hourCount }, (_, row) => (
@@ -1003,19 +1054,7 @@ export function WeekView({
             className="relative"
             style={{ gridColumn: `2 / ${days.length + 2}`, gridRow: row + 2, borderTop: `1px solid ${lineColor}` }}
           >
-            {single && !seamless && weather?.[dayKeys[0]]?.[HOUR_START + row] && (() => {
-              const w = weather[dayKeys[0]][HOUR_START + row];
-              return (
-                <span
-                  className="pointer-events-none absolute right-1 top-0.5 z-[4] flex items-center gap-1 rounded px-1 text-[11.5px] tabular-nums"
-                  style={{ color: "var(--t-ink-soft)", background: isAdventure ? "rgba(243,230,200,.75)" : "var(--t-card)" }}
-                  title={`${w.temp}° · ${w.rain}% chance of rain`}
-                >
-                  {w.rain >= 30 && <span className="flex items-center gap-0.5" style={{ color: "#2f5f99" }}><RainCloud />{w.rain}%</span>}
-                  {w.temp}°
-                </span>
-              );
-            })()}
+
           </div>
         ))}
         {/* Drag the times up or down to squeeze or stretch the day. */}
@@ -1041,7 +1080,7 @@ export function WeekView({
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
               const r = e.currentTarget.getBoundingClientRect();
-              const m = Math.max(0, Math.min(hourCount * 60 - SNAP, Math.floor((((e.clientY - r.top) / HOUR_PX) * 60) / SNAP) * SNAP));
+              const m = Math.max(0, Math.min(gridMinutes - SNAP, Math.floor((((e.clientY - r.top) / HOUR_PX) * 60) / SNAP) * SNAP));
               setGhost({ dayIndex, min: m });
             }}
             onDragLeave={() => setGhost(null)}
@@ -1050,7 +1089,7 @@ export function WeekView({
               if (!raw) return;
               e.preventDefault();
               const r = e.currentTarget.getBoundingClientRect();
-              const m = Math.max(0, Math.min(hourCount * 60 - SNAP, Math.floor((((e.clientY - r.top) / HOUR_PX) * 60) / SNAP) * SNAP));
+              const m = Math.max(0, Math.min(gridMinutes - SNAP, Math.floor((((e.clientY - r.top) / HOUR_PX) * 60) / SNAP) * SNAP));
               void placeCarried(JSON.parse(raw) as Carried, dayIndex, m);
             }}
             onPointerUp={(e) => pickUp(e, dayIndex)}
@@ -1103,18 +1142,7 @@ export function WeekView({
           const showNow = nowTop !== null && nowTop > 0 && nowTop < gridMinutes;
           return (
             <div key={`col-${dayIndex}`} className="pointer-events-none relative" style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}` }}>
-              {/* One day on screen: its hourly weather at the right of each hour (it scrolls with its day). */}
-              {seamless && single && weather?.[dayKeys[dayIndex]] &&
-                Array.from({ length: hourCount }, (_, row) => {
-                  const w = weather[dayKeys[dayIndex]]?.[HOUR_START + row];
-                  if (!w) return null;
-                  return (
-                    <span key={`w-${row}`} className="pointer-events-none absolute right-1 z-[4] flex items-center gap-1 rounded px-1 text-[11.5px] tabular-nums" style={{ top: row * HOUR_PX + 2, color: "var(--t-ink-soft)", background: isAdventure ? "rgba(243,230,200,.75)" : "var(--t-card)" }} title={`${w.temp}° · ${w.rain}% chance of rain`}>
-                      {w.rain >= 30 && <span className="flex items-center gap-0.5" style={{ color: "#2f5f99" }}><RainCloud />{w.rain}%</span>}
-                      {w.temp}°
-                    </span>
-                  );
-                })}
+
               {daily && (
                 <DailyBlocks
                   day={day}
@@ -1198,6 +1226,7 @@ export function WeekView({
       </div>
       </div>
       </div>
+      <HoursButton side="late" open={late} hidden={hidden.late} isAdventure={isAdventure} onToggle={() => setLate((v) => !v)} />
 
       {itemMenu && <CalendarItemMenu target={itemMenu.target} x={itemMenu.x} y={itemMenu.y} theme={theme} onClose={() => setItemMenu(null)} />}
       {addRange && (
@@ -1208,6 +1237,68 @@ export function WeekView({
           onClose={() => (setAddRange(null), setSel(null))}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Which day you're on, kept at the top on phones once the day headers scroll away
+ * (owner, Nov 12: "a small date indicator persist at the top so the mobile user can always see which date they are on").
+ */
+function DatePin({ days, anchor }: { days: Date[]; anchor: React.RefObject<HTMLDivElement | null> }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const el = anchor.current;
+      setShown(!!el && el.getBoundingClientRect().top < 8);
+    };
+    check();
+    window.addEventListener("scroll", check, { passive: true });
+    return () => window.removeEventListener("scroll", check);
+  }, [anchor]);
+  if (days.length === 0) return null;
+  const f = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleDateString(undefined, o);
+  const a = days[0];
+  const b = days[days.length - 1];
+  const words =
+    days.length === 1
+      ? f(a, { weekday: "short", month: "short", day: "numeric" })
+      : a.getMonth() === b.getMonth()
+        ? `${f(a, { month: "short", day: "numeric" })} – ${b.getDate()}`
+        : `${f(a, { month: "short", day: "numeric" })} – ${f(b, { month: "short", day: "numeric" })}`;
+  return (
+    <div aria-hidden={!shown} className="pointer-events-none sticky top-2 z-[32] flex h-0 justify-center md:hidden">
+      <span
+        data-date-pin
+        className="h-7 rounded-full px-3 text-[13px] font-semibold leading-7 transition-[opacity,transform] duration-200"
+        style={{ opacity: shown ? 1 : 0, transform: shown ? "none" : "translateY(-6px)", background: "radial-gradient(circle at 35% 25%, #fbefcb, #ead49a 70%)", border: "1px solid #a88a3f", color: "#2a1c10", boxShadow: "0 2px 8px rgba(0,0,0,.25)" }}
+      >
+        {words}
+      </span>
+    </div>
+  );
+}
+
+/** A quiet line above or below the hours: shows the early-morning or late-night hours, or folds them away again. */
+function HoursButton({ side, open, hidden, isAdventure, onToggle }: { side: "early" | "late"; open: boolean; hidden: number; isAdventure: boolean; onToggle: () => void }) {
+  const words = side === "early" ? (open ? "▾ Hide before 7 AM" : "▴ Before 7 AM") : open ? "▴ Hide after 10:30 PM" : "▾ After 10:30 PM";
+  return (
+    <div className="flex justify-center py-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        data-hours={side}
+        className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold"
+        style={{ color: "var(--t-ink-soft)", border: `1px solid ${isAdventure ? "rgba(168,138,63,.55)" : "var(--t-card-border)"}`, background: isAdventure ? "rgba(243,230,200,.6)" : "var(--t-card)" }}
+      >
+        {words}
+        {!open && hidden > 0 && (
+          <span className="rounded-full px-1.5 text-[11px] font-bold leading-[16px]" style={{ background: "#d9b45f", color: "#2a1c10" }}>
+            {hidden}
+          </span>
+        )}
+      </button>
     </div>
   );
 }
