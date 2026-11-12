@@ -33,6 +33,15 @@ import { fromFeedback } from "@/lib/from-feedback";
 
 /** Hour height: condensed by default; drag the times on the left to zoom. */
 const DEFAULT_HOUR_PX = 36;
+/** The hour last looked at on the calendar, if it was within the last few minutes (moving between days). */
+function savedCalHour(): number | null {
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem("cal-hour") ?? "null") as { hour: number; at: number } | null;
+    return saved && Date.now() - saved.at < 5 * 60_000 ? saved.hour : null;
+  } catch {
+    return null;
+  }
+}
 /** Adventure quests are picture cards, so its hours start roomier. */
 const ADVENTURE_HOUR_PX = 56;
 const MIN_HOUR_PX = 18;
@@ -298,17 +307,48 @@ export function WeekView({
     if (h.parentElement) ro.observe(h.parentElement);
     return () => ro.disconnect();
   }, [seamless]);
-  // The grid holds the whole day; open it at 7 AM (once, and only if the page hasn't been scrolled).
+  // The grid holds the whole day. It opens on the hour you were looking at when you move between days
+  // (kept for a few minutes in sessionStorage "cal-hour"); otherwise an hour before now when today is shown,
+  // else at 7 AM.
   const openedAt = useRef(false);
   useLayoutEffect(() => {
     const h = firstHourRef.current;
     if (!h || openedAt.current) return;
     openedAt.current = true;
-    if (window.scrollY > 10) return;
-    const y = h.getBoundingClientRect().top + window.scrollY + (DAY_FROM - HOUR_START) * HOUR_PX - 96;
-    if (y > 0) window.scrollTo({ top: y });
+    let hour = savedCalHour();
+    if (hour == null) {
+      if (window.scrollY > 10) return;
+      const d = new Date();
+      const todayShown = days.some((day) => isSameDay(day, d));
+      hour = todayShown ? Math.max(DAY_FROM - 2, d.getHours() + d.getMinutes() / 60 - 1) : DAY_FROM;
+    }
+    const y = h.getBoundingClientRect().top + window.scrollY + (hour - HOUR_START) * HOUR_PX - 96;
+    window.scrollTo({ top: Math.max(0, y) });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the hours are first laid out
   }, []);
+  // Remember the hour in view, so moving to other days (swiping, ‹ ›, the date) keeps it.
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const keep = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const h = firstHourRef.current;
+        if (!h) return;
+        const top = h.getBoundingClientRect().top + window.scrollY;
+        const hour = HOUR_START + (window.scrollY + 96 - top) / HOUR_PX;
+        try {
+          window.sessionStorage.setItem("cal-hour", JSON.stringify({ hour: Math.max(HOUR_START, hour), at: Date.now() }));
+        } catch {
+          /* storage unavailable */
+        }
+      }, 150);
+    };
+    window.addEventListener("scroll", keep, { passive: true });
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("scroll", keep);
+    };
+  }, [HOUR_PX]);
   const [colWidth, setColWidth] = useState(0);
   useLayoutEffect(() => {
     const el = boxRef.current;
@@ -610,7 +650,20 @@ export function WeekView({
     justDragged.current = true;
     window.setTimeout(() => (justDragged.current = false), 0);
     const { dayIndex, top, bottom } = d.to;
-    if (dayIndex === d.from.dayIndex && top === d.from.top && bottom === d.from.bottom) return;
+    if (dayIndex === d.from.dayIndex && top === d.from.top && bottom === d.from.bottom) {
+      // A finger held still and let go: that's a long press, so open the card's menu (iPhone fires no contextmenu).
+      const fromDay = days[d.from.dayIndex];
+      if (d.touch && fromDay) {
+        const start = minuteDate(fromDay, d.from.top);
+        const end = minuteDate(fromDay, d.from.bottom);
+        setItemMenu({
+          x: d.x0,
+          y: d.y0,
+          target: d.item.kind === "task" ? { kind: "task", task: d.item.task, start, end } : { kind: "event", id: d.item.event.id, title: d.item.event.title, start, end },
+        });
+      }
+      return;
+    }
     const day = days[dayIndex];
     if (!day) return;
     const start = minuteDate(day, top).toISOString();
