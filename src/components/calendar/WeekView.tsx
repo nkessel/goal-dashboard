@@ -403,6 +403,7 @@ export function WeekView({
     const el = scrollRef.current;
     if (!el || colWidth <= 0) return;
     const at = el.scrollLeft / (colWidth + 2);
+    if (pinRowRef.current) pinRowRef.current.style.transform = `translateX(${-el.scrollLeft}px)`;
     setFirstIdx(Math.floor(at + 0.5));
     clearTimeout(scrollTimer.current);
     scrollTimer.current = setTimeout(() => {
@@ -589,13 +590,140 @@ export function WeekView({
       <>
         {text}
         {w && (
-          <span className="block tabular-nums" style={{ fontSize: 10.5, color: w.rain >= 30 ? "#2f5f99" : "var(--t-ink-soft)", opacity: 0.85 }} title={`${w.temp}° · ${w.rain}% chance of rain`}>
-            {w.temp}°{w.rain >= 30 ? ` ${w.rain}%` : ""}
+          <span className="block tabular-nums" style={{ fontSize: 10.5, color: "var(--t-ink-soft)", opacity: 0.85 }} title={`${w.temp}° · ${w.rain}% chance of rain`}>
+            {w.temp}°
+          </span>
+        )}
+        {w && w.rain >= 20 && <RainPct pct={w.rain} />}
+      </>
+    );
+  };
+  /** A day's XP: what its quests have paid so far, else what they'd pay. */
+  const dayXp = (i: number) => {
+    let won = 0;
+    let ahead = 0;
+    for (const it of items) {
+      if (it.kind !== "task" || it.dayIndex !== i) continue;
+      if (it.task.status === "completed") won += it.task.xp_awarded ?? it.task.xp_value ?? 0;
+      else ahead += it.task.xp_value ?? 0;
+    }
+    return { won, ahead };
+  };
+  /**
+   * A day's heading: weekday, date and its XP on one line ("+ 50XP", owner Nov 12), the weather under it.
+   * The same heading, compressed, stays pinned at the top while you scroll down (`compact`).
+   */
+  const dayHead = (day: Date, i: number, isToday: boolean, compact: boolean) => {
+    const { won, ahead } = dayXp(i);
+    const w = weather ? daySummary(weather[dayKeys[i]]) : null;
+    return (
+      <>
+        <span className="flex flex-wrap items-center justify-center gap-x-1">
+          <span
+            className={isAdventure ? "font-display uppercase" : ""}
+            style={{
+              fontSize: isAdventure ? (vis >= 5 ? 12 : 13.5) : 13.5,
+              letterSpacing: isAdventure ? ".06em" : undefined,
+              fontWeight: isToday ? 700 : 500,
+              color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : isAdventure ? "#4a3a22" : "var(--t-ink-soft)",
+            }}
+          >
+            {day.toLocaleDateString(undefined, { weekday: vis >= 6 && colWidth > 0 && colWidth < 52 ? "narrow" : "short" })}
+          </span>
+          <span
+            className={`flex ${compact ? "h-5 min-w-5" : "h-6 min-w-6"} items-center justify-center rounded-full px-1 text-[13px] tabular-nums`}
+            style={
+              isToday
+                ? { background: isAdventure ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", fontWeight: 700 }
+                : { color: "var(--t-ink)" }
+            }
+          >
+            {day.getDate()}
+          </span>
+          {(won > 0 || ahead > 0) && (
+            <span
+              className="whitespace-nowrap text-[11px] font-semibold leading-tight tabular-nums"
+              style={{ color: won ? "var(--t-xp, #8a6c2c)" : "var(--t-ink-soft)", opacity: won ? 1 : 0.75 }}
+              title={won ? `${won} XP won this day${ahead ? ` · ${ahead} more to win` : ""}` : `${ahead} XP to win this day`}
+            >
+              + {won || ahead}XP
+            </span>
+          )}
+        </span>
+        {w && (
+          <span className={`${compact ? "" : "mt-0.5"} flex flex-wrap items-center justify-center gap-x-1 text-[11px] leading-tight tabular-nums`} style={{ color: "var(--t-ink-soft)" }} title={`High ${w.hi}°, low ${w.lo}°, ${w.rain}% chance of rain`}>
+            <span>
+              <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b> <span className="opacity-80">{w.lo}°</span>
+            </span>
+            {w.rain >= 20 && (
+              <span className="flex items-center gap-0.5" style={{ color: "#2f5f99" }}>
+                <RainCloud />
+                {w.rain}%
+              </span>
+            )}
           </span>
         )}
       </>
     );
   };
+  // The heading row pinned at the top once the real one scrolls away, following the days sideways.
+  const pinRowRef = useRef<HTMLDivElement | null>(null);
+  const [pinShown, setPinShown] = useState(false);
+  useLayoutEffect(() => {
+    if (pinRowRef.current) pinRowRef.current.style.transform = `translateX(${-(scrollRef.current?.scrollLeft ?? 0)}px)`;
+  });
+  // "Go to today" beside the + button whenever today (or now's hour) is off the screen (owner, Nov 12).
+  const todayIdx = now ? days.findIndex((d) => isSameDay(d, now)) : -1;
+  const [nowOff, setNowOff] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const h = firstHourRef.current;
+      if (!h) return;
+      const top = h.getBoundingClientRect().top;
+      const gridH = (gridMinutes / 60) * HOUR_PX;
+      setPinShown(top < 0 && top + gridH > 60);
+      const d = new Date();
+      const hr = d.getHours() + d.getMinutes() / 60;
+      if (hr < H0 || hr > H1) return setNowOff(false);
+      const y = top + (hr - H0) * HOUR_PX;
+      setNowOff(y < 40 || y > window.innerHeight - 110);
+    };
+    check();
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    return () => {
+      window.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+    };
+  }, [gridMinutes, HOUR_PX, H0, H1]);
+  const todayOff = todayIdx < 0 || (seamless && (todayIdx < firstIdx || todayIdx >= firstIdx + vis)) || nowOff;
+  function goToday() {
+    const d = new Date();
+    const hr = d.getHours() + d.getMinutes() / 60;
+    // The hour that puts now in the middle of the screen (the grid opens with that hour 96px from the top).
+    const hour = hr - (window.innerHeight / 2 - 96) / HOUR_PX;
+    if (todayIdx < 0) {
+      try {
+        window.sessionStorage.setItem("cal-hour", JSON.stringify({ hour, at: Date.now() }));
+      } catch {
+        /* storage unavailable */
+      }
+      const first = new Date(d);
+      first.setDate(first.getDate() - Math.floor((vis - 1) / 2));
+      const key = formatDateParam(first);
+      router.push(vis === 1 ? `/calendar?view=day&date=${key}` : `/calendar?view=days&n=${vis}&date=${key}`, { scroll: false });
+      return;
+    }
+    if (hr < H0) setEarly(true);
+    if (hr > H1) setLate(true);
+    const el = scrollRef.current;
+    if (seamless && el && colWidth > 0) el.scrollTo({ left: Math.max(0, todayIdx - Math.floor((vis - 1) / 2)) * (colWidth + 2), behavior: "smooth" });
+    const h = firstHourRef.current;
+    if (h) {
+      const top = h.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ top: Math.max(0, top + (hr - (hr < H0 ? HOUR_START : H0)) * HOUR_PX - window.innerHeight / 2), behavior: "smooth" });
+    }
+  }
   // Line the time column's parchment up with the card's (both tile the same texture from the card's corner).
   const timeColRef = useRef<HTMLDivElement | null>(null);
   const [texAt, setTexAt] = useState("0 0");
@@ -872,9 +1000,41 @@ export function WeekView({
           </>
         )}
       </div>
-      <DatePin days={days.slice(seamless ? Math.max(0, firstIdx) : 0, seamless ? Math.max(0, firstIdx) + vis : days.length)} anchor={scrollRef} />
-      <HoursButton side="early" open={early} hidden={hidden.early} isAdventure={isAdventure} onToggle={() => setEarly((v) => !v)} />
-      <div className="relative">
+      {/* The day headings, compressed, pinned at the top once the real ones scroll away (owner, Nov 12: "the same bar, just compressed"). */}
+      <div aria-hidden={!pinShown} className="pointer-events-none sticky top-0 z-[33] h-0">
+        <div
+          data-date-pin
+          className="relative overflow-hidden transition-[opacity,transform] duration-200"
+          style={{
+            opacity: pinShown ? 1 : 0,
+            transform: pinShown ? "none" : "translateY(-8px)",
+            ...(isAdventure ? { backgroundColor: "#ecdab4", backgroundImage: "url(/design/tex-parchment-2.jpg)", backgroundSize: "384px 384px" } : { background: "var(--t-card)" }),
+            borderBottom: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
+            boxShadow: "0 3px 8px rgba(0,0,0,.18)",
+          }}
+        >
+          <div
+            ref={pinRowRef}
+            className="grid"
+            style={{
+              gridTemplateColumns: seamless && colWidth > 0 ? `40px repeat(${days.length}, ${colWidth}px)` : `40px repeat(${days.length}, minmax(0, 1fr))`,
+              columnGap: 2,
+            }}
+          >
+            <div />
+            {days.map((day, i) => (
+              <div key={`pin-${day.toISOString()}`} className="flex flex-col items-center py-0.5 text-center">
+                {dayHead(day, i, !!now && isSameDay(day, now), true)}
+              </div>
+            ))}
+          </div>
+          <div className="absolute inset-y-0 left-0" style={{ width: 40, ...(isAdventure ? { backgroundColor: "#ecdab4", backgroundImage: "url(/design/tex-parchment-2.jpg)", backgroundSize: "384px 384px" } : { background: timeBg }), borderRight: `1px solid ${lineColor}` }} />
+        </div>
+      </div>
+      <div className="relative" style={{ paddingBottom: 30 }}>
+      {/* Earlier and later hours: on the time bar itself, just above and below its first and last marks (owner, Nov 12). */}
+      <HoursButton side="early" open={early} hidden={hidden.early} isAdventure={isAdventure} top={Math.max(0, headTop - 26)} onToggle={() => setEarly((v) => !v)} />
+      <HoursButton side="late" open={late} hidden={hidden.late} isAdventure={isAdventure} top={headTop + (gridMinutes / 60) * HOUR_PX + 4} onToggle={() => setLate((v) => !v)} />
       {seamless && (
         // The time column stays put while the days scroll under it (a sticky cell can't leave its grid cell, so it's its own layer).
         // Its parchment is the card's own, lined up with it, so the strip doesn't show as a different colour (owner, Nov 12).
@@ -944,67 +1104,7 @@ export function WeekView({
               style={{ borderBottom: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, paddingTop: isAdventure ? 18 : undefined, gridColumn: i + 2, gridRow: 1 }}
             >
               {isAdventure && isToday && <TodayCrest />}
-              {/* The weekday and its date on one line; the weather on the next (owner, Nov 3). */}
-              <span className="flex items-center gap-1">
-                <span
-                  className={isAdventure ? "font-display uppercase" : ""}
-                  style={{
-                    fontSize: isAdventure ? (vis >= 5 ? 12 : 13.5) : 13.5,
-                    letterSpacing: isAdventure ? ".06em" : undefined,
-                    fontWeight: isToday ? 700 : 500,
-                    color: isToday ? (isAdventure ? "var(--t-gold-deep)" : "var(--t-accent)") : isAdventure ? "#4a3a22" : "var(--t-ink-soft)",
-                  }}
-                >
-                  {day.toLocaleDateString(undefined, { weekday: vis >= 6 && colWidth > 0 && colWidth < 52 ? "narrow" : "short" })}
-                </span>
-                <span
-                  className="flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[13px] tabular-nums"
-                  style={
-                    isToday
-                      ? { background: isAdventure ? "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", fontWeight: 700 }
-                      : { color: "var(--t-ink)" }
-                  }
-                >
-                  {day.getDate()}
-                </span>
-              </span>
-              {/* The day's running XP: what its quests have paid so far, or what they'd pay (owner, Nov 5). */}
-              {(() => {
-                let won = 0;
-                let ahead = 0;
-                for (const it of items) {
-                  if (it.kind !== "task" || it.dayIndex !== i) continue;
-                  if (it.task.status === "completed") won += it.task.xp_awarded ?? it.task.xp_value ?? 0;
-                  else ahead += it.task.xp_value ?? 0;
-                }
-                if (!won && !ahead) return null;
-                return (
-                  <span
-                    className="mt-0.5 whitespace-nowrap text-[11px] font-semibold leading-tight tabular-nums"
-                    style={{ color: won ? "var(--t-xp, #8a6c2c)" : "var(--t-ink-soft)" }}
-                    title={won ? `${won} XP won this day${ahead ? ` · ${ahead} more to win` : ""}` : `${ahead} XP to win this day`}
-                  >
-                    ✦ {won ? `${won} XP` : `${ahead} XP ahead`}
-                  </span>
-                );
-              })()}
-              {!single && weather && (() => {
-                const w = daySummary(weather[dayKeys[i]]);
-                if (!w) return null;
-                return (
-                  <span className="mt-0.5 flex flex-wrap items-center justify-center gap-x-1 text-[11px] leading-tight tabular-nums" style={{ color: "var(--t-ink-soft)" }} title={`High ${w.hi}°, low ${w.lo}°, ${w.rain}% chance of rain`}>
-                    <span>
-                      <b style={{ color: "var(--t-ink)", fontWeight: 600 }}>{w.hi}°</b> <span className="opacity-80">{w.lo}°</span>
-                    </span>
-                    {w.rain >= 20 && (
-                      <span className="flex items-center gap-0.5" style={{ color: "#2f5f99" }}>
-                        <RainCloud />
-                        {w.rain}%
-                      </span>
-                    )}
-                  </span>
-                );
-              })()}
+              {dayHead(day, i, isToday, false)}
             </Link>
           );
         })}
@@ -1226,7 +1326,7 @@ export function WeekView({
       </div>
       </div>
       </div>
-      <HoursButton side="late" open={late} hidden={hidden.late} isAdventure={isAdventure} onToggle={() => setLate((v) => !v)} />
+      {todayOff && <GoToday onClick={goToday} />}
 
       {itemMenu && <CalendarItemMenu target={itemMenu.target} x={itemMenu.x} y={itemMenu.y} theme={theme} onClose={() => setItemMenu(null)} />}
       {addRange && (
@@ -1241,65 +1341,53 @@ export function WeekView({
   );
 }
 
-/**
- * Which day you're on, kept at the top on phones once the day headers scroll away
- * (owner, Nov 12: "a small date indicator persist at the top so the mobile user can always see which date they are on").
- */
-function DatePin({ days, anchor }: { days: Date[]; anchor: React.RefObject<HTMLDivElement | null> }) {
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    const check = () => {
-      const el = anchor.current;
-      setShown(!!el && el.getBoundingClientRect().top < 8);
-    };
-    check();
-    window.addEventListener("scroll", check, { passive: true });
-    return () => window.removeEventListener("scroll", check);
-  }, [anchor]);
-  if (days.length === 0) return null;
-  const f = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleDateString(undefined, o);
-  const a = days[0];
-  const b = days[days.length - 1];
-  const words =
-    days.length === 1
-      ? f(a, { weekday: "short", month: "short", day: "numeric" })
-      : a.getMonth() === b.getMonth()
-        ? `${f(a, { month: "short", day: "numeric" })} – ${b.getDate()}`
-        : `${f(a, { month: "short", day: "numeric" })} – ${f(b, { month: "short", day: "numeric" })}`;
+/** On the time bar, just above its first mark or below its last: shows the early-morning or late-night hours, or folds them away. */
+function HoursButton({ side, open, hidden, isAdventure, top, onToggle }: { side: "early" | "late"; open: boolean; hidden: number; isAdventure: boolean; top: number; onToggle: () => void }) {
+  const words = side === "early" ? (open ? "Hide before 7 AM" : "Show before 7 AM") : open ? "Hide after 10:30 PM" : "Show after 10:30 PM";
+  const up = side === "early" ? !open : open;
   return (
-    <div aria-hidden={!shown} className="pointer-events-none sticky top-2 z-[32] flex h-0 justify-center md:hidden">
-      <span
-        data-date-pin
-        className="h-7 rounded-full px-3 text-[13px] font-semibold leading-7 transition-[opacity,transform] duration-200"
-        style={{ opacity: shown ? 1 : 0, transform: shown ? "none" : "translateY(-6px)", background: "radial-gradient(circle at 35% 25%, #fbefcb, #ead49a 70%)", border: "1px solid #a88a3f", color: "#2a1c10", boxShadow: "0 2px 8px rgba(0,0,0,.25)" }}
-      >
-        {words}
-      </span>
-    </div>
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={words}
+      title={words}
+      onClick={onToggle}
+      data-hours={side}
+      className="absolute left-[3px] z-[31] flex h-[22px] w-[34px] items-center justify-center gap-0.5 rounded-full"
+      style={{ top, color: "var(--t-ink-soft)", border: `1px solid ${isAdventure ? "rgba(168,138,63,.6)" : "var(--t-card-border)"}`, background: isAdventure ? "rgba(251,240,212,.85)" : "var(--t-card)" }}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: up ? undefined : "rotate(180deg)" }}>
+        <path d="M5 15l7-7 7 7" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {!open && hidden > 0 && (
+        <span className="rounded-full px-1 text-[10px] font-bold leading-[14px]" style={{ background: "#d9b45f", color: "#2a1c10" }}>
+          {hidden}
+        </span>
+      )}
+    </button>
   );
 }
 
-/** A quiet line above or below the hours: shows the early-morning or late-night hours, or folds them away again. */
-function HoursButton({ side, open, hidden, isAdventure, onToggle }: { side: "early" | "late"; open: boolean; hidden: number; isAdventure: boolean; onToggle: () => void }) {
-  const words = side === "early" ? (open ? "▾ Hide before 7 AM" : "▴ Before 7 AM") : open ? "▴ Hide after 10:30 PM" : "▾ After 10:30 PM";
+/** "Today" beside the + button: brings today and now's hour back to the middle of the screen. */
+function GoToday({ onClick }: { onClick: () => void }) {
   return (
-    <div className="flex justify-center py-1">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={onToggle}
-        data-hours={side}
-        className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold"
-        style={{ color: "var(--t-ink-soft)", border: `1px solid ${isAdventure ? "rgba(168,138,63,.55)" : "var(--t-card-border)"}`, background: isAdventure ? "rgba(243,230,200,.6)" : "var(--t-card)" }}
-      >
-        {words}
-        {!open && hidden > 0 && (
-          <span className="rounded-full px-1.5 text-[11px] font-bold leading-[16px]" style={{ background: "#d9b45f", color: "#2a1c10" }}>
-            {hidden}
-          </span>
-        )}
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      data-go-today
+      data-hide-when-typing
+      aria-label="Go to today"
+      title="Go to today"
+      className="card-pop-in fixed bottom-[92px] z-[46] flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-semibold"
+      style={{ left: "calc(var(--fab-x, 50%) + 36px)", background: "radial-gradient(circle at 35% 25%, #fbefcb, #ead49a 70%)", border: "1px solid #a88a3f", color: "#2a1c10", boxShadow: "0 3px 10px rgba(0,0,0,.25)" }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect x="4" y="5" width="16" height="15" rx="2.5" stroke="currentColor" strokeWidth="2" />
+        <path d="M4 10h16M9 3v4M15 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="12" cy="15" r="1.8" fill="currentColor" />
+      </svg>
+      Today
+    </button>
   );
 }
 
@@ -1657,6 +1745,18 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
         </div>
       )}
     </>
+  );
+}
+
+/** The hour's chance of rain written inside a blue-filled cloud. */
+function RainPct({ pct }: { pct: number }) {
+  return (
+    <svg width="32" height="17" viewBox="0 0 32 17" aria-label={`${pct}% chance of rain`} className="mt-px block">
+      <path d="M8 16a5 5 0 0 1-1-9.9A7 7 0 0 1 20.2 4.4 5.6 5.6 0 0 1 25 16z" fill="#5b8fd6" stroke="#2f5f99" strokeWidth="1" strokeLinejoin="round" />
+      <text x="16.2" y="12.6" textAnchor="middle" fontSize="7.6" fontWeight="700" fill="#fff" style={{ fontVariantNumeric: "tabular-nums" }}>
+        {pct}%
+      </text>
+    </svg>
   );
 }
 
