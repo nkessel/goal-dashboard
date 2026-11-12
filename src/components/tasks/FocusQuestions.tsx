@@ -8,7 +8,7 @@ import { CloseIcon } from "@/components/ui/Icons";
 /** The lantern beside Today's Quests (owner, Nov 4): opens the focusing questions under the header. */
 export function FocusQuestionsButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
-    <button type="button" onClick={onToggle} aria-expanded={open} aria-label="Focusing questions" title="Focusing questions" className="today-head-btn flex h-8 w-8 items-center justify-center rounded-full">
+    <button type="button" onClick={onToggle} aria-expanded={open} aria-label="Focus: a question, Prioritize and Auto-schedule" title="Focus: a question, Prioritize and Auto-schedule" className="today-head-btn flex h-8 w-8 items-center justify-center rounded-full">
       {/* A compass (owner's pick, Nov 9: "L3a"): questions that point the way. */}
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
         <circle cx="12" cy="12" r="9.2" stroke="currentColor" strokeWidth="1.7" />
@@ -24,7 +24,7 @@ export function FocusQuestionsButton({ open, onToggle }: { open: boolean; onTogg
  * One focusing question at a time, with ‹ › to step through them; ✎ edits the list in place
  * (type over one, ✕ removes it, "+ Add a question"). Kept on the account.
  */
-export function FocusQuestions({ open }: { open: boolean }) {
+export function FocusQuestions({ open, children }: { open: boolean; /** The day's tools under the question (Prioritize, Auto-schedule). */ children?: React.ReactNode }) {
   const [list, setList] = useState<string[] | null>(null);
   const [i, setI] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -85,6 +85,7 @@ export function FocusQuestions({ open }: { open: boolean }) {
             </div>
           </div>
         )}
+        {children && !editing && <div className="flex flex-wrap items-center justify-center gap-2 pt-1">{children}</div>}
       </div>
     </Fold>
   );

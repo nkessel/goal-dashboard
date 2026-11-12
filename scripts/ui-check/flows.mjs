@@ -288,43 +288,51 @@ export const FLOWS = [
         await h.check("progress stepper");
         await h.tap((p) => p.getByTitle("Log progress").first(), "close progress stepper", { optional: true, expectMove: true });
       }
-      // Focusing questions: the lantern left of Today's Quests (owner, Nov 4).
+      // The compass left of Today's Quests: a focusing question, with Prioritize and Auto-schedule under it (owner, Nov 12).
+      const compass = (p) => p.getByRole("button", { name: /^focus: a question/i }).first();
       await h.page.hover("text=Today's Quests").catch(() => {});
-      if (await h.tap((p) => p.getByRole("button", { name: /^focusing questions$/i }).first(), "focusing questions", { optional: true, expectMove: true })) {
+      if (await h.tap(compass, "compass", { expectMove: true })) {
         await h.settle(600);
-        await h.check("focusing questions");
-        await h.tap((p) => p.getByRole("button", { name: /^focusing questions$/i }).first(), "focusing questions close", { optional: true, expectMove: true });
+        await h.check("compass: question and tools");
       }
-      // Prioritize today (owner, Nov 10): cards (rate one, snooze row) and the list (dates, snooze).
-      await h.page.hover("text=Today's Quests").catch(() => {});
-      if (await h.tap((p) => p.getByRole("button", { name: /^prioritize today$/i }).first(), "prioritize today", { optional: true, expectMove: true })) {
+      // Prioritize: today's quests first, one five-part bar, Save, skip by swipe, additional quests behind a button.
+      if (await h.tap((p) => p.getByRole("button", { name: /^prioritize$/i }).first(), "prioritize", { expectMove: true })) {
         await h.settle(1200);
         await h.check("prioritize cards");
         await h.tap((p) => p.locator("[data-prioritize-card]").getByRole("button", { name: /add a due or plan-by date|due|plan/i }).first(), "card dates", { optional: true, expectMove: true });
         await h.check("prioritize card dates");
-        await h.tap((p) => p.locator("[data-prioritize]").getByRole("radio", { name: /^importance 3$/i }).first(), "rate 3 for today", { optional: true, expectMove: true });
-        await h.settle(500);
-        await h.check("prioritize next card");
-        await h.tap((p) => p.locator("[data-prioritize]").getByRole("button", { name: /snooze/i }).last(), "card snooze", { optional: true, expectMove: true });
+        const bars = h.page.locator("[data-prioritize-card] [data-prioritize-bars]").first();
+        if (await bars.count()) {
+          const r = await bars.boundingBox();
+          // Tap the third part, then Save.
+          if (r) await h.page.mouse.click(r.x + r.width * 0.5, r.y + r.height / 2);
+          await h.settle(300);
+          await h.check("prioritize: 3 of 5 chosen");
+          await h.tap((p) => p.locator("[data-prioritize-save]").first(), "save the priority", { optional: true, expectMove: true });
+          await h.settle(600);
+          await h.check("prioritize: saved, next");
+        }
+        await h.tap((p) => p.locator("[data-prioritize]").getByRole("button", { name: /^snooze…$/i }).first(), "card snooze", { optional: true, expectMove: true });
         await h.check("prioritize snooze row");
         await h.tap((p) => p.getByRole("tab", { name: /^list$/i }).first(), "prioritize list", { optional: true, expectMove: true });
         await h.check("prioritize list");
         await h.tap((p) => p.locator("[data-prioritize]").getByRole("button", { name: /due and plan-by dates/i }).first(), "list dates", { optional: true, expectMove: true });
         await h.check("prioritize list dates");
+        if (await h.tap((p) => p.locator("[data-prioritize-more]").first(), "additional quests", { optional: true, expectMove: true })) {
+          await h.settle(400);
+          await h.check("prioritize: additional quests");
+        }
         await h.tap((p) => p.getByRole("tab", { name: /^cards$/i }).first(), "back to cards", { optional: true, expectMove: true });
         await esc(h);
       }
-      // ✨ Plan my day from Today's Quests header (owner, Nov 2): today's quests placed around the day.
-      await h.page.hover("text=Today's Quests").catch(() => {});
-      if (await h.tap((p) => p.getByRole("button", { name: /^plan my day$/i }).first(), "plan my day", { optional: true, expectMove: true })) {
-        await h.settle(1500);
-        await h.check("plan my day");
-        // Plan my day is the auto-scheduler on the calendar (owner, Nov 3): the day view with the window listing today's quests.
-        if (await h.tap((p) => p.getByRole("button", { name: /auto-schedule$/i }).first(), "auto-scheduler: auto-schedule one", { optional: true, expectMove: true })) {
-          await h.settle(1500);
-          await h.check("auto-scheduler: placed one");
-        }
-        await h.goto("/", { name: "today" });
+      // Auto-schedule from the compass: a popup with today's quests, right on Today (owner, Nov 12: not the calendar screen).
+      await h.settle(500);
+      if (!(await h.page.getByRole("button", { name: /^auto-schedule$/i }).first().isVisible().catch(() => false))) await h.tap(compass, "compass again", { optional: true, expectMove: true });
+      if (await h.tap((p) => p.getByRole("button", { name: /^auto-schedule$/i }).first(), "auto-schedule today", { expectMove: true })) {
+        await h.settle(2500);
+        if (!/^\/($|\?)/.test(new URL(h.page.url()).pathname + "")) throw new Error("Auto-schedule left Today: " + h.page.url());
+        await h.check("auto-schedule popup on Today");
+        await esc(h);
       }
     },
   },
@@ -396,6 +404,12 @@ export const FLOWS = [
         await h.settle(400);
         await h.check("+ closed by ×");
       }
+      // Opened again after a × close, it must stay open (owner, Nov 12: every later tap opened and shut it at once).
+      await h.tap(/^create something new$/i, "+ button a third time", { expectMove: true });
+      await h.settle(900);
+      if ((await h.page.locator(".create-sheet").count()) === 0) throw new Error("+ sheet closed itself after reopening");
+      await h.check("+ sheet reopened");
+      await esc(h);
     },
   },
   {

@@ -75,9 +75,11 @@ function snoozeChoices(day: Day): { main: { label: string; at: () => Date | "tom
 const VIEW_KEY = "prioritize-view";
 
 /**
- * Prioritize today's or tomorrow's quests (owner, Nov 10): one card at a time (swipe left for Snooze,
- * right to add it, or tap how important it is for the day, 1–5 bars) or a list with the same controls.
- * Due and plan-by dates sit behind one 📅 button on each. Ratings order the day's list, highest first.
+ * Prioritize today's or tomorrow's quests (owner, Nov 10; reworked Nov 12): the day's own quests first, one
+ * card at a time or as a list; additional quests wait behind a button. Set how important it is for the day
+ * on one five-part bar (drag or tap), then Save: nothing is kept until then. Swipe a card left to skip it
+ * for now (Undo on the next card); Snooze hides it until the time you pick. Swiping right does nothing for
+ * now (owner: paused while that's rethought). Due and plan-by dates sit behind one 📅 button.
  */
 export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm" | "adventure"; onClose: () => void }) {
   const router = useRouter();
@@ -95,11 +97,15 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
   const [snoozed, setSnoozed] = useState<string[]>([]);
   const [undo, setUndo] = useState<Undo | null>(null);
   const changed = useRef(false);
+  // The day's own quests come first; additional quests only once asked for.
+  const [more, setMore] = useState(false);
+  // What was on the day when it opened: a quest added from here stays under "additional" for this visit.
+  const [first, setFirst] = useState<Set<string> | null>(null);
 
   useEffect(() => {
     let live = true;
     prioritizeAction(day)
-      .then((d) => live && setData(d))
+      .then((d) => live && (setData(d), setFirst(new Set(d.onDay))))
       .catch((e) => live && setError(e instanceof Error ? e.message : "Couldn't load your quests."));
     return () => {
       live = false;
@@ -118,7 +124,12 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
   const items = (data?.items ?? []).filter((t) => !t.snoozed && !snoozed.includes(t.id));
   const onDay = new Set(data?.onDay ?? []);
   const ratings = data?.ratings ?? {};
-  const deck = items.filter((t) => !onDay.has(t.id) && !done.includes(t.id));
+  const mine = first ?? new Set<string>();
+  const dayItems = items.filter((t) => mine.has(t.id));
+  const moreItems = items.filter((t) => !mine.has(t.id));
+  // Unrated ones first, so what's still undecided comes up before what you already placed.
+  const unratedFirst = (a: PrioritizeItem, b: PrioritizeItem) => Number(!!ratings[a.id]) - Number(!!ratings[b.id]);
+  const deck = [...(more ? moreItems : dayItems)].filter((t) => !done.includes(t.id)).sort(unratedFirst);
   const dayWord = day === "today" ? "today" : "tomorrow";
 
   const patchItem = (id: string, p: Partial<PrioritizeItem>) => setData((d) => d && { ...d, items: d.items.map((t) => (t.id === id ? { ...t, ...p } : t)) });
@@ -134,9 +145,10 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
     setData((d) => d && { ...d, onDay: wasOn ? d.onDay : [...d.onDay, t.id], ratings: n ? { ...d.ratings, [t.id]: n } : d.ratings });
     setDone((v) => (v.includes(t.id) ? v : [...v, t.id]));
     run(rateForDayAction(day, t.id, n));
-    if (!wasOn)
+    if (wasOn) setUndo({ label: n ? `Saved · ${n} of 5` : "Saved", run: async () => setDone((v) => v.filter((x) => x !== t.id)) });
+    else
       setUndo({
-        label: `Added to ${dayWord}`,
+        label: `Saved and added to ${dayWord}`,
         run: async () => {
           setData((d) => d && { ...d, onDay: d.onDay.filter((x) => x !== t.id) });
           setDone((v) => v.filter((x) => x !== t.id));
@@ -147,7 +159,7 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
 
   function skip(t: PrioritizeItem) {
     setDone((v) => [...v, t.id]);
-    setUndo({ label: "Skipped", run: async () => setDone((v) => v.filter((x) => x !== t.id)) });
+    setUndo({ label: `Skipped “${t.title.length > 26 ? t.title.slice(0, 25) + "…" : t.title}” for now`, run: async () => setDone((v) => v.filter((x) => x !== t.id)) });
   }
 
   function snooze(t: PrioritizeItem, at: Date | "tomorrow", label: string) {
@@ -217,20 +229,31 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
             </p>
           )}
 
+          {data && (
+            <div className="flex items-center gap-2">
+              <h3 className="font-display m-0 flex-1 text-[15px] uppercase tracking-[.08em]" style={{ color: "#6b5631" }}>
+                {more ? "Additional quests" : day === "today" ? "Today’s quests" : "Tomorrow’s quests"}
+              </h3>
+              {more && (
+                <button type="button" onClick={() => setMore(false)} className="h-8 text-[13px] font-semibold underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+                  ‹ Back to {dayWord}’s
+                </button>
+              )}
+            </div>
+          )}
+
           {data && view === "cards" && (
-            <div className="flex min-h-[340px] flex-col">
+            <div className="flex min-h-[330px] flex-col">
               {deck.length > 0 ? (
-                <Deck key={deck[0].id} cards={deck.slice(0, 3)} rating={ratings[deck[0].id] ?? 0} left={deck.length} {...tools} />
+                <Deck key={deck[0].id} cards={deck.slice(0, 3)} rating={ratings[deck[0].id] ?? 0} left={deck.length} on={onDay.has(deck[0].id)} {...tools} />
               ) : (
-                <div className="reveal flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center">
+                <div className="reveal flex flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
                   <span aria-hidden className="text-[30px]" style={{ color: "#c9a24a" }}>
                     ✦
                   </span>
-                  <p className="font-display m-0 text-[18px]">Every quest has its place.</p>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => pickView("list")} className="h-9 rounded-full px-4 text-[13.5px] font-semibold" style={{ border: "1px solid rgba(139,112,64,.5)" }}>
-                      See the list
-                    </button>
+                  <p className="font-display m-0 text-[18px]">{more ? "Every quest has its place." : dayItems.length ? `${day === "today" ? "Today" : "Tomorrow"}’s quests are in order.` : `Nothing on ${dayWord}’s list yet.`}</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {!more && moreItems.length > 0 && <MoreButton n={moreItems.length} onClick={() => setMore(true)} />}
                     <button type="button" onClick={requestClose} className="h-9 rounded-full px-4 text-[13.5px] font-bold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
                       Done
                     </button>
@@ -242,22 +265,29 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
 
           {data && view === "list" && (
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-              {[...items]
-                .sort((a, b) => Number(onDay.has(b.id)) - Number(onDay.has(a.id)) || (ratings[b.id] ?? 0) - (ratings[a.id] ?? 0))
+              {[...(more ? moreItems : dayItems)]
+                .sort((a, b) => (ratings[b.id] ?? 0) - (ratings[a.id] ?? 0))
                 .map((t) => (
                   <Row key={t.id} t={t} on={onDay.has(t.id)} rating={ratings[t.id] ?? 0} {...tools} />
                 ))}
-              {items.length === 0 && (
-                <li className="py-8 text-center text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>
-                  No open quests to sort.
+              {(more ? moreItems : dayItems).length === 0 && (
+                <li className="py-6 text-center text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>
+                  {more ? "No other open quests." : `Nothing on ${dayWord}’s list yet.`}
                 </li>
               )}
             </ul>
           )}
 
+          {/* Additional quests stay out of the way until today's are done (owner, Nov 12). */}
+          {data && !more && moreItems.length > 0 && (view === "list" || deck.length > 0) && (
+            <div className="flex justify-center">
+              <MoreButton n={moreItems.length} onClick={() => setMore(true)} />
+            </div>
+          )}
+
           <div className="flex min-h-[28px] items-center justify-center">
             {undo && (
-              <span key={undo.label + done.length + snoozed.length} className="fade-in flex items-center gap-2 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+              <span key={undo.label + done.length + snoozed.length} data-prioritize-undo className="fade-in flex items-center gap-2 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
                 {undo.label}
                 <button
                   type="button"
@@ -289,28 +319,37 @@ type Tools = {
   setPlan: (t: PrioritizeItem, days: number | null) => void;
 };
 
-const FLY = 90;
-const REVEAL = 116;
+function MoreButton({ n, onClick }: { n: number; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} data-prioritize-more className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-4 text-[13.5px] font-semibold">
+      Additional quests ({n}) ›
+    </button>
+  );
+}
+
+const FLY = 80;
 
 /** The top card and the edges of the next two behind it. */
-function Deck({ cards, rating, left, day, rate, skip, snooze, setDue, setPlan }: Tools & { cards: PrioritizeItem[]; rating: number; left: number }) {
+function Deck({ cards, rating, left, on, day, rate, skip, snooze, setDue, setPlan }: Tools & { cards: PrioritizeItem[]; rating: number; left: number; on: boolean }) {
   const t = cards[0];
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const [out, setOut] = useState<null | "right" | "left">(null);
+  const [out, setOut] = useState<null | "left" | "up">(null);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const [other, setOther] = useState(false);
-  const start = useRef<{ x: number; y: number; base: number; dir: "x" | "y" | null } | null>(null);
+  // The level waits here until Save (owner, Nov 12: "save the priority with a button before it saves and goes to another item").
+  const [level, setLevel] = useState(rating);
+  const start = useRef<{ x: number; y: number; dir: "x" | "y" | null } | null>(null);
   const choices = snoozeChoices(day);
+  const dayWord = day === "today" ? "today" : "tomorrow";
 
-  const fly = (dir: "right" | "left", then: () => void) => {
+  const fly = (dir: "left" | "up", then: () => void) => {
     setOut(dir);
     window.setTimeout(then, 230);
   };
-  const add = (n: number | null) => fly("right", () => rate(t, n));
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
       <div className="relative" style={{ minHeight: 236, overflowX: "clip", overflowY: "visible", paddingBottom: 2 }}>
         {cards
           .slice(1)
@@ -318,13 +357,10 @@ function Deck({ cards, rating, left, day, rate, skip, snooze, setDue, setPlan }:
           .map((c, i, arr) => (
             <div key={c.id} aria-hidden className="absolute inset-x-0 top-0 rounded-[18px]" style={{ height: 228, transform: `translateY(${(arr.length - i) * 7}px) scale(${1 - (arr.length - i) * 0.04})`, background: "#f5e9cc", border: "1px solid rgba(139,112,64,.35)", boxShadow: "0 2px 6px rgba(60,40,10,.15)" }} />
           ))}
-        {/* Snooze waits behind the card, on the right, for a swipe left. */}
-        <div className="absolute inset-y-0 right-0 z-[1] flex w-[110px] flex-col items-center justify-center gap-1.5" aria-hidden={dx > -40 && !snoozeOpen}>
-          <button type="button" tabIndex={dx < -40 ? 0 : -1} onClick={() => setSnoozeOpen(true)} className="flex h-16 w-16 flex-col items-center justify-center gap-0.5 rounded-2xl text-[12px] font-bold" style={{ background: "linear-gradient(180deg,#5b6fa8,#3c4c80)", color: "#eef2ff", opacity: Math.min(1, -dx / REVEAL) }}>
-            <SnoozeIcon size={20} />
-            Snooze
-          </button>
-        </div>
+        {/* What a swipe left does, shown as the card moves. */}
+        <span aria-hidden className="absolute inset-y-0 right-3 z-[1] flex items-center text-[13px] font-semibold" style={{ color: "#6b5631", opacity: Math.min(1, -dx / FLY) }}>
+          Skip for now
+        </span>
         <div
           className="quest-card relative z-[2] flex flex-col gap-2.5 rounded-[18px] p-4"
           data-prioritize-card
@@ -334,13 +370,13 @@ function Deck({ cards, rating, left, day, rate, skip, snooze, setDue, setPlan }:
             border: "1.5px solid #c9a24a",
             boxShadow: "0 6px 18px rgba(60,40,10,.25)",
             touchAction: "pan-y",
-            transform: out ? `translateX(${out === "right" ? 120 : -120}%) rotate(${out === "right" ? 8 : -8}deg)` : `translateX(${dx}px) rotate(${dragging ? dx / 30 : 0}deg)`,
+            transform: out === "left" ? "translateX(-120%) rotate(-8deg)" : out === "up" ? "translateY(-24px) scale(.96)" : `translateX(${dx}px) rotate(${dragging ? dx / 30 : 0}deg)`,
             opacity: out ? 0 : 1,
             transition: dragging ? "none" : "transform 230ms cubic-bezier(.2,.8,.3,1), opacity 230ms",
           }}
           onPointerDown={(e) => {
             if ((e.target as HTMLElement).closest("button, input, a, [data-no-swipe]")) return;
-            start.current = { x: e.clientX, y: e.clientY, base: dx, dir: null };
+            start.current = { x: e.clientX, y: e.clientY, dir: null };
           }}
           onPointerMove={(e) => {
             const s = start.current;
@@ -354,19 +390,16 @@ function Deck({ cards, rating, left, day, rate, skip, snooze, setDue, setPlan }:
             }
             if (s.dir !== "x") return;
             setDragging(true);
-            setDx(Math.max(-REVEAL - 30, s.base + mx));
+            // Left only: a pull to the right just resists (adding by swipe is paused).
+            setDx(mx < 0 ? mx : Math.min(14, mx / 6));
           }}
           onPointerUp={() => {
             const s = start.current;
             start.current = null;
             if (!s || s.dir !== "x") return;
             setDragging(false);
-            if (dx > FLY) add(null);
-            else if (dx < -50) setDx(-REVEAL);
-            else {
-              setDx(0);
-              setSnoozeOpen(false);
-            }
+            if (dx < -FLY) fly("left", () => skip(t));
+            else setDx(0);
           }}
           onPointerCancel={() => {
             start.current = null;
@@ -387,9 +420,9 @@ function Deck({ cards, rating, left, day, rate, skip, snooze, setDue, setPlan }:
           </div>
           <div className="flex flex-col items-center gap-1.5 pt-1" data-no-swipe>
             <span className="text-[12.5px] font-semibold" style={{ color: "#6b5631" }}>
-              How important {day === "today" ? "today" : "tomorrow"}?
+              How important {dayWord}? {level ? <b style={{ color: "#2a1c10" }}>{level} of 5</b> : <span className="font-normal opacity-80">drag or tap</span>}
             </span>
-            <Bars value={rating} onPick={(n) => add(n)} big />
+            <Bars value={level} onPick={setLevel} big />
           </div>
           <Dates t={t} setDue={setDue} setPlan={setPlan} />
           <span className="text-[11.5px]" style={{ color: "rgba(107,86,49,.65)", textAlign: "center" }}>
@@ -401,7 +434,7 @@ function Deck({ cards, rating, left, day, rate, skip, snooze, setDue, setPlan }:
       <Fold open={snoozeOpen}>
         <div className="qe-fact-panel flex flex-wrap items-center justify-center gap-1.5 rounded-xl px-3 py-2" data-no-swipe>
           <span className="text-[12.5px] font-semibold" style={{ color: "#6b5631" }}>
-            Snooze
+            Hide it until
           </span>
           {choices.main.map((c) => (
             <button key={c.label} type="button" onClick={() => fly("left", () => snooze(t, c.at(), c.label))} className="qe-fact h-8 rounded-full px-3 text-[13px] font-semibold">
@@ -417,24 +450,24 @@ function Deck({ cards, rating, left, day, rate, skip, snooze, setDue, setPlan }:
                 {c.label}
               </button>
             ))}
-          <button type="button" onClick={() => (setSnoozeOpen(false), setOther(false), setDx(0))} aria-label="Keep it" className="flex h-8 w-8 items-center justify-center rounded-full" style={{ color: "#6b5631" }}>
+          <button type="button" onClick={() => (setSnoozeOpen(false), setOther(false))} aria-label="Keep it" className="flex h-8 w-8 items-center justify-center rounded-full" style={{ color: "#6b5631" }}>
             <CloseIcon size={12} />
           </button>
         </div>
       </Fold>
 
-      {/* The same three moves without swiping. */}
       <div className="flex items-center justify-between gap-2">
-        <button type="button" onClick={() => (setDx(-REVEAL), setSnoozeOpen(true))} className="flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1px solid rgba(91,111,168,.55)", color: "#3c4c80" }}>
-          ‹ <SnoozeIcon size={15} /> Snooze
+        <button type="button" aria-expanded={snoozeOpen} onClick={() => setSnoozeOpen((v) => !v)} className="flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1px solid rgba(91,111,168,.55)", color: "#3c4c80" }}>
+          <SnoozeIcon size={15} /> Snooze…
         </button>
-        <button type="button" onClick={() => fly("left", () => skip(t))} className="h-10 rounded-full px-3.5 text-[13.5px]" style={{ color: "var(--t-ink-soft)" }}>
-          Skip
-        </button>
-        <button type="button" onClick={() => add(null)} className="flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-bold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
-          Add to {day === "today" ? "today" : "tomorrow"} ›
+        <button type="button" disabled={!level} onClick={() => fly("up", () => rate(t, level))} data-prioritize-save className="flex h-10 items-center gap-1.5 rounded-full px-5 text-[13.5px] font-bold transition-opacity" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10", opacity: level ? 1 : 0.45 }}>
+          {on ? "Save" : `Save · add to ${dayWord}`}
         </button>
       </div>
+      {/* What each move does, in a line (owner, Nov 12: "more explanation of what skip vs snooze does"). */}
+      <p className="m-0 text-center text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+        <b>Swipe left</b> to skip it for now: nothing changes. <b>Snooze</b> hides it from your lists until the time you pick.
+      </p>
     </div>
   );
 }
@@ -442,32 +475,35 @@ function Deck({ cards, rating, left, day, rate, skip, snooze, setDue, setPlan }:
 /** One row of the list: the same moves as a card. */
 function Row({ t, on, rating, day, rate, snooze, setDue, setPlan }: Tools & { t: PrioritizeItem; on: boolean; rating: number }) {
   const [open, setOpen] = useState<null | "dates" | "snooze">(null);
+  const [level, setLevel] = useState(rating);
   const choices = snoozeChoices(day);
   const due = dueWords(t.due_at);
+  const dirty = level > 0 && level !== rating;
   return (
-    <li className="due-in rounded-2xl px-2.5 py-2" style={{ background: on ? "rgba(242,213,138,.22)" : "rgba(255,250,238,.55)", border: `1px solid ${on ? "rgba(201,162,74,.7)" : "rgba(139,112,64,.25)"}` }}>
+    <li className="due-in rounded-2xl px-2.5 py-2" style={{ background: "rgba(255,250,238,.55)", border: "1px solid rgba(139,112,64,.25)" }}>
       <div className="flex items-start gap-2">
         <Portrait t={t} size={30} />
-        <span className="min-w-0 flex-1 pt-1 text-[14px] font-semibold leading-tight">
-          {on && (
-            <span aria-label={`On ${day === "today" ? "today" : "tomorrow"}'s list`} style={{ color: "#a8812e" }}>
-              ✓{" "}
-            </span>
-          )}
-          {t.title}
-        </span>
+        <span className="min-w-0 flex-1 pt-1 text-[14px] font-semibold leading-tight">{t.title}</span>
       </div>
       <div className="mt-1 flex items-center gap-1.5 pl-[38px]">
         <span className="min-w-0 flex-1 truncate text-[11.5px]" style={{ color: due === "Overdue" ? "var(--t-warn)" : "var(--t-ink-soft)" }}>
           {[due, t.board].filter(Boolean).join(" · ")}
         </span>
-        <Bars value={rating} onPick={(n) => rate(t, n)} />
-        <button type="button" aria-expanded={open === "dates"} aria-label="Due and plan-by dates" title="Due and plan-by dates" onClick={() => setOpen((v) => (v === "dates" ? null : "dates"))} className="qe-fact flex h-8 w-8 items-center justify-center rounded-full text-[14px]" data-open={open === "dates" ? "true" : undefined}>
-          📅
-        </button>
-        <button type="button" aria-expanded={open === "snooze"} aria-label="Snooze" title="Snooze" onClick={() => setOpen((v) => (v === "snooze" ? null : "snooze"))} className="qe-fact flex h-8 w-8 items-center justify-center rounded-full" data-open={open === "snooze" ? "true" : undefined}>
-          <SnoozeIcon size={14} />
-        </button>
+        <Bars value={level} onPick={setLevel} />
+        {dirty ? (
+          <button type="button" onClick={() => rate(t, level)} className="fade-in h-8 rounded-full px-3 text-[12.5px] font-bold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
+            {on ? "Save" : "Save · add"}
+          </button>
+        ) : (
+          <>
+            <button type="button" aria-expanded={open === "dates"} aria-label="Due and plan-by dates" title="Due and plan-by dates" onClick={() => setOpen((v) => (v === "dates" ? null : "dates"))} className="qe-fact flex h-8 w-8 items-center justify-center rounded-full text-[14px]" data-open={open === "dates" ? "true" : undefined}>
+              📅
+            </button>
+            <button type="button" aria-expanded={open === "snooze"} aria-label="Snooze: hide it until later" title="Snooze: hide it until later" onClick={() => setOpen((v) => (v === "snooze" ? null : "snooze"))} className="qe-fact flex h-8 w-8 items-center justify-center rounded-full" data-open={open === "snooze" ? "true" : undefined}>
+              <SnoozeIcon size={14} />
+            </button>
+          </>
+        )}
       </div>
       <Fold open={open === "dates"}>
         <div className="pt-2">
@@ -476,6 +512,9 @@ function Row({ t, on, rating, day, rate, snooze, setDue, setPlan }: Tools & { t:
       </Fold>
       <Fold open={open === "snooze"}>
         <div className="flex flex-wrap items-center gap-1.5 pt-2">
+          <span className="text-[12px] font-semibold" style={{ color: "#6b5631" }}>
+            Hide it until
+          </span>
           {[...choices.main, ...choices.other].map((c) => (
             <button key={c.label} type="button" onClick={() => snooze(t, c.at(), c.label)} className="qe-fact h-8 rounded-full px-3 text-[12.5px] font-semibold">
               {c.label}
@@ -487,38 +526,64 @@ function Row({ t, on, rating, day, rate, snooze, setDue, setPlan }: Tools & { t:
   );
 }
 
-/** 1–5 rising bars: how important it is for the day. Tapping one adds it at that importance. */
+/**
+ * How important for the day: one line of five equal parts (owner, Nov 12). Drag along it or tap a part,
+ * as on the importance scales; tapping the last lit part again clears it. Arrow keys work too.
+ */
 function Bars({ value, onPick, big = false }: { value: number; onPick: (n: number) => void; big?: boolean }) {
-  const [hover, setHover] = useState(0);
-  const lit = hover || value;
-  const w = big ? 22 : 9;
-  const gap = big ? 8 : 3;
+  const track = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; moved: boolean; start: number } | null>(null);
+  const valueAt = (clientX: number) => {
+    const r = track.current!.getBoundingClientRect();
+    return Math.max(0, Math.min(5, Math.ceil(((clientX - r.left) / r.width) * 5)));
+  };
   return (
-    <div role="radiogroup" aria-label="How important for the day" className="flex items-end" style={{ gap }} onPointerLeave={() => setHover(0)}>
+    <div
+      ref={track}
+      role="slider"
+      tabIndex={0}
+      aria-label="How important for the day"
+      aria-valuemin={0}
+      aria-valuemax={5}
+      aria-valuenow={value}
+      data-prioritize-bars
+      className="flex cursor-pointer touch-none select-none items-center outline-offset-4"
+      style={{ gap: big ? 5 : 3, width: big ? 230 : 96, height: big ? 40 : 30 }}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { x: e.clientX, moved: false, start: value };
+      }}
+      onPointerMove={(e) => {
+        if (!drag.current) return;
+        if (Math.abs(e.clientX - drag.current.x) > 4) drag.current.moved = true;
+        if (drag.current.moved) onPick(valueAt(e.clientX));
+      }}
+      onPointerUp={(e) => {
+        const d = drag.current;
+        drag.current = null;
+        if (!d || d.moved) return;
+        const v = valueAt(e.clientX);
+        onPick(v === d.start ? 0 : v);
+      }}
+      onPointerCancel={() => (drag.current = null)}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowUp" || e.key === "ArrowRight") {
+          e.preventDefault();
+          onPick(Math.min(5, value + 1));
+        }
+        if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          onPick(Math.max(0, value - 1));
+        }
+      }}
+    >
       {[1, 2, 3, 4, 5].map((n) => (
-        <button
+        <span
           key={n}
-          type="button"
-          role="radio"
-          aria-checked={value === n}
-          aria-label={`Importance ${n}`}
-          onPointerEnter={(e) => e.pointerType === "mouse" && setHover(n)}
-          onClick={() => onPick(n)}
-          className="flex items-end justify-center"
-          style={{ width: big ? w + 10 : w + 6, height: big ? 44 : 30 }}
-        >
-          <span
-            aria-hidden
-            className="block rounded-[3px] transition-[background,transform] duration-150"
-            style={{
-              width: w,
-              height: (big ? 10 : 7) + n * (big ? 6.5 : 4.2),
-              background: n <= lit ? "linear-gradient(180deg,#f6dc8e,#c9a24a)" : "rgba(139,112,64,.18)",
-              border: `1px solid ${n <= lit ? "#8a6116" : "rgba(139,112,64,.35)"}`,
-              transform: hover === n ? "translateY(-2px)" : undefined,
-            }}
-          />
-        </button>
+          aria-hidden
+          className="pointer-events-none block flex-1 rounded-full transition-[background] duration-150"
+          style={{ height: big ? 14 : 9, background: n <= value ? "linear-gradient(180deg,#f6dc8e,#c9a24a)" : "rgba(139,112,64,.18)", border: `1px solid ${n <= value ? "#8a6116" : "rgba(139,112,64,.35)"}` }}
+        />
       ))}
     </div>
   );

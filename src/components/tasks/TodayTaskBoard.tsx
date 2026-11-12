@@ -604,7 +604,7 @@ export function TodayTaskBoard({
               <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
                 <div className="today-head relative">
                 {isAdventure ? (
-                  <div className={`flex items-center gap-2 px-1 ${todayOpen ? "max-sm:pl-[40px] max-sm:pr-[84px]" : ""}`}>
+                  <div className={`flex items-center gap-2 px-1 ${todayOpen ? "max-sm:pl-[40px] max-sm:pr-[40px]" : ""}`}>
                     <span className="hidden flex-1 sm:flex">
                       <GoldRule dir="left" />
                     </span>
@@ -612,7 +612,7 @@ export function TodayTaskBoard({
                     <span className={todayOpen ? "max-sm:hidden" : ""}>
                       <Leaf flip />
                     </span>
-                    <h2 className="font-display m-0 whitespace-nowrap text-[23px] leading-none sm:text-[27px]" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
+                    <h2 className="font-display m-0 whitespace-nowrap pb-[3px] text-[23px] leading-[1.3] sm:text-[27px]" style={{ color: "var(--t-cream)", textShadow: "0 2px 8px rgba(0,0,0,.45)" }}>
                       <button type="button" onClick={() => setTodayOpen((v) => !v)} aria-expanded={todayOpen} className="cursor-pointer select-none">
                         Today&apos;s Quests
                       </button>
@@ -639,15 +639,8 @@ export function TodayTaskBoard({
                 <span className="today-head-actions absolute left-0.5 top-1/2 flex -translate-y-1/2 items-center" data-open={todayOpen || focusOpen ? "true" : "false"}>
                   <FocusQuestionsButton open={focusOpen} onToggle={() => setFocusOpen((v) => !v)} />
                 </span>
-                {/* Plan my day and a new quest straight into Today's Quests: on hover (always while the section is open on touch screens). */}
+                {/* A new quest straight into Today's Quests: on hover (always while the section is open on touch screens). Prioritize and Auto-schedule wait behind the compass (owner, Nov 12). */}
                 <span className="today-head-actions absolute right-0.5 top-1/2 flex -translate-y-1/2 items-center gap-1.5" data-open={todayOpen ? "true" : "false"}>
-                  <button type="button" onClick={() => setPrioritizing(true)} aria-label="Prioritize today" title="Prioritize today: cards or a list" className="today-head-btn flex h-8 w-8 items-center justify-center rounded-full">
-                    <PrioritizeIcon size={15} />
-                  </button>
-                  <button type="button" onClick={openPlanMyDay} aria-label="Plan my day" title="Plan my day: find today's quests a time" className="today-head-btn flex h-8 items-center gap-1 rounded-full px-2.5 text-[13px] font-semibold">
-                    <MagicCalendarIcon size={15} />
-                    <span className="hidden sm:inline">Plan my day</span>
-                  </button>
                   <button type="button" onClick={() => setAdding(true)} aria-label="Add a quest to Today's Quests" title="Add a quest to Today" className="today-head-btn flex h-8 w-8 items-center justify-center rounded-full">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                       <path d="M7 1.5v11M1.5 7h11" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
@@ -655,7 +648,14 @@ export function TodayTaskBoard({
                   </button>
                 </span>
                 </div>
-                <FocusQuestions open={focusOpen} />
+                <FocusQuestions open={focusOpen}>
+                  <button type="button" onClick={() => setPrioritizing(true)} className="today-head-btn flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold">
+                    <PrioritizeIcon size={15} /> Prioritize
+                  </button>
+                  <button type="button" onClick={openPlanMyDay} className="today-head-btn flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold">
+                    <MagicCalendarIcon size={15} /> Auto-schedule
+                  </button>
+                </FocusQuestions>
                 {prioritizing && <PrioritizeTool day="today" theme={theme} onClose={() => setPrioritizing(false)} />}
                 {adding && <CreateSheet kinds={["quest"]} initial="quest" pinToToday theme={theme} onClose={() => setAdding(false)} />}
 

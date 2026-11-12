@@ -89,8 +89,10 @@ export function CreateSheet({
   useEffect(() => {
     closeRef.current = requestClose;
   });
+  // Only a new ask closes it: the count it opened with is the last sheet's (it closed every sheet after the first; owner, Nov 12).
+  const shutAtOpen = useRef(shut);
   useEffect(() => {
-    if (shut) closeRef.current();
+    if (shut !== shutAtOpen.current) closeRef.current();
   }, [shut]);
   const [toolbar, setToolbar] = useState<HTMLSpanElement | null>(null);
 
