@@ -354,7 +354,9 @@ export const FLOWS = [
       }
       if (!h.isPhone) {
         // Drag the first of Today's Quests onto 2 PM with a mouse.
-        const card = h.page.locator("[data-section='today'] .quest-card, .quest-card").first();
+        const card = h.page.locator(".quest-card", { hasText: "Relational Leadership" }).first();
+        await card.scrollIntoViewIfNeeded().catch(() => {});
+        await h.settle(300);
         const cell = h.page.locator("[data-today-cal] [data-cal-hit]").first();
         const cb = await card.boundingBox().catch(() => null);
         const hb = await cell.boundingBox().catch(() => null);
@@ -362,7 +364,8 @@ export const FLOWS = [
           await h.page.mouse.move(cb.x + 40, cb.y + 20);
           await h.page.mouse.down();
           await h.page.mouse.move(cb.x + 60, cb.y + 30, { steps: 4 });
-          await h.page.mouse.move(hb.x + hb.width / 2, hb.y + Math.min(hb.height - 20, 260), { steps: 14 });
+          const hb2 = (await cell.boundingBox().catch(() => null)) ?? hb;
+          await h.page.mouse.move(hb2.x + hb2.width / 2, Math.max(hb2.y + 40, 300), { steps: 14 });
           await h.settle(300);
           await h.check("dragging a card over the calendar");
           await h.page.mouse.up();

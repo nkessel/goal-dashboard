@@ -38,5 +38,21 @@
   {
     "match": "^today\\|clipped\\|.*cut off by <div> \"Snooze ",
     "reason": "Prioritize cards (Nov 10): swiping a card left slides it partly out of the deck on purpose to uncover its Snooze button (like SwipeReveal on Today's cards); the deck clips it sideways. Tapping × or the card brings it back whole."
+  },
+  {
+    "match": "^(today|todaycal)\\|not-restored\\|.*Today’s calendar",
+    "reason": "Nov 12: Today's day calendar is sticky beside Today on tablets and computers, so it sits at a new place on the page whenever Today grows or shrinks (a drawer opening or closing). By design: it stays on screen."
+  },
+  {
+    "match": "^todaycal\\|(covered-by-bar|off-screen-edge)\\|.*dragging a card over the calendar",
+    "reason": "Nov 12: the screenshot is taken mid-drag; the card being dragged follows the pointer over the calendar (and past the screen's edge) on purpose."
+  },
+  {
+    "match": "^(today|todaycal)\\|covered\\|<div .cal-resize",
+    "reason": "Nov 12: a calendar card's resize strip (7px, see-through except its small grip) lies along the card's foot, over the last few pixels of a roomy card's time line. Nothing is hidden."
+  },
+  {
+    "match": "^todaycal\\|covered\\|.*sits on .*\"FRI\"|^todaycal\\|covered\\|.*won this day",
+    "reason": "Nov 12: in Today's calendar the compressed day heading pins at the top while the hours scroll under it, as on the calendar screen."
   }
 ]
