@@ -1,5 +1,6 @@
 "use client";
 
+import { isTentativeTitle } from "@/lib/tentative";
 import { createContext, useContext, useState } from "react";
 
 /** The quests waiting behind each quest on the calendar, by quest id: its agenda. */
@@ -157,7 +158,7 @@ export function CalendarTaskChip({
         e.stopPropagation();
         setEditing(true);
       }}
-      className={`cal-chip flex h-full w-full min-w-0 overflow-hidden rounded-md ${tall ? "items-center justify-center text-center" : `text-left ${compact ? "items-start" : "items-center"}`}`}
+      className={`cal-chip ${isTentativeTitle(task.title) && !isCompleted ? "cal-tentative" : ""} flex h-full w-full min-w-0 overflow-hidden rounded-md ${tall ? "items-center justify-center text-center" : `text-left ${compact ? "items-start" : "items-center"}`}`}
       style={{
         ...cardStyle,
         ...(isAdventure ? { borderLeft: `3px solid ${isCompleted ? "var(--t-good)" : isWarned ? "var(--t-warn)" : "#a88a3f"}` } : {}),
@@ -338,7 +339,7 @@ function QuestCard({
         e.stopPropagation();
         onOpen();
       }}
-      className={`cal-chip quest-card ${done ? "quest-card-done" : ""} flex h-full w-full min-w-0 overflow-hidden ${stack ? "flex-col items-center justify-start text-center" : "items-center text-left"}`}
+      className={`cal-chip quest-card ${done ? "quest-card-done" : isTentativeTitle(task.title) ? "cal-tentative" : ""} flex h-full w-full min-w-0 overflow-hidden ${stack ? "flex-col items-center justify-start text-center" : "items-center text-left"}`}
       style={{
         gap: stack ? 3 : line ? 4 : 6,
         padding: line ? "1px 4px" : stack ? "5px 3px 4px" : "4px 6px 4px 4px",

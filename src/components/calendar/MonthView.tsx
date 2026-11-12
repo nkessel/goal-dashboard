@@ -1,5 +1,6 @@
 "use client";
 
+import { isTentativeTitle } from "@/lib/tentative";
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
@@ -123,7 +124,9 @@ export function MonthView({
                     <span
                       key={e.id}
                       className="block h-1.5 w-1.5 rounded-full"
-                      style={{ background: isAdventure ? "rgba(150,170,230,.85)" : "#7a90d6" }}
+                      title={isTentativeTitle(e.title) ? `${e.title} (tentative)` : e.title}
+                      // A [bracketed] event is a maybe: a hollow ring instead of a dot.
+                      style={isTentativeTitle(e.title) ? { border: `1px solid ${isAdventure ? "rgba(150,170,230,.95)" : "#7a90d6"}` } : { background: isAdventure ? "rgba(150,170,230,.85)" : "#7a90d6" }}
                     />
                   ))}
                   {overflow > 0 && <span style={{ fontSize: 10, color: "var(--t-ink-soft)" }}>+{overflow}</span>}

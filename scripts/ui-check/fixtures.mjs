@@ -66,6 +66,8 @@ export function makeFixtures() {
     task("Draft the facilitation workshop outline", { board_id: course.id, ...at(3.5, 90) }),
     task("Herb gathering at the farmers market", { status: "completed", completed_at: inHours(-1), xp_awarded: 20, ...at(-1.5, 45) }),
     task("Scout the old trail with Chester", at(25, 60)),
+    // Written in [brackets]: a maybe, drawn as a dashed outline with no fill (owner, Nov 12).
+    task("[Stretch and tea on the porch]", at(5.5, 45)),
     task("Rune puzzle: fix the printer", at(-19, 30)),
     task("Take out the trash", { is_tiny: true, is_manual_priority: true, due_at: inHours(8), estimate_minutes: 15 }),
   );

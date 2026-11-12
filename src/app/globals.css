@@ -2244,6 +2244,17 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
 @keyframes cage-words { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.8); } 25% { opacity: 1; transform: translate(-50%, 0) scale(1.1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -20px) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .cage-burst, .cage-rays, .cage-spark, .cage-flyer, .cage-words, .cage-bird { animation-duration: .01s !important; } }
 
+/* Tentative calendar items: a title in [brackets] is a maybe (owner, Nov 12: "no color + dashed outline,
+   still editable"). No fill and a dashed edge in the item's own colour; it wins over a chosen tint or
+   background, and the card still opens, drags and edits as usual. */
+.cal-chip.cal-tentative {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: 1.5px dashed var(--tent-c, #a88a3f) !important;
+}
+.cal-chip.cal-tentative::before, .cal-chip.cal-tentative::after { display: none !important; }
+
 /* Calendar events: a quiet hover — a hair brighter with a thin edge, no glow. */
 .cal-chip { transition: filter 140ms ease, box-shadow 140ms ease; }
 @media (hover: hover) {

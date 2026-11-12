@@ -1,5 +1,6 @@
 "use client";
 
+import { isTentativeTitle } from "@/lib/tentative";
 import { createPortal } from "react-dom";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -176,15 +177,18 @@ export function GoogleEventChip({
 
   const start = new Date(event.start);
   const end = new Date(event.end);
+  // Written in [brackets]: a maybe, drawn as a dashed outline with no fill (still opens and edits as usual).
+  const tentative = isTentativeTitle(event.title);
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`cal-chip flex h-full w-full overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
-        title={unanswered ? "Not answered yet" : answer === "tentative" ? "Maybe" : undefined}
+        className={`cal-chip ${tentative ? "cal-tentative" : ""} flex h-full w-full overflow-hidden rounded-md text-left ${compact ? "items-start" : "items-center"}`}
+        title={tentative ? "Tentative (in [brackets])" : unanswered ? "Not answered yet" : answer === "tentative" ? "Maybe" : undefined}
         style={{
+          ["--tent-c" as string]: event.color ?? (isAdventure ? "#46688a" : "#7f95d6"),
           // Solid (not see-through) so events fanned over each other stay readable.
           // Tinted with its calendar's own colour. An unanswered invitation is
           // only outlined (dotted, no fill), like Google's tentative look.

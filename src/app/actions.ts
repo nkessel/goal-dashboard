@@ -1,5 +1,6 @@
 "use server";
 
+import { isTentativeTitle } from "@/lib/tentative";
 import { revalidatePath } from "next/cache";
 import { auth, signIn, CALENDAR_AUTH_PARAMS } from "@/auth";
 import * as boardsData from "@/lib/data/boards";
@@ -3187,7 +3188,7 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
       const own = new Set(quests.map((t) => t.google_calendar_event_id).filter(Boolean));
       for (const e of all.events) {
         if (e.isAllDay || own.has(e.id) || (e.calendarId && hidden.has(e.calendarId))) continue;
-        if (/^\s*\[[^\]]+\]\s*$/.test(e.title ?? "")) {
+        if (isTentativeTitle(e.title)) {
           optional.push({ id: e.id, calendarId: e.calendarId ?? "primary", title: e.title.trim().slice(1, -1).trim(), start: new Date(e.start).getTime(), end: new Date(e.end).getTime() });
           continue;
         }
