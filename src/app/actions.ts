@@ -4437,7 +4437,7 @@ export async function decideImportCardAction(id: string, choice: { kind: "snooze
 }
 
 /** The card became a quest some other way (the full quest editor): mark it imported. */
-export async function editImportCardAction(id: string, patch: { title?: string; description?: string | null; kind?: importCardsData.ImportCard["kind"]; /** How soon it needs a time, in days (owner, Nov 6); null clears it. */ planWithinDays?: number | null }) {
+export async function editImportCardAction(id: string, patch: { title?: string; description?: string | null; kind?: importCardsData.ImportCard["kind"]; /** How soon it needs a time, in days (owner, Nov 6); null clears it. */ planWithinDays?: number | null; /** Its sub-quests (a buy list's items), as edited on the card: names in order. */ steps?: string[] }) {
   const ownerId = await requireProfileId();
   const KINDS = ["quest", "habit", "schedule", "reward", "project", "shopping", "done", "ritual"];
   const title = patch.title === undefined ? undefined : patch.title.replace(/\s+/g, " ").trim().slice(0, 200);
@@ -4447,6 +4447,7 @@ export async function editImportCardAction(id: string, patch: { title?: string; 
     description: patch.description === undefined ? undefined : (patch.description ?? "").trim().slice(0, 2000) || null,
     kind: patch.kind && KINDS.includes(patch.kind) ? patch.kind : undefined,
     plan_within_days: patch.planWithinDays === undefined ? undefined : patch.planWithinDays === null ? null : Math.max(0, Math.min(999, Math.round(patch.planWithinDays))),
+    steps: Array.isArray(patch.steps) ? patch.steps.map((s) => String(s).replace(/\s+/g, " ").trim().slice(0, 200)).filter(Boolean).slice(0, 30) : undefined,
   });
   revalidatePath("/import");
 }
@@ -4487,6 +4488,8 @@ export async function importCardAction(
     isTiny?: boolean;
     energyGain?: number | null;
     effort?: number | null;
+    /** XP each sub-quest pays when done, by sub-quest name (set on the card). */
+    stepXp?: Record<string, number>;
   }
 ): Promise<{ kind: "quest" | "habit" | "board" | "reward" | "ritual"; id: string }> {
   const ownerId = await requireProfileId();
@@ -4556,7 +4559,11 @@ export async function importCardAction(
       boardId: input.boardId ?? null,
       dueAt: input.dueAt ?? null,
     });
-    if (steps.length) await stepsData.replaceSteps(taskId, ownerId, steps.map((s) => ({ title: s.slice(0, 200), done: false }))).catch(() => null);
+    const stepXp = (s: string) => {
+      const v = input.stepXp?.[s];
+      return typeof v === "number" && v > 0 ? { xp: Math.min(1000, Math.round(v)) } : {};
+    };
+    if (steps.length) await stepsData.replaceSteps(taskId, ownerId, steps.map((s) => ({ title: s.slice(0, 200), done: false, ...stepXp(s) }))).catch(() => null);
     // Files kept with the card (a form to fill in) stay handy on the quest.
     if (card.attachments?.length) await supabaseAdmin().from("tasks").update({ attachments: card.attachments }).eq("owner_id", ownerId).eq("id", taskId);
     const planBy = input.planBy && Number.isFinite(Date.parse(input.planBy)) ? new Date(input.planBy).toISOString() : null;

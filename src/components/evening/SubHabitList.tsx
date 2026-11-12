@@ -17,7 +17,7 @@ const newId = () => Math.random().toString(36).slice(2, 10);
  * and its own little menu (right-click, or tap its dot) for XP, coins and Remove,
  * opening right under the row. A line at the bottom adds one.
  */
-export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-habit" }: { list: SubHabit[]; onChange: (next: SubHabit[]) => void; autoFocus?: boolean; noun?: string }) {
+export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-habit", coins = true }: { list: SubHabit[]; onChange: (next: SubHabit[]) => void; autoFocus?: boolean; noun?: string; /** False where a row pays XP only (a quest's sub-quests). */ coins?: boolean }) {
   const [draft, setDraft] = useState("");
   const [menu, setMenu] = useState<string | null>(null);
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }));
@@ -42,6 +42,8 @@ export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-ha
             <Row
               key={s.id}
               sub={s}
+              noun={noun}
+              coins={coins}
               menuOpen={menu === s.id}
               onMenu={() => setMenu((m) => (m === s.id ? null : s.id))}
               onChange={(patch) => set(s.id, patch)}
@@ -90,7 +92,7 @@ function Pays({ sub }: { sub: SubHabit }) {
   );
 }
 
-function Row({ sub, menuOpen, onMenu, onChange, onRemove }: { sub: SubHabit; menuOpen: boolean; onMenu: () => void; onChange: (patch: Partial<SubHabit>) => void; onRemove: () => void }) {
+function Row({ sub, noun, coins, menuOpen, onMenu, onChange, onRemove }: { sub: SubHabit; noun: string; coins: boolean; menuOpen: boolean; onMenu: () => void; onChange: (patch: Partial<SubHabit>) => void; onRemove: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id });
   return (
     <div
@@ -127,7 +129,7 @@ function Row({ sub, menuOpen, onMenu, onChange, onRemove }: { sub: SubHabit; men
           onChange={(e) => onChange({ title: e.target.value.slice(0, 120) })}
           onKeyDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          aria-label="Sub-habit"
+          aria-label={noun === "sub-habit" ? "Sub-habit" : `Name of this ${noun}`}
           className="h-8 min-w-0 flex-1 cursor-text rounded-md border-0 bg-transparent px-1 text-[16px] sm:text-[15px]"
         />
         <Pays sub={sub} />
@@ -135,7 +137,7 @@ function Row({ sub, menuOpen, onMenu, onChange, onRemove }: { sub: SubHabit; men
       <Fold open={menuOpen}>
         <div className="mx-2 mb-1 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl px-2.5 py-2 text-[13.5px]" style={{ background: "rgba(255,250,238,.55)", border: "1px dashed rgba(139,112,64,.45)" }}>
           <Stepper label="XP" value={sub.xp ?? 0} max={100} onChange={(n) => onChange({ xp: n || undefined })} />
-          <Stepper label={<CoinIcon size={14} />} aria="Coins" value={sub.coins ?? 0} max={50} onChange={(n) => onChange({ coins: n || undefined })} />
+          {coins && <Stepper label={<CoinIcon size={14} />} aria="Coins" value={sub.coins ?? 0} max={50} onChange={(n) => onChange({ coins: n || undefined })} />}
           <button type="button" onClick={onRemove} className="ml-auto h-8 rounded-full px-2.5 text-[13px] font-semibold hover:bg-black/5" style={{ color: "var(--t-warn)" }}>
             Remove
           </button>

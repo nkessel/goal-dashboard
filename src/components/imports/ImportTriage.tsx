@@ -17,6 +17,7 @@ import { ESTIMATE_PICKS, dueChipLabel, dueQuickPicks } from "@/components/tasks/
 import { IconScale } from "@/components/tasks/IconScale";
 import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
+import { SubHabitList, type SubHabit } from "@/components/evening/SubHabitList";
 import { LevelScales } from "@/components/ui/LevelScales";
 import { CoinIcon } from "@/components/ui/Icons";
 import { NumberInput } from "@/components/ui/NumberInput";
@@ -235,6 +236,12 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     editImportCardAction(id, { title: patch.title, description: patch.description }).catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't save that change."));
   }
 
+  /** A card's sub-quests as edited on it: shown at once, saved on the card. */
+  function resteps(id: string, steps: string[]) {
+    setQueue((q) => q.map((c) => (c.id === id ? { ...c, steps } : c)));
+    editImportCardAction(id, { steps }).catch((e: unknown) => setError(e instanceof Error ? e.message : "Couldn't save that change."));
+  }
+
   useEscape(() => (mode === "guided" && stepAt > 0 ? setStepAt(stepAt - 1) : setMode("card")), mode !== "card" && !snoozing && !editor);
 
   function say(text: string, undo?: () => void) {
@@ -318,7 +325,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
         // Its board and sub-quests go with it, as an import would take them.
         const a = attrsOf(c.id);
         const boardId = a.board === undefined ? findBoard(boards, c.board_hint)?.id ?? null : a.board;
-        await importCardAction(c.id, { kind: "done", title: c.title, description: c.description, steps: c.steps, boardId, minutes: a.minutes ?? c.minutes ?? null, ...questExtras(a) });
+        await importCardAction(c.id, { kind: "done", title: c.title, description: c.description, steps: c.steps, stepXp: a.stepXp, boardId, minutes: a.minutes ?? c.minutes ?? null, ...questExtras(a) });
         say(`Logged “${c.title}” as done ✓`);
         router.refresh();
       } catch (e) {
@@ -367,7 +374,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           importance: d.importance ?? null,
           urgency,
           minutes: d.minutes ?? null,
-          ...(d.kind === "habit" ? habitTiming : withAttrs(d.kind) ? questExtras(attrsOf(card.id)) : {}),
+          ...(d.kind === "habit" ? habitTiming : withAttrs(d.kind) ? { ...questExtras(attrsOf(card.id)), stepXp: attrsOf(card.id).stepXp } : {}),
         });
         const board = boards.find((b) => b.id === d.boardId);
         const nRewards = d.kind === "shopping" ? d.steps.filter((x) => d.rewards?.includes(x)).length : 0;
@@ -467,7 +474,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
         </div>
     ) : null;
   return (
-    <BoardsCtx.Provider value={{ boards, add: (b) => setBoards((x) => [...x, b]) }}>
+    <BoardsCtx.Provider value={{ boards, add: (b) => setBoards((x) => [...x, b]), resteps }}>
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <h1 className="m-0 whitespace-nowrap font-display text-[24px]" style={{ color: isAdventure ? "#f2d27e" : INK }}>
@@ -663,9 +670,10 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
               {card.description}
             </p>
           )}
-          <SubQuests card={card} />
         </div>
       </div>
+      {/* The full width of the card (owner, Nov 12), and edited right here. */}
+      <SubQuests card={card} attrs={attrs} onAttrs={onAttrs} />
       {pills && <BoardFold card={card} attrs={attrs} open={boarding} onAttrs={onAttrs} onClose={() => setBoarding(false)} />}
       {files.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -919,19 +927,60 @@ function useStepsShown(): [boolean, (v: boolean) => void] {
   return [shown, set];
 }
 
-/** A card's sub-quests (a buy list's items), shown in both views, with Hide / Show. */
-function SubQuests({ card, small = false }: { card: ImportCard; small?: boolean }) {
+/**
+ * A card's sub-quests (a buy list's items), shown in both views with Hide / Show. ✎ turns the list into the
+ * app's own editable list (owner, Nov 12: "full editing privileges"): rename in place, hold and drag to reorder,
+ * a row's dot (or right-click) for its XP and Remove, a line at the foot to add one.
+ */
+function SubQuests({ card, small = false, attrs, onAttrs }: { card: ImportCard; small?: boolean; attrs: Attrs; onAttrs: (a: Attrs) => void }) {
+  const { resteps } = useContext(BoardsCtx);
   const [shown, setShown] = useStepsShown();
+  const [rows, setRows] = useState<SubHabit[] | null>(null);
   const n = card.steps.length;
-  if (!n) return null;
-  const noun = card.kind === "shopping" ? (n === 1 ? "item" : "items") : n === 1 ? "sub-quest" : "sub-quests";
+  const items = card.kind === "shopping";
+  const editable = withAttrs(card.kind);
+  if (!n && !editable) return null;
+  const noun = items ? "item" : "sub-quest";
+  const open = () => setRows(card.steps.map((t, i) => ({ id: `s${i}-${t.length}`, title: t, xp: attrs.stepXp?.[t] })));
+  const change = (next: SubHabit[]) => {
+    setRows(next);
+    const named = next.filter((r) => r.title.trim());
+    resteps(card.id, named.map((r) => r.title.trim()));
+    const xp = Object.fromEntries(named.filter((r) => r.xp).map((r) => [r.title.trim(), r.xp as number]));
+    onAttrs({ ...attrs, stepXp: Object.keys(xp).length ? xp : undefined });
+  };
+  const editing = rows !== null;
   return (
     <div className="flex flex-col gap-1" data-import-steps>
-      <button type="button" onClick={() => setShown(!shown)} aria-expanded={shown} className={`flex items-center gap-1 self-start ${small ? "text-[12px]" : "text-[12.5px]"}`} style={{ color: "#7a6440" }}>
-        {n} {noun}
-        <span className="ml-1 underline decoration-dotted underline-offset-2">{shown ? "Hide" : "Show"}</span>
-      </button>
-      <div className="drawer-body" data-open={shown || undefined}>
+      <div className={`flex items-center gap-1 ${small ? "text-[12px]" : "text-[12.5px]"}`} style={{ color: "#7a6440" }}>
+        {n > 0 ? (
+          <>
+            <span>
+              {n} {n === 1 ? noun : `${noun}s`}
+            </span>
+            {!editing && (
+              <button type="button" onClick={() => setShown(!shown)} aria-expanded={shown} className="ml-1 underline decoration-dotted underline-offset-2">
+                {shown ? "Hide" : "Show"}
+              </button>
+            )}
+            {editable && (
+              <button type="button" onClick={() => (editing ? setRows(null) : open())} aria-label={editing ? `Done editing the ${noun}s` : `Edit the ${noun}s`} aria-expanded={editing} title={editing ? "Done" : `Edit: names, order${items ? "" : ", XP"}`} className="ml-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full" style={{ color: "#8a6116", background: editing ? "rgba(217,180,95,.22)" : "transparent" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+          </>
+        ) : (
+          !editing && (
+            <button type="button" onClick={open} className="underline decoration-dotted underline-offset-2">
+              + Add {noun}s
+            </button>
+          )
+        )}
+      </div>
+      <Fold open={editing}>{rows && <SubHabitList list={rows} onChange={change} noun={noun} coins={false} />}</Fold>
+      <div className="drawer-body" data-open={(shown && !editing && n > 0) || undefined}>
         <div className="drawer-inner">
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
             {card.steps.map((s, i) => (
@@ -939,7 +988,12 @@ function SubQuests({ card, small = false }: { card: ImportCard; small?: boolean 
                 <span aria-hidden className="mt-[3px] text-[10px]" style={{ color: "#b8913f" }}>
                   ◆
                 </span>
-                <span className="[overflow-wrap:anywhere]">{s}</span>
+                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{s}</span>
+                {!items && attrs.stepXp?.[s] ? (
+                  <span className="shrink-0 text-[12.5px] font-semibold tabular-nums" style={{ color: "#8a6116" }}>
+                    +{attrs.stepXp[s]} XP
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -1149,7 +1203,7 @@ function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAt
           {card.description}
         </p>
       )}
-      <SubQuests card={card} small />
+      <SubQuests card={card} small attrs={attrs} onAttrs={onAttrs} />
       <FileChips files={card.attachments} />
       <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
       {rateable(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} small />}
@@ -1678,7 +1732,7 @@ const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind ==
 // `.qe-fact` pills, `.qe-fact-panel` panels, the editor's XP bar and coin stepper, Due picks, Time picks and IconScale.
 
 /** A quest's details picked on the card, before importing. Kept on this device by card id. */
-type Attrs = { xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null };
+type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null };
 type AttrKey = "reward" | "time" | "due" | "tiny" | "importance" | "board";
 const ATTRS: { key: AttrKey; label: string }[] = [
   { key: "reward", label: "XP & coins" },
@@ -1701,7 +1755,7 @@ const withAttrs = (k: Kind) => k === "quest" || k === "schedule" || k === "shopp
 const XP_MAX = 350;
 
 /** The boards, for the Board pill (and a new board made from it). */
-const BoardsCtx = createContext<{ boards: BoardOpt[]; add: (b: BoardOpt) => void }>({ boards: [], add: () => {} });
+const BoardsCtx = createContext<{ boards: BoardOpt[]; add: (b: BoardOpt) => void; /** Save a card's edited sub-quests. */ resteps: (id: string, steps: string[]) => void }>({ boards: [], add: () => {}, resteps: () => {} });
 
 function readJSON<T>(key: string, fallback: T): T {
   try {

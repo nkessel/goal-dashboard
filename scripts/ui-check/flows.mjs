@@ -514,6 +514,16 @@ export const FLOWS = [
         await h.check("sub-quests hidden");
         await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /show/i }).first(), "sub-quests: show", { optional: true, expectMove: true });
       }
+      // ✎ by the sub-quests turns them into the editable list: rename, drag, a row's dot for XP and Remove (owner, Nov 12).
+      if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^edit the sub-quests$/i }).first(), "sub-quests: edit", { optional: true, expectMove: true })) {
+        await h.check("sub-quests: editing");
+        if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^options for /i }).first(), "sub-quest: options", { optional: true, expectMove: true })) {
+          await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^more xp$/i }).first(), "sub-quest: more XP", { optional: true });
+          await h.check("sub-quest: xp and remove");
+        }
+        await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^done editing/i }).first(), "sub-quests: done", { optional: true, expectMove: true });
+        await h.check("sub-quests: edited");
+      }
       if (await h.tap((p) => p.locator("[data-import-foot]").getByRole("button", { name: /^snooze…$/i }).first(), "foot: snooze", { optional: true, expectMove: true })) {
         await h.check("foot: snooze row");
         await h.tap((p) => p.locator("[data-import-foot]").getByRole("button", { name: /^snooze…$/i }).first(), "foot: snooze close", { optional: true, expectMove: true });
