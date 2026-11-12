@@ -20,7 +20,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   if (!profile) notFound();
   return (
     <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
-      <ImportTriage waiting={waiting} setAside={setAside} boards={boards.map((b) => ({ id: b.id, title: b.title, color: b.color }))} theme={profile.theme === "adventure" ? "adventure" : "calm"} toSchedule={toSchedule} focus={card ?? null} query={q ?? ""} />
+      <ImportTriage waiting={waiting} setAside={setAside} boards={boards.map((b) => ({ id: b.id, title: b.title, color: b.color, parent: b.parent_board_id ?? null }))} theme={profile.theme === "adventure" ? "adventure" : "calm"} toSchedule={toSchedule} focus={card ?? null} query={q ?? ""} />
     </AppShell>
   );
 }

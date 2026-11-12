@@ -1,7 +1,7 @@
 "use client";
 
 import { Fold, useLingerValue } from "@/components/ui/Fold";
-import { GearIcon, CloseIcon } from "@/components/ui/Icons";
+import { GearIcon, CloseIcon, SnoozeIcon } from "@/components/ui/Icons";
 
 import { FileChips } from "@/components/ui/FileChips";
 
@@ -16,6 +16,7 @@ import { SnoozePicker, type SnoozeChoice } from "@/components/tasks/SnoozePicker
 import { ESTIMATE_PICKS, dueChipLabel, dueQuickPicks } from "@/components/tasks/QuestEditorDialog";
 import { IconScale } from "@/components/tasks/IconScale";
 import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
+import { QuestMonogram } from "@/components/tasks/QuestMonogram";
 import { LevelScales } from "@/components/ui/LevelScales";
 import { CoinIcon } from "@/components/ui/Icons";
 import { NumberInput } from "@/components/ui/NumberInput";
@@ -31,7 +32,7 @@ import { ScheduleWithin as SchedRate } from "@/components/tasks/ScheduleWithin";
  * quest can open the full quest editor from there.
  */
 
-type BoardOpt = { id: string; title: string; color: string | null };
+type BoardOpt = { id: string; title: string; color: string | null; /** The board it sits inside, if any. */ parent?: string | null };
 type Step = "board" | "plan" | "matters" | "often" | "time" | "review";
 type Kind = ImportCard["kind"];
 const KINDS: { key: Kind; label: string; icon: string }[] = [
@@ -314,7 +315,10 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     next(c.id);
     start(async () => {
       try {
-        await importCardAction(c.id, { kind: "done", title: c.title, description: c.description, steps: [], ...questExtras(attrsOf(c.id)) });
+        // Its board and sub-quests go with it, as an import would take them.
+        const a = attrsOf(c.id);
+        const boardId = a.board === undefined ? findBoard(boards, c.board_hint)?.id ?? null : a.board;
+        await importCardAction(c.id, { kind: "done", title: c.title, description: c.description, steps: c.steps, boardId, minutes: a.minutes ?? c.minutes ?? null, ...questExtras(a) });
         say(`Logged “${c.title}” as done ✓`);
         router.refresh();
       } catch (e) {
@@ -567,9 +571,9 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           )}
         </div>
       ) : view === "list" ? (
-        <ListView cards={visible} frame={frame} active={mode !== "card" && card ? { id: card.id, node: flowNode } : null} onQuick={(c, u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l }, c)} onEdit={(c, p) => rename(c.id, p)} onRetag={(c, k) => retag(k, c.id)} onRate={(c, d) => rate(c.id, d)} attrsOf={attrsOf} shownAttrs={shownAttrs} onAttrs={setAttrs} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
+        <ListView cards={visible} frame={frame} active={mode !== "card" && card ? { id: card.id, node: flowNode } : null} onQuick={(c, u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l }, c)} onEdit={(c, p) => rename(c.id, p)} onRetag={(c, k) => retag(k, c.id)} onRate={(c, d) => rate(c.id, d)} attrsOf={attrsOf} shownAttrs={shownAttrs} onAttrs={setAttrs} onImport={(c) => (c.kind === "done" ? logDone(c) : begin(false, c))} onDone={logDone} onSnooze={(c) => setSnoozing(true, c)} onSkip={(c) => decide({ kind: "skip" }, c)} onDelete={(c) => decide({ kind: "delete" }, c)} />
       ) : mode === "card" ? (
-        <CardView key={card.id} card={card} frame={frame} onQuick={(u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l })} onRetag={retag} onRate={(d) => rate(card.id, d)} attrs={attrsOf(card.id)} shownAttrs={shownAttrs} onAttrs={(a) => setAttrs(card.id, a)} onEdit={(p) => rename(card.id, p)} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
+        <CardView key={card.id} card={card} frame={frame} onQuick={(u, l) => decide({ kind: "snooze", until: u.toISOString(), label: l })} onRetag={retag} onRate={(d) => rate(card.id, d)} attrs={attrsOf(card.id)} shownAttrs={shownAttrs} onAttrs={(a) => setAttrs(card.id, a)} onEdit={(p) => rename(card.id, p)} onImport={() => (card.kind === "done" ? logDone(card) : begin(false))} onDone={() => logDone(card)} onSnooze={() => setSnoozing(true)} onSkip={() => decide({ kind: "skip" })} menu={menu} setMenu={setMenu} onDelete={() => (setMenu(false), decide({ kind: "delete" }))} />
       ) : draft ? (
         flowNode
       ) : null}
@@ -612,11 +616,12 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
   );
 }
 
-function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onAttrs, onImport, onSnooze, onQuick, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onRate: (days: number | null) => void; attrs: Attrs; shownAttrs: AttrKey[]; onAttrs: (a: Attrs) => void; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
+function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onAttrs, onImport, onDone, onSnooze, onQuick, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onRate: (days: number | null) => void; attrs: Attrs; shownAttrs: AttrKey[]; onAttrs: (a: Attrs) => void; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onDone: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
   const [source, setSource] = useState(false);
   const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [later, setLater] = useState(false);
+  const [boarding, setBoarding] = useState(false);
   // Files kept with the card go with it onto the quest (adding one is in the quest editor's More).
   const files = card.attachments ?? [];
   const pills = withAttrs(card.kind);
@@ -641,19 +646,27 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
           </button>
         </div>
       )}
-      {editing ? (
-        <CardEdit card={card} onDone={(p) => (p && onEdit(p), setEditing(false))} />
-      ) : (
-        <h2 className="m-0 font-display text-[23px] leading-tight [overflow-wrap:anywhere]">
-          {card.title}
-          <EditPen open={false} onClick={() => setEditing(true)} />
-        </h2>
-      )}
-      {!editing && card.description && (
-        <p className="m-0 whitespace-pre-wrap text-[14.5px] leading-snug [overflow-wrap:anywhere]" style={{ color: "#4a3a22" }}>
-          {card.description}
-        </p>
-      )}
+      {/* Portrait left with its board on it, name, notes and sub-quests right: like a quest card (owner, Nov 12). */}
+      <div className="flex items-start gap-3">
+        {pills && <PortraitBoard card={card} attrs={attrs} open={boarding} onToggle={() => setBoarding((v) => !v)} />}
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          {editing ? (
+            <CardEdit card={card} onDone={(p) => (p && onEdit(p), setEditing(false))} />
+          ) : (
+            <h2 className="m-0 font-display text-[23px] leading-tight [overflow-wrap:anywhere]">
+              {card.title}
+              <EditPen open={false} onClick={() => setEditing(true)} />
+            </h2>
+          )}
+          {!editing && card.description && (
+            <p className="m-0 whitespace-pre-wrap text-[14.5px] leading-snug [overflow-wrap:anywhere]" style={{ color: "#4a3a22" }}>
+              {card.description}
+            </p>
+          )}
+          <SubQuests card={card} />
+        </div>
+      </div>
+      {pills && <BoardFold card={card} attrs={attrs} open={boarding} onAttrs={onAttrs} onClose={() => setBoarding(false)} />}
       {files.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <FileChips files={files} />
@@ -667,18 +680,6 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
             </span>
           ))}
         </div>
-      )}
-      {card.steps.length > 0 && (
-        <ul className="m-0 flex list-none flex-col gap-1 p-0">
-          {card.steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2 text-[14px]">
-              <span aria-hidden className="mt-[3px] text-[10px]" style={{ color: "#b8913f" }}>
-                ◆
-              </span>
-              <span className="[overflow-wrap:anywhere]">{s}</span>
-            </li>
-          ))}
-        </ul>
       )}
       {rateable(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} />}
       {withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} />}
@@ -697,14 +698,10 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
           </div>
         </div>
       )}
-      <div className="mt-1 flex items-center gap-2">
-        <span className="flex-1 text-[12.5px] leading-snug" style={{ color: "#6b5631" }}>
-          {importWhere(card.kind, card.plan_within_days)}
-        </span>
-        <button type="button" onClick={onImport} className="h-11 shrink-0 rounded-full px-6 text-[15px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
-          {importLabel(card.kind)}
-        </button>
-      </div>
+      <span className="text-[12.5px] leading-snug" style={{ color: "#6b5631" }}>
+        {importWhere(card.kind, card.plan_within_days)}
+      </span>
+      <ImportFoot card={card} later={later} onLater={() => setLater((v) => !v)} onImport={onImport} onDone={onDone} onDelete={onDelete} />
       <LaterRow open={later} done={card.kind === "done"} onSnooze={onSnooze} onSkip={onSkip} onDelete={onDelete} onQuick={onQuick} />
     </div>
   );
@@ -733,6 +730,224 @@ const importWhere = (k: Kind, planDays: number | null | undefined) => {
         : "A quest on its board and in Additional Quests. Pick “Schedule within” to also give it a time on your calendar.";
   }
 };
+
+/**
+ * The card's foot (owner, Nov 12): a trash can at the lower left (deleted after a moment, with Undo),
+ * "Already done ✓" beside Import as in the quest editor (logs it done: XP now, nothing left open), then Import.
+ */
+function ImportFoot({ card, small = false, later, onLater, onImport, onDone, onDelete }: { card: ImportCard; small?: boolean; later: boolean; onLater: () => void; onImport: () => void; onDone: () => void; onDelete: () => void }) {
+  const canDone = card.kind === "quest" || card.kind === "schedule" || card.kind === "shopping" || card.kind === "project";
+  return (
+    <div className="flex items-center gap-1.5" data-import-foot>
+      <button type="button" onClick={onDelete} aria-label="Delete this item" title="Delete (Undo for a few seconds)" className={`${small ? "h-8 w-8" : "h-10 w-10"} flex shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]`} style={{ color: "#8b2c1a" }}>
+        <TrashIcon size={small ? 15 : 17} />
+      </button>
+      {/* Snooze (owner, Nov 12: between delete and Already done): opens Tomorrow / Next week / Next month / Other… / Archive in place. */}
+      <button type="button" onClick={onLater} aria-label="Snooze…" aria-expanded={later} title="Snooze or archive" className={`${small ? "h-8 w-8" : "h-10 w-10"} flex shrink-0 items-center justify-center rounded-full`} style={{ color: "#6b5631", background: later ? "rgba(217,180,95,.28)" : "transparent" }}>
+        <SnoozeIcon size={small ? 15 : 17} />
+      </button>
+      {/* Already done: a green check, the third quiet button at the lower left (owner, Nov 12). */}
+      {canDone && (
+        <button type="button" onClick={onDone} aria-label="Already done" title="Already done: log it as done now (its XP, nothing left open)" className={`${small ? "h-8 w-8" : "h-10 w-10"} flex shrink-0 items-center justify-center rounded-full hover:bg-black/[.06]`} style={{ color: "#2f7d4f" }}>
+          <svg width={small ? 17 : 20} height={small ? 17 : 20} viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+      <span className="flex-1" />
+      <button type="button" onClick={onImport} className={`${small ? "h-8 px-4 text-[13.5px]" : "h-11 px-5 text-[15px]"} shrink-0 whitespace-nowrap rounded-full font-semibold`} style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
+        {importLabel(card.kind)}
+      </button>
+    </div>
+  );
+}
+
+function TrashIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 11v5.5M14 11v5.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The card's board for now: what was picked on it, else the note's suggestion. */
+const boardOf = (boards: BoardOpt[], card: ImportCard, attrs: Attrs) => {
+  const id = attrs.board === undefined ? (findBoard(boards, card.board_hint)?.id ?? null) : attrs.board;
+  return boards.find((b) => b.id === id) ?? null;
+};
+
+/** A blank portrait with the board's tag on it, as on a quest card and in the quest editor; the tag opens the board list. */
+function PortraitBoard({ card, attrs, small = false, open, onToggle }: { card: ImportCard; attrs: Attrs; small?: boolean; open: boolean; onToggle: () => void }) {
+  const { boards } = useContext(BoardsCtx);
+  const board = boardOf(boards, card, attrs);
+  const size = small ? 40 : 60;
+  return (
+    <div className="relative flex shrink-0 flex-col items-center" style={{ width: small ? 64 : size + 8, paddingTop: 9 }} data-import-portrait>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-label={`Board: ${board ? board.title : "none"}. Change it`}
+        title={board ? `${board.title}: change the board` : "Pick a board"}
+        className={`absolute left-1/2 top-0 z-[2] flex ${small ? "max-w-[64px] text-[10px]" : "max-w-[92px] text-[11px]"} -translate-x-1/2 items-center gap-0.5 whitespace-nowrap rounded-md px-1.5 py-[1px] font-semibold`}
+        style={{ background: "#f6ecd2", border: board ? "1px solid #a58c66" : "1px dashed #a58c66", color: "#3b2a14", boxShadow: open ? "0 0 0 2px #f3d98d, 0 1px 2px rgba(0,0,0,.25)" : "0 1px 2px rgba(0,0,0,.25)" }}
+      >
+        <span className="truncate">{board ? board.title : "+ board"}</span>
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0" style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform 160ms" }}>
+          <path d="M5 9l7 7 7-7" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <span className="block" style={{ width: size, height: size }}>
+        <QuestMonogram id={card.id} title={card.title} size={size} />
+      </span>
+    </div>
+  );
+}
+
+/** The board list, folding open under the card's head. */
+function BoardFold({ card, attrs, open, onAttrs, onClose }: { card: ImportCard; attrs: Attrs; open: boolean; onAttrs: (a: Attrs) => void; onClose: () => void }) {
+  const { boards, add } = useContext(BoardsCtx);
+  const board = boardOf(boards, card, attrs);
+  return (
+    <Fold open={open}>
+      <BoardTree boards={boards} value={board?.id ?? null} onPick={(id) => (onAttrs({ ...attrs, board: id }), onClose())} onCreate={(b) => (add(b), onAttrs({ ...attrs, board: b.id }), onClose())} />
+    </Fold>
+  );
+}
+
+/**
+ * Every board to choose from (owner, Nov 12): boards with boards inside start folded, say how many they hold
+ * and open on their caret; type to find one anywhere, or make a new one from what you typed.
+ */
+function BoardTree({ boards, value, onPick, onCreate }: { boards: BoardOpt[]; value: string | null; onPick: (id: string | null) => void; onCreate: (b: BoardOpt) => void }) {
+  const [q, setQ] = useState("");
+  const [openIds, setOpenIds] = useState<string[]>([]);
+  const [making, setMaking] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const ids = new Set(boards.map((b) => b.id));
+  const kids = (id: string | null) => boards.filter((b) => (b.parent && ids.has(b.parent) ? b.parent : null) === id);
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = words.length ? boards.filter((b) => words.every((w) => b.title.toLowerCase().includes(w))).slice(0, 12) : [];
+  const exact = boards.some((b) => b.title.toLowerCase() === q.trim().toLowerCase());
+  async function create() {
+    if (making) return;
+    setMaking(true);
+    setErr(null);
+    try {
+      onCreate(await createBoardQuickAction(q));
+      setQ("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't make that board.");
+    } finally {
+      setMaking(false);
+    }
+  }
+  const row = (b: BoardOpt, depth: number): React.ReactNode => {
+    const inside = words.length ? [] : kids(b.id);
+    const isOpen = openIds.includes(b.id);
+    return (
+      <li key={b.id} className="flex list-none flex-col">
+        <div className="flex items-center" style={{ paddingLeft: depth * 16 }}>
+          <button type="button" onClick={() => onPick(b.id)} aria-pressed={value === b.id} className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-[14px] hover:bg-black/[.05]" style={{ background: value === b.id ? "rgba(217,180,95,.35)" : undefined, color: "#2a1c10", fontWeight: value === b.id ? 600 : 400 }}>
+            <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: b.color || "#b8a788" }} />
+            <span className="truncate">{b.title}</span>
+          </button>
+          {inside.length > 0 && (
+            <button type="button" onClick={() => setOpenIds((o) => (isOpen ? o.filter((x) => x !== b.id) : [...o, b.id]))} aria-expanded={isOpen} aria-label={`${b.title}: ${inside.length} ${inside.length === 1 ? "board" : "boards"} inside`} className="flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-[12px] hover:bg-black/[.05]" style={{ color: "#7a6440" }}>
+              {inside.length} {inside.length === 1 ? "board" : "boards"}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden style={{ transform: isOpen ? "rotate(180deg)" : undefined, transition: "transform 160ms" }}>
+                <path d="M5 9l7 7 7-7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+        </div>
+        {inside.length > 0 && (
+          <Fold open={isOpen}>
+            <ul className="m-0 flex list-none flex-col p-0">{inside.map((k) => row(k, depth + 1))}</ul>
+          </Fold>
+        )}
+      </li>
+    );
+  };
+  return (
+    <div className="qe-fact-panel flex flex-col gap-1 rounded-2xl p-2" data-import-boards>
+      <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && hits[0] && onPick(hits[0].id)} placeholder="Find a board…" aria-label="Find a board" className="h-9 rounded-lg border px-2.5 text-[16px]" style={{ borderColor: "#b39a6a", background: "rgba(255,250,238,.85)", color: "#2a1c10" }} />
+      <ul className="m-0 flex max-h-[264px] list-none flex-col overflow-y-auto p-0">
+        {(words.length ? hits : kids(null)).map((b) => row(b, 0))}
+        {!words.length && (
+          <li className="list-none">
+            <button type="button" onClick={() => onPick(null)} aria-pressed={value === null} className="flex h-9 w-full items-center rounded-lg px-2 text-left text-[14px] italic hover:bg-black/[.05]" style={{ color: "#6b5631", background: value === null ? "rgba(217,180,95,.35)" : undefined }}>
+              No board
+            </button>
+          </li>
+        )}
+        {words.length > 0 && !exact && (
+          <li className="list-none">
+            <button type="button" onClick={create} disabled={making} className="flex h-9 w-full items-center rounded-lg px-2 text-left text-[14px] font-semibold hover:bg-black/[.05]" style={{ color: "#8a6116" }}>
+              + New board “{q.trim()}”
+            </button>
+          </li>
+        )}
+      </ul>
+      {err && (
+        <span className="text-[12.5px]" style={{ color: "#8b2c1a" }}>
+          {err}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Whether sub-quests show on import cards, one choice for every card (owner, Nov 12: "a hide button if the user wants to hide those steps"). */
+function useStepsShown(): [boolean, (v: boolean) => void] {
+  const [shown, setShown] = useState(true);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- read the device's choice once after mount (no localStorage on the server)
+      if (localStorage.getItem("import-steps-hidden") === "1") setShown(false);
+    } catch {}
+    const on = (e: Event) => setShown((e as CustomEvent<boolean>).detail);
+    window.addEventListener("import-steps-shown", on);
+    return () => window.removeEventListener("import-steps-shown", on);
+  }, []);
+  const set = (v: boolean) => {
+    try {
+      localStorage.setItem("import-steps-hidden", v ? "0" : "1");
+    } catch {}
+    window.dispatchEvent(new CustomEvent("import-steps-shown", { detail: v }));
+  };
+  return [shown, set];
+}
+
+/** A card's sub-quests (a buy list's items), shown in both views, with Hide / Show. */
+function SubQuests({ card, small = false }: { card: ImportCard; small?: boolean }) {
+  const [shown, setShown] = useStepsShown();
+  const n = card.steps.length;
+  if (!n) return null;
+  const noun = card.kind === "shopping" ? (n === 1 ? "item" : "items") : n === 1 ? "sub-quest" : "sub-quests";
+  return (
+    <div className="flex flex-col gap-1" data-import-steps>
+      <button type="button" onClick={() => setShown(!shown)} aria-expanded={shown} className={`flex items-center gap-1 self-start ${small ? "text-[12px]" : "text-[12.5px]"}`} style={{ color: "#7a6440" }}>
+        {n} {noun}
+        <span className="ml-1 underline decoration-dotted underline-offset-2">{shown ? "Hide" : "Show"}</span>
+      </button>
+      <div className="drawer-body" data-open={shown || undefined}>
+        <div className="drawer-inner">
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+            {card.steps.map((s, i) => (
+              <li key={i} className={`flex items-start gap-2 ${small ? "text-[13px]" : "text-[14px]"}`}>
+                <span aria-hidden className="mt-[3px] text-[10px]" style={{ color: "#b8913f" }}>
+                  ◆
+                </span>
+                <span className="[overflow-wrap:anywhere]">{s}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // What the button does, in its own words (it used to say just "Import").
 const importLabel = (k: Kind) =>
@@ -872,24 +1087,25 @@ function KindPicker({ open, kind, onPick }: { open: boolean; kind: Kind; onPick:
 }
 
 /** All of them at once: each row shows what it is and keeps Skip, Snooze… and Import. */
-function ListView({ cards, frame, active, onEdit, onQuick, onRetag, onRate, attrsOf, shownAttrs, onAttrs, onImport, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; /** The card being added: its import flow shows in its row's place. */ active: { id: string; node: React.ReactNode } | null; onQuick: (c: ImportCard, until: Date, label: string) => void; onEdit: (c: ImportCard, p: { title: string; description: string }) => void; onRetag: (c: ImportCard, k: Kind) => void; onRate: (c: ImportCard, days: number | null) => void; attrsOf: (id: string) => Attrs; shownAttrs: AttrKey[]; onAttrs: (id: string, a: Attrs) => void; onImport: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
+function ListView({ cards, frame, active, onEdit, onQuick, onRetag, onRate, attrsOf, shownAttrs, onAttrs, onImport, onDone, onSnooze, onSkip, onDelete }: { cards: ImportCard[]; frame: React.CSSProperties; /** The card being added: its import flow shows in its row's place. */ active: { id: string; node: React.ReactNode } | null; onQuick: (c: ImportCard, until: Date, label: string) => void; onEdit: (c: ImportCard, p: { title: string; description: string }) => void; onRetag: (c: ImportCard, k: Kind) => void; onRate: (c: ImportCard, days: number | null) => void; attrsOf: (id: string) => Attrs; shownAttrs: AttrKey[]; onAttrs: (id: string, a: Attrs) => void; onImport: (c: ImportCard) => void; onDone: (c: ImportCard) => void; onSnooze: (c: ImportCard) => void; onSkip: (c: ImportCard) => void; onDelete: (c: ImportCard) => void }) {
   return (
     <ul className="card-pop-in parchment m-0 flex list-none flex-col rounded-3xl p-1.5" style={frame}>
       {cards.map((c, i) => (
         active?.id === c.id ? (
           <li key={c.id} className="list-none p-1">{active.node}</li>
         ) : (
-        <ListRow key={c.id} card={c} first={i === 0} onQuick={(u, l) => onQuick(c, u, l)} onEdit={(p) => onEdit(c, p)} onRetag={(k) => onRetag(c, k)} onRate={(d) => onRate(c, d)} attrs={attrsOf(c.id)} shownAttrs={shownAttrs} onAttrs={(a) => onAttrs(c.id, a)} onImport={() => onImport(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
+        <ListRow key={c.id} card={c} first={i === 0} onQuick={(u, l) => onQuick(c, u, l)} onEdit={(p) => onEdit(c, p)} onRetag={(k) => onRetag(c, k)} onRate={(d) => onRate(c, d)} attrs={attrsOf(c.id)} shownAttrs={shownAttrs} onAttrs={(a) => onAttrs(c.id, a)} onImport={() => onImport(c)} onDone={() => onDone(c)} onSnooze={() => onSnooze(c)} onSkip={() => onSkip(c)} onDelete={() => onDelete(c)} />
         )
       ))}
     </ul>
   );
 }
 
-function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAttrs, onImport, onSnooze, onQuick, onSkip, onDelete }: { card: ImportCard; first: boolean; onRate: (days: number | null) => void; attrs: Attrs; shownAttrs: AttrKey[]; onAttrs: (a: Attrs) => void; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
+function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAttrs, onImport, onDone, onSnooze, onQuick, onSkip, onDelete }: { card: ImportCard; first: boolean; onRate: (days: number | null) => void; attrs: Attrs; shownAttrs: AttrKey[]; onAttrs: (a: Attrs) => void; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onDone: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
   const [picking, setPicking] = useState(false);
   const [more, setMore] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [boarding, setBoarding] = useState(false);
   // Swipe the row left for Snooze, Archive and Delete (owner, Nov 6); right to put them away. Right-click too.
   const swipe = useRef<{ x: number; y: number } | null>(null);
   const [dx, setDx] = useState(0);
@@ -918,32 +1134,31 @@ function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAt
       }}
     >
       <div className="flex items-start gap-2">
+        {withAttrs(card.kind) && <PortraitBoard card={card} attrs={attrs} small open={boarding} onToggle={() => setBoarding((v) => !v)} />}
         <span className="min-w-0 flex-1 pt-0.5 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">
           {card.title}
-          {card.steps.length > 0 && (
-            <span className="ml-1.5 text-[12px] font-normal" style={{ color: "#7a6440" }}>
-              · {card.steps.length} {card.kind === "shopping" ? "items" : "steps"}
-            </span>
-          )}
           {/* ✎ right by the words. */}
           <EditPen open={editing} onClick={() => setEditing((v) => !v)} />
         </span>
         <KindBadge kind={card.kind} open={picking} onToggle={() => setPicking((v) => !v)} small />
       </div>
       {editing && <CardEdit card={card} onDone={(p) => (p && onEdit(p), setEditing(false))} />}
+      {withAttrs(card.kind) && <BoardFold card={card} attrs={attrs} open={boarding} onAttrs={onAttrs} onClose={() => setBoarding(false)} />}
+      {card.description && !editing && (
+        <p className="m-0 whitespace-pre-wrap text-[13px] leading-snug [overflow-wrap:anywhere]" style={{ color: "#4a3a22" }}>
+          {card.description}
+        </p>
+      )}
+      <SubQuests card={card} small />
       <FileChips files={card.attachments} />
       <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
       {rateable(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} small />}
       {/* The pills get the row's whole width; Import sits under them at the right. */}
       {withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} small />}
-      <div className="flex items-center justify-end gap-2">
-        <span className="min-w-0 flex-1 text-[11.5px] leading-snug" style={{ color: "#6b5631" }}>
-          {importWhere(card.kind, card.plan_within_days)}
-        </span>
-        <button type="button" onClick={onImport} className="h-8 shrink-0 rounded-full px-4 text-[13.5px] font-semibold" style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}>
-          {importLabel(card.kind)}
-        </button>
-      </div>
+      <span className="text-[11.5px] leading-snug" style={{ color: "#6b5631" }}>
+        {importWhere(card.kind, card.plan_within_days)}
+      </span>
+      <ImportFoot card={card} small later={more} onLater={() => setMore((v) => !v)} onImport={onImport} onDone={onDone} onDelete={onDelete} />
       <LaterRow open={more} small done={card.kind === "done"} onSnooze={onSnooze} onSkip={onSkip} onDelete={onDelete} onQuick={onQuick} />
     </li>
   );
@@ -1525,7 +1740,9 @@ function AttrPills({ card, attrs, shown, onChange, small = false }: { card: Impo
   const boardId = attrs.board === undefined ? (findBoard(boards, card.board_hint)?.id ?? null) : attrs.board;
   const board = boards.find((b) => b.id === boardId);
   const set = (p: Attrs) => onChange({ ...attrs, ...p });
-  const hidden = ATTRS.map((a) => a.key).filter((k) => !shown.includes(k));
+  // The board is picked from the tag on the portrait now (owner, Nov 12), not from a pill.
+  shown = shown.filter((k) => k !== "board");
+  const hidden = ATTRS.map((a) => a.key).filter((k) => k !== "board" && !shown.includes(k));
   const face: Record<AttrKey, React.ReactNode> = {
     reward: (
       <>
