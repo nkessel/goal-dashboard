@@ -821,6 +821,20 @@ export const FLOWS = [
       await h.page.reload();
       await h.page.waitForFunction(() => navigator.serviceWorker?.controller || navigator.serviceWorker?.ready.then(() => true), null, { timeout: 15000 }).catch(() => {});
       await h.settle(9000);
+      // Online, a kept screen opens from the copy at once and is fetched again behind it; the page then
+      // hears "fresh" and refreshes in place (owner, Nov 12: "instant load based off of older data").
+      {
+        const base = `http://localhost:${new URL(h.page.url()).port}`;
+        await h.page.goto(`${base}/boards`, { waitUntil: "domcontentloaded" });
+        await h.page.evaluate(() => navigator.serviceWorker?.addEventListener("message", (e) => ((window).__fresh = e.data)));
+        const heard = await h.page.waitForFunction(() => (window).__fresh, null, { timeout: 15000 }).then((r) => r.jsonValue(), () => null);
+        const fromKept = await h.page.evaluate(() => (performance.getEntriesByType("navigation")[0]?.workerStart ?? 0) > 0);
+        if (!fromKept) throw new Error("instant open: /boards wasn't answered by the offline helper");
+        if (!heard || !(heard.ok || heard.build)) throw new Error(`instant open: the page never heard back after opening from the kept copy (${JSON.stringify(heard)})`);
+        await h.settle(1500);
+        if (!(await h.page.locator("[data-app-shell]").count())) throw new Error("instant open: /boards opened without the app");
+        await h.check("opened from the kept copy");
+      }
       await ctx.setOffline(true);
       try {
         for (const path of ["/settings/inventory", "/boards"]) {

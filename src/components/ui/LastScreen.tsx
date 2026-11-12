@@ -20,6 +20,10 @@ export function LastScreen() {
     const age = 60 * 60 * 24 * 30;
     document.cookie = `${COOKIE}=${encodeURIComponent(full.slice(0, 200))}; path=/; max-age=${age}; samesite=lax`;
     document.cookie = `last-path-at=${Date.now()}; path=/; max-age=${age}; samesite=lax`;
+    // The offline helper opens the app from its kept copy, so it needs to know too (it can't read cookies).
+    try {
+      navigator.serviceWorker?.controller?.postMessage({ type: "last", path: full.slice(0, 200) });
+    } catch {}
   }, [path]);
   return null;
 }

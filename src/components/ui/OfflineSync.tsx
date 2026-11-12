@@ -40,6 +40,45 @@ function registerWorker() {
 }
 
 /**
+ * The app opens from the copy kept on the device (public/sw.js) while the screen is fetched again
+ * behind it. Once running, the page asks whether that's done: new data refreshes in place; a new
+ * version of the app (a deploy) or a sign-out reloads, at once if you haven't touched anything
+ * yet, otherwise the next time you leave the app.
+ */
+function askFresh(refresh: () => void): () => void {
+  const sw = typeof navigator !== "undefined" ? navigator.serviceWorker : undefined;
+  if (!sw?.controller) return () => {};
+  let touched = false;
+  const touch = () => (touched = true);
+  let reloadLater = false;
+  // Opened again (not a reload), so the new copy the helper just kept shows at once.
+  const reopen = () => window.location.replace(window.location.href);
+  const onHide = () => {
+    if (reloadLater && document.visibilityState === "hidden") reopen();
+  };
+  const onMsg = (e: MessageEvent) => {
+    const d = e.data as { type?: string; ok?: boolean; build?: boolean; gone?: boolean } | null;
+    if (d?.type !== "fresh") return;
+    if (d.gone || d.build) {
+      if (!touched) reopen();
+      else reloadLater = true;
+    } else if (d.ok) refresh();
+  };
+  window.addEventListener("pointerdown", touch, { once: true, capture: true });
+  window.addEventListener("keydown", touch, { once: true, capture: true });
+  document.addEventListener("visibilitychange", onHide);
+  sw.addEventListener("message", onMsg);
+  sw.startMessages?.();
+  sw.controller.postMessage({ type: "fresh?", url: window.location.href });
+  return () => {
+    window.removeEventListener("pointerdown", touch, { capture: true });
+    window.removeEventListener("keydown", touch, { capture: true });
+    document.removeEventListener("visibilitychange", onHide);
+    sw.removeEventListener("message", onMsg);
+  };
+}
+
+/**
  * Keeps the app usable offline (owner, Nov 6): starts the offline helper (public/sw.js), sends
  * changes made offline once the connection is back (src/lib/offline.ts), and shows a small pill
  * while offline or syncing. Mounted by AppShell for the signed-in account.
@@ -66,11 +105,13 @@ export function OfflineSync({ profileId }: { profileId: string }) {
     document.addEventListener("visibilitychange", seen);
     void flushOffline();
     registerWorker();
+    const stopFresh = askFresh(() => router.refresh());
     return () => {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
       window.removeEventListener("offline-synced", synced);
       document.removeEventListener("visibilitychange", seen);
+      stopFresh();
     };
   }, [profileId, router]);
   return <OfflinePill />;

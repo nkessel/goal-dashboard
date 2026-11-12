@@ -3,8 +3,11 @@
  * else available offline").
  *
  * - Screens you're signed in to are kept on the device as you visit them (and a few main ones are
- *   fetched quietly in the background), so the app opens without a connection. Online, the network
- *   always wins; the copy is only used when it can't be reached.
+ *   fetched quietly in the background), so the app opens without a connection.
+ * - Opening the app shows the kept copy at once (owner, Nov 12: "the instant load based off of
+ *   older data"), fetches the screen again behind it and keeps the new copy; the page asks
+ *   ("fresh?") once it's running and then refreshes its data, or reloads after a deploy or a sign-out.
+ *   A copy older than a week, or none, still waits for the network as before.
  * - The app's code, styles and fonts are kept once loaded (their names change with every deploy).
  * - Pictures (portraits) are kept too, up to a limit.
  * Changes made offline are queued by the page itself (src/lib/offline.ts), not here.
@@ -13,7 +16,7 @@ const PAGES = "gd-pages-v1";
 const ASSETS = "gd-assets-v1";
 // v2: v1 could hold a failed picture kept as an opaque response (it looked fine but never showed).
 const IMAGES = "gd-images-v2";
-const KEEP = [PAGES, ASSETS, IMAGES];
+const KEEP = [PAGES, ASSETS, IMAGES, "gd-meta-v1"];
 const MAX_ASSETS = 500;
 const MAX_IMAGES = 160;
 const MAX_PAGES = 60;
@@ -80,6 +83,77 @@ a{display:inline-block;margin:0 6px 8px 0;padding:6px 12px;border-radius:999px;b
   );
 }
 
+const META = "gd-meta-v1";
+const KEEP_FOR = 7 * 86_400_000;
+/** Each opened page's background fetch, by the page (client) it was shown in, for its "fresh?" question. */
+const pending = new Map();
+
+const assetsOf = (html) => [...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"]+)"/g)].map((m) => m[1]).sort().join(" ");
+
+/** The screen you were last on (the page tells us; the server's own redirect reads a cookie we can't). */
+async function lastPath() {
+  try {
+    const r = await (await caches.open(META)).match("/__last-path");
+    return r ? await r.text() : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Fetch the screen again behind the kept copy; say what changed. */
+async function revalidate(req, stale) {
+  const staleHtml = await stale.clone().text().catch(() => "");
+  try {
+    const res = await fetch(req);
+    const cache = await caches.open(PAGES);
+    const html = await res.clone().text().catch(() => "");
+    if (!res.ok || res.redirected || !html.includes("data-app-shell")) {
+      // Signed out, gone, or moved: never show this copy again.
+      await cache.delete(req.url, { ignoreVary: true });
+      if (/sign in|sign-in|signin/i.test(html)) await caches.delete(PAGES);
+      return { gone: true };
+    }
+    await keepPage(req.url, res);
+    return { ok: true, build: assetsOf(staleHtml) !== assetsOf(html) };
+  } catch {
+    return { offline: true };
+  }
+}
+
+async function fromKeptFirst(event) {
+  const req = event.request;
+  const url = new URL(req.url);
+  if (navigator.onLine === false) return fromNetworkFirst(event);
+  const cache = await caches.open(PAGES);
+  // Opening the app at "/" picks up on the screen you were last on, as the server does.
+  if (url.pathname === "/" && !url.search) {
+    let last = await lastPath();
+    if (last.startsWith("/calendar")) last = "/calendar";
+    if (last && last !== "/" && /^\/[\w\-/?=&%.]*$/.test(last) && !last.startsWith("//")) {
+      const there = await cache.match(new URL(last, url.origin).href, { ignoreVary: true });
+      if (there && fresh(there)) return Response.redirect(new URL(last, url.origin).href, 302);
+      return fromNetworkFirst(event);
+    }
+  }
+  const hit = await cache.match(req.url, { ignoreVary: true });
+  if (!hit || !fresh(hit)) return fromNetworkFirst(event);
+  const check = revalidate(req, hit);
+  const id = event.resultingClientId;
+  // By the new page's id, and by its address too (for browsers that don't give the id).
+  for (const key of [id, req.url]) {
+    if (!key) continue;
+    pending.set(key, check);
+    setTimeout(() => pending.get(key) === check && pending.delete(key), 120_000);
+  }
+  event.waitUntil(check);
+  return hit;
+}
+
+function fresh(res) {
+  const at = Date.parse(res.headers.get("date") || "");
+  return !Number.isFinite(at) || Date.now() - at < KEEP_FOR;
+}
+
 async function fromNetworkFirst(event) {
   const req = event.request;
   try {
@@ -140,7 +214,8 @@ self.addEventListener("fetch", (event) => {
   if (same && (url.pathname.startsWith("/api/") || url.pathname === "/sw.js")) return;
 
   if (req.mode === "navigate" && same) {
-    event.respondWith(fromNetworkFirst(event));
+    // A reload asks for the newest on purpose.
+    event.respondWith(req.cache === "reload" || req.cache === "no-cache" || req.cache === "no-store" ? fromNetworkFirst(event) : fromKeptFirst(event));
     return;
   }
   if (same && url.pathname.startsWith("/_next/static/")) {
@@ -175,4 +250,15 @@ self.addEventListener("message", (event) => {
     );
   }
   if (data.type === "forget") event.waitUntil(caches.delete(PAGES));
+  if (data.type === "last" && typeof data.path === "string") {
+    event.waitUntil(caches.open(META).then((c) => c.put("/__last-path", new Response(data.path.slice(0, 200)))));
+  }
+  if (data.type === "fresh?" && event.source) {
+    const check = pending.get(event.source.id) || (typeof data.url === "string" ? pending.get(data.url) : undefined);
+    pending.delete(event.source.id);
+    if (typeof data.url === "string") pending.delete(data.url);
+    event.waitUntil(
+      (check || Promise.resolve({ none: true })).then((r) => event.source.postMessage({ type: "fresh", ...r }))
+    );
+  }
 });
