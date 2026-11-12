@@ -2,7 +2,7 @@
 
 import { PerchedOwl } from "./PerchedOwl";
 import { useEveningMode } from "@/components/evening/evening-clock";
-import { ToucanGuide } from "@/components/toucan/ToucanGuide";
+import { ToucanGuide } from "@/components/layout/LazyShell";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";

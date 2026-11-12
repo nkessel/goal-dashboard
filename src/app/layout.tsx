@@ -8,8 +8,7 @@ import { MenuLayoutStyles } from "@/components/settings/MenuLayoutSettings";
 import { SaveKeys } from "@/components/ui/SaveKeys";
 import { FOG_HEAD_SCRIPT } from "@/lib/welcome-fog";
 import { ExitGhosts } from "@/components/ui/ExitGhosts";
-import { LanguageWindow } from "@/components/xp/LearnLanguage";
-import { PackingWindow } from "@/components/settings/PackingLists";
+import { LanguageWindow, PackingWindow } from "@/components/layout/LazyShell";
 import { ClickTrail } from "@/components/ui/ClickTrail";
 import { NoBrowserMenu } from "@/components/ui/NoBrowserMenu";
 import { LastScreen } from "@/components/ui/LastScreen";
@@ -17,11 +16,15 @@ import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
+  // Not the adventure theme's fonts: fetched when used, not on every first load.
+  preload: false,
   subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  // Not the adventure theme's fonts: fetched when used, not on every first load.
+  preload: false,
   subsets: ["latin"],
 });
 
@@ -50,6 +53,8 @@ const naskh = Noto_Naskh_Arabic({
 
 const manrope = Manrope({
   variable: "--font-manrope",
+  // Not the adventure theme's fonts: fetched when used, not on every first load.
+  preload: false,
   weight: ["400", "500", "600", "700", "800"],
   subsets: ["latin"],
 });

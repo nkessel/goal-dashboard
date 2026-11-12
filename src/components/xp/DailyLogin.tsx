@@ -4,7 +4,13 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react"
 import { useRouter } from "next/navigation";
 import { dailyCheckInAction, welcomeContextAction } from "@/app/actions";
 import { eveningDayKey, isEveningCheckInTime, setEveningMode } from "@/components/evening/evening-clock";
-import { WelcomeCard, type WelcomeAward } from "./WelcomeCard";
+import type { WelcomeAward } from "./WelcomeCard";
+import dynamic from "next/dynamic";
+
+// The welcome screen is a big piece of code needed once a day: it loads on its own (started as soon as
+// it's due, behind the mist) instead of with every screen's first JavaScript (owner, Nov 12: "load faster").
+const loadWelcome = () => import("./WelcomeCard").then((m) => m.WelcomeCard);
+const WelcomeCard = dynamic(loadWelcome, { ssr: false });
 import { xpToNextLevel } from "@/lib/levels";
 import { lineForDay } from "@/lib/greetings";
 import { backHours, greetingFor, ownLines } from "@/lib/welcome";
@@ -63,7 +69,10 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   // where the page's own fog script doesn't run), fog it if the welcome screen is about to open.
   // Every path below that ends without the screen lifts it again.
   useLayoutEffect(() => {
-    if (welcomeDue()) fogOn(25_000);
+    if (welcomeDue()) {
+      fogOn(25_000);
+      void loadWelcome();
+    }
   }, []);
   // A snooze that ends while the app is still open brings it back then.
   // Settings changed (from its gear, say) show on the open screen straight away.
