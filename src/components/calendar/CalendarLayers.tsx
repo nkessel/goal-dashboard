@@ -2,7 +2,6 @@
 
 import { MagicCalendarIcon } from "@/components/ui/Icons";
 import { PaintTodayArt } from "./PaintTodayArt";
-import { openPlanMyDay } from "./PlanMyDay";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
@@ -185,7 +184,7 @@ export function CalendarLayers({
           onClick={() => window.dispatchEvent(new Event("open-scheduling"))}
           data-scheduling-pill=""
           aria-label={`Auto-scheduler (${toSchedule})`}
-          title="Auto-scheduler: your list of quests to place"
+          title="Auto-scheduler: today's quests first, then everything waiting for a time"
           // A labelled pill that sticks out over the calendar's top-left corner.
           // Stays inside the edge on every screen (on tablets it stuck out and its left was cut off: ui-check, Nov 2).
           className={`hover-glow relative ${open ? "z-[1]" : "z-[30]"} mr-auto flex h-11 shrink-0 translate-y-5 items-center gap-1.5 whitespace-nowrap rounded-full pl-3 pr-4 text-[14.5px] font-bold touch-manipulation`}
@@ -203,11 +202,6 @@ export function CalendarLayers({
               {toSchedule}
             </span>
           )}
-        </button>
-        {/* Plan my day: today's quests placed in today's free time (beside the week/month scheduling list). */}
-        <button type="button" onClick={openPlanMyDay} aria-label="Plan my day" title="Plan my day" className="hover-glow flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[13.5px] font-semibold sm:px-3" style={chip}>
-          <span style={{ color: isAdventure ? "#e8c56c" : "var(--t-accent)", display: "flex" }}><MagicCalendarIcon size={16} /></span>
-          <span className="hidden sm:inline">Plan my day</span>
         </button>
         {calendars.length > 0 && (() => {
           const othersOn = calendars.some((c) => !layers.hidden.includes(c.id) && !layers.archived.includes(c.id));

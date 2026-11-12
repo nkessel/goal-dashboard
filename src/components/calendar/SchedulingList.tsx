@@ -388,7 +388,10 @@ export function SchedulingDrawer({ tasks, folders: initialFolders, theme, today 
       return { id: h.id, title: h.title, at: slot.start, habit: true };
     }
     const t = n.task;
-    const slot = await findSlot(t, today && boxes["sec:today"].includes(t.id) ? planDay : undefined);
+    // Today's quests go into that day first (one button on the calendar now does what Plan my day did:
+    // owner, Nov 11); with no day being planned, a quest that doesn't fit today takes the next free spot.
+    const forDay = boxes["sec:today"]?.includes(t.id);
+    const slot = forDay ? ((await findSlot(t, planDay ?? new Date())) ?? (planDay ? null : await findSlot(t, undefined))) : await findSlot(t, undefined);
     if (!slot) return null;
     await applyAutoScheduleAction([{ taskId: t.id, startISO: slot.start.toISOString(), endISO: slot.end.toISOString() }]);
     return { id: t.id, title: t.title, at: slot.start, habit: false };
