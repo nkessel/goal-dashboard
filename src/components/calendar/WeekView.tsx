@@ -186,7 +186,7 @@ export function WeekView({
   // Pick a time to the quarter hour: drag with a mouse for a range, or tap
   // (mouse or finger) for a 30-minute slot. Touch still scrolls the page.
   const [sel, setSel] = useState<{ dayIndex: number; lo: number; hi: number } | null>(null);
-  const pick = useRef<{ dayIndex: number; startMin: number; x: number; y: number; mouse: boolean; moved: boolean; lo: number; hi: number } | null>(null);
+  const pick = useRef<{ dayIndex: number; startMin: number; x: number; y: number; mouse: boolean; moved: boolean; lo: number; hi: number; sideways?: number } | null>(null);
   const SNAP = 15;
   const minuteAt = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -224,6 +224,15 @@ export function WeekView({
     if (!p || p.dayIndex !== dayIndex) return;
     if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 6) p.moved = true;
     if (!p.mouse) return;
+    // A mouse dragged sideways moves through the days (at any hour), instead of picking a time.
+    const dx = e.clientX - p.x;
+    const el = scrollRef.current;
+    if (seamless && el && (p.sideways != null || (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(e.clientY - p.y) * 1.5))) {
+      if (p.sideways == null) p.sideways = el.scrollLeft;
+      el.scrollLeft = p.sideways - dx;
+      setSel(null);
+      return;
+    }
     const m = minuteAt(e);
     p.lo = Math.min(p.startMin, m);
     p.hi = Math.max(p.startMin, m) + SNAP;
@@ -233,6 +242,7 @@ export function WeekView({
     const p = pick.current;
     pick.current = null;
     if (!p || p.dayIndex !== dayIndex) return;
+    if (p.sideways != null) return; // it moved the days
     const day = days[dayIndex];
     if (!day) return;
     let lo = p.startMin;
@@ -1019,7 +1029,7 @@ export function WeekView({
           <div
             key={`hit-${dayIndex}`}
             className="relative select-none"
-            style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}`, cursor: 'url("/design/cursor-hand.svg") 11 3, pointer', touchAction: "pan-y" }}
+            style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}`, cursor: 'url("/design/cursor-hand.svg") 11 3, pointer', touchAction: seamless ? "pan-x pan-y" : "pan-y" }}
             onPointerDown={(e) => pickDown(e, dayIndex)}
             onPointerMove={(e) => {
               if (carried && e.pointerType === "mouse") setGhost({ dayIndex, min: minuteAt(e) });
@@ -1161,7 +1171,7 @@ export function WeekView({
                       // Faded but still opaque, so past items fanned over each other stay legible.
                       filter: fade,
                       ...(isMoving ? { zIndex: 40, boxShadow: "0 8px 18px rgba(40,25,5,.35)", outline: "2px solid rgba(217,180,95,.9)", cursor: 'url("/design/cursor-grabbing.svg") 13 12, grabbing' } : {}),
-                      touchAction: canDrag ? "pan-y" : undefined,
+                      touchAction: canDrag ? (seamless ? "pan-x pan-y" : "pan-y") : undefined,
                     }}
                   >
                     {it.kind === "event" ? (
