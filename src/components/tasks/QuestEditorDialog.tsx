@@ -3002,7 +3002,7 @@ function AutoGrowText({
 export { IconScale } from "./IconScale";
 
 /** A tiny ticked list: the Steps label glyph. */
-function StepsGlyph({ size = 18 }: { size?: number }) {
+export function StepsGlyph({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0" style={{ color: "#7a5f2a" }}>
       <rect x="3" y="4" width="5" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.8" />

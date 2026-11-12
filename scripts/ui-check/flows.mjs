@@ -509,20 +509,18 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/import", { name: "import" });
       await h.check("one by one");
-      // Sub-quests show on the card with Hide / Show; the foot is trash · Already done ✓ · Import (owner, Nov 12).
-      if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /hide/i }).first(), "sub-quests: hide", { optional: true, expectMove: true })) {
-        await h.check("sub-quests hidden");
-        await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /show/i }).first(), "sub-quests: show", { optional: true, expectMove: true });
+      // Sub-quests as in the quest editor: the label folds them, rows rename in place, XP on the row, ⋯ for Remove, + Add (owner, Nov 12).
+      if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^sub-quests/i }).first(), "sub-quests: fold", { optional: true, expectMove: true })) {
+        await h.check("sub-quests folded");
+        await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^sub-quests/i }).first(), "sub-quests: unfold", { optional: true, expectMove: true });
       }
-      // ✎ by the sub-quests turns them into the editable list: rename, drag, a row's dot for XP and Remove (owner, Nov 12).
-      if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^edit the sub-quests$/i }).first(), "sub-quests: edit", { optional: true, expectMove: true })) {
-        await h.check("sub-quests: editing");
-        if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^options for /i }).first(), "sub-quest: options", { optional: true, expectMove: true })) {
-          await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^more xp$/i }).first(), "sub-quest: more XP", { optional: true });
-          await h.check("sub-quest: xp and remove");
-        }
-        await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^done editing/i }).first(), "sub-quests: done", { optional: true, expectMove: true });
-        await h.check("sub-quests: edited");
+      if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^more for /i }).first(), "sub-quest: ⋯", { optional: true, expectMove: true })) {
+        await h.check("sub-quest: menu");
+        await h.page.keyboard.press("Escape");
+      }
+      if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^add a sub-quest$/i }).first(), "sub-quests: add", { optional: true, expectMove: true })) {
+        await h.check("sub-quests: adding");
+        await h.page.keyboard.press("Escape");
       }
       if (await h.tap((p) => p.locator("[data-import-foot]").getByRole("button", { name: /^snooze…$/i }).first(), "foot: snooze", { optional: true, expectMove: true })) {
         await h.check("foot: snooze row");
