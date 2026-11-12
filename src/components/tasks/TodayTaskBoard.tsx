@@ -19,6 +19,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -38,6 +39,20 @@ import { settleOptimisticQuests, takeOptimisticFailure, useOptimisticQuests, typ
 import { Fold } from "@/components/ui/Fold";
 import { CloseIcon } from "@/components/ui/Icons";
 import { FocusQuestions, FocusQuestionsButton } from "@/components/tasks/FocusQuestions";
+import { dropOnCalendarAt, hoverCalendarAt, leaveCalendars, type Carried } from "@/lib/schedule-carry";
+import { peekTodayCalendar } from "@/components/today/TodayWithCalendar";
+
+/** Where the finger or mouse is during a dnd-kit drag: where it started plus how far it has moved. */
+function pointOf(e: { activatorEvent: Event | null; delta: { x: number; y: number } }): { x: number; y: number } | null {
+  const a = e.activatorEvent as (MouseEvent & TouchEvent) | null;
+  if (!a) return null;
+  const t = a.touches?.[0] ?? a.changedTouches?.[0];
+  const x0 = t ? t.clientX : a.clientX;
+  const y0 = t ? t.clientY : a.clientY;
+  if (typeof x0 !== "number" || typeof y0 !== "number") return null;
+  return { x: x0 + e.delta.x, y: y0 + e.delta.y };
+}
+const carryOf = (t: { id: string; title: string; estimate_minutes?: number | null }): Carried => ({ id: t.id, title: t.title, minutes: Math.max(15, t.estimate_minutes ?? 30) });
 
 /** A just-created quest, drawn like the rest while it saves (blank checkbox until its portrait is ready). */
 function asTask(q: OptimisticQuest): TaskWithCategory {
@@ -395,6 +410,8 @@ export function TodayTaskBoard({
   const [seenPriorityTasks, setSeenPriorityTasks] = useState(priorityTasks);
   const [seenOtherTasks, setSeenOtherTasks] = useState(otherTasks);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // The dragged card is over Today's calendar: it shrinks a little, and letting go places it there.
+  const [overCal, setOverCal] = useState(false);
   const [startList, setStartList] = useState<ListName | null>(null);
   const [otherOpen, setOtherOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(true);
@@ -508,6 +525,17 @@ export function TodayTaskBoard({
     setLocalOther(other);
     setSoftLocal(false);
     setDragError(null);
+    document.body.setAttribute("data-quest-drag", "1");
+  }
+
+  // Over Today's calendar (beside Today, or slid out on a phone): it shows where the card would land.
+  function onDragMove(e: DragMoveEvent) {
+    const p = pointOf(e);
+    const task = [...priority, ...other].find((t) => t.id === String(e.active.id));
+    if (!p || !task) return;
+    if (window.innerWidth < 768 && p.x > window.innerWidth - 44) peekTodayCalendar();
+    const over = hoverCalendarAt(p.x, p.y, carryOf(task));
+    if (over !== overCal) setOverCal(over);
   }
 
   // Moving between the two lists happens live, while hovering.
@@ -536,6 +564,18 @@ export function TodayTaskBoard({
 
   function onDragEnd(e: DragEndEvent) {
     const id = String(e.active.id);
+    document.body.removeAttribute("data-quest-drag");
+    setOverCal(false);
+    // Let go over the calendar: it goes there (the lists stay as they were).
+    const p = pointOf(e);
+    const dragged = [...priority, ...other].find((t) => t.id === id);
+    if (p && dragged && dropOnCalendarAt(p.x, p.y, carryOf(dragged))) {
+      setActiveId(null);
+      setStartList(null);
+      setLocalPriority(null);
+      setLocalOther(null);
+      return;
+    }
     const list = listOf(id);
     let nextPriority = priority;
     let nextOther = other;
@@ -569,6 +609,9 @@ export function TodayTaskBoard({
   }
 
   function onDragCancel() {
+    document.body.removeAttribute("data-quest-drag");
+    setOverCal(false);
+    leaveCalendars();
     setActiveId(null);
     setStartList(null);
     setLocalPriority(null);
@@ -581,7 +624,7 @@ export function TodayTaskBoard({
     : { background: "var(--t-bg)", border: "1px solid var(--t-card-border)" };
 
   return (
-    <DndContext id="dnd-TodayTaskBoard" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
+    <DndContext id="dnd-TodayTaskBoard" sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
       {/* Its parts follow Today's arrangement (gear on Today): order and which show. */}
       {!layout.hidden.includes("due") && due.length > 0 && <DueSoonBand tasks={due} hours={dueHours} theme={theme} lockedBehind={lockedBehind} onHide={() => saveTodayLayout({ ...layout, hidden: [...layout.hidden, "due"] })} />}
       {/* Daily Habits, Today's Quests and Additional Quests: drag a closed one to reorder. */}
@@ -782,9 +825,9 @@ export function TodayTaskBoard({
         ].filter((sec) => !layout.hidden.includes(sec.id as TodayPart))}
       />
 
-      <DragOverlay dropAnimation={{ duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }}>
+      <DragOverlay dropAnimation={overCal ? null : { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }}>
         {active ? (
-          <ul className="m-0 list-none p-0" style={{ transform: "scale(1.02)", filter: "drop-shadow(0 12px 18px rgba(0,0,0,.45))" }}>
+          <ul data-drag-card className="m-0 list-none p-0" style={{ transform: overCal ? "scale(.72)" : "scale(1.02)", transformOrigin: "20% 30%", opacity: overCal ? 0.85 : 1, transition: "transform 180ms cubic-bezier(.2,.8,.2,1), opacity 180ms", filter: "drop-shadow(0 12px 18px rgba(0,0,0,.45))" }}>
             <TaskRow task={active} theme={theme} categoryLabel={active.categoryLabel} />
           </ul>
         ) : null}

@@ -1,13 +1,15 @@
 "use client";
 
 import { useQuestPlace } from "@/lib/use-quest-places";
+import { driveWords, useCalCardLook, useQuestDrive } from "@/lib/use-quest-cal";
+import { formatShortTimeRange } from "@/lib/calendar-dates";
 import { progressWords } from "@/lib/progress-words";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { FileChips } from "@/components/ui/FileChips";
 import { Linked } from "@/components/ui/Linked";
 
 import { TimeToken } from "@/components/xp/NightFields";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
@@ -151,6 +153,10 @@ export function TaskRow({
   // Counted in pages (or anything) instead of percent, and the little stepper to log it from the card.
   const countUnit = useProgressUnit(task.id);
   const place = useQuestPlace(task.id);
+  const drive = useQuestDrive(task.id);
+  // Its spot on the calendar, in the viewer's own time (after hydration: the server runs on UTC).
+  const onDevice = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  const calSpot = onDevice && task.is_on_calendar && task.scheduled_start && task.scheduled_end && task.status === "open" ? calSpotWords(task.scheduled_start, task.scheduled_end) : null;
   const [logOpen, setLogOpen] = useState(false);
   const [snoozing, setSnoozing] = useState(false);
   const [snoozeAt, setSnoozeAt] = useState<{ top: number; bottom: number; left: number; right: number } | null>(null);
@@ -183,16 +189,21 @@ export function TaskRow({
   const isWarnedCard = isWarned || isOverdue;
 
   const cardBase = isAdventure ? "var(--t-panel)" : "var(--t-card)";
+  // The quest's own background (owner, Nov 12: "have background color changable for quests"), the same on its calendar card.
+  const look = useCalCardLook(task.id);
+  const lookImg = look?.image === "portrait" ? ((task.icon_source === "ai" || task.icon_source === "library") && task.icon_key ? task.icon_key : null) : (look?.image ?? null);
+  const tex = isAdventure && !isOverdue ? "url(/design/tex-parchment-2.jpg)" : null;
+  const bg: React.CSSProperties =
+    lookImg && !isOverdue
+      ? { backgroundImage: `linear-gradient(rgba(251,243,220,.78), rgba(238,220,179,.7)), url("${lookImg}")`, backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat" }
+      : {
+          backgroundImage: [look?.color && !isOverdue ? `linear-gradient(${look.color}b8, ${look.color}d0)` : tint ? `linear-gradient(${tint}, ${tint})` : null, tex].filter(Boolean).join(", ") || undefined,
+          backgroundSize: "384px 384px",
+          backgroundRepeat: "repeat",
+        };
   const cardStyle: React.CSSProperties = {
     backgroundColor: isOverdue ? "var(--t-warn-bg)" : cardBase,
-    backgroundImage: [
-      tint ? `linear-gradient(${tint}, ${tint})` : null,
-      isAdventure && !isOverdue ? "url(/design/tex-parchment-2.jpg)" : null,
-    ]
-      .filter(Boolean)
-      .join(", ") || undefined,
-    backgroundSize: "384px 384px",
-    backgroundRepeat: "repeat",
+    ...bg,
     borderStyle: "solid",
     borderWidth: isAdventure ? 2 : 1,
     borderColor: isWarnedCard ? "var(--t-warn)" : isAdventure ? "#c7a96f" : "var(--t-card-border)",
@@ -710,10 +721,24 @@ export function TaskRow({
               <Linked text={task.description} />
             </p>
           )}
-          {place && (
-            <p className="m-0 mt-0.5 flex items-center gap-1 truncate text-[12.5px]" style={{ color: isAdventure ? "#5a4a2c" : "var(--t-ink-soft)" }} title={`Where: ${place}`}>
-              <span aria-hidden>📍</span>
-              <span className="truncate">{place}</span>
+          {/* Where and when it is on the calendar, the same as its calendar card (owner, Nov 12: "keep the calendar item location in the card and in the quest"). */}
+          {(place || calSpot) && (
+            <p data-cal-spot className="m-0 mt-0.5 flex min-w-0 items-center gap-1 text-[12.5px]" style={{ color: isAdventure ? "#5a4a2c" : "var(--t-ink-soft)" }} title={[calSpot && `On the calendar: ${calSpot}`, place && `Where: ${place}`, drive && `Driving: ${driveWords(drive)} each way`].filter(Boolean).join("\n")}>
+              {calSpot && (
+                <span className="flex shrink-0 items-center gap-1 whitespace-nowrap font-semibold">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
+                  <img src="/design/ui-calendar.png" alt="" width={13} height={13} className="h-[13px] w-[13px]" />
+                  {calSpot}
+                </span>
+              )}
+              {calSpot && place && <span aria-hidden style={{ opacity: 0.5 }}>·</span>}
+              {place && (
+                <span className="flex min-w-0 items-center gap-1">
+                  <span aria-hidden>📍</span>
+                  <span className="truncate">{place}</span>
+                </span>
+              )}
+              {place && drive && <span className="shrink-0 whitespace-nowrap" style={{ opacity: 0.8 }}>· 🚗 {driveWords(drive)}</span>}
             </p>
           )}
           <FileChips files={task.attachments} className="mt-1" />
@@ -1319,4 +1344,17 @@ function ScheduleWindow({ task, theme, onClose }: { task: Task; theme: "calm" | 
     </FloatingWindow>,
     document.body
   );
+}
+
+const noopSubscribe = () => () => {};
+/** "3 – 3:30pm" today, "Thu 3 – 3:30pm" another day. */
+function calSpotWords(startISO: string, endISO: string) {
+  const a = new Date(startISO);
+  const b = new Date(endISO);
+  const range = formatShortTimeRange(a, b);
+  const now = new Date();
+  if (a.toDateString() === now.toDateString()) return range;
+  const days = Math.round((new Date(a.toDateString()).getTime() - new Date(now.toDateString()).getTime()) / 86_400_000);
+  const day = days === 1 ? "Tomorrow" : days > 1 && days < 7 ? a.toLocaleDateString(undefined, { weekday: "short" }) : a.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${day} ${range}`;
 }

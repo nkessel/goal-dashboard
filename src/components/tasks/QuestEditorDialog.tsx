@@ -4,6 +4,10 @@ import { IconScale } from "./IconScale";
 import { sessionRef } from "@/lib/calendar-task-window";
 import { InlineNumber } from "@/components/ui/InlineNumber";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
+import { DrivePicks } from "./DrivePicks";
+import { CardLookPicker } from "@/components/calendar/CardLookPicker";
+import { useCalCardLook } from "@/lib/use-quest-cal";
+import { driveWords, useQuestDrive } from "@/lib/use-quest-cal";
 import { useProgressUnit, saveProgressUnit } from "@/lib/use-progress-units";
 import { pctOf, type ProgressUnit } from "@/lib/progress-units";
 import { progressWords } from "@/lib/progress-words";
@@ -242,7 +246,7 @@ export function QuestEditorDialog({
   const embedded = useIsEmbedded();
   const scaleStyle = useScaleStyle();
   // Which quick-detail chip is open (one at a time).
-  const [factOpen, setFactOpen] = useState<EditorPart | "due" | "bonus" | "place" | null>(null);
+  const [factOpen, setFactOpen] = useState<EditorPart | "due" | "bonus" | "place" | "look" | null>(null);
   const [boardCard, setBoardCard] = useState(false);
   const isAdventure = theme === "adventure";
   const task = mode.kind === "edit" ? mode.task : null;
@@ -694,6 +698,8 @@ export function QuestEditorDialog({
   const chunkMinutes = chunk.trim() && Number(chunk) > 0 ? Math.round(Number(chunk)) : null;
   const dueAt = dueIso(dueDate, dueTime);
   const place = useQuestPlace(task?.id);
+  const drive = useQuestDrive(task?.id);
+  const cardLook = useCalCardLook(task?.id);
 
   // ---- Saving as you go (existing quests) ----------------------------------
   const autosave = Boolean(task) && !review;
@@ -2683,12 +2689,25 @@ export function QuestEditorDialog({
                       <button type="button" onClick={() => setFactOpen((o) => (o === "place" ? null : "place"))} aria-expanded={factOpen === "place"} aria-label={place ? `Place: ${place}` : "Add a place"} title={place ? `📍 ${place}` : "Where it happens"} className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "place" ? "true" : undefined}>
                         <PinGlyph />
                         {place && <span className="max-w-[110px] truncate">{place}</span>}
+                        {drive && <span className="shrink-0 whitespace-nowrap" style={{ opacity: 0.8 }}>· 🚗 {driveWords(drive)}</span>}
+                      </button>
+                    )}
+                    {/* The card's background, a colour or a picture: on Today, boards and the calendar (owner, Nov 12). */}
+                    {task && !doingNow && (
+                      <button type="button" onClick={() => setFactOpen((o) => (o === "look" ? null : "look"))} aria-expanded={factOpen === "look"} aria-label="Card colour or picture" title="Card colour or picture" className="qe-fact flex h-9 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-semibold" data-open={factOpen === "look" ? "true" : undefined}>
+                        <span aria-hidden className="h-4 w-4 rounded-full" style={{ border: "1.5px solid #8a6116", background: cardLook?.color ?? (cardLook?.image ? "conic-gradient(#d9b45f, #7c9a5a, #6fa8dc, #d9b45f)" : "linear-gradient(180deg, #fbf3dc, #eedcb3)") }} />
                       </button>
                     )}
 
                   </div>
+                  {factOpen === "look" && task && (
+                    <div key="look" className="reveal qe-fact-panel rounded-xl p-3">
+                      <CardLookPicker task={task} />
+                    </div>
+                  )}
                   {factOpen === "place" && task && (
-                    <div key="place" className="reveal qe-fact-panel flex items-center gap-2 rounded-xl p-3">
+                    <div key="place" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
+                    <div className="flex items-center gap-2">
                       <PinGlyph />
                       <input
                         autoFocus
@@ -2705,6 +2724,9 @@ export function QuestEditorDialog({
                           <CloseIcon size={11} />
                         </button>
                       )}
+                    </div>
+                    {/* Driving there and back (owner, Nov 12: "the option for driving time is crucial"): kept free on the calendar. */}
+                    <DrivePicks taskId={task.id} />
                     </div>
                   )}
                   {factOpen === "due" && (
@@ -2749,7 +2771,7 @@ export function QuestEditorDialog({
                     </div>
                   )}
 
-                  {factOpen && factOpen !== "due" && factOpen !== "bonus" && factOpen !== "place" && facts.includes(factOpen) && (
+                  {factOpen && factOpen !== "due" && factOpen !== "bonus" && factOpen !== "place" && factOpen !== "look" && facts.includes(factOpen) && (
                     <div key={factOpen} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
                       {partNodes[factOpen]}
                     </div>

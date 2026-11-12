@@ -5,7 +5,7 @@ import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
 import { scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
 import { getSavedSettings, saveDayHold } from "@/lib/day-holds";
-import { carryQuest, useCarried, QUEST_DRAG_TYPE, type Carried } from "@/lib/schedule-carry";
+import { carryQuest, useCarried, QUEST_DRAG_TYPE, registerCalendarDrop, type Carried } from "@/lib/schedule-carry";
 import { WeatherLocation, useWeatherPlaceName } from "@/components/ui/WeatherLocation";
 import Link from "next/link";
 import type { Task } from "@/lib/data/types";
@@ -31,6 +31,7 @@ import { GoogleEventChip } from "./GoogleEventChip";
 import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
 import { SCHEDULER_DEFAULTS, holdAt, localDayKey, mealsOn, MEAL_ICONS, MEAL_NAMES, type DayHold, type SchedulerSettings } from "@/lib/auto-schedule";
 import { habitBlocksOn } from "@/lib/timed-habits";
+import { driveWords, useAllQuestDrives } from "@/lib/use-quest-cal";
 import { fromFeedback } from "@/lib/from-feedback";
 
 /** Hour height: condensed by default; drag the times on the left to zoom. */
@@ -85,7 +86,10 @@ export function WeekView({
   daily,
   essentials = "dashed",
   habitLook = "quest",
+  embedded = false,
 }: {
+  /** Inside a box of its own that scrolls (Today's day calendar): it scrolls that box, not the page, and stays on its day. */
+  embedded?: boolean;
   daily?: DailyLayer;
   essentials?: EssentialsLook;
   habitLook?: HabitLook;
@@ -162,6 +166,8 @@ export function WeekView({
   const placeName = useWeatherPlaceName();
   const router = useRouter();
   const carried = useCarried();
+  // Driving to a quest's place and back (owner, Nov 12): kept free before and after it.
+  const drives = useAllQuestDrives();
   const [ghost, setGhost] = useState<{ dayIndex: number; min: number } | null>(null);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
@@ -181,10 +187,19 @@ export function WeekView({
       else await scheduleTaskAction(q.id, start.toISOString(), end.toISOString());
       router.refresh();
     } catch (e) {
+      setLanding(null);
       setPlaceError(e instanceof Error ? e.message : "Couldn't put it on the calendar.");
     } finally {
       setPlacing(false);
     }
+  }
+  // A quest card dragged here from elsewhere (Today's lists): where it would land, then where it landed until fresh data arrives.
+  const [ext, setExt] = useState<{ dayIndex: number; min: number; q: Carried } | null>(null);
+  const [landing, setLanding] = useState<{ dayIndex: number; min: number; q: Carried } | null>(null);
+  const [seenTasks, setSeenTasks] = useState(tasks);
+  if (tasks !== seenTasks) {
+    setSeenTasks(tasks);
+    setLanding(null);
   }
   const vis = Math.max(1, Math.min(days.length, visible ?? days.length));
   const seamless = buffer > 0 && days.length > vis;
@@ -329,6 +344,15 @@ export function WeekView({
     const h = firstHourRef.current;
     if (!h || openedAt.current) return;
     openedAt.current = true;
+    if (embedded) {
+      // Its own box scrolls: an hour before now.
+      const sc = h.closest<HTMLElement>("[data-cal-scroller]");
+      if (!sc) return;
+      const d = new Date();
+      const hr = Math.min(H1, Math.max(H0, d.getHours() + d.getMinutes() / 60 - 1));
+      sc.scrollTop = Math.max(0, h.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop + (hr - H0) * HOUR_PX - 40);
+      return;
+    }
     let hour = savedCalHour();
     if (hour == null) {
       if (window.scrollY > 10) return;
@@ -342,6 +366,7 @@ export function WeekView({
   }, []);
   // Remember the hour in view, so moving to other days (swiping, ‹ ›, the date) keeps it.
   useEffect(() => {
+    if (embedded) return;
     let t: ReturnType<typeof setTimeout> | undefined;
     const keep = () => {
       clearTimeout(t);
@@ -362,7 +387,7 @@ export function WeekView({
       clearTimeout(t);
       window.removeEventListener("scroll", keep);
     };
-  }, [HOUR_PX, H0]);
+  }, [HOUR_PX, H0, embedded]);
   const [colWidth, setColWidth] = useState(0);
   useLayoutEffect(() => {
     const el = boxRef.current;
@@ -540,7 +565,7 @@ export function WeekView({
     router.push(k === 1 ? `/calendar?view=day&date=${key}` : `/calendar?view=days&n=${k}&date=${key}`, { scroll: false });
   };
   function startDayScroll(e: React.PointerEvent) {
-    if (e.button !== 0 || colWidth <= 0) return;
+    if (embedded || e.button !== 0 || colWidth <= 0) return;
     const x0 = e.clientX;
     dragged.current = false;
     if (seamless) {
@@ -785,7 +810,8 @@ export function WeekView({
     const check = () => {
       const h = firstHourRef.current;
       if (!h) return;
-      const top = h.getBoundingClientRect().top;
+      const sc = embedded ? h.closest<HTMLElement>("[data-cal-scroller]") : null;
+      const top = h.getBoundingClientRect().top - (sc ? sc.getBoundingClientRect().top : 0);
       const gridH = (gridMinutes / 60) * HOUR_PX;
       setPinShown(top < 0 && top + gridH > 60);
       const d = new Date();
@@ -795,13 +821,15 @@ export function WeekView({
       setNowOff(y < 40 || y > window.innerHeight - 110);
     };
     check();
-    window.addEventListener("scroll", check, { passive: true });
+    const sc = embedded ? firstHourRef.current?.closest<HTMLElement>("[data-cal-scroller]") : null;
+    const target: HTMLElement | Window = sc ?? window;
+    target.addEventListener("scroll", check, { passive: true });
     window.addEventListener("resize", check);
     return () => {
-      window.removeEventListener("scroll", check);
+      target.removeEventListener("scroll", check);
       window.removeEventListener("resize", check);
     };
-  }, [gridMinutes, HOUR_PX, H0, H1]);
+  }, [gridMinutes, HOUR_PX, H0, H1, embedded]);
   const todayOff = todayIdx < 0 || (seamless && (todayIdx < firstIdx || todayIdx >= firstIdx + vis)) || nowOff;
   function goToday() {
     const d = new Date();
@@ -1064,6 +1092,60 @@ export function WeekView({
     if (cluster.length) flush();
   }
 
+  // Quest cards dragged in from Today's lists (dnd-kit, finger or mouse) ask here where they'd land.
+  function hitAt(x: number, y: number): { dayIndex: number; min: number } | null {
+    const box = boxRef.current;
+    if (!box) return null;
+    const sc = embedded ? box.closest<HTMLElement>("[data-cal-scroller]") : null;
+    if (sc) {
+      const r = sc.getBoundingClientRect();
+      if (x < r.left || x > r.right || y < r.top || y > r.bottom) return null;
+    }
+    for (const el of box.querySelectorAll<HTMLElement>("[data-cal-hit]")) {
+      const r = el.getBoundingClientRect();
+      if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+      const m = Math.max(0, Math.min(gridMinutes - SNAP, Math.floor((((y - r.top) / HOUR_PX) * 60) / SNAP) * SNAP));
+      return { dayIndex: Number(el.dataset.calHit), min: m };
+    }
+    return null;
+  }
+  const dropIn = useEffectEvent((kind: "hover" | "drop" | "leave", x: number, y: number, q: Carried | null): boolean => {
+    if (kind === "leave" || !q) {
+      if (ext) setExt(null);
+      return false;
+    }
+    const h = hitAt(x, y);
+    if (kind === "drop") {
+      setExt(null);
+      if (!h) return false;
+      setLanding({ ...h, q });
+      void placeCarried(q, h.dayIndex, h.min);
+      return true;
+    }
+    if (!h) {
+      if (ext) setExt(null);
+      return false;
+    }
+    if (!ext || ext.dayIndex !== h.dayIndex || ext.min !== h.min || ext.q.id !== q.id) setExt({ ...h, q });
+    // Near the top or bottom of its own box: scroll the hours along.
+    const sc = embedded ? boxRef.current?.closest<HTMLElement>("[data-cal-scroller]") : null;
+    if (sc) {
+      const r = sc.getBoundingClientRect();
+      if (y < r.top + 48) sc.scrollTop -= 14;
+      else if (y > r.bottom - 48) sc.scrollTop += 14;
+    }
+    return true;
+  });
+  useEffect(
+    () =>
+      registerCalendarDrop({
+        hover: (x, y, q) => dropIn("hover", x, y, q),
+        drop: (x, y, q) => dropIn("drop", x, y, q),
+        leave: () => void dropIn("leave", 0, 0, null),
+      }),
+    []
+  );
+
   const lineColor = isAdventure ? "rgba(122,82,51,.25)" : "var(--t-card-border)";
 
   return (
@@ -1093,7 +1175,7 @@ export function WeekView({
           )}
         </div>
       )}
-      <div className="mb-1.5 flex items-center gap-2 px-1 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+      <div className={`mb-1.5 items-center gap-2 px-1 text-[13px] ${embedded ? "hidden" : "flex"}`} style={{ color: "var(--t-ink-soft)" }}>
         <span className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
         {weather === undefined ? (
           <>
@@ -1276,6 +1358,7 @@ export function WeekView({
         {days.map((_, dayIndex) => (
           <div
             key={`hit-${dayIndex}`}
+            data-cal-hit={dayIndex}
             className="relative select-none"
             style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}`, cursor: 'url("/design/cursor-hand.svg") 11 3, pointer', touchAction: seamless ? "pan-x pan-y" : "pan-y" }}
             onPointerDown={(e) => pickDown(e, dayIndex)}
@@ -1326,6 +1409,27 @@ export function WeekView({
                 {carried.title}
               </div>
             )}
+            {[ext, landing].map((g, gi) =>
+              g && g.dayIndex === dayIndex ? (
+                <div
+                  key={gi ? "landing" : "ext"}
+                  data-cal-landing={gi ? "" : undefined}
+                  className={`pointer-events-none absolute inset-x-0.5 z-[6] flex flex-col overflow-hidden rounded-md px-1.5 py-0.5 text-[11.5px] font-semibold leading-tight ${gi ? "card-pop-in quest-card" : ""}`}
+                  style={{
+                    top: (g.min / 60) * HOUR_PX,
+                    height: Math.max(22, (g.q.minutes / 60) * HOUR_PX),
+                    transition: gi ? undefined : "top 120ms ease-out",
+                    ...(gi ? { background: "linear-gradient(180deg, #fbf3dc, #eedcb3)", border: "1.5px solid #a88a3f", boxShadow: "0 4px 10px rgba(0,0,0,.25)" } : { background: "rgba(217,180,95,.45)", border: "1.5px dashed #6b5124" }),
+                    color: "#2a1c10",
+                  }}
+                >
+                  <span className="truncate font-display">{g.q.title}</span>
+                  <span className="truncate text-[10.5px] font-normal" style={{ color: "#5b4520" }}>
+                    {gi ? "Placing…" : formatShortTimeRange(minuteDate(days[dayIndex], g.min), minuteDate(days[dayIndex], g.min + g.q.minutes))}
+                  </span>
+                </div>
+              ) : null
+            )}
             {sel && sel.dayIndex === dayIndex && (
               <div
                 className="pointer-events-none absolute inset-x-0.5 rounded-md"
@@ -1358,11 +1462,40 @@ export function WeekView({
                   daily={daily}
                   essentials={essentials}
                   habitLook={habitLook}
-                  busy={dayItems.map((it) => ({ start: it.start.getTime(), end: it.end.getTime() }))}
+                  busy={dayItems.map((it) => {
+                    const d = it.kind === "task" && it.task.status !== "completed" ? (drives[it.task.id] ?? 0) * 60_000 : 0;
+                    return { start: it.start.getTime() - d, end: it.end.getTime() + d };
+                  })}
                   topOf={(d) => (offset(d, day) / 60) * HOUR_PX}
                   isAdventure={isAdventure}
                 />
               )}
+              {dayItems.flatMap((it) => {
+                const m = it.kind === "task" && it.task.status !== "completed" ? drives[it.task.id] : 0;
+                if (!m) return [];
+                const l = lanes.get(it.key) ?? { lane: 0, count: 1 };
+                const band = (key: string, top: number, words: string) => (
+                  <div
+                    key={key}
+                    data-drive-band
+                    aria-hidden
+                    className="absolute flex items-center justify-center overflow-hidden whitespace-nowrap rounded-md text-[10.5px] font-semibold"
+                    style={{
+                      top: (top / 60) * HOUR_PX + 1,
+                      height: Math.max(2, (m / 60) * HOUR_PX - 2),
+                      left: `${(100 / l.count) * l.lane}%`,
+                      width: `calc(${100 / l.count}% - 2px)`,
+                      zIndex: 1,
+                      color: "#5b4520",
+                      border: "1px dashed rgba(122,82,51,.55)",
+                      background: "repeating-linear-gradient(135deg, rgba(217,180,95,.16) 0 6px, rgba(217,180,95,.04) 6px 12px)",
+                    }}
+                  >
+                    {(m / 60) * HOUR_PX >= 14 && <span className="truncate px-1">🚗 {words}</span>}
+                  </div>
+                );
+                return [band(`drive-to-${it.key}`, it.top - m, `${driveWords(m)} there`), band(`drive-back-${it.key}`, it.bottom, `${driveWords(m)} back`)];
+              })}
               {dayItems.map((it) => {
                 const l = lanes.get(it.key) ?? { lane: 0, count: 1 };
                 const height = ((it.bottom - it.top) / 60) * HOUR_PX - 2;
@@ -1435,7 +1568,7 @@ export function WeekView({
       </div>
       </div>
       </div>
-      {todayOff && <GoToday onClick={goToday} />}
+      {todayOff && !embedded && <GoToday onClick={goToday} />}
 
       {itemMenu && <CalendarItemMenu target={itemMenu.target} x={itemMenu.x} y={itemMenu.y} theme={theme} onClose={() => setItemMenu(null)} />}
       {addRange && (

@@ -15,6 +15,8 @@ import { formatTimeRange } from "@/lib/calendar-dates";
 import { coinsForXp } from "@/lib/coins";
 import { CoinIcon } from "@/components/ui/Icons";
 import type { CardShow } from "./CalendarLayers";
+import { useCalCardLook } from "@/lib/use-quest-cal";
+import { useQuestPlace } from "@/lib/use-quest-places";
 
 import { getTaskDisplayWindow } from "@/lib/calendar-task-window";
 export { getTaskDisplayWindow };
@@ -285,6 +287,15 @@ function QuestCard({
   const { w, h } = box;
   // The quests waiting behind it, as an agenda (owner, Nov 3: time with Dad, then what to bring up).
   const agenda = useContext(AgendaContext)[task.id] ?? [];
+  // Its own look, chosen from the card's menu (owner, Nov 12): a colour, its portrait, or a photo; and where it happens.
+  const look = useCalCardLook(task.id);
+  const place = useQuestPlace(task.id);
+  const lookImg = look?.image === "portrait" ? art : (look?.image ?? null);
+  const lookBg: React.CSSProperties | null = lookImg
+    ? { backgroundImage: `linear-gradient(rgba(251,243,220,.7), rgba(238,220,179,.62)), url("${lookImg}")`, backgroundSize: "cover", backgroundPosition: "center" }
+    : look?.color
+      ? { backgroundImage: `linear-gradient(${look.color}cc, ${look.color}e6), linear-gradient(180deg, #fbf3dc, #eedcb3)` }
+      : null;
   const line = h < 30;
   // What it pays: XP and coins (done: what it paid). Shown on a line of its own when there's room, else at the end of a one-line card.
   const xpN = done ? (task.xp_awarded ?? task.xp_value) : task.xp_value;
@@ -315,7 +326,8 @@ function QuestCard({
   const payInline = pays && line && w >= 120;
   const agendaRows = !done && !line && !stack && agenda.length ? Math.max(0, Math.min(agenda.length, 3, Math.floor((h - 8 - (payLine ? smallLine : 0) - titlePx * 1.12 - smallLine) / smallLine))) : 0;
   const agendaBadge = !done && agenda.length > 0 && agendaRows === 0 && !line;
-  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? smallLine : 0) - (payLine ? smallLine : 0) - (agendaRows ? agendaRows * smallLine + smallLine : 0)) / (titlePx * 1.12)));
+  const placeLine = !!place && !line && h >= (payLine ? 58 : 44) && w >= 70;
+  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? smallLine : 0) - (payLine ? smallLine : 0) - (placeLine ? smallLine : 0) - (agendaRows ? agendaRows * smallLine + smallLine : 0)) / (titlePx * 1.12)));
 
   return (
     <button
@@ -330,7 +342,7 @@ function QuestCard({
       style={{
         gap: stack ? 3 : line ? 4 : 6,
         padding: line ? "1px 4px" : stack ? "5px 3px 4px" : "4px 6px 4px 4px",
-        ...(tint && !done ? { backgroundImage: `linear-gradient(${tint}, ${tint}), linear-gradient(180deg, #fbf3dc, #eedcb3)` } : {}),
+        ...(lookBg && !done ? lookBg : tint && !done ? { backgroundImage: `linear-gradient(${tint}, ${tint}), linear-gradient(180deg, #fbf3dc, #eedcb3)` } : {}),
         ...(warned ? { borderColor: "var(--t-warn)" } : {}),
       }}
     >
@@ -392,6 +404,11 @@ function QuestCard({
           <span className="block truncate" style={{ color: "#4e6a35", fontSize: smallPx, fontStyle: "italic", lineHeight: 1.2 }}>
             {/* When it was done (owner, Nov 5: "show when I completed quests in the past days"). */}
             {task.completed_at ? `Done ${new Date(task.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase() + "m")}` : "Completed"}
+          </span>
+        )}
+        {placeLine && (
+          <span className="block truncate" title={`Where: ${place}`} style={{ color: "#5a4a2c", fontSize: smallPx, lineHeight: `${smallLine}px` }}>
+            📍 {place}
           </span>
         )}
         {payLine && <Pays xp={show.xp ? xpN : 0} coins={show.coins ? coinN : 0} done={done} center={stack} px={smallPx} />}

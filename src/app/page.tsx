@@ -5,6 +5,10 @@ import { auth, signIn } from "@/auth";
 import { DUE_HOURS_COOKIE, byDuePriority, inDueWindow, parseDueHours } from "@/lib/due-soon";
 import { LowLightToggle } from "@/components/evening/LowLightToggle";
 import { TodayArrange } from "@/components/today/TodayArrange";
+import { Suspense } from "react";
+import { TodayWithCalendar } from "@/components/today/TodayWithCalendar";
+import { TodayCalendarData } from "@/components/today/TodayCalendarData";
+import { timedHabitsFrom } from "@/lib/timed-habits";
 import { ImportsWaiting } from "@/components/imports/ImportsWaiting";
 import { countWaitingImportCards } from "@/lib/data/import-cards";
 import { RefreshAt } from "@/components/today/RefreshAt";
@@ -247,10 +251,22 @@ export default async function Home() {
   const stats = statsView(true);
 
   return (
-    <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id}>
+    <AppShell userLabel={session.user.email ?? ""} profileId={session.user.id} wide>
       <DayNightFlip
         day={
-          <>
+          <TodayWithCalendar
+            calendar={
+              <Suspense fallback={<div className="parchment h-[60vh] rounded-2xl opacity-80" aria-label="Loading today's calendar" />}>
+                <TodayCalendarData
+                  ownerId={uid}
+                  token={gToken}
+                  dayKey={dayKey}
+                  theme={theme === "adventure" ? "adventure" : "calm"}
+                  daily={{ settings: ((profile as { scheduler?: Record<string, unknown> | null } | null)?.scheduler ?? null) as never, habits: timedHabitsFrom(rites ?? [], cleanRepeat) }}
+                />
+              </Suspense>
+            }
+          >
           {wakeAt && <RefreshAt at={wakeAt} />}
           <TodayArrange
             parts={{
@@ -293,10 +309,10 @@ export default async function Home() {
                 />
             }
           />
-          </>
+          </TodayWithCalendar>
         }
         evening={
-          <div className="flex flex-col gap-6">
+          <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
             <LowLightToggle />
             {statsView(false)}
             <EveningRites

@@ -339,6 +339,53 @@ export const FLOWS = [
     },
   },
   {
+    // Today's day calendar beside Today (owner, Nov 12): side by side on a tablet, a slide-out tab on a phone;
+    // a quest card dragged onto it shows where it lands and goes there; the place panel's driving time; the card's look.
+    name: "todaycal",
+    async run(h) {
+      await h.goto("/", { name: "todaycal" });
+      await h.settle(1500);
+      await h.check("today with its calendar");
+      if (h.isPhone && (await h.tap((p) => p.locator("[data-today-cal-tab]").first(), "calendar tab", { expectMove: true }))) {
+        await h.settle(600);
+        await h.check("calendar slid out");
+        await h.tap((p) => p.getByRole("button", { name: /^close the calendar$/i }).first(), "calendar away", { optional: true, expectMove: true });
+        await h.settle(500);
+      }
+      if (!h.isPhone) {
+        // Drag the first of Today's Quests onto 2 PM with a mouse.
+        const card = h.page.locator("[data-section='today'] .quest-card, .quest-card").first();
+        const cell = h.page.locator("[data-today-cal] [data-cal-hit]").first();
+        const cb = await card.boundingBox().catch(() => null);
+        const hb = await cell.boundingBox().catch(() => null);
+        if (cb && hb) {
+          await h.page.mouse.move(cb.x + 40, cb.y + 20);
+          await h.page.mouse.down();
+          await h.page.mouse.move(cb.x + 60, cb.y + 30, { steps: 4 });
+          await h.page.mouse.move(hb.x + hb.width / 2, hb.y + Math.min(hb.height - 20, 260), { steps: 14 });
+          await h.settle(300);
+          await h.check("dragging a card over the calendar");
+          await h.page.mouse.up();
+          await h.settle(1200);
+          await h.check("card dropped on the calendar");
+        } else h.record({ kind: "no-drag", severity: "warn", target: "todaycal", detail: "no card or calendar to drag between" });
+      }
+      // The place pill: driving time; and the card's colour or picture.
+      if (await h.tap((p) => p.locator(".quest-card").first(), "open a quest", { optional: true, expectMove: true })) {
+        await h.settle(800);
+        if (await h.tap((p) => p.getByRole("button", { name: /^add a place$|^place:/i }).first(), "place pill", { optional: true, expectMove: true })) {
+          await h.tap((p) => p.getByRole("button", { name: /^20 min$/i }).first(), "drive 20 min", { optional: true });
+          await h.check("place with driving time");
+        }
+        if (await h.tap((p) => p.getByRole("button", { name: /^card colour or picture$/i }).first(), "card look pill", { optional: true, expectMove: true })) {
+          await h.tap((p) => p.locator("[data-card-look]").getByRole("button", { name: /#dcefe0/i }).first(), "pick a colour", { optional: true });
+          await h.check("card look picker");
+        }
+        await esc(h);
+      }
+    },
+  },
+  {
     // Quests in a sequence: tap one in "Edit the sequence…" to edit it (owner, Nov 3).
     name: "sequence",
     async run(h) {

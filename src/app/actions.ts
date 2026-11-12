@@ -3161,9 +3161,12 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
     tasksData.listCalendarTasksForOwner(profileId, from, to).catch(() => []),
     supabaseAdmin().from("profiles").select("scheduler").eq("id", profileId).maybeSingle<{ scheduler: Record<string, unknown> | null }>(),
   ]);
+  // Driving there and back is busy too (owner, Nov 12).
+  const drives = quests.length ? ((await readExtras(profileId).catch(() => ({}) as Record<string, unknown>)).questDrives as Record<string, number> | undefined) ?? {} : {};
   for (const t of quests) {
     if (t.status !== "open" || !t.scheduled_start || !t.scheduled_end) continue;
-    busy.push({ start: new Date(t.scheduled_start).getTime(), end: new Date(t.scheduled_end).getTime(), title: t.title });
+    const pad = (typeof drives[t.id] === "number" ? drives[t.id] : 0) * 60_000;
+    busy.push({ start: new Date(t.scheduled_start).getTime() - pad, end: new Date(t.scheduled_end).getTime() + pad, title: t.title });
   }
   // Habits with a set time (Gym at 7) hold their time; the browser lays them out in local time.
   const riteRows = (await ritesData.listRites(profileId).catch(() => null)) ?? [];
@@ -3623,6 +3626,58 @@ export async function setQuestPlaceAction(taskId: string, place: string | null) 
   const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questPlaces: all } }).eq("id", ownerId);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return p;
+}
+
+/** A quest card's look on the calendar: a colour, its own portrait, or a photo (owner, Nov 12). */
+export type CalCardLook = { color?: string; image?: string };
+const QUEST_ID = /^[0-9a-f-]{36}$/i;
+function cleanLook(v: unknown): CalCardLook | null {
+  if (!v || typeof v !== "object") return null;
+  const r = v as Record<string, unknown>;
+  const color = typeof r.color === "string" && /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : undefined;
+  const image = typeof r.image === "string" && (r.image === "portrait" || /^https:\/\/[^\s"']{8,600}$/.test(r.image)) ? r.image : undefined;
+  return color || image ? { ...(color ? { color } : {}), ...(image ? { image } : {}) } : null;
+}
+
+/** Driving time to each quest's place (minutes each way) and each quest's calendar card look, by quest id. */
+export async function questCalExtrasAction(): Promise<{ drives: Record<string, number>; looks: Record<string, CalCardLook> }> {
+  const ownerId = await requireProfileId();
+  const extras = await readExtras(ownerId);
+  const drives: Record<string, number> = {};
+  const looks: Record<string, CalCardLook> = {};
+  for (const [k, v] of Object.entries((extras.questDrives as Record<string, unknown> | undefined) ?? {})) if (QUEST_ID.test(k) && typeof v === "number" && v > 0) drives[k] = Math.min(600, Math.round(v));
+  for (const [k, v] of Object.entries((extras.calCardLooks as Record<string, unknown> | undefined) ?? {})) {
+    const l = QUEST_ID.test(k) ? cleanLook(v) : null;
+    if (l) looks[k] = l;
+  }
+  return { drives, looks };
+}
+
+export async function setQuestDriveAction(taskId: string, minutes: number | null) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId)) throw new Error("Unknown quest.");
+  const extras = await readExtras(ownerId);
+  const all = { ...((extras.questDrives as Record<string, number> | undefined) ?? {}) };
+  const m = minutes && minutes > 0 ? Math.min(600, Math.round(minutes)) : null;
+  if (m) all[taskId] = m;
+  else delete all[taskId];
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questDrives: all } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  revalidatePath("/calendar");
+  return m;
+}
+
+export async function setCalCardLookAction(taskId: string, look: CalCardLook | null) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId)) throw new Error("Unknown quest.");
+  const extras = await readExtras(ownerId);
+  const all = { ...((extras.calCardLooks as Record<string, CalCardLook> | undefined) ?? {}) };
+  const l = cleanLook(look);
+  if (l) all[taskId] = l;
+  else delete all[taskId];
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, calCardLooks: all } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return l;
 }
 
 /** The gem each reward wears on its tag (a diamond unless chosen), kept on the account by reward id. */

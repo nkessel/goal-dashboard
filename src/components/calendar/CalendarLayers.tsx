@@ -435,3 +435,8 @@ function LookPicker({ label, value, options, onPick }: { label: string; value: s
     </div>
   );
 }
+
+/** The calendar's display choices (calendars hidden, done quests, the card's parts), for another screen showing the calendar (Today's day calendar). */
+export function useCalendarLayers() {
+  return useSyncExternalStore(subscribe, read, () => DEFAULTS);
+}

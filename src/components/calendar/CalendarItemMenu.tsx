@@ -9,6 +9,9 @@ import { sessionRef } from "@/lib/calendar-task-window";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import type { Task } from "@/lib/data/types";
 import { fromFeedback } from "@/lib/from-feedback";
+import { CardLookPicker } from "./CardLookPicker";
+import { DrivePicks } from "@/components/tasks/DrivePicks";
+import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
 
 export type MenuTarget = { kind: "task"; task: Task; start: Date; end: Date } | { kind: "event"; id: string; title: string; start: Date; end: Date };
 
@@ -20,7 +23,8 @@ export type MenuTarget = { kind: "task"; task: Task; start: Date; end: Date } | 
 export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: MenuTarget; x: number; y: number; theme: "calm" | "adventure"; onClose: () => void }) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<"menu" | "followup">("menu");
+  const [mode, setMode] = useState<"menu" | "followup" | "look" | "place">("menu");
+  const place = useQuestPlace(target.kind === "task" ? target.task.id : undefined);
   const [minutes, setMinutes] = useState(15);
   const [title, setTitle] = useState(`Follow up: ${target.kind === "task" ? target.task.title : target.title}`.slice(0, 120));
   const [editing, setEditing] = useState<Task | null>(null);
@@ -66,9 +70,9 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
     });
   }
 
-  const W = 250;
+  const W = mode === "place" ? 300 : 250;
   const left = typeof window === "undefined" ? x : Math.max(8, Math.min(x, window.innerWidth - W - 8));
-  const top = typeof window === "undefined" ? y : Math.max(8, Math.min(y, window.innerHeight - 260));
+  const top = typeof window === "undefined" ? y : Math.max(8, Math.min(y, window.innerHeight - (mode === "menu" ? 330 : 300)));
   const item = "relative z-[1] min-h-10 px-3.5 text-left text-[14.5px] hover:bg-black/[.06]";
 
   if (editing) return <EditTaskModal task={editing} theme={theme} onClose={() => (setEditing(null), onClose())} />;
@@ -129,6 +133,12 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
               <button type="button" role="menuitem" data-mi="another" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setAnother(true)}>
                 ＋ Another session…
               </button>
+              <button type="button" role="menuitem" data-mi="place" className={`${item} truncate`} style={{ color: "var(--t-ink)" }} onClick={() => setMode("place")}>
+                📍 {place ? place : "Where & driving time…"}
+              </button>
+              <button type="button" role="menuitem" data-mi="look" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setMode("look")}>
+                🎨 Card colour or picture…
+              </button>
             </>
           )}
           {target.kind === "event" && (
@@ -152,6 +162,24 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
             </p>
           )}
         </>
+      ) : mode === "look" && target.kind === "task" ? (
+        <div className="relative z-[1] px-3 py-2">
+          <CardLookPicker task={target.task} />
+        </div>
+      ) : mode === "place" && target.kind === "task" ? (
+        <div className="relative z-[1] flex flex-col gap-2 px-3 py-2">
+          <input
+            autoFocus
+            defaultValue={place ?? ""}
+            placeholder="Where? (e.g. Natick library)"
+            aria-label="Where it happens"
+            onBlur={(e) => void saveQuestPlace(target.task.id, e.target.value).catch(() => {})}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), (e.target as HTMLInputElement).blur())}
+            className="h-9 rounded-lg border px-2.5 text-[16px]"
+            style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.6)", color: "var(--t-ink)" }}
+          />
+          <DrivePicks taskId={target.task.id} />
+        </div>
       ) : (
         <div className="relative z-[1] flex flex-col gap-2 px-3 py-2">
           <span className="text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
