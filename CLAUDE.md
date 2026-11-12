@@ -4,6 +4,8 @@
 
 Read `docs/HANDOFF.md` before doing anything else. It has the current top priorities, how to ship (push to `main` deploys to the live app), the in-app feedback pipeline, and the owner's hard rules.
 
+**Before you change a screen, read its open feedback notes** (and the `universal` ones): every in-app note carries a `screens` tag in the database. The query, the screen keys and how to keep tags right are in `docs/FEEDBACK-BY-SCREEN.md`. Build or respect them in the same push, mark the ones you build, and tag any untagged note you read. The owner shouldn't have to give the same note twice.
+
 Then read `docs/REPEAT-ASKS.md`: the owner's asks that came back 3+ times. Any work touching one of them is done at higher effort, checked on every screen it applies to, and its row updated (count, status) in the same push.
 
 When you ship to `main`, update `docs/HANDOFF.md` in the same push: bump "Last updated", move finished work to "Recently shipped", and add or re-rank anything new. The next session, on any account, picks up from that file.

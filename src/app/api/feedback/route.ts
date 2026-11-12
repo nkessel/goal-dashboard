@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { addJournalEntryAction } from "@/app/actions";
+import { guessFeedbackScreens } from "@/lib/feedback-screens";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
  * Sending feedback goes through this plain endpoint rather than a server
@@ -12,6 +14,11 @@ export async function POST(req: Request) {
     const seen = typeof context === "string" ? context.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, 240) : "";
     const where = typeof page === "string" && /^\/[\w\-/?=&%.]*$/.test(page) ? `\n\n— sent from ${page.slice(0, 120)}${seen ? ` (${seen})` : ""}` : "";
     const res = await addJournalEntryAction(String(body ?? "") + (String(body ?? "").trim() ? where : ""), null, kind ?? "feedback", Number(xp ?? 1), Array.isArray(images) ? images : []);
+    // Which screen it's about, so notes can be read screen by screen (a guess; fixed by hand later).
+    if ((kind ?? "feedback") === "feedback" && res.id) {
+      const screens = guessFeedbackScreens(typeof page === "string" ? page : null, seen);
+      if (screens.length) await supabaseAdmin().from("journal_entries").update({ screens }).eq("id", res.id).eq("kind", "feedback").then(() => {}, () => {});
+    }
     return NextResponse.json({ ok: true, id: res.id, xpAwarded: res.xpAwarded });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Couldn't send it." }, { status: 400 });

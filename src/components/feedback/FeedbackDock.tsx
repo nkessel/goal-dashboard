@@ -935,6 +935,8 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
 function readContext(): string {
   try {
     const bits: string[] = [];
+    // Tells the server which screen the note is about (src/lib/feedback-screens.ts).
+    if (document.documentElement.hasAttribute("data-welcome-open")) bits.push("welcome screen");
     const dialog = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].filter((el) => !el.closest("[data-feedback-root]")).pop();
     const dl = dialog?.getAttribute("aria-label") || dialog?.querySelector("h1,h2,h3")?.textContent;
     if (dl) bits.push(`open: ${dl.trim().slice(0, 60)}`);

@@ -1,5 +1,7 @@
 # Open in-app feedback (Nov 2–3)
 
+**Newer way (Nov 12): read notes by screen from the database** (`screens` tag on every note; query and keys in `docs/FEEDBACK-BY-SCREEN.md`). This file is the older hand-written list, kept until its groups are built.
+
 The owner's notes that aren't built yet, grouped by area. They were read from `/journal` › App feedback, because there was no database connector. Take a group, build it, move it to HANDOFF › Recently shipped, and delete its lines here. Anything also in `docs/REPEAT-ASKS.md` is built there first, with more care.
 
 ## Nov 4 notes (owner, from /journal › App feedback), not built yet
