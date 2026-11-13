@@ -2,6 +2,7 @@
 
 import { RecentNotes } from "./RecentNotes";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { keyboardUp } from "@/lib/keyboard-up";
 import { loadFx, type FeedbackStyle } from "@/lib/celebration-fx";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { createPortal } from "react-dom";
@@ -59,10 +60,20 @@ const keepable = (ds: Draft[]) =>
     // A draft emptied out counts as deleted, so an older copy elsewhere can't bring it back.
     .map((d) => (!d.deleted && !hasContent(d) ? { ...d, deleted: true } : d))
     .filter((d) => !d.deleted || (d.updatedAt ?? 0) > Date.now() - 86_400_000);
-type Geom = { x: number; y: number; w: number; h: number };
+/** A place and size on screen, in px. */
+type Rect = { x: number; y: number; w: number; h: number };
+/** Where you put the box: its place, its size if you resized it (`sized`), and the screen width it was set on. */
+type SavedBox = Rect & { sized: boolean; sw: number };
 /** The round button's top-left corner, in px from the window's top-left. */
 type Pos = { x: number; y: number };
-type Viewport = { left: number; top: number; w: number; h: number; innerW: number; innerH: number };
+/**
+ * The screen as the box sees it: its width and full height (keyboard down), and, while the on-screen
+ * keyboard is up, the strip left above it (`top` is how far the browser has panned the visible part).
+ * `lastStrip` is the strip's height the last time a keyboard was seen at this width.
+ */
+type View = { w: number; h: number; top: number; strip: number | null; lastStrip: number | null };
+/** The part of the screen the box must sit wholly inside. */
+type Area = { top: number; h: number };
 
 const DRAFTS_KEY = "feedback-drafts";
 const OPEN_KEY = "feedback-open";
@@ -70,14 +81,20 @@ const LEGACY_DRAFT_KEY = "feedback-draft";
 const BUTTON_KEY = "feedback-button-pos";
 /** Where you put the button while the welcome screen is up (owner, Nov 10: it snapped back to the corner). */
 const WELCOME_BUTTON_KEY = "feedback-button-pos-welcome";
-const PANEL_KEY = "feedback-panel";
-/** Phones: how far below the top of the visible screen the box sits. */
-const PHONE_Y_KEY = "feedback-panel-phone-y";
+// Its own spot while a popup or editor is open on a phone (so it never sits on their Save).
+const POPUP_BUTTON_KEY = "feedback-button-pos-popup";
+/** The box's one saved place and size. (Older builds kept three: these are cleared on load.) */
+const BOX_KEY = "feedback-box-v2";
+const OLD_BOX_KEYS = ["feedback-panel", "feedback-panel-phone-y"];
+/** How much of the screen the keyboard left the last time it was up, to open the box clear of it. */
+const KB_KEY = "feedback-kb-strip";
 
 const BTN = 46;
-const MIN_W = 250;
-/** The box can be made very thin; its content then scrolls. */
-const MIN_H = 96;
+/** The box can be made thin and short; its content then scrolls. */
+const MIN_W = 220;
+const MIN_H = 150;
+/** Kept between the box and the edge of the screen (or the keyboard). */
+const EDGE = 8;
 
 function readJson<T>(key: string): T | null {
   try {
@@ -129,81 +146,79 @@ function deviceLabel() {
   }
 }
 
-/** The part of the screen actually visible (above an iPhone keyboard, say). */
-function useViewport(): Viewport | null {
-  const [vp, setVp] = useState<Viewport | null>(null);
+const coarsePointer = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+
+/**
+ * The screen, read once things have settled: a turn of the phone or a resized window at the next
+ * frame, the on-screen keyboard once it has stopped sliding (never frame by frame: iPhone pans the
+ * screen while the keyboard moves, and a box that chased it jumped about).
+ */
+function useView(): View | null {
+  const [view, setView] = useState<View | null>(null);
   useEffect(() => {
     const vv = window.visualViewport;
-    const read = () => {
-      pending = 0;
-      const zoomed = !!vv && vv.scale > 1.05;
-      const next = {
-        left: Math.round(vv && !zoomed ? vv.offsetLeft : 0),
-        top: Math.round(vv && !zoomed ? vv.offsetTop : 0),
-        w: Math.round(vv && !zoomed ? vv.width : window.innerWidth),
-        h: Math.round(vv && !zoomed ? vv.height : window.innerHeight),
-        innerW: window.innerWidth,
-        innerH: window.innerHeight,
-      };
-      // Only re-render when something actually changed (at most once a frame).
-      // Small nudges (a few px of pan, the address bar settling) don't move the box.
-      const near = (a: number, b: number) => Math.abs(a - b) < 24;
-      setVp((p) => (p && near(p.left, next.left) && near(p.top, next.top) && near(p.w, next.w) && near(p.h, next.h) && p.innerW === next.innerW && near(p.innerH, next.innerH) ? p : next));
-    };
-    let pending = 0;
-    // Read once the keyboard has settled, not on every frame of its slide: iPhone pans the
-    // screen while the keyboard moves, and a box that chased each frame jumped about and
-    // flashed the page behind it (owner's recording, Nov 1, 22:05).
+    let raf = 0;
     let quiet: number | undefined;
-    const update = () => {
+    const read = () => {
+      raf = 0;
+      setView((prev) => {
+        const w = window.innerWidth;
+        const up = !!vv && vv.scale <= 1.05 && keyboardUp();
+        // Chrome on iPhone shrinks the page itself under the keyboard: the full height is the one from before it.
+        // On touch screens the height is the tallest seen at this width: Safari's bars coming and going change
+        // innerHeight by 50–80px as the page scrolls, and that mustn't resize the box or move the button.
+        const same = prev && prev.w === w ? prev.h : 0;
+        const h = up && same ? same : coarsePointer() ? Math.max(window.innerHeight, same) : window.innerHeight;
+        const strip = up && vv ? Math.round(vv.height) : null;
+        const top = up && vv ? Math.max(0, Math.round(vv.offsetTop)) : 0;
+        let lastStrip = prev && prev.w === w ? prev.lastStrip : null;
+        if (strip) {
+          // Kept only when it really changed: the predictive bar or the emoji keys shift it a little between openings.
+          if (lastStrip == null || Math.abs(strip - lastStrip) > 24) {
+            writeJson(KB_KEY, { w, h: strip });
+            lastStrip = strip;
+          }
+        } else if (lastStrip == null) {
+          const kept = readJson<{ w: number; h: number }>(KB_KEY);
+          if (kept && kept.w === w && typeof kept.h === "number") lastStrip = kept.h;
+        }
+        return prev && prev.w === w && prev.h === h && prev.top === top && prev.strip === strip && prev.lastStrip === lastStrip ? prev : { w, h, top, strip, lastStrip };
+      });
+    };
+    const soon = () => {
       window.clearTimeout(quiet);
       quiet = window.setTimeout(() => {
-        if (!pending) pending = requestAnimationFrame(read);
+        if (!raf) raf = requestAnimationFrame(read);
       }, 140);
     };
-    const raf = requestAnimationFrame(read);
-    vv?.addEventListener("resize", update);
-    vv?.addEventListener("scroll", update);
-    window.addEventListener("resize", update);
+    raf = requestAnimationFrame(read);
+    vv?.addEventListener("resize", soon);
+    vv?.addEventListener("scroll", soon);
+    window.addEventListener("resize", soon);
     return () => {
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
       window.clearTimeout(quiet);
-      if (pending) cancelAnimationFrame(pending);
-      vv?.removeEventListener("resize", update);
-      vv?.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
+      vv?.removeEventListener("resize", soon);
+      vv?.removeEventListener("scroll", soon);
+      window.removeEventListener("resize", soon);
     };
   }, []);
-  return vp;
+  return view;
 }
 
 /**
- * On a phone the box's place is measured from the top of what you can see.
- * While the keyboard is up the whole box fits above it (shorter if it must,
- * its writing scrolling), so Submit and what you type are never behind it.
+ * The one rule for where the box is: the place and size you want, held wholly inside `area`
+ * (the whole screen, or the strip above the keyboard). Its top-left corner is what stays put:
+ * the box only gets smaller when it can't fit, and only moves when it would stick out.
  */
-function fitPhone(relY: number, h: number, vp: Viewport): Geom {
-  let hh = clamp(h, 170, Math.max(170, vp.innerH - 90));
-  // Keyboard up: the whole box (writing and Submit) sits in the strip above it, its writing
-  // scrolling inside, instead of half of it hiding behind the keyboard.
-  if (vp.innerH - vp.h > 120) {
-    hh = Math.min(hh, Math.max(140, vp.h - 16));
-    return { x: vp.left + 8, w: vp.w - 16, h: hh, y: vp.top + clamp(relY, 8, Math.max(8, vp.h - hh - 8)) };
-  }
-  return { x: vp.left + 8, w: vp.w - 16, h: hh, y: vp.top + clamp(relY, 8, Math.max(8, vp.h - 58)) };
-}
-
-/** Keep the box inside what's visible, shrinking only when it can't fit. */
-function fit(g: Geom, vp: Viewport): Geom {
-  const w = clamp(g.w, Math.min(MIN_W, vp.w - 16), vp.w - 16);
-  // Sized against the whole screen (not what the keyboard leaves), so it never jumps when typing.
-  const h = clamp(g.h, Math.min(MIN_H, vp.innerH - 40), vp.innerH - 40);
+function placeBox(want: Rect, view: View, area: Area): Rect {
+  const w = clamp(want.w, Math.min(MIN_W, view.w - EDGE * 2), view.w - EDGE * 2);
+  const h = clamp(want.h, Math.min(MIN_H, area.h - EDGE * 2), Math.max(MIN_H / 2, area.h - EDGE * 2));
   return {
     w,
     h,
-    x: clamp(g.x, vp.left + 8, vp.left + vp.w - w - 8),
-    // Down as far as you like, while its top bar (with Submit) stays in sight.
-    y: clamp(g.y, vp.top + 8, Math.max(vp.top + 8, vp.top + vp.h - 58)),
+    x: clamp(want.x, EDGE, Math.max(EDGE, view.w - w - EDGE)),
+    y: area.top + clamp(want.y, EDGE, Math.max(EDGE, area.h - h - EDGE)),
   };
 }
 
@@ -244,13 +259,18 @@ function pressOrDrag(
 
 /**
  * Feedback, from any screen. A round button (drag it anywhere — it stays
- * where you put it) opens a feedback box that doesn't block the app, so you
- * can keep using the very thing you're writing about. The box can be dragged
- * by its top and resized from its corner — even very thin, when its content
- * scrolls — and always stays in view, above the keyboard too. Submit sits
- * on the box's bottom edge, always visible (slide it along the edge to move
- * it). Minimize a draft to start another; with drafts waiting, the button
- * asks whether to continue one or start fresh. Shortcut: F (when not typing).
+ * where you put it, always the same size, above every popup) opens a feedback
+ * box that doesn't block the app, so you can keep using the very thing you're
+ * writing about.
+ *
+ * Where the box is, in one place (`placeBox`): the spot and size you gave it
+ * (`box`, else a default), held wholly inside the screen, or inside the strip
+ * above the on-screen keyboard. On a touch screen it opens already inside that
+ * strip (the keyboard is on its way), so nothing moves when the keyboard
+ * arrives or leaves. Drag its top to move it; drag its bottom edge or bottom
+ * corner to resize it (the top stays where it is). Minimize a draft to start
+ * another; with drafts waiting, the button asks whether to continue one or
+ * start fresh. Shortcut: F (when not typing).
  */
 /** Whether the welcome screen is up (html[data-welcome-open]). */
 function subscribeWelcome(cb: () => void) {
@@ -259,19 +279,29 @@ function subscribeWelcome(cb: () => void) {
   return () => mo.disconnect();
 }
 const welcomeOpenNow = () => document.documentElement.hasAttribute("data-welcome-open");
+/** Whether a popup, sheet or editor has the page (html.scroll-locked). */
+function subscribePopup(cb: () => void) {
+  const mo = new MutationObserver(cb);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => mo.disconnect();
+}
+const popupOpenNow = () => document.documentElement.classList.contains("scroll-locked");
 
 export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" }) {
   // While the welcome screen is up the button waits in the sky at the top right, off the card's controls
   // (its own spot comes back on the other screens; owner's recordings, Nov 2).
   const welcomeUp = useSyncExternalStore(subscribeWelcome, welcomeOpenNow, () => false);
+  // Over a popup or editor on a phone it keeps to the right edge, mid-screen (always there, never on their buttons).
+  const popupUp = useSyncExternalStore(subscribePopup, popupOpenNow, () => false);
   const isAdventure = theme === "adventure";
-  const vp = useViewport();
+  const vp = useView();
   const [loaded, setLoaded] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   // Your latest sent notes, to read or change, in place of the writing box.
   const [recentOpen, setRecentOpen] = useState(false);
+  // The past-notes view belongs to one opening: the next one starts on the writing box.
+  const [recentFor, setRecentFor] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [sent, setSent] = useState<{ id: string; kind: WhenKind; xp: number } | null>(null);
   // The little celebration after Submit: it plays and fades by itself.
   const [celebrate, setCelebrate] = useState<{ key: number; kind: WhenKind; xp: number; x: number; y: number; style: FeedbackStyle } | null>(null);
   useEffect(() => {
@@ -288,13 +318,16 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const [pos, setPos] = useState<Pos | null>(null);
   const [dragPos, setDragPos] = useState<Pos | null>(null);
   const [welcomePos, setWelcomePos] = useState<Pos | null>(null);
-  const [geom, setGeom] = useState<Geom | null>(null);
-  const [sized, setSized] = useState(false);
+  const [popupPos, setPopupPos] = useState<Pos | null>(null);
+  // Where you put the box (and its size, if you resized it). The one source of its place.
+  const [box, setBox] = useState<SavedBox | null>(null);
+  // This opening of the box: where the button was (the default place hangs from it), and whether the
+  // box keeps to the strip above the keyboard (touch screens, from the moment its writing has focus).
+  const [session, setSession] = useState<{ id: string; anchor: Pos; hold: boolean } | null>(null);
+  // While a finger or the mouse is moving or resizing the box, it follows at once (no glide).
+  const [dragging, setDragging] = useState(false);
   // Extra height the writing has asked for (per note).
   const [grow, setGrow] = useState<{ id: string; px: number } | null>(null);
-  const [phoneY, setPhoneY] = useState<number | null>(null);
-  // Just minimized: the button waits right where the minimize button was, until it's moved.
-  const [parked, setParked] = useState<Pos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
   const justDragged = useRef(false);
@@ -327,8 +360,10 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       .catch(() => {});
     setPos(readJson<Pos>(BUTTON_KEY));
     setWelcomePos(readJson<Pos>(WELCOME_BUTTON_KEY));
-    setGeom(readJson<Geom>(PANEL_KEY));
-    setPhoneY(readJson<number>(PHONE_Y_KEY));
+    setPopupPos(readJson<Pos>(POPUP_BUTTON_KEY));
+    const kept = readJson<SavedBox>(BOX_KEY);
+    setBox(kept && [kept.x, kept.y, kept.w, kept.h, kept.sw].every((n) => typeof n === "number" && Number.isFinite(n)) ? { ...kept, sized: !!kept.sized } : null);
+    for (const k of OLD_BOX_KEYS) writeJson(k, null);
     setLoaded(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -364,7 +399,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     return () => window.removeEventListener("storage", on);
   }, []);
 
-  const open = drafts.find((d) => d.id === openId && (!d.deleted || sent?.id === d.id)) ?? null;
+  const open = drafts.find((d) => d.id === openId && !d.deleted) ?? null;
+  if (recentOpen && recentFor !== openId) setRecentOpen(false);
   // Remember which note is open for this tab, so a reload (the photo picker on iPhone) brings it back.
   useEffect(() => {
     if (!loaded) return;
@@ -378,10 +414,6 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   // The note being sent isn't "waiting": it showed as a red "1" on the button for a moment after Submit (owner, Nov 5).
   const [sendingId, setSendingId] = useState<string | null>(null);
   const waiting = drafts.filter((d) => d.id !== openId && d.id !== sendingId && !d.deleted && hasContent(d));
-  // The screen height when this note opened: Safari's bars coming and going while you scroll mustn't resize the box.
-  const [baseH, setBaseH] = useState<{ id: string; h: number } | null>(null);
-  if (open && vp && baseH?.id !== open.id) setBaseH({ id: open.id, h: vp.innerH });
-  const screenH = open && baseH?.id === open.id ? baseH.h : (vp?.innerH ?? 0);
 
   /** Leave the open draft: empty ones simply go away. */
   const leaveOpen = useCallback(() => {
@@ -396,7 +428,6 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     const d: Draft = { id: newId(), body: "", kind: "feedback", page: window.location.pathname + window.location.search, context: [readContext(), deviceLabel() && `on a ${deviceLabel()}`].filter(Boolean).join(" · "), shot: null, updatedAt: Date.now() };
     setConfirmDiscard(false);
     setChoosing(false);
-    setSent(null);
     setError(null);
     setDrafts((ds) => [...ds.filter((x) => x.id !== openId || hasContent(x)), d]);
     setOpenId(d.id);
@@ -418,7 +449,6 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     setConfirmDiscard(false);
     setChoosing(false);
     setError(null);
-    setSent(null);
     setDrafts((ds) => ds.filter((d) => d.id !== openId || hasContent(d)));
     setOpenId(id);
   }
@@ -431,7 +461,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   }
 
   function requestClose() {
-    if (open && hasContent(open) && sent?.id !== open.id) setConfirmDiscard(true);
+    if (open && hasContent(open)) setConfirmDiscard(true);
     else discard();
   }
 
@@ -490,30 +520,28 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     };
   }, [begin]);
 
-  // Escape minimizes the feedback box (or closes its Sent card) first, before any
-  // popup or menu, even one opened after it.
-  useEscape(() => (sentOpen ? requestClose() : leaveOpen()), !!openId, true);
-  const sentOpen = !!openId && sent?.id === openId;
-  // Once it's sent, a tap anywhere outside closes the little "Sent" card.
+  // Escape minimizes the feedback box first, before any popup or menu, even one opened after it.
+  useEscape(leaveOpen, !!openId, true);
+  // Touch screens: the moment the box's writing has focus the keyboard is on its way, so the box
+  // keeps to the strip above it from then on (it glides there before the keyboard lands).
   useEffect(() => {
-    if (!sentOpen) return;
-    const away = (e: PointerEvent) => {
-      if (e.target instanceof Element && e.target.closest("[data-feedback-root]")) return;
-      requestClose();
+    if (!openId) return;
+    const on = (e: FocusEvent) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement) || !t.closest("[data-feedback-box]") || !coarsePointer() || window.innerWidth >= 640) return;
+      if (!(t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && t.type !== "file") || t.isContentEditable)) return;
+      setSession((s) => (s && !s.hold ? { ...s, hold: true } : s));
     };
-    const t = setTimeout(() => document.addEventListener("pointerdown", away), 0);
-    return () => {
-      clearTimeout(t);
-      document.removeEventListener("pointerdown", away);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-bound only when the sent state changes
-  }, [sentOpen]);
+    document.addEventListener("focusin", on);
+    return () => document.removeEventListener("focusin", on);
+  }, [openId]);
   if (!loaded || !vp) return null;
 
   // ---- The round button: tap to start (or continue) feedback, drag to put it anywhere.
-  const defaultPos: Pos = { x: vp.innerW - BTN - 12, y: vp.innerH - BTN - 92 };
-  const placeBtn = (p: Pos): Pos => ({ x: clamp(p.x, 6, vp.innerW - BTN - 6), y: clamp(p.y, 6, vp.innerH - BTN - 6) });
-  const btnPos = welcomeUp && !dragPos ? placeBtn(welcomePos ?? { x: vp.innerW - BTN - 10, y: 10 }) : placeBtn(dragPos ?? parked ?? pos ?? defaultPos);
+  const defaultPos: Pos = { x: vp.w - BTN - 12, y: vp.h - BTN - 92 };
+  const placeBtn = (p: Pos): Pos => ({ x: clamp(p.x, 6, vp.w - BTN - 6), y: clamp(p.y, 6, vp.h - BTN - 6) });
+  const overPopup = popupUp && !welcomeUp && vp.w < 640 && !openId;
+  const btnPos = welcomeUp && !dragPos ? placeBtn(welcomePos ?? { x: vp.w - BTN - 10, y: 10 }) : overPopup && !dragPos ? placeBtn(popupPos ?? { x: vp.w - BTN - 4, y: Math.round(vp.h * 0.42) }) : placeBtn(dragPos ?? pos ?? defaultPos);
 
   function onBtnDown(e: React.PointerEvent<HTMLButtonElement>) {
     const start = btnPos;
@@ -529,11 +557,15 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         justDragged.current = true;
         setTimeout(() => (justDragged.current = false), 0);
         setDragPos(null);
-        setParked(null);
         // The welcome screen keeps its own spot, so the other screens' spot isn't moved by it.
         if (welcomeOpenNow()) {
           setWelcomePos(last);
           writeJson(WELCOME_BUTTON_KEY, last);
+          return;
+        }
+        if (popupOpenNow() && window.innerWidth < 640) {
+          setPopupPos(last);
+          writeJson(POPUP_BUTTON_KEY, last);
           return;
         }
         setPos(last);
@@ -542,46 +574,65 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
     });
   }
 
-  // ---- The box: drag by its top, resize from its corner, always in view.
-  const mobile = vp.innerW < 640;
+  // ---- The box. One place decides where it is: `placeBox(want, vp, area)`.
+  if (open && session?.id !== open.id) setSession({ id: open.id, anchor: btnPos, hold: coarsePointer() && vp.w < 640 });
+  else if (!open && session) setSession(null);
+  const sess = open && session?.id === open.id ? session : null;
+  const phone = vp.w < 640;
+  // The strip above the keyboard: as measured while it's up; before it arrives (and after it leaves), where it was last time.
+  const guess = vp.lastStrip && vp.lastStrip > 200 && vp.lastStrip < vp.h - 120 ? vp.lastStrip : Math.round(vp.h * 0.54);
+  const area: Area = vp.strip != null ? { top: vp.top, h: vp.strip } : sess?.hold ? { top: 0, h: guess } : { top: 0, h: vp.h };
   const growBy = grow && open && grow.id === open.id ? grow.px : 0;
-  const defaultGeom = (): Geom => {
-    // Starts at a comfortable size and grows only to fit an added picture (up to the screen),
-    // so it only takes the whole screen when it really needs it.
-    const w = mobile ? vp.innerW - 16 : Math.min(380, vp.innerW - 40);
-    // Phones: sized from the whole screen (never from what the keyboard leaves), so it doesn't jump.
-    const h = mobile ? Math.min(Math.round(clamp(screenH * 0.4, 220, 300)) + growBy, Math.round(screenH * 0.62)) : Math.min(Math.min(270, vp.innerH - 170) + growBy, vp.innerH - 120);
-    const above = btnPos.y - 12 - h;
-    return { w, h, x: mobile ? 8 : clamp(btnPos.x + BTN - w, 20, vp.innerW - w - 20), y: above > 60 ? above : 60 };
+  // A place set on another size of screen (a phone turned, another device's copy) isn't used.
+  const mine = box && (phone ? box.sw === vp.w : box.sw >= 640) ? box : null;
+  const anchor = sess?.anchor ?? btnPos;
+  // The default: a comfortable size that grows only to fit an added picture; on a phone across the
+  // top of the screen, elsewhere just above the button.
+  const defW = phone ? vp.w - EDGE * 2 : Math.min(380, vp.w - 40);
+  const defH = phone ? Math.min(Math.round(clamp(vp.h * 0.4, 220, 300)) + growBy, Math.round(vp.h * 0.62)) : Math.min(Math.min(270, vp.h - 170) + growBy, vp.h - 120);
+  const want: Rect = {
+    w: mine?.sized ? mine.w : defW,
+    h: mine?.sized ? mine.h : defH,
+    x: mine ? mine.x : phone ? EDGE : anchor.x + BTN - defW,
+    y: mine ? mine.y : phone ? 56 : Math.max(60, anchor.y - 12 - defH),
   };
-  const def = defaultGeom();
-  // A size you dragged it to this time stands; otherwise it's as tall as the writing needs.
-  const shown = mobile ? fitPhone(phoneY ?? 64, sized && geom ? geom.h : def.h, vp) : fit(geom ? { ...geom, w: sized ? geom.w : def.w, h: sized ? geom.h : def.h } : def, vp);
-  const isSent = !!open && sent?.id === open.id;
+  const shown = placeBox(want, vp, area);
 
-  function onPanelDown(e: React.PointerEvent<HTMLElement>, kind: "move" | "resize") {
+  function onPanelDown(e: React.PointerEvent<HTMLElement>, kind: "move" | "resize" | "height") {
     if (kind === "move" && (e.target as HTMLElement).closest("button")) return;
-    if (kind === "resize") {
-      e.preventDefault();
-      setSized(true);
-    }
-    const g = shown;
+    if (kind !== "move") e.preventDefault();
+    const start = shown;
     const view = vp!;
-    let last = g;
+    // With the keyboard down the box is free of the strip above it again; with it up, it stays in the strip.
+    const free = view.strip == null;
+    const within: Area = free ? { top: 0, h: view.h } : area;
+    let sized = !!mine?.sized;
+    let last: Rect = { ...start, y: start.y - within.top };
     pressOrDrag(e, {
-      threshold: kind === "resize" ? 0 : 4,
+      threshold: kind === "move" ? 4 : 0,
       onMove: (dx, dy) => {
-        last = kind === "move" ? { ...g, x: g.x + dx, y: g.y + dy } : { ...g, w: Math.max(MIN_W, g.w + dx), h: Math.max(MIN_H, g.h + dy) };
-        if (mobile && kind === "move") setPhoneY(last.y - view.top);
-        else setGeom(last);
+        if (kind === "move") {
+          last = { ...last, x: clamp(start.x + dx, EDGE, Math.max(EDGE, view.w - start.w - EDGE)), y: clamp(start.y - within.top + dy, EDGE, Math.max(EDGE, within.h - start.h - EDGE)) };
+        } else {
+          // The top-left corner stays where it is: only the right and bottom edges follow.
+          sized = true;
+          last = {
+            ...last,
+            w: kind === "height" ? start.w : clamp(start.w + dx, Math.min(MIN_W, start.w), Math.max(Math.min(MIN_W, start.w), view.w - EDGE - start.x)),
+            h: clamp(start.h + dy, Math.min(MIN_H, start.h), Math.max(Math.min(MIN_H, start.h), within.top + within.h - EDGE - start.y)),
+          };
+        }
+        setDragging(true);
+        if (free) setSession((s) => (s && s.hold ? { ...s, hold: false } : s));
+        setBox({ ...last, sized, sw: view.w });
       },
       onEnd: (moved) => {
-        if (!moved) return;
-        if (mobile && kind === "move") writeJson(PHONE_Y_KEY, Math.round(clamp(last.y - view.top, 8, view.h - 58)));
-        else writeJson(PANEL_KEY, fit(last, view));
+        setDragging(false);
+        if (moved) writeJson(BOX_KEY, { ...last, sized, sw: view.w });
       },
     });
   }
+
 
   const coin = isAdventure
     ? {
@@ -590,18 +641,19 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
       }
     : { background: "var(--t-card)", boxShadow: "0 0 0 1px var(--t-card-border), 0 4px 12px rgba(0,0,0,.2)" };
 
-  const chooserAbove = btnPos.y > vp.innerH / 2;
-  const chooserRight = btnPos.x > vp.innerW / 2;
+  const chooserAbove = btnPos.y > vp.h / 2;
+  const chooserRight = btnPos.x > vp.w / 2;
 
   return createPortal(
     <>
       <UploadBar />
-      {/* On a phone the box has its own minimize, so the button steps aside while it's open. */}
-      {!(mobile && open && !isSent) && <button
+      {/* Always there, always the same size, above every popup, sheet and editor (owner, Nov 12). */}
+      <button
         type="button"
         data-feedback-hide
         data-feedback-root
         data-feedback-btn
+        data-feedback-open={openId ? "" : undefined}
         onPointerDown={onBtnDown}
         onClick={() => {
           if (justDragged.current) return;
@@ -611,8 +663,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
         aria-label={openId ? "Minimize feedback" : "Feedback (F)"}
         title={openId ? "Minimize feedback" : "Feedback (F) — drag to move"}
         aria-expanded={!!openId || choosing}
-        className={`fixed z-[95] flex touch-none select-none items-center justify-center rounded-full ${dragPos ? "cursor-grabbing" : "cursor-pointer"}`}
-        style={{ left: btnPos.x, top: btnPos.y, width: BTN, height: BTN, ...coin }}
+        className={`fixed z-[130] flex touch-none select-none items-center justify-center rounded-full ${dragPos ? "cursor-grabbing" : "cursor-pointer"}`}
+        style={{ left: btnPos.x, top: btnPos.y, width: BTN, height: BTN, transition: dragPos ? undefined : "left 200ms ease, top 200ms ease", ...coin }}
       >
         <ChatIcon size={27} />
         {waiting.length > 0 && !openId && (
@@ -624,7 +676,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             {waiting.length}
           </span>
         )}
-      </button>}
+      </button>
 
       {/* Drafts waiting: keep working on one, or start a new one. */}
       {choosing && !openId && !dragPos && (
@@ -633,10 +685,10 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           aria-label="Your unsent feedback"
           data-feedback-root
           data-kb-self
-          className="card-pop-in parchment fixed z-[96] flex w-[min(300px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl shadow-2xl"
+          className="card-pop-in parchment fixed z-[131] flex w-[min(300px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl shadow-2xl"
           style={{
-            ...(chooserRight ? { right: vp.innerW - btnPos.x - BTN } : { left: btnPos.x }),
-            ...(chooserAbove ? { bottom: vp.innerH - btnPos.y + 8 } : { top: btnPos.y + BTN + 8 }),
+            ...(chooserRight ? { right: vp.w - btnPos.x - BTN } : { left: btnPos.x }),
+            ...(chooserAbove ? { bottom: vp.h - btnPos.y + 8 } : { top: btnPos.y + BTN + 8 }),
             borderRadius: 16,
             color: "var(--t-ink)",
           }}
@@ -671,11 +723,14 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
           aria-modal={false}
           aria-label="Feedback"
           data-feedback-root
+          data-feedback-box
           data-kb-self
-          // Its own "submitted" card takes over; a fading copy showed as a blank box (textareas don't copy their words).
+          // A fading copy showed as a blank box (textareas don't copy their words).
           data-no-ghost
-          className="fixed z-[96]"
-          style={{ left: shown.x, top: shown.y, width: shown.w, height: isSent ? "auto" : shown.h }}
+          className="fixed z-[131]"
+          // The one place its position and size are set. It glides to a new place (the strip above the
+          // keyboard, a turned screen); under a finger it follows at once.
+          style={{ left: shown.x, top: shown.y, width: shown.w, height: shown.h, transition: dragging ? "none" : "left 160ms ease-out, top 160ms ease-out, width 160ms ease-out, height 160ms ease-out" }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.stopPropagation();
@@ -683,9 +738,10 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             }
           }}
         >
-          {/* Positioning stays on this box; the theme's parchment frame (which sets position: relative) lives inside. */}
+          {/* Positioning stays on the box above; the theme's parchment frame (which sets position: relative) lives inside.
+              Its entrance plays once, when the box is first put on screen. */}
           <div
-            className={`create-sheet-in relative flex flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl ${isSent ? "" : "h-full"}`}
+            className="create-sheet-in relative flex h-full flex-col overflow-hidden rounded-2xl parchment parchment-framed shadow-2xl"
             style={{
               background: isAdventure ? "var(--t-panel)" : "var(--t-card)",
               border: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`,
@@ -693,71 +749,55 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             }}
           >
             {/* The title sits on the same parchment as the note (no separate bar); the writing scrolls below it. */}
-              <div
-                className={`relative z-[2] flex shrink-0 select-none items-center gap-1 pb-0.5 pl-3.5 pr-1.5 pt-2 ${isSent ? "" : "cursor-move touch-none"}`}
-                onPointerDown={isSent ? undefined : (e) => onPanelDown(e, "move")}
-                title={isSent ? undefined : "Drag to move"}
+            <div className="relative z-[2] flex shrink-0 cursor-move touch-none select-none items-center gap-1 pb-0.5 pl-3.5 pr-1.5 pt-2" onPointerDown={(e) => onPanelDown(e, "move")} title="Drag to move">
+              <span className={`flex min-w-0 flex-1 items-center gap-1.5 py-1 ${isAdventure ? "font-display text-[17px]" : "text-base font-bold"}`}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+                  <path d="M20 3c-6 1-11 6-13 13l-1.5 4.5L10 19c5-2 9-7 10-16z" fill={isAdventure ? "#e9d49a" : "none"} stroke={isAdventure ? "#6b4a12" : "currentColor"} strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M7 16l6-6" stroke={isAdventure ? "#6b4a12" : "currentColor"} strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+                <span className="truncate">Feedback</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => (setRecentFor(openId), setRecentOpen((o) => !o))}
+                aria-pressed={recentOpen}
+                aria-label="Your recent notes"
+                title="Your recent notes: read or edit them"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
+                style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)", background: recentOpen ? "rgba(217,180,95,.3)" : undefined }}
               >
-                <span className={`flex min-w-0 flex-1 items-center gap-1.5 py-1 ${isAdventure ? "font-display text-[17px]" : "text-base font-bold"}`}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
-                    <path d="M20 3c-6 1-11 6-13 13l-1.5 4.5L10 19c5-2 9-7 10-16z" fill={isAdventure ? "#e9d49a" : "none"} stroke={isAdventure ? "#6b4a12" : "currentColor"} strokeWidth="1.5" strokeLinejoin="round" />
-                    <path d="M7 16l6-6" stroke={isAdventure ? "#6b4a12" : "currentColor"} strokeWidth="1.3" strokeLinecap="round" />
-                  </svg>
-                  <span className="truncate">Feedback</span>
-                </span>
-                {!isSent && (
-                  <button
-                    type="button"
-                    onClick={() => setRecentOpen((o) => !o)}
-                    aria-pressed={recentOpen}
-                    aria-label="Your recent notes"
-                    title="Your recent notes: read or edit them"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
-                    style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)", background: recentOpen ? "rgba(217,180,95,.3)" : undefined }}
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
-                      <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                )}
-                {!isSent && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      // The feedback button comes back right beside where you tapped.
-                      const r = e.currentTarget.getBoundingClientRect();
-                      setParked({ x: r.left + r.width / 2 - BTN / 2, y: r.top + r.height / 2 - BTN / 2 });
-                      leaveOpen();
-                    }}
-                    aria-label="Minimize"
-                    title="Minimize — continue later from the feedback button"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
-                    style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M5 18h14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                )}
-                <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5" style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </div>
-            <div className={`feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain ${isSent ? "pb-3" : "pb-1"}`}>
-
-              {isSent && sent ? (
-                <Sent kind={sent.kind} xp={sent.xp} isAdventure={isAdventure} onAnother={startNew} />
-              ) : recentOpen ? (
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
+                  <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={leaveOpen}
+                aria-label="Minimize"
+                title="Minimize — continue later from the feedback button"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
+                style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M5 18h14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button type="button" onClick={requestClose} aria-label="Close" title="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5" style={{ color: isAdventure ? "#6b4a12" : "var(--t-ink-soft)" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <div className="feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-2">
+              {recentOpen ? (
                 <RecentNotes isAdventure={isAdventure} onBack={() => setRecentOpen(false)} />
               ) : (
                 <Composer
                   key={open.id}
                   draft={open}
                   isAdventure={isAdventure}
-                  compact={mobile}
+                  compact={phone || shown.w < 360}
                   saving={isSaving}
                   error={error}
                   onChange={update}
@@ -783,19 +823,16 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
               </div>
             )}
 
-            {/* Resize from the corner. */}
-            <span
-              role="presentation"
-              title="Drag to resize"
-              className="absolute bottom-0 right-0 z-[3] flex h-7 w-7 cursor-nwse-resize touch-none items-end justify-end p-1.5"
-              onPointerDown={(e) => onPanelDown(e, "resize")}
-            >
+            {/* Resize from the bottom: the edge for its height, the corner for both. The top stays put. */}
+            <span role="presentation" data-feedback-resize="height" title="Drag to make it taller or shorter" className="absolute bottom-0 left-3 right-7 z-[3] flex h-2.5 cursor-ns-resize touch-none items-end justify-center pb-[3px] before:absolute before:inset-x-0 before:-top-3 before:bottom-0 before:content-['']" onPointerDown={(e) => onPanelDown(e, "height")}>
+              <span aria-hidden className="block h-[3px] w-9 rounded-full" style={{ background: "var(--t-ink-soft)", opacity: 0.35 }} />
+            </span>
+            <span role="presentation" data-feedback-resize="corner" title="Drag to resize" className="absolute bottom-0 right-0 z-[3] flex h-7 w-7 cursor-nwse-resize touch-none items-end justify-end p-1.5" onPointerDown={(e) => onPanelDown(e, "resize")}>
               <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden style={{ color: "var(--t-ink-soft)", opacity: 0.7 }}>
                 <path d="M11 3L3 11M11 7L7 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </span>
           </div>
-
         </div>
       )}
       {celebrate && <SentBurst key={celebrate.key} kind={celebrate.kind} xp={celebrate.xp} x={celebrate.x} y={celebrate.y} isAdventure={isAdventure} style={celebrate.style} onClose={() => setCelebrate(null)} />}
@@ -833,7 +870,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
   if (style === "quiet") {
     const hold = typeof window === "undefined" ? 2.2 : (loadFx().feedbackHold ?? 2.2);
     return (
-      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[97] flex items-center justify-center p-6" style={{ ["--fb-pace" as string]: String(paceNow()), ["--fb-hold" as string]: `${hold || 2.2}s` }}>
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[132] flex items-center justify-center p-6" style={{ ["--fb-pace" as string]: String(paceNow()), ["--fb-hold" as string]: `${hold || 2.2}s` }}>
         {/* A tap on the card closes it at once (owner, Nov 5). */}
         <div onClick={onClose} className={`${hold === 0 ? "fb-done fb-done-stay" : "fb-done"} pointer-events-auto cursor-pointer relative flex w-[min(300px,100%)] flex-col items-center gap-2 rounded-3xl px-6 pb-5 pt-6 text-center`} style={isAdventure ? { background: "linear-gradient(180deg,#f6ecd2,#ead7aa)", border: "2px solid #a88a3f", color: "#2a1c10", boxShadow: "0 18px 40px rgba(0,0,0,.45)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)", color: "var(--t-ink)", boxShadow: "0 18px 40px rgba(0,0,0,.25)" }}>
           {closeBtn(false)}
@@ -858,7 +895,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
   // Handed to the Great Toucan Spirit: he takes the letter and powers up.
   if (style === "toucan")
     return (
-      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[97] flex items-center justify-center" style={{ ["--fb-pace" as string]: String(paceNow()) }}>
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-0 z-[132] flex items-center justify-center" style={{ ["--fb-pace" as string]: String(paceNow()) }}>
         <div className="fb-spirit relative flex flex-col items-center">
           <span aria-hidden className="fb-spirit-rays absolute left-1/2 top-[64px] h-[260px] w-[260px] rounded-full" />
           <span aria-hidden className="fb-spirit-ring absolute left-1/2 top-[64px] h-[120px] w-[120px] rounded-full" />
@@ -895,7 +932,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
   );
   if (style === "crane")
     return (
-      <div role="status" aria-live="polite" className="pointer-events-none fixed z-[97]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
+      <div role="status" aria-live="polite" className="pointer-events-none fixed z-[132]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
         <div className="fb-burst relative flex flex-col items-center">
           <svg className="fb-crane" width="96" height="72" viewBox="0 0 96 72" aria-hidden>
             <path d="M4 50l34-8 10-30 8 30 36-26-30 44-18-2z" fill="#f6ecd2" stroke="#8a6116" strokeWidth="2" strokeLinejoin="round" />
@@ -908,7 +945,7 @@ export function SentBurst({ kind, xp, x, y, isAdventure, style = "quiet", onClos
       </div>
     );
   return (
-    <div role="status" aria-live="polite" className="pointer-events-none fixed z-[97]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
+    <div role="status" aria-live="polite" className="pointer-events-none fixed z-[132]" style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}>
       <div className="fb-burst relative flex flex-col items-center">
         {Array.from({ length: 10 }, (_, i) => (
           <span key={i} aria-hidden className="fb-spark" style={{ ["--a" as string]: `${i * 36}deg`, ["--d" as string]: `${54 + (i % 3) * 14}px` }} />
@@ -1155,7 +1192,7 @@ function Composer({
         <label className="relative flex h-8 min-w-0 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-semibold" style={{ border: "1px solid var(--t-panel-border)", color: "var(--t-ink)" }} title="When it gets built">
           <span className="truncate">deploys: {WHEN.find(([k]) => k === draft.kind)?.[1].toLowerCase()}</span>
           <span aria-hidden className="text-[10px] opacity-60">▾</span>
-          <select aria-label="When it gets built" value={draft.kind} onChange={(e) => onChange({ kind: e.target.value as WhenKind })} className="absolute inset-0 cursor-pointer opacity-0">
+          <select aria-label="When it gets built" value={draft.kind} onChange={(e) => onChange({ kind: e.target.value as WhenKind })} className="absolute inset-0 cursor-pointer text-[16px] opacity-0">
             {WHEN.map(([k, label]) => (
               <option key={k} value={k}>
                 {label}
@@ -1277,7 +1314,7 @@ function Composer({
       )}
       {viewing &&
         createPortal(
-          <div role="dialog" aria-label="Attachment" className="fixed inset-0 z-[98] flex items-center justify-center p-4" style={{ background: "rgba(10,8,14,.82)" }} onClick={() => setViewing(null)}>
+          <div role="dialog" aria-label="Attachment" className="fixed inset-0 z-[133] flex items-center justify-center p-4" style={{ background: "rgba(10,8,14,.82)" }} onClick={() => setViewing(null)}>
             {/* eslint-disable-next-line @next/next/no-img-element -- attachment, full size */}
             <img src={viewing} alt="Attachment, full size" className="max-h-full max-w-full rounded-lg object-contain" style={{ boxShadow: "0 12px 40px rgba(0,0,0,.6)" }} />
             <button type="button" onClick={() => setViewing(null)} aria-label="Close" className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full text-[22px]" style={{ background: "rgba(255,255,255,.15)", color: "#fff" }}>
@@ -1348,37 +1385,6 @@ function Segmented<V extends string | number>({
   );
 }
 
-function Sent({ kind, xp, isAdventure, onAnother }: { kind: WhenKind; xp: number; isAdventure: boolean; onAnother: () => void }) {
-  return (
-    <div className="flex flex-col gap-2.5 px-4 pb-2 pt-1" role="status">
-      <div className="flex items-center gap-2.5">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden className="card-pop-in shrink-0">
-          <circle cx="12" cy="12" r="10.5" fill="#58a04a" stroke="#2f5a26" strokeWidth="1.2" />
-          <path d="M6.8 12.4l3.4 3.4 7-7.6" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <p className={`m-0 leading-snug ${isAdventure ? "font-display text-[17px]" : "text-[15.5px] font-bold"}`}>
-            {kind === "future" ? "Saved to the future ideas log" : kind === "refill" ? "Saved for when credits refill" : "Sent — it goes into the next update"}
-          </p>
-          {xp > 0 && (
-            <p className="m-0 text-[14.5px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
-              +{xp} XP
-            </p>
-          )}
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onAnother}
-        className="flex h-10 w-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full text-[14.5px] font-bold"
-        style={{ background: isAdventure ? "linear-gradient(180deg,#f6e3a8,#dcb763)" : "var(--t-accent)", border: isAdventure ? "1.5px solid #8a6116" : undefined, color: isAdventure ? "#2a1c10" : "#fff" }}
-      >
-        <span aria-hidden className="text-[17px] leading-none">+</span>
-        Write another
-      </button>
-    </div>
-  );
-}
 
 /**
  * Pictures still sending (or that need a retry), as a small bar at the bottom

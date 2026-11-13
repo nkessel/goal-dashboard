@@ -61,7 +61,7 @@ export function NotificationPreview() {
   }, [router]);
 
   if (!item) return null;
-  const href = (item.kind === "reaction" || item.kind === "comment") && item.activityId ? `/feed#activity-${item.activityId}` : "/notifications";
+  const href = (item.kind === "reaction" || item.kind === "comment") && item.activityId ? `/feed#activity-${item.activityId}` : item.kind === "message" ? "/feed#messages" : "/notifications";
   return (
     <button
       type="button"

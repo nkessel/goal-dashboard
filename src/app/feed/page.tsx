@@ -27,6 +27,8 @@ import { listFeed } from "@/lib/data/activity";
 import { listThreads } from "@/lib/data/forum";
 import { listSharedBoards } from "@/lib/data/party";
 import { SupportCall } from "@/components/social/SupportCall";
+import { Messages } from "@/components/social/Messages";
+import { unreadByFriend } from "@/lib/data/messages";
 import { SharedBoards } from "@/components/social/SharedBoards";
 import { Forums, type AuthorView } from "@/components/social/Forums";
 
@@ -40,6 +42,7 @@ export default async function FeedPage() {
   const sharedP = listSharedBoards(profileId);
   const forumsP = Promise.all((["party", "community", "ideas"] as const).map((sc) => listThreads(sc, profileId)));
   const feedP = friendIdsP.then((ids) => listFeed([profileId, ...ids], 30));
+  const unreadP = unreadByFriend(profileId).catch(() => ({}) as Record<string, number>);
   const [directory, friendshipMap, incoming, friendIds, invite, profile, champion, shared, week, weekPeople, adders, forums, forumPeople, incomingProfiles, feed, allProfiles, cap] = await Promise.all([
     listDirectory(profileId),
     getFriendshipMap(profileId),
@@ -68,6 +71,7 @@ export default async function FeedPage() {
     ownerName: b.owner.name?.split(" ")[0] ?? "A party member",
     quests: b.quests.map((q) => ({ id: q.id, title: q.title, xp: q.xp_value, addedBy: q.added_by ? (adders.get(q.added_by)?.name?.split(" ")[0] ?? null) : null })),
   }));
+  const unread = await unreadP;
   const threads = forums.flatMap((f) => f.threads);
   const forumAuthors: Record<string, AuthorView> = Object.fromEntries(
     [...forumPeople.values()].map((p) => [p.id, { id: p.id, name: p.name ?? "Adventurer", level: shownLevel(p), avatar_color: p.avatar_color, avatar_image_url: p.avatar_image_url, champion: p.id === champion?.id }])
@@ -163,6 +167,8 @@ export default async function FeedPage() {
         />
 
         <SupportButton support={String((profile?.life_wheel as { support?: unknown } | null)?.support ?? "")} isAdventure={isAdventure} />
+
+        <Messages friends={friendIds.map((id) => ({ id, name: weekPeople.get(id)?.name?.split(" ")[0] ?? "A friend", unread: unread[id] ?? 0 }))} isAdventure={isAdventure} />
 
         <SupportCall partySize={friendIds.length} isAdventure={isAdventure} />
 

@@ -89,8 +89,7 @@ export function KeyboardViewport() {
       else {
         releaseRoom();
         if (!isTextField(document.activeElement)) releaseLayers();
-        // The keyboard has settled down: a page held for the feedback box gets its scroll back.
-        if (pinned && !root.classList.contains("scroll-locked") && !feedbackHeld()) unpin();
+        if (pinned && !root.classList.contains("scroll-locked")) unpin();
       }
     };
     const update = () => {
@@ -116,15 +115,11 @@ export function KeyboardViewport() {
       return null;
     };
     const inPopup = (el: HTMLElement) => root.classList.contains("scroll-locked") && !!fixedLayer(el);
-    // The feedback box floats over any screen without locking it: typing there holds the page
-    // still too (else iPhone pans Today up to the box and drops it back as the keyboard closes).
-    const inFeedback = (el: HTMLElement) => !!el.closest("[data-feedback-root]");
-    const steadied = (el: HTMLElement) => inPopup(el) || inFeedback(el);
-    // Still typing in the feedback box, or its keyboard still on its way down.
-    const feedbackHeld = () => {
-      const a = document.activeElement;
-      return (a instanceof HTMLElement && inFeedback(a)) || kbUp();
-    };
+    // The feedback box floats over any screen without locking or holding it (opening feedback never
+    // changes anything else on screen): it keeps itself in the strip above the keyboard from the
+    // moment it has focus (FeedbackDock), so the browser has nothing to pan to. Only a real popup
+    // (scroll-locked) pins the page.
+    const steadied = (el: HTMLElement) => inPopup(el);
 
     // ── Keep the page at the top while you type in a popup ──────────────────
     // (the way React Aria does it): the page behind is held in place by a
@@ -151,20 +146,9 @@ export function KeyboardViewport() {
     };
     // The popup closed: give the page its scroll position back.
     const lockWatch = new MutationObserver(() => {
-      if (!root.classList.contains("scroll-locked") && !feedbackHeld()) unpin();
+      if (!root.classList.contains("scroll-locked")) unpin();
     });
     lockWatch.observe(root, { attributes: true, attributeFilter: ["class"] });
-    // Writing feedback while looking around: touching or scrolling the page outside the box gives it
-    // its scroll back (owner, Nov 3: "trying to scroll down just jumped right back").
-    const outside = (e: Event) => {
-      if (!pinned || root.classList.contains("scroll-locked")) return;
-      const t = e.target;
-      if (t instanceof Element && t.closest("[data-feedback-root]")) return;
-      const a = document.activeElement;
-      if (a instanceof HTMLElement && inFeedback(a)) unpin();
-    };
-    document.addEventListener("touchstart", outside, { passive: true, capture: true });
-    document.addEventListener("wheel", outside, { passive: true, capture: true });
 
     // Focus a field as if it were already at the top of the screen, so the
     // browser has no reason to pan; the transform is gone a frame later.
@@ -330,7 +314,7 @@ export function KeyboardViewport() {
           if (!kbUp()) releaseLayers();
         }
         // No keyboard ever came up (or it's already down): let go of the page now.
-        if (pinned && !root.classList.contains("scroll-locked") && !feedbackHeld()) unpin();
+        if (pinned && !root.classList.contains("scroll-locked")) unpin();
       }, 60);
     };
 
@@ -357,8 +341,6 @@ export function KeyboardViewport() {
       window.clearInterval(stuckTimer);
       document.removeEventListener("touchstart", onTouchStart, { capture: true });
       document.removeEventListener("touchend", onTouchEnd, { capture: true });
-      document.removeEventListener("touchstart", outside, { capture: true });
-      document.removeEventListener("wheel", outside, { capture: true });
       lockWatch.disconnect();
       releaseLayers();
       unpin();

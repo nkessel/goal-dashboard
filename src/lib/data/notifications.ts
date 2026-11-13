@@ -43,7 +43,7 @@ export async function createNotification(input: {
  * daily check-ins). Essential: only what needs you — party requests, calls for
  * support, reminders, shared boards and (for the owner) feedback.
  */
-const ESSENTIAL = new Set(["friend_request", "support", "reschedule_reminder", "imports", "feedback", "shared_board"]);
+const ESSENTIAL = new Set(["friend_request", "support", "reschedule_reminder", "imports", "feedback", "shared_board", "message"]);
 const NOT_HIGHLIGHTS = new Set(["reaction", "level_up", "daily_check_in"]);
 export function passesLevel(level: string, kind: string): boolean {
   if (level === "essential") return ESSENTIAL.has(kind);

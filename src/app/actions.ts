@@ -40,6 +40,7 @@ import { styleLook, AVATAR_STYLE_OPTIONS, STYLE_EXAMPLE_SUBJECT } from "@/lib/av
 import { exportAccountData, type AccountExport } from "@/lib/data/export";
 import type { TaskIconLibraryEntry, Task } from "@/lib/data/types";
 import { sendEmail } from "@/lib/email";
+import * as messagesData from "@/lib/data/messages";
 import { findOpenSlots, type Interval } from "@/lib/scheduling";
 import {
   listBusyIntervals,
@@ -2793,6 +2794,21 @@ export async function callForSupportAction(kind: partyData.SupportKind, message:
   const threadId = await partyData.callForSupport(id, name, kind, message);
   revalidatePath("/feed");
   return threadId;
+}
+
+/** Messages with one party member (reading marks theirs read). */
+export async function messageThreadAction(friendId: string) {
+  const me = await requireProfileId();
+  return { me, messages: await messagesData.listThread(me, friendId) };
+}
+
+export async function sendMessageAction(friendId: string, body: string) {
+  const { id, name } = await requireIdentity();
+  try {
+    return { ok: true as const, message: await messagesData.sendMessage(id, name, friendId, body) };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Couldn't send that." };
+  }
 }
 
 /** What a settings popup opened from a gear needs that only the server knows. */

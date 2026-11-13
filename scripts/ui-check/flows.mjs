@@ -11,6 +11,8 @@
 // target: a RegExp (button name), "text=…", "css=…", or (page) => locator.
 // Taps marked optional are skipped quietly when the thing isn't there.
 
+import { fakeKeyboard } from "./audit.mjs";
+
 const esc = async (h) => {
   await h.page.keyboard.press("Escape");
   await h.settle(500);
@@ -840,15 +842,219 @@ export const FLOWS = [
     },
   },
   {
-    // The feedback box (repeat ask 14: no lag): open it, take a screen picture (writing goes on), your recent notes.
+    // The feedback box (repeat asks 14 and the Nov 12 rebuild): one place decides where it is, so it never
+    // jumps; it resizes from the bottom; the button is always there, the same size, above every popup.
     name: "feedback",
     async run(h) {
+      const p = h.page;
+      const KB = 336;
+      const fail = (detail) => h.record({ kind: "feedback-box", severity: "error", target: "feedback box", detail });
+      const btn = () => p.locator("[data-feedback-btn]").first();
+      const press = (loc) => (h.isPhone ? loc.tap({ timeout: 4000 }) : loc.click({ timeout: 4000 }));
+      const rectOf = (sel) =>
+        p.evaluate((sel) => {
+          const r = document.querySelector(sel)?.getBoundingClientRect();
+          return r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
+        }, sel);
+      // Every frame: where the box and the button are, and how often the box's entrance starts.
+      const traceStart = () =>
+        p.evaluate(() => {
+          const t = (window.__fbTrace = { rows: [], anims: 0, on: true });
+          const onAnim = (e) => {
+            if (e.animationName === "create-sheet-in" && e.target instanceof Element && e.target.closest("[data-feedback-box]")) t.anims++;
+          };
+          document.addEventListener("animationstart", onAnim, true);
+          t.off = () => document.removeEventListener("animationstart", onAnim, true);
+          const tick = () => {
+            if (!t.on) return;
+            const r = document.querySelector("[data-feedback-box]")?.getBoundingClientRect();
+            const b = document.querySelector("[data-feedback-btn]")?.getBoundingClientRect();
+            t.rows.push({ box: r ? [r.left, r.top, r.width, r.height] : null, btn: b ? [b.left, b.top, b.width, b.height] : null });
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+      const traceStop = () =>
+        p.evaluate(() => {
+          const t = window.__fbTrace;
+          t.on = false;
+          t.off();
+          return { rows: t.rows, anims: t.anims };
+        });
+      /** The biggest change of the box's place or size between two frames in a row. */
+      const maxStep = (rows) => {
+        let m = 0;
+        for (let i = 1; i < rows.length; i++) if (rows[i].box && rows[i - 1].box) for (let k = 0; k < 4; k++) m = Math.max(m, Math.abs(rows[i].box[k] - rows[i - 1].box[k]));
+        return m;
+      };
+      const drag = async (from, dx, dy) => {
+        await p.mouse.move(from.x, from.y);
+        await p.mouse.down();
+        for (let i = 1; i <= 12; i++) {
+          await p.mouse.move(from.x + (dx * i) / 12, from.y + (dy * i) / 12);
+          await p.waitForTimeout(16);
+        }
+        await p.mouse.up();
+        await h.settle(250);
+      };
+      const centre = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+      const buttonOnTop = (where) =>
+        p.evaluate((where) => {
+          const b = document.querySelector("[data-feedback-btn]");
+          if (!b) return `${where}: no feedback button on the page`;
+          const r = b.getBoundingClientRect();
+          const cs = getComputedStyle(b);
+          if (Math.abs(r.width - 46) > 0.5 || Math.abs(r.height - 46) > 0.5) return `${where}: the button is ${r.width}×${r.height}, not 46×46`;
+          if (cs.visibility !== "visible" || Number(cs.opacity) < 0.99 || cs.pointerEvents === "none") return `${where}: the button is hidden (visibility ${cs.visibility}, opacity ${cs.opacity}, pointer-events ${cs.pointerEvents})`;
+          if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) return `${where}: the button is off screen`;
+          const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (!top || !b.contains(top)) return `${where}: the button is covered by <${top?.tagName.toLowerCase()} class="${String(top?.className).slice(0, 60)}">`;
+          return null;
+        }, where);
+
+      await h.goto("/", { name: "feedback" });
+      await p.evaluate(() => ["feedback-box-v2", "feedback-kb-strip", "feedback-drafts"].forEach((k) => localStorage.removeItem(k)));
+      await h.goto("/", { name: "feedback" });
+      try {
+        await btn().waitFor({ state: "visible", timeout: 8000 });
+      } catch {
+        fail("the feedback button never showed on Today");
+        return;
+      }
+
+      // 1. Open and close ten times, with and without the keyboard: the box is put in one place and stays there.
+      let first = null;
+      for (let i = 0; i < 10; i++) {
+        const withKb = h.isPhone && i % 2 === 1;
+        await traceStart();
+        await press(btn());
+        await p.waitForTimeout(350);
+        if (withKb) await p.evaluate(fakeKeyboard, KB);
+        await p.waitForTimeout(650);
+        const at = await rectOf("[data-feedback-box]");
+        await press(p.locator('[data-feedback-box] button[aria-label="Minimize"]'));
+        await p.waitForTimeout(150);
+        if (withKb) await p.evaluate(fakeKeyboard, 0);
+        await p.waitForTimeout(450);
+        const t = await traceStop();
+        const shownRows = t.rows.filter((r) => r.box);
+        if (!at || shownRows.length < 10) {
+          fail(`open ${i + 1}: the box didn't open (${shownRows.length} frames)`);
+          break;
+        }
+        const step = maxStep(t.rows);
+        if (step > 0.5) fail(`open ${i + 1}${withKb ? " (keyboard)" : ""}: the box moved or changed size by ${step.toFixed(1)}px between two frames`);
+        if (t.anims !== 1) fail(`open ${i + 1}: the box's entrance played ${t.anims} times (once is right)`);
+        if (!first) first = at;
+        else if (["x", "y", "w", "h"].some((k) => Math.abs(at[k] - first[k]) > 0.5)) fail(`open ${i + 1}: the box opened at ${JSON.stringify(at)}, not where it first did ${JSON.stringify(first)}`);
+        const b0 = t.rows.find((r) => r.btn)?.btn;
+        if (t.rows.some((r) => !r.btn)) fail(`open ${i + 1}: the feedback button left the page`);
+        else if (t.rows.some((r) => r.btn.some((v, k) => Math.abs(v - b0[k]) > 0.5))) fail(`open ${i + 1}: the feedback button moved or changed size`);
+        if (await p.locator("[data-feedback-box]").count()) fail(`open ${i + 1}: the box didn't close`);
+        if (i === 0 || i === 1 || i === 9) console.log(`    feedback open ${i + 1}${withKb ? " (keyboard)" : ""}: ${shownRows.length} frames with the box, biggest frame-to-frame change ${step.toFixed(2)}px, entrance played ${t.anims}×, at ${JSON.stringify(at)}`);
+      }
+
+      // 2. The button is on every screen, the same size, above every popup.
+      for (const path of ["/boards", "/calendar", "/settings", "/import", "/insights"]) {
+        await h.goto(path, { name: "feedback" });
+        const bad = await buttonOnTop(path);
+        if (bad) fail(bad);
+      }
+      await h.goto("/", { name: "feedback" });
+      if (await h.tap("text=Pick up medication", "open quest editor", { expectMove: true })) {
+        await h.settle(500);
+        const bad = await buttonOnTop("quest editor open");
+        if (bad) fail(bad);
+        await h.check("quest editor with the feedback button");
+        // Feedback opens over the editor, and the editor stays as it was.
+        await press(btn());
+        await h.settle(700);
+        if (!(await p.locator("[data-feedback-box]").count())) fail("the feedback box didn't open over the quest editor");
+        else if (!(await p.locator("[role=dialog]:not([data-feedback-box])").count())) fail("opening feedback closed the quest editor");
+        await h.check("feedback over the quest editor");
+        await p.evaluate(() => document.activeElement?.blur());
+        await press(p.locator('[data-feedback-box] button[aria-label="Minimize"]')).catch(() => {});
+        await h.settle(300);
+        await esc(h);
+        await h.settle(400);
+      }
+
+      // 3. Moved low, then written in: it glides into the strip above the keyboard (one smooth move), and
+      //    the keyboard arriving and leaving moves nothing.
+      await h.goto("/", { name: "feedback" });
+      await press(btn());
+      await h.settle(700);
+      if (h.isPhone) {
+        await p.evaluate(() => document.activeElement?.blur());
+        const r0 = await rectOf("[data-feedback-box]");
+        await drag({ x: r0.x + 70, y: r0.y + 22 }, 0, 330);
+        const low = await rectOf("[data-feedback-box]");
+        if (Math.abs(low.y - (r0.y + 330)) > 1.5) fail(`dragging the box down 330px put it at ${low.y}, from ${r0.y}`);
+        await traceStart();
+        await p.locator("[data-feedback-box] textarea").first().tap();
+        await p.waitForTimeout(450);
+        const before = await rectOf("[data-feedback-box]");
+        await p.evaluate(fakeKeyboard, KB);
+        await p.waitForTimeout(700);
+        const up = await rectOf("[data-feedback-box]");
+        await p.evaluate(() => document.activeElement?.blur());
+        await p.evaluate(fakeKeyboard, 0);
+        await p.waitForTimeout(700);
+        const after = await rectOf("[data-feedback-box]");
+        const t = await traceStop();
+        const tops = t.rows.filter((r) => r.box).map((r) => r.box[1]);
+        const vh = await p.evaluate(() => innerHeight);
+        if (up.y + up.h > vh - KB - 7.5) fail(`with the keyboard up the box ends at ${up.y + up.h}, behind the keyboard (which starts at ${vh - KB})`);
+        if (tops.some((y, i) => i && y > tops[i - 1] + 0.5)) fail("on its way above the keyboard the box went back down");
+        if (new Set(tops.map((y) => Math.round(y))).size < 4) fail("the box jumped above the keyboard in one frame instead of gliding");
+        if (maxStep(t.rows) > 130) fail(`the box jumped ${maxStep(t.rows).toFixed(0)}px in one frame on its way above the keyboard`);
+        if (Math.abs(before.y - up.y) > 0.5 || Math.abs(before.h - up.h) > 0.5) fail(`the keyboard arriving moved the box (${before.y} → ${up.y})`);
+        if (Math.abs(after.y - up.y) > 0.5 || Math.abs(after.h - up.h) > 0.5) fail(`the keyboard leaving moved the box (${up.y} → ${after.y})`);
+        console.log(`    feedback glide: from ${low.y} to ${up.y} over ${new Set(tops.map((y) => Math.round(y))).size} distinct tops, biggest step ${maxStep(t.rows).toFixed(1)}px; keyboard up ${before.y}→${up.y}, down ${up.y}→${after.y}; box bottom ${up.y + up.h} vs keyboard top ${vh - KB}`);
+      }
+
+      // 4. Resize from the bottom: the top-left corner never moves; down to 220px wide and 150px tall.
+      {
+        const r0 = await rectOf("[data-feedback-box]");
+        const corner = await rectOf('[data-feedback-resize="corner"]');
+        await traceStart();
+        await drag(centre(corner), -700, -700);
+        let t = await traceStop();
+        const small = await rectOf("[data-feedback-box]");
+        const moved = (rows) => rows.some((r) => r.box && (Math.abs(r.box[0] - r0.x) > 0.5 || Math.abs(r.box[1] - r0.y) > 0.5));
+        if (moved(t.rows)) fail("resizing from the corner moved the box's top-left corner");
+        if (Math.abs(small.w - 220) > 0.5 || Math.abs(small.h - 150) > 0.5) fail(`the smallest box is ${small.w}×${small.h}, not 220×150`);
+        await h.check("feedback box: smallest");
+        const edge = await rectOf('[data-feedback-resize="height"]');
+        await traceStart();
+        await drag(centre(edge), 0, 120);
+        t = await traceStop();
+        const taller = await rectOf("[data-feedback-box]");
+        if (moved(t.rows)) fail("resizing from the bottom edge moved the box's top");
+        if (Math.abs(taller.h - 270) > 1.5 || Math.abs(taller.w - small.w) > 0.5) fail(`dragging the bottom edge down 120px made it ${taller.w}×${taller.h}, from ${small.w}×${small.h}`);
+        const corner2 = await rectOf('[data-feedback-resize="corner"]');
+        await traceStart();
+        await drag(centre(corner2), 900, 900);
+        t = await traceStop();
+        const big = await rectOf("[data-feedback-box]");
+        const [vw, vh] = await p.evaluate(() => [innerWidth, innerHeight]);
+        if (moved(t.rows)) fail("making the box bigger moved its top-left corner");
+        if (big.x + big.w > vw - 7.5 || big.y + big.h > vh - 7.5) fail(`the biggest box runs off the screen (${JSON.stringify(big)})`);
+        console.log(`    feedback resize: smallest ${small.w}×${small.h}, bottom edge +120 → ${taller.w}×${taller.h}, biggest ${big.w}×${big.h} at ${big.x},${big.y} on ${vw}×${vh}; top-left stayed ${r0.x},${r0.y}`);
+        // Back to the default for the rest of the walk.
+        await press(p.locator('[data-feedback-box] button[aria-label="Minimize"]')).catch(() => {});
+        await h.settle(300);
+        await p.evaluate(() => {
+          localStorage.removeItem("feedback-box-v2");
+          sessionStorage.removeItem("feedback-open");
+        });
+      }
+
+      // 5. The usual walk: the box, the keyboard, a screen picture (writing goes on), your recent notes.
       await h.goto("/", { name: "feedback" });
       if (await h.tap((p) => p.getByRole("button", { name: /^feedback \(f\)$/i }).first(), "open feedback", { optional: true, expectMove: true })) {
         await h.settle(600);
         await h.check("feedback box");
-        // With the keyboard up the page under it is painted dark (owner, Nov 6: a parchment band showed
-        // through iPhone's see-through keyboard); the phone shot shows the dark ground below the box.
         await h.typeIn((p) => p.locator("[data-feedback-root] textarea").first(), "feedback writing");
         await h.tap((p) => p.getByRole("button", { name: /add a picture of this screen/i }).first(), "screen picture", { optional: true });
         await h.page.keyboard.type("Typing right after the picture").catch(() => {});
@@ -858,6 +1064,10 @@ export const FLOWS = [
           await h.settle(800);
           await h.check("feedback: recent notes");
         }
+        // Left as it was found: the next flows start without a box over their screens.
+        await h.page.evaluate(() => document.activeElement?.blur());
+        await h.page.locator('[data-feedback-box] button[aria-label="Minimize"]').click({ timeout: 3000 }).catch(() => {});
+        await h.settle(300);
       }
     },
   },
@@ -1045,6 +1255,12 @@ export const FLOWS = [
       for (const path of ["/boards", "/quests", "/calendar", "/rewards", "/feed", "/plan", "/matrix", "/journal", "/notifications", "/settings/inventory", "/power-ups"]) {
         await h.goto(path);
         await h.check("loaded");
+      }
+      // Messages in the Guild Hall (owner, Nov 13): a party member's conversation opens in place.
+      await h.goto("/feed");
+      if (await h.tap((p) => p.locator("[data-message-friend]").first(), "feed: open a conversation", { optional: true, expectMove: true })) {
+        await h.settle(900);
+        await h.check("feed: conversation");
       }
       // A board scroll (owner, Nov 9): "Show N more quests" lists the rest in place; tapping the title rolls it up.
       await h.goto("/boards");

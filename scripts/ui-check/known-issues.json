@@ -54,5 +54,9 @@
   {
     "match": "^todaycal\\|covered\\|.*sits on .*\"FRI\"|^todaycal\\|covered\\|.*won this day",
     "reason": "Nov 12: in Today's calendar the compressed day heading pins at the top while the hours scroll under it, as on the calendar screen."
+  },
+  {
+    "match": "(covered-by-bar|floating-overlap)\\|<button>\\|.*\"Feedback \\(F\\)\": sits on",
+    "reason": "Owner, Nov 12: the feedback button must be visible on every screen, above every popup and editor. A floating button always sits on something; over a popup on a phone it waits at the right edge mid-screen (off the footers' Save) and can be dragged anywhere, which it remembers."
   }
 ]

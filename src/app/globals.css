@@ -1764,20 +1764,16 @@ html[data-kb] [data-hide-when-typing] {
   pointer-events: none;
   transition: opacity 160ms ease, visibility 0s linear 160ms;
 }
-/* The feedback button stays available while typing; it only steps aside while the keyboard is actually up. */
-html[data-kb] [data-feedback-hide] {
+/* The feedback button is on every screen, above every popup (owner, Nov 12). Its one exception: it steps
+   aside while the on-screen keyboard is up for a field outside the feedback box. */
+html[data-kb] [data-feedback-hide]:not([data-feedback-open]) {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transition: opacity 160ms ease, visibility 0s linear 160ms;
 }
-/* The feedback button never changes size anywhere (owner, Nov 9). With a popup open on a phone it
-   fades out of the way (it sat on the quest editor's Save; moved up it covered the editor's own
-   parts) and fades back, as it was, when the popup closes. */
-@media (pointer: coarse) {
-  html.scroll-locked:not([data-welcome-open]) [data-feedback-btn]:not([aria-expanded="true"]) { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 200ms ease, visibility 0s linear 200ms; }
-  html.scroll-locked:not([data-welcome-open])[data-typing] [data-feedback-hide]:not([data-feedback-open]) { opacity: 0; visibility: hidden; pointer-events: none; }
-}
+/* The feedback button never changes size anywhere (owner, Nov 9), and no popup, sheet or editor
+   hides it (owner, Nov 12: "visible on every screen"): drag it if it sits on something. */
 /* The welcome screen isn't a popup over buttons: there the feedback button sits full size in the
    sky at the top right (FeedbackDock), clear of the card. While only the mist is up (before the
    welcome screen or Today shows) it waits out of sight, so it never floats over the fog alone. */

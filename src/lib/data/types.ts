@@ -320,7 +320,8 @@ export type NotificationKind =
   | "imports"
   | "feedback"
   | "support"
-  | "shared_board";
+  | "shared_board"
+  | "message";
 
 export type AppNotification = {
   id: string;
