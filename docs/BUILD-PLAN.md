@@ -5,7 +5,8 @@ unless one is blocked. Each task is self-contained: read its notes, build, check
 
 ## Rules that apply to every task (read first)
 
-- Follow `CLAUDE.md` and `docs/HANDOFF.md` (sections 3 and 4) exactly: ship to `main`, `npm run ui-check` for the
+- **Design review before shipping** (owner, Nov 14): screen changes go to a `review/<topic>` branch and a review page of screenshots, and reach `main` only after the owner's OK (`CLAUDE.md` › "Design review before shipping").
+- Follow `CLAUDE.md` and `docs/HANDOFF.md` (sections 3 and 4) exactly: `npm run ui-check` for the
   flows you touched before every push, fix every **error** on your screens, add new screens/popups to
   `scripts/ui-check/flows.mjs`, update HANDOFF "Recently shipped" in the same push.
 - Read the open notes before changing a screen: the `screens` query in `docs/FEEDBACK-BY-SCREEN.md`.

@@ -10,6 +10,18 @@ Then read `docs/REPEAT-ASKS.md`: the owner's asks that came back 3+ times. Any w
 
 When you ship to `main`, update `docs/HANDOFF.md` in the same push: bump "Last updated", move finished work to "Recently shipped", and add or re-rank anything new. The next session, on any account, picks up from that file.
 
+# Design review before shipping (owner, Nov 14: "Can we go thru a design review before shipping from now on?")
+
+Nothing that changes what's on screen goes to `main` until the owner has seen it and said OK. This replaces the old "ship straight to the live app" rule.
+
+1. Build it, run the UI check (below), fix its errors.
+2. Push the work to a branch `review/<short-topic>` (never `main`), so any session or account can pick it up.
+3. Show the owner the screens: publish (or update) a review page with the UI check's screenshots of every state that changed, phone first, before/after where useful, and one line per change saying what it is. For bigger changes, run the three UX teams (`.claude/agents/ux-team-*`) on the screenshots first and fix what they agree on.
+4. Wait for his OK or his notes. Notes: change, re-check, update the same review page. OK: merge to `main`, push, update `docs/HANDOFF.md`, mark the feedback notes.
+5. List what's waiting in HANDOFF section 0a ("Waiting on the owner's design review": branch, review page link, date).
+
+Only changes with nothing visible (data fixes, server speed, docs) still ship straight to `main`.
+
 # Before every push to main: run the UI check
 
 The owner should never be the one who finds a layout bug. Before you push anything that changes what's on screen:

@@ -36,6 +36,8 @@ Take them in order. Each is the owner's own ask (note id prefix in brackets; rea
 
 Started in the owner's Claude project threads; written here so another account can carry on.
 
+- **Waiting on the owner's design review** (branch · review page · date): none yet.
+
 - **Make the app load faster**: shipped Nov 12 (see Recently shipped). Needs the owner's iPhone look (Home Screen app): opening should show the last screen at once.
 - **Habit editor aligned with the quest editor**: owner picked B and reviewed a draft (Nov 14); shipped Nov 14 (see Recently shipped). Left from B: the editor's gear arranges it in place (it still opens Settings).
 - **Habits in the daily plan** (owner, Nov 14; picked from a brainstorm: lanes At a time / Sometime today / Rest today, choose habits in the morning and evening like quests, core habits that look different; hold off on bundling and habits of the week). **Part 1 shipped Nov 14** (see Recently shipped). **Part 2, not built yet:** when planning tomorrow (and today), place the chosen habits on the calendar along with the quests and around the non-negotiables (lunch etc.; the auto-scheduler's Habits section and day holds `h:<id>` are the start: list only chosen + core habits there), a "by when" time for a habit that floats (like Gym's window), and the toucan offering a habit when you have a gap or just finished a quest, **with an on/off switch in Toucan Spirit settings**.
@@ -122,7 +124,7 @@ Each item is the owner's own ask. Take them top to bottom; mark done here and mo
 
 ## 3. How to ship (the loop)
 
-The owner's standing rule: **ship straight to the live app. Don't wait for an OK on a preview.** When the owner says "update the site", that means build and ship all pending in-app feedback, then deploy.
+**Design review first (owner, Nov 14, replaces "ship straight to the live app"):** anything that changes what's on screen waits on a `review/<topic>` branch until the owner has seen its screenshots on a review page and said OK; then merge to `main`. Steps in `CLAUDE.md` › "Design review before shipping". Changes with nothing visible still ship straight. When the owner says "update the site", build the pending feedback, then send it for review.
 
 1. **Sync.** `git fetch origin main` and start from the latest `main`. Other sessions ship to it several times a day.
 2. **Read pending feedback** (in-app notes live in `journal_entries` with `kind = 'feedback'`):
