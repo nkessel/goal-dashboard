@@ -4,7 +4,8 @@ import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncEx
 import { daySummary, useWeatherRange } from "@/lib/use-weather";
 import { useRouter } from "next/navigation";
 import { scheduleTaskAction, updateGoogleEventAction } from "@/app/actions";
-import { getSavedSettings, saveDayHold } from "@/lib/day-holds";
+import { saveDayHold } from "@/lib/day-holds";
+import { DailyEventEditor, useDailySettings } from "./DailyEvents";
 import { carryQuest, useCarried, QUEST_DRAG_TYPE, registerCalendarDrop, type Carried } from "@/lib/schedule-carry";
 import { WeatherLocation, useWeatherPlaceName } from "@/components/ui/WeatherLocation";
 import Link from "next/link";
@@ -29,7 +30,7 @@ import { sessionRef, showsOnCalendar } from "@/lib/calendar-task-window";
 import type { CardShow } from "./CalendarLayers";
 import { GoogleEventChip } from "./GoogleEventChip";
 import type { DailyLayer, EssentialsLook, HabitLook } from "./CalendarLayers";
-import { SCHEDULER_DEFAULTS, holdAt, localDayKey, mealsOn, MEAL_ICONS, MEAL_NAMES, type DayHold, type SchedulerSettings } from "@/lib/auto-schedule";
+import { SCHEDULER_DEFAULTS, dailyEvents, holdAt, localDayKey, mealsOn, type DayHold, type SchedulerSettings } from "@/lib/auto-schedule";
 import { habitBlocksOn } from "@/lib/timed-habits";
 import { driveWords, useAllQuestDrives } from "@/lib/use-quest-cal";
 import { fromFeedback } from "@/lib/from-feedback";
@@ -1753,7 +1754,12 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
   const [mine, setMine] = useState<Record<string, DayHold | null>>({});
   const [menu, setMenu] = useState<HoldTarget | null>(null);
   const [edit, setEdit] = useState(false);
+  const [every, setEvery] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  // The every-day editor is tall: bring the whole menu into view when it opens.
+  useEffect(() => {
+    if (every) menuRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [every]);
   const lastTap = useRef<{ key: string; at: number } | null>(null);
   useEffect(() => {
     if (!menu) return;
@@ -1769,7 +1775,8 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
       document.removeEventListener("keydown", key);
     };
   }, [menu]);
-  const base = { ...SCHEDULER_DEFAULTS, ...((getSavedSettings() ?? daily.settings) ?? {}) } as SchedulerSettings;
+  const current = useDailySettings(daily.settings);
+  const base = { ...SCHEDULER_DEFAULTS, ...(current ?? {}) } as SchedulerSettings;
   const dayHolds: Record<string, DayHold> = { ...(base.essentialDays?.[dayKey] ?? {}) };
   for (const [k, v] of Object.entries(mine)) {
     if (v) dayHolds[k] = v;
@@ -1792,6 +1799,7 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
 
   const pick = (t: HoldTarget) => {
     setEdit(false);
+    setEvery(false);
     setMenu(t);
   };
   // The holds let clicks through (a quest can be dragged or added over them); the grid asks them instead.
@@ -1862,7 +1870,7 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
             : essentials === "line"
               ? { borderLeft: "3px solid rgba(139,112,64,.55)" }
               : { border: `1.5px ${h.kept ? "solid" : "dashed"} rgba(139,112,64,.6)`, borderRadius: 6 };
-        const t: HoldTarget = { key: h.key, label: MEAL_NAMES[h.key], at: h.at, minutes: h.minutes, kept: !!h.kept, crowded: h.crowded, meal: true };
+        const t: HoldTarget = { key: h.key, label: h.name, at: h.at, minutes: h.minutes, kept: !!h.kept, crowded: h.crowded, meal: true };
         const asQuest = (looks[h.key] ?? (essentials === "quest" ? "quest" : "hold")) === "quest";
         if (asQuest) {
           // Like a quest: a storybook card with its emoji.
@@ -1870,16 +1878,16 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
             <div
               key={h.key}
               {...handlers(t)}
-              title={`${MEAL_NAMES[h.key]}${h.crowded ? ": no free time left for it here" : ""} · right-click or double-tap`}
+              title={`${h.name}${h.crowded ? ": no free time left for it here" : ""} · right-click or double-tap`}
               className="quest-card absolute inset-x-0.5 flex items-center gap-1.5 overflow-hidden"
               style={{ top: top + 1, height, zIndex: menu?.key === h.key ? 3 : 0, padding: height >= 26 ? "3px 6px 3px 4px" : "1px 6px", borderRadius: 14, ...(h.crowded ? { background: "linear-gradient(rgba(178,84,66,.2), rgba(178,84,66,.2)), linear-gradient(180deg,#f6e8c4,#e8d29c)", border: "1.5px dashed rgba(160,70,52,.7)" } : {}) }}
             >
               <span aria-hidden className="shrink-0" style={{ fontSize: Math.min(20, Math.max(12, height - 10)), lineHeight: 1 }}>
-                {MEAL_ICONS[h.key]}
+                {h.icon}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="font-display block truncate" style={{ color: h.crowded ? "#8a3f2c" : "#3a2a14", fontSize: 12.5, lineHeight: 1.15 }}>
-                  {MEAL_NAMES[h.key]}
+                  {h.name}
                 </span>
                 {height >= 34 && (
                   <span className="block truncate" style={{ color: h.crowded ? "#8a3f2c" : "var(--t-ink-soft)", fontSize: 10.5, lineHeight: 1.2 }}>
@@ -1894,13 +1902,13 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
           <div
             key={h.key}
             {...handlers(t)}
-            title={h.crowded ? `${MEAL_NAMES[h.key]}: no free time left for it here (right-click or double-tap)` : `${MEAL_NAMES[h.key]}: ${h.kept ? "kept here" : "kept free (floats as things are planned)"} · right-click or double-tap`}
+            title={h.crowded ? `${h.name}: no free time left for it here (right-click or double-tap)` : `${h.name}: ${h.kept ? "kept here" : "kept free (floats as things are planned)"} · right-click or double-tap`}
             className="absolute inset-x-0.5 overflow-hidden px-1.5 py-0.5 text-[11px] italic leading-tight"
             style={{ top: top + 1, height, color: ink, opacity: 0.9, zIndex: menu?.key === h.key ? 3 : 0, ...look }}
           >
             {/* As many lines as the block holds, the last ending in "…", so no word is cut by its edge (owner, Nov 14). */}
             <span className="block" style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: Math.max(1, Math.floor((height - 4) / 13.75)), overflow: "hidden", overflowWrap: "anywhere" }}>
-              <span aria-hidden>{MEAL_ICONS[h.key]}</span> {MEAL_NAMES[h.key]}
+              <span aria-hidden>{h.icon}</span> {h.name}
             </span>
           </div>
         );
@@ -1983,6 +1991,8 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
               {clock(menu.at)} · {menu.minutes}m{menu.kept ? " · kept here" : ""}
             </span>
           </span>
+          {!every && (
+            <>
           {!menu.kept && (
             <button type="button" role="menuitem" onClick={() => (keepAt(menu, menu.at), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left font-semibold hover:bg-black/[.05]">
               ✓ Keep it here
@@ -2011,6 +2021,22 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
               </span>
             </div>
           )}
+            </>
+          )}
+          {menu.meal && (() => {
+            const ev = dailyEvents(base).find((x) => x.key === menu.key);
+            if (!ev) return null;
+            return (
+              <>
+                <button type="button" role="menuitem" aria-expanded={every} onClick={() => setEvery((v) => !v)} className="relative z-[1] h-9 rounded-lg px-2 text-left font-semibold hover:bg-black/[.05]" style={{ background: every ? "rgba(217,180,95,.2)" : undefined }}>
+                  ✎ Rename or change every day
+                </button>
+                {every && <DailyEventEditor key={`${ev.key}:${ev.name}:${ev.icon}`} base={current} ev={ev} onDone={() => setMenu(null)} />}
+              </>
+            );
+          })()}
+          {!every && (
+            <>
           {menu.kept && (
             <button type="button" role="menuitem" onClick={() => (save(menu.key, null), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]">
               ↺ Let it float again
@@ -2029,6 +2055,8 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
           <button type="button" role="menuitem" onClick={() => (save(menu.key, { off: true }), setMenu(null))} className="relative z-[1] h-9 rounded-lg px-2 text-left hover:bg-black/[.05]" style={{ color: "#8a3f2c" }}>
             Skip for today
           </button>
+            </>
+          )}
         </div>
       )}
     </>

@@ -873,6 +873,30 @@ export const FLOWS = [
         await h.tap((p) => p.getByRole("button", { name: /^creature$/i }).first(), "show creature", { optional: true });
         await esc(h);
       }
+      // Daily events (owner, Nov 14: rename "Wind-down", add your own), under the display gear. The gear's tap
+      // above times out in the check (something lies over it in the fake run), so it's clicked from the page.
+      {
+        const gear = h.page.getByRole("button", { name: /^display settings$/i }).first();
+        const listed = () => h.page.getByRole("button", { name: /add a daily event/i }).count();
+        for (let i = 0; i < 2 && !(await listed()); i++) {
+          await gear.evaluate((el) => el.click()).catch(() => {});
+          await h.settle(400);
+        }
+      }
+      if (await h.page.getByRole("button", { name: /add a daily event/i }).count()) {
+        if (await h.tap((p) => p.getByRole("button", { name: /wind-down/i }).first(), "daily event: wind-down", { optional: true, expectMove: true })) {
+          await h.check("daily event editor");
+          await h.tap((p) => p.getByRole("button", { name: /wind-down/i }).first(), "daily event folded", { optional: true });
+        }
+        if (await h.tap((p) => p.getByRole("button", { name: /^\+ add a daily event$/i }).first(), "add a daily event", { optional: true, expectMove: true })) {
+          await h.page.keyboard.type("Evening walk");
+          await h.page.keyboard.press("Enter");
+          await h.settle(500);
+          await h.check("daily event added");
+          if (!(await h.page.getByRole("button", { name: /evening walk/i }).count())) h.record({ kind: "not-added", severity: "error", target: "daily events", detail: "A new daily event didn't show in the list" });
+        }
+        await esc(h);
+      }
       // Another session of a quest (owner, Nov 5: one quest in several calendar spots): right-click its card.
       {
         const card = h.page.locator("[title^='Edit \"Goblin']").first();
@@ -944,6 +968,7 @@ export const FLOWS = [
           await h.settle(400);
           if (!(await h.page.locator("[role=menu][aria-label=Lunch]").count())) h.record({ kind: "no-menu", severity: "error", target: "essential's menu", detail: "Right-click on a meal hold opened no menu" });
           await h.check("essential's menu");
+          if (await h.tap((p) => p.getByRole("menuitem", { name: /rename or change every day/i }).first(), "essential: every day", { optional: true, expectMove: true })) await h.check("essential's every-day editor");
           await h.page.keyboard.press("Escape");
           await h.settle(300);
         }

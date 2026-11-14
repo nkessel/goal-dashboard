@@ -10,6 +10,7 @@ import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
 import { fromFeedback } from "@/lib/from-feedback";
 import { CalendarList } from "./CalendarList";
+import { DailyEventsList } from "./DailyEvents";
 import { InterestCalendars } from "./InterestCalendars";
 import { KeepInTouch } from "./KeepInTouch";
 import type { InterestCalendar } from "@/lib/interest-calendars";
@@ -292,7 +293,7 @@ export function CalendarLayers({
           </div>
         )}
         {open === "calendars" && (
-          <div className="reveal absolute right-0 top-11 z-[35] w-[270px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
+          <div className="reveal absolute right-0 top-11 z-[35] max-h-[min(78vh,640px)] w-[270px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-2xl p-2.5" style={popup}>
             <p className="m-0 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
               Calendars{hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ""}
             </p>
@@ -320,7 +321,7 @@ export function CalendarLayers({
           </div>
         )}
         {open === "display" && (
-          <div className="reveal absolute right-0 top-11 z-[35] w-[270px] max-w-[calc(100vw-24px)] rounded-2xl p-2.5" style={popup}>
+          <div className="reveal absolute right-0 top-11 z-[35] max-h-[min(78vh,640px)] w-[270px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-2xl p-2.5" style={popup}>
             <p className="m-0 px-2 pb-1 text-[11.5px] font-bold uppercase tracking-[.14em]" style={{ color: "var(--t-ink-soft)" }}>
               Display
             </p>
@@ -330,7 +331,7 @@ export function CalendarLayers({
             {row("Finished quests", layers.done, () => set({ done: !layers.done }))}
             {row("All-day events", layers.allDay, () => set({ allDay: !layers.allDay }))}
             <LookPicker
-              label="Meals, wind-down & tidy"
+              label="Daily events (meals, wind-down…)"
               value={layers.essentials}
               options={[
                 ["dashed", "Dashed"],
@@ -341,6 +342,7 @@ export function CalendarLayers({
               ]}
               onPick={(v) => set({ essentials: v as EssentialsLook })}
             />
+            <DailyEventsList base={daily?.settings} />
             <LookPicker
               label="Habits with a time (Gym…)"
               value={layers.habits}

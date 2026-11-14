@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { applyAutoScheduleAction, listenBoardAction, resolveOptionalEventAction, saveSchedulerSettingsAction, schedulerContextAction } from "@/app/actions";
-import { MEAL_DEFAULTS, MEAL_ICONS, MEAL_NAMES, SCHEDULER_DEFAULTS, clockOf, freeStretch, holdAt, localDayKey, mealsOn, planSchedule, type Avoid, type Busy, type MealKey, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
+import { MEAL_DEFAULTS, MEAL_NAMES, SCHEDULER_DEFAULTS, clockOf, freeStretch, holdAt, localDayKey, mealsOn, planSchedule, type Avoid, type Busy, type MealKey, type SchedulerSettings, type TimeOfDay } from "@/lib/auto-schedule";
 import { useEscape } from "@/lib/use-escape";
 import { habitBlocksOn, habitOnDay } from "@/lib/timed-habits";
 import type { Repeat } from "@/lib/habit-repeat";
@@ -196,7 +196,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = fal
   const shown = current && moved?.id === current.id ? { ...current, start: new Date(moved.start), end: new Date(moved.start + moved.minutes * 60_000), late: false } : current;
   const meals = Object.fromEntries((Object.keys(MEAL_DEFAULTS) as MealKey[]).map((k) => [k, { ...MEAL_DEFAULTS[k], ...((settings?.meals as Partial<Record<MealKey, object>> | undefined)?.[k] ?? {}) }])) as typeof MEAL_DEFAULTS;
   function setMeal(key: MealKey, patch: Partial<(typeof meals)[MealKey]>) {
-    change({ meals: { ...meals, [key]: { ...meals[key], ...patch } } });
+    change({ meals: { ...(settings?.meals ?? {}), ...meals, [key]: { ...meals[key], ...patch } } });
   }
   const todayKey = localDayKey(now);
   const breakfastToday = (settings?.breakfastDays ?? []).includes(todayKey);
@@ -210,7 +210,7 @@ export function AutoScheduler({ tasks, theme, onClose: closeNow, day, over = fal
     const placedBusy = [...fixed, ...(plan?.placed ?? [])].map((p) => ({ start: p.start.getTime(), end: p.end.getTime() }));
     return mealsOn(day, settings).map((m) => {
       const at = holdAt(m.from, m.to, m.minutes, [...blocking, ...placedBusy], m.ideal);
-      return { key: m.key, from: m.from, to: m.to, at, minutes: m.minutes };
+      return { key: m.key, name: m.name, icon: m.icon, from: m.from, to: m.to, at, minutes: m.minutes };
     });
   };
   function toggleFyi(id: string) {
@@ -646,8 +646,8 @@ function DayStrip({ day, rows, busy, holds, extras = [], from, to, picked, onPic
           </span>
         ))}
         {holds.filter((h) => h.at !== null).map((h) => (
-          <span key={h.key} aria-hidden title={MEAL_NAMES[h.key]} className="absolute inset-y-1.5 flex items-center justify-center rounded text-[10px]" style={{ ...pos(h.at!, h.at! + h.minutes * 60_000), border: "1px dashed rgba(139,112,64,.55)" }}>
-            {MEAL_ICONS[h.key]}
+          <span key={h.key} aria-hidden title={h.name} className="absolute inset-y-1.5 flex items-center justify-center rounded text-[10px]" style={{ ...pos(h.at!, h.at! + h.minutes * 60_000), border: "1px dashed rgba(139,112,64,.55)" }}>
+            {h.icon}
           </span>
         ))}
         {rows.map((p, i) => (
@@ -675,7 +675,7 @@ function DayStrip({ day, rows, busy, holds, extras = [], from, to, picked, onPic
   );
 }
 
-type Hold = { key: MealKey; from: number; to: number; at: number | null; minutes: number };
+type Hold = { key: string; name: string; icon: string; from: number; to: number; at: number | null; minutes: number };
 type HabitHold = { id: string; title: string; start: number; end: number };
 type OptionalEvent = { id: string; calendarId: string; title: string; start: number; end: number };
 type Extra = { id: string; title: string; start: number; end: number; kind: "habit" | "optional" };
@@ -860,7 +860,7 @@ function OneByOne({
           />
           {holds.length > 0 && (
             <span className="text-[12.5px] italic" style={{ color: soft }}>
-              {holds.map((h) => `${MEAL_ICONS[h.key]} ${MEAL_NAMES[h.key]}${h.at !== null ? ` ${hm(new Date(h.at))}` : ": crowded out"}`).join(" · ")}
+              {holds.map((h) => `${h.icon} ${h.name}${h.at !== null ? ` ${hm(new Date(h.at))}` : ": crowded out"}`).join(" · ")}
             </span>
           )}
           <Fold open={adjust}>
@@ -1012,8 +1012,8 @@ function ReviewStrip({ day, current, accepted, busy, holds, extras, from, to, is
           </span>
         ))}
         {holds.filter((h) => h.at !== null).map((h) => (
-          <span key={h.key} aria-hidden title={MEAL_NAMES[h.key]} className="absolute inset-y-2 flex items-center justify-center rounded text-[10px]" style={{ ...pos(h.at!, h.at! + h.minutes * 60_000), border: "1px dashed rgba(139,112,64,.55)" }}>
-            {MEAL_ICONS[h.key]}
+          <span key={h.key} aria-hidden title={h.name} className="absolute inset-y-2 flex items-center justify-center rounded text-[10px]" style={{ ...pos(h.at!, h.at! + h.minutes * 60_000), border: "1px dashed rgba(139,112,64,.55)" }}>
+            {h.icon}
           </span>
         ))}
         {accepted.map((p) => (

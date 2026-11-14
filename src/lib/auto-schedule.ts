@@ -25,7 +25,7 @@ export type SchedulerSettings = {
   /** Calendars whose events don't block time ("just so you know"). Unset = the ones you can't edit. */
   fyi?: string[];
   /** Meal time kept free: an hour that floats inside each range (never booked, just never crowded out). */
-  meals?: Meals;
+  meals?: Record<string, Partial<Meal>>;
   /** Days ("YYYY-MM-DD") that also keep breakfast free, when breakfast is off by default. */
   breakfastDays?: string[];
   /** One day's changes to its non-negotiables (meals by key, timed habits as "h:<id>"): kept at a time, or left out that day. */
@@ -38,7 +38,7 @@ export type DayHold = { at?: number; minutes?: number; off?: boolean };
 /** Daily essentials kept free: meals, the wind-down, the after-dinner tidy. */
 export type MealKey = "breakfast" | "lunch" | "dinner" | "winddown" | "tidy";
 /** `ideal` (minutes after midnight): where it would best go; the hold leans toward it. */
-export type Meal = { on: boolean; from: number; to: number; minutes: number; ideal?: number };
+export type Meal = { on: boolean; from: number; to: number; minutes: number; ideal?: number; /** Your own name and emoji (owner, Nov 14: "Wind-down" → "End of day routine"). */ name?: string; icon?: string; /** One you added yourself and then removed. */ gone?: boolean };
 export type Meals = Record<MealKey, Meal>;
 export const MEAL_DEFAULTS: Meals = {
   breakfast: { on: true, from: 7 * 60, to: 10 * 60, minutes: 30, ideal: 8 * 60 },
@@ -49,26 +49,44 @@ export const MEAL_DEFAULTS: Meals = {
 };
 export const MEAL_NAMES: Record<MealKey, string> = { breakfast: "Breakfast", lunch: "Lunch", winddown: "Wind-down", dinner: "Dinner", tidy: "Clean up & breakfast prep" };
 export const MEAL_ICONS: Record<MealKey, string> = { breakfast: "🍳", lunch: "🍽", winddown: "🕯", dinner: "🍲", tidy: "🧽" };
+
+/** A daily event as it stands: the built-in ones (with your name, icon and times) and the ones you added ("e:<id>"). */
+export type DailyEvent = Meal & { key: string; name: string; icon: string; own: boolean };
+/** Every daily event, the built-in ones first (switched off ones too; removed ones of your own left out). */
+export function dailyEvents(s: Partial<SchedulerSettings> | null | undefined): DailyEvent[] {
+  const saved = (s?.meals ?? {}) as Record<string, Partial<Meal> | undefined>;
+  const built = (Object.keys(MEAL_DEFAULTS) as MealKey[]).map((key) => {
+    const m = { ...MEAL_DEFAULTS[key], ...(saved[key] ?? {}) };
+    return { ...m, key, name: m.name?.trim() || MEAL_NAMES[key], icon: m.icon?.trim() || MEAL_ICONS[key], own: false };
+  });
+  const own = Object.entries(saved)
+    .filter(([key, m]) => key.startsWith("e:") && m && !m.gone)
+    .map(([key, m]) => {
+      const x = { on: true, from: 9 * 60, to: 10 * 60, minutes: 30, ...m } as Meal;
+      return { ...x, key, name: x.name?.trim() || "Daily event", icon: x.icon?.trim() || "✦", own: true };
+    })
+    .sort((a, b) => a.from - b.from);
+  return [...built, ...own];
+}
 const pad2 = (n: number) => String(n).padStart(2, "0");
 export const localDayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
 /** The meals kept free on a day: each one's range on that day, in ms. */
-export function mealsOn(day: Date, s: SchedulerSettings): { key: MealKey; from: number; to: number; minutes: number; ideal: number | null; kept?: boolean }[] {
-  const saved = (s.meals ?? {}) as Partial<Meals>;
+export function mealsOn(day: Date, s: SchedulerSettings): { key: string; name: string; icon: string; from: number; to: number; minutes: number; ideal: number | null; kept?: boolean }[] {
   const k = localDayKey(day);
   const today = s.essentialDays?.[k] ?? {};
-  return (Object.keys(MEAL_DEFAULTS) as MealKey[])
-    .map((key) => [key, { ...MEAL_DEFAULTS[key], ...(saved[key] ?? {}) }] as const)
-    .filter(([key, m]) => (m.on || (key === "breakfast" && (s.breakfastDays ?? []).includes(k))) && !today[key]?.off)
-    .map(([key, m]) => {
+  return dailyEvents(s)
+    .filter((m) => (m.on || (m.key === "breakfast" && (s.breakfastDays ?? []).includes(k))) && !today[m.key]?.off)
+    .map((m) => {
+      const { key, name, icon } = m;
       const o = today[key];
       const minutes = Math.max(15, o?.minutes ?? m.minutes);
       // Kept by hand at a time that day: it holds exactly there.
       if (o?.at != null) {
         const from = at(day, o.at).getTime();
-        return { key, from, to: from + minutes * 60_000, minutes, ideal: from, kept: true };
+        return { key, name, icon, from, to: from + minutes * 60_000, minutes, ideal: from, kept: true };
       }
-      return { key, from: at(day, m.from).getTime(), to: at(day, m.to).getTime(), minutes, ideal: m.ideal != null ? at(day, m.ideal).getTime() : null };
+      return { key, name, icon, from: at(day, m.from).getTime(), to: at(day, m.to).getTime(), minutes, ideal: m.ideal != null ? at(day, m.ideal).getTime() : null };
     });
 }
 

@@ -66,5 +66,9 @@
   {
     "match": "popup-behind\\|.*\"Due date\".*underneath <svg>",
     "reason": "The <svg> is the feedback button's icon: by the owner's ask (Nov 12) the button sits above every popup, the date picker included; it can be dragged aside and remembers where."
+  },
+  {
+    "match": "^calendar\\|moved-on-tap\\|daily event folded",
+    "reason": "Nov 14: folding a daily event's options at the very end of the calendar gear's scrolling panel: the panel's content gets shorter, so the browser pulls it down to its new end (it glides with the fold). The row itself doesn't change; nothing to fix there."
   }
 ]
