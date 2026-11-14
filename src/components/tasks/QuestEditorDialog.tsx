@@ -1,5 +1,6 @@
 "use client";
 
+import { XpGuide } from "@/components/tour/XpGuide";
 import { IconScale } from "./IconScale";
 import { sessionRef } from "@/lib/calendar-task-window";
 import { InlineNumber } from "@/components/ui/InlineNumber";
@@ -1865,6 +1866,7 @@ export function QuestEditorDialog({
       <>
               {/* XP and coins */}
               <div className="flex flex-col gap-1">
+                {!doingNow && <XpGuide onPick={(x, c) => (setXp(x), setCoinValue(c))} />}
                 <div className="flex items-center gap-2">
                   <span className="flex flex-col items-start gap-0.5">
                     <span className={labelCls}>{isAdventure ? "XP reward" : "Points"}</span>
@@ -2667,6 +2669,7 @@ export function QuestEditorDialog({
                         aria-expanded={factOpen === f}
                         className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold"
                         data-open={factOpen === f ? "true" : undefined}
+                        data-tour={`fact-${f}`}
                       >
                         {factIcon(f)}
                         <span className="max-w-[150px] truncate">{factLabel(f)}</span>

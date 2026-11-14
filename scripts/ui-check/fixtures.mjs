@@ -135,6 +135,8 @@ export function makeFixtures() {
         is_admin: true,
         last_check_in_at: inHours(-26),
         life_wheel: {
+          // The walkthrough is finished for the test account (its own flow, "tour", starts it again).
+          tour: { step: "end", done: true, at: 1 },
           cleaning: {
             spaces: [
               { id: "kitchen", name: "Kitchen", mess: 7 },

@@ -4986,3 +4986,67 @@ export async function tickDawnAction(day: string, what: { stone: string } | { ex
   revalidatePath("/");
   return { day: dawn.days[day], xp: pay };
 }
+
+// ---------------------------------------------------------------------------
+// The new-adventurer walkthrough (owner, Nov 13): where each account is in it, kept on the account.
+
+export type TourState = { step: string; done?: boolean; hidden?: string[]; practiceId?: string | null; realId?: string | null; since?: string | null; at?: number };
+
+export async function tourAction(): Promise<TourState | null> {
+  const ownerId = await requireProfileId();
+  const t = (await readExtras(ownerId)).tour as TourState | undefined;
+  return t && typeof t === "object" ? t : null;
+}
+
+export async function saveTourAction(state: TourState) {
+  const ownerId = await requireProfileId();
+  const clean: TourState = {
+    step: String(state.step || "intro").slice(0, 40),
+    done: !!state.done,
+    hidden: (state.hidden ?? []).map((x) => String(x).slice(0, 40)).slice(0, 20),
+    practiceId: state.practiceId && /^[0-9a-f-]{36}$/i.test(state.practiceId) ? state.practiceId : null,
+    realId: state.realId && /^[0-9a-f-]{36}$/i.test(state.realId) ? state.realId : null,
+    since: state.since ? new Date(state.since).toISOString() : null,
+    at: Date.now(),
+  };
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, tour: clean } }).eq("id", ownerId);
+  if (error) throw new Error(error.message);
+  return clean;
+}
+
+/** The walkthrough's first quest: "Make your first quest", on Today, worth a small first win. */
+export async function tourPracticeQuestAction(): Promise<{ id: string }> {
+  const ownerId = await requireProfileId();
+  const t = await tasksData.createTask(ownerId, {
+    title: "Make your first quest ✦",
+    description: "Tap + and choose Quest, give it a name, and save it. This one completes itself when you do.",
+    xpValue: 15,
+    coinValue: 1,
+    estimateMinutes: 2,
+    isManualPriority: true,
+  });
+  revalidatePath("/");
+  return { id: t.id };
+}
+
+/** The newest quest made since the walkthrough asked for one (not its own practice quest). */
+export async function tourNewQuestAction(since: string, not: string[] = []): Promise<{ id: string; title: string } | null> {
+  const ownerId = await requireProfileId();
+  let q = supabaseAdmin().from("tasks").select("id, title").eq("owner_id", ownerId).gte("created_at", new Date(since).toISOString()).order("created_at", { ascending: false }).limit(5);
+  const ids = not.filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  if (ids.length) q = q.not("id", "in", `(${ids.join(",")})`);
+  const { data } = await q;
+  return data?.[0] ? { id: data[0].id as string, title: data[0].title as string } : null;
+}
+
+/** Completes the practice quest, paying its XP like any quest. */
+export async function tourCompletePracticeAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  if (!/^[0-9a-f-]{36}$/i.test(taskId)) throw new Error("Unknown quest.");
+  const t = await tasksData.getTask(taskId, ownerId);
+  if (!t || t.status === "completed") return null;
+  const res = await finishTask(ownerId, taskId);
+  revalidatePath("/");
+  return { title: t.title, xp: t.xp_value, totalXp: (res as { totalXp?: number | null } | null)?.totalXp ?? null, coins: t.coin_value ?? 1 };
+}

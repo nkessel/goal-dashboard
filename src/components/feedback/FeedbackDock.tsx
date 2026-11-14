@@ -291,7 +291,8 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   // While the welcome screen is up the button waits in the sky at the top right, off the card's controls
   // (its own spot comes back on the other screens; owner's recordings, Nov 2).
   const welcomeUp = useSyncExternalStore(subscribeWelcome, welcomeOpenNow, () => false);
-  // Over a popup or editor on a phone it keeps to the right edge, mid-screen (always there, never on their buttons).
+  // Over a popup or editor on a phone it keeps to the right edge, below the middle (always there; clear of the
+  // Today calendar's edge tab at 38–55% and of editors' footers).
   const popupUp = useSyncExternalStore(subscribePopup, popupOpenNow, () => false);
   const isAdventure = theme === "adventure";
   const vp = useView();
@@ -541,7 +542,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
   const defaultPos: Pos = { x: vp.w - BTN - 12, y: vp.h - BTN - 92 };
   const placeBtn = (p: Pos): Pos => ({ x: clamp(p.x, 6, vp.w - BTN - 6), y: clamp(p.y, 6, vp.h - BTN - 6) });
   const overPopup = popupUp && !welcomeUp && vp.w < 640 && !openId;
-  const btnPos = welcomeUp && !dragPos ? placeBtn(welcomePos ?? { x: vp.w - BTN - 10, y: 10 }) : overPopup && !dragPos ? placeBtn(popupPos ?? { x: vp.w - BTN - 4, y: Math.round(vp.h * 0.42) }) : placeBtn(dragPos ?? pos ?? defaultPos);
+  const btnPos = welcomeUp && !dragPos ? placeBtn(welcomePos ?? { x: vp.w - BTN - 10, y: 10 }) : overPopup && !dragPos ? placeBtn(popupPos ?? { x: vp.w - BTN - 4, y: Math.round(vp.h * 0.62) }) : placeBtn(dragPos ?? pos ?? defaultPos);
 
   function onBtnDown(e: React.PointerEvent<HTMLButtonElement>) {
     const start = btnPos;
@@ -1004,35 +1005,35 @@ function readContext(): string {
  */
 async function captureScreen(): Promise<File | null> {
   try {
-    const w = window as unknown as { __domToJpeg?: (el: Element, o: object) => Promise<string> };
-    if (!w.__domToJpeg) {
-      await new Promise<void>((resolve, reject) => {
-        const s = document.createElement("script");
-        s.type = "module";
-        s.textContent = 'import { domToJpeg } from "https://cdn.jsdelivr.net/npm/modern-screenshot@4/+esm"; window.__domToJpeg = domToJpeg; window.dispatchEvent(new Event("shot-ready"));';
-        const t = setTimeout(() => reject(new Error("timeout")), 8000);
-        window.addEventListener("shot-ready", () => (clearTimeout(t), resolve()), { once: true });
-        document.head.appendChild(s);
-      });
-    }
-    const dataUrl = await w.__domToJpeg!(document.body, {
+    // Bundled with the app (it was fetched from a CDN at the moment of the tap, which failed for the owner, Nov 13).
+    const { domToJpeg } = await import("modern-screenshot");
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const sy = window.scrollY;
+    const dataUrl = await domToJpeg(document.body, {
       quality: 0.8,
-      scale: Math.min(1, 1400 / window.innerWidth),
-      width: window.innerWidth,
-      height: window.innerHeight,
-      style: { transform: `translateY(-${window.scrollY}px)` },
+      scale: Math.min(window.devicePixelRatio || 1, 1600 / vw, 1.5),
+      width: vw,
+      height: vh,
+      backgroundColor: getComputedStyle(document.body).backgroundColor || "#1a2418",
+      style: { transform: `translateY(-${sy}px)` },
+      // A picture that can't be fetched (another site's, a failed portrait) is left blank instead of failing the shot.
+      fetch: { bypassingCache: false, placeholderImage: "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" },
+      timeout: 6000,
       // Only what's on screen is drawn: skipping everything scrolled out of view makes the picture several times quicker.
       filter: (n: Node) => {
         if (!(n instanceof Element)) return true;
         if (n.closest("[data-feedback-root]")) return false;
         const r = n.getBoundingClientRect();
         if (r.width === 0 && r.height === 0) return true;
-        return !(r.bottom < -40 || r.top > window.innerHeight + 40 || r.right < -40 || r.left > window.innerWidth + 40) || getComputedStyle(n).position === "fixed";
+        return !(r.bottom < -40 || r.top > vh + 40 || r.right < -40 || r.left > vw + 40) || getComputedStyle(n).position === "fixed";
       },
     });
     const blob = await (await fetch(dataUrl)).blob();
+    if (!blob.size) return null;
     return new File([blob], "screen.jpg", { type: "image/jpeg" });
-  } catch {
+  } catch (e) {
+    console.warn("[feedback] screen picture failed", e);
     return null;
   }
 }

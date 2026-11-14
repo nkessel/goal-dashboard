@@ -11,3 +11,4 @@ export const ToucanGuide = dynamic(() => import("@/components/toucan/ToucanGuide
 export const FeedbackDock = dynamic(() => import("@/components/feedback/FeedbackDock").then((m) => m.FeedbackDock), { ssr: false });
 export const LanguageWindow = dynamic(() => import("@/components/xp/LearnLanguage").then((m) => m.LanguageWindow), { ssr: false });
 export const PackingWindow = dynamic(() => import("@/components/settings/PackingLists").then((m) => m.PackingWindow), { ssr: false });
+export const Walkthrough = dynamic(() => import("@/components/tour/Walkthrough").then((m) => m.Walkthrough), { ssr: false });

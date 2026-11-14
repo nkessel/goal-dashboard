@@ -8,8 +8,8 @@
     "reason": "Seamless days (Nov 3): the time column stays put while the days scroll sideways under it, so a day header scrolled to the far left slides under the time column's top cell. By design; the day is reachable by scrolling."
   },
   {
-    "match": "(covered-by-bar|floating-overlap)\\|<div .reveal> \"Auto-scheduler",
-    "reason": "The auto-scheduler is a floating window over the calendar by design (owner, Nov 3): it moves by its title, resizes and minimizes to a chip, so what it covers can always be uncovered."
+    "match": "\\|(covered-by-bar|floating-overlap)\\|<button> \"Feedback \\(F\\)\".*sits on <button[^>]*> \"(Quest actions|More for )",
+    "reason": "Owner, Nov 12: the feedback button must be visible on every screen, above every popup and editor. With an editor open on a phone it waits at the right edge (its own draggable spot), which can be over a quest card's ⋯ that the editor already covers."
   },
   {
     "match": "^calendar\\|covered-by-bar\\|<button .owl-perch",
@@ -56,7 +56,7 @@
     "reason": "Nov 12: in Today's calendar the compressed day heading pins at the top while the hours scroll under it, as on the calendar screen."
   },
   {
-    "match": "(covered-by-bar|floating-overlap)\\|<button>\\|.*\"Feedback \\(F\\)\": sits on",
-    "reason": "Owner, Nov 12: the feedback button must be visible on every screen, above every popup and editor. A floating button always sits on something; over a popup on a phone it waits at the right edge mid-screen (off the footers' Save) and can be dragged anywhere, which it remembers."
+    "match": "\\|(covered-by-bar|floating-overlap)\\|<button> \"Feedback \\(F\\)\".*sits on <button[^>]*> \"(Quest actions|More for )",
+    "reason": "Owner, Nov 12: the feedback button must be visible on every screen, above every popup and editor. With an editor open on a phone it waits at the right edge (its own draggable spot), which can be over a quest card's ⋯ that the editor already covers."
   }
 ]

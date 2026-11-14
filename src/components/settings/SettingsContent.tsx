@@ -1,3 +1,4 @@
+import { RestartTour } from "@/components/tour/RestartTour";
 import { FoldGroup as FxGroup } from "./FoldGroup";
 import { ScaleColorSettings } from "@/components/ui/LevelScales";
 import Link from "next/link";
@@ -503,8 +504,9 @@ export async function SettingsContent({ userId, open }: { userId: string; open?:
               </svg>
             }
           >
+            <RestartTour />
             <p className="text-xs" style={{ color: "var(--t-ink-soft)" }}>
-              Something not working, or an idea for the app? Reach out at{" "}
+              Something not working, or an idea for the app? Tap the feedback button on any screen, or reach out at{" "}
               <a href="mailto:support@example.com" className="underline" style={{ color: iconColor }}>
                 support@example.com
               </a>

@@ -439,6 +439,58 @@ export const FLOWS = [
     },
   },
   {
+    // The new-adventurer walkthrough (owner, Nov 13): the intro, the practice quest made from +, the choice,
+    // then a real quest's name, ETA, XP guide and Save, then the screens tour.
+    name: "tour",
+    async run(h) {
+      await h.goto("/", { name: "tour" });
+      await h.page.evaluate(() => {
+        localStorage.setItem("tour-state", JSON.stringify({ step: "intro", done: false, at: Date.now() + 1e9 }));
+        window.dispatchEvent(new Event("tour-change"));
+      });
+      await h.settle(900);
+      if (!(await h.page.locator("[data-tour-card]").count())) throw new Error("Walkthrough card didn't show");
+      await h.check("tour: intro");
+      await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: /^begin$/i }), "tour: begin", { expectMove: true });
+      await h.settle(1500);
+      await h.check("tour: practice quest, pointing at +");
+      await h.tap(/^create something new$/i, "tour: + ", { expectMove: true });
+      await h.settle(500);
+      await h.tap((p) => p.getByRole("button", { name: /^new quest/i }).first(), "tour: + › New quest", { optional: true, expectMove: true });
+      await h.settle(900);
+      await h.check("tour: name it");
+      await h.typeIn((p) => p.locator('[role="dialog"][data-save-keys] [aria-label="Title"]').first(), "tour title", "Drink a glass of water");
+      await h.tap((p) => p.locator('[role="dialog"][data-save-keys] [data-submit]').first(), "tour: create quest", { optional: true, expectMove: true });
+      await h.settle(2500);
+      await h.page.keyboard.press("Escape").catch(() => {});
+      await h.page.getByRole("button", { name: /^continue$/i }).first().click({ timeout: 3000 }).catch(() => {});
+      await h.settle(1200);
+      await h.check("tour: choice");
+      if (await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: /make a real quest/i }), "tour: make a real quest", { optional: true, expectMove: true })) {
+        await h.settle(600);
+        await h.tap(/^create something new$/i, "tour: + again", { expectMove: true });
+        await h.settle(500);
+        await h.tap((p) => p.getByRole("button", { name: /^new quest/i }).first(), "tour: + › New quest again", { optional: true, expectMove: true });
+        await h.settle(900);
+        await h.check("tour: real name");
+        for (const [label, shot] of [["next", "tour: ETA"], ["next", "tour: XP"]]) {
+          await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: new RegExp(`^${label}$`, "i") }), `tour: ${label}`, { optional: true, expectMove: true });
+          await h.settle(500);
+          await h.check(shot);
+        }
+        // The XP guide in the editor's XP panel.
+        await h.tap((p) => p.locator('[role="dialog"][data-save-keys] [data-tour="fact-xp"]').first(), "tour: XP pill", { optional: true, expectMove: true });
+        await h.settle(500);
+        if (!(await h.page.locator("[data-xp-guide]").count())) throw new Error("XP guide missing from the XP panel");
+        await h.check("tour: XP guide");
+        await h.page.keyboard.press("Escape").catch(() => {});
+        await h.page.keyboard.press("Escape").catch(() => {});
+      }
+      // Leave the walkthrough finished for the flows after this one.
+      await h.page.evaluate(() => localStorage.setItem("tour-state", JSON.stringify({ step: "end", done: true, at: Date.now() + 2e9 })));
+    },
+  },
+  {
     name: "create",
     async run(h) {
       await h.goto("/", { name: "create" });
@@ -1059,6 +1111,10 @@ export const FLOWS = [
         await h.tap((p) => p.getByRole("button", { name: /add a picture of this screen/i }).first(), "screen picture", { optional: true });
         await h.page.keyboard.type("Typing right after the picture").catch(() => {});
         await h.settle(1500);
+        // The picture must really arrive (owner, Nov 13: "the screenshot tool doesn't work").
+        const shotOk = await h.page.locator("[data-feedback-root] img").first().waitFor({ timeout: 12000 }).then(() => true, () => false);
+        const shotErr = await h.page.getByText(/couldn't take a picture of this screen/i).count();
+        if (!shotOk || shotErr) throw new Error("Screen picture never appeared in the feedback box");
         await h.check("feedback: picture and writing");
         if (await h.tap((p) => p.getByRole("button", { name: /your recent notes/i }).first(), "recent notes", { optional: true, expectMove: true })) {
           await h.settle(800);
