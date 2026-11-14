@@ -434,6 +434,14 @@ export const FLOWS = [
         if (await h.tap((p) => p.getByRole("button", { name: /^certain days$/i }).first(), "certain days", { optional: true, expectMove: true })) {
           await h.check("habit editor: certain days");
         }
+        // XP & coins: the quest editor's −5 [bar] +5 row; When: the time of day; ⋯: Delete habit.
+        await h.tap((p) => p.locator("[data-mi=pills] button").nth(2), "xp pill", { optional: true, expectMove: true });
+        await h.check("habit editor: xp pill");
+        await h.tap((p) => p.locator("[data-mi=pills] button").nth(3), "when pill", { optional: true, expectMove: true });
+        await h.check("habit editor: when pill");
+        if (await h.tap((p) => p.getByRole("button", { name: /^more$/i }).first(), "habit menu", { optional: true, expectMove: true })) {
+          await h.check("habit editor: menu");
+        }
         await esc(h);
       }
     },

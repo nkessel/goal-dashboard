@@ -115,15 +115,7 @@ function Row({ sub, noun, coins, menuOpen, onMenu, onChange, onRemove }: { sub: 
           boxShadow: isDragging ? "0 8px 18px rgba(0,0,0,.2)" : "inset 0 1px 0 rgba(255,255,255,.5)",
         }}
       >
-        <button
-          type="button"
-          onClick={onMenu}
-          aria-label={`Options for ${sub.title}`}
-          aria-expanded={menuOpen}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-        >
-          <span aria-hidden className="h-[18px] w-[18px] rounded-full" style={{ border: "2px solid #a58c66", background: menuOpen ? "rgba(217,180,95,.45)" : "rgba(255,250,238,.6)" }} />
-        </button>
+        <span aria-hidden className="h-[18px] w-[18px] shrink-0 rounded-full" style={{ border: "2px solid #a58c66", background: "rgba(255,250,238,.6)" }} />
         <input
           value={sub.title}
           onChange={(e) => onChange({ title: e.target.value.slice(0, 120) })}
@@ -133,6 +125,17 @@ function Row({ sub, noun, coins, menuOpen, onMenu, onChange, onRemove }: { sub: 
           className="h-8 min-w-0 flex-1 cursor-text rounded-md border-0 bg-transparent px-1 text-[16px] sm:text-[15px]"
         />
         <Pays sub={sub} />
+        <button
+          type="button"
+          onClick={onMenu}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label={`Options for ${sub.title}`}
+          aria-expanded={menuOpen}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[16px] font-bold leading-none hover:bg-black/5"
+          style={{ color: "var(--t-ink-soft)", background: menuOpen ? "rgba(217,180,95,.35)" : undefined }}
+        >
+          ⋯
+        </button>
       </div>
       <Fold open={menuOpen}>
         <div className="mx-2 mb-1 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl px-2.5 py-2 text-[13.5px]" style={{ background: "rgba(255,250,238,.55)", border: "1px dashed rgba(139,112,64,.45)" }}>

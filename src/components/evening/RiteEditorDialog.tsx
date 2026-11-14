@@ -1,6 +1,6 @@
 "use client";
 
-import { TimeToken, clock12 } from "@/components/xp/NightFields";
+import { TimeToken } from "@/components/xp/NightFields";
 import { useState, useTransition } from "react";
 import { nextOccurrence, repeatLabel, type Repeat } from "@/lib/habit-repeat";
 import { createPortal } from "react-dom";
@@ -88,6 +88,7 @@ export function RiteEditorDialog({
   // "Certain days" shows the weekday picker; "Daily" is every day with nothing to pick.
   const [certainDays, setCertainDays] = useState(!rite?.repeat && (rite?.days?.length ?? 7) < 7);
   const [minutesOther, setMinutesOther] = useState(minutes !== null && !MINUTE_PRESETS.includes(minutes));
+  const [menuOpen, setMenuOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -159,11 +160,39 @@ export function RiteEditorDialog({
           <span className="flex items-center gap-1">
             {/* What this editor shows, and in what order: Settings › Layout. */}
             <SettingsGear to="menus" label="Layout settings" tone="plain" size={32} />
+            {rite && (
+              <button type="button" onClick={() => setMenuOpen((o) => !o)} aria-label="More" aria-expanded={menuOpen} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] font-bold leading-none hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+                ⋯
+              </button>
+            )}
             <button type="button" onClick={close} aria-label="Close" className="h-8 w-8 text-2xl leading-none" style={{ color: "var(--t-ink-soft)" }}>
               <CloseIcon size={14} />
             </button>
           </span>
         </div>
+
+        {rite && menuOpen && (
+          <div className="reveal qe-fact-panel relative z-[1] flex items-center gap-2 rounded-xl px-3 py-2 text-[14px]">
+            {!confirmingDelete ? (
+              <>
+                <span className="font-semibold">{isHabit ? "This habit" : "This rite"}</span>
+                <button type="button" onClick={() => setConfirmingDelete(true)} className="ml-auto h-8 rounded-full px-2.5 text-[13px] font-semibold hover:bg-black/5" style={{ color: "var(--t-warn)" }}>
+                  Delete {isHabit ? "habit" : "rite"}
+                </button>
+              </>
+            ) : (
+              <>
+                <span>Delete it for good?</span>
+                <button type="button" onClick={remove} disabled={isSaving} className="ml-auto rounded-full px-3 py-1.5 font-semibold" style={{ background: "var(--t-warn)", color: "#fff" }}>
+                  Yes, delete
+                </button>
+                <button type="button" onClick={() => setConfirmingDelete(false)} style={{ color: "var(--t-ink-soft)" }}>
+                  Keep
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="relative z-[1] flex items-start gap-3">
           {rite?.kind !== "wins" && (
@@ -180,9 +209,6 @@ export function RiteEditorDialog({
                 clearLabel={isHabit ? "Use the checkbox" : "Use the simple icon"}
                 onDraftChange={(url, source) => setIcon(url ? { url, source } : null)}
               />
-              <span className="text-[11px]" style={{ color: "var(--t-ink-soft)" }}>
-                Avatar
-              </span>
             </div>
           )}
           <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -212,11 +238,6 @@ export function RiteEditorDialog({
             <span className="text-[14.5px] font-semibold">{isHabit ? "Sub-habits" : "Subtasks"}</span>
             {extraSubs}
             <SubHabitList list={subs} onChange={setSubs} autoFocus={focusSub} noun={isHabit ? "sub-habit" : "subtask"} />
-            {subs.length > 0 && (
-              <p className="m-0 pl-2 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-                Drag to reorder · right-click or tap a dot for XP and coins
-              </p>
-            )}
           </div>
         )}
 
@@ -224,10 +245,12 @@ export function RiteEditorDialog({
           <div data-mi="pills" className="relative z-[1] flex flex-wrap items-center gap-1.5" role="group" aria-label="Habit details">
             {(
               [
-                ["repeats", "↻", repeat ? repeatLabel(repeat) : days.length === 7 ? "Daily" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "No days"],
-                ["takes", "◷", minutes ? (minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes} min`) : "Time"],
-                ["reward", "✦", `${xp} XP${(coinValue ?? coinsForXp(xp)) ? ` · ${coinValue ?? coinsForXp(xp)} coins` : ""}`],
-                ["due", "⏰", dueTime ? (windowTo ? `${clock12(dueTime)}–${clock12(windowTo)}` : `by ${clock12(dueTime)}`) : "Due by"],
+                ["repeats", <span key="r" className="text-[14px] leading-none">↻</span>, repeat ? repeatLabel(repeat) : days.length === 7 ? "Daily" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "No days"],
+                // eslint-disable-next-line @next/next/no-img-element -- card glyph
+                ["takes", <img key="t" src="/design/ui-clock.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />, minutes ? (minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes} min`) : "Time"],
+                ["reward", <span key="x" className="text-[13px] leading-none" style={{ color: "var(--t-xp, #6a4b0e)" }}>✦</span>, `${xp} XP${(coinValue ?? coinsForXp(xp)) ? ` · ${coinValue ?? coinsForXp(xp)} 🪙` : ""}`],
+                // eslint-disable-next-line @next/next/no-img-element -- card glyph
+                ["due", <img key="d" src="/design/ui-calendar.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />, dueTime ? (windowTo ? spanWords(dueTime, windowTo) : `by ${shortClock(dueTime)}`) : "When"],
               ] as const
             ).map(([k, icon, label]) => (
               <button
@@ -235,10 +258,10 @@ export function RiteEditorDialog({
                 type="button"
                 onClick={() => setPill((p) => (p === k ? null : k))}
                 aria-expanded={pill === k}
-                className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold"
-                style={pill === k ? { background: "linear-gradient(180deg,#f6e3a8,#dcb763)", border: "1px solid #8a6116", color: "#2a1c10" } : { border: "1px solid #b39a6a", color: "var(--t-ink)", background: "rgba(255,250,235,.35)" }}
+                className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold"
+                data-open={pill === k ? "true" : undefined}
               >
-                <span aria-hidden className="text-[13px] opacity-75">{icon}</span>
+                <span aria-hidden className="flex items-center">{icon}</span>
                 <span className="max-w-[160px] truncate">{label}</span>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="opacity-60 transition-transform" style={{ transform: pill === k ? "rotate(180deg)" : undefined }}>
                   <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
@@ -406,47 +429,59 @@ export function RiteEditorDialog({
           </div>
         )}
 
-        {isHabit && (
-          <div data-mi="coins" className={`relative z-[1] flex-wrap items-center gap-2 ${pill === "reward" ? "reveal qe-fact-panel flex rounded-xl p-3" : "hidden"}`}>
-            <span className="flex items-center gap-1.5 text-[14.5px] font-semibold">
-              <CoinIcon size={17} /> Coins
-            </span>
-            <span className="flex h-8 items-center rounded-full border" style={{ borderColor: coinValue === null ? "#b39a6a" : "#5a4520" }}>
-              <button
-                type="button"
-                onClick={() => setCoinValue(Math.max(0, (coinValue ?? coinsForXp(xp)) - 1))}
-                aria-label="Fewer coins"
-                className="flex h-8 w-8 items-center justify-center text-[17px] leading-none"
-                style={{ color: "var(--t-ink-soft)" }}
-              >
-                −
+        {isHabit && pill === "reward" && (
+          <div data-mi="xp" className="reveal qe-fact-panel relative z-[1] flex flex-col gap-2 rounded-xl p-3">
+            {/* The quest editor's own XP row: −5 and +5 either side of the bar, the amount to its right. */}
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setXp(Math.max(0, xp - 5))} aria-label="5 XP less" title="−5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
+                −5
               </button>
-              <span className="min-w-6 text-center text-[15px] font-bold tabular-nums" style={{ color: coinValue === null ? "var(--t-ink-soft)" : "#8a6116" }} aria-live="polite">
-                {coinValue ?? coinsForXp(xp)}
+              <input type="range" min={0} max={100} step={5} value={Math.min(100, xp)} onChange={(e) => setXp(Number(e.target.value))} aria-label="XP reward" className="h-8 min-w-0 flex-1" style={{ accentColor: "var(--t-xp)" }} />
+              <button type="button" onClick={() => setXp(Math.min(500, xp + 5))} aria-label="5 XP more" title="+5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
+                +5
+              </button>
+              <span className="flex h-9 shrink-0 items-center gap-0.5">
+                <span className="xp-type flex h-full items-center pr-px">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={500}
+                    value={xp}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onChange={(e) => setXp(Math.max(0, Math.min(500, Math.round(Number(e.target.value) || 0))))}
+                    aria-label="XP amount"
+                    className="bare-input h-full w-11 bg-transparent px-1 text-right text-[18px] font-bold tabular-nums focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                    style={{ color: "var(--t-xp)" }}
+                  />
+                </span>
+                <span className="text-[12px] font-bold" style={{ color: "var(--t-xp)" }}>XP</span>
               </span>
-              <button
-                type="button"
-                onClick={() => setCoinValue(Math.min(1000, (coinValue ?? coinsForXp(xp)) + 1))}
-                aria-label="More coins"
-                className="flex h-8 w-8 items-center justify-center text-[17px] leading-none"
-                style={{ color: "var(--t-ink-soft)" }}
-              >
-                +
-              </button>
-            </span>
-            {coinValue === null ? (
-              <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
-                automatic (1 per 30 XP)
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-9 shrink-0 items-center gap-0.5 rounded-lg border px-1" style={{ borderColor: "#b39a6a" }} title="Coins earned each time">
+                <button type="button" onClick={() => setCoinValue(Math.max(0, (coinValue ?? coinsForXp(xp)) - 1))} aria-label="Fewer coins" className="flex h-7 w-6 items-center justify-center text-[17px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
+                  −
+                </button>
+                <CoinIcon size={16} />
+                <span className="min-w-5 text-center text-[15px] font-bold tabular-nums" aria-live="polite">{coinValue ?? coinsForXp(xp)}</span>
+                <button type="button" onClick={() => setCoinValue(Math.min(1000, (coinValue ?? coinsForXp(xp)) + 1))} aria-label="More coins" className="flex h-7 w-6 items-center justify-center text-[17px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
+                  +
+                </button>
               </span>
-            ) : (
-              <button type="button" onClick={() => setCoinValue(null)} className="text-[13px] underline" style={{ color: "var(--t-ink-soft)" }}>
-                reset
-              </button>
-            )}
+              <span className="ml-auto text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                {coinValue === null ? "coins follow XP (1 per 30)" : (
+                  <button type="button" onClick={() => setCoinValue(null)} className="underline">
+                    custom coins · reset to auto
+                  </button>
+                )}
+              </span>
+            </div>
           </div>
         )}
 
-        <div data-mi="xp" className={`relative z-[1] flex-wrap items-center gap-1.5 ${!isHabit ? "flex" : pill === "reward" ? "reveal qe-fact-panel flex rounded-xl p-3" : "hidden"}`}>
+        {!isHabit && (
+        <div data-mi="xp" className="relative z-[1] flex flex-wrap items-center gap-1.5">
           <span className="mr-0.5 text-[14.5px] font-semibold">XP</span>
           {XP_PRESETS.map((v) => (
             <button
@@ -477,6 +512,7 @@ export function RiteEditorDialog({
             style={{ borderColor: XP_PRESETS.includes(xp) ? "#b39a6a" : "#5a4520", background: XP_PRESETS.includes(xp) ? undefined : "radial-gradient(circle at 32% 28%, #f6dc8e, #d9b45f 55%, #a88a3f)" }}
           />
         </div>
+        )}
 
         {isHabit && (
           <div data-mi="due" className={`relative z-[1] flex-col gap-2 ${pill === "due" ? "reveal qe-fact-panel flex rounded-xl p-3" : "hidden"}`}>
@@ -538,27 +574,7 @@ export function RiteEditorDialog({
         )}
 
         <div className="sticky -bottom-5 z-[2] -mx-5 -mb-5 flex items-center justify-between gap-2 px-5 pb-5 pt-2" style={{ order: 99, background: "linear-gradient(180deg, rgba(240,226,192,0), rgba(240,226,192,.96) 30%)" }}>
-          {rite ? (
-            !confirmingDelete ? (
-              <button type="button" onClick={() => setConfirmingDelete(true)} className="flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[14px] font-semibold hover:bg-black/5" style={{ color: "var(--t-warn)" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5L17.5 7M9.5 7V4.5h5V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Delete
-              </button>
-            ) : (
-              <span className="flex items-center gap-2 text-sm">
-                <button type="button" onClick={remove} disabled={isSaving} className="rounded-full px-3 py-1.5 font-semibold" style={{ background: "var(--t-warn)", color: "#fff" }}>
-                  Yes, delete
-                </button>
-                <button type="button" onClick={() => setConfirmingDelete(false)} style={{ color: "var(--t-ink-soft)" }}>
-                  Keep
-                </button>
-              </span>
-            )
-          ) : (
-            <span />
-          )}
+          <span />
           <span className="flex gap-2">
 
             <button
@@ -626,4 +642,20 @@ function nextHour(t: string, hours: number) {
   if (!m) return "";
   const h = Math.min(23, Number(m[1]) + hours);
   return `${String(h).padStart(2, "0")}:${m[2]}`;
+}
+
+/** "7 AM", "7:30 PM". */
+function shortClock(t: string) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(t);
+  if (!m) return t;
+  const h = Number(m[1]);
+  const ap = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 || 12;
+  return m[2] === "00" ? `${h12} ${ap}` : `${h12}:${m[2]} ${ap}`;
+}
+/** "7–10 AM", or "11 AM–1 PM" across noon. */
+function spanWords(from: string, to: string) {
+  const a = shortClock(from);
+  const b = shortClock(to);
+  return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)}–${b}` : `${a}–${b}`;
 }
