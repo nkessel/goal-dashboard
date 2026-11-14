@@ -3409,8 +3409,27 @@ body[data-quest-drag] .today-cal-tab { box-shadow: 0 0 0 2px rgba(246, 220, 142,
 .tour-chip:hover { background: rgba(255, 240, 200, .16); }
 .tour-snooze { color: #f2d58a; border: 1px solid rgba(242, 213, 138, .45); background: rgba(255, 240, 200, .06); }
 .tour-snooze[aria-expanded="true"] { background: rgba(242, 213, 138, .2); }
-.tour-input { color: #2a1c10; background: #fffaf0; border: 1px solid #c9a24a; outline: none; }
-.tour-input:focus { box-shadow: 0 0 0 3px rgba(242, 213, 138, .45); }
+/* The name, written on the card: big serif gold ink on a gilded line that draws itself in and glows while you write. */
+.tour-call { color: #9fe3d6; letter-spacing: .02em; }
+.tour-name-line { position: relative; display: flex; align-items: center; gap: 10px; padding: 0 4px 6px; }
+.tour-name-line::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #c9a24a 12%, #f2d58a 50%, #c9a24a 88%, transparent);
+  transform-origin: center; animation: tour-line-in .7s cubic-bezier(.2, .8, .2, 1) .25s both;
+  transition: box-shadow .3s ease, filter .3s ease;
+}
+.tour-name-line:focus-within::after { box-shadow: 0 0 10px 1px rgba(242, 213, 138, .55); filter: brightness(1.15); }
+@keyframes tour-line-in { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+.tour-name-star { color: #c9a24a; font-size: 12px; opacity: .8; transition: color .3s ease, opacity .3s ease, text-shadow .3s ease; }
+.tour-name-line:focus-within .tour-name-star { color: #f2d58a; opacity: 1; text-shadow: 0 0 8px rgba(242, 213, 138, .8); }
+.tour-name {
+  background: transparent; border: 0; outline: none; padding: 2px 0; text-align: center;
+  font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: .01em;
+  color: #f6dd98; caret-color: #f2d58a; text-shadow: 0 1px 0 rgba(0, 0, 0, .35), 0 0 14px rgba(242, 213, 138, .25);
+}
+.tour-name::placeholder { color: rgba(242, 213, 138, .38); font-style: italic; font-weight: 500; text-shadow: none; }
+.tour-card .tour-name:focus-visible { outline: none; }
+@media (prefers-reduced-motion: reduce) { .tour-name-line::after { animation: none; } }
 .tour-card :focus-visible { outline: 2px solid #f2d58a; outline-offset: 2px; }
 html[data-tour-open] [data-perched-owl] { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .tour-card { animation: none; } }

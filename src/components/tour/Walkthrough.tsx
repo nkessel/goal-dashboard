@@ -449,25 +449,37 @@ export function Walkthrough() {
         )}
         {step === "intro" && (
           <form
-            className="mt-1 flex items-center gap-2"
+            className="mt-1 flex flex-col gap-2.5"
             onSubmit={(e) => {
               e.preventDefault();
               void begin();
             }}
           >
-            <input
-              id="tour-name"
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              maxLength={40}
-              autoComplete="given-name"
-              placeholder="Your name"
-              aria-label="What shall I call you?"
-              className="tour-input h-10 min-w-0 flex-1 rounded-xl px-3 text-[16px]"
-            />
-            <button type="submit" disabled={busy || !nameDraft.trim()} className="h-10 shrink-0 rounded-full px-4 text-[14px] font-bold disabled:opacity-50" style={GOLD_BTN}>
-              {busy ? "…" : "Let's begin"}
-            </button>
+            {/* The name is written right on his card, in gold ink on a gilded line: no box. */}
+            <label htmlFor="tour-name" className="tour-call text-[12px] italic">
+              You may call me…
+            </label>
+            <div className="tour-name-line">
+              <span aria-hidden className="tour-name-star">✦</span>
+              <input
+                id="tour-name"
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                maxLength={40}
+                autoComplete="given-name"
+                autoCapitalize="words"
+                spellCheck={false}
+                placeholder="your name"
+                aria-label="What shall I call you?"
+                className="tour-name font-display min-w-0 flex-1"
+              />
+              <span aria-hidden className="tour-name-star">✦</span>
+            </div>
+            <div className="flex justify-end">
+              <button type="submit" disabled={busy || !nameDraft.trim()} className="h-10 shrink-0 rounded-full px-5 text-[14px] font-bold transition-opacity disabled:opacity-45" style={GOLD_BTN}>
+                {busy ? "…" : "Let's begin ›"}
+              </button>
+            </div>
           </form>
         )}
         <div className="flex flex-wrap items-center justify-end gap-2 empty:hidden">
