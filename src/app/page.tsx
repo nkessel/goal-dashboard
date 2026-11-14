@@ -202,6 +202,11 @@ export default async function Home() {
   const tomorrow = tomorrowRows?.map((r) => openTasks.find((t) => t.id === r.id) ?? r) ?? null;
   const riteView = (r: NonNullable<typeof rites>[number]) => ({ id: r.id, title: r.title, description: r.description, is_core: r.is_core, xp_value: r.xp_value, slot: r.slot ?? "evening", days: r.days ?? null, due_time: r.due_time ?? null, window_to: r.window_to ?? null, kind: r.kind ?? null, icon_key: r.icon_source ? r.icon_key : null, icon_source: r.icon_source ?? null, coin_value: r.coin_value ?? null, estimate_minutes: r.estimate_minutes ?? null, steps: cleanRiteSteps(r.steps), repeat: cleanRepeat(r.repeat) });
   const habits = rites?.filter((r) => r.slot === "day").map(riteView) ?? null;
+  // The day's habits (owner, Nov 14): core ones plus the ones picked in Prioritize sit in Today's Quests.
+  const habitPlanRaw = (profile?.life_wheel as { habitPlan?: { core?: unknown; days?: Record<string, unknown> } } | null | undefined)?.habitPlan;
+  const idList = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+  const habitPlan = { core: idList(habitPlanRaw?.core), today: idList(habitPlanRaw?.days?.[dayKey]) };
+  const plannedHabits = [...new Set([...habitPlan.core, ...habitPlan.today])];
   // Your videos to listen to (a board named like "Online learning videos"): offered under walk and drive habits.
   const listenBoard = (projectBoards as { id: string; title: string }[]).find((b) => /learning videos|listen/i.test(b.title)) ?? null;
   const eveningRites = rites?.filter((r) => r.slot !== "day").map(riteView) ?? null;
@@ -303,7 +308,12 @@ export default async function Home() {
                   theme={theme}
                   between={
                     habits && rites?.some((r) => "slot" in r) ? (
-                      <DailyHabits listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} />
+                      <DailyHabits listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                    ) : null
+                  }
+                  habitsInToday={
+                    habits && plannedHabits.length > 0 ? (
+                      <DailyHabits bare listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
                     ) : null
                   }
                 />

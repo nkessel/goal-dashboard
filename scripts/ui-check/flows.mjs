@@ -327,7 +327,20 @@ export const FLOWS = [
           await h.check("prioritize: additional quests");
         }
         await h.tap((p) => p.getByRole("tab", { name: /^cards$/i }).first(), "back to cards", { optional: true, expectMove: true });
+        // Habits in the day's plan (owner, Nov 14): pick one for today, mark one core, let one rest.
+        if (await h.tap((p) => p.locator("[data-prioritize-kind=habits]").first(), "prioritize habits", { optional: true, expectMove: true })) {
+          await h.settle(1200);
+          await h.check("prioritize habits");
+          await h.tap((p) => p.locator("[data-prioritize-habit]").first().getByRole("button", { name: /^today$/i }), "habit: today", { optional: true });
+          await h.tap((p) => p.locator("[data-prioritize-habit]").nth(1).getByRole("button", { name: /core habit/i }), "habit: core", { optional: true });
+          await h.tap((p) => p.locator("[data-prioritize-habit]").nth(2).getByRole("button", { name: /^rest$/i }), "habit: rest", { optional: true });
+          await h.settle(800);
+          await h.check("prioritize habits chosen");
+        }
         await esc(h);
+        // The chosen habits sit inside Today's Quests.
+        await h.settle(1500);
+        if (await h.page.locator("[data-habits-in-today]").first().isVisible().catch(() => false)) await h.check("habits in Today's Quests");
       }
       // Auto-schedule from the compass: a popup with today's quests, right on Today (owner, Nov 12: not the calendar screen).
       await h.settle(500);

@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   coachSetDueAction,
+  habitPlanAction,
   prioritizeAction,
+  setCoreHabitAction,
+  setHabitForDayAction,
   rateForDayAction,
   setTaskPlanByAction,
   snoozeQuestAction,
@@ -12,6 +15,7 @@ import {
   undoSnoozeAction,
   undoSnoozeUntilAction,
   unrateForDayAction,
+  type PlanHabit,
   type PrioritizeItem,
 } from "@/app/actions";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -101,6 +105,28 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
   const [more, setMore] = useState(false);
   // What was on the day when it opened: a quest added from here stays under "additional" for this visit.
   const [first, setFirst] = useState<Set<string> | null>(null);
+
+  // Quests or habits (owner, Nov 14: "choose in the morning like I choose my quests").
+  const [kind, setKind] = useState<"quests" | "habits">("quests");
+  const [hab, setHab] = useState<{ habits: PlanHabit[]; picked: string[]; rested: string[] } | null>(null);
+  useEffect(() => {
+    let live = true;
+    habitPlanAction(day)
+      // Core first, fixed for the visit (marking one core doesn't make the list jump).
+      .then((h) => live && setHab({ ...h, habits: [...h.habits].sort((a, b) => Number(b.core) - Number(a.core)) }))
+      .catch(() => live && setHab({ habits: [], picked: [], rested: [] }));
+    return () => {
+      live = false;
+    };
+  }, [day]);
+  function chooseHabit(h: PlanHabit, choice: "today" | "rest" | null) {
+    setHab((v) => v && { ...v, picked: [...v.picked.filter((x) => x !== h.id), ...(choice === "today" ? [h.id] : [])], rested: [...v.rested.filter((x) => x !== h.id), ...(choice === "rest" ? [h.id] : [])] });
+    run(setHabitForDayAction(day, h.id, choice));
+  }
+  function markCore(h: PlanHabit, core: boolean) {
+    setHab((v) => v && { ...v, habits: v.habits.map((x) => (x.id === h.id ? { ...x, core } : x)) });
+    run(setCoreHabitAction(h.id, core));
+  }
 
   useEffect(() => {
     let live = true;
@@ -205,7 +231,7 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
         <div className="flex flex-col gap-3" role="dialog" aria-modal="true" aria-label={`Prioritize ${dayWord}`} data-prioritize>
           <div className="flex items-center gap-2">
             <h2 className="font-display m-0 flex-1 text-[20px] leading-tight">{day === "today" ? "Prioritize today" : "Prioritize tomorrow"}</h2>
-            <div role="tablist" aria-label="View" className="flex rounded-full p-0.5" style={{ border: "1px solid rgba(139,112,64,.4)" }}>
+            <div role="tablist" aria-label="View" className="flex rounded-full p-0.5" style={{ border: "1px solid rgba(139,112,64,.4)", visibility: kind === "habits" ? "hidden" : undefined }}>
               {(["cards", "list"] as const).map((v) => (
                 <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => pickView(v)} className="h-7 rounded-full px-3 text-[12.5px] font-semibold" style={view === v ? { background: "linear-gradient(180deg,#f2d58a,#d9b45f)", color: "#2a1c10" } : { color: "var(--t-ink-soft)" }}>
                   {v === "cards" ? "Cards" : "List"}
@@ -229,7 +255,17 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
             </p>
           )}
 
-          {data && (
+          <div role="tablist" aria-label="Quests or habits" className="flex gap-1.5">
+            {(["quests", "habits"] as const).map((k) => (
+              <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => setKind(k)} data-prioritize-kind={k} data-open={kind === k ? "true" : undefined} className="qe-fact h-8 rounded-full px-3.5 text-[13px] font-semibold">
+                {k === "quests" ? "Quests" : `Habits${hab && hab.habits.length ? ` · ${hab.habits.length}` : ""}`}
+              </button>
+            ))}
+          </div>
+
+          {kind === "habits" && <HabitChoices day={day} hab={hab} choose={chooseHabit} markCore={markCore} />}
+
+          {kind === "quests" && data && (
             <div className="flex items-center gap-2">
               <h3 className="font-display m-0 flex-1 text-[15px] uppercase tracking-[.08em]" style={{ color: "#6b5631" }}>
                 {more ? "Additional quests" : day === "today" ? "Today’s quests" : "Tomorrow’s quests"}
@@ -242,7 +278,7 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
             </div>
           )}
 
-          {data && view === "cards" && (
+          {kind === "quests" && data && view === "cards" && (
             <div className="flex min-h-[330px] flex-col">
               {deck.length > 0 ? (
                 <Deck key={deck[0].id} cards={deck.slice(0, 3)} rating={ratings[deck[0].id] ?? 0} left={deck.length} on={onDay.has(deck[0].id)} {...tools} />
@@ -254,6 +290,11 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
                   <p className="font-display m-0 text-[18px]">{more ? "Every quest has its place." : dayItems.length ? `${day === "today" ? "Today" : "Tomorrow"}’s quests are in order.` : `Nothing on ${dayWord}’s list yet.`}</p>
                   <div className="flex flex-wrap justify-center gap-2">
                     {!more && moreItems.length > 0 && <MoreButton n={moreItems.length} onClick={() => setMore(true)} />}
+                    {hab && hab.habits.length > 0 && (
+                      <button type="button" onClick={() => setKind("habits")} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-4 text-[13.5px] font-semibold">
+                        Choose {dayWord}’s habits ›
+                      </button>
+                    )}
                     <button type="button" onClick={requestClose} className="h-9 rounded-full px-4 text-[13.5px] font-bold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
                       Done
                     </button>
@@ -263,7 +304,7 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
             </div>
           )}
 
-          {data && view === "list" && (
+          {kind === "quests" && data && view === "list" && (
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
               {[...(more ? moreItems : dayItems)]
                 .sort((a, b) => (ratings[b.id] ?? 0) - (ratings[a.id] ?? 0))
@@ -279,7 +320,7 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
           )}
 
           {/* Additional quests stay out of the way until today's are done (owner, Nov 12). */}
-          {data && !more && moreItems.length > 0 && (view === "list" || deck.length > 0) && (
+          {kind === "quests" && data && !more && moreItems.length > 0 && (view === "list" || deck.length > 0) && (
             <div className="flex justify-center">
               <MoreButton n={moreItems.length} onClick={() => setMore(true)} />
             </div>
@@ -307,6 +348,76 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
         </div>
       )}
     </BottomSheet>
+  );
+}
+
+/**
+ * The day's habits (owner, Nov 14): core ones (★) always come; pick the others for the day or let them rest.
+ * Picked and core habits sit in Today's Quests that day; resting ones wait until the next day they're up.
+ */
+function HabitChoices({ day, hab, choose, markCore }: { day: Day; hab: { habits: PlanHabit[]; picked: string[]; rested: string[] } | null; choose: (h: PlanHabit, c: "today" | "rest" | null) => void; markCore: (h: PlanHabit, core: boolean) => void }) {
+  const dayWord = day === "today" ? "today" : "tomorrow";
+  if (!hab)
+    return (
+      <p className="m-0 py-10 text-center text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>
+        Gathering your habits…
+      </p>
+    );
+  if (!hab.habits.length)
+    return (
+      <p className="m-0 py-8 text-center text-[14px] italic" style={{ color: "var(--t-ink-soft)" }}>
+        No habits fall on {dayWord}.
+      </p>
+    );
+  const state = (h: PlanHabit) => (hab.rested.includes(h.id) ? "rest" : h.core || hab.picked.includes(h.id) ? "today" : null);
+  const list = hab.habits;
+  const chosen = list.filter((h) => state(h) === "today").length;
+  return (
+    <div className="flex flex-col gap-2" data-prioritize-habits>
+      <div className="flex items-baseline gap-2">
+        <h3 className="font-display m-0 flex-1 text-[15px] uppercase tracking-[.08em]" style={{ color: "#6b5631" }}>
+          {day === "today" ? "Today’s habits" : "Tomorrow’s habits"}
+        </h3>
+        {chosen > 0 && (
+          <span className="text-[12.5px] font-semibold" style={{ color: "#6b5631" }}>
+            {chosen} in {dayWord}’s quests
+          </span>
+        )}
+      </div>
+      <p className="m-0 text-[12.5px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+        <b style={{ color: "#b8860b" }}>★ Core</b> habits always come. Pick the others for {dayWord}, or let them <b>rest</b>: they join {dayWord}’s quests, so you see them as you plan.
+      </p>
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+        {list.map((h) => {
+          const st = state(h);
+          return (
+            <li key={h.id} data-prioritize-habit className="due-in flex items-center gap-2 rounded-2xl px-2.5 py-2" style={{ background: "rgba(255,250,238,.55)", border: h.core ? "1.5px solid #c9a24a" : "1px solid rgba(139,112,64,.25)", opacity: st === "rest" ? 0.7 : 1 }}>
+              <button type="button" aria-pressed={h.core} aria-label={h.core ? `${h.title} is a core habit (tap to unmark)` : `Make ${h.title} a core habit`} title={h.core ? "Core habit: always in the day’s plan" : "Make it a core habit"} onClick={() => markCore(h, !h.core)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[17px] leading-none" style={{ color: h.core ? "#b8860b" : "rgba(139,112,64,.45)" }}>
+                {h.core ? "★" : "☆"}
+              </button>
+              {h.icon_key && (
+                // eslint-disable-next-line @next/next/no-img-element -- habit portrait
+                <img src={h.icon_key} alt="" width={30} height={30} className="h-[30px] w-[30px] shrink-0 rounded-full object-cover" style={{ boxShadow: "0 0 0 1.5px #a58c66" }} />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-semibold leading-tight" style={{ textDecoration: "none" }}>
+                  {h.title}
+                </span>
+                <span className="block text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                  {[h.done ? "✓ Done" : null, h.estimate_minutes ? `${h.estimate_minutes}m` : null, `${h.xp_value} XP`].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+              <button type="button" aria-pressed={st === "today"} onClick={() => choose(h, st === "today" && !h.core ? null : "today")} data-open={st === "today" ? "true" : undefined} className="qe-fact h-8 shrink-0 rounded-full px-3 text-[12.5px] font-semibold">
+                {day === "today" ? "Today" : "Tomorrow"}
+              </button>
+              <button type="button" aria-pressed={st === "rest"} onClick={() => choose(h, st === "rest" ? null : "rest")} data-open={st === "rest" ? "true" : undefined} className="qe-fact h-8 shrink-0 rounded-full px-3 text-[12.5px] font-semibold">
+                Rest
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { reorderRitesAction, skipHabitAction, unskipHabitAction } from "@/app/actions";
+import { reorderRitesAction, setCoreHabitAction, skipHabitAction, unskipHabitAction } from "@/app/actions";
 import { saveOrQueue } from "@/lib/offline";
 import { useLocalDay } from "@/components/evening/evening-clock";
 import { nextOccurrence, repeatIsUp, repeatLabel } from "@/lib/habit-repeat";
@@ -39,7 +39,16 @@ export function DailyHabits({
   cleaning: cleaningRaw = null,
   theme,
   listenHref = null,
+  planned = [],
+  core = [],
+  bare = false,
 }: {
+  /** Habits in today's plan (core ones and the ones picked for today): they sit in Today's Quests, not here. */
+  planned?: string[];
+  /** Core habits: a gold star, and they always come up in the day's plan. */
+  core?: string[];
+  /** Just today's planned habits as cards, for inside Today's Quests (no header, tray or extras). */
+  bare?: boolean;
   /** Your list of videos to listen to (a board): a 🎧 pill under a walk, drive or dog-walk habit that's still to do. */
   listenHref?: string | null;
   /** The mess check-in (spaces, laundry, chores) shown under the cleaning habit. */
@@ -226,7 +235,26 @@ export function DailyHabits({
       localStorage.setItem(SNOOZE_KEY, JSON.stringify(next));
     } catch {}
   }
-  const todays = dueToday.filter((h) => !skipped(h.id) && !isSnoozed(h.id));
+  // Planned habits (core + picked for today) live in Today's Quests; this section keeps the rest (owner, Nov 14).
+  const plannedSet = new Set(planned);
+  const todays = dueToday.filter((h) => !skipped(h.id) && !isSnoozed(h.id) && plannedSet.has(h.id) === bare);
+  const plannedHere = !bare && dueToday.some((h) => plannedSet.has(h.id) && !skipped(h.id) && !isSnoozed(h.id));
+  const [coreOverride, setCoreOverride] = useState<Record<string, boolean>>({});
+  const isCore = (id: string) => coreOverride[id] ?? core.includes(id);
+  function toggleCore(h: RiteView) {
+    const next = !isCore(h.id);
+    setMenuFor(null);
+    setError(null);
+    setCoreOverride((o) => ({ ...o, [h.id]: next }));
+    startTransition(async () => {
+      try {
+        await setCoreHabitAction(h.id, next);
+      } catch (e) {
+        setCoreOverride((o) => ({ ...o, [h.id]: !next }));
+        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
   const skippedToday = dueToday.filter((h) => skipped(h.id));
   const snoozedToday = dueToday.filter((h) => !skipped(h.id) && isSnoozed(h.id));
   const notToday = ordered.filter((h) => !dueToday.includes(h));
@@ -235,7 +263,7 @@ export function DailyHabits({
   /**
    * Days in a row this habit was done, counting only the days it's due.
    * Today counts once ticked; until then the streak carries on from
-   * yesterday. A missed or skipped day ends it.
+   * yesterday. A missed day ends it; a rest day is passed over.
    */
   function streak(h: RiteView): number {
     if (!day || h.repeat) return 0;
@@ -246,8 +274,9 @@ export function DailyHabits({
       if (dueOn(h, d.getDay())) {
         const isDone = i === 0 ? done(h.id) : doneSet.has(`${h.id}|${key}`);
         const isSkipped = i === 0 ? skipped(h.id) : skipSet.has(`${h.id}|${key}`);
+        // A day it rested (skipped on purpose) neither counts nor breaks the streak (owner, Nov 14: "no guilt").
         if (isDone) n++;
-        else if (isSkipped || i > 0) return n;
+        else if (!isSkipped && i > 0) return n;
       }
       d.setDate(d.getDate() - 1);
     }
@@ -343,7 +372,9 @@ export function DailyHabits({
   }
 
   return (
-    <section className="flex flex-col">
+    bare && todays.length === 0 ? null : (
+    <section className="flex flex-col" data-habits-in-today={bare ? "" : undefined}>
+      {!bare && (
       <div ref={headerBox} className="group relative">
       <button
         type="button"
@@ -456,13 +487,14 @@ export function DailyHabits({
         </div>
       )}
       </div>
+      )}
 
-      <div className="drawer-body" data-open={open ? "true" : "false"}>
-        <div className="drawer-inner">
+      <div className={bare ? "" : "drawer-body"} data-open={open || bare ? "true" : "false"}>
+        <div className={bare ? "" : "drawer-inner"}>
           {/* Joined to the header: the same border runs down its sides and round its bottom. */}
           <div
-            className="rounded-b-2xl px-2.5 pb-3 pt-3.5"
-            style={{
+            className={bare ? "" : "rounded-b-2xl px-2.5 pb-3 pt-3.5"}
+            style={bare ? undefined : {
               // A deep green velvet tray, lit softly from the middle.
               // It starts in the header's own colour, so bar and tray read as one piece (no line between).
               background: isAdventure ? "linear-gradient(180deg, #221f15, rgba(34,31,21,0) 36px), radial-gradient(120% 80% at 50% 20%, rgba(74,92,58,.5), rgba(24,32,20,.85) 70%), linear-gradient(180deg, #232c1e, #161c13)" : "var(--t-bg)",
@@ -476,14 +508,14 @@ export function DailyHabits({
               {error}
             </p>
           )}
-          <DndContext id="dnd-DailyHabits" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <DndContext id={bare ? "dnd-DailyHabits-today" : "dnd-DailyHabits"} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={todays.map((h) => h.id)} strategy={verticalListSortingStrategy}>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {todays.map((h) => {
               const d = done(h.id);
               const s = streak(h);
               return (
-                <SortableHabit key={h.id} id={h.id} disabled={!open} raised={menuFor === h.id || confirmSkip === h.id}>
+                <SortableHabit key={h.id} id={h.id} disabled={!open && !bare} raised={menuFor === h.id || confirmSkip === h.id}>
                 {/* Swipe left for "Snooze for today" (owner, Nov 2). */}
                 <SwipeReveal side="right" label="Snooze today" icon={<SnoozeIcon size={18} />} background="linear-gradient(180deg,#5b6b8a,#3f4c66)" onAction={() => snooze(h, true)} disabled={d}>
                 <div
@@ -503,7 +535,7 @@ export function DailyHabits({
                   // Done: no crossed-out name; the whole card turns a little green (owner, Nov 12).
                   data-done={d ? "" : undefined}
                   // A gilded edge and a soft shadow, so each habit sits on the velvet like a card.
-                  style={isAdventure ? { borderRadius: 16, boxShadow: "0 0 0 1.5px #b39a6a, 0 0 0 3px rgba(60,44,16,.55), 0 4px 10px rgba(0,0,0,.4)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
+                  style={isAdventure ? { borderRadius: 16, boxShadow: isCore(h.id) ? "0 0 0 2px #d9b45f, 0 0 0 3.5px rgba(60,44,16,.6), 0 0 12px rgba(242,210,126,.35), 0 4px 10px rgba(0,0,0,.4)" : "0 0 0 1.5px #b39a6a, 0 0 0 3px rgba(60,44,16,.55), 0 4px 10px rgba(0,0,0,.4)" } : { background: "var(--t-card)", border: isCore(h.id) ? "1.5px solid var(--t-gold)" : "1px solid var(--t-card-border)" }}
                 >
                   {h.icon_key ? (
                     <button
@@ -557,6 +589,11 @@ export function DailyHabits({
                       className="block text-[16px] font-semibold leading-snug"
                       style={{ color: "var(--t-ink)" }}
                     >
+                      {isCore(h.id) && (
+                        <span aria-label="Core habit" title="Core habit: always in the day's plan" className="mr-1" style={{ color: "#b8860b" }}>
+                          ★
+                        </span>
+                      )}
                       {h.title}
                       {h.id === cleanId && cleaning && (
                         <>
@@ -688,6 +725,19 @@ export function DailyHabits({
                           </span>
                         ) : null}
                       </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        data-mi="core"
+                        onClick={() => toggleCore(h)}
+                        className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5"
+                        style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
+                      >
+                        <span aria-hidden className="w-[18px] text-center" style={{ color: "#b8860b" }}>
+                          {isCore(h.id) ? "☆" : "★"}
+                        </span>
+                        {isCore(h.id) ? "Not a core habit" : "Make it a core habit"}
+                      </button>
                       {/* No "Skip today": Snooze does the same (owner, Nov 2). */}
                       <button
                         type="button"
@@ -795,12 +845,18 @@ export function DailyHabits({
           </ul>
           </SortableContext>
           </DndContext>
+          {!bare && plannedHere && (
+            <p className="m-0 px-2 pt-1 text-center text-[13px] italic" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.8 }}>
+              {todays.length ? "Today’s chosen habits are in Today’s Quests." : "Today’s habits are all in Today’s Quests ✦"}
+            </p>
+          )}
+          {!bare && (<>
           {skippedToday.length > 0 && (
             <p className="m-0 px-2 pt-2 text-center text-[13.5px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.85 }}>
               {skippedToday.map((h, i) => (
                 <span key={h.id}>
                   {i > 0 && " · "}
-                  {h.title} skipped today{" "}
+                  {h.title} resting today{" "}
                   <button type="button" onClick={() => setSkip(h, false)} className="underline">
                     undo
                   </button>
@@ -878,6 +934,7 @@ export function DailyHabits({
               </button>
             </li>
           </ul>
+          </>)}
           </div>
         </div>
       </div>
@@ -907,6 +964,7 @@ export function DailyHabits({
       )}
       {focusTask && <FocusMode task={focusTask} theme={theme} onClose={() => setFocusing(null)} />}
     </section>
+    )
   );
 }
 

@@ -2051,6 +2051,71 @@ export async function unrateForDayAction(day: "today" | "tomorrow", taskId: stri
   revalidatePath("/");
 }
 
+/**
+ * Habits in the day's plan (owner, Nov 14): `life_wheel.habitPlan` = { core: ids, days: { "YYYY-MM-DD": ids } }.
+ * Core habits always come up; the ones picked for a day join Today's Quests that day. "Rest" is a habit skip.
+ */
+type HabitPlan = { core: string[]; days: Record<string, string[]> };
+function cleanHabitPlan(raw: unknown): HabitPlan {
+  const r = (raw && typeof raw === "object" ? raw : {}) as { core?: unknown; days?: unknown };
+  const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 200) : []);
+  const days = r.days && typeof r.days === "object" ? Object.fromEntries(Object.entries(r.days as Record<string, unknown>).filter(([k]) => /^\d{4}-\d{2}-\d{2}$/.test(k)).map(([k, v]) => [k, ids(v)])) : {};
+  return { core: ids(r.core), days };
+}
+async function saveHabitPlan(ownerId: string, plan: HabitPlan) {
+  const extras = await readExtras(ownerId);
+  // Keep only the last few days.
+  const days = Object.fromEntries(Object.entries(plan.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 5));
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, habitPlan: { core: plan.core, days } } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save that: ${error.message}`);
+}
+const planDayKey = (day: "today" | "tomorrow") => (day === "today" ? tomorrowData.appDayKey() : tomorrowData.nextDayKey(tomorrowData.appDayKey()));
+
+export type PlanHabit = { id: string; title: string; icon_key: string | null; estimate_minutes: number | null; xp_value: number; due_time: string | null; core: boolean; done: boolean };
+/** The habits that fall on today or tomorrow, which are core, which are picked for that day and which rest. */
+export async function habitPlanAction(day: "today" | "tomorrow"): Promise<{ habits: PlanHabit[]; picked: string[]; rested: string[] }> {
+  const ownerId = await requireProfileId();
+  const key = planDayKey(day);
+  const [rites, extras] = await Promise.all([ritesData.listRites(ownerId).catch(() => null), readExtras(ownerId)]);
+  const list = (rites ?? []).filter((r) => r.slot === "day" && r.kind !== "ritual");
+  const since = new Date(Date.parse(`${key}T12:00:00Z`) - 400 * 86_400_000).toISOString().slice(0, 10);
+  const [done, skips] = await Promise.all([ritesData.listCompletionsFor(ownerId, list.map((r) => r.id), since).catch(() => []), ritesData.listHabitSkips(ownerId, since).catch(() => [])]);
+  const daysOf = (l: { rite_id: string; day: string }[] | null, id: string) => (l ?? []).filter((c) => c.rite_id === id).map((c) => c.day);
+  const wd = new Date(`${key}T12:00:00`).getDay();
+  const plan = cleanHabitPlan(extras.habitPlan);
+  const habits = list
+    .filter((r) => {
+      const repeat = cleanRepeat(r.repeat);
+      return repeat ? repeatIsUp(repeat, key, daysOf(done, r.id), daysOf(skips, r.id).filter((d) => d !== key)) : !r.days || r.days.length === 0 || r.days.includes(wd);
+    })
+    .map((r) => ({ id: r.id, title: r.title, icon_key: r.icon_source ? r.icon_key : null, estimate_minutes: r.estimate_minutes ?? null, xp_value: r.xp_value ?? 0, due_time: r.due_time ?? null, core: plan.core.includes(r.id), done: daysOf(done, r.id).includes(key) }));
+  const ids = new Set(habits.map((h) => h.id));
+  return { habits, picked: (plan.days[key] ?? []).filter((id) => ids.has(id)), rested: (skips ?? []).filter((s) => s.day === key && ids.has(s.rite_id)).map((s) => s.rite_id) };
+}
+
+/** Pick a habit for the day ("today"), let it rest that day ("rest"), or leave it undecided (null). */
+export async function setHabitForDayAction(day: "today" | "tomorrow", riteId: string, choice: "today" | "rest" | null) {
+  const ownerId = await requireProfileId();
+  const key = planDayKey(day);
+  const plan = cleanHabitPlan((await readExtras(ownerId)).habitPlan);
+  const picked = (plan.days[key] ?? []).filter((id) => id !== riteId);
+  if (choice === "today") picked.push(riteId);
+  await saveHabitPlan(ownerId, { ...plan, days: { ...plan.days, [key]: picked } });
+  if (choice === "rest") await ritesData.addHabitSkip(ownerId, riteId, key);
+  else await ritesData.removeHabitSkip(ownerId, riteId, key).catch(() => {});
+  revalidatePath("/");
+}
+
+/** A core habit always comes up in the day's plan and wears a gold star. */
+export async function setCoreHabitAction(riteId: string, core: boolean) {
+  const ownerId = await requireProfileId();
+  const plan = cleanHabitPlan((await readExtras(ownerId)).habitPlan);
+  const next = plan.core.filter((id) => id !== riteId);
+  if (core) next.push(riteId);
+  await saveHabitPlan(ownerId, { ...plan, core: next });
+  revalidatePath("/");
+}
+
 /** Snooze a quest until tomorrow (end of tomorrow's plan; counts as a reschedule). Returns what Undo needs. */
 export async function snoozeQuestAction(taskId: string) {
   const ownerId = await requireProfileId();

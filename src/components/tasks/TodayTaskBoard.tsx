@@ -392,6 +392,7 @@ export function TodayTaskBoard({
   otherTasks,
   theme = "calm",
   between,
+  habitsInToday,
 }: {
   /** Due within `dueHours` (or just missed): shown above everything, due next first and past due last, until done. */
   dueTasks?: TaskWithCategory[];
@@ -402,6 +403,8 @@ export function TodayTaskBoard({
   theme?: "calm" | "adventure";
   /** Daily habits: a section of its own, above Today's Quests unless moved. */
   between?: React.ReactNode;
+  /** The habits in today's plan, as cards inside Today's Quests (owner, Nov 14). */
+  habitsInToday?: React.ReactNode;
 }) {
   // Today's arrangement (order and hidden parts), set from Today's gear.
   const layout = useSyncExternalStore(subscribeTodayLayout, readTodayLayout, serverTodayLayout);
@@ -723,12 +726,13 @@ export function TodayTaskBoard({
                             ))}
                         </ul>
                       </SortableContext>
-                      {priority.length === 0 && (
+                      {priority.length === 0 && !habitsInToday && (
                         <p className="-mt-8 px-2 pb-1 text-center text-[14.5px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.75 }}>
                           Drag a quest up here, or add one below.
                         </p>
                       )}
                     </Zone>
+                    {habitsInToday && <div className="mt-3">{habitsInToday}</div>}
                     <button
                       type="button"
                       onClick={() => setAdding(true)}
