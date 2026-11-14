@@ -287,7 +287,8 @@ export default async function Home() {
               ),
               victories: (
                   <VictoriesToday
-                    tasks={completedTasks}
+                    // A failed quest isn't a victory (it shows its red X on the calendar and in its board's done list).
+                    tasks={completedTasks.filter((t) => !t.failed_at)}
                     claimed={recentClaims.map((r) => ({ id: r.id, title: r.title, claimed_at: r.claimed_at, status: r.status, completed_at: r.completed_at ?? null, bonus_xp: r.bonus_xp ?? 0, bonus_coins: r.bonus_coins ?? 0 }))}
                     lastCheckInAt={profile?.last_check_in_at ?? null}
                     rites={riteCompletions.flatMap((c) => {

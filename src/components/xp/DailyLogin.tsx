@@ -20,6 +20,21 @@ function askWelcome(first: boolean): Promise<WelcomeStart> {
     .then((r) => (r.ok ? (r.json() as Promise<WelcomeStart>) : null))
     .catch(() => null);
 }
+/** The last welcome data seen, kept on the device so the day's first welcome never waits on a server that's
+ * still waking up (owner, Nov 14: "the app still takes a long time to load when I open it up for the first time in a day"). */
+const CTX_KEY = "welcome-ctx-kept";
+function keptCtx(): WelcomeCtx | null {
+  try {
+    return JSON.parse(window.localStorage.getItem(CTX_KEY) || "null") as WelcomeCtx | null;
+  } catch {
+    return null;
+  }
+}
+function keepCtx(ctx: WelcomeCtx) {
+  try {
+    window.localStorage.setItem(CTX_KEY, JSON.stringify(ctx));
+  } catch {}
+}
 /** The request the page's first script already sent (see FOG_SCRIPT), taken once. */
 function takeEarly(first: boolean): Promise<WelcomeStart> | null {
   const w = window as unknown as { __wpre?: { first: boolean; at: number; p: Promise<WelcomeStart> } | null };
@@ -261,6 +276,17 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
         return;
       }
       if (first) {
+        // Slow server (first open of the day): open with what this device last saw, then fill in.
+        const kept = keptCtx();
+        let opened = false;
+        const quick = kept
+          ? setTimeout(() => {
+              if (!live) return;
+              opened = true;
+              markBack();
+              setShown({ mode: "day", award: null, ctx: kept, seed: "early" });
+            }, 1500)
+          : undefined;
         const early = await start;
         const r = early?.first && early.checkin ? early.checkin : await dailyCheckInAction(new Date().getTimezoneOffset()).catch(() => null);
         let award: WelcomeAward | null = null;
@@ -285,10 +311,12 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
         }
         // The day's first visit here always greets you (with last night's sleep, if it isn't logged yet).
         const ctx = await ctxP;
+        clearTimeout(quick);
         if (!live) return;
-        markBack();
+        keepCtx(ctx);
+        if (!opened) markBack();
         // (No refresh here: Today re-rendering under the welcome screen only slowed it; it refreshes on close.)
-        setShown({ mode: "day", award, ctx });
+        setShown({ mode: "day", award, ctx, seed: opened ? "early" : undefined });
         return;
       }
       // Welcome back: a few hours since your last check-in (and since this screen last came up).

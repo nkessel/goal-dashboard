@@ -728,20 +728,33 @@ export async function restoreArchivedQuestAction(taskId: string) {
   return { title: String(hit.task.title ?? "") };
 }
 
+/** Quest failure (owner, Nov 6): no XP, no coins, a red X where the check would be. Undo is "Undo quest completion". */
+export async function failTaskAction(taskId: string, reason?: string | null) {
+  const ownerId = await requireProfileId();
+  if (!/^[0-9a-f-]{36}$/i.test(taskId)) throw new Error("Unknown quest.");
+  await tasksData.failTask(taskId, ownerId, reason ?? null);
+  revalidatePath("/");
+  revalidatePath("/calendar");
+  revalidatePath("/boards");
+  return { ok: true as const };
+}
+
 export async function reopenTaskAction(taskId: string) {
   const ownerId = await requireProfileId();
   const before = await tasksData.getTask(taskId, ownerId);
   await tasksData.reopenTask(taskId, ownerId);
   // Undo what the quest paid out so re-completing later doesn't farm points;
   // progress starts over.
-  if (before?.status === "completed" && before.reward_id) {
+  // A failed quest paid nothing and finished nothing: reopening it only reopens it.
+  const failed = !!before?.failed_at;
+  if (before?.status === "completed" && before.reward_id && !failed) {
     // Reopening a reward's quest puts the reward back to accepted (bonus coins back out).
     const was = await rewardsData.uncompleteReward(before.reward_id, ownerId);
     if (was && (was.bonus_coins ?? 0) > 0) await rewardsData.addCoins(ownerId, -(was.bonus_coins ?? 0));
     revalidatePath("/rewards");
   }
-  if (before?.status === "completed" && before.boss_id) await bossStep(ownerId, before.boss_id, -1).catch(() => {});
-  if (before?.status === "completed") {
+  if (before?.status === "completed" && before.boss_id && !failed) await bossStep(ownerId, before.boss_id, -1).catch(() => {});
+  if (before?.status === "completed" && !failed) {
     const paid = typeof before.xp_awarded === "number" ? before.xp_awarded : before.xp_value;
     if (paid > 0) await xp.awardXp(ownerId, -paid, "task_completed", taskId);
     const coinAdjust = customCoinAdjustment(before);

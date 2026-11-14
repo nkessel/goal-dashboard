@@ -21,7 +21,7 @@ export const FOG_SCRIPT = `(function(){try{var n=Date.now(),s=localStorage,J=fun
  * browser that has opened the app signed in before (AppShell marks it), and
  * lifted at once if the page turns out not to be the app (signed out).
  */
-export const FOG_HEAD_SCRIPT = `try{if(localStorage.getItem("app-shell")==="1"){${FOG_SCRIPT}document.addEventListener("DOMContentLoaded",function(){if(!window.__appShell){var e=document.documentElement;e.removeAttribute("data-fog");e.removeAttribute("data-fog-lift")}})}}catch(_){}`;
+export const FOG_HEAD_SCRIPT = `try{if(localStorage.getItem("app-shell")==="1"){var B=document.documentElement;B.setAttribute("data-booting","");window.addEventListener("load",function(){setTimeout(function(){B.removeAttribute("data-booting")},1500)});${FOG_SCRIPT}document.addEventListener("DOMContentLoaded",function(){if(!window.__appShell){var e=document.documentElement;e.removeAttribute("data-fog");e.removeAttribute("data-fog-lift")}})}}catch(_){}`;
 
 /** AppShell's own copy: marks the app as here (for the head script) and fogs a first-ever visit. */
 export const FOG_SHELL_SCRIPT = `window.__appShell=1;try{localStorage.setItem("app-shell","1")}catch(_){}${FOG_SCRIPT}`;

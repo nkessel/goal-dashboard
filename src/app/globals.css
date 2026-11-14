@@ -24,6 +24,21 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* On a device that has opened the app before (the head script sets data-booting), the page is the
+   forest while it loads, never the browser's black (owner, Nov 14: "it shows a black screen while
+   loading"), and after a moment a quiet line says it's on its way. Gone the moment the app paints. */
+html[data-booting], html[data-booting] body { background: radial-gradient(ellipse 90% 70% at 50% 35%, #3a4a34, #1f2a1d 70%, #161d15); background-color: #1f2a1d; min-height: 100%; }
+html[data-booting]:not(:has([data-app-shell])) body::before {
+  content: "✦  Opening your quest log…";
+  position: fixed; inset: 0; z-index: 1;
+  display: grid; place-items: center;
+  font: 500 17px/1.4 Georgia, "Times New Roman", serif; letter-spacing: .02em;
+  color: rgba(246, 226, 170, .9); text-shadow: 0 1px 8px rgba(0,0,0,.5);
+  pointer-events: none;
+  animation: boot-cue 2.4s ease-in-out .7s infinite both;
+}
+@keyframes boot-cue { 0% { opacity: 0; } 35%, 70% { opacity: 1; } 100% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { html[data-booting]:not(:has([data-app-shell])) body::before { animation: none; } }
 
 /* ---------------------------------------------------------------------
  * Theme design tokens (visual redesign to match the Productivity RPG

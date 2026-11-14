@@ -162,7 +162,7 @@ export function CalendarTaskChip({
       className={`cal-chip ${isTentativeTitle(task.title) && !isCompleted ? "cal-tentative" : ""} flex h-full w-full min-w-0 overflow-hidden rounded-md ${tall ? "items-center justify-center text-center" : `text-left ${compact ? "items-start" : "items-center"}`}`}
       style={{
         ...cardStyle,
-        ...(isAdventure ? { borderLeft: `3px solid ${isCompleted ? "var(--t-good)" : isWarned ? "var(--t-warn)" : "#a88a3f"}` } : {}),
+        ...(isAdventure ? { borderLeft: `3px solid ${isCompleted && task.failed_at ? "#b5321f" : isCompleted ? "var(--t-good)" : isWarned ? "var(--t-warn)" : "#a88a3f"}` } : {}),
         flexDirection: tall ? "column" : "row",
         gap: tall ? 3 : compact ? 4 : 8,
         padding: tall ? "5px 4px" : compact ? "3px 4px" : "6px 8px",
@@ -177,7 +177,13 @@ export function CalendarTaskChip({
           background: isAdventure ? undefined : "#fff",
         }}
       >
-        {isCompleted ? (
+        {isCompleted && task.failed_at ? (
+          // Failed: a red X where the check would be (the card itself stays calm; owner, Nov 6).
+          <svg width={iconSize - 4} height={iconSize - 4} viewBox="0 0 24 24" fill="none" aria-label="Failed">
+            <circle cx="12" cy="12" r="10" fill="#b5321f" />
+            <path d="M8 8l8 8M16 8l-8 8" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+        ) : isCompleted ? (
           <svg width={iconSize - 4} height={iconSize - 4} viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" fill="var(--t-good)" />
             <path d="M7 12.5l3 3 7-7" stroke="#fff" strokeWidth="2" fill="none" />
@@ -220,7 +226,7 @@ export function CalendarTaskChip({
             className="truncate leading-tight"
             style={{ color: "var(--t-ink-soft)", fontSize: compact ? 10 : 11.5, opacity: 0.8 }}
           >
-            Completed
+            {task.failed_at ? "Failed" : "Completed"}
           </p>
         )}
         {showTime && !isCompleted && (

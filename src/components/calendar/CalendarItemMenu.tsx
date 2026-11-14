@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { addTaskSessionAction, completeTaskAction, createQuestAction, unscheduleTaskAction } from "@/app/actions";
+import { addTaskSessionAction, completeTaskAction, createQuestAction, failTaskAction, reopenTaskAction, unscheduleTaskAction } from "@/app/actions";
 import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { SlotPickerDialog } from "@/components/tasks/SlotPickerDialog";
 import { sessionRef } from "@/lib/calendar-task-window";
@@ -24,7 +24,7 @@ export type MenuTarget = { kind: "task"; task: Task; start: Date; end: Date } | 
 export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: MenuTarget; x: number; y: number; theme: "calm" | "adventure"; onClose: () => void }) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<"menu" | "followup" | "look" | "place">("menu");
+  const [mode, setMode] = useState<"menu" | "followup" | "look" | "place" | "fail">("menu");
   const place = useQuestPlace(target.kind === "task" ? target.task.id : undefined);
   const [minutes, setMinutes] = useState(15);
   const [title, setTitle] = useState(`Follow up: ${target.kind === "task" ? target.task.title : target.title}`.slice(0, 120));
@@ -176,12 +176,75 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
           <button type="button" role="menuitem" data-mi="followup" className={`${item} flex items-center gap-2 border-t`} style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("followup")}>
             Schedule follow-up quest
           </button>
+          {/* Below the last divider (owner, Nov 13): failing a quest, or taking a failure back. */}
+          {target.kind === "task" && target.task.status !== "completed" && (
+            <button type="button" role="menuitem" data-mi="fail" className={`${item} border-t`} style={{ color: "#8a2a1c", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("fail")}>
+              ✕ Quest failure
+            </button>
+          )}
+          {target.kind === "task" && target.task.status === "completed" && target.task.failed_at && (
+            <button
+              type="button"
+              role="menuitem"
+              data-mi="unfail"
+              className={`${item} border-t`}
+              style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }}
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  await reopenTaskAction(target.task.id).catch(() => {});
+                  router.refresh();
+                  onClose();
+                })
+              }
+            >
+              Undo quest failure
+            </button>
+          )}
           {error && (
             <p className="relative z-[1] m-0 px-3.5 pb-1 text-[12.5px]" style={{ color: "var(--t-warn)" }}>
               {error}
             </p>
           )}
         </>
+      ) : mode === "fail" && target.kind === "task" ? (
+        <form
+          className="relative z-[1] flex flex-col gap-2 p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const reason = String(new FormData(e.currentTarget).get("reason") ?? "");
+            startTransition(async () => {
+              try {
+                await failTaskAction(target.task.id, reason);
+                router.refresh();
+                onClose();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Couldn't mark it failed.");
+              }
+            });
+          }}
+        >
+          <span className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
+            Quest failure
+          </span>
+          <input name="reason" autoFocus maxLength={300} placeholder="Why? (optional)" aria-label="Why it failed (optional)" className="h-10 rounded-lg px-2.5 text-[16px]" style={{ background: "#fffaf0", border: "1px solid rgba(139,112,64,.45)", color: "#2a1c10" }} />
+          <span className="text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+            No XP, a red ✕ on its card. It can be undone from this menu.
+          </span>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setMode("menu")} className="h-9 px-2 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+              Cancel
+            </button>
+            <button type="submit" disabled={pending} className="h-9 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60" style={{ background: "#b5321f", color: "#fff" }}>
+              Mark failed
+            </button>
+          </div>
+          {error && (
+            <p className="m-0 text-[12.5px]" style={{ color: "var(--t-warn)" }}>
+              {error}
+            </p>
+          )}
+        </form>
       ) : mode === "look" && target.kind === "task" ? (
         <div className="relative z-[1] px-3 py-2">
           <CardLookPicker task={target.task} />

@@ -547,13 +547,28 @@ export async function reopenTask(taskId: string, ownerId: string): Promise<Task>
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("tasks")
-    .update({ status: "open", completed_at: null })
+    .update({ status: "open", completed_at: null, failed_at: null, fail_reason: null })
     .eq("id", taskId)
     .eq("owner_id", ownerId)
     .select("*")
     .single();
 
   if (error) throw new Error(`Failed to reopen task: ${error.message}`);
+  return data;
+}
+
+/** Mark a quest failed: it leaves the open lists like a finished one, pays nothing, and can be reopened. */
+export async function failTask(taskId: string, ownerId: string, reason?: string | null): Promise<Task> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseAdmin()
+    .from("tasks")
+    .update({ status: "completed", completed_at: now, logged_at: now, failed_at: now, fail_reason: reason?.trim().slice(0, 300) || null, is_manual_priority: false })
+    .eq("id", taskId)
+    .eq("owner_id", ownerId)
+    .eq("status", "open")
+    .select("*")
+    .single();
+  if (error) throw new Error(`Couldn't mark that quest failed: ${error.message}`);
   return data;
 }
 

@@ -100,6 +100,9 @@ export type Task = {
   progress?: number;
   /** XP already paid out for this quest (partial progress and/or completion). */
   xp_awarded?: number;
+  /** Marked failed (it counts as finished, with nothing paid; shown with a red X). */
+  failed_at?: string | null;
+  fail_reason?: string | null;
   /** This quest is the reward itself (created when the reward was accepted). */
   reward_id?: string | null;
   /** Hidden behind this (prerequisite) quest until it's completed. */
