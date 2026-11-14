@@ -307,29 +307,72 @@ function QuestCard({
   const stack = !line && (portrait || w < 130) && h >= 66;
   // With room to spare (a close-up on a big screen), the words and the creature grow with the card (owner, Nov 12:
   // "the text of a quest should show larger when there's extra space"); the small print grows a little less.
-  const big = line ? 1 : roomyScale(w, h);
+  // Everything on the card fits inside its edges (owner, Nov 14: "the time of the event spills over the card
+  // boundaries… make the card text size appropriate for the space available"). Start from the roomy size and
+  // shrink the words (down to 80%) until the title's first line and every extra line fit; if even the smallest
+  // size can't hold them all, the least needed lines go first: the time, then the place, then the done note.
+  const chrome = (stack ? 9 : 8) + 3; // padding + the 1.5px border, top and bottom
+  const wantTime = show.time && !done && !stack && !line && !!timeLabel && w >= 110;
+  const wantPlace = !!place && !line && w >= 70;
+  const wantDone = done && !line;
+  const wantPay = pays && !line;
+  type Fit = { big: number; time: boolean; place: boolean; doneNote: boolean; payLine: boolean };
+  const fitAt = (s: number, drop: number, whole: boolean): Fit | null => {
+    const sp = 10.5 * (1 + (s - 1) * 0.6);
+    const sl = Math.round(sp * 1.33);
+    const tp = (w < 52 ? 11 : w < 110 ? (stack ? 12.5 : 11.5) : 14) * s;
+    const f: Fit = { big: s, time: wantTime && drop < 1, place: wantPlace && drop < 2, doneNote: wantDone && drop < 3, payLine: wantPay && drop < 4 };
+    const extras = [f.time, f.place, f.doneNote, f.payLine].filter(Boolean).length * sl;
+    // A stacked card needs room for at least a small creature above the words.
+    const artNeed = stack && show.art ? 18 + 3 : 0;
+    // First try to keep the whole title (up to two lines, stacked cards three), then settle for its first line.
+    const need = whole ? Math.min(stack ? 3 : 2, Math.max(1, Math.ceil((task.title.length * tp * 0.5) / Math.max(1, (stack ? w : w * 0.62) - 8)))) : 1;
+    return chrome + artNeed + Math.ceil(tp * 1.12 * need) + extras <= h ? f : null;
+  };
+  const roomy = line ? 1 : roomyScale(w, h);
+  let fit: Fit = { big: 0.8, time: false, place: false, doneNote: false, payLine: false };
+  if (line) fit = { big: 1, time: false, place: false, doneNote: false, payLine: false };
+  else
+    search: for (let pass = 0; pass <= 5; pass++) {
+      const drop = Math.max(0, pass - 1);
+      for (let s = roomy; s >= (pass === 0 ? 0.9 : 0.8) - 1e-6; s -= 0.05) {
+        const f = fitAt(Math.max(0.8, s), drop, pass === 0);
+        if (f) {
+          fit = f;
+          break search;
+        }
+      }
+    }
+  const big = fit.big;
   const smallPx = 10.5 * (1 + (big - 1) * 0.6);
   const titlePx = (w < 52 ? 11 : w < 110 ? (stack ? 12.5 : 11.5) : 14) * big;
   // Stacked, the creature and the title share the height: the creature gets what the title (at least one line) leaves,
   // so even a narrow one-hour card keeps its creature, like a card in a storybook (owner's mockup, Nov 3).
   const lineH = titlePx * 1.12;
+  const smallLine = Math.round(smallPx * 1.33);
+  const doneNote = fit.doneNote;
+  const payLine = fit.payLine;
+  const placeLine = fit.place;
+  const timeLine = fit.time;
+  const extraH = [doneNote, payLine, placeLine, timeLine].filter(Boolean).length * smallLine;
   const wantLines = Math.min(3, Math.max(1, Math.ceil((task.title.length * titlePx * 0.5) / Math.max(1, w - 8))));
-  const stackArt = (keep: number) => Math.max(0, Math.min(w - 10, h - 12 - Math.ceil(lineH * keep), 64 * big));
+  const stackArt = (keep: number) => Math.max(0, Math.min(w - 10, h - chrome - 3 - extraH - Math.ceil(lineH * keep), 64 * big));
   const artPx = line
     ? Math.max(0, Math.min(h - 6, 22))
     : stack
       ? stackArt(wantLines) >= 30 ? stackArt(wantLines) : stackArt(Math.min(wantLines, 2)) >= 18 ? stackArt(Math.min(wantLines, 2)) : stackArt(1)
-      : Math.max(0, Math.min(h - 10, (h >= 80 ? 64 : 52) * big, w < 130 ? w * 0.3 : w * 0.38));
+      : Math.max(0, Math.min(h - chrome, (h >= 80 ? 64 : 52) * big, w < 130 ? w * 0.3 : w * 0.38));
   const showArt = show.art && artPx >= 16;
   const sealPx = Math.min(artPx, (stack ? 24 : 26) * big);
-  const smallLine = Math.round(smallPx * 1.3);
-  const doneNote = done && !line && h >= (stack ? 64 : 44);
-  const payLine = pays && !line && h >= (stack ? 60 : 40);
   const payInline = pays && line && w >= 120;
-  const agendaRows = !done && !line && !stack && agenda.length ? Math.max(0, Math.min(agenda.length, 3, Math.floor((h - 8 - (payLine ? smallLine : 0) - titlePx * 1.12 - smallLine) / smallLine))) : 0;
-  const agendaBadge = !done && agenda.length > 0 && agendaRows === 0 && !line;
-  const placeLine = !!place && !line && h >= (payLine ? 58 : 44) && w >= 70;
-  const lines = Math.max(1, Math.floor((h - (stack && showArt ? (done ? sealPx : artPx) + 10 : 8) - (doneNote ? smallLine : 0) - (payLine ? smallLine : 0) - (placeLine ? smallLine : 0) - (agendaRows ? agendaRows * smallLine + smallLine : 0)) / (titlePx * 1.12)));
+  // Narrow cards (a week on a phone): the XP line shrinks to the card's width, or steps aside when it can't be read.
+  const payChars = (show.xp && xpN > 0 ? `+${xpN} XP`.length : 0) + (show.coins && coinN > 0 ? String(coinN).length + (show.xp && xpN > 0 ? 4 : 2) : 0);
+  const payPx = Math.min(smallPx, (w - (stack ? 6 : 10) - (stack || !showArt ? 0 : artPx + 6)) / Math.max(1, payChars * 0.62));
+  const payShown = payLine && payPx >= 7.5;
+  const textRoom = h - chrome - (stack && showArt ? (done ? sealPx : artPx) + 3 : 0) - extraH;
+  const agendaRows = !done && !line && !stack && agenda.length ? Math.max(0, Math.min(agenda.length, 3, Math.floor((textRoom - lineH - smallLine) / smallLine))) : 0;
+  const agendaBadge = !done && agenda.length > 0 && agendaRows === 0 && !line && textRoom - lineH >= 15;
+  const lines = Math.max(1, Math.floor((textRoom - (agendaRows ? agendaRows * smallLine + smallLine : agendaBadge ? 16 : 0)) / lineH));
 
   return (
     <button
@@ -403,7 +446,7 @@ function QuestCard({
           {task.title}
         </span>
         {doneNote && (
-          <span className="block truncate" style={{ color: "#4e6a35", fontSize: smallPx, fontStyle: "italic", lineHeight: 1.2 }}>
+          <span className="block truncate" style={{ color: "#4e6a35", fontSize: smallPx, fontStyle: "italic", lineHeight: `${smallLine}px` }}>
             {/* When it was done (owner, Nov 5: "show when I completed quests in the past days"). */}
             {task.completed_at ? `Done ${new Date(task.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase() + "m")}` : "Completed"}
           </span>
@@ -413,7 +456,7 @@ function QuestCard({
             📍 {place}
           </span>
         )}
-        {payLine && <Pays xp={show.xp ? xpN : 0} coins={show.coins ? coinN : 0} done={done} center={stack} px={smallPx} />}
+        {payShown && <Pays xp={show.xp ? xpN : 0} coins={show.coins ? coinN : 0} done={done} center={stack} px={payPx} />}
         {agendaRows > 0 && (
           <span className="mt-0.5 block" style={{ fontSize: smallPx, lineHeight: `${smallLine}px`, color: "#5b4520" }}>
             <span className="block font-semibold" style={{ color: "#7a5a1c" }}>Agenda</span>
@@ -429,8 +472,8 @@ function QuestCard({
             Agenda {agenda.length}
           </span>
         )}
-        {show.time && !done && !stack && !line && timeLabel && h >= (payLine ? 66 : 52) && w >= 110 && (
-          <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: smallPx, lineHeight: 1.2 }}>
+        {timeLine && (
+          <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: smallPx, lineHeight: `${smallLine}px` }}>
             {timeLabel}
           </span>
         )}

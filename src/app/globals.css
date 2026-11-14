@@ -2248,6 +2248,8 @@ details > summary ~ * { animation: ui-reveal 0.22s ease-out both; }
   background-image: none !important;
   box-shadow: none !important;
   border: 1.5px dashed var(--tent-c, #a88a3f) !important;
+  /* Same corners as the tentative Google events and the meal holds, not a quest card's round 18px (owner, Nov 14). */
+  border-radius: 6px !important;
 }
 .cal-chip.cal-tentative::before, .cal-chip.cal-tentative::after { display: none !important; }
 

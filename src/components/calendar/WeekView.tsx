@@ -1545,7 +1545,7 @@ export function WeekView({
                     }}
                   >
                     {it.kind === "event" ? (
-                      <GoogleEventChip event={it.event} theme={theme} compact timeLabel={label} oneLine={oneLine} scale={colWidth > 0 && !oneLine ? roomyScale(cardW, height) : 1} />
+                      <GoogleEventChip event={it.event} theme={theme} compact timeLabel={label} oneLine={oneLine} scale={colWidth > 0 && !oneLine ? roomyScale(cardW, height) : 1} boxH={height} />
                     ) : (
                       <CalendarTaskChip task={it.task} theme={theme} compact timeLabel={label} oneLine={oneLine || (portraits && height < 64)} portrait={portraits} show={card} box={colWidth > 0 ? { w: cardW, h: height } : undefined} />
                     )}
@@ -1898,7 +1898,10 @@ function DailyBlocks({ day, daily, essentials, habitLook, busy, topOf, isAdventu
             className="absolute inset-x-0.5 overflow-hidden px-1.5 py-0.5 text-[11px] italic leading-tight"
             style={{ top: top + 1, height, color: ink, opacity: 0.9, zIndex: menu?.key === h.key ? 3 : 0, ...look }}
           >
-            <span aria-hidden>{MEAL_ICONS[h.key]}</span> {MEAL_NAMES[h.key]}
+            {/* As many lines as the block holds, the last ending in "…", so no word is cut by its edge (owner, Nov 14). */}
+            <span className="block" style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: Math.max(1, Math.floor((height - 4) / 13.75)), overflow: "hidden", overflowWrap: "anywhere" }}>
+              <span aria-hidden>{MEAL_ICONS[h.key]}</span> {MEAL_NAMES[h.key]}
+            </span>
           </div>
         );
       })}

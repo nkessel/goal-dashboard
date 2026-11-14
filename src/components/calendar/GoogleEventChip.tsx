@@ -44,10 +44,13 @@ export function GoogleEventChip({
   compact = false,
   timeLabel,
   oneLine = false,
-  scale = 1,
+  scale: roomy = 1,
+  boxH,
 }: {
   /** Bigger words on a roomy card (a close-up on a big screen). */
   scale?: number;
+  /** The card's height on the grid: the words shrink (to 80%) or the time line goes so everything fits inside it. */
+  boxH?: number;
   event: GoogleCalendarEvent;
   theme?: "calm" | "adventure";
   compact?: boolean;
@@ -179,6 +182,20 @@ export function GoogleEventChip({
   const end = new Date(event.end);
   // Written in [brackets]: a maybe, drawn as a dashed outline with no fill (still opens and edits as usual).
   const tentative = isTentativeTitle(event.title);
+  // Fit inside the card (owner, Nov 14: the time spilled over the card's edge): the title's first line and the
+  // time must fit; shrink the words down to 80% first, then leave the time out.
+  let scale = roomy;
+  let showTimeLine = !!timeLabel && !oneLine;
+  let titleLines = scale > 1.15 ? 3 : 2;
+  if (compact && boxH && !oneLine) {
+    const room = (s: number, withTime: boolean) => boxH - 6 - (tentative || unanswered ? 3 : 0) - (withTime ? Math.ceil(10.5 * (1 + (s - 1) * 0.6) * 1.25) : 0);
+    const titleLH = (s: number) => 11.5 * s * 1.15;
+    let s = roomy;
+    while (s > 0.8 && room(s, showTimeLine) < titleLH(s)) s = Math.max(0.8, s - 0.05);
+    if (room(s, showTimeLine) < titleLH(s)) showTimeLine = false;
+    scale = s;
+    titleLines = Math.max(1, Math.min(titleLines, Math.floor(room(s, showTimeLine) / titleLH(s))));
+  }
 
   return (
     <>
@@ -215,7 +232,7 @@ export function GoogleEventChip({
         </div>
         <div className="min-w-0 flex-1">
           <p
-            className={oneLine ? "truncate leading-tight" : compact ? `${scale > 1.15 ? "line-clamp-3" : "line-clamp-2"} leading-[1.15] [overflow-wrap:normal] [word-break:normal]` : "truncate leading-tight"}
+            className={oneLine ? "truncate leading-tight" : compact ? `${titleLines === 3 ? "line-clamp-3" : titleLines === 2 ? "line-clamp-2" : "line-clamp-1"} leading-[1.15] [overflow-wrap:normal] [word-break:normal]` : "truncate leading-tight"}
             style={{ color: isAdventure ? "#22374a" : "var(--t-ink)", fontSize: (compact ? 11.5 : 13.5) * scale, fontWeight: 500 }}
           >
             {oneLine && timeLabel ? (
@@ -227,7 +244,7 @@ export function GoogleEventChip({
               event.title
             )}
           </p>
-          {timeLabel && !oneLine && (
+          {showTimeLine && (
             <p className="truncate leading-tight" style={{ color: isAdventure ? "#22374a" : "var(--t-ink-soft)", fontSize: 10.5 * (1 + (scale - 1) * 0.6), opacity: 0.8 }}>
               {timeLabel}
             </p>
