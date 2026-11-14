@@ -1,5 +1,6 @@
 "use client";
 
+import { stepsComplete } from "@/lib/habit-steps";
 import { progressWords } from "@/lib/progress-words";
 import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -343,16 +344,17 @@ export function DailyHabits({
     });
   }
 
-  /** Tick one sub-habit; the last tick completes the habit. */
+  /** Tick one sub-habit; the last required tick completes the habit. */
   function tickStep(h: RiteView, stepId: string) {
     if (!day) return;
     const on = !ticked(h, stepId);
     const subs = subsOf(h);
     const after = new Map(subs.map((st) => [st.id, st.id === stepId ? on : ticked(h, st.id)]));
-    const all = subs.every((st) => after.get(st.id));
+    const wasDone = done(h.id);
+    // Only the required sub-habits finish it (owner, Nov 14); with none required, ticks leave it as it was.
+    const all = stepsComplete(subs, (id) => !!after.get(id)) ?? wasDone;
     setError(null);
     setStepOpt((o) => ({ ...o, ...Object.fromEntries(subs.map((st) => [`${h.id}|${st.id}`, after.get(st.id)!])) }));
-    const wasDone = done(h.id);
     if (all !== wasDone) {
       setOptimistic((o) => ({ ...o, [h.id]: all }));
       if (all && h.xp_value > 0) {
@@ -807,6 +809,11 @@ export function DailyHabits({
                               </span>
                               <span className="min-w-0 flex-1 text-[15px] leading-snug" style={{ color: "var(--t-ink)" }}>
                                 {st.title}
+                                {st.optional && (
+                                  <span className="ml-1.5 text-[12px] italic" style={{ color: "var(--t-ink-soft)" }}>
+                                    optional
+                                  </span>
+                                )}
                               </span>
                               {(st.xp || st.coins) && (
                                 <span className="shrink-0 text-[12px] font-bold tabular-nums" style={{ color: "var(--t-xp, #4f7d38)" }}>

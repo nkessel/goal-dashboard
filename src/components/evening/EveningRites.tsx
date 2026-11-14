@@ -1,5 +1,6 @@
 "use client";
 
+import { stepsComplete } from "@/lib/habit-steps";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { progressWords } from "@/lib/progress-words";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
@@ -67,7 +68,7 @@ export type RiteView = {
   /** Habits: repeat on an interval (every N days/weeks/months/years); null = weekdays. */
   repeat?: import("@/lib/habit-repeat").Repeat | null;
   /** Habits: sub-habits ticked off each day. */
-  steps?: { id: string; title: string; xp?: number; coins?: number }[];
+  steps?: { id: string; title: string; xp?: number; coins?: number; optional?: boolean }[];
 };
 
 const CORE_ZONE = "zone:core";
@@ -273,7 +274,8 @@ export function EveningRites({
     const on = !stepDone(r.id, stepId);
     const steps = r.steps ?? [];
     const wasDone = doneTonight(r.id);
-    const allAfter = steps.every((st) => (st.id === stepId ? on : stepDone(r.id, st.id)));
+    // Only required subtasks finish it; with none required, the rite stays as it was.
+    const allAfter = stepsComplete(steps, (id) => (id === stepId ? on : stepDone(r.id, id))) ?? wasDone;
     setError(null);
     setStepOpt((o) => ({ ...o, [`${r.id}|${stepId}`]: on }));
     if (allAfter !== wasDone) {
@@ -646,6 +648,11 @@ export function EveningRites({
                   </span>
                   <span className="min-w-0 flex-1 break-words text-[14.5px] leading-snug" style={{ color: "var(--t-ink)", opacity: ticked ? 0.6 : 1 }}>
                     {st.title}
+                    {st.optional && (
+                      <span className="ml-1.5 text-[12px] italic" style={{ color: "var(--t-ink-soft)" }}>
+                        optional
+                      </span>
+                    )}
                   </span>
                   {(st.xp ?? 0) > 0 && (
                     <span className="shrink-0 text-[12.5px] font-semibold" style={{ color: "var(--t-xp)" }}>

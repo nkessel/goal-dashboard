@@ -479,6 +479,14 @@ export const FLOWS = [
         await h.settle(300);
         if (await h.tap((p) => p.getByRole("button", { name: /options for stretch/i }).first(), "sub-habit options", { optional: true, expectMove: true })) {
           await h.check("habit editor: sub-habit options");
+          // Give it XP (shows on its row), then mark it not required (owner, Nov 14).
+          await h.tap((p) => p.getByRole("menuitem", { name: /give xp/i }).first(), "sub-habit: give XP", { optional: true, expectMove: true });
+          await h.check("habit editor: sub-habit XP on its row");
+          await h.tap((p) => p.getByRole("button", { name: /options for stretch/i }).first(), "sub-habit options again", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("menuitemcheckbox", { name: /required to finish/i }).first(), "sub-habit: not required", { optional: true });
+          await h.check("habit editor: sub-habit optional");
+          await h.page.keyboard.press("Escape").catch(() => {});
+          await h.settle(200);
         }
         // Its details are pills now: open Repeats, then pick Certain days.
         await h.tap((p) => p.locator("[data-mi=pills] button").first(), "repeats pill", { optional: true, expectMove: true });

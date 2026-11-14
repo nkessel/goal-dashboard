@@ -37,7 +37,7 @@ export type Rite = {
 };
 
 /** A sub-habit; `xp`/`coins` are paid when it is ticked (on top of the habit's own). */
-export type RiteStep = { id: string; title: string; xp?: number; coins?: number };
+export type RiteStep = { id: string; title: string; xp?: number; coins?: number; /** Not needed to finish the habit (owner, Nov 14). */ optional?: boolean };
 
 export type RiteCompletion = {
   id: string;
@@ -332,7 +332,7 @@ export function cleanRiteSteps(raw: unknown): RiteStep[] {
     .map((x) => {
       const xp = Math.max(0, Math.min(100, Math.round(Number(x.xp) || 0)));
       const coins = Math.max(0, Math.min(50, Math.round(Number(x.coins) || 0)));
-      return { id: x.id!.slice(0, 40), title: x.title!.replace(/\s+/g, " ").trim().slice(0, 120), ...(xp ? { xp } : {}), ...(coins ? { coins } : {}) };
+      return { id: x.id!.slice(0, 40), title: x.title!.replace(/\s+/g, " ").trim().slice(0, 120), ...(xp ? { xp } : {}), ...(coins ? { coins } : {}), ...(x.optional === true ? { optional: true } : {}) };
     })
     .slice(0, 20);
 }

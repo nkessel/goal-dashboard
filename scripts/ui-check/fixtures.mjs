@@ -88,7 +88,7 @@ export function makeFixtures() {
     rite("Walk Chester 🐶", "day", { kind: "habit" }),
     rite("Learn a language 🗣", "day", { kind: "habit" }),
     rite("Morning routine ☀️", "day", { kind: "habit", steps: [{ id: "m1", title: "Read the book with Tiffany" }, { id: "m2", title: "Walk Chester" }, { id: "m3", title: "Make breakfast for Tiffany and me" }] }),
-    rite("Vitamins before 12pm", "day", { kind: "habit", steps: [{ id: "s1", title: "Vitamins" }, { id: "s2", title: "B12" }, { id: "s3", title: "D3" }] }),
+    rite("Vitamins before 12pm", "day", { kind: "habit", steps: [{ id: "s1", title: "Vitamins" }, { id: "s2", title: "B12" }, { id: "s3", title: "D3", optional: true, xp: 2 }] }),
     rite("Brush and floss", "evening"),
     rite("Lay out tomorrow's clothes", "evening"),
     rite("Calendar check-in with Tiffany", "evening", { is_core: true, steps: [{ id: "e1", title: "Check if Tiffany has any morning meetings the bedroom door needs to be closed for (so I can sleep)" }] }),

@@ -234,7 +234,7 @@ export function RiteEditorDialog({
 
         {/* Evening rites get subtasks too (owner, Nov 6: "check if Tiffany has any morning meetings…"). The special rites keep their own content. */}
         {(isHabit || !rite?.kind) && (
-          <div data-mi="subs" className="relative z-[1] flex flex-col gap-1">
+          <div data-mi="subs" className="relative z-[2] flex flex-col gap-1">
             <span className="text-[14.5px] font-semibold">{isHabit ? "Sub-habits" : "Subtasks"}</span>
             {extraSubs}
             <SubHabitList list={subs} onChange={setSubs} autoFocus={focusSub} noun={isHabit ? "sub-habit" : "subtask"} />
@@ -573,7 +573,7 @@ export function RiteEditorDialog({
           </p>
         )}
 
-        <div className="sticky -bottom-5 z-[2] -mx-5 -mb-5 flex items-center justify-between gap-2 px-5 pb-5 pt-2" style={{ order: 99, background: "linear-gradient(180deg, rgba(240,226,192,0), rgba(240,226,192,.96) 30%)" }}>
+        <div data-editor-foot className="sticky -bottom-5 z-[2] -mx-5 -mb-5 flex items-center justify-between gap-2 px-5 pb-5 pt-2" style={{ order: 99, background: "linear-gradient(180deg, rgba(240,226,192,0), rgba(240,226,192,.96) 30%)" }}>
           <span />
           <span className="flex gap-2">
 

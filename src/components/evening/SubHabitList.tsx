@@ -1,21 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CoinIcon } from "@/components/ui/Icons";
-import { Fold } from "@/components/ui/Fold";
+import { InlineNumber } from "@/components/ui/InlineNumber";
 
-export type SubHabit = { id: string; title: string; xp?: number; coins?: number };
+export type SubHabit = { id: string; title: string; xp?: number; coins?: number; /** Not needed to finish the habit (owner, Nov 14). */ optional?: boolean };
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 
 /**
- * A habit's sub-habits, the way the owner asked (repeat ask 15): always in view,
- * each row dragged by itself to reorder (no arrows, no grips), renamed in place,
- * and its own little menu (right-click, or tap its dot) for XP, coins and Remove,
- * opening right under the row. A line at the bottom adds one.
+ * A habit's sub-habits, the way the owner asked (repeat ask 15), drawn like the quest
+ * editor's sub-quests (owner, Nov 14: no white box, no dotted tray): bare rows on the
+ * editor's own parchment, each dragged by itself to reorder (no arrows, no grips),
+ * renamed in place, its XP and coins on its row (tap the number to type over it), and
+ * a ⋯ menu (right-click too) for Give XP, Give coins, Required to finish, and Remove.
+ * A line at the bottom adds one.
  */
 export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-habit", coins = true }: { list: SubHabit[]; onChange: (next: SubHabit[]) => void; autoFocus?: boolean; noun?: string; /** False where a row pays XP only (a quest's sub-quests). */ coins?: boolean }) {
   const [draft, setDraft] = useState("");
@@ -34,8 +36,28 @@ export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-ha
     setDraft("");
   };
   const set = (id: string, patch: Partial<SubHabit>) => onChange(list.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  // The menu closes on a press outside it, or Esc (which then doesn't close the editor too).
+  useEffect(() => {
+    if (!menu) return;
+    const down = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest?.("[data-sub-menu]") || t?.closest?.("[data-feedback-root]")) return;
+      setMenu(null);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setMenu(null);
+    };
+    document.addEventListener("pointerdown", down, true);
+    document.addEventListener("keydown", key, true);
+    return () => {
+      document.removeEventListener("pointerdown", down, true);
+      document.removeEventListener("keydown", key, true);
+    };
+  }, [menu]);
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-0.5" role="list">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onEnd} onDragStart={() => setMenu(null)}>
         <SortableContext items={list.map((s) => s.id)} strategy={verticalListSortingStrategy}>
           {list.map((s) => (
@@ -48,12 +70,13 @@ export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-ha
               onMenu={() => setMenu((m) => (m === s.id ? null : s.id))}
               onChange={(patch) => set(s.id, patch)}
               onRemove={() => (setMenu(null), onChange(list.filter((x) => x.id !== s.id)))}
+              closeMenu={() => setMenu(null)}
             />
           ))}
         </SortableContext>
       </DndContext>
-      <div className="flex items-center gap-2 px-2">
-        <span aria-hidden className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed text-[12px]" style={{ borderColor: "#a58c66", color: "var(--t-ink-soft)" }}>
+      <div className="flex items-center gap-2 px-1.5">
+        <span aria-hidden className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed text-[11px]" style={{ borderColor: "#a58c66", color: "var(--t-ink-soft)" }}>
           +
         </span>
         <input
@@ -69,37 +92,25 @@ export function SubHabitList({ list, onChange, autoFocus = false, noun = "sub-ha
           autoFocus={autoFocus}
           placeholder={list.length ? `Another ${noun}` : noun === "sub-habit" ? "Add a sub-habit (e.g. Food and water)" : `Add a ${noun}`}
           aria-label={`Add a ${noun}`}
-          className="h-8 min-w-0 flex-1 rounded-md border border-dashed bg-transparent px-2 text-[16px] sm:text-[15px]"
-          style={{ borderColor: "#b39a6a" }}
+          className="bare-input h-8 min-w-0 flex-1 border-0 bg-transparent px-1 text-[16px] sm:text-[15px]"
+          style={{ color: "var(--t-ink)" }}
         />
       </div>
     </div>
   );
 }
 
-/** The XP and coins a sub-habit pays when ticked, as one quiet badge ("+3 XP · 1"). */
-function Pays({ sub }: { sub: SubHabit }) {
-  if (!sub.xp && !sub.coins) return null;
-  return (
-    <span className="flex shrink-0 items-center gap-1 text-[12.5px] font-semibold tabular-nums" style={{ color: "#8a6116" }}>
-      {sub.xp ? `+${sub.xp} XP` : null}
-      {sub.coins ? (
-        <span className="flex items-center gap-0.5">
-          {sub.xp ? "·" : "+"} {sub.coins} <CoinIcon size={12} />
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-function Row({ sub, noun, coins, menuOpen, onMenu, onChange, onRemove }: { sub: SubHabit; noun: string; coins: boolean; menuOpen: boolean; onMenu: () => void; onChange: (patch: Partial<SubHabit>) => void; onRemove: () => void }) {
+function Row({ sub, noun, coins, menuOpen, onMenu, closeMenu, onChange, onRemove }: { sub: SubHabit; noun: string; coins: boolean; menuOpen: boolean; onMenu: () => void; closeMenu: () => void; onChange: (patch: Partial<SubHabit>) => void; onRemove: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id });
+  const whole = noun === "sub-habit" ? "the habit" : "the rite";
+  const hold = (e: React.SyntheticEvent) => e.stopPropagation();
+  const items: [string, React.ReactNode, string][] = [
+    ...(!sub.xp ? [["xp", <span key="i" style={{ color: "var(--t-xp)" }}>✦</span>, "Give XP"] as [string, React.ReactNode, string]] : []),
+    ...(coins && !sub.coins ? [["coins", <CoinIcon key="i" size={14} />, "Give coins"] as [string, React.ReactNode, string]] : []),
+    ["remove", "−", "Remove"],
+  ];
   return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 5 : undefined, position: "relative" }}
-      className="due-in"
-    >
+    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 5 : menuOpen ? 4 : undefined, position: "relative" }} className="due-in">
       <div
         {...attributes}
         {...listeners}
@@ -108,64 +119,110 @@ function Row({ sub, noun, coins, menuOpen, onMenu, onChange, onRemove }: { sub: 
           e.preventDefault();
           onMenu();
         }}
-        className={`group flex min-h-9 items-center gap-2 rounded-xl px-2 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
-        style={{
-          background: isDragging ? "rgba(255,248,228,.97)" : "linear-gradient(180deg, rgba(255,250,236,.75), rgba(244,231,200,.6))",
-          border: `1px solid ${menuOpen ? "rgba(138,97,22,.6)" : "rgba(139,112,64,.3)"}`,
-          boxShadow: isDragging ? "0 8px 18px rgba(0,0,0,.2)" : "inset 0 1px 0 rgba(255,255,255,.5)",
-        }}
+        className={`flex min-h-9 items-center gap-2 rounded-lg px-1.5 transition-colors ${isDragging ? "cursor-grabbing" : "cursor-grab hover:bg-black/[.035]"}`}
+        style={isDragging ? { background: "rgba(255,248,228,.92)", boxShadow: "0 8px 18px rgba(0,0,0,.18)" } : undefined}
       >
-        <span aria-hidden className="h-[18px] w-[18px] shrink-0 rounded-full" style={{ border: "2px solid #a58c66", background: "rgba(255,250,238,.6)" }} />
+        {/* The round check it gets on its card, drawn empty here; dashed when it isn't needed to finish. */}
+        <span aria-hidden className="h-[16px] w-[16px] shrink-0 rounded-full" style={{ border: `1.5px ${sub.optional ? "dashed" : "solid"} #a58c66` }} />
         <input
           value={sub.title}
           onChange={(e) => onChange({ title: e.target.value.slice(0, 120) })}
-          onKeyDown={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={hold}
+          onPointerDown={hold}
+          onMouseDown={hold}
+          onTouchStart={hold}
           aria-label={noun === "sub-habit" ? "Sub-habit" : `Name of this ${noun}`}
-          className="h-8 min-w-0 flex-1 cursor-text rounded-md border-0 bg-transparent px-1 text-[16px] sm:text-[15px]"
+          className="bare-input h-8 min-w-0 flex-1 cursor-text border-0 bg-transparent px-1 text-[16px] sm:text-[15px]"
+          style={{ color: "var(--t-ink)" }}
         />
-        <Pays sub={sub} />
-        <button
-          type="button"
-          onClick={onMenu}
-          onPointerDown={(e) => e.stopPropagation()}
-          aria-label={`Options for ${sub.title}`}
-          aria-expanded={menuOpen}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[16px] font-bold leading-none hover:bg-black/5"
-          style={{ color: "var(--t-ink-soft)", background: menuOpen ? "rgba(217,180,95,.35)" : undefined }}
-        >
-          ⋯
-        </button>
-      </div>
-      <Fold open={menuOpen}>
-        <div className="mx-2 mb-1 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl px-2.5 py-2 text-[13.5px]" style={{ background: "rgba(255,250,238,.55)", border: "1px dashed rgba(139,112,64,.45)" }}>
-          <Stepper label="XP" value={sub.xp ?? 0} max={100} onChange={(n) => onChange({ xp: n || undefined })} />
-          {coins && <Stepper label={<CoinIcon size={14} />} aria="Coins" value={sub.coins ?? 0} max={50} onChange={(n) => onChange({ coins: n || undefined })} />}
-          <button type="button" onClick={onRemove} className="ml-auto h-8 rounded-full px-2.5 text-[13px] font-semibold hover:bg-black/5" style={{ color: "var(--t-warn)" }}>
-            Remove
+        {sub.optional && (
+          <span className="shrink-0 text-[12px] italic" style={{ color: "var(--t-ink-soft)" }} title={`Not needed to finish ${whole}`}>
+            optional
+          </span>
+        )}
+        {/* Its XP and coins on its row, like a sub-quest's: tap the number to type over it (0 takes it off). */}
+        {(sub.xp ?? 0) > 0 && (
+          <span onPointerDown={hold} onMouseDown={hold} onTouchStart={hold} className="flex h-7 shrink-0 items-center text-[12.5px] font-semibold tabular-nums" style={{ color: "var(--t-xp)" }} title={`XP this ${noun} brings (tap to change; 0 takes it off)`}>
+            <InlineNumber value={sub.xp ?? 0} min={0} max={100} suffix=" XP" label={`XP for ${sub.title}`} onChange={(n) => onChange({ xp: n || undefined })} />
+          </span>
+        )}
+        {coins && (sub.coins ?? 0) > 0 && (
+          <span onPointerDown={hold} onMouseDown={hold} onTouchStart={hold} className="flex h-7 shrink-0 items-center gap-0.5 text-[12.5px] font-semibold tabular-nums" style={{ color: "#8a6116" }} title={`Coins this ${noun} brings (tap to change; 0 takes them off)`}>
+            <InlineNumber value={sub.coins ?? 0} min={0} max={50} suffix="" label={`Coins for ${sub.title}`} onChange={(n) => onChange({ coins: n || undefined })} />
+            <CoinIcon size={13} />
+          </span>
+        )}
+        <span className="relative shrink-0" data-sub-menu>
+          <button
+            type="button"
+            onClick={onMenu}
+            onPointerDown={hold}
+            onMouseDown={hold}
+            onTouchStart={hold}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={`Options for ${sub.title}`}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]"
+            style={{ color: "var(--t-ink-soft)", background: menuOpen ? "rgba(217,180,95,.3)" : undefined }}
+          >
+            ⋯
           </button>
-        </div>
-      </Fold>
-    </div>
-  );
-}
-
-function Stepper({ label, aria, value, max, onChange }: { label: React.ReactNode; aria?: string; value: number; max: number; onChange: (n: number) => void }) {
-  const name = aria ?? (typeof label === "string" ? label : "");
-  return (
-    <span className="flex items-center gap-1">
-      <span className="flex items-center font-semibold">{label}</span>
-      <span className="flex h-8 items-center rounded-full border" style={{ borderColor: value ? "#5a4520" : "#b39a6a" }}>
-        <button type="button" onClick={() => onChange(Math.max(0, value - 1))} aria-label={`Less ${name}`} className="flex h-8 w-7 items-center justify-center text-[16px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-          −
-        </button>
-        <span className="min-w-5 text-center font-bold tabular-nums" style={{ color: value ? "#8a6116" : "var(--t-ink-soft)" }}>
-          {value}
+          {menuOpen && (
+            <span
+              role="menu"
+              // Opens upward when the editor's pinned Save row would cover it.
+              ref={(el) => {
+                if (!el || el.dataset.placed) return;
+                el.dataset.placed = "1";
+                const box = el.closest("[role=dialog]") ?? document.documentElement;
+                const foot = box.querySelector("[data-editor-foot]");
+                const limit = Math.min(window.innerHeight, foot ? foot.getBoundingClientRect().top : box.getBoundingClientRect().bottom) - 8;
+                if (el.getBoundingClientRect().bottom > limit) {
+                  el.style.top = "auto";
+                  el.style.bottom = "36px";
+                }
+              }}
+              onPointerDown={hold} onMouseDown={hold} onTouchStart={hold} className="card-pop-in parchment absolute right-0 top-9 z-30 flex w-[228px] flex-col overflow-hidden py-1" style={{ borderRadius: 12, boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
+              {/* Needed to finish the habit, or not (owner, Nov 14): some habits are done with one sub-habit, or none. */}
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={!sub.optional}
+                onClick={() => onChange({ optional: sub.optional ? undefined : true })}
+                className="relative z-[1] flex min-h-10 items-center gap-2.5 px-3.5 text-left text-[14.5px] hover:bg-black/5"
+                style={{ color: "var(--t-ink)" }}
+              >
+                <span aria-hidden className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full" style={{ border: `1.5px solid ${sub.optional ? "#a58c66" : "var(--t-good)"}`, background: sub.optional ? "transparent" : "var(--t-good)" }}>
+                  {!sub.optional && (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                      <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
+                Required to finish {whole}
+              </button>
+              {items.map(([k, icon, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    if (k === "remove") return onRemove();
+                    closeMenu();
+                    if (k === "xp") onChange({ xp: 5 });
+                    if (k === "coins") onChange({ coins: 1 });
+                  }}
+                  className="relative z-[1] flex min-h-10 items-center gap-2.5 px-3.5 text-left text-[14.5px] hover:bg-black/5"
+                  style={{ color: "var(--t-ink)" }}
+                >
+                  <span aria-hidden className="flex w-4 justify-center">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </span>
+          )}
         </span>
-        <button type="button" onClick={() => onChange(Math.min(max, value + 1))} aria-label={`More ${name}`} className="flex h-8 w-7 items-center justify-center text-[16px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-          +
-        </button>
-      </span>
-    </span>
+      </div>
+    </div>
   );
 }

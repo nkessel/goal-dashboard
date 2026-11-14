@@ -50,6 +50,7 @@ import {
   listEvents,
 } from "@/lib/google-calendar";
 import { coinsForXp } from "@/lib/coins";
+import { stepsComplete } from "@/lib/habit-steps";
 import { earlyBirdBonus, earlyBirdCoins, oneStepPerProject } from "@/lib/next-action";
 
 async function requireProfileId(): Promise<string> {
@@ -4462,7 +4463,7 @@ export async function sequenceMoveAction(taskId: string, dir: -1 | 1, viewFrom?:
 /* ── Sub-habits ──────────────────────────────────────────────────────── */
 
 /** Save a habit's sub-habit checklist. */
-export async function setRiteStepsAction(riteId: string, steps: { id: string; title: string; xp?: number; coins?: number }[]) {
+export async function setRiteStepsAction(riteId: string, steps: { id: string; title: string; xp?: number; coins?: number; optional?: boolean }[]) {
   const ownerId = await requireProfileId();
   const clean = ritesData.cleanRiteSteps(steps);
   await ritesData.setRiteSteps(ownerId, riteId, clean);
@@ -4471,8 +4472,8 @@ export async function setRiteStepsAction(riteId: string, steps: { id: string; ti
 }
 
 /**
- * Tick (or untick) one sub-habit for `day`. Ticking the last one completes the
- * habit (XP and all); unticking one of a completed habit undoes that.
+ * Tick (or untick) one sub-habit for `day`. Ticking the last required one completes the
+ * habit (XP and all); unticking a required one of a completed habit undoes that.
  */
 export async function tickRiteStepAction(riteId: string, stepId: string, day: string, on: boolean) {
   const ownerId = await requireProfileId();
@@ -4486,13 +4487,14 @@ export async function tickRiteStepAction(riteId: string, stepId: string, day: st
   if (changed && step) await payStep(ownerId, step, on ? 1 : -1);
   const checks = ((await ritesData.listRiteStepChecks(ownerId, day)) ?? []).filter((c) => c.rite_id === riteId && c.day === day);
   const ticked = new Set(checks.map((c) => c.step_id));
-  const all = steps.length > 0 && steps.every((st) => ticked.has(st.id));
+  // Only the required sub-habits finish it; with none required, ticks never complete or undo it.
+  const all = stepsComplete(steps, (id) => ticked.has(id));
   const { data: doneRow } = await supabaseAdmin().from("rite_completions").select("id").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle();
   let completed: { xp: number; coinsEarned: number } | null = null;
-  if (all && !doneRow) completed = await completeRiteAction(riteId, day);
-  else if (!all && doneRow) await uncompleteRiteAction(riteId, day);
+  if (all === true && !doneRow) completed = await completeRiteAction(riteId, day);
+  else if (all === false && doneRow) await uncompleteRiteAction(riteId, day);
   revalidatePath("/");
-  return { done: all, xp: completed?.xp ?? 0 };
+  return { done: all ?? !!doneRow, xp: completed?.xp ?? 0 };
 }
 
 async function payStep(ownerId: string, step: ritesData.RiteStep, sign: 1 | -1) {
