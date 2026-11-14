@@ -5,8 +5,13 @@ import { useEveningMode } from "@/components/evening/evening-clock";
 import { ToucanGuide } from "@/components/layout/LazyShell";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
+import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type Modifier } from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useViewTransitionNavigate } from "@/components/ui/ViewTransitionProvider";
+import { normalizeNavOrder, type NavHref } from "@/lib/nav-order";
+import { saveNavOrderAction } from "@/app/actions";
 
 type Theme = "calm" | "adventure";
 
@@ -64,8 +69,8 @@ function calmIcon(name: string, color: string) {
   }
 }
 
-const ITEMS: {
-  href: string;
+type NavItem = {
+  href: NavHref;
   key: "calendar" | "grid" | "now" | "insights" | "party";
   /** Other paths that belong to this tab. */
   also?: string[];
@@ -75,7 +80,8 @@ const ITEMS: {
   adventureIcon: string;
   adventureLabel: string;
   calmLabel: string;
-}[] = [
+};
+const ITEMS: NavItem[] = [
   { href: "/calendar", key: "calendar", adventureIcon: "ui-scroll.png", adventureLabel: "Calendar", calmLabel: "Calendar" },
   { href: "/boards", key: "grid", adventureIcon: "ui-grid.png", adventureLabel: "All Quests", calmLabel: "Quests", also: ["/matrix"] },
   { href: "/", key: "now", adventureIcon: "ui-compass.png", adventureLabel: "Today's Quest", calmLabel: "Now" },
@@ -83,10 +89,54 @@ const ITEMS: {
   { href: "/feed", key: "party", adventureIcon: "ui-party-simple.svg", adventureLabel: "Party", calmLabel: "Friends" },
 ];
 
-/** Index of the nav item a pathname belongs to, or -1 if it's not one of
- * the main tabs (a detail page, settings, etc). */
-function navIndex(pathname: string) {
-  return ITEMS.findIndex((item) => onTab(item, pathname));
+/** Index of the nav item a pathname belongs to in the order shown, or -1 if
+ * it's not one of the main tabs (a detail page, settings, etc). */
+function navIndex(items: NavItem[], pathname: string) {
+  return items.findIndex((item) => onTab(item, pathname));
+}
+
+// The order chosen on this page, ahead of the account: the shell re-mounts on
+// every screen change and prefetched screens still carry the old order, so the
+// latest drag wins here until the next full load.
+let chosenOrder: NavHref[] | null = null;
+const orderListeners = new Set<() => void>();
+function subscribeOrder(fn: () => void) {
+  orderListeners.add(fn);
+  return () => void orderListeners.delete(fn);
+}
+function setChosenOrder(order: NavHref[]) {
+  chosenOrder = order;
+  for (const fn of orderListeners) fn();
+}
+
+/** A dragged tab moves only sideways and never leaves the screen. */
+const alongTheBar: Modifier = ({ transform, draggingNodeRect }) => {
+  if (!draggingNodeRect || typeof window === "undefined") return { ...transform, y: 0 };
+  const min = -draggingNodeRect.left;
+  const max = window.innerWidth - draggingNodeRect.right;
+  return { ...transform, x: Math.min(max, Math.max(min, transform.x)), y: 0 };
+};
+
+/** One tab, held and dragged sideways to move it (no grips: the tab itself moves). */
+function NavSlot({ id, children }: { id: string; children: ReactNode }) {
+  const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      data-nav-slot
+      className="relative flex min-w-0 flex-auto items-stretch"
+      style={{
+        zIndex: isDragging ? 3 : 1,
+        transform: transform ? CSS.Transform.toString({ ...transform, y: 0, scaleX: 1, scaleY: 1 }) : undefined,
+        transition,
+        filter: isDragging ? "drop-shadow(0 4px 8px rgba(0,0,0,.55)) brightness(1.12)" : undefined,
+        touchAction: "manipulation",
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 function onTab(item: { href: string; also?: string[] }, pathname: string) {
@@ -94,8 +144,33 @@ function onTab(item: { href: string; also?: string[] }, pathname: string) {
   return [item.href, ...(item.also ?? [])].some((h) => pathname.startsWith(h));
 }
 
-export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme; name?: string | null; toucan?: unknown }) {
+export function BottomNav({ theme, name = null, toucan = null, navOrder = null }: { theme: Theme; name?: string | null; toucan?: unknown; navOrder?: unknown }) {
   const pathname = usePathname();
+  const chosen = useSyncExternalStore(subscribeOrder, () => chosenOrder, () => null);
+  const order = chosen ?? normalizeNavOrder(navOrder);
+  const items = order.map((h) => ITEMS.find((it) => it.href === h)!);
+  const orderKey = order.join(",");
+  const [dragging, setDragging] = useState(false);
+  const justDragged = useRef(false);
+  const dropped = () => {
+    setDragging(false);
+    justDragged.current = true;
+    window.setTimeout(() => (justDragged.current = false), 350);
+  };
+  // A hold (finger) or a small move (mouse) picks a tab up; a plain tap still opens it.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 380, tolerance: 8 } })
+  );
+  function onDragEnd(e: DragEndEvent) {
+    dropped();
+    const from = order.indexOf(e.active.id as NavHref);
+    const to = e.over ? order.indexOf(e.over.id as NavHref) : -1;
+    if (from < 0 || to < 0 || from === to) return;
+    const next = arrayMove(order, from, to);
+    setChosenOrder(next);
+    saveNavOrderAction(next).catch(() => {});
+  }
   const router = useRouter();
   // The other tabs load ahead of time, but only once the first screen (and the welcome screen over it) is
   // done: fetching four whole screens right at startup slowed the app's opening on phones (owner, Nov 2).
@@ -130,7 +205,7 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
   // same moment the screen-level view transition kicks off (see navigate()
   // below), not just when this component happens to re-render.
   useLayoutEffect(() => {
-    const activeIndex = navIndex(activePath);
+    const activeIndex = navIndex(items, activePath);
     const row = rowRef.current;
     const el = itemRefs.current[activeIndex];
     if (!row || !el) {
@@ -148,12 +223,13 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
     // recheck on both so the box never drifts out of alignment.
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [activePath, isAdventure]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- items follows orderKey
+  }, [activePath, isAdventure, orderKey]);
 
   // The + button sits right above the Today's Quest tab: publish that tab's
   // centre as --fab-x so the button can line up with it at any width.
   useLayoutEffect(() => {
-    const center = itemRefs.current[2];
+    const center = itemRefs.current[order.indexOf("/")];
     if (!center) return;
     const place = () => {
       const r = center.getBoundingClientRect();
@@ -167,10 +243,11 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
       ro.disconnect();
       window.removeEventListener("resize", place);
     };
-  }, [isAdventure]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- order follows orderKey
+  }, [isAdventure, orderKey]);
 
   // Whole screen slides in from the right when moving to a tab further
-  // right in the nav order, or from the left when moving to one further
+  // right in the nav order (the order the owner arranged), or from the left when moving to one further
   // left — a low-key sense of spatial direction, layered on the browser's
   // native View Transitions API (progressively enhanced; a plain navigation
   // everywhere else). Scoped with the `data-transition` attribute so it
@@ -180,6 +257,8 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
   // handled centrally by ViewTransitionProvider.
   function navigate(e: MouseEvent<HTMLAnchorElement>, href: string) {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // let opens-in-new-tab work normally
+    // Letting go of a dragged tab isn't a tap.
+    if (dragging || justDragged.current) return void e.preventDefault();
     if (href === pathname) {
       // Already there — swallow the tap instead of letting Link perform a
       // real (if same-URL) navigation, which was refetching/flashing the
@@ -191,8 +270,8 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
       return;
     }
     e.preventDefault();
-    const fromIndex = navIndex(pathname);
-    const toIndex = navIndex(href);
+    const fromIndex = navIndex(items, pathname);
+    const toIndex = navIndex(items, href);
     const direction = pathname.startsWith("/settings")
       ? "nav-up"
       : fromIndex >= 0 && toIndex >= 0 && toIndex < fromIndex
@@ -241,8 +320,9 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
           <div
             aria-hidden
             data-nav-highlight
-            className="pointer-events-none absolute transition-[left,width] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+            className="pointer-events-none absolute transition-[left,width,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
             style={{
+              opacity: dragging ? 0 : 1,
               left: highlight.left,
               width: highlight.width,
               top: isAdventure ? 1 : 6,
@@ -260,12 +340,21 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
             }}
           />
         )}
-        {ITEMS.map((item, i) => {
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[alongTheBar]}
+          onDragStart={() => setDragging(true)}
+          onDragCancel={dropped}
+          onDragEnd={onDragEnd}
+        >
+        <SortableContext items={order} strategy={horizontalListSortingStrategy}>
+        {items.map((item, i) => {
           const active = onTab(item, activePath);
           const label = isAdventure ? item.adventureLabel : item.calmLabel;
 
           return (
-            <div key={item.href} className="relative flex min-w-0 flex-auto items-stretch" style={{ zIndex: 1 }}>
+            <NavSlot key={item.href} id={item.href}>
               {i > 0 && (
                 <div
                   aria-hidden
@@ -283,6 +372,8 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
                 // A finger landing on a tab starts its screen loading before the tap ends.
                 onPointerDown={() => router.prefetch(item.href)}
                 onClick={(e) => navigate(e, item.href)}
+                draggable={false}
+                style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
                 ref={(el) => {
                   itemRefs.current[i] = el;
                 }}
@@ -294,6 +385,7 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
                     <img
                       src={`/design/${item.adventureIcon}`}
                       alt=""
+                      draggable={false}
                       width={38}
                       height={38}
                       style={{
@@ -337,9 +429,11 @@ export function BottomNav({ theme, name = null, toucan = null }: { theme: Theme;
                   </>
                 )}
               </Link>
-            </div>
+            </NavSlot>
           );
         })}
+        </SortableContext>
+        </DndContext>
       </div>
     </nav>
   );

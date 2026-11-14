@@ -4697,6 +4697,15 @@ export async function saveOwnWordsAction(words: OwnWords) {
 /** The welcome screen's layout (order, hidden parts, its buttons), kept on the account so every device shows the same screen. */
 export type WelcomeLayout = Record<string, unknown> & { at?: number };
 const WELCOME_LAYOUT_KEYS = ["welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar"] as const;
+/** The bottom bar's tab order (hold and drag a tab). */
+export async function saveNavOrderAction(order: string[]) {
+  const ownerId = await requireProfileId();
+  const { normalizeNavOrder } = await import("@/lib/nav-order");
+  const extras = await readExtras(ownerId);
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, navOrder: normalizeNavOrder(order) } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+}
+
 export async function getWelcomeLayoutAction(): Promise<WelcomeLayout | null> {
   const ownerId = await requireProfileId();
   const w = (await readExtras(ownerId)).welcomeLayout;

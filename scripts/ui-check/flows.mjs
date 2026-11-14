@@ -341,6 +341,45 @@ export const FLOWS = [
     },
   },
   {
+    // The bottom bar's tabs reorder by dragging a tab (owner, Nov 14); the screen slide follows the new order.
+    name: "navorder",
+    async run(h) {
+      await h.goto("/", { name: "navorder" });
+      await h.settle(1200);
+      const hrefs = () => h.page.$$eval("nav[data-app-nav] [data-nav-slot] a[href]", (as) => as.map((a) => a.getAttribute("href")));
+      const drag = async (from, to, label) => {
+        const a = await h.page.locator(`nav[data-app-nav] a[href="${from}"]`).boundingBox().catch(() => null);
+        const b = await h.page.locator(`nav[data-app-nav] a[href="${to}"]`).boundingBox().catch(() => null);
+        if (!a || !b) return h.record({ kind: "no-drag", severity: "error", target: "navorder", detail: `no ${from} or ${to} tab` });
+        await h.page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+        await h.page.mouse.down();
+        await h.page.mouse.move(a.x + a.width / 2 + 12, a.y + a.height / 2, { steps: 3 });
+        await h.page.mouse.move(b.x + b.width / 2 + (to === "/feed" ? 10 : -10), b.y + b.height / 2, { steps: 12 });
+        await h.settle(250);
+        await h.check(label);
+        await h.page.mouse.up();
+        await h.settle(700);
+      };
+      await drag("/calendar", "/feed", "dragging the Calendar tab");
+      const after = await hrefs();
+      if (after[after.length - 1] !== "/calendar") h.record({ kind: "nav-order", severity: "error", target: "navorder", detail: `Calendar didn't move to the end: ${after.join(" ")}` });
+      await h.check("Calendar tab moved to the end");
+      // Today → Calendar is now a step to the right: the screen leaves to the left.
+      await h.page.locator('nav[data-app-nav] a[href="/calendar"]').click({ timeout: 3000 }).catch(() => {});
+      const dir = await h.page.evaluate(() => document.documentElement.getAttribute("data-nav-pending") ?? document.documentElement.getAttribute("data-enter"));
+      if (dir && dir !== "nav-forward") h.record({ kind: "nav-order", severity: "error", target: "navorder", detail: `slide to the moved Calendar went ${dir}` });
+      await h.page.waitForURL(/\/calendar/, { timeout: 15000 }).catch(() => {});
+      await h.settle(1500);
+      await h.check("calendar after the reordered tab");
+      const kept = await hrefs();
+      if (kept[kept.length - 1] !== "/calendar") h.record({ kind: "nav-order", severity: "error", target: "navorder", detail: `order not kept on the next screen: ${kept.join(" ")}` });
+      // Put it back for the flows after this one.
+      await drag("/calendar", "/boards", "dragging Calendar back");
+      const back = await hrefs();
+      if (back[0] !== "/calendar") h.record({ kind: "nav-order", severity: "warn", target: "navorder", detail: `couldn't put Calendar back: ${back.join(" ")}` });
+    },
+  },
+  {
     // Today's day calendar beside Today (owner, Nov 12): side by side on a tablet, a slide-out tab on a phone;
     // a quest card dragged onto it shows where it lands and goes there; the place panel's driving time; the card's look.
     name: "todaycal",

@@ -133,7 +133,7 @@ export async function AppShell({
 
       {profileId && <FocusTimerPill theme={theme} />}
       {profileId && <WeatherSync place={profile?.life_wheel?.weather ?? null} />}
-      {profileId && <BottomNav theme={theme} name={profile?.name ?? null} toucan={profile?.toucan ?? null} />}
+      {profileId && <BottomNav theme={theme} name={profile?.name ?? null} toucan={profile?.toucan ?? null} navOrder={(profile?.life_wheel as { navOrder?: unknown } | null | undefined)?.navOrder ?? null} />}
       {profileId && <FeedbackDock theme={theme} />}
       {profileId && <PlanMyDayHost theme={theme} />}
       {profileId && <NotificationPreview />}
