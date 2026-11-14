@@ -20,6 +20,10 @@ export type QuestStep = {
   parent_id?: string | null;
   /** XP this step has paid so far. */
   xp_paid?: number;
+  /** Coins paid when the step is done (0 = none; migration 0088). */
+  coins?: number;
+  /** Coins this step has paid so far. */
+  coins_paid?: number;
   /** Skipped (left out) or failed; null when open or done. */
   state?: "skipped" | "failed" | null;
 };
@@ -30,7 +34,7 @@ export type StepInput = {
   key?: string;
   /** The step this one sits inside (its key or id), or null at the top. */
   parentKey?: string | null;
-  title: string; done: boolean; xp?: number; weight?: number | null; progress?: number; seconds?: number; state?: "skipped" | "failed" | null };
+  title: string; done: boolean; xp?: number; coins?: number; weight?: number | null; progress?: number; seconds?: number; state?: "skipped" | "failed" | null };
 
 /** True when the error just means the quest_steps table hasn't been created yet. */
 function missingTable(error: { code?: string; message: string } | null) {
@@ -106,6 +110,7 @@ export async function replaceSteps(
     const parentId = s.parentKey === undefined ? undefined : s.parentKey === null ? null : (idOf.get(s.parentKey) ?? (before.has(s.parentKey) ? s.parentKey : null));
     const extra = {
       ...(s.xp !== undefined ? { xp: Math.max(0, Math.min(1000, Math.round(s.xp))) } : {}),
+      ...(s.coins !== undefined ? { coins: Math.max(0, Math.min(100, Math.round(s.coins))) } : {}),
       ...(s.weight !== undefined ? { weight: s.weight === null ? null : Math.max(1, Math.min(100, Math.round(s.weight))) } : {}),
       ...(s.progress !== undefined || s.done ? { progress: s.done ? 100 : Math.max(0, Math.min(99, Math.round(s.progress ?? 0))) } : {}),
       ...(s.seconds !== undefined ? { seconds_spent: Math.max(0, Math.round(s.seconds)) } : {}),
@@ -117,6 +122,7 @@ export async function replaceSteps(
         prev.done === s.done &&
         prev.sort_order === i &&
         (extra.xp === undefined || extra.xp === (prev.xp ?? 0)) &&
+        (extra.coins === undefined || extra.coins === (prev.coins ?? 0)) &&
         (extra.weight === undefined || extra.weight === (prev.weight ?? null)) &&
         (extra.progress === undefined || extra.progress === (prev.progress ?? 0)) &&
         (extra.seconds_spent === undefined || extra.seconds_spent === (prev.seconds_spent ?? 0)) &&
@@ -186,6 +192,6 @@ export async function attachNextSteps<T extends Task>(tasks: T[], ownerId: strin
 }
 
 /** Record what a step has paid. */
-export async function setStepPaid(stepId: string, ownerId: string, xpPaid: number): Promise<void> {
-  await supabaseAdmin().from("quest_steps").update({ xp_paid: xpPaid }).eq("id", stepId).eq("owner_id", ownerId);
+export async function setStepPaid(stepId: string, ownerId: string, xpPaid: number, coinsPaid?: number): Promise<void> {
+  await supabaseAdmin().from("quest_steps").update({ xp_paid: xpPaid, ...(coinsPaid !== undefined ? { coins_paid: coinsPaid } : {}) }).eq("id", stepId).eq("owner_id", ownerId);
 }

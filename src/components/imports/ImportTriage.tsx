@@ -328,7 +328,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
         // Its board and sub-quests go with it, as an import would take them.
         const a = attrsOf(c.id);
         const boardId = a.board === undefined ? findBoard(boards, c.board_hint)?.id ?? null : a.board;
-        await importCardAction(c.id, { kind: "done", title: c.title, description: c.description, steps: c.steps, stepXp: a.stepXp, boardId, minutes: a.minutes ?? c.minutes ?? null, ...questExtras(a) });
+        await importCardAction(c.id, { kind: "done", title: c.title, description: c.description, steps: c.steps, stepXp: a.stepXp, stepCoins: a.stepCoins, boardId, minutes: a.minutes ?? c.minutes ?? null, ...questExtras(a) });
         say(`Logged “${c.title}” as done ✓`);
         router.refresh();
       } catch (e) {
@@ -377,7 +377,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           importance: d.importance ?? null,
           urgency,
           minutes: d.minutes ?? null,
-          ...(d.kind === "habit" ? habitTiming : withAttrs(d.kind) ? { ...questExtras(attrsOf(card.id)), stepXp: attrsOf(card.id).stepXp } : {}),
+          ...(d.kind === "habit" ? habitTiming : withAttrs(d.kind) ? { ...questExtras(attrsOf(card.id)), stepXp: attrsOf(card.id).stepXp, stepCoins: attrsOf(card.id).stepCoins } : {}),
         });
         const board = boards.find((b) => b.id === d.boardId);
         const nRewards = d.kind === "shopping" ? d.steps.filter((x) => d.rewards?.includes(x)).length : 0;
@@ -629,7 +629,6 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
 function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onAttrs, onImport, onDone, onSnooze, onQuick, onSkip, menu, setMenu, onDelete }: { card: ImportCard; frame: React.CSSProperties; onRate: (days: number | null) => void; attrs: Attrs; shownAttrs: AttrKey[]; onAttrs: (a: Attrs) => void; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onDone: () => void; onSnooze: () => void; onSkip: () => void; menu: boolean; setMenu: (v: boolean) => void; onDelete: () => void }) {
   const [source, setSource] = useState(false);
   const [picking, setPicking] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [later, setLater] = useState(false);
   const [boarding, setBoarding] = useState(false);
   // Files kept with the card go with it onto the quest (adding one is in the quest editor's More).
@@ -658,21 +657,10 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
       )}
       {/* Portrait left with its board on it, name, notes and sub-quests right: like a quest card (owner, Nov 12). */}
       <div className="flex items-start gap-3">
-        {pills && <PortraitBoard card={card} attrs={attrs} open={boarding} onToggle={() => setBoarding((v) => !v)} />}
+        {pills && <PortraitBoard card={card} attrs={attrs} open={boarding} onToggle={() => setBoarding((v) => !v)} onAttrs={onAttrs} />}
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          {editing ? (
-            <CardEdit card={card} onDone={(p) => (p && onEdit(p), setEditing(false))} />
-          ) : (
-            <h2 className="m-0 font-display text-[23px] leading-tight [overflow-wrap:anywhere]">
-              {card.title}
-              <EditPen open={false} onClick={() => setEditing(true)} />
-            </h2>
-          )}
-          {!editing && card.description && (
-            <p className="m-0 whitespace-pre-wrap text-[14.5px] leading-snug [overflow-wrap:anywhere]" style={{ color: "#4a3a22" }}>
-              {card.description}
-            </p>
-          )}
+          {/* Tap the name or the notes to edit them where they sit (owner, Nov 14: no ✎). */}
+          <InlineCardText card={card} onEdit={onEdit} />
         </div>
       </div>
       {/* The full width of the card (owner, Nov 12), and edited right here. */}
@@ -788,7 +776,7 @@ const boardOf = (boards: BoardOpt[], card: ImportCard, attrs: Attrs) => {
 };
 
 /** A blank portrait with the board's tag on it, as on a quest card and in the quest editor; the tag opens the board list. */
-function PortraitBoard({ card, attrs, small = false, open, onToggle }: { card: ImportCard; attrs: Attrs; small?: boolean; open: boolean; onToggle: () => void }) {
+function PortraitBoard({ card, attrs, small = false, open, onToggle, onAttrs }: { card: ImportCard; attrs: Attrs; small?: boolean; open: boolean; onToggle: () => void; onAttrs: (a: Attrs) => void }) {
   const { boards } = useContext(BoardsCtx);
   const board = boardOf(boards, card, attrs);
   const size = small ? 40 : 60;
@@ -811,6 +799,11 @@ function PortraitBoard({ card, attrs, small = false, open, onToggle }: { card: I
       <span className="block" style={{ width: size, height: size }}>
         <QuestMonogram id={card.id} title={card.title} size={size} />
       </span>
+      {/* Tiny under the portrait, exactly as in the quest editor (owner, Nov 14). */}
+      <label className={`mt-1 flex cursor-pointer items-center gap-1 whitespace-nowrap ${small ? "text-[10.5px]" : "text-[11.5px]"}`} style={{ color: "var(--t-ink-soft, #6b5631)" }} title="Tiny tasks show half height on Today, with just a check box unless they have a portrait">
+        <input type="checkbox" checked={!!attrs.tiny} onChange={(e) => onAttrs(tinyAttrs(attrs, e.target.checked))} className="h-3.5 w-3.5" style={{ accentColor: "#7a5f2a" }} />
+        Tiny task
+      </label>
     </div>
   );
 }
@@ -971,22 +964,28 @@ function SubQuests({ card, small = false, attrs, onAttrs }: { card: ImportCard; 
   const noun = items ? "item" : "sub-quest";
   // Each sub-quest's XP: an equal share of the quest's XP plus any extra you gave it (as the editor counts it).
   const share = n ? Math.round((attrs.xp ?? XP_DEFAULT) / n) : 0;
-  const save = (next: string[], xp: Record<string, number> = attrs.stepXp ?? {}) => {
+  const save = (next: string[], xp: Record<string, number> = attrs.stepXp ?? {}, coins: Record<string, number> = attrs.stepCoins ?? {}) => {
     const clean = next.map((t) => t.trim()).filter(Boolean);
     resteps(card.id, clean);
-    const kept = Object.fromEntries(Object.entries(xp).filter(([t, v]) => v > 0 && clean.includes(t)));
-    onAttrs({ ...attrs, stepXp: Object.keys(kept).length ? kept : undefined });
+    const keep = (m: Record<string, number>) => {
+      const k = Object.fromEntries(Object.entries(m).filter(([t, v]) => v > 0 && clean.includes(t)));
+      return Object.keys(k).length ? k : undefined;
+    };
+    onAttrs({ ...attrs, stepXp: keep(xp), stepCoins: keep(coins) });
   };
   const rename = (i: number, title: string) => {
     const t = title.trim();
     if (t === steps[i]) return;
     if (!t) return save(steps.filter((_, j) => j !== i));
-    const xp = { ...(attrs.stepXp ?? {}) };
-    if (xp[steps[i]] != null) {
-      xp[t] = xp[steps[i]];
-      delete xp[steps[i]];
-    }
-    save(steps.map((s, j) => (j === i ? t : s)), xp);
+    const move = (m: Record<string, number>) => {
+      const out = { ...m };
+      if (out[steps[i]] != null) {
+        out[t] = out[steps[i]];
+        delete out[steps[i]];
+      }
+      return out;
+    };
+    save(steps.map((s, j) => (j === i ? t : s)), move(attrs.stepXp ?? {}), move(attrs.stepCoins ?? {}));
   };
   const add = () => {
     const t = draft.trim();
@@ -1043,6 +1042,8 @@ function SubQuests({ card, small = false, attrs, onAttrs }: { card: ImportCard; 
                     editable={editable}
                     xp={items ? null : share + (attrs.stepXp?.[s] ?? 0)}
                     onXp={(v) => save(steps, { ...(attrs.stepXp ?? {}), [s]: Math.max(0, v - share) })}
+                    coins={items ? null : (attrs.stepCoins?.[s] ?? 0)}
+                    onCoins={(v) => (setMenu(null), save(steps, attrs.stepXp ?? {}, { ...(attrs.stepCoins ?? {}), [s]: v }))}
                     onRename={(t) => rename(i, t)}
                     onEnter={() => (setAdding(true), requestAnimationFrame(() => newRef.current?.focus()))}
                     menuOpen={menu === i}
@@ -1096,7 +1097,7 @@ function SubQuests({ card, small = false, attrs, onAttrs }: { card: ImportCard; 
 }
 
 /** One sub-quest row, as in the quest editor: its name edited in place, its XP, its ⋯. */
-function StepRow({ id, title, small, editable, xp, onXp, onRename, onEnter, menuOpen, onMenu, onRemove }: { id: string; title: string; small: boolean; editable: boolean; xp: number | null; onXp: (v: number) => void; onRename: (t: string) => void; onEnter: () => void; menuOpen: boolean; onMenu: () => void; onRemove: () => void }) {
+function StepRow({ id, title, small, editable, xp, onXp, coins, onCoins, onRename, onEnter, menuOpen, onMenu, onRemove }: { id: string; title: string; small: boolean; editable: boolean; xp: number | null; onXp: (v: number) => void; coins: number | null; onCoins: (v: number) => void; onRename: (t: string) => void; onEnter: () => void; menuOpen: boolean; onMenu: () => void; onRemove: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: !editable });
   const [text, setText] = useState(title);
   return (
@@ -1135,6 +1136,13 @@ function StepRow({ id, title, small, editable, xp, onXp, onRename, onEnter, menu
           {editable ? <InlineNumber value={xp} min={0} max={500} suffix=" XP" label={`XP for ${title}`} onChange={onXp} /> : `${xp} XP`}
         </span>
       )}
+      {/* Its own coins, once given (⋯ › Give coins), as in the quest editor (owner, Nov 14). */}
+      {coins ? (
+        <span className="mt-[3px] flex h-7 shrink-0 items-center gap-0.5 text-[12.5px] font-semibold" style={{ color: "#8a6116" }} title="Coins this sub-quest brings (tap to change; 0 takes them off)">
+          {editable ? <InlineNumber value={coins} min={0} max={100} suffix="" label={`Coins for ${title}`} onChange={onCoins} /> : coins}
+          <CoinIcon size={13} />
+        </span>
+      ) : null}
       {editable && (
         <span className="relative shrink-0" data-step-menu>
           <button type="button" onClick={onMenu} aria-haspopup="menu" aria-expanded={menuOpen} aria-label={`More for ${title}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[17px] leading-none hover:bg-black/[.06]" style={{ color: "var(--t-ink-soft, #6b5631)" }}>
@@ -1142,6 +1150,12 @@ function StepRow({ id, title, small, editable, xp, onXp, onRename, onEnter, menu
           </button>
           {menuOpen && (
             <span role="menu" className="card-pop-in parchment absolute right-0 top-8 z-30 flex w-[170px] flex-col overflow-hidden py-1" style={{ borderRadius: 12, boxShadow: "0 10px 24px rgba(0,0,0,.3)" }}>
+              {coins === 0 && (
+                <button type="button" role="menuitem" onClick={() => onCoins(1)} className="relative z-[1] flex min-h-10 items-center gap-2.5 px-3.5 text-left text-[14.5px] hover:bg-black/5" style={{ color: "var(--t-ink, #2a1c10)" }}>
+                  <span aria-hidden className="w-4 text-center">🪙</span>
+                  Give coins
+                </button>
+              )}
               <button type="button" role="menuitem" onClick={onRemove} className="relative z-[1] flex min-h-10 items-center gap-2.5 px-3.5 text-left text-[14.5px] hover:bg-black/5" style={{ color: "var(--t-ink, #2a1c10)" }}>
                 <span aria-hidden className="w-4 text-center">−</span>
                 Remove
@@ -1213,46 +1227,74 @@ function LaterRow({ open, small = false, done, onSnooze, onSkip, onDelete, onQui
   );
 }
 
-/** ✎ beside a card's name: change its name and notes. */
-function EditPen({ open, onClick }: { open: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} aria-label="Edit the name and notes" title="Edit" aria-expanded={open} className="-my-1 ml-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle" style={{ color: "#8a6116", background: open ? "rgba(217,180,95,.22)" : "transparent" }}>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      </svg>
-    </button>
-  );
-}
-
-function CardEdit({ card, onDone }: { card: ImportCard; onDone: (p: { title: string; description: string } | null) => void }) {
+/**
+ * A card's name and notes, edited right where they sit (owner, Nov 14: "the user can just click on the title or
+ * desc to start editing inline"): same font and size while typing, no box or wash (`bare-input`), saved on
+ * leaving the field or Enter in the name; Esc puts it back. Empty notes show a quiet "Add notes" line.
+ */
+function InlineCardText({ card, onEdit, small = false }: { card: ImportCard; onEdit: (p: { title: string; description: string }) => void; small?: boolean }) {
   const [title, setTitle] = useState(card.title);
   const [notes, setNotes] = useState(card.description ?? "");
-  const save = () => onDone(title.trim() ? { title, description: notes } : null);
+  const [seen, setSeen] = useState({ t: card.title, d: card.description ?? "" });
+  // A fresh card (or a change saved elsewhere) replaces what's shown.
+  if (seen.t !== card.title || seen.d !== (card.description ?? "")) {
+    setSeen({ t: card.title, d: card.description ?? "" });
+    setTitle(card.title);
+    setNotes(card.description ?? "");
+  }
+  const save = () => {
+    const t = title.trim();
+    if (!t) return setTitle(card.title);
+    if (t !== card.title || notes !== (card.description ?? "")) onEdit({ title: t, description: notes });
+  };
+  const grow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  const keys = (reset: () => void) => (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      reset();
+      e.currentTarget.blur();
+    }
+    if ((e.metaKey || e.ctrlKey) && (e.key === "Enter" || e.key === "s")) {
+      e.preventDefault();
+      e.currentTarget.blur();
+    }
+  };
   return (
-    <div
-      className="reveal flex flex-col gap-1.5"
-      onKeyDown={(e) => {
-        if ((e.metaKey || e.ctrlKey) && (e.key === "Enter" || e.key === "s")) {
-          e.preventDefault();
-          save();
-        }
-        if (e.key === "Escape") {
-          e.stopPropagation();
-          onDone(null);
-        }
-      }}
-    >
-      <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Name" className="h-10 rounded-xl px-3 text-[16px] font-semibold outline-none" style={{ background: "rgba(255,250,238,.85)", border: "1px solid rgba(139,112,64,.45)", color: "#2a1c10" }} />
-      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes" aria-label="Notes" className="resize-y rounded-xl px-3 py-2 text-[16px] leading-snug outline-none" style={{ background: "rgba(255,250,238,.85)", border: "1px solid rgba(139,112,64,.45)", color: "#2a1c10" }} />
-      <div className="flex justify-end gap-1.5">
-        <button type="button" onClick={() => onDone(null)} className="h-8 rounded-full px-3 text-[13px]" style={{ color: "#7a6440" }}>
-          Cancel
-        </button>
-        <button type="button" onClick={save} className="h-8 rounded-full px-4 text-[13px] font-semibold" style={{ background: "linear-gradient(180deg,#f6dc8e,#d9b45f)", color: "#2a1c10", border: "1px solid #8a6116" }}>
-          Save
-        </button>
-      </div>
-    </div>
+    <>
+      <textarea
+        ref={grow}
+        rows={1}
+        value={title}
+        onChange={(e) => (setTitle(e.target.value.replace(/\n/g, " ")), grow(e.target))}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            e.currentTarget.blur();
+          } else keys(() => setTitle(card.title))(e);
+        }}
+        aria-label="Name"
+        title="Tap to edit"
+        className={`bare-input m-0 block w-full resize-none overflow-hidden rounded border border-transparent bg-transparent p-0 leading-tight focus:outline-none [overflow-wrap:anywhere] ${small ? "text-[15px] font-semibold leading-snug" : "font-display text-[23px]"}`}
+        style={{ color: "#2a1c10" }}
+      />
+      <textarea
+        ref={grow}
+        rows={1}
+        value={notes}
+        onChange={(e) => (setNotes(e.target.value), grow(e.target))}
+        onBlur={save}
+        onKeyDown={keys(() => setNotes(card.description ?? ""))}
+        placeholder="Add notes"
+        aria-label="Notes"
+        className={`bare-input m-0 block w-full resize-none overflow-hidden rounded border border-transparent bg-transparent p-0 leading-snug focus:outline-none [overflow-wrap:anywhere] placeholder:text-[#a08a64] ${small ? "text-[13px]" : "text-[14.5px]"}`}
+        style={{ color: "#4a3a22" }}
+      />
+    </>
   );
 }
 
@@ -1309,7 +1351,6 @@ function ListView({ cards, frame, active, onEdit, onQuick, onRetag, onRate, attr
 function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAttrs, onImport, onDone, onSnooze, onQuick, onSkip, onDelete }: { card: ImportCard; first: boolean; onRate: (days: number | null) => void; attrs: Attrs; shownAttrs: AttrKey[]; onAttrs: (a: Attrs) => void; onQuick: (until: Date, label: string) => void; onEdit: (p: { title: string; description: string }) => void; onRetag: (k: Kind) => void; onImport: () => void; onDone: () => void; onSnooze: () => void; onSkip: () => void; onDelete: () => void }) {
   const [picking, setPicking] = useState(false);
   const [more, setMore] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [boarding, setBoarding] = useState(false);
   // Swipe the row left for Snooze, Archive and Delete (owner, Nov 6); right to put them away. Right-click too.
   const swipe = useRef<{ x: number; y: number } | null>(null);
@@ -1339,21 +1380,13 @@ function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAt
       }}
     >
       <div className="flex items-start gap-2">
-        {withAttrs(card.kind) && <PortraitBoard card={card} attrs={attrs} small open={boarding} onToggle={() => setBoarding((v) => !v)} />}
-        <span className="min-w-0 flex-1 pt-0.5 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">
-          {card.title}
-          {/* ✎ right by the words. */}
-          <EditPen open={editing} onClick={() => setEditing((v) => !v)} />
+        {withAttrs(card.kind) && <PortraitBoard card={card} attrs={attrs} small open={boarding} onToggle={() => setBoarding((v) => !v)} onAttrs={onAttrs} />}
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <InlineCardText card={card} onEdit={onEdit} small />
         </span>
         <KindBadge kind={card.kind} open={picking} onToggle={() => setPicking((v) => !v)} small />
       </div>
-      {editing && <CardEdit card={card} onDone={(p) => (p && onEdit(p), setEditing(false))} />}
       {withAttrs(card.kind) && <BoardFold card={card} attrs={attrs} open={boarding} onAttrs={onAttrs} onClose={() => setBoarding(false)} />}
-      {card.description && !editing && (
-        <p className="m-0 whitespace-pre-wrap text-[13px] leading-snug [overflow-wrap:anywhere]" style={{ color: "#4a3a22" }}>
-          {card.description}
-        </p>
-      )}
       <SubQuests card={card} small attrs={attrs} onAttrs={onAttrs} />
       <FileChips files={card.attachments} />
       <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
@@ -1883,23 +1916,30 @@ const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind ==
 // `.qe-fact` pills, `.qe-fact-panel` panels, the editor's XP bar and coin stepper, Due picks, Time picks and IconScale.
 
 /** A quest's details picked on the card, before importing. Kept on this device by card id. */
-type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null };
+type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; /** Coins a sub-quest pays when done, by its name. */ stepCoins?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null };
 type AttrKey = "reward" | "time" | "due" | "tiny" | "importance" | "board";
 const ATTRS: { key: AttrKey; label: string }[] = [
   { key: "reward", label: "XP & coins" },
   { key: "time", label: "Time" },
   { key: "due", label: "Due date" },
-  { key: "tiny", label: "Tiny task" },
   { key: "importance", label: "Importance" },
   { key: "board", label: "Board" },
 ];
-const ATTR_SHOWN_DEFAULT: AttrKey[] = ["reward", "time", "due", "tiny", "importance", "board"];
+const ATTR_SHOWN_DEFAULT: AttrKey[] = ["reward", "time", "due", "importance", "board"];
 const ATTRS_KEY = "import-attrs";
 // v2: the pills were regrouped on Nov 6 (XP & coins one pill; importance, difficulty and energy one pill).
 const ATTR_LAYOUT_KEY = "import-attr-shown-v2";
 /** Every import starts at 15 XP and a coin (owner, Nov 6). */
 const XP_DEFAULT = 15;
 const COIN_DEFAULT = 1;
+/**
+ * Tiny on or off, as the quest editor does it: on fills 5 minutes and two energy boosts only where nothing
+ * was set; off takes back exactly what it filled (it used to leave its 5 minutes and energy behind).
+ */
+function tinyAttrs(a: Attrs, on: boolean): Attrs {
+  if (on) return { ...a, tiny: true, minutes: a.minutes ?? TINY.minutes, energy: a.energy || TINY.energy };
+  return { ...a, tiny: false, minutes: a.minutes === TINY.minutes ? undefined : a.minutes, energy: a.energy === TINY.energy ? undefined : a.energy };
+}
 /** A tiny task: two energy boosts, 15 XP, 5 minutes, a coin (owner, Nov 6). */
 const TINY: Attrs = { tiny: true, energy: 2, xp: 15, minutes: 5, coins: 1 };
 const withAttrs = (k: Kind) => k === "quest" || k === "schedule" || k === "shopping" || k === "done";
@@ -1946,7 +1986,8 @@ function AttrPills({ card, attrs, shown, onChange, small = false }: { card: Impo
   const board = boards.find((b) => b.id === boardId);
   const set = (p: Attrs) => onChange({ ...attrs, ...p });
   // The board is picked from the tag on the portrait now (owner, Nov 12), not from a pill.
-  shown = shown.filter((k) => k !== "board");
+  // The board and Tiny sit on the portrait now, as in the quest editor.
+  shown = shown.filter((k) => k !== "board" && k !== "tiny");
   const hidden = ATTRS.map((a) => a.key).filter((k) => k !== "board" && !shown.includes(k));
   const face: Record<AttrKey, React.ReactNode> = {
     reward: (
@@ -2000,7 +2041,7 @@ function AttrPills({ card, attrs, shown, onChange, small = false }: { card: Impo
         aria-pressed={k === "tiny" ? !!attrs.tiny : undefined}
         aria-label={k === "tiny" ? "Tiny task: 2 energy boosts, 15 XP, 5 minutes, 1 coin" : k === "board" ? `Board: ${board ? board.title : "none"}` : undefined}
         onClick={() => {
-          if (k === "tiny") return onChange(attrs.tiny ? { ...attrs, tiny: false } : { ...attrs, ...TINY });
+          if (k === "tiny") return onChange(tinyAttrs(attrs, !attrs.tiny));
           setOpen(open === k ? null : k);
         }}
         className={`qe-fact flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 font-semibold ${small ? "h-7 text-[12px]" : "h-8 text-[12.5px]"}`}

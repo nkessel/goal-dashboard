@@ -615,7 +615,7 @@ export function QuestEditorDialog({
     listQuestStepsAction(taskId)
       .then((rows) => {
         if (rows === null) setStepsUnavailable(true);
-        setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null }))));
+        setSteps(treeOrder((rows ?? []).map((r) => ({ key: r.id, id: r.id, title: r.title, done: r.done, xp: r.xp ?? 0, coins: r.coins ?? 0, weight: r.weight ?? null, progress: r.progress ?? (r.done ? 100 : 0), state: r.state ?? null, parentKey: r.parent_id ?? null }))));
       })
       .catch(() => {
         setStepsUnavailable(true);
@@ -1722,6 +1722,13 @@ export function QuestEditorDialog({
                               {Math.round((wOf.get(st.key) ?? 0) * xp) + (st.xp ?? 0)} XP
                             </span>
                           )}
+                          {/* Its own coins, once given (⋯ › Give coins; owner, Nov 14): tap the number to change it. */}
+                          {!isHolder && (st.coins ?? 0) > 0 && (
+                            <span className="mt-[3px] flex h-7 shrink-0 items-center gap-0.5 text-[12.5px] font-semibold" style={{ color: "#8a6116" }} title="Coins this sub-quest brings (tap to change; 0 takes them off)">
+                              <InlineNumber value={st.coins ?? 0} min={0} max={100} suffix="" label={`Coins for ${st.title}`} onChange={(v) => updateStep(st.key, { coins: v })} />
+                              <CoinIcon size={13} />
+                            </span>
+                          )}
                           <span className="relative shrink-0" data-step-menu>
                             <button
                               type="button"
@@ -1740,6 +1747,7 @@ export function QuestEditorDialog({
                                   [
                                     // Order and words from the owner (Nov 4): Skip, then Remove, Failed last, all in black ink.
                                     ["sub", "＋", "Add a sub-task", "var(--t-ink)"],
+                                    ...(!isHolder && !(st.coins ?? 0) ? [["coins", "🪙", "Give coins", "var(--t-ink)"]] : []),
                                     ...(st.state || st.done ? [["open", "↺", "Back to open", "var(--t-ink)"]] : []),
                                     ...(st.state !== "skipped" ? [["skip", "»", "Skip", "var(--t-ink)"]] : []),
                                     ["remove", "−", "Remove", "var(--t-ink)"],
@@ -1753,6 +1761,7 @@ export function QuestEditorDialog({
                                     onClick={() => {
                                       setStepMenu(null);
                                       if (k === "sub") addSubStep(st.key);
+                                      if (k === "coins") updateStep(st.key, { coins: 1 });
                                       if (k === "skip") updateStep(st.key, { state: "skipped", done: false, progress: 0 });
                                       if (k === "fail") updateStep(st.key, { state: "failed", done: false, progress: 0 });
                                       if (k === "open") updateStep(st.key, { state: null, done: false, progress: 0 });

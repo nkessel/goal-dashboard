@@ -636,6 +636,13 @@ export const FLOWS = [
       }
       if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^more for /i }).first(), "sub-quest: ⋯", { optional: true, expectMove: true })) {
         await h.check("sub-quest: menu");
+        // Sub-quests can pay coins (owner, Nov 14): ⋯ › Give coins puts a coin count on the row.
+        if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("menuitem", { name: /give coins/i }).first(), "sub-quest: give coins", { optional: true, expectMove: true })) await h.check("sub-quest: coins");
+        else await h.page.keyboard.press("Escape");
+      }
+      // The name edits where it sits (no ✎).
+      if (await h.tap((p) => p.getByRole("textbox", { name: /^name$/i }).first(), "card: name in place", { optional: true })) {
+        await h.check("card: editing the name");
         await h.page.keyboard.press("Escape");
       }
       if (await h.tap((p) => p.locator("[data-import-steps]").getByRole("button", { name: /^add a sub-quest$/i }).first(), "sub-quests: add", { optional: true, expectMove: true })) {
@@ -660,7 +667,8 @@ export const FLOWS = [
         if (await h.tap((p) => p.locator("[data-import-boards]").getByRole("button", { name: /boards? inside/i }).first(), "board list: open sub-boards", { optional: true, expectMove: true })) await h.check("board list: sub-boards");
         await h.tap((p) => p.locator("[data-import-boards]").getByRole("button", { pressed: false }).first(), "board list: pick", { optional: true, expectMove: true });
       }
-      await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /tiny/i }).first(), "attrs: tiny", { optional: true });
+      // Tiny sits under the portrait as in the quest editor (owner, Nov 14).
+      if (await h.tap((p) => p.locator("[data-import-portrait]").getByText(/tiny task/i).first(), "portrait: tiny", { optional: true })) await h.check("tiny on");
       if (await h.tap((p) => p.getByRole("button", { name: /^more…$/i }).first(), "attrs: more", { optional: true, expectMove: true })) await h.check("attrs: more open");
       if (await h.tap((p) => p.getByRole("button", { name: /import settings/i }).first(), "import gear", { optional: true, expectMove: true })) {
         await h.check("import gear open");

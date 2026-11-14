@@ -638,20 +638,29 @@ export async function saveQuestStepsAction(taskId: string, steps: stepsData.Step
   if (!task) throw new Error("That quest isn't here anymore.");
   const saved = await stepsData.replaceSteps(taskId, ownerId, steps.slice(0, 50));
   let delta = 0;
+  let coinDelta = 0;
   for (const st of saved) {
     const owed = st.done ? (st.xp ?? 0) : 0;
     const paid = st.xp_paid ?? 0;
-    if (owed !== paid) {
+    // A sub-quest's own coins (owner, Nov 14), paid when ticked and taken back when unticked.
+    const owedC = st.done ? (st.coins ?? 0) : 0;
+    const paidC = st.coins_paid ?? 0;
+    if (owed !== paid || owedC !== paidC) {
       delta += owed - paid;
-      await stepsData.setStepPaid(st.id, ownerId, owed);
+      coinDelta += owedC - paidC;
+      await stepsData.setStepPaid(st.id, ownerId, owed, owedC !== paidC ? owedC : undefined);
     }
   }
   let coinsEarned = 0;
   if (delta !== 0) coinsEarned = (await xp.awardXp(ownerId, delta, "task_completed", taskId)).coinsEarned;
+  if (coinDelta !== 0) {
+    await rewardsData.addCoins(ownerId, coinDelta).catch(() => {});
+    coinsEarned += coinDelta;
+  }
   revalidatePath("/");
   revalidatePath("/boards", "layout");
   return {
-    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null, parent_id: s.parent_id ?? null })),
+    steps: saved.map((s) => ({ id: s.id, title: s.title, done: s.done, sort_order: s.sort_order, xp: s.xp ?? 0, coins: s.coins ?? 0, weight: s.weight ?? null, progress: s.progress ?? (s.done ? 100 : 0), state: s.state ?? null, parent_id: s.parent_id ?? null })),
     xpEarned: delta,
     coinsEarned,
   };
@@ -4562,6 +4571,8 @@ export async function importCardAction(
     effort?: number | null;
     /** XP each sub-quest pays when done, by sub-quest name (set on the card). */
     stepXp?: Record<string, number>;
+    /** Coins a sub-quest pays when done, by its name (owner, Nov 14). */
+    stepCoins?: Record<string, number>;
   }
 ): Promise<{ kind: "quest" | "habit" | "board" | "reward" | "ritual"; id: string }> {
   const ownerId = await requireProfileId();
@@ -4635,7 +4646,11 @@ export async function importCardAction(
       const v = input.stepXp?.[s];
       return typeof v === "number" && v > 0 ? { xp: Math.min(1000, Math.round(v)) } : {};
     };
-    if (steps.length) await stepsData.replaceSteps(taskId, ownerId, steps.map((s) => ({ title: s.slice(0, 200), done: false, ...stepXp(s) }))).catch(() => null);
+    const stepCoins = (s: string) => {
+      const v = input.stepCoins?.[s];
+      return typeof v === "number" && v > 0 ? { coins: Math.min(100, Math.round(v)) } : {};
+    };
+    if (steps.length) await stepsData.replaceSteps(taskId, ownerId, steps.map((s) => ({ title: s.slice(0, 200), done: false, ...stepXp(s), ...stepCoins(s) }))).catch(() => null);
     // Files kept with the card (a form to fill in) stay handy on the quest.
     if (card.attachments?.length) await supabaseAdmin().from("tasks").update({ attachments: card.attachments }).eq("owner_id", ownerId).eq("id", taskId);
     const planBy = input.planBy && Number.isFinite(Date.parse(input.planBy)) ? new Date(input.planBy).toISOString() : null;

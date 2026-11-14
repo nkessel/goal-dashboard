@@ -1,6 +1,6 @@
 /** A quest's steps (a checklist that can nest): order, weights, and what they add up to. Shared by the editor and the card's steps tray. */
 
-export type StepDraft = { key: string; id?: string; title: string; done: boolean; xp?: number; weight?: number | null; progress?: number; state?: "skipped" | "failed" | null; parentKey?: string | null };
+export type StepDraft = { key: string; id?: string; title: string; done: boolean; xp?: number; coins?: number; weight?: number | null; progress?: number; state?: "skipped" | "failed" | null; parentKey?: string | null };
 
 /** Steps that hold sub-tasks of their own (they count through those). */
 export const parentKeys = (list: StepDraft[]) => new Set(list.map((st) => st.parentKey).filter(Boolean) as string[]);
@@ -48,4 +48,4 @@ export function stepsShare(list: StepDraft[]): number {
   const w = stepWeights(list);
   return Math.round(list.reduce((n, st, i) => n + w[i] * (st.done ? 1 : (st.progress ?? 0) / 100), 0) * 100);
 }
-export const stepPayload = (list: StepDraft[]) => treeOrder(list).map(({ key, id, title, done, xp, weight, progress, state, parentKey }) => ({ key, id, parentKey: parentKey ?? null, title, done, xp: xp ?? 0, weight: weight ?? null, progress: done ? 100 : (progress ?? 0), state: done ? null : (state ?? null) }));
+export const stepPayload = (list: StepDraft[]) => treeOrder(list).map(({ key, id, title, done, xp, coins, weight, progress, state, parentKey }) => ({ key, id, parentKey: parentKey ?? null, title, done, xp: xp ?? 0, ...(coins !== undefined ? { coins } : {}), weight: weight ?? null, progress: done ? 100 : (progress ?? 0), state: done ? null : (state ?? null) }));
