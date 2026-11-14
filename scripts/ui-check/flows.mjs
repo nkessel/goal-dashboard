@@ -519,7 +519,12 @@ export const FLOWS = [
       await h.settle(900);
       if (!(await h.page.locator("[data-tour-card]").count())) throw new Error("Walkthrough card didn't show");
       await h.check("tour: intro");
-      await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: /^begin$/i }), "tour: begin", { expectMove: true });
+      // The toucan asks what to call you; snooze opens its choices in place.
+      await h.tap((p) => p.getByRole("button", { name: /snooze or skip the walkthrough/i }), "tour: snooze choices", { expectMove: true });
+      await h.check("tour: snooze choices");
+      await h.tap((p) => p.getByRole("button", { name: /snooze or skip the walkthrough/i }), "tour: snooze choices closed", { optional: true });
+      await h.page.locator("#tour-name").fill("Robin").catch(() => {});
+      await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: /^let's begin$/i }), "tour: begin", { expectMove: true });
       await h.settle(1500);
       await h.check("tour: practice quest, pointing at +");
       await h.tap(/^create something new$/i, "tour: + ", { expectMove: true });
@@ -534,7 +539,7 @@ export const FLOWS = [
       await h.page.getByRole("button", { name: /^continue$/i }).first().click({ timeout: 3000 }).catch(() => {});
       await h.settle(1200);
       await h.check("tour: choice");
-      if (await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: /make a real quest/i }), "tour: make a real quest", { optional: true, expectMove: true })) {
+      if (await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: /create a real quest/i }), "tour: create a real quest", { optional: true, expectMove: true })) {
         await h.settle(600);
         await h.tap(/^create something new$/i, "tour: + again", { expectMove: true });
         await h.settle(500);

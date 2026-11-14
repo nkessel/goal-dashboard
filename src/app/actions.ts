@@ -5094,12 +5094,20 @@ export async function tickDawnAction(day: string, what: { stone: string } | { ex
 // ---------------------------------------------------------------------------
 // The new-adventurer walkthrough (owner, Nov 13): where each account is in it, kept on the account.
 
-export type TourState = { step: string; done?: boolean; hidden?: string[]; practiceId?: string | null; realId?: string | null; since?: string | null; at?: number };
+export type TourState = { step: string; done?: boolean; hidden?: string[]; practiceId?: string | null; realId?: string | null; since?: string | null; at?: number; /** What the person asked the toucan to call them. */ name?: string | null; /** Snoozed until (ms). */ until?: number | null };
 
 export async function tourAction(): Promise<TourState | null> {
   const ownerId = await requireProfileId();
   const t = (await readExtras(ownerId)).tour as TourState | undefined;
   return t && typeof t === "object" ? t : null;
+}
+
+/** The name the account goes by now (the walkthrough offers it when the toucan asks what to call you). */
+export async function tourNameAction(): Promise<string | null> {
+  const ownerId = await requireProfileId();
+  const { data } = await supabaseAdmin().from("profiles").select("name").eq("id", ownerId).maybeSingle();
+  // Only the first word: "Nathan", not "Nathan Kessel".
+  return ((data?.name as string | null | undefined) ?? "").trim().split(/\s+/)[0] || null;
 }
 
 export async function saveTourAction(state: TourState) {
@@ -5112,6 +5120,8 @@ export async function saveTourAction(state: TourState) {
     realId: state.realId && /^[0-9a-f-]{36}$/i.test(state.realId) ? state.realId : null,
     since: state.since ? new Date(state.since).toISOString() : null,
     at: Date.now(),
+    name: state.name ? String(state.name).trim().slice(0, 40) || null : null,
+    until: typeof state.until === "number" && Number.isFinite(state.until) ? state.until : null,
   };
   const extras = await readExtras(ownerId);
   const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, tour: clean } }).eq("id", ownerId);
