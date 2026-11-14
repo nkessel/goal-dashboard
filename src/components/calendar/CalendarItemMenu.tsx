@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { addTaskSessionAction, createQuestAction, unscheduleTaskAction } from "@/app/actions";
+import { addTaskSessionAction, completeTaskAction, createQuestAction, unscheduleTaskAction } from "@/app/actions";
+import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { SlotPickerDialog } from "@/components/tasks/SlotPickerDialog";
 import { sessionRef } from "@/lib/calendar-task-window";
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
@@ -111,8 +112,32 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
           {target.kind === "task" && (
             <>
               <button type="button" role="menuitem" data-mi="open" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setEditing(target.task)}>
-                Open quest
+                Edit quest
               </button>
+              {target.task.status !== "completed" && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-mi="complete"
+                  className={item}
+                  style={{ color: "var(--t-ink)" }}
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const t = target.task;
+                      const fd = new FormData();
+                      fd.set("taskId", t.id);
+                      const res = await completeTaskAction(fd).catch(() => null);
+                      if (!res) return setError("Couldn't complete it. Try again.");
+                      celebrateQuest({ taskId: t.id, title: t.title, description: t.description ?? null, xp: t.xp_value, iconSrc: t.icon_source === "ai" || t.icon_source === "library" ? t.icon_key : null, totalXp: res?.totalXp ?? null, coinsEarned: res?.coinsEarned ?? 0 });
+                      router.refresh();
+                      onClose();
+                    })
+                  }
+                >
+                  Complete quest
+                </button>
+              )}
               <button
                 type="button"
                 role="menuitem"
@@ -128,16 +153,13 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
                   })
                 }
               >
-                {target.task.session_id ? "Take this session off" : "Take off the calendar"}
+                {target.task.session_id ? "Remove this session" : "Remove from calendar"}
               </button>
               <button type="button" role="menuitem" data-mi="another" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setAnother(true)}>
-                ＋ Another session…
+                + Additional time block for this quest
               </button>
               <button type="button" role="menuitem" data-mi="place" className={`${item} truncate`} style={{ color: "var(--t-ink)" }} onClick={() => setMode("place")}>
-                📍 {place ? place : "Where & driving time…"}
-              </button>
-              <button type="button" role="menuitem" data-mi="look" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setMode("look")}>
-                🎨 Card colour or picture…
+                {place ? place : "Add location or travel time"}
               </button>
             </>
           )}
@@ -152,9 +174,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
             </>
           )}
           <button type="button" role="menuitem" data-mi="followup" className={`${item} flex items-center gap-2 border-t`} style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("followup")}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- follow-up icon */}
-            <img src="/design/icon-followup.svg" alt="" width={20} height={20} />
-            Schedule a follow-up quest
+            Schedule follow-up quest
           </button>
           {error && (
             <p className="relative z-[1] m-0 px-3.5 pb-1 text-[12.5px]" style={{ color: "var(--t-warn)" }}>

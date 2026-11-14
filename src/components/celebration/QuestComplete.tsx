@@ -396,11 +396,7 @@ export function QuestComplete(props: QuestCompleteProps) {
 
               <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
                 <h2 className={`m-0 break-words ${title.length > 48 ? "text-[18px]" : "text-[22px]"} font-bold leading-[1.1]`} style={{ color: "#2f2a1f" }}>{title}</h2>
-                {description && (
-                  <div className={`${description.length > 140 ? "text-[13.5px]" : "text-[15px]"} leading-[1.22]`} style={{ color: "#6b6252" }}>
-                    {description}
-                  </div>
-                )}
+                {description && <Clamped text={description} />}
               </div>
 
               <div className="w-px shrink-0" style={{ background: "#b9a47c" }} />
@@ -759,6 +755,24 @@ function RewardChest({
       >
         Continue to the next quest
       </button>
+    </div>
+  );
+}
+
+/** The quest's description, three lines at most until "See more" (owner, Nov 13). */
+function Clamped({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 110 || text.split("\n").length > 3;
+  return (
+    <div className={`${text.length > 140 ? "text-[13.5px]" : "text-[15px]"} leading-[1.22]`} style={{ color: "#6b6252" }}>
+      <div className="whitespace-pre-line break-words" style={open || !long ? undefined : { display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+        {text}
+      </div>
+      {long && (
+        <button type="button" onClick={() => setOpen((o) => !o)} className="mt-0.5 text-[12.5px] font-semibold underline underline-offset-2" style={{ color: "#8a6c2c" }}>
+          {open ? "See less" : "See more"}
+        </button>
+      )}
     </div>
   );
 }

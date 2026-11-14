@@ -5,7 +5,7 @@
 export const DAILY_LINES = [
   "You came back. That's the whole secret, repeated.",
   "Every return is a vote for the person you're becoming.",
-  "The path remembers every footstep. Here's another.",
+  "The path remembers every footstep. Walk mindfully.",
   "Small steps, taken again and again, move mountains.",
   "Consistency is quiet magic. You just cast it.",
   "You don't have to be ready. You just have to begin.",

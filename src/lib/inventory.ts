@@ -81,7 +81,7 @@ export function normalizePacking(raw: unknown): PackingList[] {
 
 export function normalizeInventory(raw: unknown): Inventory {
   const r = (raw ?? {}) as Partial<Inventory>;
-  const slots = { top: Math.max(4, Math.min(16, Number(r.slots?.top) || 4)), main: Math.max(4, Math.min(32, Number(r.slots?.main) || 8)) };
+  const slots = { top: Math.max(1, Math.min(16, Math.round(Number(r.slots?.top) || 4))), main: Math.max(1, Math.min(32, Math.round(Number(r.slots?.main) || 8))) };
   const items = (Array.isArray(r.items) ? r.items : [])
     .filter((i): i is InventoryItem => !!i && typeof i.id === "string" && typeof i.name === "string")
     .map((i) => ({
@@ -96,7 +96,7 @@ export function normalizeInventory(raw: unknown): Inventory {
       refilledAt: typeof i.refilledAt === "string" ? i.refilledAt : null,
     }))
     .slice(0, 48);
-  for (const i of items) if (i.slot >= slots[i.pocket]) slots[i.pocket] = Math.min(32, Math.ceil((i.slot + 1) / 4) * 4);
+  for (const i of items) if (i.slot >= slots[i.pocket]) slots[i.pocket] = Math.min(32, i.slot + 1);
   return { slots, items, bring: normalizeBring(r.bring), packing: normalizePacking(r.packing) };
 }
 

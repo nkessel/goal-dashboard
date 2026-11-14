@@ -12,17 +12,23 @@ const pill = { background: "rgba(233,212,154,.55)", border: "1px solid #a88a3f",
 
 const LEAF_EVENT = "🍃 Cannabis";
 
+/** A seven-fingered leaf, green on parchment (owner, Nov 13: "better drawn, have the leaf be green"). */
 function LeafIcon() {
+  const blades: [number, number][] = [
+    [0, 1],
+    [-38, 0.86],
+    [38, 0.86],
+    [-74, 0.66],
+    [74, 0.66],
+    [-108, 0.4],
+    [108, 0.4],
+  ];
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-      <g fill="#f3ffe9" stroke="#1f4a1c" strokeWidth=".7" strokeLinejoin="round">
-        <path d="M12 2c1.5 3.2 1.6 7.6 0 12.2C10.4 9.600 10.5 5.2 12 2z" />
-        <path d="M4.300 6.300c3 1.300 5.600 4 7 8.200-3.700-1.300-6.300-4.200-7-8.200z" />
-        <path d="M19.700 6.300c-3 1.300-5.600 4-7 8.200 3.700-1.300 6.300-4.200 7-8.200z" />
-        <path d="M2.500 13.400c3-.5 6.200.300 9 2.200-3.300.9-6.600 0-9-2.200z" />
-        <path d="M21.500 13.400c-3-.5-6.200.300-9 2.200 3.300.9 6.600 0 9-2.200z" />
-      </g>
-      <path d="M12 14.500V22" stroke="#f3ffe9" strokeWidth="1.500" strokeLinecap="round" />
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 15.500V22" stroke="#2c6a2a" strokeWidth="1.400" strokeLinecap="round" />
+      {blades.map(([deg, k]) => (
+        <path key={deg} d="M0 0C-2.300-3.800-1.700-9 0-13.500 1.700-9 2.300-3.800 0 0Z" transform={`translate(12 15.800) rotate(${deg}) scale(${k})`} fill="#3f9a3a" stroke="#1f5a1e" strokeWidth={0.7 / k} strokeLinejoin="round" />
+      ))}
     </svg>
   );
 }
@@ -75,21 +81,6 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          aria-expanded={leaf !== null}
-          aria-label="Log cannabis"
-          title="Log cannabis: pick the time, now by default"
-          onClick={() => {
-            const d = new Date();
-            setLeaf((v) => (v === null ? d.getHours() * 60 + d.getMinutes() : null));
-          }}
-          data-leaf-log
-          className="hover-glow flex h-8 w-8 items-center justify-center rounded-full"
-          style={{ background: "radial-gradient(circle at 35% 30%, #8fd17a, #3f8a3a 70%)", border: "1px solid #2c5f28", boxShadow: leaf !== null ? "0 0 0 2px rgba(63,138,58,.35)" : undefined }}
-        >
-          <LeafIcon />
-        </button>
         {(names ?? []).map((n) => (
           <button
             key={n}
@@ -133,6 +124,21 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
             style={{ color: INK, borderBottom: "1px solid #a88a3f" }}
           />
         )}
+        <button
+          type="button"
+          aria-expanded={leaf !== null}
+          aria-label="Log cannabis"
+          title="Log cannabis: pick the time, now by default"
+          onClick={() => {
+            const d = new Date();
+            setLeaf((v) => (v === null ? d.getHours() * 60 + d.getMinutes() : null));
+          }}
+          data-leaf-log
+          className="hover-glow ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+          style={{ background: "radial-gradient(circle at 35% 30%, #fffaf0, #f0e4c4 75%)", border: "1px solid #7a9a5a", boxShadow: leaf !== null ? "0 0 0 2px rgba(63,138,58,.4)" : undefined }}
+        >
+          <LeafIcon />
+        </button>
       </div>
       <Fold open={leaf !== null}>
         <div className="flex flex-wrap items-center gap-2.5 pt-0.5">

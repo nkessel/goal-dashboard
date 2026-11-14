@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { deleteJournalEntryAction } from "@/app/actions";
 import { JOURNAL_KINDS, journalKindMeta } from "@/lib/journal-kinds";
 import { CloseIcon } from "@/components/ui/Icons";
@@ -16,6 +16,27 @@ export function JournalList({ entries, isAdventure }: { entries: Entry[] | null;
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState<string | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
+  // App feedback can be kept out of the journal (owner, Nov 13); remembered on this device.
+  const [hideFb, setHideFb] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the choice lives in browser storage, read after hydration
+      if (localStorage.getItem("journal-hide-feedback") === "1") setHideFb(true);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggleFb = () => {
+    const v = !hideFb;
+    setHideFb(v);
+    if (v && filter === "feedback") setFilter(null);
+    try {
+      localStorage.setItem("journal-hide-feedback", v ? "1" : "0");
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  const hasFb = !!entries?.some((e) => e.kind === "feedback");
   const [, startTransition] = useTransition();
 
   if (entries === null) {
@@ -25,8 +46,8 @@ export function JournalList({ entries, isAdventure }: { entries: Entry[] | null;
       </p>
     );
   }
-  const shown = entries.filter((e) => !hidden.has(e.id) && (!filter || e.kind === filter));
-  const kindsUsed = JOURNAL_KINDS.filter((k) => entries.some((e) => e.kind === k.key));
+  const shown = entries.filter((e) => !hidden.has(e.id) && (!filter || e.kind === filter) && !(hideFb && e.kind === "feedback"));
+  const kindsUsed = JOURNAL_KINDS.filter((k) => entries.some((e) => e.kind === k.key) && !(hideFb && k.key === "feedback"));
   if (shown.length === 0) {
     return (
       <div className={`flex flex-col items-center gap-2 rounded-2xl px-5 py-8 text-center ${isAdventure ? "parchment" : ""}`} style={isAdventure ? undefined : { background: "var(--t-card)" }}>
@@ -36,6 +57,11 @@ export function JournalList({ entries, isAdventure }: { entries: Entry[] | null;
         <p className="m-0 text-[15px]" style={{ color: "var(--t-ink)" }}>
           Nothing written yet. Tap + to write your first entry.
         </p>
+        {hideFb && hasFb && (
+          <button type="button" onClick={toggleFb} className="text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+            Show app feedback
+          </button>
+        )}
       </div>
     );
   }
@@ -66,6 +92,11 @@ export function JournalList({ entries, isAdventure }: { entries: Entry[] | null;
               {k.label}
             </button>
           ))}
+          {hasFb && (
+            <button type="button" aria-pressed={hideFb} onClick={toggleFb} className="ml-auto h-9 rounded-full px-3 text-[12.5px] underline underline-offset-2" style={{ color: "var(--t-cream)", opacity: 0.85 }}>
+              {hideFb ? "Show app feedback" : "Hide app feedback"}
+            </button>
+          )}
         </div>
       )}
       {groups.map((g) => (

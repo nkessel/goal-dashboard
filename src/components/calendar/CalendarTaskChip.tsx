@@ -24,7 +24,8 @@ export { getTaskDisplayWindow };
 
 /** How much a calendar card's words can grow: 1 for an ordinary card, up to 1.55 with room to spare (wide and tall). */
 export function roomyScale(w: number, h: number): number {
-  return Math.max(1, Math.min(1.55, Math.min(w / 170, h / 48)));
+  // Up to 1.3× (1.55 read as too large on a computer; owner, Nov 13).
+  return Math.max(1, Math.min(1.3, Math.min(w / 190, h / 54)));
 }
 
 export function CalendarTaskChip({

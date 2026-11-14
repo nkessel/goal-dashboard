@@ -179,7 +179,7 @@ export function LifeWheel({ topics: initialTopics, last }: { topics: string[]; l
       )}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={checkIn} disabled={pending || !Object.keys(vals).length} className="hover-glow h-10 rounded-full px-5 text-[14.5px] font-bold disabled:opacity-60" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" }}>
-          {pending ? "Saving…" : "Check in the wheel"}
+          {pending ? "Saving…" : "Save Wheel of Life check-in"}
         </button>
         <span className="text-[12.5px]" style={{ color: INK_SOFT }}>
           Drag a marker, or tap along a spoke · the areas are your top-level boards

@@ -58,5 +58,13 @@
   {
     "match": "\\|(covered-by-bar|floating-overlap)\\|<button> \"Feedback \\(F\\)\".*sits on <button[^>]*> \"(Quest actions|More for )",
     "reason": "Owner, Nov 12: the feedback button must be visible on every screen, above every popup and editor. With an editor open on a phone it waits at the right edge (its own draggable spot), which can be over a quest card's ⋯ that the editor already covers."
+  },
+  {
+    "match": "\\|(covered-by-bar|floating-overlap)\\|<button> \"Feedback \\(F\\)\"",
+    "reason": "Owner, Nov 12: the feedback button stays visible above every popup and editor. With the quest editor open it floats at the right edge over whatever the page behind has there; the editor covers that anyway."
+  },
+  {
+    "match": "popup-behind\\|.*\"Due date\".*underneath <svg>",
+    "reason": "The <svg> is the feedback button's icon: by the owner's ask (Nov 12) the button sits above every popup, the date picker included; it can be dragged aside and remembers where."
   }
 ]

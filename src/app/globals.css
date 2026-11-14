@@ -3372,3 +3372,6 @@ body[data-quest-drag] .today-cal-tab { box-shadow: 0 0 0 2px rgba(246, 220, 142,
 @keyframes tour-ring-pulse { 0%, 100% { box-shadow: 0 0 0 2px #f2d58a, 0 0 0 6px rgba(242,213,138,.35), 0 0 18px rgba(242,213,138,.5); } 50% { box-shadow: 0 0 0 2px #f2d58a, 0 0 0 10px rgba(242,213,138,.15), 0 0 26px rgba(242,213,138,.65); } }
 .tour-ring { transition: left 200ms ease, top 200ms ease, width 200ms ease, height 200ms ease; animation: tour-ring-pulse 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .tour-ring { animation: none; box-shadow: 0 0 0 3px #f2d58a; } }
+
+/* A finished habit or quest card: a soft green wash over the whole card instead of a crossed-out name (owner, Nov 12). */
+.habit-row[data-done]::after, .quest-card[data-done]::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(86, 150, 66, .2); box-shadow: inset 0 0 0 1.5px rgba(78, 138, 58, .55); pointer-events: none; z-index: 1; transition: opacity 240ms ease; }

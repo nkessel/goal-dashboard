@@ -80,6 +80,15 @@ function Slot({ item, painting, failed = false, onTap, moving, at, onGrab, lifte
  */
 export function Backpack({ initial }: { initial: Inventory }) {
   const [inv, setInv] = useState(initial);
+  // Fresh data from the server replaces what the page opened with: the app opens from its kept copy first
+  // and refreshes behind it, and the backpack kept showing the old copy (owner, Nov 13: "items marked
+  // refill are not persisting between sessions"). Not while a change of yours is still waiting to be sent.
+  const [seenInitial, setSeenInitial] = useState(initial);
+  const [sending, setSending] = useState(0);
+  if (seenInitial !== initial) {
+    setSeenInitial(initial);
+    if (JSON.stringify(initial) !== JSON.stringify(seenInitial) && sending === 0 && (typeof window === "undefined" || !pendingFor<Inventory>("inventory"))) setInv(initial);
+  }
   // Changed offline and not synced yet: this device's backpack wins over the (kept) page's.
   useEffect(() => {
     const waiting = pendingFor<Inventory>("inventory");
@@ -156,15 +165,15 @@ export function Backpack({ initial }: { initial: Inventory }) {
     const host = rootRef.current?.closest('[role="dialog"]')?.querySelector("[data-modal-tools]") ?? document.querySelector("[data-modal-tools]");
     setToolsHost(host);
   }, []);
-  // Fewer or more slots (4 at a time). Taking slots away moves what's in them into free slots higher up.
+  // Fewer or more slots, one at a time (owner, Nov 13). Taking slots away moves what's in them into free slots higher up.
   const maxSlots = (p: PocketKey) => (p === "top" ? 16 : 32);
   function canShrink(p: PocketKey) {
-    const n = inv.slots[p] - 4;
-    if (n < 4) return false;
+    const n = inv.slots[p] - 1;
+    if (n < 1) return false;
     const mine = inv.items.filter((i) => i.pocket === p);
     return mine.filter((i) => i.slot >= n).length <= n - mine.filter((i) => i.slot < n).length;
   }
-  function changeSlots(p: PocketKey, delta: 4 | -4) {
+  function changeSlots(p: PocketKey, delta: 1 | -1) {
     const n = inv.slots[p] + delta;
     if (delta > 0) {
       if (n > maxSlots(p)) return;
@@ -248,10 +257,13 @@ export function Backpack({ initial }: { initial: Inventory }) {
   function persist(next: Inventory) {
     const prev = inv;
     setInv(next);
+    setSending((n) => n + 1);
     start(async () => {
       try {
         await saveOrQueue("saveInventory", next, "inventory");
+        setSending((n) => Math.max(0, n - 1));
       } catch (e) {
+        setSending((n) => Math.max(0, n - 1));
         setInv(prev);
         setError(e instanceof Error ? e.message : "Couldn't save the backpack.");
       }
@@ -427,8 +439,8 @@ export function Backpack({ initial }: { initial: Inventory }) {
                 </svg>
               </button>
               <span className="flex shrink-0 items-center gap-1">
-                <SlotButton label="− 4 slots" aria={`Remove 4 slots from the ${p.label.toLowerCase()}`} disabled={!canShrink(p.key)} onClick={() => changeSlots(p.key, -4)} />
-                <SlotButton label="+ 4 slots" aria={`Add 4 slots to the ${p.label.toLowerCase()}`} disabled={inv.slots[p.key] >= maxSlots(p.key)} onClick={() => changeSlots(p.key, 4)} />
+                <SlotButton label="− slot" aria={`Remove a slot from the ${p.label.toLowerCase()}`} disabled={!canShrink(p.key)} onClick={() => changeSlots(p.key, -1)} />
+                <SlotButton label="+ slot" aria={`Add a slot to the ${p.label.toLowerCase()}`} disabled={inv.slots[p.key] >= maxSlots(p.key)} onClick={() => changeSlots(p.key, 1)} />
               </span>
             </div>
             <Fold open={!folded[p.key]}>

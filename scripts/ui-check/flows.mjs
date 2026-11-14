@@ -820,7 +820,7 @@ export const FLOWS = [
           await card.click({ button: "right" }).catch(() => {});
           await h.settle(400);
           await h.check("quest menu: another session");
-          if (await h.tap((p) => p.getByRole("menuitem", { name: /another session/i }).first(), "another session", { optional: true, expectMove: true })) {
+          if (await h.tap((p) => p.getByRole("menuitem", { name: /additional time block/i }).first(), "another session", { optional: true, expectMove: true })) {
             await h.settle(900);
             await h.check("another session picker");
             await esc(h);
@@ -1162,7 +1162,7 @@ export const FLOWS = [
       await h.tap((p) => p.getByRole("button", { name: /^offline/i }).first(), "offline pill: why", { optional: true, expectMove: true });
       await h.check("offline pill: open");
       await h.tap((p) => p.getByRole("button", { name: /^offline/i }).first(), "offline pill: close", { optional: true, expectMove: true });
-      await h.tap((p) => p.getByRole("button", { name: /^add 4 slots to the utility pocket$/i }).first(), "offline: add slots", { optional: true, expectMove: true });
+      await h.tap((p) => p.getByRole("button", { name: /^add a slot to the utility pocket$/i }).first(), "offline: add slots", { optional: true, expectMove: true });
       if (await h.tap((p) => p.getByRole("button", { name: /^backpack menu$/i }).first(), "offline: backpack menu", { optional: true, expectMove: true })) {
         if (await h.tap((p) => p.getByRole("menuitem", { name: /packing lists/i }).first(), "offline: packing window", { optional: true, expectMove: true })) {
           await h.settle(900);
@@ -1300,7 +1300,7 @@ export const FLOWS = [
         await h.check("add item sheet: note");
         await h.tap((p) => p.getByRole("button", { name: /^close$/i }).last(), "add item: close", { optional: true, expectMove: true });
       }
-      await h.tap((p) => p.getByRole("button", { name: /^add 4 slots to the utility pocket$/i }).first(), "add slots", { optional: true, expectMove: true });
+      await h.tap((p) => p.getByRole("button", { name: /^add a slot to the utility pocket$/i }).first(), "add slots", { optional: true, expectMove: true });
       await h.tap((p) => p.getByRole("button", { name: /^utility pocket/i }).first(), "fold utility pocket", { optional: true, expectMove: true });
       await h.check("pocket folded");
     },

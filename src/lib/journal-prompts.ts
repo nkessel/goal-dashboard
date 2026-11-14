@@ -12,7 +12,6 @@ export const DEFAULT_PROMPTS: JournalPrompt[] = [
   { id: "showup", label: "Intention", prompt: "How do I want to show up today?", xp: 5 },
   // From the owner's own paper planners (Nov 9).
   { id: "willbe", label: "Today I will be", prompt: "Today I will be…", xp: 5 },
-  { id: "dreamt", label: "Last night's dream", prompt: "Last night I dreamt about…", xp: 5 },
   { id: "universe", label: "Help from the Universe", prompt: "I would like help from the Universe with…", xp: 5 },
 ];
 /** Prompts added after a list was first saved: they join a saved list once (until it's saved again). */

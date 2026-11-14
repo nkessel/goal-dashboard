@@ -12,6 +12,7 @@ export const DEFAULT_LANGUAGES = [
   "French",
   "Japanese",
   "Mandarin Chinese",
+  "Classical Chinese (5th–7th century)",
   "Arabic",
   "Greek",
   "Hindi",
@@ -29,6 +30,7 @@ export const APPROXIMATE: Record<string, string> = {
   phoenician: "Known only from inscriptions: a reconstruction, approximate.",
   "ancient greek": "Pronunciation is reconstructed.",
   latin: "Classical pronunciation is reconstructed.",
+  "classical chinese (5th–7th century)": "Written in its own characters; the pronunciation line is a reconstruction of Middle Chinese: approximate.",
   sanskrit: "",
 };
 export const approxNote = (lang: string) => APPROXIMATE[lang.toLowerCase()] || "";

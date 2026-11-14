@@ -500,6 +500,8 @@ export function DailyHabits({
                     setMenuFor(h.id);
                   }}
                   className={`habit-row relative flex flex-wrap items-center gap-x-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
+                  // Done: no crossed-out name; the whole card turns a little green (owner, Nov 12).
+                  data-done={d ? "" : undefined}
                   // A gilded edge and a soft shadow, so each habit sits on the velvet like a card.
                   style={isAdventure ? { borderRadius: 16, boxShadow: "0 0 0 1.5px #b39a6a, 0 0 0 3px rgba(60,44,16,.55), 0 4px 10px rgba(0,0,0,.4)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
                 >
@@ -553,7 +555,7 @@ export function DailyHabits({
                   >
                     <span
                       className="block text-[16px] font-semibold leading-snug"
-                      style={{ color: "var(--t-ink)", textDecoration: d ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)", opacity: d ? 0.7 : 1 }}
+                      style={{ color: "var(--t-ink)" }}
                     >
                       {h.title}
                       {h.id === cleanId && cleaning && (
@@ -753,7 +755,7 @@ export function DailyHabits({
                                   </svg>
                                 )}
                               </span>
-                              <span className="min-w-0 flex-1 text-[15px] leading-snug" style={{ color: "var(--t-ink)", textDecoration: t ? "line-through" : undefined, textDecorationColor: "rgba(80,60,20,.45)", opacity: t ? 0.7 : 1 }}>
+                              <span className="min-w-0 flex-1 text-[15px] leading-snug" style={{ color: "var(--t-ink)" }}>
                                 {st.title}
                               </span>
                               {(st.xp || st.coins) && (

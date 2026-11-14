@@ -1,14 +1,14 @@
 /**
- * Several events in one line: "headache, skipped lunch; long walk" logs three.
- * On unless turned off (the choice is remembered in this browser).
+ * Several events in one line: "headache, skipped lunch; long walk" can log three.
+ * Off unless turned on (owner, Nov 12: "comma should not separate events logged"); the choice is remembered in this browser.
  */
 const KEY = "event-split";
 
 export function splitOn(): boolean {
   try {
-    return window.localStorage.getItem(KEY) !== "off";
+    return window.localStorage.getItem(KEY) === "on";
   } catch {
-    return true;
+    return false;
   }
 }
 export function setSplitOn(on: boolean) {

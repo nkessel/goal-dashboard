@@ -1595,7 +1595,8 @@ export function QuestEditorDialog({
                         +{stepXpPop} XP
                       </span>
                     )}
-                    {!isCompleted && steps !== null && !addingStep && (
+                    {/* With sub-quests on the list, Add sits under the last one (owner, Nov 13). */}
+                    {!isCompleted && steps !== null && !addingStep && steps.length === 0 && (
                       <button aria-label="Add a sub-quest"
                         type="button"
                         onClick={() => (setAddingStep(true), setStepsFolded(false))}
@@ -1857,6 +1858,17 @@ export function QuestEditorDialog({
                         </li>
                       )}
                     </ul>
+                  )}
+                  {!isCompleted && steps !== null && steps.length > 0 && !addingStep && !stepsFolded && (
+                    <button
+                      type="button"
+                      aria-label="Add a sub-quest"
+                      onClick={() => setAddingStep(true)}
+                      className="hover-glow ml-[22px] mt-1 flex h-8 items-center gap-1 self-start rounded-full px-3 text-[13px] font-bold"
+                      style={{ background: isAdventure ? "linear-gradient(180deg,#f2d58a,#d9b45f)" : "var(--t-accent)", color: isAdventure ? "#2a1c10" : "#fff", border: isAdventure ? "1px solid #8a6116" : undefined, boxShadow: "0 1px 3px rgba(60,40,10,.3)" }}
+                    >
+                      <span aria-hidden className="text-[16px] leading-none">+</span> Add sub-quest
+                    </button>
                   )}
                 </div>
               )}

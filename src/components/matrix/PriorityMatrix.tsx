@@ -59,7 +59,7 @@ const QUADRANTS = {
     adventure: [
       { title: "Battle Now", desc: "Important & urgent" },
       { title: "Plan the Siege", desc: "Important, not urgent" },
-      { title: "Send a Scout", desc: "Urgent, not important" },
+      { title: "Send a Raiding Party", desc: "Urgent, not important" },
       { title: "Abandon Quest", desc: "Neither important nor urgent" },
     ],
     calm: [
@@ -69,14 +69,14 @@ const QUADRANTS = {
       { title: "Let go", desc: "Neither important nor urgent" },
     ],
     tint: ["rgba(196,72,40,.13)", "rgba(79,109,60,.13)", "rgba(56,104,140,.12)", "rgba(107,98,82,.10)"],
-    axes: { up: "Urgent ↑", down: { adventure: "Can wait", calm: "Not urgent" }, left: { adventure: "Minor", calm: "Not important" }, right: "Important →" },
+    axes: { up: "Urgent ↑", down: { adventure: "Not urgent", calm: "Not urgent" }, left: { adventure: "Not important", calm: "Not important" }, right: "Important →" },
   },
   impact: {
     pos: ["tl", "tr", "bl", "br"],
     adventure: [
       { title: "Quick Victories", desc: "Big impact, little effort — start here" },
       { title: "Grand Campaigns", desc: "Big impact, big effort — plan them" },
-      { title: "Side Errands", desc: "Small impact, little effort — fill gaps" },
+      { title: "Side Quests", desc: "Small impact, little effort — fill gaps" },
       { title: "The Swamp", desc: "Small impact, big effort — avoid" },
     ],
     calm: [
@@ -137,7 +137,7 @@ export function PriorityMatrix({
   }
 
   // ---- Mode and board filter (remembered per browser) -------------------
-  const [mode, setMode] = useState<Mode>("priority");
+  const [mode, setMode] = useState<Mode>("impact");
   const [hiddenBoards, setHiddenBoards] = useState<Set<string>>(() => new Set());
   const [filterOpen, setFilterOpen] = useState(false);
   const [legendOpen, setLegendOpen] = useState(false);
@@ -146,7 +146,8 @@ export function PriorityMatrix({
       const saved = JSON.parse(window.localStorage.getItem("matrix-hidden-boards") ?? "[]");
       // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
       if (Array.isArray(saved) && saved.length) setHiddenBoards(new Set(saved));
-      if (window.localStorage.getItem("matrix-mode") === "impact") setMode("impact");
+      // Impact × Effort is the default view (owner, Nov 13); Priority only when chosen.
+      if (window.localStorage.getItem("matrix-mode") === "priority") setMode("priority");
     } catch {
       /* storage unavailable */
     }

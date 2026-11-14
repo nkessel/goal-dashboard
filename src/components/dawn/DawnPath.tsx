@@ -32,7 +32,8 @@ export function DawnPath({ label, icon }: { label?: string; icon?: string }) {
   const done = new Set([...(d.done ?? []), ...doneIds]);
   const lib = new Map(dawn.stones.map((s) => [s.id, s]));
   const planned = (d.stones ?? []).map((id) => lib.get(id)).filter((s): s is Stone => !!s);
-  const stones = planned.length ? planned : dawn.stones.slice(0, 3);
+  // Your first three until you choose; once you've chosen, the choice stands, even none at all (owner, Nov 9: "can't remove all stones").
+  const stones = Array.isArray(d.stones) ? planned : dawn.stones.slice(0, 3);
   const week = on.week ? chapterFor(dawn, day) : null;
   const short = on.short && !!d.short;
   const count = stones.filter((s) => done.has(s.id)).length + (week && d.weekDone ? 1 : 0) + (d.took && d.cardDone ? 1 : 0);

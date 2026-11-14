@@ -454,7 +454,11 @@ export function WelcomeCard({
   const [filledParts, setFilledParts] = useState<PartKey[]>([]);
   const filledRef = useRef<PartKey[]>([]);
   const fillPart = (k: PartKey) => {
-    if (!filledRef.current.includes(k)) filledRef.current = [...filledRef.current, k];
+    if (!filledRef.current.includes(k)) {
+      filledRef.current = [...filledRef.current, k];
+      // Paid the moment the part is saved, not on the way out (owner, Nov 13); once a day each, the server keeps count.
+      if (k !== "focus" && partXp(k) > 0) void welcomePartsXpAction([{ key: k, xp: partXp(k) }]).catch(() => {});
+    }
     setFilledParts((cur) => (cur.includes(k) ? cur : [...cur, k]));
   };
   // Journal prompts written this visit, each with its own XP.
@@ -463,6 +467,7 @@ export function WelcomeCard({
   const fillJournal = (key: string, xpN: number) => {
     if (journalRef.current.some((j) => j.key === key)) return;
     journalRef.current = [...journalRef.current, { key, xp: xpN }];
+    if (xpN > 0) void welcomePartsXpAction([{ key, xp: xpN }]).catch(() => {});
     setJournalFilled(journalRef.current);
   };
   // Pays each part filled in this visit (once a day each, the server keeps count).
@@ -640,7 +645,8 @@ export function WelcomeCard({
             aria-label="Minimize the check-in"
             title="Minimize (comes back from the sun bubble)"
             data-welcome-corner
-            className="settings-gear absolute right-[42px] top-1.5 z-[4] flex h-[28px] w-[28px] items-center justify-center rounded-full"
+            // Not the gear's class: that one turns on hover, which tilted the minus (owner, Nov 9).
+            className="hover-glow absolute right-[42px] top-1.5 z-[4] flex h-[28px] w-[28px] items-center justify-center rounded-full"
             style={{ color: "#f2d27e", background: "radial-gradient(circle at 40% 35%, #3a3524, #1c1a10)", boxShadow: "0 0 0 1.5px #8d7642, 0 2px 6px rgba(0,0,0,.5)" }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -812,14 +818,22 @@ export function WelcomeCard({
                 ) : (
                   parts[el]
                 )}
+                {/* Done: a clear green check at the section button's left (owner, Nov 13). */}
+                {((el === "focus" && journalFilled.length > 0) || (isPartKey(el) && el !== "focus" && filledParts.includes(el))) && (
+                  <span aria-label="Done" className="card-pop-in pointer-events-none absolute left-0.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "#4e8a3a", boxShadow: "0 1px 4px rgba(0,0,0,.25)" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M5 12.500l4.500 4.500L19 7.500" stroke="#fff" strokeWidth="3.400" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                )}
                 {el === "focus" && journalFilled.length > 0 && (
                   <span className="pointer-events-none mt-0.5 text-[11.5px] font-semibold tabular-nums" style={{ color: "#4e6a35" }}>
-                    ✓ +{journalFilled.reduce((a, j) => a + j.xp, 0)} XP on the way
+                    +{journalFilled.reduce((a, j) => a + j.xp, 0)} XP
                   </span>
                 )}
                 {isPartKey(el) && el !== "focus" && partXp(el) > 0 && (
                   <span className="pointer-events-none mt-0.5 text-[11.5px] font-semibold tabular-nums" style={{ color: filledParts.includes(el) ? "#4e6a35" : "#8a6a2c", opacity: filledParts.includes(el) ? 1 : 0.75 }}>
-                    {filledParts.includes(el) ? `✓ +${partXp(el)} XP on the way` : `+${partXp(el)} XP when filled in`}
+                    {filledParts.includes(el) ? `+${partXp(el)} XP` : `+${partXp(el)} XP when filled in`}
                   </span>
                 )}
                 {isButtonKey(el) && (
@@ -1848,7 +1862,7 @@ function ButtonShell({ el, onEdit, children }: { el: WelcomeEl; onEdit: (k: Butt
   if (!isButtonKey(el)) return <div className="flex w-full flex-col items-center">{children}</div>;
   return (
     <div
-      className="flex w-full flex-col items-center [-webkit-touch-callout:none]"
+      className="relative flex w-full flex-col items-center [-webkit-touch-callout:none]"
       onContextMenu={(e) => {
         if (!onButton(e.target)) return;
         e.preventDefault();
@@ -1934,9 +1948,6 @@ function ButtonEditor({ k, fx, pays, onDone, children, onSnooze, onHide }: { k: 
         </div>
       )}
       <div className="flex items-center justify-end gap-3">
-        <button type="button" onClick={() => (set({ text: undefined, icon: undefined, xp: undefined }), onDone())} className="text-[12.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
-          Back to how it was
-        </button>
         <button type="button" onClick={onDone} className="h-8 rounded-full px-4 text-[13px] font-bold" style={GILT}>
           Done
         </button>

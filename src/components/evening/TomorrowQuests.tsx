@@ -65,8 +65,16 @@ export function TomorrowQuests({
   if (seen !== queued) {
     setSeen(queued);
     setLocal(null);
-    setTicked(null);
-    setRowsLocal(null);
+    // The list you're working on stays as it is when fresh data arrives (adding a quest used to clear it:
+    // the suggestions from Today and anything unticked vanished; owner, Nov 10). Anything newly on
+    // tomorrow's list from elsewhere joins at the end, ticked.
+    if (rowsLocal && queued) {
+      const add = queued.map((t) => t.id).filter((id) => !rowsLocal.includes(id));
+      if (add.length) {
+        setRowsLocal([...rowsLocal, ...add]);
+        setTicked(new Set([...(ticked ?? []), ...add]));
+      }
+    }
   }
 
   const sensors = useSensors(

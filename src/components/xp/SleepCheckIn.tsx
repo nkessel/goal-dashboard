@@ -73,7 +73,11 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
   const [savedQuality, setSavedQuality] = useState<number | null>(null);
   const qualityNew = quality !== null && quality !== savedQuality;
   const filled = others.filter((n) => n.day && (n.bed || n.wake));
-  const dirty = touched || qualityNew || filled.length > 0;
+  // A line about the night, under the faces (owner, Nov 11); kept as a "😴 Sleep note" event so Insights shows it.
+  const [note, setNote] = useState("");
+  const [savedNote, setSavedNote] = useState("");
+  const noteNew = note.trim() !== "" && note.trim() !== savedNote;
+  const dirty = touched || qualityNew || noteNew || filled.length > 0;
   async function save() {
     if (!dirty) return true;
     setError(null);
@@ -82,7 +86,11 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
       for (const n of filled) await saveOrQueue("saveNightDay", { day: n.day, bed: n.bed || null, wake: n.wake || null, effort: [], hindrances: [], keep: true }, `night:${n.day}`);
       if (touched) await saveOrQueue("saveNight", night, `night:${night.today ? "today" : "last"}`);
       if (qualityNew) await saveOrQueue("saveCheckIn", { energy: null, metrics: [{ metric: "Sleep quality", level: quality * 2 }], at: new Date().toISOString() });
-      if (filled.length || touched || qualityNew) onFilled?.();
+      if (noteNew) {
+        await saveOrQueue("logEvent", { title: "😴 Sleep note", details: note.trim().slice(0, 400), tone: quality ? (quality >= 4 ? 1 : quality <= 2 ? -1 : 0) : null, at: new Date().toISOString() });
+        setSavedNote(note.trim());
+      }
+      if (filled.length || touched || qualityNew || noteNew) onFilled?.();
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your sleep.");
@@ -160,13 +168,21 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
               </p>
             )}
             {/* Sleep quality: five faces, one tap. */}
-            <button type="button" onClick={() => setQualityOpen((v) => !v)} aria-expanded={qualityOpen} className="wheel-btn mx-auto flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+            <button type="button" onClick={() => setQualityOpen((v) => !v)} aria-expanded={qualityOpen} className="wheel-btn flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold">
               {quality ? <Face mouth={FACES[quality - 1].mouth} color={FACE_COLOR[quality - 1]} /> : <span aria-hidden>☺</span>}
               Sleep quality{quality ? ` · ${FACES[quality - 1].label}` : ""}
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-300" style={{ transform: qualityOpen ? "rotate(90deg)" : undefined }}>
                 <path d="M9 5.5l6.5 6.5L9 18.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
+            {/* Its Save sits beside the Sleep quality button (owner, Nov 11), once there's something to save. */}
+            {dirty && (
+              <button type="button" onClick={saveNow} disabled={saving} className="fade-in flex h-8 items-center gap-1 rounded-full px-4 text-[13px] font-bold disabled:opacity-70" style={GILT}>
+                {saving ? "Saving…" : "Save sleep check-in ✓"}
+              </button>
+            )}
+            </div>
             <div className="drawer-body" data-open={qualityOpen ? "true" : "false"}>
               <div className="drawer-inner" inert={!qualityOpen}>
                 <div role="radiogroup" aria-label="How well did you sleep?" className="flex justify-center gap-1.5 pt-1">
@@ -184,6 +200,16 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
                 </div>
               </div>
             </div>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={1}
+              maxLength={400}
+              aria-label="Sleep notes"
+              placeholder="Sleep notes (dreams, wake-ups, what helped…)"
+              className="min-h-[38px] w-full resize-none rounded-xl px-3 py-2 text-[16px] leading-snug"
+              style={{ background: "rgba(255,250,238,.7)", border: "1px solid rgba(139,112,64,.35)", color: "var(--t-ink)", fieldSizing: "content" } as React.CSSProperties}
+            />
             {/* Other nights: a row only once you add one (no empty fields waiting). */}
             {others.map((n, i) => (
               <div key={n.id} className="reveal flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl px-2 py-1.5" style={{ background: "rgba(255,250,238,.55)", border: "1px solid rgba(139,112,64,.3)" }}>
@@ -203,14 +229,6 @@ export function SleepCheckIn({ register, label, icon, onFilled }: { register: (s
                 {error}
               </p>
             )}
-            {/* Save, bottom right, once there's something to save. */}
-            <Fold open={dirty}>
-              <div className="flex justify-end pt-0.5">
-                <button type="button" onClick={saveNow} disabled={saving} className="flex h-8 items-center gap-1 rounded-full px-4 text-[13px] font-bold disabled:opacity-70" style={GILT}>
-                  {saving ? "Saving…" : "Save ✓"}
-                </button>
-              </div>
-            </Fold>
           </div>
         </div>
       </div>
