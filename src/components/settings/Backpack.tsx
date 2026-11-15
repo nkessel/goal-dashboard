@@ -11,11 +11,12 @@ import { useEscape } from "@/lib/use-escape";
 import { useFitAboveKeyboard } from "@/lib/use-fit-above-keyboard";
 import { Fold, useClosing } from "@/components/ui/Fold";
 import { openPackingWindow } from "./PackingLists";
+import { FloatingWindow } from "@/components/ui/FloatingWindow";
 
 const STATUS: { v: ItemStatus; label: string; hint: string }[] = [
-  { v: "full", label: "Stocked", hint: "Full and ready" },
+  { v: "full", label: "✓ Ready", hint: "Full and ready" },
   { v: "low", label: "Running low", hint: "Refill soon" },
-  { v: "empty", label: "Needs refill", hint: "Ran out" },
+  { v: "empty", label: "↻ Needs refill", hint: "Ran out" },
 ];
 
 /** How see-through the "Refill" band is by default (the portrait shows through it); set from the backpack's gear. */
@@ -562,6 +563,7 @@ export function Backpack({ initial }: { initial: Inventory }) {
             setEditing(null);
           }}
           onQuest={() => refillQuest(editing.item)}
+          painted={[...new Set(inv.items.map((i) => i.icon).filter((u): u is string => !!u && u !== editing.item.icon))].slice(0, 24)}
         />
       )}
     </div>
@@ -588,12 +590,13 @@ function BringDrawer({ list, onChange, onClose }: { list: BringList; onChange: (
   };
   const savePlace = () => place.trim() !== list.place && onChange({ ...list, place: place.trim() });
   const link = "text-[13.5px] underline underline-offset-2";
-  return createPortal(
-    <div className="drawer-fade-in fixed inset-0 z-[56] flex justify-end overscroll-contain" style={{ background: "rgba(10,8,4,.35)" }} onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Bring from home" onClick={(e) => e.stopPropagation()} className="drawer-slide-in parchment parchment-framed flex h-full w-[min(360px,88vw)] flex-col gap-3 overflow-y-auto overscroll-contain rounded-l-2xl p-4 pt-[max(16px,env(safe-area-inset-top))] pb-[max(16px,env(safe-area-inset-bottom))]" style={{ background: "var(--t-card)" }}>
+  // A window you move by its title and size from its corner, wide enough for its whole title (owner, Nov 9).
+  return (
+    <FloatingWindow storageKey="bring-window-at" width={Math.min(400, typeof window === "undefined" ? 400 : window.innerWidth - 16)} z={56} minimized={false} onRestore={() => {}} chip={<>🏠 Bring from home</>} label="Bring from home (drag to move)" resizable at={() => ({ x: Math.max(8, window.innerWidth - 408), y: 72 })}>
+      <div role="dialog" aria-label="Bring from home" className="card-pop-in parchment parchment-framed flex max-h-[80dvh] flex-col gap-3 overflow-y-auto overscroll-contain rounded-2xl p-4" style={{ background: "var(--t-card)", boxShadow: "0 14px 34px rgba(0,0,0,.4)" }}>
         <div className="relative z-[1] flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="font-display m-0 text-[20px]" style={{ color: "var(--t-ink)" }}>
+            <h3 data-drag-handle className="font-display m-0 cursor-grab touch-none select-none whitespace-nowrap text-[20px]" style={{ color: "var(--t-ink)" }}>
               Bring from home
             </h3>
             <label className="mt-1 flex items-center gap-1.5 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
@@ -640,8 +643,7 @@ function BringDrawer({ list, onChange, onClose }: { list: BringList; onChange: (
           </div>
         )}
       </div>
-    </div>,
-    document.body
+    </FloatingWindow>
   );
 }
 
@@ -660,8 +662,17 @@ function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest, onGone, onPa
           {item.name}
         </span>
         <button type="button" role="menuitem" data-mi="refill" onClick={onToggle} className={row} style={{ color: "var(--t-ink)" }}>
-          <span aria-hidden className="w-5 text-center">{empty ? "✓" : "⚗"}</span>
-          {empty ? "Refilled" : "Needs a refill"}
+          {/* The band's own ↻ for "needs a refill"; a green check for "ready" (owner, Nov 9). */}
+          {empty ? (
+            <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full text-[12px] font-bold" style={{ background: "#3f7a2e", color: "#fff" }}>
+              ✓
+            </span>
+          ) : (
+            <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full text-[13px] font-bold" style={{ background: "rgba(150,36,20,.9)", color: "#fff1e0" }}>
+              ↻
+            </span>
+          )}
+          {empty ? "Ready: refilled" : "Needs a refill"}
         </button>
         <button type="button" role="menuitem" data-mi="quest" onClick={onQuest} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">＋</span>
@@ -711,7 +722,10 @@ function ItemSheet({
   onRemove,
   onMove,
   onQuest,
+  painted = [],
 }: {
+  /** Pictures already painted for your other items: pick one instead of painting (owner, Nov 9). */
+  painted?: string[];
   initial: InventoryItem;
   isNew: boolean;
   onClose: () => void;
@@ -731,6 +745,7 @@ function ItemSheet({
   const [repaint, setRepaint] = useState(false);
   // The description box opens from "Paint it"; the note stays folded until asked for.
   const [describing, setDescribing] = useState(false);
+  const [reusing, setReusing] = useState(false);
   const [noting, setNoting] = useState(!!initial.note);
   // The sheet sits in the strip above the on-screen keyboard, so it can't be covered or stretched.
   const kb = useFitAboveKeyboard(true);
@@ -805,9 +820,15 @@ function ItemSheet({
         {/* The picture, always in view: painted from its name, painted from your words, your photo as it is, or your photo painted. */}
         <div className="relative z-[1] flex flex-col gap-1.5">
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="The picture">
-            <button type="button" data-open={wantsPaint ? "true" : "false"} onClick={() => (setRepaint(true), setDescribing((v) => (wantsPaint ? !v : true)))} className={`qe-fact ${chip}`} title="Paint a picture from its name (or describe it)">
-              ✨ Paint it
+            {/* Painted from its name by default, so this one is for describing your own (owner, Nov 9). */}
+            <button type="button" data-open={wantsPaint && describing ? "true" : "false"} onClick={() => (setRepaint(true), setReusing(false), setDescribing((v) => (wantsPaint ? !v : true)))} className={`qe-fact ${chip}`} title="Describe the portrait you'd like painted">
+              ✨ Custom portrait
             </button>
+            {painted.length > 0 && (
+              <button type="button" data-open={reusing ? "true" : "false"} onClick={() => (setReusing((v) => !v), setDescribing(false))} className={`qe-fact ${chip}`} title="Use a picture already painted for another item">
+                🖼 Painted before
+              </button>
+            )}
             <label className={`qe-fact ${chip}`} title="Use your photo as the picture" onPointerDown={dropKeyboard}>
               📷 My photo
               <input type="file" accept="image/*" className="sr-only" onChange={pick("photo")} disabled={!!busy} />
@@ -820,6 +841,16 @@ function ItemSheet({
           <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
             {busy ? (busy === "illustrate" ? "Painting your photo…" : "Adding your photo…") : wantsPaint ? "Painted from its name when you save." : "Keeping this picture."}
           </span>
+          <Fold open={reusing}>
+            <div className="grid grid-cols-6 gap-1.5 pt-0.5" role="radiogroup" aria-label="Pictures painted before">
+              {painted.map((u) => (
+                <button key={u} type="button" role="radio" aria-checked={item.icon === u} onClick={() => (setItem({ ...item, icon: u }), setRepaint(false), setReusing(false))} className="aspect-square overflow-hidden rounded-lg" style={{ border: item.icon === u ? "2px solid #8a6116" : "1px solid rgba(139,112,64,.35)" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- painted portraits from storage */}
+                  <img src={u} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </Fold>
           <Fold open={wantsPaint && describing}>
             <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe it (optional), e.g. a green pouch of fizzy tablets" maxLength={160} className={field} style={fieldStyle} aria-label="Describe the portrait" />
           </Fold>
@@ -844,7 +875,7 @@ function ItemSheet({
                 title={o.hint}
                 onClick={() => setItem({ ...item, status: o.v })}
                 className="h-11 flex-1 rounded-full text-[13.5px] font-semibold"
-                style={item.status === o.v ? { background: o.v === "empty" ? "#9a3b26" : o.v === "low" ? "#c98a2a" : "var(--t-gold)", color: o.v === "full" ? "#2a1c10" : "#fff" } : { color: "var(--t-ink-soft)" }}
+                style={item.status === o.v ? { background: o.v === "empty" ? "#9a3b26" : o.v === "low" ? "#c98a2a" : "#3f7a2e", color: "#fff" } : { color: "var(--t-ink-soft)" }}
               >
                 {o.label}
               </button>
