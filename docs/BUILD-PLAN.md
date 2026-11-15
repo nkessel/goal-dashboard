@@ -68,7 +68,7 @@ hidden, deleted by holding it; "+ My own prompt"; written text shows two lines w
 add it under the event box (Insights › Events, check-in) and the journal entry. Stored on the event's existing
 `tone`/a new field: read the notes; if a column is needed, migration 0089. ui-check: insights, welcome.
 
-### 6. Edit times after the fact — S
+### 6. Edit times after the fact — S (habit time and event edit shipped Nov 14 night; left: Complete in the editor asks when [0c17c4c9])
 - A habit's completion time can be edited (hold the done habit → time wheels, `ui/TimeWheels.tsx`) [c12d59cf rest].
 - A logged event opens its edit on a press [431c686d] (`insights/EventLog.tsx` already has `EventEdit`).
 - Complete in the quest editor asks "Done now / Earlier…" with the time wheels [0c17c4c9].
@@ -119,7 +119,7 @@ Streaks, add one in the past simply, tracked-event options shown. Read all four 
 [dafe3364] Read the note; the quest editor's sub-quests and the sequence window. Large file
 (`QuestEditorDialog.tsx`): change only the parts named.
 
-### 17. Smaller ones — S
+### 17. Smaller ones — S (shipped Nov 14 night except cleaning XP [ce1eda24, unclear: ask] and welcome headers [29018ed3])
 - Toucan settings sit with the cage icon in Settings [89fd58c4].
 - Edit things in Celebrate today's wins (evening) [ef01814f].
 - Toucan flies backwards [bbaf7d59] (flip the sprite on the return flight).
