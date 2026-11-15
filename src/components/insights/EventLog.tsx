@@ -1,5 +1,7 @@
 "use client";
 
+import { FaceIcon, FaceRating, faceOf, isFace } from "@/components/ui/FaceRating";
+
 import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -12,13 +14,8 @@ import { TrackedEvents } from "./TrackedEvents";
 
 type Note = { id: string; body: string; created_at: string; details?: string | null; tone?: number | null };
 
-/** How it felt: minus, neutral or plus, each its own colour (also on the Insights chart). */
-export const TONES = [
-  { v: -1, label: "−", name: "Hard / minus", color: "#a33c2a", bg: "rgba(163,60,42,.16)" },
-  { v: 0, label: "●", name: "Neutral", color: "#7a6a4f", bg: "rgba(122,106,79,.16)" },
-  { v: 1, label: "+", name: "Good / plus", color: "#3f7a2e", bg: "rgba(63,122,46,.16)" },
-] as const;
-export const toneOf = (t: number | null | undefined) => TONES.find((x) => x.v === t) ?? null;
+/** How it felt: five faces (owner, Nov 13), shared with the Insights chart. */
+export const toneOf = (t: number | null | undefined) => faceOf(t);
 type When = "now" | "morning" | "yesterday" | "pick";
 
 const INK = "#3b2a14";
@@ -154,7 +151,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
   const [detailsOf, setDetailsOf] = useState<Record<string, string | null>>({});
   const [tones, setTonesOf] = useState<Record<string, number | null>>({});
   const [times, setTimesOf] = useState<Record<string, string>>({});
-  function saveFull(id: string, e: { text: string; details: string | null; tone: -1 | 0 | 1 | null; at: string }) {
+  function saveFull(id: string, e: { text: string; details: string | null; tone: number | null; at: string }) {
     setEditingNote(null);
     const n = notes.find((x) => x.id === id);
     const text = e.text.trim();
@@ -234,14 +231,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
             <span className="text-[13px] font-semibold" style={{ color: INK_SOFT }}>
               Felt
             </span>
-            {TONES.map((t) => {
-              const on = tone === t.v;
-              return (
-                <button key={t.v} type="button" role="radio" aria-checked={on} aria-label={t.name} title={t.name} onClick={() => setTone(on ? null : t.v)} className="flex h-8 w-10 items-center justify-center rounded-full text-[17px] font-bold leading-none transition-transform" style={{ color: on ? "#fff" : t.color, background: on ? t.color : t.bg, border: `1.5px solid ${t.color}`, transform: on ? "scale(1.06)" : undefined }}>
-                  {t.label}
-                </button>
-              );
-            })}
+            <FaceRating value={tone} onChange={setTone} compact />
           </div>
           <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={2} maxLength={1000} placeholder="Details (optional): shown when you hover over it" aria-label="Details" className="event-input resize-none rounded-xl px-2.5 py-1.5 text-[15px] leading-snug" style={{ color: INK }} />
           <div role="radiogroup" aria-label="When" className="flex flex-wrap items-center gap-1.5">
@@ -312,8 +302,8 @@ export function EventLog({ notes }: { notes: Note[] }) {
                   style={tag ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 } : { background: "rgba(255,250,235,.7)", border: "1px solid rgba(139,112,64,.4)", color: INK }}
                 >
                   {toneOf(n.tone) ? (
-                    <span aria-label={toneOf(n.tone)!.name} className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[11px] font-bold leading-none" style={{ background: toneOf(n.tone)!.color, color: "#fff" }}>
-                      {toneOf(n.tone)!.label}
+                    <span aria-label={toneOf(n.tone)!.label} className="flex shrink-0">
+                      <FaceIcon v={n.tone!} size={17} />
                     </span>
                   ) : (
                     !tag && <EventGlyph />
@@ -387,7 +377,7 @@ function EventGlyph() {
 }
 
 /** Editing an event in place: its title, details, how it felt and when it happened (owner, Nov 5). */
-function EventEdit({ note, onSave, onCancel }: { note: Note; onSave: (e: { text: string; details: string | null; tone: -1 | 0 | 1 | null; at: string }) => void; onCancel: () => void }) {
+function EventEdit({ note, onSave, onCancel }: { note: Note; onSave: (e: { text: string; details: string | null; tone: number | null; at: string }) => void; onCancel: () => void }) {
   const [text, setText] = useState(note.body);
   const [more, setMore] = useState(note.details ?? "");
   const [tone, setTone] = useState<number | null>(note.tone ?? null);
@@ -396,7 +386,7 @@ function EventEdit({ note, onSave, onCancel }: { note: Note; onSave: (e: { text:
   const [when, setWhen] = useState(`${d0.getFullYear()}-${pad(d0.getMonth() + 1)}-${pad(d0.getDate())}T${pad(d0.getHours())}:${pad(d0.getMinutes())}`);
   const save = () => {
     const at = new Date(when);
-    onSave({ text, details: more.trim() || null, tone: tone === -1 || tone === 0 || tone === 1 ? tone : null, at: Number.isFinite(at.getTime()) ? at.toISOString() : note.created_at });
+    onSave({ text, details: more.trim() || null, tone: isFace(tone) ? tone : null, at: Number.isFinite(at.getTime()) ? at.toISOString() : note.created_at });
   };
   return (
     <div
@@ -418,14 +408,7 @@ function EventEdit({ note, onSave, onCancel }: { note: Note; onSave: (e: { text:
         <span className="text-[13px] font-semibold" style={{ color: INK_SOFT }}>
           Felt
         </span>
-        {TONES.map((t) => {
-          const on = tone === t.v;
-          return (
-            <button key={t.v} type="button" role="radio" aria-checked={on} aria-label={t.name} title={t.name} onClick={() => setTone(on ? null : t.v)} className="flex h-8 w-10 items-center justify-center rounded-full text-[17px] font-bold leading-none" style={{ color: on ? "#fff" : t.color, background: on ? t.color : t.bg, border: `1.5px solid ${t.color}` }}>
-              {t.label}
-            </button>
-          );
-        })}
+        <FaceRating value={tone} onChange={setTone} compact />
       </div>
       <label className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: INK_SOFT }}>
         When

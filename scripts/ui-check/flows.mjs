@@ -189,6 +189,13 @@ export const FLOWS = [
       // Quest editor from the first quest card.
       if (await h.tap("text=Pick up medication", "open quest editor", { expectMove: true })) {
         await h.check("quest editor");
+        // Complete asks when it was finished (owner, Nov 8): Just now, or Earlier… on the time wheels. Closed again without completing.
+        if (await h.tap((p) => p.getByRole("button", { name: /complete (quest|task)/i }).first(), "editor: complete asks when", { optional: true, expectMove: true })) {
+          await h.tap((p) => p.locator("[data-complete-when]").getByRole("button", { name: /earlier/i }).first(), "editor: complete earlier", { optional: true, expectMove: true });
+          await h.settle(400);
+          await h.check("editor: when did you finish");
+          await h.tap((p) => p.locator("[data-complete-when]").getByRole("button", { name: /not yet/i }).first(), "editor: not yet", { optional: true });
+        }
         // The board tag on the portrait opens the board picker under it (owner, Nov 12).
         if (await h.tap((p) => p.locator("[role=dialog] [data-board-chip]").first(), "editor: board tag", { expectMove: true })) {
           await h.settle(500);

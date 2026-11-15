@@ -155,7 +155,7 @@ export async function addCheckNote(ownerId: string, text: string, atISO?: string
     if (t < Date.now() - 90 * 86_400_000) throw new Error("That's more than 90 days ago.");
     at = new Date(t).toISOString();
   }
-  const { data, error } = await supabaseAdmin().from("check_in_notes").insert({ owner_id: ownerId, body, tags: tagsIn(body), ...(at ? { created_at: at } : {}), ...(allDay ? { all_day: true } : {}), ...(extra.details?.trim() ? { details: extra.details.trim().slice(0, 1000) } : {}), ...(extra.tone === -1 || extra.tone === 0 || extra.tone === 1 ? { tone: extra.tone } : {}) }).select("id, body, tags, created_at, details, tone").single();
+  const { data, error } = await supabaseAdmin().from("check_in_notes").insert({ owner_id: ownerId, body, tags: tagsIn(body), ...(at ? { created_at: at } : {}), ...(allDay ? { all_day: true } : {}), ...(extra.details?.trim() ? { details: extra.details.trim().slice(0, 1000) } : {}), ...(typeof extra.tone === "number" && Number.isInteger(extra.tone) && extra.tone >= -2 && extra.tone <= 2 ? { tone: extra.tone } : {}) }).select("id, body, tags, created_at, details, tone").single();
   if (error) throw new Error(`Couldn't save that: ${error.message}`);
   return data as CheckNote;
 }
@@ -170,7 +170,7 @@ export async function listCheckNotesSince(ownerId: string, sinceISO: string): Pr
   return (data ?? []) as CheckNote[];
 }
 
-export async function updateCheckNote(ownerId: string, id: string, edit: string | { text?: string; details?: string | null; tone?: -1 | 0 | 1 | null; at?: string }): Promise<CheckNote> {
+export async function updateCheckNote(ownerId: string, id: string, edit: string | { text?: string; details?: string | null; tone?: number | null; at?: string }): Promise<CheckNote> {
   const e = typeof edit === "string" ? { text: edit } : edit;
   const patch: Record<string, unknown> = {};
   if (e.text !== undefined) {
@@ -180,7 +180,7 @@ export async function updateCheckNote(ownerId: string, id: string, edit: string 
     patch.tags = tagsIn(body);
   }
   if (e.details !== undefined) patch.details = e.details?.trim().slice(0, 400) || null;
-  if (e.tone !== undefined) patch.tone = e.tone === -1 || e.tone === 0 || e.tone === 1 ? e.tone : null;
+  if (e.tone !== undefined) patch.tone = typeof e.tone === "number" && Number.isInteger(e.tone) && e.tone >= -2 && e.tone <= 2 ? e.tone : null;
   if (e.at !== undefined) {
     const t = Date.parse(e.at);
     if (!Number.isFinite(t)) throw new Error("That time doesn't look right.");
