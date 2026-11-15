@@ -79,7 +79,7 @@ ui-check: today, insights.
 - Prioritize: tap a card for a short preview, a second tap (or "Edit") opens the editor [469594c1].
 ui-check: today.
 
-### 8. Inventory — S
+### 8. Inventory — S (shipped Nov 14 night)
 [896ea7e1, 5e9cb5e8, dd185e39, e53c4d19] Refill icon + green check; reuse already painted pictures (library
 pick before painting); Bring from home movable and wider (`FloatingWindow`); the seam is a visible button.
 ui-check: inventory.
