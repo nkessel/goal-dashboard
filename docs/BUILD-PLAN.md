@@ -30,7 +30,7 @@ gesture/keyboard/positioning work, data model changes, or many screens at once).
 
 ## Task list
 
-### 1. Quest failure, the rest — S
+### 1. Quest failure, the rest — S (Archive choice, FailQuest, slam shipped Nov 14 night; left: editor ⋯ item, Failed seal in lists)
 Shipped Nov 14: `tasks.failed_at`, `fail_reason` (migration 0088, applied), `failTaskAction`, calendar card menu
 "✕ Quest failure" / "Undo quest failure", red X on failed calendar cards, failed quests left out of Victories.
 Left:
@@ -42,12 +42,12 @@ Left:
 - ui-check: add steps to the `today` flow (open ⋯ › Archive, see three choices).
 - Mark 43ee3855, 441501e4 when done; 856cbdf3 only after task 2.
 
-### 2. Calendar card "slam" — S
+### 2. Calendar card "slam" — S (shipped Nov 14 night)
 [856cbdf3, rest] When a quest is completed or failed from the calendar card menu, a gold ✓ (or red ✕) stamps onto
 the card: scale 1.6 → 1 with a small bounce and a brief shadow, ~350ms (`CalendarTaskChip.tsx`, a CSS keyframe in
 `globals.css`, `prefers-reduced-motion` off). Mark 856cbdf3.
 
-### 3. Small wording/spacing notes — S (one push)
+### 3. Small wording/spacing notes — S (shipped Nov 14 night)
 Each is a few lines; read the note first.
 - "+25" in the party says "+25 XP" [89c05f2c].
 - Move icon is a folder [457bea7b]; "Remove from Additional Quests" → "Move…" like Today's [2dc2a33d].
