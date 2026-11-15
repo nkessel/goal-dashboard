@@ -262,6 +262,16 @@ export const FLOWS = [
         await esc(h);
         await esc(h);
       }
+      // Archive asks Fail / Archive / Delete; Fail writes its reason on the menu's parchment (owner, Nov 9).
+      if (await h.tap((p) => p.locator("li", { hasText: "Pick up medication" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for archive", { optional: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^archive/i }).first(), "archive choices", { optional: true, expectMove: true })) {
+          await h.check("archive choices");
+          if (await h.tap((p) => p.getByRole("button", { name: /mark it failed/i }).first(), "quest failure", { optional: true, expectMove: true })) await h.check("quest failure form");
+        }
+        await esc(h);
+        await esc(h);
+        await esc(h);
+      }
       // A quest with steps: tapping its card slides the steps tray open under it (repeat ask 9: no overlap).
       if (await h.tap("text=read chapter four", "steps tray", { optional: true, expectMove: true })) {
         await h.settle(500);

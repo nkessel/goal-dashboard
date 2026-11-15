@@ -309,7 +309,8 @@ export function TaskRow({
         await moveTaskToBoardAction(task.id, boardId);
         await setTaskPlacementAction(task.id, "none");
         const prev = task.board_id ?? null;
-        listMoves?.notify?.({ text: `Moved to ${label}: ${task.title}`, undo: async () => (await moveTaskToBoardAction(task.id, prev), await setTaskPlacementAction(task.id, "today")) });
+        const back = task.is_manual_priority ? "today" : "additional";
+        listMoves?.notify?.({ text: `Moved to ${label}: ${task.title}`, undo: async () => (await moveTaskToBoardAction(task.id, prev), await setTaskPlacementAction(task.id, back)) });
         if (!listMoves) router.refresh();
       } catch (e) {
         if (listMoves) {
@@ -428,7 +429,8 @@ export function TaskRow({
       align={align}
       anchor={menuAnchor}
       onPick={pick}
-      onMoveToBoard={task.is_manual_priority ? moveToBoard : undefined}
+      onMoveToBoard={task.is_manual_priority || task.in_additional !== false ? moveToBoard : undefined}
+      failTask={task.reward_id ? undefined : task}
       onClose={() => setMenu(null)}
     />
   );
@@ -1085,7 +1087,7 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose: closeN
   const quick = [0, 1, 2].map((n) => {
     const d = new Date(now);
     d.setDate(now.getDate() - n);
-    return { key: keyOf(d), label: n === 0 ? "Earlier today" : n === 1 ? "Yesterday" : d.toLocaleDateString(undefined, { weekday: "long" }) };
+    return { key: keyOf(d), label: n === 0 ? "Earlier today" : n === 1 ? "Yesterday" : "Two days ago" };
   });
   function confirm() {
     const [y, m, d] = day.split("-").map(Number);
@@ -1126,8 +1128,7 @@ function DoneEarlierDialog({ title, isAdventure, onPick, onEdit, onClose: closeN
         </div>
         <div className="relative z-[1] flex flex-wrap items-center gap-2 text-[14px]">
           <DateField value={day} max={keyOf(now)} onChange={(v) => v && setDay(v)} ariaLabel="Day" className="h-10 rounded-lg border px-2 text-[16px]" style={{ borderColor: "#b39a6a" }} />
-          <TimeToken value={time} onChange={setTime} label="Time (optional)" kind="any" compact />
-          <span style={{ color: "var(--t-ink-soft)" }}>time optional</span>
+          <TimeToken value={time} onChange={setTime} label="Time (optional)" kind="any" compact quiet placeholder="+ time (optional)" />
         </div>
         <div className="relative z-[1] flex flex-wrap justify-end gap-2 pt-1">
           {/* Update it first (steps, XP, notes), then come back here to mark it done. */}

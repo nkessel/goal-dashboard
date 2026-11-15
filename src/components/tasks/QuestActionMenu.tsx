@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { createPortal } from "react-dom";
 import { useEscape } from "@/lib/use-escape";
 import { GearIcon } from "@/components/ui/Icons";
+import { FailQuest } from "@/components/tasks/FailQuest";
 import { listBoardOptionsAction } from "@/app/actions";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -29,8 +30,11 @@ export function QuestActionMenu({
   anchor,
   onPick,
   onMoveToBoard,
+  failTask,
   onClose,
 }: {
+  /** The quest, so Archive can offer "Mark it failed" in place (owner, Nov 9). */
+  failTask?: React.ComponentProps<typeof FailQuest>["task"];
   /** "Move" › To a quest board: takes it off Today and files it under that board. */
   onMoveToBoard?: (boardId: string, label: string) => void;
   /** Offer "Snooze until tomorrow" (quests on the Today screen). */
@@ -56,6 +60,7 @@ export function QuestActionMenu({
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [failing, setFailing] = useState(false);
   // The menu's own gear arranges it in place: drag items, hide them with the eye on the right.
   const [arranging, setArranging] = useState(false);
   // "Move" opens its two places right here (owner, Nov 4: one Move button instead of "Remove from Today's Quests").
@@ -83,7 +88,7 @@ export function QuestActionMenu({
       window.removeEventListener("scroll", place, true);
       window.removeEventListener("resize", place);
     };
-  }, [anchor, align, confirmDelete, arranging, moving]);
+  }, [anchor, align, confirmDelete, arranging, moving, failing]);
 
   useEscape(() => (arranging ? setArranging(false) : moving ? setMoving(moving === "board" ? "where" : null) : onClose()));
 
@@ -110,12 +115,13 @@ export function QuestActionMenu({
     { key: "focus", icon: <Glyph d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 3.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />, label: "Engage Quest" },
     {
       key: "battle",
-      icon: inBattle ? <Glyph d="M4 12h13M13 7l5 5-5 5M4 5v14" /> : <Glyph d="M5 19l9-9M14 5l5 0 0 5-9 9-5 0 0-5zM15 15l4 4" />,
+      icon: inBattle ? <FolderGlyph /> : <Glyph d="M5 19l9-9M14 5l5 0 0 5-9 9-5 0 0-5zM15 15l4 4" />,
       label: inBattle ? "Move…" : isAdventure ? "Add to Today's Quests" : "Add to Today's Focus",
     },
     ...(canSnooze ? [{ key: "snooze" as const, icon: <SnoozeGlyph />, label: "Snooze…" }] : []),
     // In Additional Quests, taking it out of that list takes it off the Today screen.
-    ...(onToday && !inBattle ? [{ key: "offtoday" as const, icon: <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />, label: isAdventure ? "Remove from Additional Quests" : "Remove from More tasks" }] : []),
+    // Owner (Nov 9): one "Move…" here too, with a folder icon, not "Remove from Additional Quests".
+    ...(onToday && !inBattle ? [{ key: "offtoday" as const, icon: <FolderGlyph />, label: "Move…" }] : []),
     { key: "calendar", icon: <Glyph d="M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4" />, label: onCalendar ? "Reschedule…" : "Schedule…" },
     // "See quest in its board" left the menu (owner, Nov 4): the board label on the editor's portrait does it.
     ...(!isReward
@@ -154,33 +160,35 @@ export function QuestActionMenu({
         <MoveRows
           step={moving}
           isAdventure={isAdventure}
+          fromAdditional={!inBattle}
+          onOff={() => onPick("offtoday")}
           onBack={() => setMoving(moving === "board" ? "where" : null)}
           onAdditional={() => onPick("battle")}
           onBoards={onMoveToBoard ? () => setMoving("board") : undefined}
           onBoard={(id, label) => onMoveToBoard?.(id, label)}
         />
+      ) : failing && failTask ? (
+        <FailQuest task={failTask} onBack={() => setFailing(false)} onDone={onClose} />
       ) : confirmDelete ? (
-        <div className="flex flex-col gap-2 p-3 text-sm">
-          <p className="font-semibold">{isAdventure ? "Archive this quest, or delete it for good?" : "Archive this task, or delete it for good?"}</p>
-          <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-            Archived ones wait under Boards › Archived quests, ready to bring back.
-          </p>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" onClick={() => setConfirmDelete(false)} className="h-9 rounded-full px-3" style={{ color: "var(--t-ink-soft)" }}>
-              Cancel
+        // Archive asks first (owner, Nov 9): fail it, archive it (the default), or delete it fully.
+        <div className="flex flex-col gap-1.5 p-3 text-sm" data-archive-ask>
+          <p className="m-0 font-semibold">{isReward ? "Delete this reward?" : isAdventure ? "What should happen to this quest?" : "What should happen to this task?"}</p>
+          {!isReward && (
+            <button type="button" autoFocus onClick={() => onPick("archive")} className="min-h-10 rounded-full px-4 text-left font-semibold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
+              Archive <span className="font-normal opacity-75">· keep it for later</span>
             </button>
-            <button type="button" onClick={() => onPick("archive")} className="h-9 rounded-full px-4 font-semibold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
-              Archive
+          )}
+          {!isReward && failTask && (
+            <button type="button" onClick={() => setFailing(true)} className="min-h-10 rounded-full px-4 text-left font-semibold" style={{ border: "1px solid #b39a6a", color: "#8a2a1c" }}>
+              ✕ Mark it failed
             </button>
-            <button
-              type="button"
-              onClick={() => onPick("delete")}
-              className="h-9 rounded-full px-4 font-semibold"
-              style={{ background: "var(--t-warn)", color: "#fff" }}
-            >
-              Delete for good
-            </button>
-          </div>
+          )}
+          <button type="button" onClick={() => onPick("delete")} className="min-h-10 rounded-full px-4 text-left font-semibold" style={{ border: "1px solid var(--t-warn)", color: "var(--t-warn)" }}>
+            Delete for good
+          </button>
+          <button type="button" onClick={() => setConfirmDelete(false)} className="h-8 self-end px-2 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+            Back
+          </button>
         </div>
       ) : (
         <>
@@ -209,7 +217,7 @@ export function QuestActionMenu({
             key={it.key}
             type="button"
             role="menuitem"
-            onClick={() => (it.key === "delete" ? setConfirmDelete(true) : it.key === "battle" && inBattle ? setMoving("where") : onPick(it.key))}
+            onClick={() => (it.key === "delete" || it.key === "archive" ? setConfirmDelete(true) : (it.key === "battle" && inBattle) || it.key === "offtoday" ? setMoving("where") : onPick(it.key))}
             className={`flex min-h-11 items-center gap-3 px-3.5 text-left text-[15px] hover:bg-black/5 ${it.key === "delete" ? "border-t" : ""}`}
             style={{
               color: it.key === "delete" ? "var(--t-warn)" : undefined,
@@ -237,7 +245,7 @@ export function QuestActionMenu({
 }
 
 /** Move: to Additional Quests, or to a quest board (found by typing), in the menu itself. */
-function MoveRows({ step, isAdventure, onBack, onAdditional, onBoards, onBoard }: { step: "where" | "board"; isAdventure: boolean; onBack: () => void; onAdditional: () => void; onBoards?: () => void; onBoard: (id: string, label: string) => void }) {
+function MoveRows({ step, isAdventure, fromAdditional = false, onOff, onBack, onAdditional, onBoards, onBoard }: { step: "where" | "board"; isAdventure: boolean; /** Opened from Additional Quests: the other list is Today's Quests, and it can leave the Today screen. */ fromAdditional?: boolean; onOff?: () => void; onBack: () => void; onAdditional: () => void; onBoards?: () => void; onBoard: (id: string, label: string) => void }) {
   const [boards, setBoards] = useState<{ id: string; label: string }[] | null>(null);
   const [q, setQ] = useState("");
   useEffect(() => {
@@ -265,8 +273,16 @@ function MoveRows({ step, isAdventure, onBack, onAdditional, onBoards, onBoard }
             <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
               <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />
             </span>
-            {isAdventure ? "Additional Quests" : "More tasks"}
+            {fromAdditional ? (isAdventure ? "Today's Quests" : "Today's Focus") : isAdventure ? "Additional Quests" : "More tasks"}
           </button>
+          {fromAdditional && onOff && (
+            <button type="button" role="menuitem" onClick={onOff} className={row}>
+              <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
+                <Glyph d="M4 13.5h4.2l1.8 2.6h4l1.8-2.6H20M4 13.5L6.3 6h11.4l2.3 7.5V19H4z" />
+              </span>
+              Off the Today screen <span className="text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>· stays on its board</span>
+            </button>
+          )}
           {onBoards && (
             <button type="button" role="menuitem" onClick={onBoards} className={row}>
               <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center" style={{ color: "var(--t-ink-soft)" }}>
@@ -400,6 +416,11 @@ function ArrangeRow({ it, hidden, canHide, isAdventure, onToggle, onRename }: { 
 }
 
 /** A flat line icon in the menu's ink colour. */
+/** A folder: the Move icon (owner, Nov 9). */
+function FolderGlyph() {
+  return <Glyph d="M3.5 7.5a1.5 1.5 0 0 1 1.5-1.5h4l2 2.2h8a1.5 1.5 0 0 1 1.5 1.5v8.3a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z" />;
+}
+
 function Glyph({ d }: { d: string }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>

@@ -238,7 +238,7 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind, onHide }: 
   if (!shown.length) return null;
   return (
     // The same drawer as Additional Quests: the whole bar opens and closes it, and the tray slides.
-    <section aria-label="Due soon" className="mb-5">
+    <section aria-label="Due soon" className="mb-3">
       <div className="relative">
         <button
           type="button"
