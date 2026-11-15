@@ -30,7 +30,7 @@ gesture/keyboard/positioning work, data model changes, or many screens at once).
 
 ## Task list
 
-### 1. Quest failure, the rest — S (Archive choice, FailQuest, slam shipped Nov 14 night; left: editor ⋯ item, Failed seal in lists)
+### 1. Quest failure, the rest — S (Archive choice, FailQuest, slam shipped Nov 14 night; failed seal in the editor shipped; left: editor ⋯ item)
 Shipped Nov 14: `tasks.failed_at`, `fail_reason` (migration 0088, applied), `failTaskAction`, calendar card menu
 "✕ Quest failure" / "Undo quest failure", red X on failed calendar cards, failed quests left out of Victories.
 Left:
@@ -58,7 +58,7 @@ Each is a few lines; read the note first.
   when not editing).
 ui-check: today, insights, pages.
 
-### 4. Journal prompts — S
+### 4. Journal prompts — S (shipped Nov 14 night)
 [a6138ad1, e8404a56, 64a404e0 rest] Welcome › Journal: the button shows the chosen prompt; a prompt can be edited,
 hidden, deleted by holding it; "+ My own prompt"; written text shows two lines with "Show more". Files:
 `xp/WelcomeCard.tsx` (journal part), `lib/journal-prompts.ts`. ui-check: welcome.
@@ -74,7 +74,7 @@ add it under the event box (Insights › Events, check-in) and the journal entry
 - Complete in the quest editor asks "Done now / Earlier…" with the time wheels [0c17c4c9].
 ui-check: today, insights.
 
-### 7. Due soon and Prioritize — S
+### 7. Due soon and Prioritize — S (shipped Nov 14 night)
 - Take a quest out of Due soon (× in Edit, or swipe) [11e52f4e]; hold a Due soon quest for its menu [144dcaa0].
 - Prioritize: tap a card for a short preview, a second tap (or "Edit") opens the editor [469594c1].
 ui-check: today.
@@ -87,7 +87,7 @@ ui-check: inventory.
 ### 9. Language window — S
 [c084cb95, d6ad55e1, 34a34b07] Read the three notes; `xp/LearnLanguage.tsx`. ui-check: language.
 
-### 10. Party — S
+### 10. Party — S (shipped Nov 14 night)
 Remove a party member (with a confirm inline) [d9a74c0f]; XP confirmation after the emotional check-in [b5b83086].
 ui-check: pages.
 
