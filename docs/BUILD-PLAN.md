@@ -63,12 +63,12 @@ ui-check: today, insights, pages.
 hidden, deleted by holding it; "+ My own prompt"; written text shows two lines with "Show more". Files:
 `xp/WelcomeCard.tsx` (journal part), `lib/journal-prompts.ts`. ui-check: welcome.
 
-### 5. Five-face rating for journal entries and events — S
+### 5. Five-face rating for journal entries and events — S (events shipped Nov 14 night; journal already has its mood; left: a8c139db partial check-ins kept when leaving)
 [85ebdc3a rest, a8c139db, 8ad7c288] Reuse the Sleep quality faces (`xp/SleepCheckIn.tsx`) as a small component;
 add it under the event box (Insights › Events, check-in) and the journal entry. Stored on the event's existing
 `tone`/a new field: read the notes; if a column is needed, migration 0089. ui-check: insights, welcome.
 
-### 6. Edit times after the fact — S (habit time and event edit shipped Nov 14 night; left: Complete in the editor asks when [0c17c4c9])
+### 6. Edit times after the fact — S (habit time and event edit shipped Nov 14 night; Complete asks when shipped too)
 - A habit's completion time can be edited (hold the done habit → time wheels, `ui/TimeWheels.tsx`) [c12d59cf rest].
 - A logged event opens its edit on a press [431c686d] (`insights/EventLog.tsx` already has `EventEdit`).
 - Complete in the quest editor asks "Done now / Earlier…" with the time wheels [0c17c4c9].
