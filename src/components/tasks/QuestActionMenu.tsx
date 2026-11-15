@@ -179,16 +179,16 @@ export function QuestActionMenu({
           <p className="m-0 font-semibold">{isReward ? "Delete this reward?" : isAdventure ? "What should happen to this quest?" : "What should happen to this task?"}</p>
           {!isReward && (
             <button type="button" autoFocus onClick={() => onPick("archive")} className="min-h-10 rounded-full px-4 text-left font-semibold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
-              Archive <span className="font-normal opacity-75">· keep it for later</span>
+              Archive
             </button>
           )}
           {!isReward && failTask && (
             <button type="button" onClick={() => setFailing(true)} className="min-h-10 rounded-full px-4 text-left font-semibold" style={{ border: "1px solid #b39a6a", color: "#8a2a1c" }}>
-              ✕ Mark it failed
+              ✕ Mark as failed
             </button>
           )}
           <button type="button" onClick={() => onPick("delete")} className="min-h-10 rounded-full px-4 text-left font-semibold" style={{ border: "1px solid var(--t-warn)", color: "var(--t-warn)" }}>
-            Delete for good
+            Delete permanently
           </button>
           <button type="button" onClick={() => setConfirmDelete(false)} className="h-8 self-end px-2 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
             Back

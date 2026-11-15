@@ -287,7 +287,7 @@ export const FLOWS = [
       if (await h.tap((p) => p.locator("li", { hasText: "Pick up medication" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for archive", { optional: true })) {
         if (await h.tap((p) => p.getByRole("menuitem", { name: /^archive/i }).first(), "archive choices", { optional: true, expectMove: true })) {
           await h.check("archive choices");
-          if (await h.tap((p) => p.getByRole("button", { name: /mark it failed/i }).first(), "quest failure", { optional: true, expectMove: true })) await h.check("quest failure form");
+          if (await h.tap((p) => p.getByRole("button", { name: /mark as failed/i }).first(), "quest failure", { optional: true, expectMove: true })) await h.check("quest failure form");
         }
         await esc(h);
         await esc(h);
