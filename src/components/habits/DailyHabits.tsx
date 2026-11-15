@@ -7,7 +7,9 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { reorderRitesAction, setCoreHabitAction, skipHabitAction, unskipHabitAction } from "@/app/actions";
+import { reorderRitesAction, setCoreHabitAction, setRiteDoneTimeAction, skipHabitAction, unskipHabitAction } from "@/app/actions";
+import { TimeWheels } from "@/components/ui/TimeWheels";
+import { useRouter } from "next/navigation";
 import { saveOrQueue } from "@/lib/offline";
 import { useLocalDay } from "@/components/evening/evening-clock";
 import { nextOccurrence, repeatIsUp, repeatLabel } from "@/lib/habit-repeat";
@@ -658,7 +660,7 @@ export function DailyHabits({
                       </span>
                     )}
                   </span>
-                  {!d && (
+                  {(
                     <button
                       type="button"
                       onMouseDown={(e) => e.stopPropagation()}
@@ -692,6 +694,7 @@ export function DailyHabits({
                       >
                         <span aria-hidden className="w-[18px] text-center">✎</span> Edit habit
                       </button>
+                      {d && day && <DoneTime riteId={h.id} day={day} onDone={() => setMenuFor(null)} />}
                       <button
                         type="button"
                         role="menuitem"
@@ -1183,6 +1186,55 @@ function CleaningParts({ cleaning, onOpen }: { cleaning: NonNullable<ReturnType<
       <button type="button" onClick={onOpen} className="self-start text-[13px] font-semibold underline underline-offset-2" style={{ color: "#6b4a12" }}>
         Change them in the mess check-in ›
       </button>
+    </div>
+  );
+}
+
+/** A done habit's time, changed after the fact: time wheels in its menu (owner, Nov 9). */
+function DoneTime({ riteId, day, onDone }: { riteId: string; day: string; onDone: () => void }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [mins, setMins] = useState(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}>
+      <button type="button" role="menuitem" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="relative z-[1] flex min-h-11 w-full items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5">
+        <span aria-hidden className="w-[18px] text-center">◷</span> Change when it was done
+      </button>
+      <Fold open={open}>
+        <div className="relative z-[1] flex flex-col items-center gap-2 px-3 pb-3">
+          <TimeWheels value={mins} onChange={setMins} />
+          {error && <span className="text-[12.5px]" style={{ color: "var(--t-warn)" }}>{error}</span>}
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                setError(null);
+                const [y, m, dd] = day.split("-").map(Number);
+                const at = new Date(y, m - 1, dd, Math.floor(mins / 60), mins % 60);
+                // The app's day runs to 5:30am: an early-morning time belongs to the next calendar day.
+                if (mins < 330) at.setDate(at.getDate() + 1);
+                try {
+                  await setRiteDoneTimeAction(riteId, day, at.toISOString());
+                  onDone();
+                  router.refresh();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Couldn't change it.");
+                }
+              })
+            }
+            className="h-9 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60"
+            style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}
+          >
+            {pending ? "Saving…" : "Save time"}
+          </button>
+        </div>
+      </Fold>
     </div>
   );
 }

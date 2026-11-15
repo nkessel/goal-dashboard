@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { splitEvents, splitOn } from "@/lib/event-split";
 import { TrackedEvents } from "@/components/insights/TrackedEvents";
 import { saveOrQueue } from "@/lib/offline";
-import { addCheckNoteAction, addJournalEntryAction, addToTopOfTodayAction, deleteCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
+import { addCheckNoteAction, addJournalEntryAction, addToTopOfTodayAction, deleteCheckNoteAction, updateCheckNoteAction, createQuestAction, listTakeoffQuestsAction, saveNightAction, setCheckMetricsAction, wheelOfTimeAction } from "@/app/actions";
 import { EMPTY_NIGHT, NightFields, nightIsEmpty, type NightDraft, MoonIcon, SunIcon, TimeToken } from "./NightFields";
 import { DateField } from "@/components/ui/DateField";
 import { shiftDay } from "@/lib/wheel-of-time";
@@ -206,6 +206,15 @@ export function EnergyCheck({
     setNotes((n) => n.filter((x) => x.id !== id));
     if (!id.startsWith("temp-")) void deleteCheckNoteAction(id).catch(() => {});
   }
+  // A pressed event opens in place: change its words, or delete it (owner, Nov 9: "no need to show delete button by default").
+  const [editingNote, setEditingNote] = useState<string | null>(null);
+  function renameNote(id: string, text: string) {
+    const t = text.trim();
+    setEditingNote(null);
+    if (!t) return;
+    setNotes((n) => n.map((x) => (x.id === id ? { ...x, body: t } : x)));
+    if (!id.startsWith("temp-")) void updateCheckNoteAction(id, { text: t }).catch(() => {});
+  }
   const [adding, setAdding] = useState(false);
   const [editingList, setEditingList] = useState(false);
   // Arrived from "Edit check-in" on Today: open the editing straight away.
@@ -382,17 +391,42 @@ export function EnergyCheck({
   const label = "w-[78px] shrink-0 truncate text-[14.5px] font-semibold";
   const chipsFor = (list: typeof notes) => list.length > 0 && (
     <ul className="m-0 flex list-none flex-wrap justify-center gap-1.5 p-0">
-      {list.map((n) => (
-        <li
-          key={n.id}
-          className="flex h-7 max-w-full items-center gap-1 rounded-full pl-2.5 pr-1 text-[13px]"
-          style={
-            /^#\S+$/.test(n.body)
-              ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 }
-              : { background: "rgba(242,210,126,.14)", border: "1px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)" }
-          }
-        >
-          <span className="truncate" title={n.body}>
+      {list.map((n) =>
+        editingNote === n.id ? (
+          <li key={n.id} className="reveal flex w-full flex-wrap items-center justify-center gap-1.5">
+            <form
+              className="flex min-w-0 flex-1 items-center gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                renameNote(n.id, String(new FormData(e.currentTarget).get("t") ?? ""));
+              }}
+            >
+              <input name="t" autoFocus defaultValue={n.body} maxLength={400} aria-label="Edit this event" onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), setEditingNote(null))} className="bare-input fail-reason min-w-0 flex-1 text-[16px]" style={{ color: "var(--t-cream)" }} />
+              <button type="submit" className="h-8 rounded-full px-3 text-[13px] font-bold" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", color: "#2a1c10" }}>
+                Save
+              </button>
+            </form>
+            <button type="button" onClick={() => (setEditingNote(null), dropNote(n.id))} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: "1px solid rgba(240,120,90,.7)", color: "#ffb4a0" }}>
+              Delete
+            </button>
+            <button type="button" onClick={() => setEditingNote(null)} className="h-8 px-1 text-[13px] underline underline-offset-2" style={{ color: "var(--ec-soft, rgba(239,230,204,.7))" }}>
+              Cancel
+            </button>
+          </li>
+        ) : (
+        <li key={n.id}>
+          <button
+            type="button"
+            onClick={() => setEditingNote(n.id)}
+            title="Tap to change or delete"
+            className="flex h-7 max-w-full items-center gap-1 rounded-full px-2.5 text-[13px]"
+            style={
+              /^#\S+$/.test(n.body)
+                ? { background: "#e9d49a", border: "1px solid #8a6116", color: "#2a1c10", fontWeight: 600 }
+                : { background: "rgba(242,210,126,.14)", border: "1px solid var(--ec-line, rgba(217,180,95,.45))", color: "var(--t-cream)" }
+            }
+          >
+          <span className="truncate">
             {/* A chip shows the first line; the whole event (with its line breaks) is in Insights › Events. */}
             {n.body.split("\n")[0].split(/(#[\p{L}\p{N}_-]+)/u).map((part, i) =>
               part.startsWith("#") ? (
@@ -404,11 +438,10 @@ export function EnergyCheck({
               )
             )}
           </span>
-          <button type="button" onClick={() => dropNote(n.id)} aria-label={`Remove “${n.body}”`} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[15px] leading-none hover:bg-white/10" style={{ color: "var(--ec-soft, rgba(239,230,204,.7))" }}>
-            <CloseIcon size={9} />
           </button>
         </li>
-      ))}
+        )
+      )}
     </ul>
   );
   // The open bar shows only what was written just now, not the last check-in's tags.
