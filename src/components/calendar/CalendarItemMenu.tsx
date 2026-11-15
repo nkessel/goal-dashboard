@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { addTaskSessionAction, completeTaskAction, createQuestAction, failTaskAction, reopenTaskAction, unscheduleTaskAction } from "@/app/actions";
+import { addTaskSessionAction, completeTaskAction, createQuestAction, reopenTaskAction, unscheduleTaskAction } from "@/app/actions";
+import { FailQuest } from "@/components/tasks/FailQuest";
 import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { SlotPickerDialog } from "@/components/tasks/SlotPickerDialog";
 import { sessionRef } from "@/lib/calendar-task-window";
@@ -208,43 +209,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
           )}
         </>
       ) : mode === "fail" && target.kind === "task" ? (
-        <form
-          className="relative z-[1] flex flex-col gap-2 p-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const reason = String(new FormData(e.currentTarget).get("reason") ?? "");
-            startTransition(async () => {
-              try {
-                await failTaskAction(target.task.id, reason);
-                router.refresh();
-                onClose();
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Couldn't mark it failed.");
-              }
-            });
-          }}
-        >
-          <span className="text-[13.5px] font-semibold" style={{ color: "var(--t-ink)" }}>
-            Quest failure
-          </span>
-          <input name="reason" autoFocus maxLength={300} placeholder="Why? (optional)" aria-label="Why it failed (optional)" className="h-10 rounded-lg px-2.5 text-[16px]" style={{ background: "#fffaf0", border: "1px solid rgba(139,112,64,.45)", color: "#2a1c10" }} />
-          <span className="text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-            No XP, a red ✕ on its card. It can be undone from this menu.
-          </span>
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setMode("menu")} className="h-9 px-2 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
-              Cancel
-            </button>
-            <button type="submit" disabled={pending} className="h-9 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60" style={{ background: "#b5321f", color: "#fff" }}>
-              Mark failed
-            </button>
-          </div>
-          {error && (
-            <p className="m-0 text-[12.5px]" style={{ color: "var(--t-warn)" }}>
-              {error}
-            </p>
-          )}
-        </form>
+        <FailQuest task={target.task} onBack={() => setMode("menu")} onDone={() => (router.refresh(), onClose())} />
       ) : mode === "look" && target.kind === "task" ? (
         <div className="relative z-[1] px-3 py-2">
           <CardLookPicker task={target.task} />

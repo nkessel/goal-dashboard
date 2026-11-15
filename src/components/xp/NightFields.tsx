@@ -47,7 +47,7 @@ const WAKE_TIMES = ["05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30
  * minutes to fine-tune, in 5-minute steps or typed in.
  */
 /** The app's time picker: a parchment token showing the time ("— : —" when unset) that opens the time dial. "spirit" suits the toucan's dark panels. */
-export function TimeToken({ value, onChange, label, icon, kind, compact = false, variant = "parchment", placeholder = "add time", active, onToggle }: { value: string; onChange: (v: string) => void; label: string; icon?: React.ReactNode; kind: "bed" | "wake" | "any"; compact?: boolean; variant?: "parchment" | "spirit"; /** Shown (softly, in words) while no time is set. */ placeholder?: string; /** Inline mode: the token only toggles a ruler its owner shows in place (no popup dial). */ active?: boolean; onToggle?: () => void }) {
+export function TimeToken({ value, onChange, label, icon, kind, compact = false, variant = "parchment", placeholder = "add time", active, onToggle, quiet = false }: { value: string; onChange: (v: string) => void; label: string; icon?: React.ReactNode; kind: "bed" | "wake" | "any"; compact?: boolean; variant?: "parchment" | "spirit"; /** Shown (softly, in words) while no time is set. */ placeholder?: string; /** Inline mode: the token only toggles a ruler its owner shows in place (no popup dial). */ active?: boolean; onToggle?: () => void; /** While empty: plain soft words, no pill (owner: "too loud"). */ quiet?: boolean }) {
   const [openAt, setOpenAt] = useState<HTMLElement | null>(null);
   const inline = !!onToggle;
   const open = inline ? !!active : !!openAt;
@@ -63,7 +63,7 @@ export function TimeToken({ value, onChange, label, icon, kind, compact = false,
         }}
         aria-label={`${label}: ${shown || "not set"}. Change`}
         aria-expanded={open}
-        className={`${variant === "spirit" ? "time-token time-token-spirit" : "time-token"} flex shrink-0 items-center gap-1.5 rounded-full ${inline ? "h-9 min-w-[100px] justify-center px-2.5" : compact ? "h-9 px-3" : "h-10 px-3.5"}`}
+        className={`${variant === "spirit" ? "time-token time-token-spirit" : "time-token"}${quiet && !value ? " time-token-quiet" : ""} flex shrink-0 items-center gap-1.5 rounded-full ${inline ? "h-9 min-w-[100px] justify-center px-2.5" : compact ? "h-9 px-3" : "h-10 px-3.5"}`}
       >
         {icon}
         <span className={`font-display whitespace-nowrap tabular-nums ${compact || inline ? "text-[15px]" : "text-[17px]"}`} style={{ opacity: value ? 1 : 0.55 }}>

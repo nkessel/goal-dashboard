@@ -53,12 +53,14 @@ export function SwipeReveal({
         }}
         tabIndex={open ? 0 : -1}
         aria-hidden={!open}
+        aria-label={label}
+        title={label}
         className={`absolute inset-y-0 ${side === "left" ? "left-0" : "right-0"} flex items-center justify-center rounded-2xl text-[14px] font-bold`}
         style={{ width: REVEAL - 8, background, color, visibility: dx * sign > 0 ? "visible" : "hidden" }}
       >
         <span className="flex flex-col items-center gap-0.5 px-1 text-center leading-tight">
-          {icon}
-          {label}
+          {/* The icon alone says it (owner, Nov 9: "the snooze button doesn't need words"); words only when there's no icon. */}
+          {icon ?? label}
         </span>
       </button>
       <div

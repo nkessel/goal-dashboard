@@ -17,6 +17,7 @@ import { AddFile } from "@/components/ui/AddFile";
 import type { FileRef } from "@/lib/file-refs";
 
 import { TimeToken } from "@/components/xp/NightFields";
+import { LinkOuts } from "@/components/ui/Linked";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { GearIcon, CloseIcon } from "@/components/ui/Icons";
 import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
@@ -1711,6 +1712,9 @@ export function QuestEditorDialog({
                             className={`bare-input min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-[3px] text-[16px] leading-snug focus:outline-none ${st.state ? "line-through" : ""}`}
                             style={st.state === "failed" ? { color: "#b5321f", textDecorationColor: "#b5321f" } : st.state === "skipped" ? { color: "#9a9286", textDecorationColor: "#9a9286" } : { color: "var(--t-ink)" }}
                           />
+                          <span className="mt-[3px] shrink-0">
+                            <LinkOuts text={st.title} iconOnly />
+                          </span>
                           {isHolder && (
                             <button type="button" onClick={() => setOpenSteps((o) => new Set(o).add(st.key))} className="mt-[3px] flex h-7 shrink-0 items-center rounded-full px-2 text-[12px] font-semibold tabular-nums" style={{ color: "var(--t-ink-soft)", border: "1px solid rgba(139,112,64,.35)" }} title="Sub-tasks done">
                               {progressWords(insideDone, inside.length)}
@@ -2550,6 +2554,7 @@ export function QuestEditorDialog({
                 className="rounded-lg border px-2.5 py-1.5 text-[15px]"
                 style={fieldStyle}
               />
+              <LinkOuts text={description} />
               {/* Private files kept with it (a form to fill in): open in a tap, add more. */}
               {task && (task.attachments?.length || addedFiles.length) ? (
                 <div className="flex flex-wrap items-center gap-1.5">

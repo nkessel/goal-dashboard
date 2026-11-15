@@ -37,7 +37,7 @@ export function PartyWeekBoard({ members, isAdventure }: { members: Member[]; is
                   <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.max(4, (m.xp / top) * 100)}%`, background: "linear-gradient(90deg,#a88a3f,#f2d27e)" }} />
                 </span>
                 <span className="w-[64px] shrink-0 text-right font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
-                  +{m.xp.toLocaleString("en-US")}
+                  +{m.xp.toLocaleString("en-US")} XP
                 </span>
                 <span className="w-[54px] shrink-0 text-right text-[12.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }} title="Quests finished this week">
                   {m.quests} {m.quests === 1 ? "quest" : "quests"}

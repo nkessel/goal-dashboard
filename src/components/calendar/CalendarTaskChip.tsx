@@ -4,6 +4,11 @@ import { isTentativeTitle } from "@/lib/tentative";
 import { createContext, useContext, useState } from "react";
 
 /** The quests waiting behind each quest on the calendar, by quest id: its agenda. */
+/** Completed (or failed) in the last 20 seconds: its mark arrives with the slam; older ones just sit there. */
+function justDone(at: string | null | undefined) {
+  return !!at && Date.now() - Date.parse(at) < 20_000;
+}
+
 export const AgendaContext = createContext<Record<string, { id: string; title: string }[]>>({});
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
 import { completeTaskAction } from "@/app/actions";
@@ -179,12 +184,12 @@ export function CalendarTaskChip({
       >
         {isCompleted && task.failed_at ? (
           // Failed: a red X where the check would be (the card itself stays calm; owner, Nov 6).
-          <svg width={iconSize - 4} height={iconSize - 4} viewBox="0 0 24 24" fill="none" aria-label="Failed">
+          <svg width={iconSize - 4} height={iconSize - 4} viewBox="0 0 24 24" fill="none" aria-label="Failed" className={justDone(task.completed_at) ? "cal-slam" : undefined}>
             <circle cx="12" cy="12" r="10" fill="#b5321f" />
             <path d="M8 8l8 8M16 8l-8 8" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
           </svg>
         ) : isCompleted ? (
-          <svg width={iconSize - 4} height={iconSize - 4} viewBox="0 0 24 24" fill="none">
+          <svg width={iconSize - 4} height={iconSize - 4} viewBox="0 0 24 24" fill="none" className={justDone(task.completed_at) ? "cal-slam" : undefined}>
             <circle cx="12" cy="12" r="10" fill="var(--t-good)" />
             <path d="M7 12.5l3 3 7-7" stroke="#fff" strokeWidth="2" fill="none" />
           </svg>
@@ -398,9 +403,14 @@ function QuestCard({
       }}
     >
       {done && (showArt || (!show.art && !line && h >= 40)) ? (
-        <span className="quest-seal flex shrink-0 items-center justify-center rounded-full" style={{ width: sealPx, height: sealPx }}>
+        // Done just now: the check (or a failure's ✕) slams onto the card like the celebration's (owner, Nov 12).
+        <span
+          className={`quest-seal flex shrink-0 items-center justify-center rounded-full${justDone(task.completed_at) ? " cal-slam" : ""}`}
+          style={{ width: sealPx, height: sealPx, ...(task.failed_at ? { background: "radial-gradient(circle at 40% 35%,#d4543f,#8e2414)", boxShadow: "0 0 0 1.5px #6e1a0e" } : {}) }}
+          aria-label={task.failed_at ? "Failed" : "Completed"}
+        >
           <svg width="62%" height="62%" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+            {task.failed_at ? <path d="M7 7l10 10M17 7L7 17" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" /> : <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />}
           </svg>
         </span>
       ) : showArt ? (
