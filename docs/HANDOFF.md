@@ -37,6 +37,7 @@ Take them in order. Each is the owner's own ask (note id prefix in brackets; rea
 Started in the owner's Claude project threads; written here so another account can carry on.
 
 - **Waiting on the owner's design review** (branch · review page · date): none yet.
+- **Walkthrough redesign (on hold, owner Nov 14)**: workshop page https://claude.ai/artifact/HRreCiT4av1adpEfKhUCD9 (looks A / B / Blend 2 / Blend 3, the toucan floating at the card's corner liked; flow: name → character → two starter quests "Explore the realm" and "Create your first quest"; Snooze + "Skip this step" lower left). **Chosen:** his first words: "Ah, a new traveller at the forest's edge — welcome! I'm the Great Toucan Spirit, and I'll be your guide here. This is a magical place where we turn what matters to you into quests, complete your most important goals, and lead a meaningful and fulfilling life. Before we set forth: by what name do you travel?" **Waiting on picks:** the look, character wording (3 options), "Choosing your quests" wording (3 options), starter rewards. Don't build until picked.
 
 - **Make the app load faster**: shipped Nov 12 (see Recently shipped). Needs the owner's iPhone look (Home Screen app): opening should show the last screen at once.
 - **Habit editor aligned with the quest editor**: owner picked B and reviewed a draft (Nov 14); shipped Nov 14 (see Recently shipped). Left from B: the editor's gear arranges it in place (it still opens Settings).
