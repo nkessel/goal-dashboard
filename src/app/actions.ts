@@ -1761,6 +1761,18 @@ function assertDay(day: string) {
 
 /** Complete a rite for your local `day` (YYYY-MM-DD); pays its XP once per day. */
 /** Complete a rite for `day`; `pct` below 100 marks it done in part, for that share of its XP. */
+/** When a habit was done that day, changed after the fact (owner, Nov 9: "including changing the completion time"). */
+export async function setRiteDoneTimeAction(riteId: string, day: string, at: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const when = new Date(at);
+  if (!Number.isFinite(when.getTime())) throw new Error("That time doesn't look right.");
+  if (when.getTime() > Date.now() + 60_000) throw new Error("That's in the future.");
+  const { data, error } = await supabaseAdmin().from("rite_completions").update({ completed_at: when.toISOString() }).eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).select("id");
+  if (error) throw new Error(`Couldn't change the time: ${error.message}`);
+  if (!data?.length) throw new Error("That habit isn't marked done that day.");
+}
+
 export async function completeRiteAction(riteId: string, day: string, pct = 100) {
   const ownerId = await requireProfileId();
   assertDay(day);

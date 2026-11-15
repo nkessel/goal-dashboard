@@ -1,5 +1,7 @@
 "use client";
 
+import { revealSetting } from "@/components/settings/SettingsSearch";
+
 import { useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
@@ -106,11 +108,23 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
         <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }}>
           <span className="block font-semibold">His cage</span>
           Drag the toucan here to let him rest
+          {compact && (
+            // His settings sit with his cage (owner, Nov 10): opens the Toucan Spirit section below.
+            <button type="button" onClick={(e) => (e.stopPropagation(), revealSetting("toucan-spirit"))} className="mt-0.5 block text-[12.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "#8a6116" }}>
+              His settings ›
+            </button>
+          )}
         </span>
       ) : compact ? (
         <span className="min-w-0 text-[13px] leading-snug" style={{ color: "var(--t-ink)" }}>
           <span className="block font-semibold">Your toucan</span>
           Tap the cage to set him free
+          {compact && (
+            // His settings sit with his cage (owner, Nov 10): opens the Toucan Spirit section below.
+            <button type="button" onClick={(e) => (e.stopPropagation(), revealSetting("toucan-spirit"))} className="mt-0.5 block text-[12.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "#8a6116" }}>
+              His settings ›
+            </button>
+          )}
         </span>
       ) : (
         <span className="text-[14px] leading-snug" style={{ color: "var(--t-ink)" }}>

@@ -13,7 +13,7 @@ const split = (b: string) => {
 /**
  * Your latest notes, to read again or change (owner, Nov 3). Tap one to edit its words; Save puts them back.
  */
-export function RecentNotes({ isAdventure, onBack }: { isAdventure: boolean; onBack: () => void }) {
+export function RecentNotes({ isAdventure, draft, onBack }: { isAdventure: boolean; /** The note being written now: shown on top, a tap goes back to it (owner, Nov 9). */ draft?: string; onBack: () => void }) {
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -54,6 +54,16 @@ export function RecentNotes({ isAdventure, onBack }: { isAdventure: boolean; onB
           {msg}
         </span>
       </div>
+      {draft?.trim() && (
+        <button type="button" onClick={onBack} className="flex flex-col items-start rounded-xl border border-dashed px-2.5 py-1.5 text-left" style={{ borderColor: "#b08a3e" }} title="Back to this note">
+          <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: soft }}>
+            Writing now
+          </span>
+          <span className="line-clamp-3 whitespace-pre-line text-[14px] italic leading-snug" style={{ color: ink }}>
+            {draft}
+          </span>
+        </button>
+      )}
       {notes === null ? (
         <p className="m-0 text-[13.5px] italic" style={{ color: soft }}>
           Finding your notes…
@@ -63,12 +73,12 @@ export function RecentNotes({ isAdventure, onBack }: { isAdventure: boolean; onB
           No notes yet.
         </p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {notes.map((n) => {
             const { text: words } = split(n.body);
             const open = editing === n.id;
             return (
-              <li key={n.id} className="due-in rounded-xl px-2.5 py-1.5" style={{ border: `1px solid ${open ? "#8a6116" : "var(--t-panel-border)"}`, background: open ? "rgba(255,250,235,.6)" : undefined }}>
+              <li key={n.id} className="due-in rounded-2xl rounded-bl-md px-3 py-2" style={{ border: `1px solid ${open ? "#8a6116" : "rgba(139,112,64,.4)"}`, background: open ? "rgba(255,250,235,.75)" : "linear-gradient(180deg, rgba(242,222,170,.75), rgba(226,200,140,.6))", boxShadow: "0 1px 3px rgba(60,40,10,.15)" }}>
                 {open ? (
                   <div className="flex flex-col gap-1.5">
                     <textarea
@@ -89,7 +99,7 @@ export function RecentNotes({ isAdventure, onBack }: { isAdventure: boolean; onB
                     />
                     <div className="flex items-center justify-end gap-2">
                       <button type="button" onClick={() => setEditing(null)} className="h-8 px-2 text-[13px] underline" style={{ color: soft }}>
-                        Keep as it was
+                        Cancel
                       </button>
                       <button type="button" disabled={busy || !text.trim()} onClick={() => void save(n)} className="h-8 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-50" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
                         {busy ? "Saving…" : "Save"}

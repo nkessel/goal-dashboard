@@ -200,12 +200,23 @@ export function RecentWins({ day, onHide }: { day: string | null; /** Fold the t
   );
 }
 
-/** One win; a quest can be edited with a long press (or right-click). */
+/** One win; a quest opens its editor with a tap, its ✎, a long press or a right-click (owner, Nov 10: "I should be able to edit things"). */
 function WinRow({ onEdit, style, children }: { onEdit?: () => void; style: React.CSSProperties; children: React.ReactNode }) {
-  const { handlers } = useLongPress(() => onEdit?.());
+  const { handlers, wasLong } = useLongPress(() => onEdit?.());
   return (
-    <li {...(onEdit ? handlers : {})} title={onEdit ? "Hold to edit" : undefined} className={`flex min-h-[44px] items-center gap-3 py-2 text-[16.5px] ${onEdit ? "select-none [-webkit-touch-callout:none]" : ""}`} style={style}>
+    <li
+      {...(onEdit ? handlers : {})}
+      onClick={onEdit ? () => !wasLong() && onEdit() : undefined}
+      title={onEdit ? "Tap to edit" : undefined}
+      className={`group flex min-h-[44px] items-center gap-3 py-2 text-[16.5px] ${onEdit ? "cursor-pointer select-none [-webkit-touch-callout:none]" : ""}`}
+      style={style}
+    >
       {children}
+      {onEdit && (
+        <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center text-[14px] opacity-50 transition-opacity group-hover:opacity-100" style={{ color: "#8a6116" }}>
+          ✎
+        </span>
+      )}
     </li>
   );
 }

@@ -1243,15 +1243,15 @@ html[data-evening] [data-theme="adventure"] {
 /* A real bird's way in: wingbeats lift him a little, glides let him sink, he banks into
    the turn, slows, tips back with his wings spread to brake, and settles with a small bob. */
 @keyframes welcome-toucan {
-  /* In from the right across the sky at about the card's height (never off the top of a phone screen). */
-  0% { opacity: 0; transform: translate(92vw, -46px) scale(0.55) rotate(-6deg); animation-timing-function: ease-out; }
-  6% { opacity: 1; transform: translate(84vw, -50px) scale(0.57) rotate(-6deg); animation-timing-function: ease-in-out; }
-  20% { transform: translate(66vw, -36px) scale(0.62) rotate(-1deg); animation-timing-function: ease-in-out; }
-  32% { transform: translate(52vw, -48px) scale(0.68) rotate(-7deg); animation-timing-function: ease-in-out; }
-  46% { transform: translate(36vw, -32px) scale(0.76) rotate(0deg); animation-timing-function: ease-in-out; }
-  58% { transform: translate(24vw, -42px) scale(0.83) rotate(-6deg); animation-timing-function: ease-in-out; }
-  70% { transform: translate(13vw, -24px) scale(0.9) rotate(2deg); animation-timing-function: ease-out; }
-  82% { transform: translate(5vw, -13px) scale(0.96) rotate(-8deg); animation-timing-function: ease-out; }
+  /* In from the right across the sky at about the card's height (never off the top of a phone screen). He faces the way he flies (mirrored) and turns to face you as he lands (owner, Nov 9: "flying backwards"). */
+  0% { opacity: 0; transform: translate(92vw, -46px) scale(-0.55, 0.55) rotate(-6deg); animation-timing-function: ease-out; }
+  6% { opacity: 1; transform: translate(84vw, -50px) scale(-0.57, 0.57) rotate(-6deg); animation-timing-function: ease-in-out; }
+  20% { transform: translate(66vw, -36px) scale(-0.62, 0.62) rotate(-1deg); animation-timing-function: ease-in-out; }
+  32% { transform: translate(52vw, -48px) scale(-0.68, 0.68) rotate(-7deg); animation-timing-function: ease-in-out; }
+  46% { transform: translate(36vw, -32px) scale(-0.76, 0.76) rotate(0deg); animation-timing-function: ease-in-out; }
+  58% { transform: translate(24vw, -42px) scale(-0.83, 0.83) rotate(-6deg); animation-timing-function: ease-in-out; }
+  70% { transform: translate(13vw, -24px) scale(-0.9, 0.9) rotate(2deg); animation-timing-function: ease-out; }
+  82% { transform: translate(5vw, -13px) scale(-0.96, 0.96) rotate(-8deg); animation-timing-function: ease-out; }
   91% { transform: translate(1vw, -4px) scale(1) rotate(-16deg); animation-timing-function: ease-in; }
   96% { transform: translate(0, 2px) scale(1.04, 0.94) rotate(-3deg); animation-timing-function: ease-out; }
   100% { opacity: 1; transform: none; }
@@ -2946,7 +2946,7 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 
 /* A toucan note: he flies in from the side, lands, and then speaks. */
 .nudge-bird { animation: nudge-fly 1100ms linear both; }
-@keyframes nudge-fly { 0% { opacity: 0; transform: translate(150px, -100px) rotate(-12deg) scale(.75); animation-timing-function: ease-in-out; } 35% { opacity: 1; transform: translate(80px, -48px) rotate(-3deg) scale(.86); animation-timing-function: ease-in-out; } 65% { transform: translate(26px, -22px) rotate(-8deg) scale(.95); animation-timing-function: ease-out; } 85% { transform: translate(2px, -3px) rotate(-15deg); animation-timing-function: ease-in; } 93% { transform: translateY(2px) scale(1.04, .95) rotate(-3deg); } 100% { transform: none; } }
+@keyframes nudge-fly { 0% { opacity: 0; transform: translate(150px, -100px) rotate(12deg) scale(-.75, .75); animation-timing-function: ease-in-out; } 35% { opacity: 1; transform: translate(80px, -48px) rotate(3deg) scale(-.86, .86); animation-timing-function: ease-in-out; } 65% { transform: translate(26px, -22px) rotate(8deg) scale(-.95, .95); animation-timing-function: ease-out; } 85% { transform: translate(2px, -3px) rotate(-15deg); animation-timing-function: ease-in; } 93% { transform: translateY(2px) scale(1.04, .95) rotate(-3deg); } 100% { transform: none; } }
 .nudge-bubble { animation: nudge-bubble 300ms 980ms cubic-bezier(.2,.9,.3,1.2) both; transform-origin: 0% 100%; }
 @keyframes nudge-bubble { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .nudge-bird, .nudge-bubble { animation: none; } }

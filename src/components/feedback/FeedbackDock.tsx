@@ -792,7 +792,7 @@ export function FeedbackDock({ theme = "calm" }: { theme?: "calm" | "adventure" 
             </div>
             <div className="feedback-scroll relative z-[1] flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-2">
               {recentOpen ? (
-                <RecentNotes isAdventure={isAdventure} onBack={() => setRecentOpen(false)} />
+                <RecentNotes isAdventure={isAdventure} draft={open.body} onBack={() => setRecentOpen(false)} />
               ) : (
                 <Composer
                   key={open.id}
