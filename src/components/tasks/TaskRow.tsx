@@ -1,5 +1,7 @@
 "use client";
 
+import { useLongPress } from "@/lib/use-long-press";
+
 import { useQuestPlace } from "@/lib/use-quest-places";
 import { driveWords, useCalCardLook, useQuestDrive } from "@/lib/use-quest-cal";
 import { formatShortTimeRange } from "@/lib/calendar-dates";
@@ -99,7 +101,10 @@ export function TaskRow({
   listMoves,
   onEditorClose,
   compact = false,
+  onOutOfDue,
 }: {
+  /** In Due soon: its menu offers "Take out of Due soon", and a held finger opens the menu (owner, Nov 9). */
+  onOutOfDue?: () => void;
   task: Task;
   /** A smaller card (on the map): one line of description. */
   compact?: boolean;
@@ -182,6 +187,13 @@ export function TaskRow({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const liRef = useRef<HTMLLIElement | null>(null);
+  // Due soon has no drag, so a held finger opens the menu there (iOS sends no right-click for a hold).
+  const holdMenu = useLongPress(() => {
+    const dots = liRef.current?.querySelector<HTMLElement>(".quest-dots");
+    if (!dots) return;
+    setMenuAnchor(dots);
+    setMenu("dots");
+  });
   const tint = rescheduleRedness(task.reschedule_count);
   const isAdventure = theme === "adventure";
   const isWarned = task.reschedule_count >= 3;
@@ -328,6 +340,7 @@ export function TaskRow({
     if (action === "calendar") return setScheduling(true);
     if (action === "focus") return openFocusMode({ ...task, categoryLabel });
     if (action === "earlier") return setDoneEarlier(true);
+    if (action === "outdue") return onOutOfDue?.();
     if (action === "sequence") return setSequencing(true);
     if (action === "board" && task.board_id) return router.push(`/boards/${task.board_id}`);
     if (action === "nextstep") {
@@ -431,6 +444,7 @@ export function TaskRow({
       onPick={pick}
       onMoveToBoard={task.is_manual_priority || task.in_additional !== false ? moveToBoard : undefined}
       failTask={task.reward_id ? undefined : task}
+      inDueSoon={!!onOutOfDue}
       onClose={() => setMenu(null)}
     />
   );
@@ -474,6 +488,7 @@ export function TaskRow({
       >
       <div
       onClick={() => {
+        if (onOutOfDue && holdMenu.wasLong()) return;
         // A sequence fans out (its sub-quests open with it); a quest with sub-quests opens its tray; else the editor.
         if (queue.length > 0 && !done) {
           const next = !fanned;
@@ -483,6 +498,7 @@ export function TaskRow({
         else setEditing(true);
       }}
       aria-expanded={hasSteps ? tray : undefined}
+      {...(onOutOfDue ? holdMenu.handlers : {})}
       onContextMenu={(e) => {
         // Right-click opens the same menu as ⋯.
         if ((e.target as Element).closest("input,textarea,a")) return;

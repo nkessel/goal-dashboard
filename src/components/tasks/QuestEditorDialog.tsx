@@ -2816,24 +2816,34 @@ export function QuestEditorDialog({
           {isCompleted && task && (
             // A victory seal: what was won and when, with a quiet way to take it back.
             <div className="defeated-box flex items-center gap-3 rounded-2xl px-3 py-2.5">
-              <span aria-hidden className="defeated-seal flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[18px]">
-                {isAdventure ? "⚔" : "✓"}
+              <span aria-hidden className="defeated-seal flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[18px]" style={task.failed_at ? { background: "radial-gradient(circle at 35% 30%, #e0604a, #b5321f 60%, #7a1f12)", color: "#fff" } : undefined}>
+                {task.failed_at ? "✕" : isAdventure ? "⚔" : "✓"}
               </span>
               <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                {task.failed_at ? (
+                  // A failed quest (owner, Nov 9: "a red X rather than a green checkmark"): no XP, and why, if written.
+                  <span className={`${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ color: "#8a2414" }}>
+                    Quest failed
+                    {task.fail_reason && <span className="ml-1.5 font-sans text-[13px] font-normal italic" style={{ color: "#4a3a20" }}>· {task.fail_reason}</span>}
+                  </span>
+                ) : (
                 <span className={`${isAdventure ? "font-display text-[17px]" : "text-[15px] font-bold"}`} style={{ color: "#2f4a1c" }}>
                   {isAdventure ? "Defeated!" : "Completed"}
                   <span className="ml-1.5 text-[13px] font-semibold tabular-nums" style={{ color: "#6a4b0e" }}>
                     +{xp} XP
                   </span>
                 </span>
+                )}
                 {task.completed_at && (
                   <span className="text-[13px]" style={{ color: "#4a3a20" }}>
                     {new Date(task.completed_at).toLocaleString(undefined, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                   </span>
                 )}
-                <span className="text-[11.5px]" style={{ color: "#6b5631" }}>
-                  Change the XP above and what you earned changes too.
-                </span>
+                {!task.failed_at && (
+                  <span className="text-[11.5px]" style={{ color: "#6b5631" }}>
+                    Change the XP above and what you earned changes too.
+                  </span>
+                )}
               </span>
               <button
                 type="button"

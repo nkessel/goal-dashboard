@@ -80,6 +80,15 @@ export const FLOWS = [
       await h.check("journal open");
       await h.tap((p) => p.getByRole("tab", { name: /morning pages/i }).first(), "morning pages pill", { optional: true });
       await h.typeIn((p) => p.getByPlaceholder(/write here/i).first(), "morning pages");
+      // Two lines of prompts, "Show more prompts", ✎ edits them, "+ My own" adds one (owner, Nov 9).
+      if (await h.tap((p) => p.getByRole("button", { name: /show more prompts/i }).first(), "journal: more prompts", { optional: true, expectMove: true })) await h.check("journal: all prompts");
+      if (await h.tap((p) => p.getByRole("button", { name: /edit the journal prompts/i }).first(), "journal: edit prompts", { optional: true, expectMove: true })) {
+        await h.settle(400);
+        await h.check("journal: editing prompts");
+        await h.tap((p) => p.getByRole("button", { name: /edit the journal prompts/i }).first(), "journal: edit prompts closed", { optional: true });
+      }
+      if (await h.tap((p) => p.getByRole("button", { name: /^\+ my own$/i }).first(), "journal: my own", { optional: true, expectMove: true })) await h.check("journal: my own prompt");
+      await h.tap((p) => p.getByRole("button", { name: /^cancel$/i }).first(), "journal: my own cancel", { optional: true });
       await h.tap((p) => p.getByRole("tab", { name: /top priorities/i }).first(), "top priorities pill", { optional: true });
       await h.typeIn((p) => p.getByPlaceholder(/most important/i).first(), "top priority");
       await h.toggle(/other priorities/i, "other priorities");
@@ -158,6 +167,11 @@ export const FLOWS = [
       // Due soon's reach picker (the owner's recording, Nov 1: it opened underneath Daily Habits).
       if (await h.tap((p) => p.getByRole("button", { name: /counting quests due/i }).first(), "due soon reach", { optional: true })) {
         await h.check("due soon reach picker");
+        await esc(h);
+      }
+      // A Due soon quest's menu offers "Take out of Due soon" (owner, Nov 9); right-click opens it like a held finger.
+      if (await h.tap((p) => p.locator('section[aria-label="Due soon"] .quest-dots').first(), "due soon quest menu", { optional: true, expectMove: true })) {
+        await h.check("due soon quest menu");
         await esc(h);
       }
       await h.toggle(/additional quests/i, "additional quests");
@@ -313,6 +327,11 @@ export const FLOWS = [
       if (await h.tap((p) => p.getByRole("button", { name: /^prioritize$/i }).first(), "prioritize", { expectMove: true })) {
         await h.settle(1200);
         await h.check("prioritize cards");
+        // Tap a card: a short preview (a second tap opens the editor).
+        if (await h.tap((p) => p.locator("[data-prioritize-preview]").first(), "prioritize preview", { optional: true, expectMove: true })) {
+          await h.settle(400);
+          await h.check("prioritize preview");
+        }
         await h.tap((p) => p.locator("[data-prioritize-card]").getByRole("button", { name: /add a due or plan-by date|due|plan/i }).first(), "card dates", { optional: true, expectMove: true });
         await h.check("prioritize card dates");
         const bars = h.page.locator("[data-prioritize-card] [data-prioritize-bars]").first();

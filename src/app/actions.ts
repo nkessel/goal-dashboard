@@ -1010,6 +1010,13 @@ export async function respondFriendRequestAction(friendshipId: string, accept: b
   revalidatePath("/feed");
 }
 
+/** Remove someone from your party (Guild Hall › This week in the party, owner Nov 9). */
+export async function removePartyMemberAction(friendId: string) {
+  const ownerId = await requireProfileId();
+  await friendshipsData.removeFriendshipWith(friendId, ownerId);
+  revalidatePath("/feed");
+}
+
 export async function removeFriendAction(friendshipId: string) {
   const ownerId = await requireProfileId();
   await friendshipsData.removeFriendship(friendshipId, ownerId);
@@ -1980,7 +1987,7 @@ export async function setTomorrowQueueAction(rankIds: string[], seqIds?: string[
  * swipe one in, rate how important it is for that day (1–5), snooze it, or set its dates.
  * Ratings are per day in `life_wheel.dayRatings` ({ "2026-11-10": { id: 4 } }, last few days kept).
  */
-export type PrioritizeItem = { id: string; title: string; due_at: string | null; plan_by: string | null; xp_value: number; estimate_minutes: number | null; icon_key: string | null; icon_source: string | null; board: string | null; snoozed: boolean };
+export type PrioritizeItem = { id: string; title: string; description: string | null; due_at: string | null; plan_by: string | null; xp_value: number; estimate_minutes: number | null; icon_key: string | null; icon_source: string | null; board: string | null; snoozed: boolean };
 export async function prioritizeAction(day: "today" | "tomorrow"): Promise<{ items: PrioritizeItem[]; onDay: string[]; ratings: Record<string, number> }> {
   const ownerId = await requireProfileId();
   const key = day === "today" ? tomorrowData.appDayKey() : tomorrowData.nextDayKey(tomorrowData.appDayKey());
@@ -2000,6 +2007,7 @@ export async function prioritizeAction(day: "today" | "tomorrow"): Promise<{ ite
     .map((t) => ({
       id: t.id,
       title: t.title,
+      description: t.description ? t.description.slice(0, 400) : null,
       due_at: t.due_at ?? null,
       plan_by: (t as Task & { plan_by?: string | null }).plan_by ?? null,
       xp_value: t.xp_value,
@@ -4776,7 +4784,7 @@ export async function saveOwnWordsAction(words: OwnWords) {
 
 /** The welcome screen's layout (order, hidden parts, its buttons), kept on the account so every device shows the same screen. */
 export type WelcomeLayout = Record<string, unknown> & { at?: number };
-const WELCOME_LAYOUT_KEYS = ["welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar"] as const;
+const WELCOME_LAYOUT_KEYS = ["welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
 /** The bottom bar's tab order (hold and drag a tab). */
 export async function saveNavOrderAction(order: string[]) {
   const ownerId = await requireProfileId();

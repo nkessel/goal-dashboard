@@ -11,7 +11,7 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { arrangeMenu, readMenuLayout, saveMenuLayout, serverMenuLayout, subscribeMenuLayout, type MenuLayout } from "@/lib/quest-menu-layout";
 
-export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "board" | "earlier" | "nextstep" | "sequence" | "delete" | "archive";
+export type QuestAction = "edit" | "complete" | "focus" | "battle" | "snooze" | "offtoday" | "calendar" | "board" | "earlier" | "nextstep" | "sequence" | "delete" | "archive" | "outdue";
 
 /**
  * The quest card's action list — opened from the card's icon (the blank
@@ -31,8 +31,11 @@ export function QuestActionMenu({
   onPick,
   onMoveToBoard,
   failTask,
+  inDueSoon = false,
   onClose,
 }: {
+  /** Shown in Due soon: offer taking it out of there (owner, Nov 9). */
+  inDueSoon?: boolean;
   /** The quest, so Archive can offer "Mark it failed" in place (owner, Nov 9). */
   failTask?: React.ComponentProps<typeof FailQuest>["task"];
   /** "Move" › To a quest board: takes it off Today and files it under that board. */
@@ -118,6 +121,7 @@ export function QuestActionMenu({
       icon: inBattle ? <FolderGlyph /> : <Glyph d="M5 19l9-9M14 5l5 0 0 5-9 9-5 0 0-5zM15 15l4 4" />,
       label: inBattle ? "Move…" : isAdventure ? "Add to Today's Quests" : "Add to Today's Focus",
     },
+    ...(inDueSoon ? [{ key: "outdue" as const, icon: <Glyph d="M6 6l12 12M18 6L6 18" />, label: "Take out of Due soon" }] : []),
     ...(canSnooze ? [{ key: "snooze" as const, icon: <SnoozeGlyph />, label: "Snooze…" }] : []),
     // In Additional Quests, taking it out of that list takes it off the Today screen.
     // Owner (Nov 9): one "Move…" here too, with a folder icon, not "Remove from Additional Quests".
