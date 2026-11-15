@@ -2786,9 +2786,9 @@ export async function setIdeaStatusAction(threadId: string, status: forumData.Id
 // Check-in notes and #tags
 // ---------------------------------------------------------------------------
 
-export async function addCheckNoteAction(text: string, atISO?: string | null, allDay = false) {
+export async function addCheckNoteAction(text: string, atISO?: string | null, allDay = false, tone: number | null = null) {
   const ownerId = await requireProfileId();
-  const note = await energyData.addCheckNote(ownerId, text, atISO, allDay);
+  const note = await energyData.addCheckNote(ownerId, text, atISO, allDay, { tone });
   revalidatePath("/insights");
   return note;
 }
@@ -3683,7 +3683,7 @@ export async function inventoryPhotoAction(formData: FormData) {
 }
 
 /** Edit a logged event or #tag. */
-export async function updateCheckNoteAction(id: string, edit: string | { text?: string; details?: string | null; tone?: -1 | 0 | 1 | null; at?: string }) {
+export async function updateCheckNoteAction(id: string, edit: string | { text?: string; details?: string | null; tone?: number | null; at?: string }) {
   const ownerId = await requireProfileId();
   const note = await energyData.updateCheckNote(ownerId, id, edit);
   revalidatePath("/insights");

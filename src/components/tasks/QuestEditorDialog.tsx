@@ -18,6 +18,7 @@ import type { FileRef } from "@/lib/file-refs";
 
 import { TimeToken } from "@/components/xp/NightFields";
 import { LinkOuts } from "@/components/ui/Linked";
+import { TimeWheels } from "@/components/ui/TimeWheels";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { GearIcon, CloseIcon } from "@/components/ui/Icons";
 import { Fragment, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, useTransition } from "react";
@@ -1123,14 +1124,27 @@ export function QuestEditorDialog({
    * Saves what's changed (XP included), completes it and plays the celebration straight away
    * (owner, Nov 5: "when I hit complete, it should trigger the celebration screen"; it used to wait for Done).
    */
-  function completeExisting() {
+  // Complete asks when it was finished first (owner, Nov 8): just now, or earlier on the time wheels.
+  const [askWhen, setAskWhen] = useState(false);
+  const [earlier, setEarlier] = useState(false);
+  const [whenYesterday, setWhenYesterday] = useState(false);
+  const [whenMins, setWhenMins] = useState(0);
+  function completeEarlier() {
+    const at = new Date();
+    if (whenYesterday) at.setDate(at.getDate() - 1);
+    at.setHours(Math.floor(whenMins / 60), whenMins % 60, 0, 0);
+    const now = new Date();
+    completeExisting(at > now ? now : at);
+  }
+  function completeExisting(at?: Date) {
     if (!task) return;
+    setAskWhen(false);
     setError(null);
     startSaving(async () => {
       try {
         await persist(true);
         // Offline, the completion waits on the device (the XP total shows once it's sent).
-        const out = await saveOrQueue("completeQuest", { id: task.id, at: new Date().toISOString() });
+        const out = await saveOrQueue("completeQuest", { id: task.id, at: (at ?? new Date()).toISOString() });
         const res = out.queued ? null : out.result;
         deleted.current = true; // nothing more to save or pay out as it closes
         celebrateQuest({
@@ -2973,10 +2987,58 @@ export function QuestEditorDialog({
                     {saveState === "saving" ? "Saving…" : saveState === "error" ? "Not saved" : ""}
                   </span>
                   {/* Complete in gold, then Done in green at the bottom right. */}
+                  {!isCompleted && askWhen && (
+                    <div role="dialog" aria-label="When did you finish it?" data-complete-when className="card-pop-in parchment absolute bottom-full right-0 z-20 mb-2 flex w-[min(320px,calc(100vw-48px))] flex-col gap-2 rounded-2xl p-3" style={{ borderRadius: 16, boxShadow: "0 8px 24px rgba(60,40,10,.3)" }} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), setAskWhen(false))}>
+                      <span className="relative z-[1] flex items-center gap-2">
+                        <span className="font-display text-[16px]" style={{ color: "var(--t-ink)" }}>
+                          When did you finish it?
+                        </span>
+                        <button type="button" onClick={() => setAskWhen(false)} aria-label="Not yet" className="ml-auto flex h-7 w-7 items-center justify-center rounded-full" style={{ color: "var(--t-ink-soft)" }}>
+                          <CloseIcon size={10} />
+                        </button>
+                      </span>
+                      <span className="relative z-[1] flex gap-2">
+                        <button type="button" autoFocus onClick={() => completeExisting()} disabled={isSaving} className="h-10 flex-1 rounded-full text-[14.5px] font-bold disabled:opacity-60" style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}>
+                          Just now
+                        </button>
+                        <button
+                          type="button"
+                          aria-expanded={earlier}
+                          onClick={() => {
+                            if (!earlier) {
+                              const n = new Date();
+                              setWhenMins(Math.max(0, n.getHours() * 60 + n.getMinutes() - 60));
+                            }
+                            setEarlier((v) => !v);
+                          }}
+                          className="qe-fact h-10 flex-1 rounded-full text-[14.5px] font-semibold"
+                          data-open={earlier ? "true" : undefined}
+                        >
+                          Earlier…
+                        </button>
+                      </span>
+                      <Fold open={earlier}>
+                        <span className="relative z-[1] flex flex-col items-center gap-2 pt-1">
+                          <span className="flex gap-1.5">
+                            {[false, true].map((y) => (
+                              <button key={String(y)} type="button" aria-pressed={whenYesterday === y} onClick={() => setWhenYesterday(y)} className="qe-fact h-8 rounded-full px-3 text-[13px] font-semibold" data-open={whenYesterday === y ? "true" : undefined}>
+                                {y ? "Yesterday" : "Today"}
+                              </button>
+                            ))}
+                          </span>
+                          <TimeWheels value={whenMins} onChange={setWhenMins} />
+                          <button type="button" onClick={completeEarlier} disabled={isSaving} className="qe-complete h-10 rounded-full px-4 text-[14.5px] font-semibold disabled:opacity-60">
+                            ✦ Complete {noun}
+                          </button>
+                        </span>
+                      </Fold>
+                    </div>
+                  )}
                   {!isCompleted && (
                     <button
                       type="button"
-                      onClick={completeExisting}
+                      aria-expanded={askWhen}
+                      onClick={() => (setAskWhen((v) => !v), setEarlier(false), setWhenYesterday(false))}
                       disabled={isSaving || !title.trim()}
                       title={`Complete this ${noun} now`}
                       className="qe-complete flex h-10 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-[14.5px] font-semibold disabled:cursor-default disabled:opacity-45"

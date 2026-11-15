@@ -1,5 +1,7 @@
 "use client";
 
+import { FaceRating } from "@/components/ui/FaceRating";
+
 import { saveNightToo } from "./save-night";
 import { snapTo, useSliderStep } from "@/lib/use-slider-step";
 import Link from "next/link";
@@ -159,6 +161,8 @@ export function EnergyCheck({
     }
   };
   const [noteText, setNoteText] = useState("");
+  // How the event felt, on five faces (owner, Nov 13); shown on the Insights chart.
+  const [noteFace, setNoteFace] = useState<number | null>(null);
   // #tags typed in the box become pills as soon as a space follows them.
   const [pendingTags, setPendingTags] = useState<string[]>([]);
   function typeNote(v: string) {
@@ -171,11 +175,11 @@ export function EnergyCheck({
     }
     setNoteText(v);
   }
-  function saveNote(body: string) {
+  function saveNote(body: string, tone: number | null = null) {
     const temp = { id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, body };
     setNotes((n) => [...n, temp]);
     setSessionIds((s) => new Set(s).add(temp.id));
-    addCheckNoteAction(body)
+    addCheckNoteAction(body, null, false, tone)
       .then((saved) => {
         setSessionIds((s) => new Set(s).add(saved.id));
         setNotes((n) => n.map((x) => (x.id === temp.id ? { id: saved.id, body: saved.body } : x)));
@@ -196,7 +200,8 @@ export function EnergyCheck({
     }).replace(/\s+/g, " ").trim();
     if (!text && !tags.length) return setNoting(false);
     // "a, b; c" is three events (Insights › Events can keep it as one).
-    for (const w of splitEvents(text, splitOn())) saveNote(w);
+    for (const w of splitEvents(text, splitOn())) saveNote(w, noteFace);
+    setNoteFace(null);
     for (const t of tags) if (!notes.some((n) => n.body.toLowerCase() === `#${t}`)) saveNote(`#${t}`);
     setNoteText("");
     setPendingTags([]);
@@ -501,6 +506,7 @@ export function EnergyCheck({
         <CloseIcon size={11} />
       </button>
     </div>
+    <FaceRating value={noteFace} onChange={setNoteFace} label="How it felt" compact light />
     {/* Tracked events (anti-habits): one tap logs it now (owner, Nov 4). */}
     <TrackedEvents />
     </div>

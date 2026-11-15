@@ -1,5 +1,7 @@
 "use client";
 
+import { FaceIcon, faceOf } from "@/components/ui/FaceRating";
+
 import { useEffect, useRef, useState } from "react";
 import { WEATHER_EVENT, WEATHER_KEY } from "@/lib/use-weather";
 import { WeatherLocation } from "@/components/ui/WeatherLocation";
@@ -8,9 +10,8 @@ import { fromFeedback } from "@/lib/from-feedback";
 type Reading = { metric: string; level: number; at: string };
 type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null; details?: string | null; tone?: number | null };
 /** An event's colour by how it felt (minus, neutral, plus); others keep their kind's colour. */
-const TONE_COLOR: Record<string, string> = { "-1": "#a33c2a", "0": "#7a6a4f", "1": "#3f7a2e" };
-const TONE_GLYPH: Record<string, string> = { "-1": "−", "0": "●", "1": "+" };
-const markColor = (w: WinLite, fallback: string) => (w.kind === "note" && w.tone != null ? (TONE_COLOR[String(w.tone)] ?? fallback) : fallback);
+// A felt event shows its face on the chart (owner, Nov 13); its words on hover or a tap.
+const markColor = (w: WinLite, fallback: string) => (w.kind === "note" ? (faceOf(w.tone)?.color ?? fallback) : fallback);
 
 /** Series colors, checked for contrast and color-blind separation on parchment. */
 const SERIES = ["#c4620f", "#2a6fb5", "#24875a", "#8a3fa0", "#c23a48", "#a0880a"];
@@ -618,13 +619,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
                     <g key={`${ev.key}-${wi}`} transform={`translate(${px.toFixed(1)} ${(y(avgV) - 1 - (wi % 3) * 3).toFixed(1)})`}>
                       {/* Hover: its title and details. A felt event is a coloured + / ● / − button. */}
                       <title>{[w.title, w.details].filter(Boolean).join(" — ")}</title>
-                      {w.kind === "note" && w.tone != null ? (
-                        <>
-                          <circle r="8" fill={markColor(w, ev.color)} stroke="#fbf3df" strokeWidth="1.5" />
-                          <text y="4" textAnchor="middle" fontSize="12" fontWeight="700" fill="#fff">
-                            {TONE_GLYPH[String(w.tone)]}
-                          </text>
-                        </>
+                      {w.kind === "note" && faceOf(w.tone) ? (
+                        <FaceIcon v={w.tone!} size={18} inSvg />
                       ) : (
                         <>
                           <circle r="7.5" fill="#fbf3df" stroke={ev.color} strokeWidth="1.2" opacity=".95" />
@@ -701,10 +697,10 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
             )}
             {hoverEvents.slice(0, 4).map((w, i) => (
               <span key={i} className="truncate" style={{ color: INK_SOFT }}>
-                {w.kind === "note" && w.tone != null && (
-                  <b className="mr-1" style={{ color: TONE_COLOR[String(w.tone)] }}>
-                    {TONE_GLYPH[String(w.tone)]}
-                  </b>
+                {w.kind === "note" && faceOf(w.tone) && (
+                  <span className="mr-1 inline-flex align-[-3px]">
+                    <FaceIcon v={w.tone!} size={15} />
+                  </span>
                 )}
                 {EVENTS.find((e) => e.kinds.includes(w.kind))?.label.replace(/s?( &.*)?$/, "")}: {w.title ?? w.kind}
                 {w.details && <span className="block whitespace-normal text-[11.5px] opacity-80">{w.details}</span>}
