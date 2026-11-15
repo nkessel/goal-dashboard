@@ -111,7 +111,7 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
           {compact && (
             // His settings sit with his cage (owner, Nov 10): opens the Toucan Spirit section below.
             <button type="button" onClick={(e) => (e.stopPropagation(), revealSetting("toucan-spirit"))} className="mt-0.5 block text-[12.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "#8a6116" }}>
-              His settings ›
+              Toucan Spirit settings ›
             </button>
           )}
         </span>
@@ -122,7 +122,7 @@ export function OwlCage({ toucan = null, compact = false }: { toucan?: unknown; 
           {compact && (
             // His settings sit with his cage (owner, Nov 10): opens the Toucan Spirit section below.
             <button type="button" onClick={(e) => (e.stopPropagation(), revealSetting("toucan-spirit"))} className="mt-0.5 block text-[12.5px] font-semibold underline-offset-2 hover:underline" style={{ color: "#8a6116" }}>
-              His settings ›
+              Toucan Spirit settings ›
             </button>
           )}
         </span>
