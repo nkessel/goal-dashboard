@@ -355,7 +355,7 @@ function DueSoonBand({ tasks, hours: shownHours, theme, lockedBehind, onHide }: 
                     </span>
                   </li>
                 ) : (
-                  <TaskRow key={task.id} task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} />
+                  <TaskRow key={task.id} task={task} theme={theme} categoryLabel={task.categoryLabel} behind={lockedBehind.get(task.id)} onOutOfDue={() => snooze(task.id)} />
                 )
               )}
             </ul>

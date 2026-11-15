@@ -122,3 +122,13 @@ export async function removeFriendship(friendshipId: string, profileId: string):
 
   if (error) throw new Error(`Failed to remove friendship: ${error.message}`);
 }
+
+/** Leave a party member: removes the friendship between the two, whoever asked first. */
+export async function removeFriendshipWith(friendId: string, profileId: string): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/i.test(friendId)) throw new Error("Unknown party member.");
+  const { error } = await supabaseAdmin()
+    .from("friendships")
+    .delete()
+    .or(`and(requester_id.eq.${profileId},addressee_id.eq.${friendId}),and(requester_id.eq.${friendId},addressee_id.eq.${profileId})`);
+  if (error) throw new Error(`Couldn't remove them: ${error.message}`);
+}

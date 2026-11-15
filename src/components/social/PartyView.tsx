@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { removePartyMemberAction } from "@/app/actions";
 import { SettingsGear } from "@/components/ui/SettingsGear";
 import { setPartyView, usePartyView, PARTY_VIEW_OPTIONS, type PartyView } from "@/lib/party-view";
 
@@ -15,7 +18,26 @@ type Member = { id: string; name: string; isYou: boolean; streak: number; xp: nu
 /** This week in the party: everyone's XP and quests side by side, streaks, and a nudge for anyone who's been quiet. */
 export function PartyWeekBoard({ members, isAdventure }: { members: Member[]; isAdventure: boolean }) {
   const view = usePartyView();
+  const router = useRouter();
+  // Remove someone: a quiet ⋯ on their row asks in place (owner, Nov 9: "No remove button here for party members").
+  const [asking, setAsking] = useState<string | null>(null);
+  const [gone, setGone] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const remove = (id: string) =>
+    start(async () => {
+      setError(null);
+      try {
+        await removePartyMemberAction(id);
+        setGone((g) => [...g, id]);
+        setAsking(null);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't remove them.");
+      }
+    });
   if (!view.week && !view.quiet) return null;
+  members = members.filter((m) => !gone.includes(m.id));
   const ranked = [...members].sort((a, b) => b.xp - a.xp);
   const top = Math.max(1, ...ranked.map((m) => m.xp));
   const quiet = members.filter((m) => !m.isYou && m.quietDays !== null && m.quietDays >= 3);
@@ -29,7 +51,8 @@ export function PartyWeekBoard({ members, isAdventure }: { members: Member[]; is
           </h2>
           <ul className="relative z-[1] m-0 flex list-none flex-col gap-1.5 p-0">
             {ranked.map((m) => (
-              <li key={m.id} className="flex items-center gap-2.5 text-[14.5px]" style={{ color: "var(--t-ink)" }}>
+              <li key={m.id} className="flex flex-col gap-1">
+              <span className="flex items-center gap-2.5 text-[14.5px]" style={{ color: "var(--t-ink)" }}>
                 <Link href={m.isYou ? "/" : `/friends/${m.id}`} className="w-[92px] shrink-0 truncate font-semibold underline-offset-2 hover:underline">
                   {m.isYou ? "You" : m.name}
                 </Link>
@@ -49,9 +72,37 @@ export function PartyWeekBoard({ members, isAdventure }: { members: Member[]; is
                     {m.streak}
                   </span>
                 )}
+                {m.isYou ? (
+                  <span className="w-7 shrink-0" />
+                ) : (
+                  <button type="button" onClick={() => setAsking((a) => (a === m.id ? null : m.id))} aria-expanded={asking === m.id} aria-label={`Options for ${m.name}`} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <circle cx="5" cy="12" r="2" />
+                      <circle cx="12" cy="12" r="2" />
+                      <circle cx="19" cy="12" r="2" />
+                    </svg>
+                  </button>
+                )}
+              </span>
+              {asking === m.id && (
+                <span className="reveal flex flex-wrap items-center justify-end gap-2 text-[13px]" style={{ color: "var(--t-ink)" }}>
+                  Remove {m.name} from your party?
+                  <button type="button" disabled={pending} onClick={() => remove(m.id)} className="h-8 rounded-full px-3 font-semibold disabled:opacity-60" style={{ background: "#b5321f", color: "#fff" }}>
+                    {pending ? "Removing…" : "Remove"}
+                  </button>
+                  <button type="button" onClick={() => setAsking(null)} className="h-8 px-1 underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+                    Keep
+                  </button>
+                </span>
+              )}
               </li>
             ))}
           </ul>
+          {error && (
+            <p className="relative z-[1] m-0 text-[12.5px]" style={{ color: "var(--t-warn)" }}>
+              {error}
+            </p>
+          )}
         </>
       )}
       {view.quiet && quiet.length > 0 && (

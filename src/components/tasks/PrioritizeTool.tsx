@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   coachSetDueAction,
   habitPlanAction,
   prioritizeAction,
+  questForEditAction,
   setCoreHabitAction,
   setHabitForDayAction,
   rateForDayAction,
@@ -23,6 +24,9 @@ import { Fold } from "@/components/ui/Fold";
 import { DateField } from "@/components/ui/DateField";
 import { CloseIcon, SnoozeIcon } from "@/components/ui/Icons";
 import { ScheduleWithin } from "@/components/tasks/ScheduleWithin";
+import type { Task } from "@/lib/data/types";
+
+const EditTaskModal = lazy(() => import("./EditTaskModal").then((m) => ({ default: m.EditTaskModal })));
 
 type Day = "today" | "tomorrow";
 type Undo = { label: string; run: () => Promise<unknown> };
@@ -223,8 +227,29 @@ export function PrioritizeTool({ day, theme, onClose }: { day: Day; theme: "calm
     onClose();
   };
 
-  const tools = { day, rate, skip, snooze, setDue, setPlan };
+  // A quest opened in full from its card or row (owner, Nov 12: "first tap gives a preview card, second tap the full edit interface").
+  const [editing, setEditing] = useState<Task | null>(null);
+  const openQuest = (id: string) =>
+    questForEditAction(id).then(
+      (t) => (t ? setEditing(t) : setError("That quest isn't there any more.")),
+      () => setError("Couldn't open that quest.")
+    );
+  const tools = { day, rate, skip, snooze, setDue, setPlan, openQuest };
 
+  if (editing)
+    return (
+      <Suspense fallback={null}>
+        <EditTaskModal
+          task={editing}
+          theme={theme}
+          onClose={() => {
+            setEditing(null);
+            changed.current = true;
+            prioritizeAction(day).then(setData, () => {});
+          }}
+        />
+      </Suspense>
+    );
   return (
     <BottomSheet onClose={close} theme={theme}>
       {(requestClose) => (
@@ -428,6 +453,7 @@ type Tools = {
   snooze: (t: PrioritizeItem, at: Date | "tomorrow", label: string) => void;
   setDue: (t: PrioritizeItem, iso: string | null) => void;
   setPlan: (t: PrioritizeItem, days: number | null) => void;
+  openQuest: (id: string) => void;
 };
 
 function MoreButton({ n, onClick }: { n: number; onClick: () => void }) {
@@ -441,7 +467,7 @@ function MoreButton({ n, onClick }: { n: number; onClick: () => void }) {
 const FLY = 80;
 
 /** The top card and the edges of the next two behind it. */
-function Deck({ cards, rating, left, on, day, rate, skip, snooze, setDue, setPlan }: Tools & { cards: PrioritizeItem[]; rating: number; left: number; on: boolean }) {
+function Deck({ cards, rating, left, on, day, rate, skip, snooze, setDue, setPlan, openQuest }: Tools & { cards: PrioritizeItem[]; rating: number; left: number; on: boolean }) {
   const t = cards[0];
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -450,6 +476,7 @@ function Deck({ cards, rating, left, on, day, rate, skip, snooze, setDue, setPla
   const [other, setOther] = useState(false);
   // The level waits here until Save (owner, Nov 12: "save the priority with a button before it saves and goes to another item").
   const [level, setLevel] = useState(rating);
+  const [preview, setPreview] = useState(false);
   const start = useRef<{ x: number; y: number; dir: "x" | "y" | null } | null>(null);
   const choices = snoozeChoices(day);
   const dayWord = day === "today" ? "today" : "tomorrow";
@@ -518,17 +545,33 @@ function Deck({ cards, rating, left, on, day, rate, skip, snooze, setDue, setPla
             setDx(0);
           }}
         >
-          <div className="flex items-start gap-3">
+          {/* Tap: a short preview; tap again (or "Open quest"): the full editor. */}
+          <button type="button" data-prioritize-preview onClick={() => (preview ? openQuest(t.id) : setPreview(true))} aria-expanded={preview} className="flex items-start gap-3 text-left">
             <Portrait t={t} size={56} />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="font-display text-[18px] leading-snug" style={{ color: "#2a1c10" }}>
                 {t.title}
               </span>
               <span className="text-[12.5px]" style={{ color: "#6b5631" }}>
                 {[t.board, t.estimate_minutes ? `${t.estimate_minutes}m` : null, `${t.xp_value} XP`].filter(Boolean).join(" · ")}
               </span>
+            </span>
+          </button>
+          <Fold open={preview}>
+            <div className="flex flex-col gap-1.5 border-t pt-2" style={{ borderColor: "rgba(139,112,64,.3)" }} data-no-swipe>
+              <p className="m-0 line-clamp-4 whitespace-pre-line text-[13.5px] leading-snug" style={{ color: t.description ? "#2a1c10" : "#6b5631", fontStyle: t.description ? undefined : "italic" }}>
+                {t.description || "No description yet."}
+              </p>
+              <span className="flex items-center justify-between gap-2">
+                <button type="button" onClick={() => setPreview(false)} className="h-8 text-[12.5px] underline underline-offset-2" style={{ color: "#6b5631" }}>
+                  Hide
+                </button>
+                <button type="button" onClick={() => openQuest(t.id)} className="qe-fact h-8 rounded-full px-3 text-[12.5px] font-semibold">
+                  Open quest ›
+                </button>
+              </span>
             </div>
-          </div>
+          </Fold>
           <div className="flex flex-col items-center gap-1.5 pt-1" data-no-swipe>
             <span className="text-[12.5px] font-semibold" style={{ color: "#6b5631" }}>
               How important {dayWord}? {level ? <b style={{ color: "#2a1c10" }}>{level} of 5</b> : <span className="font-normal opacity-80">drag or tap</span>}
@@ -584,9 +627,10 @@ function Deck({ cards, rating, left, on, day, rate, skip, snooze, setDue, setPla
 }
 
 /** One row of the list: the same moves as a card. */
-function Row({ t, on, rating, day, rate, snooze, setDue, setPlan }: Tools & { t: PrioritizeItem; on: boolean; rating: number }) {
+function Row({ t, on, rating, day, rate, snooze, setDue, setPlan, openQuest }: Tools & { t: PrioritizeItem; on: boolean; rating: number }) {
   const [open, setOpen] = useState<null | "dates" | "snooze">(null);
   const [level, setLevel] = useState(rating);
+  const [preview, setPreview] = useState(false);
   const choices = snoozeChoices(day);
   const due = dueWords(t.due_at);
   const dirty = level > 0 && level !== rating;
@@ -594,8 +638,20 @@ function Row({ t, on, rating, day, rate, snooze, setDue, setPlan }: Tools & { t:
     <li className="due-in rounded-2xl px-2.5 py-2" style={{ background: "rgba(255,250,238,.55)", border: "1px solid rgba(139,112,64,.25)" }}>
       <div className="flex items-start gap-2">
         <Portrait t={t} size={30} />
-        <span className="min-w-0 flex-1 pt-1 text-[14px] font-semibold leading-tight">{t.title}</span>
+        <button type="button" onClick={() => (preview ? openQuest(t.id) : setPreview(true))} aria-expanded={preview} className="min-w-0 flex-1 pt-1 text-left text-[14px] font-semibold leading-tight">
+          {t.title}
+        </button>
       </div>
+      <Fold open={preview}>
+        <div className="flex items-end gap-2 pb-1 pl-[38px] pt-1">
+          <p className="m-0 line-clamp-3 min-w-0 flex-1 whitespace-pre-line text-[12.5px] leading-snug" style={{ color: "var(--t-ink-soft)", fontStyle: t.description ? undefined : "italic" }}>
+            {t.description || "No description yet."}
+          </p>
+          <button type="button" onClick={() => openQuest(t.id)} className="qe-fact h-8 shrink-0 rounded-full px-3 text-[12px] font-semibold">
+            Open ›
+          </button>
+        </div>
+      </Fold>
       <div className="mt-1 flex items-center gap-1.5 pl-[38px]">
         <span className="min-w-0 flex-1 truncate text-[11.5px]" style={{ color: due === "Overdue" ? "var(--t-warn)" : "var(--t-ink-soft)" }}>
           {[due, t.board].filter(Boolean).join(" · ")}
