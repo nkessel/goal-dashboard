@@ -598,7 +598,7 @@ export function DailyHabits({
                     if ((e.target as Element).closest("input,textarea,a")) return;
                     e.preventDefault();
                     const r = e.currentTarget.getBoundingClientRect();
-                    setMenuUp(window.innerHeight - r.bottom < 200);
+                    setMenuUp(window.innerHeight - r.bottom < 520 && r.top > window.innerHeight - r.bottom);
                     setMenuFor(h.id);
                   }}
                   className={`habit-row relative flex flex-wrap items-center gap-x-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
@@ -671,7 +671,7 @@ export function DailyHabits({
                         <>
                           {cleanTop ? ": " : ""}
                           {cleanTop && (
-                            <span style={{ color: "#7a5410" }}>
+                            <span className="md:ml-1.5" style={{ color: "#7a5410" }}>
                               {cleanTop.icon} {cleanTop.name}
                             </span>
                           )}
@@ -681,6 +681,7 @@ export function DailyHabits({
                         </>
                       )}
                       {/* Something to listen to, in the title's line like the cleaning area (owner, Nov 16). */}
+                      {listenHref && !d && LISTEN_HABIT.test(h.title) && " "}
                       {listenHref && !d && LISTEN_HABIT.test(h.title) && (
                         <span
                           role="link"
@@ -690,7 +691,7 @@ export function DailyHabits({
                           onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => (e.stopPropagation(), window.location.assign(listenHref))}
                           onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), window.location.assign(listenHref))}
-                          className="ml-2 inline-flex cursor-pointer items-center gap-1 whitespace-nowrap align-baseline text-[14px] font-semibold underline-offset-2 hover:underline"
+                          className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap align-baseline text-[14px] md:ml-2.5 font-semibold underline-offset-2 hover:underline"
                           style={{ color: "#7a5410" }}
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -757,7 +758,7 @@ export function DailyHabits({
                       onClick={(e) => {
                         // Near the bottom of the screen the menu opens upward so it isn't cut off.
                         const r = e.currentTarget.getBoundingClientRect();
-                        setMenuUp(window.innerHeight - r.bottom < 200);
+                        setMenuUp(window.innerHeight - r.bottom < 520 && r.top > window.innerHeight - r.bottom);
                         setMenuFor(menuFor === h.id ? null : h.id);
                       }}
                       data-habit-menu

@@ -17,6 +17,8 @@ export function habitOnDay(h: Pick<TimedHabit, "days" | "repeat">, day: Date): b
  * (Gym 7–10) takes the first free stretch inside it, around `busy`; else its start. */
 export function habitBlocksOn(habits: TimedHabit[], day: Date, busy: { start: number; end: number }[] = [], /** That day's changes by hand ("h:<id>"): kept at a time, or off. */ holds: Record<string, DayHold> = {}, /** Where a day starts for a habit with only an end time (minutes). */ dayStart: number = 7 * 60): { habit: TimedHabit; start: number; end: number; crowded?: boolean; kept?: boolean }[] {
   type Block = { habit: TimedHabit; start: number; end: number; crowded?: boolean; kept?: boolean };
+  // Floating habits make room for each other too: each one placed counts as busy for the next.
+  const taken = [...busy];
   return habits.flatMap((h): Block[] => {
     const m = /^(\d{1,2}):(\d{2})/.exec(h.due_time);
     const w = h.window_to ? /^(\d{1,2}):(\d{2})/.exec(h.window_to) : null;
@@ -40,11 +42,12 @@ export function habitBlocksOn(habits: TimedHabit[], day: Date, busy: { start: nu
     if (w) {
       const e = new Date(day);
       e.setHours(Number(w[1]), Number(w[2]), 0, 0);
-      const free = freeStretch(s.getTime(), e.getTime(), need / 60_000, busy);
+      const free = freeStretch(s.getTime(), e.getTime(), need / 60_000, taken);
       // No room left in its window: it stays at its start, marked crowded (shown in a muted red).
       crowded = free === null;
       start = free ?? Math.max(s.getTime(), m ? s.getTime() : e.getTime() - need);
     }
+    if (w && !crowded) taken.push({ start, end: start + need });
     return [{ habit: h, start, end: start + need, crowded }];
   });
 }
