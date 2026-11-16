@@ -6,10 +6,15 @@ const nextConfig: NextConfig = {
     return [{ source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }, { key: "Service-Worker-Allowed", value: "/" }] }];
   },
   // `PERF_NAMES=1 next build --webpack` keeps component names readable for scripts/perf/taps.mjs. Never set in production.
-  webpack(config) {
-    if (process.env.PERF_NAMES) config.optimization.minimize = false;
-    return config;
-  },
+  // Only added when asked for: the live build (Turbopack) refuses to run with a `webpack` key present.
+  ...(process.env.PERF_NAMES
+    ? {
+        webpack(config: { optimization: { minimize: boolean } }) {
+          config.optimization.minimize = false;
+          return config;
+        },
+      }
+    : {}),
   experimental: {
     // Bottom-nav tabs are fully prefetched (see BottomNav); keep those
     // prefetches fresh for a minute so switching tabs is instant. Any server
