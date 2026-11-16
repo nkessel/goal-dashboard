@@ -95,6 +95,8 @@ Each item is the owner's own ask. Take them top to bottom; mark done here and mo
 
 **Known not possible:** reordering the iPhone photo menu (library, camera, files, Drive). iOS draws it, not the app.
 
+**Saved for a future weekly / monthly / yearly review (owner, Nov 15: "remind me then"):** lines he loved for reviews, not the walkthrough: "Picture yourself a month from now, looking back and smiling. What did you do that you're glad about?" and "Most of us carry a few things we keep meaning to get to. Name one, and we'll turn it into a quest. You'll feel lighter just setting it down here." When reviews are built, remind the owner of these.
+
 **Ideas floated, not asked for:** a cheap DIY wall-calendar tablet tied to the app; growing the Final Boss into a fuller planning screen; the life wheel as the backbone of boards (see `docs/archive/planning-brief-2026-10-18.md`).
 
 **Non-dev, owner side:** choosing a domain (lifequests.win was the next to check; lifequest.win is premium-priced).
