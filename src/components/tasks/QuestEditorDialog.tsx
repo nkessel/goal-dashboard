@@ -143,13 +143,6 @@ const MORE_NAMES: Partial<Record<EditorPart, string>> = {
   steps: "sub-quests",
 };
 /** The due chip's label: "today", "tomorrow", "Fri", or "Nov 12". */
-/** The walkthrough's open/closed mark on <html> (data-tour-open), for useSyncExternalStore. */
-function subscribeTourOpen(cb: () => void) {
-  const mo = new MutationObserver(cb);
-  mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tour-open"] });
-  return () => mo.disconnect();
-}
-
 export function dueChipLabel(day: string) {
   const d = new Date(`${day}T12:00`);
   const today = new Date();
@@ -256,8 +249,6 @@ export function QuestEditorDialog({
   const embedded = useIsEmbedded();
   const scaleStyle = useScaleStyle();
   // Which quick-detail chip is open (one at a time).
-  // The walkthrough points at the XP controls themselves; its guide pills wait while it's on (owner, Nov 16).
-  const touring = useSyncExternalStore(subscribeTourOpen, () => document.documentElement.hasAttribute("data-tour-open"), () => false);
   const [factOpen, setFactOpen] = useState<EditorPart | "due" | "bonus" | "place" | "look" | null>(null);
   const [boardCard, setBoardCard] = useState(false);
   const isAdventure = theme === "adventure";
@@ -1914,7 +1905,7 @@ export function QuestEditorDialog({
       <>
               {/* XP and coins */}
               <div className="flex flex-col gap-1">
-                {!doingNow && !touring && <XpGuide onPick={(x, c) => (setXp(x), setCoinValue(c))} />}
+                {!doingNow && <XpGuide />}
                 <div className="flex items-center gap-2">
                   <span className="flex flex-col items-start gap-0.5">
                     <span className={labelCls}>{isAdventure ? "XP reward" : "Points"}</span>

@@ -48,20 +48,20 @@ export function useTourLook(): TourLook {
 }
 
 /**
- * How a step's ask ("Tap the +…") is drawn (owner, Nov 16: less like a button, more like an action request).
- * Three looks under review: a whispered line with an arrow toward the control, a gilded ribbon rule, or a small
- * tag beside the lit control itself. Kept on this device (`tour-press-style`) until one is chosen.
+ * How the floating ask beside the lit control looks (owner, Nov 16: "a floating instruction for each click",
+ * apart from his card). Three looks under review, kept on this device (`tour-ask-look`) until one is chosen:
+ * "parchment" (a cream label, dark ink), "gold" (a bright gilded tag) and "ink" (glowing words and a drawn arrow).
  */
-export type TourPress = "whisper" | "ribbon" | "tag";
-const PRESS_KEY = "tour-press-style";
+export type TourPress = "parchment" | "gold" | "ink";
+const PRESS_KEY = "tour-ask-look";
 function readPress(): TourPress {
   try {
     const v = localStorage.getItem(PRESS_KEY);
-    return v === "ribbon" || v === "tag" ? v : "whisper";
+    return v === "gold" || v === "ink" ? v : "parchment";
   } catch {
-    return "whisper";
+    return "parchment";
   }
 }
 export function useTourPress(): TourPress {
-  return useSyncExternalStore(subscribe, readPress, () => "whisper");
+  return useSyncExternalStore(subscribe, readPress, () => "parchment");
 }

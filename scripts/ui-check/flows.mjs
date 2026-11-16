@@ -556,6 +556,14 @@ export const FLOWS = [
       await h.settle(900);
       if (!(await h.page.locator("[data-tour-card]").count())) throw new Error("Walkthrough card didn't show");
       await h.check("tour: intro");
+      // His welcome in the other two looks (the speech bubble shows him saying it).
+      for (const look of ["spirit", "page"]) {
+        await h.page.evaluate((l) => (localStorage.setItem("tour-look", l), window.dispatchEvent(new Event("tour-look-change"))), look);
+        await h.settle(500);
+        await h.check(`tour: intro, look ${look}`);
+      }
+      await h.page.evaluate(() => (localStorage.removeItem("tour-look"), window.dispatchEvent(new Event("tour-look-change"))));
+      await h.settle(300);
       const card = (p) => p.locator("[data-tour-card]");
       const next = async (label, shot) => {
         await h.tap((p) => card(p).getByRole("button", { name: new RegExp(`^${label}`, "i") }), `tour: ${shot}`, { optional: true, expectMove: true });
@@ -588,25 +596,26 @@ export const FLOWS = [
       await h.check("tour: one quest left");
       await next("create your first quest", "create: intro, pointing at +");
       // The three looks for the step's ask, on this step (owner's review).
-      for (const style of ["ribbon", "tag"]) {
-        await h.page.evaluate((v) => (localStorage.setItem("tour-press-style", v), window.dispatchEvent(new Event("tour-look-change"))), style);
+      for (const style of ["gold", "ink"]) {
+        await h.page.evaluate((v) => (localStorage.setItem("tour-ask-look", v), window.dispatchEvent(new Event("tour-look-change"))), style);
         await h.settle(400);
         await h.check(`create: ask as ${style}`);
       }
-      await h.page.evaluate(() => (localStorage.removeItem("tour-press-style"), window.dispatchEvent(new Event("tour-look-change"))));
+      await h.page.evaluate(() => (localStorage.removeItem("tour-ask-look"), window.dispatchEvent(new Event("tour-look-change"))));
       await h.settle(300);
       await h.tap(/^create something new$/i, "tour: + ", { expectMove: true });
       await h.settle(500);
+      await h.check("create: tap New quest");
       await h.tap((p) => p.getByRole("button", { name: /^new quest/i }).first(), "tour: + › New quest", { optional: true, expectMove: true });
       await h.settle(900);
       await h.check("create: name it");
       await h.typeIn((p) => p.locator('[role="dialog"][data-save-keys] [aria-label="Title"]').first(), "tour title", "Call the dentist");
       await next("next", "create: how long");
       await next("next", "create: due day");
-      await next("next", "create: reward");
+      await next("next", "create: reward, tap XP");
       await h.tap((p) => p.locator('[role="dialog"][data-save-keys] [data-tour="fact-xp"]').first(), "tour: XP pill", { optional: true, expectMove: true });
       await h.settle(500);
-      if (await h.page.locator("[data-xp-guide]").count()) throw new Error("The XP guide pills show during the walkthrough");
+      if (await h.page.locator('[data-xp-guide] button:not([aria-label="Hide this tip"])').count()) throw new Error("The XP tip still has buttons that fill the reward in");
       await h.check("create: XP controls lit");
       await next("next", "create: create it");
       await h.tap((p) => p.locator('[role="dialog"][data-save-keys] [data-submit]').first(), "tour: create quest", { optional: true, expectMove: true });

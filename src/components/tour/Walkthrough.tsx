@@ -33,8 +33,10 @@ type Step = {
   press?: string;
   /** Needs Today on screen (offers to go there). */
   today?: boolean;
-  /** The same ask in a few words, for a tag beside the lit control (the "tag" style). */
+  /** The ask in a few words, floating beside the lit control (owner, Nov 16: one instruction per tap). */
   tag?: string;
+  /** Several taps in a row, one instruction at a time: the last one whose control is on screen is shown. */
+  asks?: { find: () => Element | null; say: string }[];
 };
 
 const PLUS = '[aria-label="Create something new"]';
@@ -106,7 +108,10 @@ const STEPS: Record<string, Step> = {
     text: () =>
       "This is where you add your first quest. A quest can be big or small, and should be something that matters to you. I recommend starting with something you can finish today, so you can begin with a victory under your belt. You can add additional quests at any time.",
     press: "Tap the glowing +, then choose New quest.",
-    tag: "Tap +, then New quest",
+    asks: [
+      { find: () => document.querySelector(PLUS), say: "Tap +" },
+      { find: () => buttonByText(/^new quest/i), say: "Tap New quest" },
+    ],
   },
   "cr-name": {
     target: `${EDITOR} [aria-label="Title"]`,
@@ -114,7 +119,7 @@ const STEPS: Record<string, Step> = {
     title: () => "Name your quest",
     text: () => "Write it the way you'd say it to a friend: what you'll actually do.",
     press: "Type it in the glowing field.",
-    tag: "Type your quest here",
+    tag: "Type your quest's name",
     next: "Next",
   },
   "cr-eta": {
@@ -123,7 +128,10 @@ const STEPS: Record<string, Step> = {
     title: () => "How long will this take?",
     text: () => "A rough guess is fine. It helps me find room for it in your day.",
     press: "Tap Time, then pick a length.",
-    tag: "Pick a length",
+    asks: [
+      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-time"]`), say: "Tap Time" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="panel-time"]`), say: "Pick how long it'll take" },
+    ],
     next: "Next",
   },
   "cr-due": {
@@ -132,7 +140,10 @@ const STEPS: Record<string, Step> = {
     title: () => "When should it be done?",
     text: () => "Give it a due day. If you like, block out a time for it on your calendar too: a quest with a day is a quest that happens.",
     press: "Tap Due, pick a day, and “Find a time” for your calendar.",
-    tag: "Pick a day",
+    asks: [
+      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-due"]`), say: "Tap Due date" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="panel-due"]`), say: "Pick a day (and a time, if you like)" },
+    ],
     next: "Next",
   },
   "cr-xp": {
@@ -141,7 +152,10 @@ const STEPS: Record<string, Step> = {
     title: () => "Choose your reward",
     text: () => "Use XP and coins to reward and motivate yourself. XP helps you level up your character, and coins buy special rewards you set for yourself in your Treasure Chest. Give just enough to make you want to start.",
     press: "Tap XP, then set the XP with − and + (or type it), and the coins beside it.",
-    tag: "Set XP and coins",
+    asks: [
+      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-xp"]`), say: "Tap XP" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="panel-xp"]`), say: "Set the XP with − and +, or type it" },
+    ],
     next: "Next",
   },
   "cr-save": {
@@ -150,7 +164,7 @@ const STEPS: Record<string, Step> = {
     title: () => "Create it",
     text: () => "It will wait for you on Today's Quests.",
     press: "Tap Create quest.",
-    tag: "Tap to create",
+    tag: "Tap Create quest",
   },
   "cr-engage": {
     today: true,
@@ -158,7 +172,10 @@ const STEPS: Record<string, Step> = {
     title: () => "Engage your quest",
     text: () => "When you're ready to begin, Engage Quest clears everything else away so you can focus on this one thing.",
     press: "Tap ⋯ on your new quest (or hold the card), then Engage Quest.",
-    tag: "Tap ⋯, then Engage Quest",
+    asks: [
+      { find: () => document.querySelector(`[data-task-id="${readTour()?.realId}"] [aria-label="Quest actions"]`), say: "Tap ⋯" },
+      { find: () => buttonByText(/^engage quest/i), say: "Tap Engage Quest" },
+    ],
   },
   "cr-focus": {
     target: () => buttonByText(/complete/i, ".one-thing"),
@@ -166,7 +183,7 @@ const STEPS: Record<string, Step> = {
     title: () => "One quest, nothing else",
     text: () => "Do it now, and tap Complete when it's done. Already done it? Tell me how long it took, then Complete. If it's for later, skip this step: it waits on Today.",
     press: "When it's done, tap Complete.",
-    tag: "Tap when it's done",
+    tag: "Tap Complete when it's done",
   },
   "cr-claim": {
     today: true,
@@ -174,7 +191,7 @@ const STEPS: Record<string, Step> = {
     title: () => "Claim your first victory!",
     text: (n) => `Well done, ${n}! Now claim the reward for this one: tap the circle and watch your XP and coins pour in!`,
     press: `Tap the circle on “${CREATE}”.`,
-    tag: "Tap to claim",
+    tag: "Tap the circle to claim it",
   },
   done: {
     title: (n) => `You're ready, ${n} ✦`,
@@ -227,7 +244,7 @@ export function Walkthrough() {
   const router = useRouter();
   const pathname = usePathname();
   const look = useTourLook();
-  const pressStyle = useTourPress();
+  const askLook = useTourPress();
   const tour = useSyncExternalStore(subscribeTour, () => localStorage.getItem("tour-state") ?? "", () => "");
   const state: TourState | null = tour ? (JSON.parse(tour) as TourState) : null;
   const welcomeUp = useSyncExternalStore(subscribeHtml, welcomeUpNow, () => true);
@@ -239,6 +256,9 @@ export function Walkthrough() {
   const [, wake] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const [cardH, setCardH] = useState(180);
+  const [ask, setAsk] = useState<string | null>(null);
+  // Where the card's bottom edge last sat: it stays there while it can, so he moves as little as he must.
+  const [lastB, setLastB] = useState<number | null>(null);
 
   // The account's place in the walkthrough wins over this device's (latest change wins); the name it goes by
   // is offered when the toucan asks what to call you.
@@ -365,7 +385,18 @@ export function Walkthrough() {
       return new DOMRect(l, tp, Math.max(...parts.map((r) => r.right)) - l, Math.max(...parts.map((r) => r.bottom)) - tp);
     };
     const tick = () => {
-      const r = withStarters ? union() : (findTarget(target)?.getBoundingClientRect() ?? null);
+      // Several taps in a row: the latest one whose control is showing.
+      let el: Element | null = null;
+      let say = s.tag ?? null;
+      if (s.asks) {
+        for (let i = s.asks.length - 1; i >= 0 && !el; i--) {
+          const e = s.asks[i].find();
+          const b = e?.getBoundingClientRect();
+          if (e && b && b.width > 0 && b.height > 0) [el, say] = [e, s.asks[i].say];
+        }
+      } else if (!withStarters) el = findTarget(target);
+      setAsk((old) => (old === say ? old : say));
+      const r = withStarters ? union() : (el?.getBoundingClientRect() ?? null);
       setRect((old) => (old && r && Math.abs(old.top - r.top) < 1 && Math.abs(old.left - r.left) < 1 && Math.abs(old.width - r.width) < 1 && Math.abs(old.height - r.height) < 1 ? old : r));
     };
     tick();
@@ -445,27 +476,27 @@ export function Walkthrough() {
   // The toucan floats above the card's top-left corner (or below it, in the speech-bubble look): keep room.
   const TOPROOM = look === "spirit" ? 12 : 48;
   const BOTROOM = look === "spirit" ? 84 : 8;
-  // In the lower half of the screen by default (owner, Nov 16): under what it points at when there's room, else
-  // above it; with nothing to point at, low on the screen above the bottom bar.
+  // Low on the screen by default (owner, Nov 16), and it stays put: the card keeps its last place while that
+  // still leaves the lit control and its floating ask clear; otherwise the nearest place that does. Anchored by
+  // its bottom edge, so a longer or shorter step grows upward instead of shifting the whole card.
   const NAV_ROOM = 96;
-  let left = vw / 2 - W / 2;
-  let top = vh - NAV_ROOM - BOTROOM - cardH;
-  if (rect) {
-    left = Math.max(14, Math.min(vw - W - 14, rect.left + rect.width / 2 - W / 2));
-    const gap = pressStyle === "tag" && s.press ? 54 : 16;
-    const below = rect.bottom + gap + TOPROOM;
-    top = below + cardH + BOTROOM <= vh - 8 ? Math.max(below, Math.min(vh * 0.5, vh - NAV_ROOM - BOTROOM - cardH)) : Math.max(TOPROOM, rect.top - gap - BOTROOM - cardH);
-  }
-  top = Math.max(TOPROOM, Math.min(top, vh - cardH - BOTROOM));
-  // Which way the lit control lies from the card, for the arrow in its words.
-  const toward = rect ? (rect.top + rect.height / 2 < top ? "up" : "down") : null;
-  // The "tag" ask sits between the card and the lit control (the card keeps room for it).
-  let tagSpot: React.CSSProperties = {};
-  let tagDir: "up" | "down" = "up";
-  if (rect) {
-    const cx = Math.max(10, Math.min(vw - 230, rect.left + rect.width / 2 - 70));
-    [tagSpot, tagDir] = toward === "up" ? [{ left: cx, top: rect.bottom + 10 }, "up"] : [{ left: cx, top: rect.top - 42 }, "down"];
-  }
+  const ASK_ROOM = ask ? 50 : 16;
+  const left = Math.max(14, Math.min(vw - W - 14, rect ? rect.left + rect.width / 2 - W / 2 : vw / 2 - W / 2));
+  const fits = (b: number) => b <= vh - BOTROOM && b - cardH >= TOPROOM && (!rect || b + 4 <= rect.top - ASK_ROOM || b - cardH - 4 >= rect.bottom + ASK_ROOM);
+  const low = vh - NAV_ROOM - BOTROOM;
+  // His welcome sits a little above the middle, where the eye rests (owner, Nov 16).
+  const welcome = step === "intro" ? Math.round(vh * 0.46 + cardH / 2) : null;
+  // Low first (his usual place); just above a control low on the screen; then wherever he last stood; then
+  // under or over the control; the top last.
+  const lowControl = rect && rect.top > vh * 0.6 ? rect.top - ASK_ROOM : null;
+  const choices = [welcome, low, lowControl, lastB, rect ? rect.bottom + ASK_ROOM + cardH : null, rect ? rect.top - ASK_ROOM : null, TOPROOM + cardH].filter((b): b is number => b != null);
+  const bottom = choices.find(fits) ?? Math.max(TOPROOM + cardH, Math.min(low, vh - BOTROOM));
+  const top = bottom - cardH;
+  // The floating ask: beside the lit control, on the card's side of it.
+  const askBelow = rect ? rect.bottom <= top : false;
+  const askSpot: React.CSSProperties | null = rect
+    ? { left: Math.max(10, Math.min(vw - 250, rect.left + rect.width / 2 - 90)), top: askBelow ? rect.bottom + 10 : rect.top - 44 }
+    : null;
 
   const needsToday = s.today && pathname !== "/";
 
@@ -533,17 +564,17 @@ export function Walkthrough() {
         aria-hidden
         data-tour-spot
         className="tour-spot pointer-events-none fixed z-[133]"
+        data-dark={step === "intro" ? "true" : undefined}
         style={{ left: 0, top: 0, ...(rect ? { transform: `translate(${rect.left - 6}px, ${rect.top - 6}px)`, width: rect.width + 12, height: rect.height + 12 } : { transform: `translate(${vw / 2}px, ${vh / 2}px)`, width: 0, height: 0 }) }}
       />
       {/* Placed by transform, so following the control as it scrolls never counts as the page jumping. */}
-      {rect && s.press && pressStyle === "tag" && (
-        <div
-          data-tour-tag
-          className="tour-tag pointer-events-none fixed z-[137] flex max-w-[240px] items-center gap-1.5 rounded-lg px-2.5 py-1 text-[13.5px] italic"
-          style={tagSpot}
-        >
-          <ArrowGlyph dir={tagDir} />
-          {s.tag ?? s.press}
+      <Remember value={bottom} onChange={setLastB} />
+      {/* One instruction at a time, floating right by what to tap: its own look, apart from his card. */}
+      {rect && ask && askSpot && (
+        <div key={ask} data-tour-tag data-ask-look={askLook} className="tour-ask pointer-events-none fixed z-[137] flex max-w-[260px] items-center gap-2" style={askSpot}>
+          {askLook === "ink" ? <ArrowGlyph dir={askBelow ? "up" : "down"} /> : <TapGlyph />}
+          <span>{ask}</span>
+          {askLook !== "ink" && <span aria-hidden className="tour-ask-point" data-below={askBelow ? "true" : undefined} />}
         </div>
       )}
       {rect && <div aria-hidden data-tour-ring className="tour-ring pointer-events-none fixed z-[134] rounded-2xl" style={{ left: 0, top: 0, transform: `translate(${rect.left - 6}px, ${rect.top - 6}px)`, width: rect.width + 12, height: rect.height + 12 }} />}
@@ -554,7 +585,8 @@ export function Walkthrough() {
         data-tour-card
         data-look={look}
         className="tour-card card-pop-in fixed z-[136] flex flex-col gap-2 rounded-[20px] px-4 pb-3 pt-3"
-        style={{ left, top, width: W, transition: "left 220ms ease, top 220ms ease" }}
+        // Placed by `translate` and glided there, so moving never reads as the page jumping.
+        style={{ left: 0, top: 0, translate: `${left}px ${top}px`, width: W, transition: "translate 420ms cubic-bezier(.3,.7,.2,1)" }}
       >
         {/* The toucan himself, floating at the card's corner (or under it, in the speech-bubble look). */}
         <span aria-hidden className="tour-toucan">
@@ -565,21 +597,10 @@ export function Walkthrough() {
             {s.part ? `${s.part[0]} · ${s.part[1]} of ${s.part[2]}` : "The Great Toucan Spirit"}
           </span>
         </div>
-        <h2 className="tour-title font-display m-0 text-[20px] leading-tight">{step === "quests" && left2.length === 1 ? "One quest left" : s.title(name)}</h2>
-        <p className="tour-text m-0 text-[14.5px] leading-snug">{step === "quests" && left2.length === 1 ? `One quest still waits for you, ${name}: “${left2[0]}”. It pays XP and coins when it's done.` : s.text(name)}</p>
-        {/* The ask itself (owner, Nov 16: "less like a button and more like an action request"): three looks to choose from. */}
-        {s.press && pressStyle === "whisper" && (
-          <p className="tour-whisper m-0 flex items-start gap-1.5 text-[14px] italic leading-snug" data-tour-ask>
-            <ArrowGlyph dir={toward} />
-            <span>{s.press}</span>
-          </p>
-        )}
-        {s.press && pressStyle === "ribbon" && (
-          <p className="tour-ribbon m-0 text-center text-[12px] font-semibold uppercase leading-snug tracking-[0.1em]" data-tour-ask>
-            <span>{s.press}</span>
-          </p>
-        )}
-        {s.press && pressStyle === "tag" && <p className="tour-whisper m-0 text-[13px] italic leading-snug opacity-80">{toward === "up" ? "Look above ↑" : toward === "down" ? "Look below ↓" : s.press}</p>}
+        <h2 key={`t-${step}`} className="tour-step-in tour-title font-display m-0 text-[20px] leading-tight">{step === "quests" && left2.length === 1 ? "One quest left" : s.title(name)}</h2>
+        <p key={`p-${step}`} className="tour-step-in tour-text m-0 text-[14.5px] leading-snug">{step === "quests" && left2.length === 1 ? `One quest still waits for you, ${name}: “${left2[0]}”. It pays XP and coins when it's done.` : s.text(name)}</p>
+        {/* With nothing on screen to point at yet, the ask stays in his words. */}
+        {s.press && !rect && <p className="tour-whisper m-0 text-[14px] italic leading-snug">{s.press}</p>}
         {step === "intro" && (
           <form
             className="mt-1 flex flex-col gap-2.5"
@@ -683,6 +704,22 @@ export function Walkthrough() {
         )}
       </div>
     </>
+  );
+}
+
+/** Keeps the card's last resting place (where its bottom edge sat), so the next step starts from there. */
+function Remember({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  useEffect(() => onChange(value), [value, onChange]);
+  return null;
+}
+
+/** A tap: a dot with a ripple, drawn in the ask's ink. */
+function TapGlyph() {
+  return (
+    <svg aria-hidden width="18" height="18" viewBox="0 0 18 18" fill="none" className="tour-tap shrink-0">
+      <circle cx="9" cy="9" r="3" fill="currentColor" />
+      <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.4" opacity=".55" />
+    </svg>
   );
 }
 
