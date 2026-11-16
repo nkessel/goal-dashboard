@@ -22,6 +22,7 @@ import { fromFeedback } from "@/lib/from-feedback";
 import { defaultCleaning, normalizeCleaning, todaysPicks } from "@/lib/cleaning";
 import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
 import { LanguagePractice, openLanguageWindow } from "@/components/xp/LearnLanguage";
+import { LessonButton, LessonMenuItem } from "./LessonButton";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { Fold } from "@/components/ui/Fold";
 
@@ -743,6 +744,7 @@ export function DailyHabits({
                         </span>
                         {isCore(h.id) ? "Not a core habit" : "Make it a core habit"}
                       </button>
+                      {day && <LessonMenuItem habit={h} day={day} onPicked={() => setMenuFor(null)} />}
                       {/* No "Skip today": Snooze does the same (owner, Nov 2). */}
                       <button
                         type="button"
@@ -843,6 +845,7 @@ export function DailyHabits({
                 </div>
                 </SwipeReveal>
                 {/learn(ing)? (a )?language|language practice/i.test(h.title) && <LanguagePractice />}
+                {day && <LessonButton habit={h} day={day} />}
                 {listenHref && !d && LISTEN_HABIT.test(h.title) && (
                   <a href={listenHref} onPointerDown={(e) => e.stopPropagation()} className="due-in ml-11 mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold no-underline" style={{ background: "rgba(201,162,74,.14)", border: "1px solid rgba(160,120,40,.45)", color: "#6b4c12" }}>
                     <span aria-hidden>🎧</span> Something to listen to
@@ -1013,7 +1016,8 @@ function scheduleLabel(h: RiteView): string | null {
     return `${((hh + 11) % 12) + 1}${mm ? `:${String(mm).padStart(2, "0")}` : ""} ${hh < 12 ? "AM" : "PM"}`;
   };
   if (h.due_time && h.window_to) parts.push(`${clock(h.due_time)}–${clock(h.window_to)}`);
-  else if (h.due_time) parts.push(`by ${clock(h.due_time)}`);
+  else if (h.due_time) parts.push(`at ${clock(h.due_time)}`);
+  else if (h.window_to) parts.push(`before ${clock(h.window_to)}`);
   return parts.length ? parts.join(" · ") : null;
 }
 

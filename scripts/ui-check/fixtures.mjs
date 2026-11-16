@@ -84,6 +84,7 @@ export function makeFixtures() {
   const rite = (title, slot, extra = {}) => ({ id: randomUUID(), owner_id: OWNER_ID, title, slot, sort_order: sort++, xp_value: 5, ...extra });
   const rites = [
     rite("Gym 🏋️", "day", { kind: "habit", estimate_minutes: 60, due_time: "07:00", window_to: "10:00" }),
+    rite("Facilitation course 📘", "day", { kind: "habit", estimate_minutes: 30, window_to: "14:00" }),
     rite("20 mins of house cleaning", "day", { kind: "habit" }),
     rite("Walk Chester 🐶", "day", { kind: "habit" }),
     rite("Learn a language 🗣", "day", { kind: "habit" }),

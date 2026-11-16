@@ -212,6 +212,11 @@ export const FLOWS = [
         // The due pill reads "Due today", "Due Fri · Thu 3pm" or "Due date".
         if (await h.tap((p) => p.locator("[role=dialog] button.qe-fact", { hasText: /^(Due|Plan:)/ }).first(), "editor: due", { optional: true, expectMove: true })) {
           await h.check("quest editor: due panel");
+          // Time of day (owner, Nov 16): a range any quest can have, for the auto-scheduler.
+          if (await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Before$/ }).first(), "editor: time of day, before", { optional: true, expectMove: true })) {
+            await h.check("quest editor: sometime before");
+            await h.tap((p) => p.locator("[data-quest-window] button", { hasText: /^Any time$/ }).first(), "editor: time of day, any", { optional: true, expectMove: true });
+          }
           // The month calendar (owner, Nov 7: "the due date picker isn't working"; it opened off screen in the adventure theme).
           if (await h.tap((p) => p.locator('[role=dialog] button[aria-label="Due date"]').first(), "editor: due date calendar", { optional: true, expectMove: true })) {
             await h.check("quest editor: due date calendar");
@@ -506,6 +511,22 @@ export const FLOWS = [
       await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
       await h.page.getByText("Gym 🏋️").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
       await h.settle(300);
+      // Complete lesson (owner, Nov 16): the button under a course habit pays XP and coins with the small celebration.
+      await h.page.locator("[data-lesson-button]").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      await h.settle(300);
+      await h.check("lesson button");
+      if (await h.tap((p) => p.locator("[data-lesson-button] button[aria-label='Change what a lesson pays']").first(), "lesson: what it pays", { optional: true, expectMove: true })) {
+        await h.check("lesson button: XP and coins");
+        await h.tap((p) => p.locator("[data-lesson-button] button[aria-label='Change what a lesson pays']").first(), "lesson: close pay", { optional: true, expectMove: true });
+      }
+      if (await h.tap((p) => p.locator("[data-lesson-button] button", { hasText: /complete lesson/i }).first(), "lesson: complete", { optional: true })) {
+        await h.settle(1200);
+        await h.check("lesson complete celebration");
+        await h.page.keyboard.press("Escape").catch(() => {});
+        await h.tap((p) => p.getByRole("button", { name: /continue|claim|done/i }).first(), "lesson: close celebration", { optional: true });
+        await h.settle(600);
+        await h.check("lesson button: counted today");
+      }
       // The habit editor (repeat ask 15): sub-habits in view, dragged to reorder, a dot opens XP/coins/Remove.
       if (await h.tap("text=Gym 🏋️", "habit editor", { optional: true, expectMove: true })) {
         await h.settle(500);
@@ -535,6 +556,9 @@ export const FLOWS = [
         await h.check("habit editor: xp pill");
         await h.tap((p) => p.locator("[data-mi=pills] button").nth(3), "when pill", { optional: true, expectMove: true });
         await h.check("habit editor: when pill");
+        // When (owner, Nov 16): Any time · At · Before · Between; "Before" needs only an end time.
+        if (await h.tap((p) => p.locator("[data-time-range] button", { hasText: /^Before$/ }).first(), "when: before", { optional: true, expectMove: true })) await h.check("habit editor: sometime before");
+        if (await h.tap((p) => p.locator("[data-time-range] button", { hasText: /^Between$/ }).first(), "when: between", { optional: true, expectMove: true })) await h.check("habit editor: between two times");
         if (await h.tap((p) => p.getByRole("button", { name: /^more$/i }).first(), "habit menu", { optional: true, expectMove: true })) {
           await h.check("habit editor: menu");
         }

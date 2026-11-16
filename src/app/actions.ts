@@ -3297,8 +3297,22 @@ export async function schedulerContextAction(fromISO: string, toISO: string, hid
   const riteRows = (await ritesData.listRites(profileId).catch(() => null)) ?? [];
   const habits = timedHabitsFrom(riteRows, cleanRepeat);
   // Habits without a set time but with a length (20 mins of cleaning): the day planner keeps room for them.
-  const flex = riteRows.filter((r) => r.slot === "day" && !r.due_time && (r.estimate_minutes ?? 0) > 0 && r.kind !== "ritual");
-  const doneIds = dayKey && /^\d{4}-\d{2}-\d{2}$/.test(dayKey) && flex.length ? new Set((await ritesData.listCompletionsFor(profileId, flex.map((r) => r.id), dayKey).catch(() => [])).filter((c) => c.day === dayKey).map((c) => c.rite_id)) : new Set<string>();
+  const dayOk = !!dayKey && /^\d{4}-\d{2}-\d{2}$/.test(dayKey);
+  // With habits chosen for that day (or core ones), room is kept only for those (owner, Nov 14).
+  const habitPlan = dayOk ? cleanHabitPlan((await readExtras(profileId).catch(() => ({}) as Record<string, unknown>)).habitPlan) : null;
+  const chosen = new Set(habitPlan ? [...habitPlan.core, ...(habitPlan.days[dayKey!] ?? [])] : []);
+  const flex = riteRows.filter((r) => r.slot === "day" && !r.due_time && !r.window_to && (r.estimate_minutes ?? 0) > 0 && r.kind !== "ritual" && (!chosen.size || chosen.has(r.id)));
+  const doneIds = dayOk && flex.length
+    ? new Set(
+        [
+          ...(await ritesData.listCompletionsFor(profileId, flex.map((r) => r.id), dayKey!).catch(() => [])),
+          // Resting today counts as off the plan.
+          ...((await ritesData.listHabitSkips(profileId, dayKey!).catch(() => [])) ?? []),
+        ]
+          .filter((c) => c.day === dayKey)
+          .map((c) => c.rite_id)
+      )
+    : new Set<string>();
   const flexHabits = flex.filter((r) => !doneIds.has(r.id)).map((r) => ({ id: r.id, title: r.title, days: r.days ?? null, minutes: r.estimate_minutes ?? 15, repeat: cleanRepeat(r.repeat) }));
   // Events written in [brackets] on your calendar are optional: they don't hold time until you keep them.
   const optional: { id: string; calendarId: string; title: string; start: number; end: number }[] = [];
@@ -3367,7 +3381,7 @@ export async function planDayTasksAction(dayEndISO: string) {
 }
 
 /** A daily habit as the auto-scheduler lists it. */
-export type SchedHabit = { id: string; title: string; minutes: number; due_time: string | null; window_to: string | null; icon_key: string | null; days: number[] | null; repeat: unknown };
+export type SchedHabit = { id: string; title: string; minutes: number; due_time: string | null; window_to: string | null; icon_key: string | null; days: number[] | null; repeat: unknown; core?: boolean };
 
 /**
  * The auto-scheduler's sections on top (owner, Nov 6): Today's quests, Additional quests and today's
@@ -3391,10 +3405,15 @@ export async function autoSchedulerSectionsAction(dayKey: string) {
   const ids = dayHabits.map((r) => r.id);
   const [done, skips] = await Promise.all([ritesData.listCompletionsFor(ownerId, ids, day).catch(() => []), ritesData.listHabitSkips(ownerId, day).catch(() => [])]);
   const off = new Set([...done, ...(skips ?? [])].filter((c) => c.day === day).map((c) => c.rite_id));
+  // With habits chosen for the day (or core ones), only those are lined up, core first (owner, Nov 14).
+  const plan = cleanHabitPlan((await readExtras(ownerId).catch(() => ({}) as Record<string, unknown>)).habitPlan);
+  const chosen = new Set([...plan.core, ...(plan.days[day] ?? [])]);
+  const coreIds = new Set(plan.core);
   const habits: SchedHabit[] = dayHabits
-    .filter((r) => !off.has(r.id))
-    .map((r) => ({ id: r.id, title: r.title, minutes: r.estimate_minutes ?? (r.due_time ? 60 : 30), due_time: r.due_time ?? null, window_to: r.window_to ?? null, icon_key: r.icon_source ? (r.icon_key ?? null) : null, days: r.days ?? null, repeat: cleanRepeat(r.repeat) }));
-  return { today, additional, habits, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
+    .filter((r) => !off.has(r.id) && (!chosen.size || chosen.has(r.id)))
+    .sort((a, b) => Number(coreIds.has(b.id)) - Number(coreIds.has(a.id)))
+    .map((r) => ({ id: r.id, title: r.title, minutes: r.estimate_minutes ?? (r.due_time || r.window_to ? 60 : 30), due_time: r.due_time ?? null, window_to: r.window_to ?? null, icon_key: r.icon_source ? (r.icon_key ?? null) : null, days: r.days ?? null, repeat: cleanRepeat(r.repeat), core: coreIds.has(r.id) }));
+  return { today, additional, habits, habitsChosen: chosen.size > 0, settings: profileRes.error ? null : (profileRes.data?.scheduler ?? null) };
 }
 
 /** Put a quest on the list to schedule in a group (owner, Nov 6): its plan-by (undefined keeps it) and the list's whole new order. */
@@ -3765,7 +3784,32 @@ function cleanLook(v: unknown): CalCardLook | null {
 }
 
 /** Driving time to each quest's place (minutes each way) and each quest's calendar card look, by quest id. */
-export async function questCalExtrasAction(): Promise<{ drives: Record<string, number>; looks: Record<string, CalCardLook> }> {
+/** A quest's own time range ("09:00"–"14:00"; either end alone works), for the auto-scheduler. */
+export type QuestWindow = { from?: string; to?: string };
+const HHMM = /^[0-2][0-9]:[0-5][0-9]$/;
+function cleanWindow(v: unknown): QuestWindow | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const from = typeof o.from === "string" && HHMM.test(o.from) ? o.from : undefined;
+  const to = typeof o.to === "string" && HHMM.test(o.to) ? o.to : undefined;
+  if (from && to && from >= to) return { from };
+  return from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : null;
+}
+
+export async function setQuestWindowAction(taskId: string, win: QuestWindow | null) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId)) throw new Error("Unknown quest.");
+  const extras = await readExtras(ownerId);
+  const all = { ...((extras.questWindows as Record<string, QuestWindow> | undefined) ?? {}) };
+  const w = cleanWindow(win);
+  if (w) all[taskId] = w;
+  else delete all[taskId];
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, questWindows: all } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  return w;
+}
+
+export async function questCalExtrasAction(): Promise<{ drives: Record<string, number>; looks: Record<string, CalCardLook>; windows: Record<string, QuestWindow> }> {
   const ownerId = await requireProfileId();
   const extras = await readExtras(ownerId);
   const drives: Record<string, number> = {};
@@ -3775,7 +3819,12 @@ export async function questCalExtrasAction(): Promise<{ drives: Record<string, n
     const l = QUEST_ID.test(k) ? cleanLook(v) : null;
     if (l) looks[k] = l;
   }
-  return { drives, looks };
+  const windows: Record<string, QuestWindow> = {};
+  for (const [k, v] of Object.entries((extras.questWindows as Record<string, unknown> | undefined) ?? {})) {
+    const w = QUEST_ID.test(k) ? cleanWindow(v) : null;
+    if (w) windows[k] = w;
+  }
+  return { drives, looks, windows };
 }
 
 export async function setQuestDriveAction(taskId: string, minutes: number | null) {
@@ -5183,4 +5232,95 @@ export async function tourCompletePracticeAction(taskId: string) {
   const res = await finishTask(ownerId, taskId);
   revalidatePath("/");
   return { title: t.title, xp: t.xp_value, totalXp: (res as { totalXp?: number | null } | null)?.totalXp ?? null, coins: t.coin_value ?? 1 };
+}
+
+// ---------------------------------------------------------------------------
+// Complete lesson: a button on a habit that pays XP and coins each time a lesson is done
+// (owner, Nov 16: "a complete lesson button that gives an XP celebration… with editable XP and coin values")
+
+export type LessonButton = { on: boolean; xp: number; coins: number };
+type LessonStore = { buttons: Record<string, LessonButton>; days: Record<string, Record<string, number>> };
+const LESSON_DEFAULT = { xp: 10, coins: 1 };
+function cleanLessons(raw: unknown): LessonStore {
+  const r = (raw && typeof raw === "object" ? raw : {}) as { buttons?: unknown; days?: unknown };
+  const num = (v: unknown, d: number, max: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(max, Math.round(v))) : d);
+  const buttons: Record<string, LessonButton> = {};
+  for (const [k, v] of Object.entries((r.buttons && typeof r.buttons === "object" ? r.buttons : {}) as Record<string, unknown>)) {
+    if (!QUEST_ID.test(k) || !v || typeof v !== "object") continue;
+    const b = v as Record<string, unknown>;
+    buttons[k] = { on: b.on !== false, xp: num(b.xp, LESSON_DEFAULT.xp, 500), coins: num(b.coins, LESSON_DEFAULT.coins, 100) };
+  }
+  const days: LessonStore["days"] = {};
+  for (const [d, v] of Object.entries((r.days && typeof r.days === "object" ? r.days : {}) as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !v || typeof v !== "object") continue;
+    const row: Record<string, number> = {};
+    for (const [k, n] of Object.entries(v as Record<string, unknown>)) if (QUEST_ID.test(k) && num(n, 0, 99) > 0) row[k] = num(n, 0, 99);
+    if (Object.keys(row).length) days[d] = row;
+  }
+  return { buttons, days };
+}
+async function saveLessons(ownerId: string, extras: Record<string, unknown>, store: LessonStore) {
+  // The last 90 days of counts are enough for the card.
+  const days = Object.fromEntries(Object.entries(store.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 90));
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, lessons: { buttons: store.buttons, days } } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+}
+
+/** Each habit's lesson button, and how many lessons each has on `day`. */
+export async function lessonsAction(day: string): Promise<{ buttons: Record<string, LessonButton>; today: Record<string, number> }> {
+  const ownerId = await requireProfileId();
+  const store = cleanLessons((await readExtras(ownerId)).lessons);
+  return { buttons: store.buttons, today: store.days[day] ?? {} };
+}
+
+export async function saveLessonButtonAction(riteId: string, patch: Partial<LessonButton>) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(riteId)) throw new Error("Unknown habit.");
+  const extras = await readExtras(ownerId);
+  const store = cleanLessons(extras.lessons);
+  store.buttons = cleanLessons({ buttons: { ...store.buttons, [riteId]: { ...LESSON_DEFAULT, ...store.buttons[riteId], ...patch } } }).buttons;
+  await saveLessons(ownerId, extras, store);
+  return store.buttons[riteId];
+}
+
+/** One lesson done: pays its XP and coins, counts it for the day and logs it as an event (Insights). */
+export async function completeLessonAction(riteId: string, day: string) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rite = await ritesData.getRite(riteId, ownerId);
+  if (!rite) throw new Error("That habit is gone.");
+  const extras = await readExtras(ownerId);
+  const store = cleanLessons(extras.lessons);
+  const b = store.buttons[riteId] ?? { on: true, ...LESSON_DEFAULT };
+  const count = (store.days[day]?.[riteId] ?? 0) + 1;
+  store.days[day] = { ...(store.days[day] ?? {}), [riteId]: count };
+  await saveLessons(ownerId, extras, store);
+  const award = b.xp > 0 ? await xp.awardXp(ownerId, b.xp, "task_completed") : null;
+  if (b.coins > 0) await rewardsData.addCoins(ownerId, b.coins).catch(() => {});
+  const note = await energyData.addCheckNote(ownerId, `Lesson: ${rite.title}`.slice(0, 200), null, false, { tone: 1 }).catch(() => null);
+  revalidatePath("/");
+  revalidatePath("/insights");
+  return { xp: b.xp, coins: b.coins, coinsEarned: (award?.coinsEarned ?? 0) + b.coins, totalXp: award?.totalXp ?? null, count, noteId: note?.id ?? null };
+}
+
+/** Take the last lesson back (a slip of the thumb): its XP, coins, count and event. */
+export async function undoLessonAction(riteId: string, day: string, paid: { xp: number; coins: number; noteId: string | null }) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  if (!QUEST_ID.test(riteId)) throw new Error("Unknown habit.");
+  const extras = await readExtras(ownerId);
+  const store = cleanLessons(extras.lessons);
+  const had = store.days[day]?.[riteId] ?? 0;
+  if (had < 1) return { count: 0 };
+  // Never take back more than a lesson can pay.
+  const backXp = Math.max(0, Math.min(Math.round(Number(paid.xp) || 0), 500));
+  const backCoins = Math.max(0, Math.min(Math.round(Number(paid.coins) || 0), 100));
+  store.days[day] = { ...store.days[day], [riteId]: had - 1 };
+  await saveLessons(ownerId, extras, cleanLessons(store));
+  if (backXp > 0) await xp.awardXp(ownerId, -backXp, "task_completed").catch(() => {});
+  if (backCoins > 0) await rewardsData.addCoins(ownerId, -backCoins).catch(() => {});
+  if (paid.noteId) await energyData.deleteCheckNote(ownerId, paid.noteId).catch(() => {});
+  revalidatePath("/");
+  revalidatePath("/insights");
+  return { count: had - 1 };
 }
