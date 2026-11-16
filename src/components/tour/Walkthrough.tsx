@@ -154,7 +154,7 @@ const STEPS: Record<string, Step> = {
     press: "Tap XP, then set the XP with − and + (or type it), and the coins beside it.",
     asks: [
       { find: () => document.querySelector(`${EDITOR} [data-tour="fact-xp"]`), say: "Tap XP" },
-      { find: () => document.querySelector(`${EDITOR} [data-tour="panel-xp"]`), say: "Set the XP with − and +, or type it" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="xp-row"]`), say: "Set the XP with − and +, or type it" },
     ],
     next: "Next",
   },
@@ -412,6 +412,13 @@ export function Walkthrough() {
     };
   }, [s, step, state?.createId, state?.realId]);
 
+  // Create quest can sit below the editor's fold once its panels are open: bring it into view.
+  useEffect(() => {
+    if (step !== "cr-save") return;
+    const id = window.setTimeout(() => document.querySelector(`${EDITOR} [data-submit]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 250);
+    return () => window.clearTimeout(id);
+  }, [step]);
+
   // A part of Today it points at is brought into view.
   useEffect(() => {
     if (!step || !(step === "quests" || step === "cr-claim" || step === "cr-engage" || step.startsWith("home-"))) return;
@@ -488,8 +495,10 @@ export function Walkthrough() {
   const welcome = step === "intro" ? Math.round(vh * 0.46 + cardH / 2) : null;
   // Low first (his usual place); just above a control low on the screen; then wherever he last stood; then
   // under or over the control; the top last.
-  const lowControl = rect && rect.top > vh * 0.6 ? rect.top - ASK_ROOM : null;
-  const choices = [welcome, low, lowControl, lastB, rect ? rect.bottom + ASK_ROOM + cardH : null, rect ? rect.top - ASK_ROOM : null, TOPROOM + cardH].filter((b): b is number => b != null);
+  const lowControl = rect && rect.top > vh * 0.6 ? rect.top - ASK_ROOM - 6 : null;
+  // (Where he last stood counts only while that was low: a high place is left as soon as a low one fits.)
+  const stayed = lastB != null && lastB - cardH >= vh * 0.4 ? lastB : null;
+  const choices = [welcome, low, lowControl, stayed, rect ? rect.bottom + ASK_ROOM + cardH + 6 : null, rect ? rect.top - ASK_ROOM - 6 : null, TOPROOM + cardH].filter((b): b is number => b != null);
   const bottom = choices.find(fits) ?? Math.max(TOPROOM + cardH, Math.min(low, vh - BOTROOM));
   const top = bottom - cardH;
   // The floating ask: beside the lit control, on the card's side of it.

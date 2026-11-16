@@ -1933,7 +1933,7 @@ export function QuestEditorDialog({
                   </span>
                 </div>
                 {!doingNow && <StatSplitEditor xp={xp} split={statSplit} onChange={changeStatSplit} isAdventure={isAdventure} open={statsOpen} onOpenChange={setStatsOpen} />}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" data-tour="xp-row">
                   {/* −5 and +5 either side of the bar, the amount to its right. */}
                   <button type="button" onClick={() => (setXp(Math.max(0, xp - 5)), setXpOwn(true))} aria-label="5 XP less" title="−5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
                     −5
