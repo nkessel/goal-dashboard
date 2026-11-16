@@ -31,8 +31,8 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - `review/prioritize-bars` (taller Prioritize bars): built Nov 14, not UI-checked or reviewed.
 - `review/walkthrough-v2` (the rebuilt walkthrough): built Nov 15, review page sent, waiting on his OK or notes.
 - `review/import-calendar` (import card A: a calendar time from Due, a landing line, no "To schedule" type): built Nov 16, review page sent.
-- Daily coursework as a habit: options A–D sent Nov 11.
-- Habits in the daily plan, part 2: not built yet (plan in WAITING).
+- `review/time-ranges-lesson-button` (time ranges for habits and quests, chosen habits in the auto-scheduler, Complete lesson button): built Nov 16, review page sent, waiting on his OK or notes.
+- Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
 - The email to Daniel about his Champion title: needs his OK and wording.
 - Waiting on his iPhone: a list of things cloud sessions can't check (in `docs/WAITING.md` and `docs/PRIORITIES.md`).
