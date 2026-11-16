@@ -648,7 +648,7 @@ export function TodayTaskBoard({
             id: "today",
             node: (
               <section className="flex flex-col gap-3 rounded-3xl px-2.5 pb-3 pt-3 sm:px-3" style={sectionStyle}>
-                <div className="today-head relative">
+                <div className="today-head relative" data-tour="today-quests">
                 {isAdventure ? (
                   <div className={`flex items-center gap-2 px-1 ${todayOpen ? "max-sm:pl-[40px] max-sm:pr-[40px]" : ""}`}>
                     <span className="hidden flex-1 sm:flex">
@@ -766,6 +766,7 @@ export function TodayTaskBoard({
                   <button
                     type="button"
                     data-quest-dropzone="other"
+                    data-tour="additional-quests"
                     aria-expanded={otherOpen}
                     onClick={() => setOtherOpen((v) => !v)}
                     className={`drawer-header relative flex min-h-[58px] w-full items-center justify-center px-4 py-2.5 transition-[border-radius] duration-200 ${otherOpen ? "rounded-t-2xl" : "rounded-2xl"}`}

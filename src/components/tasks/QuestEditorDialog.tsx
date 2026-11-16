@@ -2720,7 +2720,7 @@ export function QuestEditorDialog({
                     ))}
                     {/* When it's due, right on the surface; and once it has a date, an optional bonus for finishing early. */}
                     {!doingNow && !isCompleted && (
-                      <button type="button" onClick={() => setFactOpen((o) => (o === "due" ? null : "due"))} aria-expanded={factOpen === "due"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "due" ? "true" : undefined}>
+                      <button type="button" onClick={() => setFactOpen((o) => (o === "due" ? null : "due"))} aria-expanded={factOpen === "due"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "due" ? "true" : undefined} data-tour="fact-due">
                         {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
                         <img src="/design/ui-calendar.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />
                         <span className="max-w-[210px] truncate">{dueChipWords}</span>

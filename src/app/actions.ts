@@ -5114,7 +5114,7 @@ export async function tickDawnAction(day: string, what: { stone: string } | { ex
 // ---------------------------------------------------------------------------
 // The new-adventurer walkthrough (owner, Nov 13): where each account is in it, kept on the account.
 
-export type TourState = { step: string; done?: boolean; hidden?: string[]; practiceId?: string | null; realId?: string | null; since?: string | null; at?: number; /** What the person asked the toucan to call them. */ name?: string | null; /** Snoozed until (ms). */ until?: number | null };
+export type TourState = { step: string; done?: boolean; hidden?: string[]; practiceId?: string | null; realId?: string | null; since?: string | null; at?: number; /** What the person asked the toucan to call them. */ name?: string | null; /** Snoozed until (ms). */ until?: number | null; /** The two starter quests on Today (owner, Nov 15). */ exploreId?: string | null; createId?: string | null };
 
 export async function tourAction(): Promise<TourState | null> {
   const ownerId = await requireProfileId();
@@ -5142,6 +5142,8 @@ export async function saveTourAction(state: TourState) {
     at: Date.now(),
     name: state.name ? String(state.name).trim().slice(0, 40) || null : null,
     until: typeof state.until === "number" && Number.isFinite(state.until) ? state.until : null,
+    exploreId: state.exploreId && /^[0-9a-f-]{36}$/i.test(state.exploreId) ? state.exploreId : null,
+    createId: state.createId && /^[0-9a-f-]{36}$/i.test(state.createId) ? state.createId : null,
   };
   const extras = await readExtras(ownerId);
   const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, tour: clean } }).eq("id", ownerId);
@@ -5162,6 +5164,33 @@ export async function tourPracticeQuestAction(): Promise<{ id: string }> {
   });
   revalidatePath("/");
   return { id: t.id };
+}
+
+/**
+ * The walkthrough's two starter quests on Today (owner, Nov 15): "Explore the realm" (+15 XP, 1 coin) and
+ * "Create your first quest" (+25 XP, 2 coins), tiny so they tick off with one tap. Ones already made and
+ * still open are kept, not made twice.
+ */
+export async function tourStarterQuestsAction(have: { exploreId?: string | null; createId?: string | null } = {}): Promise<{ exploreId: string; createId: string }> {
+  const ownerId = await requireProfileId();
+  const keep = async (id: string | null | undefined) => {
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+    const t = await tasksData.getTask(id, ownerId).catch(() => null);
+    return t ? t.id : null;
+  };
+  const make = (title: string, description: string, xpValue: number, coinValue: number) =>
+    tasksData.createTask(ownerId, { title, description, xpValue, coinValue, estimateMinutes: 5, isManualPriority: true, isTiny: true }).then((t) => t.id);
+  const exploreId = (await keep(have.exploreId)) ?? (await make("Explore the realm ✦", "The Great Toucan Spirit shows you around: Today, the calendar, your boards, Insights, your party and the Treasure Chest.", 15, 1));
+  const createId = (await keep(have.createId)) ?? (await make("Create your first quest ✦", "Make your first real quest with the Great Toucan Spirit, then tick this one off to claim its reward.", 25, 2));
+  revalidatePath("/");
+  return { exploreId, createId };
+}
+
+/** The portrait the account wears now (the walkthrough's character step shows it). */
+export async function tourAvatarAction(): Promise<string | null> {
+  const ownerId = await requireProfileId();
+  const { data } = await supabaseAdmin().from("profiles").select("avatar_image_url").eq("id", ownerId).maybeSingle();
+  return (data?.avatar_image_url as string | null | undefined) ?? null;
 }
 
 /** The newest quest made since the walkthrough asked for one (not its own practice quest). */
