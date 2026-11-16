@@ -48,7 +48,7 @@ export function DayView({
           const selected = isSameDay(day, date);
           const isToday = !!now && isSameDay(day, now);
           return (
-            <Link key={formatDateParam(day)} href={`/calendar?view=day&date=${formatDateParam(day)}`} className="flex flex-col items-center gap-1">
+            <Link key={formatDateParam(day)} prefetch={false} href={`/calendar?view=day&date=${formatDateParam(day)}`} className="flex flex-col items-center gap-1">
               <span
                 className="text-[11.5px]"
                 style={{

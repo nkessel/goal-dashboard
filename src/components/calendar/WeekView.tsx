@@ -1281,8 +1281,11 @@ export function WeekView({
         {days.map((day, i) => {
           const isToday = !!now && isSameDay(day, now);
           return (
+            // prefetch off: a link to this same screen with other search words makes Next fetch it again and
+            // again for as long as it shows (hundreds of requests a second, found Nov 16).
             <Link
               key={day.toISOString()}
+              prefetch={false}
               href={`/calendar?view=day&date=${formatDateParam(day)}`}
               draggable={false}
               onPointerDown={startDayScroll}

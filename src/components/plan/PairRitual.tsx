@@ -192,7 +192,7 @@ export function PairRitual(props: {
             ← Calendar
           </Link>
           <span className="flex-1" />
-          <Link href="/plan" className="rounded-full px-3 py-1.5 text-[13px] font-semibold" style={{ background: "rgba(20,14,30,.45)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.4)" }}>
+          <Link prefetch={false} href="/plan" className="rounded-full px-3 py-1.5 text-[13px] font-semibold" style={{ background: "rgba(20,14,30,.45)", color: "#f6ecd2", border: "1px solid rgba(242,210,126,.4)" }}>
             My weekly ritual →
           </Link>
         </div>

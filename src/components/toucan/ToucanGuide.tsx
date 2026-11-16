@@ -922,7 +922,7 @@ function NudgeNote({ text, actions, onClose, instant = false }: { text: string; 
         }
       }}
     >
-      <button type="button" data-bird onClick={() => (movedLast.current ? undefined : acted.current ? talkToToucan() : setQuiet(false))} aria-label={quiet ? "The toucan: show what he said" : "The toucan"} className={`${instant ? "" : "nudge-bird"} shrink-0 cursor-pointer`} style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,.45))" }}>
+      <button type="button" data-bird onClick={() => (movedLast.current ? undefined : acted.current ? talkToToucan() : setQuiet(false))} aria-label={quiet ? "The toucan: show what he said" : "The toucan"} className={`${instant ? "" : "nudge-bird"} nudge-shadow shrink-0 cursor-pointer`}>
         <ToucanArt size={58} />
       </button>
       <div

@@ -17,6 +17,20 @@ const BILLS: Record<string, string[]> = {
 };
 
 /**
+ * One sheet of the drawing. He is drawn on several stacked sheets (same size, same viewBox) so that each
+ * part that moves all day (the aura's pulse, the turning halo, the twinkling stars, the pendant's glow, the
+ * motes) is a whole sheet: the browser can then move or fade it on the graphics card. Animated shapes
+ * *inside* one SVG are redrawn by the page itself on every frame, which kept every screen busy while idle.
+ */
+function Sheet({ size, className, style, children }: { size: number; className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
+  return (
+    <svg viewBox="0 0 52 56" width={size} height={(size * 56) / 52} aria-hidden className={className} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", ...style }}>
+      {children}
+    </svg>
+  );
+}
+
+/**
  * The great toucan spirit, drawn in SVG: midnight plumage with an iridescent
  * sheen, gold-edged wings, a sunrise bill traced with filigree, a gentle
  * amber eye and a small smile, sage's brow plumes, a crown of light, a slowly
@@ -33,7 +47,8 @@ export function ToucanArt({ equipped = {}, flying = false, size = 52 }: { equipp
   const hatHidesPlumes = head === "wizard";
 
   return (
-    <svg viewBox="0 0 52 56" width={size} height={(size * 56) / 52} aria-hidden className="toucan-spirit" style={{ overflow: "visible" }}>
+    <span aria-hidden className="toucan-spirit" style={{ width: size, height: (size * 56) / 52, ["--tk" as string]: size / 52 }}>
+      <Sheet size={size} className="toucan-aura">
       <defs>
         <radialGradient id={id("aura")} cx=".5" cy=".5" r=".5">
           <stop offset="0" stopColor={aura[0]} stopOpacity=".6" />
@@ -89,15 +104,17 @@ export function ToucanArt({ equipped = {}, flying = false, size = 52 }: { equipp
 
       {/* aura */}
       <circle className="toucan-aura" cx="26" cy="20" r="40" fill={url("aura")} />
+      </Sheet>
       {equipped.aura === "aura-cosmic" && (
-        <g className="toucan-stars">
+        <Sheet size={size} className="toucan-stars">
           {[[-8, 6, "#ffb3c7"], [52, 2, "#b3e5ff"], [-4, 40, "#c9ffb3"], [56, 40, "#ffe6a3"], [6, -20, "#e0c7ff"], [44, -24, "#ffd1a3"], [62, 20, "#a3fff0"], [-14, 22, "#fff"]].map(([x, y, c], i) => (
             <path key={i} d={`M${x} ${Number(y) - 2}l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z`} fill={String(c)} />
           ))}
-        </g>
+        </Sheet>
       )}
       {/* rune halo */}
-      <g className="toucan-halo" opacity=".85">
+      <Sheet size={size} className="toucan-halo">
+      <g opacity=".85">
         <circle cx="22" cy="12" r="19" fill="none" stroke="#f2d27e" strokeWidth=".7" strokeDasharray="2 2.6" opacity=".7" />
         <circle cx="22" cy="12" r="21.5" fill="none" stroke={aura[1]} strokeWidth=".45" opacity=".6" />
         <g fill="none" stroke="#fff1b8" strokeWidth=".8" strokeLinecap="round" strokeLinejoin="round" filter={url("glow")}>
@@ -110,7 +127,9 @@ export function ToucanArt({ equipped = {}, flying = false, size = 52 }: { equipp
           <path d="M7.5 27l1.5 2.4 1.5-2.4" />
         </g>
       </g>
+      </Sheet>
 
+      <Sheet size={size}>
       {/* ethereal tail (streams out behind in flight) */}
       <g transform={flying ? "rotate(28 18 40)" : undefined}>
         <path d="M15 40c-4 8-4 16 0 24 2-8 4-14 8-19z" fill={url("wisp")} />
@@ -136,9 +155,11 @@ export function ToucanArt({ equipped = {}, flying = false, size = 52 }: { equipp
       <path d="M23 13c6 1 10 6 10 12 0 4-2 7-6 8-4-2-6-7-6-12 0-4 1-6 2-8z" fill={url("bib")} />
       <path d="M24.5 31.5q3.5 1.2 6-1.8" stroke="#d63a2a" strokeWidth="1.7" strokeLinecap="round" fill="none" />
 
+      </Sheet>
       {/* pendant */}
       {equipped.neck && (
-        <g className="toucan-amulet" filter={url("glow")}>
+        <Sheet size={size} className="toucan-amulet">
+        <g filter={url("glow")}>
           <path d="M24.6 19.4q2.9 2.4 5.8 0" stroke="#c99a2e" strokeWidth=".5" fill="none" />
           {equipped.neck === "gem" && (
             <>
@@ -160,8 +181,10 @@ export function ToucanArt({ equipped = {}, flying = false, size = 52 }: { equipp
           )}
           {equipped.neck === "heart" && <path d="M27.5 26.6c-2.6-1.8-3.4-3.2-3.4-4.3a1.7 1.7 0 0 1 3.4-.6 1.7 1.7 0 0 1 3.4.6c0 1.1-.8 2.5-3.4 4.3z" fill="#ff7a8a" stroke="#ffd6a0" strokeWidth=".5" />}
         </g>
+        </Sheet>
       )}
 
+      <Sheet size={size}>
       {flying ? (
         /* near wing, spread and beating */
         <g className="tc-wing-near">
@@ -183,13 +206,22 @@ export function ToucanArt({ equipped = {}, flying = false, size = 52 }: { equipp
           <path d="M19 6c-2-6-1-11 2-15-1 5 0 10 1 15z" fill={url("plume")} />
           <path d="M16 7c-4-4-5-9-4-14 1 5 3 9 6 13z" fill={url("plume")} opacity=".85" />
           <path d="M22 6c1-5 4-9 8-11-3 4-4 8-5 12z" fill={url("plume")} opacity=".85" />
-          <g className="toucan-stars" fill="#fff6c8" filter={url("glow")}>
+        </>
+      )}
+      </Sheet>
+      {!hatHidesPlumes && (
+        <>
+          <Sheet size={size} className="toucan-stars">
+          <g fill="#fff6c8" filter={url("glow")}>
             <path d="M21 -11.5l.8-2.3.8 2.3 2.3.8-2.3.8-.8 2.3-.8-2.3-2.3-.8z" />
             <path d="M11.8 -8l.5-1.4.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5z" />
             <path d="M30.6 -6.4l.5-1.4.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5z" />
           </g>
+          </Sheet>
         </>
       )}
+
+      <Sheet size={size}>
 
       {/* headwear */}
       {head === "hibiscus" && (
@@ -280,11 +312,13 @@ export function ToucanArt({ equipped = {}, flying = false, size = 52 }: { equipp
         <path d="M19 43v3.4M21.6 43v3.6M24.2 43v3.4" stroke="#20304a" strokeWidth="1.4" strokeLinecap="round" />
       )}
 
+      </Sheet>
+
       {/* motes */}
-      <circle className="toucan-mote" cx="-2" cy="28" r="1.2" fill="#c9fff3" style={{ animationDelay: "0s" }} />
-      <circle className="toucan-mote" cx="50" cy="34" r="1" fill="#fff1b8" style={{ animationDelay: "0.75s" }} />
-      <circle className="toucan-mote" cx="44" cy="-14" r="1.1" fill="#c9fff3" style={{ animationDelay: "1.5s" }} />
-      <circle className="toucan-mote" cx="-6" cy="0" r=".9" fill="#fff1b8" style={{ animationDelay: "2.25s" }} />
-    </svg>
+      <Sheet size={size} className="toucan-mote" style={{ animationDelay: "0s" }}><circle cx="-2" cy="28" r="1.2" fill="#c9fff3" /></Sheet>
+      <Sheet size={size} className="toucan-mote" style={{ animationDelay: "0.75s" }}><circle cx="50" cy="34" r="1" fill="#fff1b8" /></Sheet>
+      <Sheet size={size} className="toucan-mote" style={{ animationDelay: "1.5s" }}><circle cx="44" cy="-14" r="1.1" fill="#c9fff3" /></Sheet>
+      <Sheet size={size} className="toucan-mote" style={{ animationDelay: "2.25s" }}><circle cx="-6" cy="0" r=".9" fill="#fff1b8" /></Sheet>
+    </span>
   );
 }
