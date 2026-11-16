@@ -1,5 +1,6 @@
 "use server";
 
+import { LESSON_DEFAULT, cleanLessons, type LessonButton, type LessonStore } from "@/lib/lessons";
 import { isTentativeTitle } from "@/lib/tentative";
 import { revalidatePath } from "next/cache";
 import { auth, signIn, CALENDAR_AUTH_PARAMS } from "@/auth";
@@ -5238,27 +5239,6 @@ export async function tourCompletePracticeAction(taskId: string) {
 // Complete lesson: a button on a habit that pays XP and coins each time a lesson is done
 // (owner, Nov 16: "a complete lesson button that gives an XP celebration… with editable XP and coin values")
 
-export type LessonButton = { on: boolean; xp: number; coins: number };
-type LessonStore = { buttons: Record<string, LessonButton>; days: Record<string, Record<string, number>> };
-const LESSON_DEFAULT = { xp: 10, coins: 1 };
-function cleanLessons(raw: unknown): LessonStore {
-  const r = (raw && typeof raw === "object" ? raw : {}) as { buttons?: unknown; days?: unknown };
-  const num = (v: unknown, d: number, max: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(max, Math.round(v))) : d);
-  const buttons: Record<string, LessonButton> = {};
-  for (const [k, v] of Object.entries((r.buttons && typeof r.buttons === "object" ? r.buttons : {}) as Record<string, unknown>)) {
-    if (!QUEST_ID.test(k) || !v || typeof v !== "object") continue;
-    const b = v as Record<string, unknown>;
-    buttons[k] = { on: b.on !== false, xp: num(b.xp, LESSON_DEFAULT.xp, 500), coins: num(b.coins, LESSON_DEFAULT.coins, 100) };
-  }
-  const days: LessonStore["days"] = {};
-  for (const [d, v] of Object.entries((r.days && typeof r.days === "object" ? r.days : {}) as Record<string, unknown>)) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !v || typeof v !== "object") continue;
-    const row: Record<string, number> = {};
-    for (const [k, n] of Object.entries(v as Record<string, unknown>)) if (QUEST_ID.test(k) && num(n, 0, 99) > 0) row[k] = num(n, 0, 99);
-    if (Object.keys(row).length) days[d] = row;
-  }
-  return { buttons, days };
-}
 async function saveLessons(ownerId: string, extras: Record<string, unknown>, store: LessonStore) {
   // The last 90 days of counts are enough for the card.
   const days = Object.fromEntries(Object.entries(store.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 90));

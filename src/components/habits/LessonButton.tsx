@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useSyncExternalStore, useTransition } from "react";
-import { completeLessonAction, lessonsAction, saveLessonButtonAction, undoLessonAction, type LessonButton as Config } from "@/app/actions";
+import { completeLessonAction, lessonsAction, saveLessonButtonAction, undoLessonAction } from "@/app/actions";
+import type { LessonButton as Config } from "@/lib/lessons";
 import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 import { Fold } from "@/components/ui/Fold";
 import { InlineNumber } from "@/components/ui/InlineNumber";
@@ -16,17 +17,31 @@ const set = (next: Partial<State>) => {
   state = { ...state, ...next };
   subs.forEach((f) => f());
 };
-function useLessons(day: string) {
+const seeds = new WeakMap<object, State>();
+function seeded(seed?: { buttons: State["buttons"]; today: State["today"] } | null): State {
+  if (!seed) return EMPTY;
+  let s = seeds.get(seed);
+  if (!s) seeds.set(seed, (s = { buttons: seed.buttons, today: seed.today, loaded: true }));
+  return s;
+}
+/** The store as it stands, started from what the page sent the first time it's read. */
+function current(seed?: { buttons: State["buttons"]; today: State["today"] } | null): State {
+  if (seed && !state.loaded) state = seeded(seed);
+  return state;
+}
+/** What the page already knows (sent with Today), so the button is there from the first paint. */
+export type LessonSeed = { buttons: Record<string, Config>; today: Record<string, number> };
+function useLessons(day: string, seed?: LessonSeed | null) {
   return useSyncExternalStore(
     (cb) => {
       subs.add(cb);
-      loading ??= lessonsAction(day)
+      if (!state.loaded) loading ??= lessonsAction(day)
         .then((r) => set({ buttons: { ...r.buttons, ...state.buttons }, today: { ...r.today, ...state.today }, loaded: true }))
         .catch(() => set({ loaded: true }));
       return () => subs.delete(cb);
     },
-    () => state,
-    () => EMPTY
+    () => current(seed),
+    () => seeded(seed)
   );
 }
 
@@ -35,8 +50,8 @@ const DEFAULT: Config = { on: true, xp: 10, coins: 1 };
 const COURSE = /\b(course|class|lesson|lecture|coursework|module|study|studying)\b/i;
 
 /** Is the button showing on this habit, and can it be turned on or off (from the habit's menu)? */
-export function useLessonButton(habit: { id: string; title: string }, day: string) {
-  const s = useLessons(day);
+export function useLessonButton(habit: { id: string; title: string }, day: string, seed?: LessonSeed | null) {
+  const s = useLessons(day, seed);
   const cfg = s.buttons[habit.id];
   const on = s.loaded && (cfg ? cfg.on : COURSE.test(habit.title));
   const toggle = () => {
@@ -60,9 +75,9 @@ function BookIcon() {
  * "Complete lesson" under a habit (owner, Nov 16): each press pays the lesson's XP and coins with the small
  * celebration, as many times a day as you finish one. The pencil beside it changes what a lesson pays.
  */
-export function LessonButton({ habit, day }: { habit: { id: string; title: string }; day: string }) {
-  const s = useLessons(day);
-  const { on } = useLessonButton(habit, day);
+export function LessonButton({ habit, day, seed, dark = false }: { habit: { id: string; title: string }; day: string; seed?: LessonSeed | null; /** On a dark tray. */ dark?: boolean }) {
+  const s = useLessons(day, seed);
+  const { on } = useLessonButton(habit, day, seed);
   const cfg = { ...DEFAULT, ...s.buttons[habit.id] };
   const count = s.today[habit.id] ?? 0;
   const [editing, setEditing] = useState(false);
@@ -70,7 +85,8 @@ export function LessonButton({ habit, day }: { habit: { id: string; title: strin
   const [error, setError] = useState<string | null>(null);
   const [busy, start] = useTransition();
   if (!on) return null;
-  const soft = { color: "var(--t-ink-soft)" };
+  // It sits on the habit tray (dark in the adventure look), so its quiet words take the tray's ink.
+  const soft = { color: dark ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: dark ? 0.85 : 1 };
   const stop = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation() };
 
   const save = (patch: Partial<Config>) => {
@@ -102,16 +118,16 @@ export function LessonButton({ habit, day }: { habit: { id: string; title: strin
     });
 
   return (
-    <div data-lesson-button className="due-in ml-11 mt-1 flex flex-col gap-1" {...stop}>
+    <div data-lesson-button className="ml-11 mt-1 flex flex-col gap-1" {...stop}>
       <div className="flex flex-wrap items-center gap-1.5">
-        <button type="button" onClick={complete} disabled={busy} className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold disabled:opacity-60" style={{ background: "rgba(201,162,74,.18)", border: "1px solid rgba(160,120,40,.55)", color: "#5a3f0c" }}>
+        <button type="button" onClick={complete} disabled={busy} className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold disabled:opacity-60" style={{ background: "linear-gradient(180deg, #f6e9c4, #ead7a4)", border: "1px solid #a07828", color: "#4a3408", boxShadow: "0 1px 0 rgba(255,255,255,.5) inset" }}>
           <BookIcon />
           Complete lesson
           <span className="font-normal tabular-nums" style={{ color: "#7a5a1c" }}>
             +{cfg.xp} XP{cfg.coins > 0 ? ` · ${cfg.coins} ${cfg.coins === 1 ? "coin" : "coins"}` : ""}
           </span>
         </button>
-        <button type="button" onClick={() => setEditing((e) => !e)} aria-expanded={editing} aria-label="Change what a lesson pays" title="Change what a lesson pays" className="flex h-6 w-6 items-center justify-center rounded-full text-[13px]" style={{ color: "#8a6116", background: editing ? "rgba(217,180,95,.3)" : undefined }}>
+        <button type="button" onClick={() => setEditing((e) => !e)} aria-expanded={editing} aria-label="Change what a lesson pays" title="Change what a lesson pays" className="flex h-6 w-6 items-center justify-center rounded-full text-[13px]" style={{ color: "#d9b45f", background: editing ? "rgba(217,180,95,.25)" : undefined }}>
           ✎
         </button>
         {count > 0 && (
@@ -126,7 +142,7 @@ export function LessonButton({ habit, day }: { habit: { id: string; title: strin
         )}
       </div>
       <Fold open={editing}>
-        <div className="qe-fact-panel flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl px-3 py-2 text-[13.5px]" style={{ color: "var(--t-ink)" }}>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl px-3 py-2 text-[13.5px]" style={{ color: "#3a2a0c", background: "linear-gradient(180deg, #f6e9c4, #ead7a4)", border: "1px solid #a07828" }}>
           <span className="flex items-center gap-1.5">
             Each lesson pays
             <InlineNumber value={cfg.xp} onChange={(n) => save({ xp: n })} min={0} max={500} suffix=" XP" label="XP for a lesson" className="font-semibold" />
@@ -135,7 +151,7 @@ export function LessonButton({ habit, day }: { habit: { id: string; title: strin
             and
             <InlineNumber value={cfg.coins} onChange={(n) => save({ coins: n })} min={0} max={100} suffix={cfg.coins === 1 ? " coin" : " coins"} label="Coins for a lesson" className="font-semibold" />
           </span>
-          <span className="text-[12.5px]" style={soft}>
+          <span className="text-[12.5px]" style={{ color: "#7a5a1c" }}>
             tap a number to change it
           </span>
         </div>

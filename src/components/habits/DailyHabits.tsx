@@ -22,7 +22,7 @@ import { fromFeedback } from "@/lib/from-feedback";
 import { defaultCleaning, normalizeCleaning, todaysPicks } from "@/lib/cleaning";
 import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
 import { LanguagePractice, openLanguageWindow } from "@/components/xp/LearnLanguage";
-import { LessonButton, LessonMenuItem } from "./LessonButton";
+import { LessonButton, LessonMenuItem, type LessonSeed } from "./LessonButton";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { Fold } from "@/components/ui/Fold";
 
@@ -46,7 +46,10 @@ export function DailyHabits({
   planned = [],
   core = [],
   bare = false,
+  lessons = null,
 }: {
+  /** Complete lesson buttons and today's counts, so they show from the first paint. */
+  lessons?: LessonSeed | null;
   /** Habits in today's plan (core ones and the ones picked for today): they sit in Today's Quests, not here. */
   planned?: string[];
   /** Core habits: a gold star, and they always come up in the day's plan. */
@@ -845,7 +848,7 @@ export function DailyHabits({
                 </div>
                 </SwipeReveal>
                 {/learn(ing)? (a )?language|language practice/i.test(h.title) && <LanguagePractice />}
-                {day && <LessonButton habit={h} day={day} />}
+                {day && <LessonButton habit={h} day={day} seed={lessons} dark={isAdventure} />}
                 {listenHref && !d && LISTEN_HABIT.test(h.title) && (
                   <a href={listenHref} onPointerDown={(e) => e.stopPropagation()} className="due-in ml-11 mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold no-underline" style={{ background: "rgba(201,162,74,.14)", border: "1px solid rgba(160,120,40,.45)", color: "#6b4c12" }}>
                     <span aria-hidden>🎧</span> Something to listen to

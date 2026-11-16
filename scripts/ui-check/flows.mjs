@@ -522,8 +522,7 @@ export const FLOWS = [
       if (await h.tap((p) => p.locator("[data-lesson-button] button", { hasText: /complete lesson/i }).first(), "lesson: complete", { optional: true })) {
         await h.settle(1200);
         await h.check("lesson complete celebration");
-        await h.page.keyboard.press("Escape").catch(() => {});
-        await h.tap((p) => p.getByRole("button", { name: /continue|claim|done/i }).first(), "lesson: close celebration", { optional: true });
+        await h.tap((p) => p.getByRole("button", { name: /^close$/i }).first(), "lesson: close celebration", { optional: true });
         await h.settle(600);
         await h.check("lesson button: counted today");
       }
