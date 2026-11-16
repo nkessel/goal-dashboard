@@ -127,7 +127,7 @@ export function LevelScales({ items, renderRow }: { items: ScaleItem[]; renderRo
     <div className="relative flex flex-col gap-1.5">
       <StyleToggle style={style} />
       {style === "bars" ? (
-        {/* Tops line up: a name that wraps to two lines grows downward, it never lifts its bar (owner, Nov 16). */}
+        // Tops line up: a name that wraps to two lines grows downward, it never lifts its bar (owner, Nov 16).
         <div className="flex items-start justify-around gap-2 pt-1">
           {items.map((it) => (
             <LevelBar key={it.key} item={it} />
