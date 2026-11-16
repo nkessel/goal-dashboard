@@ -916,6 +916,10 @@ html[data-evening] [data-theme="adventure"] {
     evening-sparkle var(--tw-dur, 6s) ease-in-out var(--tw-delay, 0s) infinite,
     evening-sparkle-shimmer 5s ease-in-out var(--sh-delay, 0s) infinite;
 }
+.evening-sky[data-unseen] .evening-star,
+.evening-sky[data-unseen] .evening-sparkle {
+  animation-play-state: paused;
+}
 /* A wave of light passing over the stars: each one flares as it goes by. */
 /* (transform only: animating shadows and filters on every star repainted the card each frame) */
 @keyframes evening-star-shimmer {

@@ -47,9 +47,20 @@ const SPARKLES = [
   { left: 95, top: 64, size: 7, delay: -0.2, duration: 6.8 },
 ];
 
+/**
+ * The stars only move while the sky is on screen. Their 60 animations are worked out
+ * on the page thread every frame (about half of it on a phone), even scrolled out of view.
+ */
+function watchSky(el: HTMLSpanElement | null) {
+  if (!el || typeof IntersectionObserver === "undefined") return;
+  const io = new IntersectionObserver(([e]) => el.toggleAttribute("data-unseen", !e.isIntersecting), { rootMargin: "80px" });
+  io.observe(el);
+  return () => io.disconnect();
+}
+
 function NightSky() {
   return (
-    <span aria-hidden className="evening-sky">
+    <span aria-hidden className="evening-sky" ref={watchSky}>
       {DUST.map((d, i) => (
         <span
           key={i}
