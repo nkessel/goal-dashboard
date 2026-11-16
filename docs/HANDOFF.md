@@ -31,10 +31,11 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - `review/prioritize-bars` (taller Prioritize bars): built Nov 14, not UI-checked or reviewed.
 - `review/walkthrough-v2` (the rebuilt walkthrough): built Nov 15, review page sent, waiting on his OK or notes.
 - `review/import-calendar` (import card A: a calendar time from Due, a landing line, no "To schedule" type): built Nov 16, review page sent.
+- `claude/project-thread-6rvbre` (cleaning XP: a cleaner meter pays its share of the space's worth; meters don't advance on their own): built Nov 16, review page sent.
 - Daily coursework as a habit: options A–D sent Nov 11.
 - Habits in the daily plan, part 2: not built yet (plan in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
-- The email to Daniel about his Champion title: needs his OK and wording.
+- The email to Daniel about his Champion title: only after the app has a domain email address (owner, Nov 15), then his OK and wording.
 - Waiting on his iPhone: a list of things cloud sessions can't check (in `docs/WAITING.md` and `docs/PRIORITIES.md`).
 - When weekly / monthly / yearly reviews are built: remind him of the lines he saved (in `docs/WAITING.md`).
 
