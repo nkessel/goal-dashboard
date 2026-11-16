@@ -3,7 +3,7 @@
 import { stepsComplete } from "@/lib/habit-steps";
 import { progressWords } from "@/lib/progress-words";
 import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -24,10 +24,12 @@ import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
 import { openLanguageWindow } from "@/components/xp/LearnLanguage";
 import { setHabitTicks, useHabitTicks } from "@/lib/use-habit-ticks";
 import type { HabitTicksSeed } from "@/lib/habit-ticks";
-import { setHabitManyAction, setHabitXpNowAction, tickHabitAgainAction, undoHabitTickAction } from "@/app/actions";
+import { setHabitXpNowAction, tickHabitAgainAction, undoHabitTickAction } from "@/app/actions";
 import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { Fold } from "@/components/ui/Fold";
+import { MenuArrange, MenuGear, MenuLabel } from "@/components/ui/MenuArrange";
+import { SnoozePicker } from "@/components/tasks/SnoozePicker";
 
 /**
  * Daily habits: small repeating quests on the day side (stored like evening
@@ -219,15 +221,20 @@ export function DailyHabits({
   const subsOf = (h: RiteView) => h.steps ?? [];
   const skipped = (id: string) => skipOverride[id] ?? skipSet.has(`${id}|${day}`);
   const dueToday = ordered.filter((h) => dueOn(h, weekday));
-  // Snoozed until tomorrow (kept in this browser).
+  // Snoozed (kept in this browser): for the day (its day key), or until a time ("u:<ms>").
   const [snoozed, setSnoozed] = useState<Record<string, string>>({});
+  const nowMinute = useMinute();
+  // Snooze asks how long (owner, Nov 16: "1hr, until tomorrow, other"): the quests' small picker, by the habit's card.
+  const [snoozeFor, setSnoozeFor] = useState<{ h: RiteView; anchor: { top: number; bottom: number; left: number; right: number } } | null>(null);
+  // The ⋯ menu's gear: its items as rows to drag, rename and hide.
+  const [arrangingMenu, setArrangingMenu] = useState(false);
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- only readable after hydration
       setSnoozed(JSON.parse(localStorage.getItem(SNOOZE_KEY) || "{}"));
     } catch {}
   }, []);
-  const isSnoozed = (id: string) => !!day && snoozed[id] === day;
+  const isSnoozed = (id: string) => !!day && (snoozed[id] === day || (!!snoozed[id]?.startsWith("u:") && Number(snoozed[id].slice(2)) > nowMinute * 60_000));
   /** A tap on a habit's card: its sub-habits, the mess check-in, the phrase tool, or else its editor (⋯ and right-click edit any habit). */
   function cardTap(h: RiteView) {
     if (h.id === cleanId && cleaning) return setCleanOpen((v) => !v);
@@ -243,11 +250,13 @@ export function DailyHabits({
     setEditing(h);
   }
 
-  function snooze(h: RiteView, on: boolean) {
+  function snooze(h: RiteView, on: boolean, until?: Date) {
     if (!day) return;
     setMenuFor(null);
-    const next = { ...Object.fromEntries(Object.entries(snoozed).filter(([, d]) => d === day)) };
-    if (on) next[h.id] = day;
+    setSnoozeFor(null);
+    const now = nowMinute * 60_000;
+    const next = { ...Object.fromEntries(Object.entries(snoozed).filter(([, d]) => d === day || (d.startsWith("u:") && Number(d.slice(2)) > now))) };
+    if (on) next[h.id] = until ? `u:${until.getTime()}` : day;
     else delete next[h.id];
     setSnoozed(next);
     try {
@@ -357,11 +366,6 @@ export function DailyHabits({
       barCaption: times > 1 ? `${times} times today` : "First one today",
       onXp: (n) => void setHabitXpNowAction(h.id, day, n).catch(() => setError("Couldn't change the XP.")),
     });
-  }
-  function toggleMany(h: RiteView) {
-    const on = !isMany(h.id);
-    setHabitTicks({ many: on ? [...ticks.many, h.id] : ticks.many.filter((id) => id !== h.id) });
-    void setHabitManyAction(h.id, on).catch(() => setError("Couldn't save that."));
   }
   function tickAgain(h: RiteView) {
     if (!day) return;
@@ -690,26 +694,29 @@ export function DailyHabits({
                         </>
                       )}
                       {/* Something to listen to, in the title's line like the cleaning area (owner, Nov 16). */}
-                      {listenHref && !d && LISTEN_HABIT.test(h.title) && " "}
                       {listenHref && !d && LISTEN_HABIT.test(h.title) && (
-                        <span
-                          role="link"
-                          tabIndex={0}
-                          data-listen-link
-                          title="Something to listen to"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => (e.stopPropagation(), window.location.assign(listenHref))}
-                          onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), window.location.assign(listenHref))}
-                          className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap align-baseline text-[14px] md:ml-2.5 font-semibold underline-offset-2 hover:underline"
-                          style={{ color: "#7a5410" }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
-                            <rect x="3" y="14" width="4.5" height="6.5" rx="1.6" />
-                            <rect x="16.5" y="14" width="4.5" height="6.5" rx="1.6" />
-                          </svg>
-                          Listen
-                        </span>
+                        <>
+                          {/* A no-break space, so the icon never drops to a line of its own. */}
+                          {"\u00A0"}
+                          <span
+                            role="link"
+                            tabIndex={0}
+                            data-listen-link
+                            aria-label="Something to listen to"
+                            title="Something to listen to"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => (e.stopPropagation(), window.location.assign(listenHref))}
+                            onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), window.location.assign(listenHref))}
+                            className="-my-1.5 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full align-middle hover:bg-black/[.06] md:ml-1"
+                            style={{ color: "#7a5410" }}
+                          >
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+                              <rect x="3" y="14" width="4.5" height="6.5" rx="1.6" />
+                              <rect x="16.5" y="14" width="4.5" height="6.5" rx="1.6" />
+                            </svg>
+                          </span>
+                        </>
                       )}
                     </span>
                     {/* How long it takes sits by the XP (owner, Nov 2); this line only when there's a time of day or a note. */}
@@ -768,6 +775,7 @@ export function DailyHabits({
                         // Near the bottom of the screen the menu opens upward so it isn't cut off.
                         const r = e.currentTarget.getBoundingClientRect();
                         placeMenu(r);
+                        setArrangingMenu(false);
                         setMenuFor(menuFor === h.id ? null : h.id);
                       }}
                       data-habit-menu
@@ -780,7 +788,11 @@ export function DailyHabits({
                     </button>
                   )}
                   {menuFor === h.id && (
-                    <div data-habit-menu data-menu="habit" role="menu" className={`card-pop-in absolute right-2 z-30 flex flex-col overflow-y-auto overflow-x-hidden rounded-xl parchment ${menuUp ? "bottom-full mb-1" : "top-full mt-1"}`} style={{ maxHeight: menuMax, borderRadius: 12, minWidth: 190 }}>
+                    <div data-habit-menu data-menu="habit" role="menu" className={`card-pop-in absolute right-2 z-30 flex flex-col overflow-y-auto overflow-x-hidden rounded-xl parchment ${menuUp ? "bottom-full mb-1" : "top-full mt-1"}`} style={{ maxHeight: menuMax, borderRadius: 12, minWidth: arrangingMenu ? 250 : 210 }}>
+                      <MenuGear on={arrangingMenu} onToggle={() => setArrangingMenu((v) => !v)} />
+                      {arrangingMenu ? (
+                        <MenuArrange menu="habit" states={{ core: { state: isCore(h.id) ? "on" : "off", label: isCore(h.id) ? "Not a core habit" : "Make it a core habit" } }} />
+                      ) : (<>
                       <button
                         type="button"
                         role="menuitem"
@@ -791,7 +803,7 @@ export function DailyHabits({
                         }}
                         className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5"
                       >
-                        <span aria-hidden className="w-[18px] text-center">✎</span> Edit habit
+                        <span aria-hidden className="w-[18px] text-center">✎</span> <MenuLabel menu="habit" k="edit">Edit habit</MenuLabel>
                       </button>
                       {d && day && <DoneTime riteId={h.id} day={day} onDone={() => setMenuFor(null)} />}
                       <button
@@ -809,7 +821,7 @@ export function DailyHabits({
                         <span aria-hidden className="flex w-[18px] justify-center">
                           <span className="flex h-4 w-4 items-center justify-center rounded-full text-[11px] leading-none" style={{ border: "1.5px solid #8a6c2c" }}>+</span>
                         </span>
-                        Add a sub-habit
+                        <MenuLabel menu="habit" k="sub">Add a sub-habit</MenuLabel>
                       </button>
                       <button
                         role="menuitem"
@@ -822,7 +834,7 @@ export function DailyHabits({
                         }}
                         className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5"
                       >
-                        <FocusGlyph /> Focus mode
+                        <FocusGlyph /> <MenuLabel menu="habit" k="focus">Focus mode</MenuLabel>
                         {h.estimate_minutes ? (
                           <span className="ml-auto text-[13px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
                             {h.estimate_minutes}m
@@ -840,27 +852,30 @@ export function DailyHabits({
                         <span aria-hidden className="w-[18px] text-center" style={{ color: "#b8860b" }}>
                           {isCore(h.id) ? "☆" : "★"}
                         </span>
-                        {isCore(h.id) ? "Not a core habit" : "Make it a core habit"}
+                        <MenuLabel menu="habit" k={isCore(h.id) ? "core:on" : "core:off"}>{isCore(h.id) ? "Not a core habit" : "Make it a core habit"}</MenuLabel>
                       </button>
                       {isMany(h.id) && d && (
                         <button type="button" role="menuitem" data-mi="undo-tick" onClick={() => (setMenuFor(null), undoTick(h))} className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5" style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}>
                           <span aria-hidden className="w-[18px] text-center">↶</span>
-                          Undo the last one
+                          <MenuLabel menu="habit" k="undo-tick">Undo the last one</MenuLabel>
                         </button>
                       )}
-                      <button type="button" role="menuitem" data-mi="many" onClick={() => (setMenuFor(null), toggleMany(h))} className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5" style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}>
-                        <span aria-hidden className="w-[18px] text-center text-[13px] font-bold">×N</span>
-                        {isMany(h.id) ? "Once a day is enough" : "Count every time I do it"}
-                      </button>
                       {/* No "Skip today": Snooze does the same (owner, Nov 2). */}
                       <button
                         type="button"
-                        onClick={() => snooze(h, true)}
+                        role="menuitem"
+                        data-mi="snooze"
+                        onClick={(e) => {
+                          const r = (e.currentTarget.closest("[data-habit-card]") ?? e.currentTarget).getBoundingClientRect();
+                          setMenuFor(null);
+                          setSnoozeFor({ h, anchor: { top: r.top, bottom: r.bottom, left: r.left, right: r.right } });
+                        }}
                         className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5"
                         style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}
                       >
-                        <span className="flex items-center gap-2"><SnoozeIcon /> Snooze until tomorrow</span>
+                        <span className="flex items-center gap-2"><SnoozeIcon /> <MenuLabel menu="habit" k="snooze">Snooze</MenuLabel></span>
                       </button>
+                      </>)}
                     </div>
                   )}
                   {confirmSkip === h.id && (
@@ -982,7 +997,7 @@ export function DailyHabits({
               {snoozedToday.map((h, i) => (
                 <span key={h.id}>
                   {i > 0 && " · "}
-                  {h.title} snoozed until tomorrow{" "}
+                  {h.title} snoozed {snoozedWords(snoozed[h.id])}{" "}
                   <button type="button" onClick={() => snooze(h, false)} className="underline">
                     undo
                   </button>
@@ -1052,6 +1067,7 @@ export function DailyHabits({
         </div>
       </div>
 
+      {snoozeFor && <SnoozePicker title={snoozeFor.h.title} anchor={snoozeFor.anchor} tomorrowHint="back tomorrow" onClose={() => setSnoozeFor(null)} onPick={(c) => ("tomorrow" in c ? snooze(snoozeFor.h, true) : snooze(snoozeFor.h, true, c.until))} />}
       {editing && (
         <RiteEditorDialog
           rite={editing === "new" ? undefined : editing}
@@ -1135,6 +1151,26 @@ function FocusGlyph() {
 type HabitMark = "seedling" | "check" | "sun" | "leaf" | "plus";
 const MARK_KEY = "habits-header-mark";
 const SNOOZE_KEY = "habit-snooze";
+
+/** The current minute, ticking (0 on the server), so a habit snoozed for an hour comes back by itself. */
+function useMinute() {
+  return useSyncExternalStore(
+    (cb) => {
+      const id = setInterval(cb, 30_000);
+      return () => clearInterval(id);
+    },
+    () => Math.floor(Date.now() / 60_000),
+    () => 0
+  );
+}
+
+/** "until tomorrow", "until 4:15 PM", or "until Wed" for a longer snooze. */
+function snoozedWords(v: string | undefined): string {
+  if (!v?.startsWith("u:")) return "until tomorrow";
+  const d = new Date(Number(v.slice(2)));
+  const sameDay = d.toDateString() === new Date().toDateString();
+  return `until ${sameDay ? d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`;
+}
 
 /** When a habit not up today comes next: "Every year · next Mar 3" or "Mondays, Thursdays". */
 function nextLabel(h: RiteView, day: string | null) {

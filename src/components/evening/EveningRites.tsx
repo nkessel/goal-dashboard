@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuLabel } from "@/components/ui/MenuArrange";
 import { stepsComplete } from "@/lib/habit-steps";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { progressWords } from "@/lib/progress-words";
@@ -538,7 +539,7 @@ export function EveningRites({
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                Edit
+                <MenuLabel menu="rite" k="edit">Edit</MenuLabel>
               </button>
             )}
             {!special && !done && r.xp_value > 0 && (
@@ -554,12 +555,12 @@ export function EveningRites({
                 style={{ borderColor: "rgba(139,112,64,.3)" }}
               >
                 <span aria-hidden className="w-4 text-center">◐</span>
-                Done in part…
+                <MenuLabel menu="rite" k="part">Done in part…</MenuLabel>
               </button>
             )}
             <button type="button" role="menuitem" data-mi="skip" onClick={() => setAwayFor(r.id, "skip")} className="relative z-[1] flex min-h-11 items-center gap-2.5 border-t px-4 text-left text-[15px] hover:bg-black/5" style={{ borderColor: "rgba(139,112,64,.3)" }}>
               <span aria-hidden className="w-4 text-center">⤼</span>
-              Skip tonight
+              <MenuLabel menu="rite" k="skip">Skip tonight</MenuLabel>
             </button>
             {!special && (
               <button
@@ -574,7 +575,7 @@ export function EveningRites({
                 style={{ borderColor: "rgba(139,112,64,.3)", color: "var(--t-warn)" }}
               >
                 <TrashGlyph />
-                Delete
+                <MenuLabel menu="rite" k="delete">Delete</MenuLabel>
               </button>
             )}
           </div>

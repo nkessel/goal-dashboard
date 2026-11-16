@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuLabel } from "@/components/ui/MenuArrange";
 import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeRiteAction, deleteCheckNoteAction, logSlipAction, saveStreaksAction } from "@/app/actions";
@@ -143,10 +144,10 @@ export function Streaks({ initial, notes: initialNotes, habits = [] }: { initial
                 {menu === def.id && (
                   <div role="menu" data-menu="streak" className="card-pop-in absolute right-2 top-10 z-10 flex min-w-[170px] flex-col overflow-hidden rounded-xl parchment" style={{ borderRadius: 12 }}>
                     <button type="button" role="menuitem" data-mi="edit" onClick={() => (setMenu(null), setRenaming(def))} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5">
-                      ✎ Edit
+                      ✎ <MenuLabel menu="streak" k="edit">Edit</MenuLabel>
                     </button>
                     <button type="button" role="menuitem" data-mi="remove" onClick={() => (setMenu(null), persist(defs.filter((d) => d.id !== def.id)))} className="relative z-[1] min-h-11 px-4 text-left text-[15px] hover:bg-black/5" style={{ borderTop: "1px solid rgba(139,112,64,.2)", color: "#9a3b26" }}>
-                      Remove streak
+                      <MenuLabel menu="streak" k="remove">Remove streak</MenuLabel>
                     </button>
                   </div>
                 )}

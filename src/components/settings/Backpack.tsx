@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuLabel } from "@/components/ui/MenuArrange";
 import { GearIcon, CloseIcon } from "@/components/ui/Icons";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
@@ -676,7 +677,7 @@ function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest, onGone, onPa
         </button>
         <button type="button" role="menuitem" data-mi="quest" onClick={onQuest} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">＋</span>
-          Make it a quest
+          <MenuLabel menu="inventory" k="quest">Make it a quest</MenuLabel>
         </button>
         {!item.icon && onPaint && (
           <button type="button" role="menuitem" data-mi="paint" onClick={onPaint} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
@@ -686,11 +687,11 @@ function ItemMenu({ item, x, y, onClose, onEdit, onToggle, onQuest, onGone, onPa
         )}
         <button type="button" role="menuitem" data-mi="edit" onClick={onEdit} className={row} style={{ color: "var(--t-ink)", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">✎</span>
-          Edit
+          <MenuLabel menu="inventory" k="edit">Edit</MenuLabel>
         </button>
         <button type="button" role="menuitem" data-mi="gone" onClick={onGone} className={row} style={{ color: "#9a3b26", borderTop: "1px solid rgba(139,112,64,.2)" }}>
           <span aria-hidden className="w-5 text-center">✕</span>
-          Gone (take it out)
+          <MenuLabel menu="inventory" k="gone">Gone (take it out)</MenuLabel>
         </button>
       </div>
     </div>,

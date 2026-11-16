@@ -518,9 +518,32 @@ export const FLOWS = [
       await h.settle(300);
       await h.check("habit cards: listen link inline");
       if (await h.tap((p) => walk(p).getByRole("button", { name: /more for walk chester/i }), "habit menu", { optional: true, expectMove: true })) {
-        await h.check("habit menu: count every time");
-        await h.tap((p) => p.getByRole("menuitem", { name: /count every time/i }).first(), "count every time", { optional: true, expectMove: true });
-        await h.settle(300);
+        await h.check("habit menu");
+        // The menu's gear (owner, Nov 16): drag to reorder, tap a name to rename it, the eye hides.
+        if (await h.tap((p) => p.locator("[data-menu=habit] [data-menu-gear]").first(), "habit menu: gear", { optional: true, expectMove: true })) {
+          await h.settle(300);
+          await h.check("habit menu: arranging");
+          await h.tap((p) => p.locator("[data-menu=habit] [data-menu-gear]").first(), "habit menu: done arranging", { optional: true });
+          await h.settle(300);
+        }
+        // Snooze asks how long (owner, Nov 16): 1 hour, Tomorrow, Other…
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^snooze$/i }).first(), "habit menu: snooze", { optional: true, expectMove: true })) {
+          await h.settle(400);
+          await h.check("habit snooze: how long");
+          await h.tap((p) => p.getByRole("dialog", { name: /snooze until/i }).getByRole("button", { name: /^close$/i }).first(), "close snooze", { optional: true });
+          await h.settle(400);
+        }
+        // "Count every time I do it" lives in the habit's editor, under Repeats (owner, Nov 16).
+        await h.tap((p) => walk(p).getByRole("button", { name: /more for walk chester/i }), "habit menu for edit", { optional: true, expectMove: true });
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /edit habit/i }).first(), "edit habit", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.tap((p) => p.locator("[data-mi=pills] button").first(), "repeats pill (walk)", { optional: true, expectMove: true });
+          await h.tap((p) => p.locator("[data-habit-many] label").first(), "count every time", { optional: true });
+          await h.settle(300);
+          await h.check("habit editor: count every time");
+          await h.page.keyboard.press("Escape").catch(() => {});
+          await h.settle(500);
+        }
         const closeParty = async () => {
           await h.tap((p) => p.getByRole("button", { name: /^close$/i }).first(), "close celebration", { optional: true });
           await h.settle(500);

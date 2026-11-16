@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuLabel } from "@/components/ui/MenuArrange";
 import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { TaskWithBoard } from "@/lib/data/tasks";
@@ -1192,7 +1193,7 @@ function ContextMenu({
             className="relative z-[1] flex min-h-11 flex-col justify-center px-3.5 py-1.5 text-left hover:bg-black/5"
             style={{ color: r.a === "trash" ? "var(--t-warn)" : undefined }}
           >
-            <span className="text-[15px]">{r.label}</span>
+            <span className="text-[15px]"><MenuLabel menu="matrix" k={r.a}>{r.label}</MenuLabel></span>
             {r.hint && (
               <span className="text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
                 {r.hint}

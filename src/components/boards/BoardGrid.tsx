@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuLabel } from "@/components/ui/MenuArrange";
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -833,7 +834,7 @@ function BoardMenu({
           className="relative z-[1] min-h-10 px-3.5 text-left text-[14.5px] hover:bg-black/[.06]"
           style={{ color: "var(--t-ink)" }}
         >
-          {label}
+          <MenuLabel menu="board" k={key}>{label}</MenuLabel>
         </button>
       ))}
     </div>,

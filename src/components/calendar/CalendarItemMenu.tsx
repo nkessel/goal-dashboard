@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuLabel } from "@/components/ui/MenuArrange";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -113,7 +114,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
           {target.kind === "task" && (
             <>
               <button type="button" role="menuitem" data-mi="open" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setEditing(target.task)}>
-                Edit quest
+                <MenuLabel menu="calendar-item" k="open">Edit quest</MenuLabel>
               </button>
               {target.task.status !== "completed" && (
                 <button
@@ -167,7 +168,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
           {target.kind === "event" && (
             <>
               <button type="button" role="menuitem" data-mi="edit" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "edit" } })), onClose())}>
-                Edit
+                <MenuLabel menu="calendar-item" k="edit">Edit</MenuLabel>
               </button>
               <button type="button" role="menuitem" data-mi="quest" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "quest" } })), onClose())}>
                 {theme === "adventure" ? "Turn into a quest" : "Turn into a task"}
@@ -175,7 +176,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
             </>
           )}
           <button type="button" role="menuitem" data-mi="followup" className={`${item} flex items-center gap-2 border-t`} style={{ color: "var(--t-ink)", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("followup")}>
-            Schedule follow-up quest
+            <MenuLabel menu="calendar-item" k="followup">Schedule follow-up quest</MenuLabel>
           </button>
           {/* Below the last divider (owner, Nov 13): failing a quest, or taking a failure back. */}
           {target.kind === "task" && target.task.status !== "completed" && (

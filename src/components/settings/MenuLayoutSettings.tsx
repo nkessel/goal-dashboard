@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { MENUS, defaultLayout, layoutFor, menuLayoutCss, readMenuLayouts, saveMenuLayoutFor, serverMenuLayouts, subscribeMenuLayouts, type MenuDef } from "@/lib/menu-layouts";
 import { QuestMenuSettings } from "./QuestMenuSettings";
 import { QuestEditorLayoutSettings } from "./QuestEditorLayoutSettings";
@@ -19,7 +19,7 @@ export function MenusSettings({ isAdventure, openGroup }: { isAdventure: boolean
   return (
     <div className="flex flex-col gap-2">
       <p className="m-0 text-xs" style={{ color: "var(--t-ink-soft)" }}>
-        Drag items into your order (hold on a phone). Swipe one left to hide it. Saved on this device.
+        Drag items into your order (hold on a phone). Tap a name in a context menu to rename it. Saved on this device.
       </p>
       <h4 className={`m-0 mt-1 ${head}`}>Editors</h4>
       <details open={openGroup === "quest-editor" || undefined} className="rounded-xl px-3 py-2" style={{ border: "1px solid rgba(139,112,64,.3)" }}>
@@ -75,7 +75,23 @@ export function OneMenu({ menu }: { menu: MenuDef }) {
         id={`menu-${menu.id}`}
         ids={layout.order}
         onReorder={(order) => saveMenuLayoutFor(menu.id, { ...layout, order })}
-        row={(k) => ({ label: labelOf(k), toggle: keep(k) ? null : { hidden: layout.hidden.includes(k), onToggle: () => toggle(k) } })}
+        row={(k) => ({
+          label:
+            menu.id.endsWith("-editor") || menu.items.find((i) => i.key === k)?.varies ? (
+              labelOf(k)
+            ) : (
+              <RenameLabel
+                usual={labelOf(k)}
+                mine={layout.labels?.[k]}
+                onRename={(w) => {
+                  const labels = { ...(layout.labels ?? {}) };
+                  if (w && w !== labelOf(k)) labels[k] = w;
+                  else delete labels[k];
+                  saveMenuLayoutFor(menu.id, { ...layout, labels });
+                }}
+              />
+            ),
+          toggle: keep(k) ? null : { hidden: layout.hidden.includes(k), onToggle: () => toggle(k) } })}
       />
       {!isDefault && (
         <button type="button" onClick={() => saveMenuLayoutFor(menu.id, null)} className="self-start text-xs underline" style={{ color: "var(--t-ink-soft)" }}>
@@ -86,3 +102,42 @@ export function OneMenu({ menu }: { menu: MenuDef }) {
   );
 }
 
+
+/** An item's name in the list: tap it to give it your own words (empty brings the usual ones back). */
+function RenameLabel({ usual, mine, onRename }: { usual: string; mine?: string; onRename: (words: string) => void }) {
+  const [naming, setNaming] = useState(false);
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  if (naming)
+    return (
+      <input
+        autoFocus
+        defaultValue={mine ?? usual}
+        maxLength={40}
+        aria-label={`Rename ${usual}`}
+        onPointerDown={stop}
+        onMouseDown={stop}
+        onTouchStart={stop}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") setNaming(false);
+        }}
+        onBlur={(e) => {
+          onRename(e.currentTarget.value.trim());
+          setNaming(false);
+        }}
+        className="bare-input w-full bg-transparent text-[16px] outline-none"
+        style={{ borderBottom: "1px solid #c8a24a" }}
+      />
+    );
+  return (
+    <button type="button" onClick={() => setNaming(true)} onPointerDown={stop} onMouseDown={stop} onTouchStart={stop} title="Tap to rename" className="max-w-full truncate text-left">
+      {mine ?? usual}
+      {mine && (
+        <span className="ml-1.5 text-[11.5px]" style={{ color: "var(--t-ink-soft)" }}>
+          ({usual})
+        </span>
+      )}
+    </button>
+  );
+}

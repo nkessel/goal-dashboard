@@ -4,7 +4,7 @@ import { TimeRangePick } from "@/components/ui/TimeRangePick";
 import { useState, useTransition } from "react";
 import { nextOccurrence, repeatLabel, type Repeat } from "@/lib/habit-repeat";
 import { createPortal } from "react-dom";
-import { createRiteAction, removeRiteAction, setRiteStepsAction, updateRiteAction } from "@/app/actions";
+import { createRiteAction, removeRiteAction, setHabitManyAction, setRiteStepsAction, updateRiteAction } from "@/app/actions";
 import type { RiteView } from "./EveningRites";
 import { Moon } from "./BeginEveningButton";
 import { useEscape } from "@/lib/use-escape";
@@ -15,6 +15,8 @@ import { SettingsGear } from "@/components/ui/SettingsGear";
 import { coinsForXp } from "@/lib/coins";
 import { RiteGlyph, glyphFor } from "./RiteGlyph";
 import { SubHabitList, type SubHabit } from "./SubHabitList";
+import { GoldCheck } from "@/components/xp/WelcomeArrange";
+import { setHabitTicks, useHabitTicks } from "@/lib/use-habit-ticks";
 
 const XP_PRESETS = [1, 3, 5, 10, 15];
 const MINUTE_PRESETS = [5, 10, 15, 30];
@@ -43,6 +45,14 @@ export function RiteEditorDialog({
   onClose: () => void;
 }) {
   const isHabit = slot === "day";
+  // "Count every time I do it": every tick is another completion (kept at once, like the card's own choices).
+  const ticks = useHabitTicks(null);
+  const many = !!rite && ticks.many.includes(rite.id);
+  function setMany(on: boolean) {
+    if (!rite) return;
+    setHabitTicks({ many: on ? [...ticks.many.filter((id) => id !== rite.id), rite.id] : ticks.many.filter((id) => id !== rite.id) });
+    void setHabitManyAction(rite.id, on).catch(() => setHabitTicks({ many: ticks.many }));
+  }
   useEscape(() => close());
   const [title, setTitle] = useState(rite?.title ?? "");
   const [description, setDescription] = useState(rite?.description ?? "");
@@ -244,7 +254,7 @@ export function RiteEditorDialog({
           <div data-mi="pills" className="relative z-[1] flex flex-wrap items-center gap-1.5" role="group" aria-label="Habit details">
             {(
               [
-                ["repeats", <span key="r" className="text-[14px] leading-none">↻</span>, repeat ? repeatLabel(repeat) : days.length === 7 ? "Daily" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "No days"],
+                ["repeats", <span key="r" className="text-[14px] leading-none">↻</span>, `${repeat ? repeatLabel(repeat) : days.length === 7 ? "Daily" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "No days"}${many ? " · every time" : ""}`],
                 // eslint-disable-next-line @next/next/no-img-element -- card glyph
                 ["takes", <img key="t" src="/design/ui-clock.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />, minutes ? (minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes} min`) : "Time"],
                 ["reward", <span key="x" className="text-[13px] leading-none" style={{ color: "var(--t-xp, #6a4b0e)" }}>✦</span>, `${xp} XP${(coinValue ?? coinsForXp(xp)) ? ` · ${coinValue ?? coinsForXp(xp)} 🪙` : ""}`],
@@ -368,6 +378,17 @@ export function RiteEditorDialog({
                 );
               })}
             </div>
+            )}
+            {/* In the editor, not the card's menu (owner, Nov 16). */}
+            {rite && (
+              <div data-habit-many className="border-t pt-2" style={{ borderColor: "rgba(139,112,64,.25)" }}>
+                <GoldCheck checked={many} onChange={setMany}>
+                  Count every time I do it
+                  <span className="block text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                    Each tick in a day is another completion, with its XP. Off: once a day is enough.
+                  </span>
+                </GoldCheck>
+              </div>
             )}
             </div>
             )}

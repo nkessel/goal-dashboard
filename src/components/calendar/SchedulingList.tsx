@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuLabel } from "@/components/ui/MenuArrange";
 import { MagicCalendarIcon } from "@/components/ui/Icons";
 import { talkToToucan } from "@/components/toucan/ToucanGuide";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -1016,7 +1017,7 @@ function SmallMenu({ items, menu, onClose }: { items: [string, () => void, strin
           className="relative z-[1] min-h-10 px-3 text-left text-[14px] hover:bg-black/[.06]"
           style={{ color: "var(--t-ink)" }}
         >
-          {label}
+          <MenuLabel menu={menu} k={key}>{label}</MenuLabel>
         </button>
       ))}
     </div>

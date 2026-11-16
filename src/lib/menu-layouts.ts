@@ -5,7 +5,7 @@
  * with data-mi="<key>"; <MenuLayoutStyles /> arranges them with CSS, so the
  * menus' own code doesn't change.
  */
-export type MenuDef = { id: string; title: string; hint: string; items: { key: string; label: string; keep?: boolean }[] };
+export type MenuDef = { id: string; title: string; hint: string; items: { key: string; label: string; keep?: boolean; /** Its words change with its state (renamed where it shows, not in Settings). */ varies?: boolean }[] };
 
 export const MENUS: MenuDef[] = [
   {
@@ -26,11 +26,11 @@ export const MENUS: MenuDef[] = [
     title: "Calendar items",
     hint: "Right-click or ⋯ on a quest or event in the calendar.",
     items: [
-      { key: "open", label: "Open quest" },
-      { key: "unschedule", label: "Take off the calendar" },
+      { key: "open", label: "Edit quest" },
+      { key: "unschedule", label: "Remove from calendar / Remove this session", varies: true },
       { key: "edit", label: "Edit (events)" },
-      { key: "quest", label: "Turn into a quest (events)" },
-      { key: "followup", label: "Schedule a follow-up quest" },
+      { key: "quest", label: "Turn into a quest (events)", varies: true },
+      { key: "followup", label: "Schedule follow-up quest" },
     ],
   },
   {
@@ -41,6 +41,9 @@ export const MENUS: MenuDef[] = [
       { key: "edit", label: "Edit habit", keep: true },
       { key: "sub", label: "Add a sub-habit" },
       { key: "focus", label: "Focus mode" },
+      { key: "core", label: "Make it a core habit / Not a core habit", varies: true },
+      { key: "undo-tick", label: "Undo the last one" },
+      { key: "snooze", label: "Snooze" },
     ],
   },
   {
@@ -71,9 +74,9 @@ export const MENUS: MenuDef[] = [
     title: "Priority Matrix",
     hint: "Tapping a quest or board on the matrix.",
     items: [
-      { key: "open", label: "Open quest / Edit board", keep: true },
-      { key: "collapse", label: "Collapse a board's quests" },
-      { key: "expand-ask", label: "Show a board's quests" },
+      { key: "open", label: "Open quest / Edit board", keep: true, varies: true },
+      { key: "collapse", label: "Collapse a board's quests", varies: true },
+      { key: "expand-ask", label: "Show a board's quests", varies: true },
       { key: "expand-here", label: "Plot them all where the board is" },
       { key: "expand-unplotted", label: "Put them all in Not yet plotted" },
       { key: "later", label: "Save for later" },
@@ -86,7 +89,7 @@ export const MENUS: MenuDef[] = [
     title: "Inventory",
     hint: "Tapping an item in your backpack.",
     items: [
-      { key: "refill", label: "Needs a refill / Refilled" },
+      { key: "refill", label: "Needs a refill / Refilled", varies: true },
       { key: "quest", label: "Make it a quest" },
       { key: "edit", label: "Edit", keep: true },
       { key: "gone", label: "Gone (take it out)" },
@@ -97,7 +100,7 @@ export const MENUS: MenuDef[] = [
     title: "Notifications",
     hint: "The ⋯ on a notification.",
     items: [
-      { key: "read", label: "Mark as read / unread" },
+      { key: "read", label: "Mark as read / unread", varies: true },
       { key: "snooze", label: "Snooze…" },
       { key: "delete", label: "Delete" },
     ],
@@ -183,7 +186,7 @@ export function arrangeSteps<T extends { key: string }>(id: string, steps: reado
   return kept.sort((a, b) => (a.key === "seal" ? 1 : b.key === "seal" ? -1 : (rank.get(a.key) ?? 99) - (rank.get(b.key) ?? 99)));
 }
 
-export type MenuLayout = { order: string[]; hidden: string[] };
+export type MenuLayout = { order: string[]; hidden: string[]; /** Your own words for items, by key (or "key:state"). */ labels?: Record<string, string> };
 export type MenuLayouts = Record<string, MenuLayout>;
 
 const KEY = "menu-layouts";
@@ -199,7 +202,14 @@ export function layoutFor(m: MenuDef, saved: MenuLayout | undefined): MenuLayout
   for (const [i, it] of m.items.entries()) if (!order.includes(it.key)) order.splice(Math.min(i, order.length), 0, it.key);
   const keep = new Set(m.items.filter((i) => i.keep).map((i) => i.key));
   const hidden = (Array.isArray(saved?.hidden) ? saved.hidden : []).filter((k) => known.has(k) && !keep.has(k));
-  return { order: [...new Set(order)], hidden: [...new Set(hidden)] };
+  const labels: Record<string, string> = {};
+  for (const [k, v] of Object.entries(saved?.labels ?? {})) if (known.has(k.split(":")[0]) && typeof v === "string" && v.trim()) labels[k] = v.trim().slice(0, 40);
+  return { order: [...new Set(order)], hidden: [...new Set(hidden)], ...(Object.keys(labels).length ? { labels } : {}) };
+}
+
+/** An item's words: yours if you renamed it, else the usual ones. */
+export function menuLabel(all: MenuLayouts, menu: string, key: string, usual: string): string {
+  return all[menu]?.labels?.[key]?.trim() || usual;
 }
 
 let cache: { raw: string | null; value: MenuLayouts } | null = null;

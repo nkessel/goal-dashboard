@@ -1,5 +1,6 @@
 "use client";
 
+import { MenuLabel } from "@/components/ui/MenuArrange";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { deleteNotificationAction, markNotificationReadAction, markNotificationUnreadAction, markAllNotificationsReadAction, snoozeNotificationAction } from "@/app/actions";
@@ -262,7 +263,7 @@ export function NotificationList({
                   className="relative z-[1] min-h-11 border-t px-4 text-left text-[15px] hover:bg-black/5"
                   style={{ borderColor: "rgba(139,112,64,.25)" }}
                 >
-                  Snooze…
+                  <MenuLabel menu="notification" k="snooze">Snooze…</MenuLabel>
                 </button>
                 <button
                   type="button"
@@ -272,7 +273,7 @@ export function NotificationList({
                   className="relative z-[1] min-h-11 border-t px-4 text-left text-[15px] hover:bg-black/5"
                   style={{ borderColor: "rgba(139,112,64,.25)", color: "var(--t-warn)" }}
                 >
-                  Delete
+                  <MenuLabel menu="notification" k="delete">Delete</MenuLabel>
                 </button>
               </span>
             )}
