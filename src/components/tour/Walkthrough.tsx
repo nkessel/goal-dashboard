@@ -3,13 +3,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { TourState } from "@/app/actions";
-import { generateAvatarImageAction, tourAction, tourAvatarAction, tourCompletePracticeAction, tourNameAction, tourNewQuestAction, tourStarterQuestsAction } from "@/app/actions";
+import { ensureStyleExamplesAction, generateAvatarImageAction, tourAction, tourAvatarAction, tourCompletePracticeAction, tourNameAction, tourNewQuestAction, tourPinQuestAction, tourStarterQuestsAction } from "@/app/actions";
 import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { SnoozeIcon } from "@/components/ui/Icons";
-import { AVATAR_STYLE_OPTIONS, DEFAULT_AVATAR_STYLE } from "@/lib/avatar-prompts";
+import { AVATAR_STYLE_OPTIONS, DEFAULT_AVATAR_STYLE, SAMPLE_AVATAR_PROMPTS } from "@/lib/avatar-prompts";
 import { readTour, subscribeTour, writeTour } from "@/lib/tour-store";
-import { useTourLook } from "@/lib/tour-look";
+import { useTourLook, useTourPress } from "@/lib/tour-look";
 
 /**
  * The new-adventurer walkthrough, guided by the Great Toucan Spirit (owner, Nov 13–15; every account goes
@@ -33,6 +33,8 @@ type Step = {
   press?: string;
   /** Needs Today on screen (offers to go there). */
   today?: boolean;
+  /** The same ask in a few words, for a tag beside the lit control (the "tag" style). */
+  tag?: string;
 };
 
 const PLUS = '[aria-label="Create something new"]';
@@ -52,8 +54,11 @@ function buttonByText(re: RegExp, scope = "body"): Element | null {
 /** The + button, or, once its menu is open, its "New quest" choice. */
 const plusOrNewQuest = () => buttonByText(/^new quest/i) ?? document.querySelector(PLUS);
 
-const ex = (i: number): Step["part"] => [EXPLORE, i, 9];
-const cr = (i: number): Step["part"] => [CREATE, i, 7];
+const ex = (i: number): Step["part"] => [EXPLORE, i, 6];
+const cr = (i: number): Step["part"] => [CREATE, i, 9];
+const hm = (i: number): Step["part"] => ["Your home", i, 6];
+/** The XP controls once the XP pill is open, else the pill (owner, Nov 16: light what you'll actually touch). */
+const pillOrPanel = (k: "time" | "due" | "xp") => () => document.querySelector(`${EDITOR} [data-tour="panel-${k}"]`) ?? document.querySelector(`${EDITOR} [data-tour="fact-${k}"]`);
 
 const STEPS: Record<string, Step> = {
   intro: {
@@ -66,45 +71,29 @@ const STEPS: Record<string, Step> = {
     text: () =>
       "This is where you make your character, your persona in this game of real-life quests. Be a calm monk, a brave warrior, a skilled night elf, or anything else that calls to you. There's no wrong choice, and you can change it any time. Describe your character below, and watch them come to life.",
   },
+  // A quick look around the home screen before the two starter quests (owner, Nov 16).
+  "home-hero": { target: '[data-tour="hero"]', today: true, part: hm(1), title: (n) => `This is you, ${n}`, text: () => "Your character, level and XP live at the top of your home screen. Every quest you finish earns XP, and your character grows with you.", next: "Next" },
+  "home-due": { target: '[data-tour="due-soon"]', today: true, part: hm(2), title: () => "Due soon", text: () => "Quests with a due date coming up gather here, so nothing sneaks up on you. Add them to today with a tap.", next: "Next" },
+  "home-habits": { target: '[data-tour="daily-habits"]', today: true, part: hm(3), title: () => "Daily Habits", text: () => "The small things you do again and again, each worth its own XP. Tick them off as you go, and watch your streaks grow.", next: "Next" },
+  "home-today": { target: '[data-tour="today-quests"]', today: true, part: hm(4), title: () => "Today's Quests", text: () => "These are today's priorities. Keep this list to as few quests as you can realistically finish by the end of the day: most of them, or all of them.", next: "Next" },
+  "home-additional": { target: '[data-tour="additional-quests"]', today: true, part: hm(5), title: () => "Additional Quests", text: () => "Quests you'd like to do that don't need to happen today wait here. Move one up to Today's Quests whenever you have room.", next: "Next" },
+  "home-victories": { target: '[data-tour="victories"]', today: true, part: hm(6), title: () => "Victories Today", text: () => "Everything you finish today gathers here, with the XP and coins it earned: a record of your day's wins.", next: "Next" },
   quests: {
     target: '[data-tour="today-quests"]',
     today: true,
     title: () => "Two quests await you",
     text: (n) => `Take them in any order, ${n}: one shows you around the realm, the other helps you create your first real quest. Each pays XP and coins when it's done.`,
     press: "Tap either quest on Today's Quests, or choose one here.",
+    tag: "Tap a quest to begin",
   },
-  "ex-today": {
-    target: '[data-tour="today-quests"]',
-    today: true,
-    part: ex(1),
-    title: () => "Today's Quests",
-    text: () => "These are today's priorities. Keep this list to as few quests as you can realistically finish by the end of the day: most of them, or all of them.",
-    next: "Next",
-  },
-  "ex-additional": {
-    target: '[data-tour="additional-quests"]',
-    today: true,
-    part: ex(2),
-    title: () => "Additional Quests",
-    text: () => "Quests you'd like to do that don't need to happen today wait here. Move one up to Today's Quests whenever you have room.",
-    next: "Next",
-  },
-  "ex-victories": {
-    target: '[data-tour="victories"]',
-    today: true,
-    part: ex(3),
-    title: () => "Victories Today",
-    text: () => "Everything you finish today gathers here, with the XP and coins it earned.",
-    next: "Next",
-  },
-  "ex-calendar": { target: NAV("/calendar"), part: ex(4), title: () => "The Calendar", text: () => "Your quests and your calendars side by side. Drag a quest onto a time to plan it.", next: "Next" },
-  "ex-boards": { target: NAV("/boards"), part: ex(5), title: () => "All Quests", text: () => "Every quest you have, gathered on boards you shape for your projects and areas of life. The priority matrix helps you see what matters most and what can wait.", next: "Next" },
-  "ex-insights": { target: NAV("/insights"), part: ex(6), title: () => "Insights", text: () => "Insights helps you track your life: quests completed, mood, energy, sleep, and more.", next: "Next" },
-  "ex-party": { target: NAV("/feed"), part: ex(7), title: () => "Your Party", text: () => "This is where you and your friends can cheer each other on. Message them, share boards, and call for support when you need it.", next: "Next" },
-  "ex-chest": { target: 'a[href="/rewards"]', part: ex(8), title: () => "The Treasure Chest", text: () => "Your rewards live here. Set things you'd love and price them in coins. When you've earned enough, buy one and give yourself that reward.", next: "Next" },
+  "ex-calendar": { target: NAV("/calendar"), part: ex(1), title: () => "The Calendar", text: () => "For scheduling your quests, planning your days, and seeing what's coming up next. Your quests sit beside your own calendars: drag one onto a time to plan it.", next: "Next" },
+  "ex-boards": { target: NAV("/boards"), part: ex(2), title: () => "All Quests", text: () => "Every quest you have, gathered on boards for your projects and areas of life. Break big goals into steps, see what's next on each board, and use the priority matrix to sort what matters most from what can wait.", next: "Next" },
+  "ex-insights": { target: NAV("/insights"), part: ex(3), title: () => "Insights", text: () => "See how you're really doing: quests completed, mood, energy, sleep and more, across days and weeks, so you can spot what helps you thrive.", next: "Next" },
+  "ex-party": { target: NAV("/feed"), part: ex(4), title: () => "Your Party", text: () => "Adventures are better together. Cheer each other on, send messages, share boards, and call for support when you need it.", next: "Next" },
+  "ex-chest": { target: 'a[href="/rewards"]', part: ex(5), title: () => "The Treasure Chest", text: () => "Turn your effort into real rewards. Set things you'd love, price them in coins, and treat yourself once you've earned them.", next: "Next" },
   "ex-feedback": {
     target: "[data-feedback-btn]",
-    part: ex(9),
+    part: ex(6),
     title: () => "Help shape this world",
     text: () => "This realm is still being built, and your voice shapes it. Tap this button whenever something is confusing, broken, or could be better. Every note goes straight to the people building it.",
     next: "Claim this quest ✦",
@@ -116,7 +105,8 @@ const STEPS: Record<string, Step> = {
     title: () => "Your first quest",
     text: () =>
       "This is where you add your first quest. A quest can be big or small, and should be something that matters to you. I recommend starting with something you can finish today, so you can begin with a victory under your belt. You can add additional quests at any time.",
-    press: "Tap the glowing + below, then choose New quest.",
+    press: "Tap the glowing +, then choose New quest.",
+    tag: "Tap +, then New quest",
   },
   "cr-name": {
     target: `${EDITOR} [aria-label="Title"]`,
@@ -124,30 +114,34 @@ const STEPS: Record<string, Step> = {
     title: () => "Name your quest",
     text: () => "Write it the way you'd say it to a friend: what you'll actually do.",
     press: "Type it in the glowing field.",
+    tag: "Type your quest here",
     next: "Next",
   },
   "cr-eta": {
-    target: `${EDITOR} [data-tour="fact-time"]`,
+    target: pillOrPanel("time"),
     part: cr(3),
     title: () => "How long will this take?",
     text: () => "A rough guess is fine. It helps me find room for it in your day.",
-    press: "Tap the glowing Time pill and pick a length.",
+    press: "Tap Time, then pick a length.",
+    tag: "Pick a length",
     next: "Next",
   },
   "cr-due": {
-    target: `${EDITOR} [data-tour="fact-due"]`,
+    target: pillOrPanel("due"),
     part: cr(4),
     title: () => "When should it be done?",
     text: () => "Give it a due day. If you like, block out a time for it on your calendar too: a quest with a day is a quest that happens.",
-    press: "Tap the glowing Due pill: pick a day, and “Find a time” for your calendar.",
+    press: "Tap Due, pick a day, and “Find a time” for your calendar.",
+    tag: "Pick a day",
     next: "Next",
   },
   "cr-xp": {
-    target: `${EDITOR} [data-tour="fact-xp"]`,
+    target: pillOrPanel("xp"),
     part: cr(5),
     title: () => "Choose your reward",
     text: () => "Use XP and coins to reward and motivate yourself. XP helps you level up your character, and coins buy special rewards you set for yourself in your Treasure Chest. Give just enough to make you want to start.",
-    press: "Tap the glowing XP pill: the guide inside matches the reward to the effort.",
+    press: "Tap XP, then set the XP with − and + (or type it), and the coins beside it.",
+    tag: "Set XP and coins",
     next: "Next",
   },
   "cr-save": {
@@ -155,14 +149,32 @@ const STEPS: Record<string, Step> = {
     part: cr(6),
     title: () => "Create it",
     text: () => "It will wait for you on Today's Quests.",
-    press: "Tap the glowing Create quest button.",
+    press: "Tap Create quest.",
+    tag: "Tap to create",
+  },
+  "cr-engage": {
+    today: true,
+    part: cr(7),
+    title: () => "Engage your quest",
+    text: () => "When you're ready to begin, Engage Quest clears everything else away so you can focus on this one thing.",
+    press: "Tap ⋯ on your new quest (or hold the card), then Engage Quest.",
+    tag: "Tap ⋯, then Engage Quest",
+  },
+  "cr-focus": {
+    target: () => buttonByText(/complete/i, ".one-thing"),
+    part: cr(8),
+    title: () => "One quest, nothing else",
+    text: () => "Do it now, and tap Complete when it's done. Already done it? Tell me how long it took, then Complete. If it's for later, skip this step: it waits on Today.",
+    press: "When it's done, tap Complete.",
+    tag: "Tap when it's done",
   },
   "cr-claim": {
     today: true,
-    part: cr(7),
+    part: cr(9),
     title: () => "Claim your first victory!",
-    text: (n) => `You did it, ${n}! Your first real quest is ready. Now claim the reward for this one: tap the circle and watch your XP and coins pour in!`,
-    press: `Tap the glowing circle on “${CREATE}”.`,
+    text: (n) => `Well done, ${n}! Now claim the reward for this one: tap the circle and watch your XP and coins pour in!`,
+    press: `Tap the circle on “${CREATE}”.`,
+    tag: "Tap to claim",
   },
   done: {
     title: (n) => `You're ready, ${n} ✦`,
@@ -171,8 +183,9 @@ const STEPS: Record<string, Step> = {
   },
 };
 
-const ORDER_EXPLORE = ["ex-today", "ex-additional", "ex-victories", "ex-calendar", "ex-boards", "ex-insights", "ex-party", "ex-chest", "ex-feedback"];
-const ORDER_CREATE = ["cr-intro", "cr-name", "cr-eta", "cr-due", "cr-xp", "cr-save", "cr-claim"];
+const ORDER_HOME = ["home-hero", "home-due", "home-habits", "home-today", "home-additional", "home-victories"];
+const ORDER_EXPLORE = ["ex-calendar", "ex-boards", "ex-insights", "ex-party", "ex-chest", "ex-feedback"];
+const ORDER_CREATE = ["cr-intro", "cr-name", "cr-eta", "cr-due", "cr-xp", "cr-save", "cr-engage", "cr-focus", "cr-claim"];
 
 const subscribeHtml = (cb: () => void) => {
   const mo = new MutationObserver(cb);
@@ -214,6 +227,7 @@ export function Walkthrough() {
   const router = useRouter();
   const pathname = usePathname();
   const look = useTourLook();
+  const pressStyle = useTourPress();
   const tour = useSyncExternalStore(subscribeTour, () => localStorage.getItem("tour-state") ?? "", () => "");
   const state: TourState | null = tour ? (JSON.parse(tour) as TourState) : null;
   const welcomeUp = useSyncExternalStore(subscribeHtml, welcomeUpNow, () => true);
@@ -298,7 +312,9 @@ export function Walkthrough() {
       const id = (e as CustomEvent<{ taskId?: string }>).detail?.taskId;
       const t = readTour();
       if (!id || !t || t.done) return;
-      if (id === t.createId && !seenIn(t, "create")) finished("create");
+      // The quest you made, completed in Engage Quest (or anywhere): on to claiming the starter quest.
+      if (id === t.realId && (t.step === "cr-engage" || t.step === "cr-focus")) go("cr-claim");
+      else if (id === t.createId && !seenIn(t, "create")) finished("create");
       else if (id === t.exploreId && !seenIn(t, "explore")) finished("explore");
     };
     window.addEventListener("quest-complete", on);
@@ -315,7 +331,7 @@ export function Walkthrough() {
       if (!card || el?.closest('[role="checkbox"],[aria-label="Quest actions"]')) return;
       const id = card.getAttribute("data-task-id");
       const t = readTour();
-      const next = id && id === t?.exploreId ? "ex-today" : id && id === t?.createId ? "cr-intro" : null;
+      const next = id && id === t?.exploreId ? "ex-calendar" : id && id === t?.createId ? "cr-intro" : null;
       if (!next) return;
       e.preventDefault();
       e.stopPropagation();
@@ -330,9 +346,14 @@ export function Walkthrough() {
     if (!s) return;
     let raf = 0;
     const target: Step["target"] =
-      step === "cr-claim" && state?.createId ? `[data-task-id="${state.createId}"] [role="checkbox"]` : s.target;
-    // Today's Quests' heading with the two starter quests under it, lit as one (the card waits above them).
-    const withStarters = step === "quests" || step === "ex-today";
+      step === "cr-claim" && state?.createId
+        ? `[data-task-id="${state.createId}"] [role="checkbox"]`
+        : step === "cr-engage" && state?.realId
+          ? // Its ⋯, then (once the menu is open) the Engage Quest row itself, so the card never sits on it.
+            () => buttonByText(/^engage quest/i) ?? document.querySelector(`[data-task-id="${state.realId}"] [aria-label="Quest actions"]`)
+          : s.target;
+    // Today's Quests' heading with the two starter quests under it, lit as one.
+    const withStarters = step === "quests";
     const union = (): DOMRect | null => {
       const t = readTour();
       const parts = [findTarget(target), ...[t?.exploreId, t?.createId].map((id) => (id ? document.querySelector(`[data-task-id="${id}"]`) : null))]
@@ -358,13 +379,15 @@ export function Walkthrough() {
       window.removeEventListener("scroll", on, true);
       window.removeEventListener("resize", on);
     };
-  }, [s, step, state?.createId]);
+  }, [s, step, state?.createId, state?.realId]);
 
   // A part of Today it points at is brought into view.
   useEffect(() => {
-    if (!step || !["quests", "ex-today", "ex-additional", "ex-victories", "cr-claim"].includes(step)) return;
+    if (!step || !(step === "quests" || step === "cr-claim" || step === "cr-engage" || step.startsWith("home-"))) return;
     const t = window.setTimeout(() => {
-      const sel = step === "cr-claim" && readTour()?.createId ? `[data-task-id="${readTour()?.createId}"]` : (STEPS[step].target as string);
+      const tr = readTour();
+      const sel =
+        step === "cr-claim" && tr?.createId ? `[data-task-id="${tr.createId}"]` : step === "cr-engage" && tr?.realId ? `[data-task-id="${tr.realId}"]` : (STEPS[step].target as string);
       const el = document.querySelector(sel);
       const r = el?.getBoundingClientRect();
       if (el && r && (r.top < 80 || r.bottom > window.innerHeight * 0.55)) el.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -401,9 +424,12 @@ export function Walkthrough() {
         const t = readTour();
         const made = t?.since ? await tourNewQuestAction(t.since, [t.exploreId ?? "", t.createId ?? ""].filter(Boolean)).catch(() => null) : null;
         if (!made) return go("cr-intro");
+        // It joins Today's Quests, where Engage Quest is shown next.
+        await tourPinQuestAction(made.id).catch(() => {});
         router.refresh();
-        return go("cr-claim", { realId: made.id });
+        return go("cr-engage", { realId: made.id });
       }
+      if (step === "cr-engage" && document.querySelector(".one-thing")) return go("cr-focus");
     };
     const mo = new MutationObserver(() => void check());
     mo.observe(document.body, { childList: true, subtree: true });
@@ -419,24 +445,27 @@ export function Walkthrough() {
   // The toucan floats above the card's top-left corner (or below it, in the speech-bubble look): keep room.
   const TOPROOM = look === "spirit" ? 12 : 48;
   const BOTROOM = look === "spirit" ? 84 : 8;
-  // Beside the control when there's room (under it, else above it); centred when it points at nothing.
-  let top = vh / 2 - cardH / 2;
+  // In the lower half of the screen by default (owner, Nov 16): under what it points at when there's room, else
+  // above it; with nothing to point at, low on the screen above the bottom bar.
+  const NAV_ROOM = 96;
   let left = vw / 2 - W / 2;
-  const inEditor = typeof s.target === "string" && s.target.startsWith(EDITOR);
-  // Inside the quest editor the card waits outside it (above, else below), so it never covers the fields.
-  const box = inEditor && typeof document !== "undefined" ? document.querySelector(EDITOR)?.getBoundingClientRect() : null;
-  if (rect && box) {
-    left = Math.max(14, Math.min(vw - W - 14, box.left + box.width / 2 - W / 2));
-    top = box.top - 12 - BOTROOM - cardH >= TOPROOM ? box.top - 12 - BOTROOM - cardH : box.bottom + 12 + TOPROOM + cardH + BOTROOM <= vh ? box.bottom + 12 + TOPROOM : TOPROOM;
-  } else if (rect && (step === "quests" || step === "ex-today") && rect.top - 16 - BOTROOM - cardH >= TOPROOM) {
-    // Today's starter quests: the card waits above them so they stay in sight.
+  let top = vh - NAV_ROOM - BOTROOM - cardH;
+  if (rect) {
     left = Math.max(14, Math.min(vw - W - 14, rect.left + rect.width / 2 - W / 2));
-    top = rect.top - 16 - BOTROOM - cardH;
-  } else if (rect) {
-    left = Math.max(14, Math.min(vw - W - 14, rect.left + rect.width / 2 - W / 2));
-    top = rect.bottom + 16 + TOPROOM + cardH + BOTROOM < vh ? rect.bottom + 16 + TOPROOM : Math.max(TOPROOM, rect.top - 16 - BOTROOM - cardH);
-  } else if (step === "intro" || step === "character") top = Math.max(TOPROOM + 24, Math.min(vh * 0.14, vh / 2 - cardH / 2));
+    const gap = pressStyle === "tag" && s.press ? 54 : 16;
+    const below = rect.bottom + gap + TOPROOM;
+    top = below + cardH + BOTROOM <= vh - 8 ? Math.max(below, Math.min(vh * 0.5, vh - NAV_ROOM - BOTROOM - cardH)) : Math.max(TOPROOM, rect.top - gap - BOTROOM - cardH);
+  }
   top = Math.max(TOPROOM, Math.min(top, vh - cardH - BOTROOM));
+  // Which way the lit control lies from the card, for the arrow in its words.
+  const toward = rect ? (rect.top + rect.height / 2 < top ? "up" : "down") : null;
+  // The "tag" ask sits between the card and the lit control (the card keeps room for it).
+  let tagSpot: React.CSSProperties = {};
+  let tagDir: "up" | "down" = "up";
+  if (rect) {
+    const cx = Math.max(10, Math.min(vw - 230, rect.left + rect.width / 2 - 70));
+    [tagSpot, tagDir] = toward === "up" ? [{ left: cx, top: rect.bottom + 10 }, "up"] : [{ left: cx, top: rect.top - 42 }, "down"];
+  }
 
   const needsToday = s.today && pathname !== "/";
 
@@ -448,7 +477,7 @@ export function Walkthrough() {
     setBusy(false);
     if (pathname !== "/") router.push("/");
     else router.refresh();
-    go("quests", q ?? {});
+    go("home-hero", q ?? {});
   }
 
   async function claimExplore() {
@@ -468,6 +497,8 @@ export function Walkthrough() {
   function main() {
     if (busy || !step) return;
     if (step === "ex-feedback") return void claimExplore();
+    const h = ORDER_HOME.indexOf(step);
+    if (h >= 0) return go(ORDER_HOME[h + 1] ?? "quests");
     const e = ORDER_EXPLORE.indexOf(step);
     if (e >= 0) return go(ORDER_EXPLORE[e + 1]);
     const c = ORDER_CREATE.indexOf(step);
@@ -483,6 +514,8 @@ export function Walkthrough() {
     if (step === "quests" || step === "done") return go("end");
     if (step === "ex-feedback") return go(seenIn(readTour(), "create") ? "done" : "quests", { hidden: withMark(readTour(), "explore") });
     if (step === "cr-claim") return go(seenIn(readTour(), "explore") ? "done" : "quests");
+    const h = ORDER_HOME.indexOf(step);
+    if (h >= 0) return go(ORDER_HOME[h + 1] ?? "quests");
     const e = ORDER_EXPLORE.indexOf(step);
     if (e >= 0) return go(ORDER_EXPLORE[e + 1]);
     const c = ORDER_CREATE.indexOf(step);
@@ -503,6 +536,16 @@ export function Walkthrough() {
         style={{ left: 0, top: 0, ...(rect ? { transform: `translate(${rect.left - 6}px, ${rect.top - 6}px)`, width: rect.width + 12, height: rect.height + 12 } : { transform: `translate(${vw / 2}px, ${vh / 2}px)`, width: 0, height: 0 }) }}
       />
       {/* Placed by transform, so following the control as it scrolls never counts as the page jumping. */}
+      {rect && s.press && pressStyle === "tag" && (
+        <div
+          data-tour-tag
+          className="tour-tag pointer-events-none fixed z-[137] flex max-w-[240px] items-center gap-1.5 rounded-lg px-2.5 py-1 text-[13.5px] italic"
+          style={tagSpot}
+        >
+          <ArrowGlyph dir={tagDir} />
+          {s.tag ?? s.press}
+        </div>
+      )}
       {rect && <div aria-hidden data-tour-ring className="tour-ring pointer-events-none fixed z-[134] rounded-2xl" style={{ left: 0, top: 0, transform: `translate(${rect.left - 6}px, ${rect.top - 6}px)`, width: rect.width + 12, height: rect.height + 12 }} />}
       <div
         ref={cardRef}
@@ -524,12 +567,19 @@ export function Walkthrough() {
         </div>
         <h2 className="tour-title font-display m-0 text-[20px] leading-tight">{step === "quests" && left2.length === 1 ? "One quest left" : s.title(name)}</h2>
         <p className="tour-text m-0 text-[14.5px] leading-snug">{step === "quests" && left2.length === 1 ? `One quest still waits for you, ${name}: “${left2[0]}”. It pays XP and coins when it's done.` : s.text(name)}</p>
-        {s.press && (
-          <p className="tour-press m-0 flex items-start gap-1.5 rounded-lg px-2.5 py-1.5 text-[13.5px] font-semibold leading-snug">
-            <span aria-hidden>✦</span>
+        {/* The ask itself (owner, Nov 16: "less like a button and more like an action request"): three looks to choose from. */}
+        {s.press && pressStyle === "whisper" && (
+          <p className="tour-whisper m-0 flex items-start gap-1.5 text-[14px] italic leading-snug" data-tour-ask>
+            <ArrowGlyph dir={toward} />
             <span>{s.press}</span>
           </p>
         )}
+        {s.press && pressStyle === "ribbon" && (
+          <p className="tour-ribbon m-0 text-center text-[12px] font-semibold uppercase leading-snug tracking-[0.1em]" data-tour-ask>
+            <span>{s.press}</span>
+          </p>
+        )}
+        {s.press && pressStyle === "tag" && <p className="tour-whisper m-0 text-[13px] italic leading-snug opacity-80">{toward === "up" ? "Look above ↑" : toward === "down" ? "Look below ↓" : s.press}</p>}
         {step === "intro" && (
           <form
             className="mt-1 flex flex-col gap-2.5"
@@ -569,7 +619,7 @@ export function Walkthrough() {
         {step === "quests" && (
           <div className={`grid gap-2 ${left2.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
             {left2.includes(EXPLORE) && (
-              <button type="button" onClick={() => go("ex-today")} className="h-10 rounded-full px-2 text-[13.5px] font-semibold tour-chip">
+              <button type="button" onClick={() => go("ex-calendar")} className="h-10 rounded-full px-2 text-[13.5px] font-semibold tour-chip">
                 {EXPLORE}
               </button>
             )}
@@ -636,6 +686,18 @@ export function Walkthrough() {
   );
 }
 
+/** A small hand-drawn arrow toward the lit control (or a quill mark when it points at nothing). */
+function ArrowGlyph({ dir }: { dir: "up" | "down" | "left" | "right" | null }) {
+  if (!dir) return <span aria-hidden className="mt-[1px] shrink-0">✦</span>;
+  const turn = { up: "none", down: "rotate(180deg)", left: "rotate(-90deg)", right: "rotate(90deg)" }[dir];
+  return (
+    <svg aria-hidden width="14" height="16" viewBox="0 0 14 16" fill="none" className="mt-[2px] shrink-0" style={{ transform: turn }}>
+      <path d="M7 15 C5 11, 9 8, 7 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M3.5 5 L7 1.5 L10.5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /**
  * The character step: describe them in your own words, choose a style, and he paints the portrait right here
  * (the same painter as Settings › Your character). Already have one? It shows, to keep or paint anew.
@@ -648,6 +710,15 @@ function CharacterPainter({ name, busy, onKeep }: { name: string; busy: boolean;
   const [painting, setPainting] = useState(false);
   const [painted, setPainted] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // The same parts as Settings › Your character (owner, Nov 16): each style's example, ideas to try, prompting tips.
+  const [examples, setExamples] = useState<Record<string, string> | null>(null);
+  const [ideas, setIdeas] = useState(0);
+  const [tips, setTips] = useState(false);
+  useEffect(() => {
+    ensureStyleExamplesAction()
+      .then(setExamples)
+      .catch(() => setExamples({}));
+  }, []);
   useEffect(() => {
     tourAvatarAction()
       .then((u) => setUrl(u))
@@ -672,7 +743,7 @@ function CharacterPainter({ name, busy, onKeep }: { name: string; busy: boolean;
 
   const showPortrait = !!url && !repaint;
   return (
-    <div className="mt-1 flex flex-col gap-2.5" data-tour-character>
+    <div className="-mr-2 mt-1 flex max-h-[46dvh] flex-col gap-2.5 overflow-y-auto overscroll-contain pr-2" data-tour-character>
       {showPortrait ? (
         <div className="reveal flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element -- stored portrait */}
@@ -699,12 +770,53 @@ function CharacterPainter({ name, busy, onKeep }: { name: string; busy: boolean;
               disabled={painting}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Art style">
+          {/* Ideas to try: a tap writes one on the line above (to change as you like). */}
+          <div className="flex flex-col gap-1" data-tour-ideas>
+            <span className="tour-call text-[12px] italic">Need ideas? Tap one to try it</span>
+            <div className="flex flex-wrap gap-1.5">
+              {[0, 1, 2].map((k) => {
+                const idea = SAMPLE_AVATAR_PROMPTS[(ideas * 3 + k) % SAMPLE_AVATAR_PROMPTS.length];
+                return (
+                  <button key={idea} type="button" onClick={() => setWords(idea)} disabled={painting} className="tour-chip rounded-2xl px-2.5 py-1 text-left text-[12.5px] leading-snug">
+                    {idea}
+                  </button>
+                );
+              })}
+              <button type="button" onClick={() => setIdeas((n) => n + 1)} className="tour-skip h-7 px-1 text-[12.5px] underline underline-offset-2">
+                More ideas
+              </button>
+            </div>
+          </div>
+          {/* Each style shows its own example portrait. */}
+          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Art style">
             {AVATAR_STYLE_OPTIONS.map((o) => (
-              <button key={o.key} type="button" role="radio" aria-checked={style === o.key} title={o.description} onClick={() => setStyle(o.key)} className="h-8 rounded-full px-3 text-[13px] font-semibold tour-chip" disabled={painting}>
+              <button key={o.key} type="button" role="radio" aria-checked={style === o.key} title={o.description} onClick={() => setStyle(o.key)} className="tour-chip tour-style flex flex-col items-stretch gap-1 rounded-xl p-1.5 text-[12.5px] font-semibold" disabled={painting}>
+                <span className="relative block aspect-square w-full overflow-hidden rounded-lg" style={{ background: "rgba(0,0,0,.25)" }}>
+                  {examples?.[o.key] ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- stored example portrait
+                    <img src={examples[o.key]} alt={`${o.label} example`} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="absolute inset-0 grid place-items-center text-[10.5px] italic opacity-70">{examples ? "No preview" : "Painting…"}</span>
+                  )}
+                </span>
                 {o.label}
               </button>
             ))}
+          </div>
+          {/* Prompting tips, folded until asked for. */}
+          <div>
+            <button type="button" onClick={() => setTips((v) => !v)} aria-expanded={tips} className="tour-call text-[12.5px] italic underline-offset-2 hover:underline">
+              {tips ? "Hide the tips" : "Tips for a great portrait ›"}
+            </button>
+            {tips && (
+              <ul className="tour-text reveal m-0 mt-1 flex list-disc flex-col gap-1 pl-5 text-[12.5px] leading-snug">
+                <li><b>Who, wearing what, holding what.</b> “An old owl sage in a starry cloak, holding a lantern” beats “a wizard”.</li>
+                <li><b>Pick a mood.</b> Brave, calm, mischievous, weary: one word changes the whole face.</li>
+                <li><b>Make it yours.</b> Add something from your real life: your dog, your instrument, the mountains you hike.</li>
+                <li><b>One character, close up.</b> Portraits read best small when it&rsquo;s a single figure from the shoulders up.</li>
+                <li><b>Try two styles.</b> The same words in Storybook and Heroic can look like different heroes.</li>
+              </ul>
+            )}
           </div>
           {painting && <p className="tour-text tour-painting m-0 text-[13.5px] italic">Painting your portrait… this takes a few moments.</p>}
           {err && (

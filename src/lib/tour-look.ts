@@ -46,3 +46,22 @@ function subscribe(cb: () => void) {
 export function useTourLook(): TourLook {
   return useSyncExternalStore(subscribe, read, () => "narrator");
 }
+
+/**
+ * How a step's ask ("Tap the +…") is drawn (owner, Nov 16: less like a button, more like an action request).
+ * Three looks under review: a whispered line with an arrow toward the control, a gilded ribbon rule, or a small
+ * tag beside the lit control itself. Kept on this device (`tour-press-style`) until one is chosen.
+ */
+export type TourPress = "whisper" | "ribbon" | "tag";
+const PRESS_KEY = "tour-press-style";
+function readPress(): TourPress {
+  try {
+    const v = localStorage.getItem(PRESS_KEY);
+    return v === "ribbon" || v === "tag" ? v : "whisper";
+  } catch {
+    return "whisper";
+  }
+}
+export function useTourPress(): TourPress {
+  return useSyncExternalStore(subscribe, readPress, () => "whisper");
+}

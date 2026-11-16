@@ -3473,12 +3473,22 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
 .tour-card[data-look="page"] .tour-name::placeholder, .tour-card[data-look="page"] .tour-describe::placeholder { color: rgba(107, 58, 20, .4); }
 .tour-card[data-look="page"] .tour-name-star { color: #a07a2c; }
 .tour-card[data-look="page"] .tour-press { box-shadow: 0 0 0 1px #a88a3f, 0 1px 0 rgba(0, 0, 0, .06); }
+/* The step's ask (owner, Nov 16): not a button. "whisper": an italic line with a hand-drawn arrow toward the lit
+   control; "ribbon": small caps between two gilded rules; "tag": a small label beside the lit control itself. */
+.tour-whisper { color: #f2d58a; }
+.tour-card[data-look="page"] .tour-whisper { color: #7a4a14; }
+.tour-ribbon { display: flex; align-items: center; gap: 10px; color: #f2d58a; }
+.tour-ribbon::before, .tour-ribbon::after { content: ""; flex: 1; height: 1px; min-width: 18px; background: linear-gradient(90deg, transparent, #c9a24a); }
+.tour-ribbon::after { background: linear-gradient(90deg, #c9a24a, transparent); }
+.tour-ribbon span { flex: 0 1 auto; }
+.tour-card[data-look="page"] .tour-ribbon { color: #7a4a14; }
+.tour-tag { color: #f6dd98; background: rgba(16, 32, 31, .88); box-shadow: 0 0 0 1px rgba(242, 213, 138, .6), 0 4px 12px rgba(0, 0, 0, .4); animation: card-pop-in .3s ease both; }
 /* The character's description, written on the card like the name: no box, a gilded line under it. */
 .tour-describe { background: transparent; border: 0; outline: none; resize: none; width: 100%; font-size: 16px; line-height: 1.4; color: #f6dd98; caret-color: #f2d58a; font-style: italic; }
 .tour-describe::placeholder { color: rgba(242, 213, 138, .42); }
 .tour-describe-line { position: relative; padding-bottom: 4px; }
 .tour-describe-line::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px; background: linear-gradient(90deg, transparent, #c9a24a 12%, #f2d58a 50%, #c9a24a 88%, transparent); }
-.tour-card .tour-chip[aria-checked="true"] { background: rgba(242, 213, 138, .26); border-color: #f2d58a; }
+.tour-card .tour-chip[aria-checked="true"], .tour-card .tour-style[aria-checked="true"] { background: rgba(242, 213, 138, .26); border-color: #f2d58a; }
 .tour-card[data-look="page"] .tour-chip[aria-checked="true"] { background: rgba(217, 180, 95, .35); border-color: #8a6116; }
 .tour-portrait { border-radius: 9999px; box-shadow: 0 0 0 2px #c9a24a, 0 0 0 4px #10201f, 0 0 0 5px rgba(242, 213, 138, .6), 0 0 18px rgba(120, 230, 210, .4); object-fit: cover; }
 @keyframes tour-paint { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }

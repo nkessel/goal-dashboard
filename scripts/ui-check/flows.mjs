@@ -570,13 +570,16 @@ export const FLOWS = [
       await next("let's begin", "character");
       if (!(await h.page.locator("[data-tour-character]").count())) throw new Error("Character painter missing from the walkthrough");
       await h.typeIn((p) => p.locator("[data-tour-character] textarea").first(), "tour character", "A calm monk with a lantern");
-      await h.tap((p) => card(p).getByRole("radio", { name: /^storybook$/i }), "tour: art style", { optional: true });
+      await h.tap((p) => card(p).getByRole("radio", { name: /storybook/i }), "tour: art style", { optional: true });
+      await h.tap((p) => card(p).getByRole("button", { name: /tips for a great portrait/i }), "tour: portrait tips", { optional: true, expectMove: true });
       await h.check("tour: character described");
-      // The fake database can't paint: skip the step, which sets out the two starter quests.
-      await next("skip this step", "two starter quests");
+      // The fake database can't paint: skip the step, which sets out the two starter quests and tours the home screen.
+      await next("skip this step", "home: you");
+      for (const shot of ["home: due soon", "home: daily habits", "home: today's quests", "home: additional quests", "home: victories today"]) await next("next", shot);
+      await next("next", "two starter quests");
       if ((await h.page.getByText(/explore the realm/i).count()) < 2) throw new Error("Starter quest “Explore the realm” isn't on Today");
-      await next("explore the realm", "explore: Today's Quests");
-      for (const shot of ["explore: Additional Quests", "explore: Victories Today", "explore: calendar", "explore: boards", "explore: insights", "explore: party", "explore: treasure chest", "explore: feedback"]) await next("next", shot);
+      await next("explore the realm", "explore: calendar");
+      for (const shot of ["explore: boards", "explore: insights", "explore: party", "explore: treasure chest", "explore: feedback"]) await next("next", shot);
       await h.tap((p) => card(p).getByRole("button", { name: /claim this quest/i }), "tour: claim explore", { optional: true, expectMove: true });
       await h.settle(2500);
       await h.page.getByRole("button", { name: /^continue$/i }).first().click({ timeout: 3000 }).catch(() => {});
@@ -584,6 +587,14 @@ export const FLOWS = [
       await h.settle(1200);
       await h.check("tour: one quest left");
       await next("create your first quest", "create: intro, pointing at +");
+      // The three looks for the step's ask, on this step (owner's review).
+      for (const style of ["ribbon", "tag"]) {
+        await h.page.evaluate((v) => (localStorage.setItem("tour-press-style", v), window.dispatchEvent(new Event("tour-look-change"))), style);
+        await h.settle(400);
+        await h.check(`create: ask as ${style}`);
+      }
+      await h.page.evaluate(() => (localStorage.removeItem("tour-press-style"), window.dispatchEvent(new Event("tour-look-change"))));
+      await h.settle(300);
       await h.tap(/^create something new$/i, "tour: + ", { expectMove: true });
       await h.settle(500);
       await h.tap((p) => p.getByRole("button", { name: /^new quest/i }).first(), "tour: + › New quest", { optional: true, expectMove: true });
@@ -595,11 +606,22 @@ export const FLOWS = [
       await next("next", "create: reward");
       await h.tap((p) => p.locator('[role="dialog"][data-save-keys] [data-tour="fact-xp"]').first(), "tour: XP pill", { optional: true, expectMove: true });
       await h.settle(500);
-      if (!(await h.page.locator("[data-xp-guide]").count())) throw new Error("XP guide missing from the XP panel");
-      await h.check("create: XP guide");
+      if (await h.page.locator("[data-xp-guide]").count()) throw new Error("The XP guide pills show during the walkthrough");
+      await h.check("create: XP controls lit");
       await next("next", "create: create it");
       await h.tap((p) => p.locator('[role="dialog"][data-save-keys] [data-submit]').first(), "tour: create quest", { optional: true, expectMove: true });
       await h.settle(2500);
+      await h.check("create: engage your quest");
+      await h.tap((p) => p.locator("[data-task-id]", { hasText: "Call the dentist" }).getByRole("button", { name: /^quest actions$/i }).first(), "tour: quest menu", { optional: true, expectMove: true });
+      await h.settle(500);
+      await h.tap((p) => p.getByRole("menuitem", { name: /engage quest/i }).first(), "tour: engage quest", { optional: true, expectMove: true });
+      await h.settle(900);
+      await h.check("create: one quest, nothing else");
+      await h.tap((p) => p.locator(".one-thing").getByRole("button", { name: /complete/i }).first(), "tour: complete in engage", { optional: true, expectMove: true });
+      await h.settle(2500);
+      await h.page.getByRole("button", { name: /^continue$/i }).first().click({ timeout: 3000 }).catch(() => {});
+      await h.page.keyboard.press("Escape").catch(() => {});
+      await h.settle(1200);
       await h.check("create: claim your first victory");
       await h.tap((p) => p.getByRole("checkbox", { name: /complete create your first quest/i }).first(), "tour: claim create", { optional: true, expectMove: true });
       await h.settle(2500);

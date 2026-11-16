@@ -1488,7 +1488,7 @@ export async function ensureStyleExamplesAction(): Promise<Record<string, string
   const out: Record<string, string> = {};
   const db = supabaseAdmin();
   const { data: existing } = await db.storage.from("ai-images").list("style-examples");
-  const have = new Set((existing ?? []).map((f: { name: string }) => f.name));
+  const have = new Set((Array.isArray(existing) ? existing : []).map((f: { name: string }) => f.name));
   for (const style of AVATAR_STYLE_OPTIONS) {
     // Heroic keeps the v2 example Nathan liked.
     const version = style.key === "heroic" ? "v2" : "v7";
@@ -5184,6 +5184,14 @@ export async function tourStarterQuestsAction(have: { exploreId?: string | null;
   const createId = (await keep(have.createId)) ?? (await make("Create your first quest ✦", "Make your first real quest with the Great Toucan Spirit, then tick this one off to claim its reward.", 25, 2));
   revalidatePath("/");
   return { exploreId, createId };
+}
+
+/** The quest made in the walkthrough joins Today's Quests, where Engage Quest is shown next. */
+export async function tourPinQuestAction(taskId: string) {
+  const ownerId = await requireProfileId();
+  if (!/^[0-9a-f-]{36}$/i.test(taskId)) return;
+  await supabaseAdmin().from("tasks").update({ is_manual_priority: true }).eq("id", taskId).eq("owner_id", ownerId);
+  revalidatePath("/");
 }
 
 /** The portrait the account wears now (the walkthrough's character step shows it). */
