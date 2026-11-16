@@ -1,0 +1,75 @@
+# Priorities: the owner's queues
+
+The owner's ranked lists of what to build, moved here from `docs/HANDOFF.md` (sections 0 and 1) on Nov 16 so sessions don't load them at every start. **Open this when you're choosing what to work on.** Text is as it stood; **some items have shipped since**: before building one, search `docs/SHIPPED.md` for its note id or name, and strike or remove it here when you confirm it's done. Add new asks here in priority order, with what each is waiting on.
+
+Related: `docs/BUILD-PLAN.md` (tasks for lighter models), `docs/REPEAT-ASKS.md`, `docs/FEEDBACK-OPEN.md`, `docs/HIGH-EFFORT.md`, `docs/WAITING.md` (what's waiting on the owner).
+
+**Pending in-app feedback (as of Nov 12):** 316 unshipped notes since Oct 27 (Nov 12 afternoon, all tagged by screen: welcome 55, calendar 52, quest editor 38, quest cards 35, habits 28, today 26, universal 23, insights 20; see `docs/FEEDBACK-BY-SCREEN.md`). Earlier count: 286 (Nov 12 morning; by day: Nov 2 76, Nov 4 61, Nov 5 63, Nov 6 18, Nov 9 26, Nov 12 9, others under 11). **The database is the full list**: `docs/FEEDBACK-OPEN.md` covers notes to Nov 5 and section 0 below the Nov 9–11 ones, so the Nov 6–7 and Nov 12 notes are only in the database. Earlier count: 277 (query in section 3, Nov 11; many are already built but were never marked: when you build one, mark it). The Supabase connector was connected on Nov 10; if it's missing, ask the owner to connect it (claude.ai Settings › Connectors).
+
+---
+
+**Lighter-model sessions: work from `docs/BUILD-PLAN.md` (Nov 14), top to bottom.**
+
+## 0. Start here: top dev priorities (owner, Nov 11: "save our top dev priorities to continue with another account")
+
+Take them in order. Each is the owner's own ask (note id prefix in brackets; read the full note with the section 3 query, `where id::text like 'xxxx%'`).
+
+1. **Bug: adding a quest in "Choose tomorrow's quests" clears the whole list** [2664d546], and the quest creator button there is faulty [234f0d70]. Loses work, so first. (`evening/TomorrowQuests.tsx`: local `ticked`/`rowsLocal` state is likely reset when `queued` changes after the add.)
+2. **Right-click menus open as popup menus, not inline trays** [841971c2] (app-wide; quest card ⋯ / right-click, habits, rites).
+3. **Today's "auto-scheduler"/calendar sheet** [a3fe0686]: movable, the calendars' colours as on the calendar screen, choose which calendars show.
+4. **Sleep check-in**: a sleep-notes field under the faces [d38e5f85]; its Save beside the Sleep quality button, not below [1416c34f].
+5. **Feedback tool**: show the current draft above past feedback, more distinct (on-theme) bubbles for past notes [2cf6858f]; "Cancel" instead of "Keep it as it was" when editing a past note [a5453c54].
+6. **Insights**: a log of today's check-ins with a range drop-down for longer; gears fixed (shape and place: the check-in section's gear vs the Insights page's gear) [388c0f4e]; sleep/wake times and notes on the chart [10a509a0, f3cca214]; thumbs-up a check-in [a4df137c]; the Wheel of Time spun by dragging, no turn count [bb5ca474].
+7. **Toucan Spirit settings** sit with the cage icon [89fd58c4].
+8. **Evening: edit things in Celebrate today's wins** [ef01814f].
+9. **Anti-habits / streaks** (Nov 9 notes): log without saying "slip", show them more like habits [b07ee9eb]; edit the habits shown in Streaks [3d5ccb0e]; add one in the past simply [2388f419]; tracked-event options shown [57384f3c].
+10. **Smaller Nov 9 notes**: archive asks Fail / Archive (default) / Delete [441501e4]; "Remove from Additional Quests" → Move [2dc2a33d]; move icon = folder [457bea7b]; hold a Due soon quest for its menu [144dcaa0]; less space between Due soon and Habits [6a5acc13]; the auto-schedule button movable [3cec60a1]; journal prompts: drop "Last night's dream", add a custom one, hold to delete [64a404e0]; can't remove all stones [5cd3e891]; "+25" should say XP [89c05f2c]; remove a party member [d9a74c0f]; party: XP confirmation after the emotional check-in [b5b83086]; welcome minus button tilts [d454f537]; swipe left shows only snooze [839ff5d5]; smoother quest reordering [14b894f7].
+11. **Brainstorm, report back first (don't build):** character info at the top of Settings and a character screen [98a2c58f].
+12. **Ask the owner before doing anything:** the email to Daniel about his Champion title [13b4b2d4] (sending a message on his behalf needs his OK and wording).
+13. Then `docs/FEEDBACK-OPEN.md` and `docs/REPEAT-ASKS.md`, and section 1 below.
+
+**Needs a real-iPhone look (from Nov 10):** prioritize cards' swipe, the Schedule… window's card drag, sequence fan-out, the welcome feedback button drag, Morning routine title rename.
+
+---
+
+## 1. Top priorities
+
+Ranked. Take the first item that isn't blocked on the owner. When you finish one, move it to "Recently shipped" and re-rank.
+
+| # | Work | State | Next step |
+|---|---|---|---|
+| 0000 | **docs/FEEDBACK-OPEN.md** (the owner's open notes, by area) | Ready | Build a group at a time; repeat asks first. |
+| 000 | **docs/REPEAT-ASKS.md, open rows** (owner, Nov 2: do repeated asks comprehensively) | Ready | Work the open rows there first, highest count first: seamless calendar scroll (12), feedback tool lag (14), habit editor (15). |
+| 00 | **Plan my day follow-ups** (owner's notes, Nov 2) | Ready | Shipped (below). Left: mobile long-press on the Today's Quests header for a menu (the header's long press is the section drag on iPhone, so ✨ shows while the section is open instead); habits placed as real calendar blocks (now only room kept, 🌿); "🎧 something to listen to" as an icon in the planner to pick today's learning video (note); the owner's ask to plan Alliance Jiu Jitsu soon and Shaolin within 45 days (create as quests with plan_by; needs DB or the app); Martin-care quests as follow-ups when scheduling time with Dad; the morning exercise blocks on the owner's calendar go once the Gym habit holds the time. |
+| 0 | **Import scheduling: follow-ups** | Ready | Shipped Nov 1 (below). Left: a one-tap "Breakfast today" on Today/check-in only matters if breakfast is turned off; essentials' ideal times aren't editable yet (only ranges and lengths, in Auto-schedule › Daily essentials); accepted placements go straight on the calendar (no separate tentative state in the database). |
+| 1 | **Arrange in context on every screen** (owner ask, Oct 30) | In progress | Welcome, quest editor, quest menu, Today, Insights, a board and the calendar done (`ui/ScreenArrange.tsx` + `lib/screen-layout.ts` for any new screen). Next: boards list, Treasure Chest, Settings pages, plan. |
+| 1b | **Finish the UX synthesis** (welcome screen polish, quest editor) | In progress | Follow `docs/WIP-ux-synthesis.md` "Still to do". Reviews in `docs/ux/`. Left: consistent capitalization, pinned editor footer. The UX teams can now read real click timings from `ui_clicks`. |
+| 2 | **Owner's queue (Nov 1)** | In progress | Work through "Next up, in order" right below this table, top to bottom. |
+| 1c | **UI check: keep it covering everything** (owner, Nov 2: "so I don't find a bug at every screen") | Ongoing | `npm run ui-check` before every push (see CLAUDE.md, `docs/ui-check.md`). Findings log with status: `/mnt/project-files/ui-audit/2026-11-02-findings.md` (Claude project files). Next: flows for boards (a board's arrange mode), Treasure Chest editors, the quest editor's folds, the toucan chat, the feedback box itself; a "layout viewport shrinks" keyboard mode (Chrome on iPhone) in `fakeKeyboard`. |
+| 2b | **Smoothness audit follow-ups** | Ready | Audit method: in the signed-in browser pane, a layout-shift + DOM observer script opens every toggle and fakes the keyboard by overriding `visualViewport.height` (Oct 31 night). Left: a real-iPhone keyboard pass (the simulation can't show iOS panning); (Insights' Last night and the remaining exits were done Nov 1.) |
+| 3 | **Toucan-started feedback builds** | Owner action | Built Oct 28 (`src/lib/data/feedback-run.ts`). The owner must generate the scheduled task's API token and paste it in Settings › App feedback. Then test one real run ("implement my feedback"). |
+
+### Next up, in order (owner's queue as of Nov 1 evening)
+
+Each item is the owner's own ask. Take them top to bottom; mark done here and move to Recently shipped.
+
+1. **Check two one-time cleanups ran** (`src/lib/data/cleanups.ts`, run from AppShell's `after()` on the owner's next page load, each recorded in `profiles.life_wheel.cleanups`):
+   - `sleep-quality-dupes-2026-11-01`: **ran Nov 1 (verified: 1 row left)**. It should leave **1** 'Sleep quality' row in `check_ins` for 2026-11-01 (there were 558). Check: `select count(*) from check_ins where owner_id='42ed6196-bfb0-474d-96a9-1a6cd6807b8b' and metric='Sleep quality' and created_at::date='2026-11-01';`
+   - `forms-on-cards-2026-11-01`: puts the uploaded PDFs on import cards "Claim unclaimed MA money from the Treasurer" (1 file) and "Apply for subway performer permit" (blank + filled). Check `select title, attachments from import_cards where id in ('13b3a450-7045-40d6-b27a-0298aa225349','d23f2e67-fd71-4301-b42c-a36fe5d0aef7');`
+   - The temporary upload function `tmp_handoff_attachment` is closed (Nov 1: replaced by a stub that always raises, execute revoked from everyone; the real password is refused). Dropping it is optional tidying: `drop function if exists public.tmp_handoff_attachment(text,text,text,text);` (needs a connector approval).
+2. **Page-change lag, the rest:** Today, Insights and the calendar (Google events alongside the quests) now load in one wave. Plan, matrix, the Guild Hall (/feed) and a friend's page load in one wave too (Nov 2; Treasure Chest, Settings and /import already did). Left: measure on the live app; if a screen still lags, look inside its components: put independent queries in one `Promise.all`, stream slow extras with `Suspense`. Measure with a signed-in session if possible.
+3. **Queued in-app feedback notes** (40 on Nov 1; query in section 3). Batch 1 shipped Nov 1 (see Recently shipped). Marked shipped (verified): 7db714b0, 1312c8cf, 5bfca9fc, a0d361cd, c028825d, 49ebadea, 1cab0c69, d78e903f, 5e3b3c36, 87af3830, 69d2f921, c39a347a, 9ea4eb26, 86769211, c5fcedd8, 0cb3e071, 9a91631f (id prefixes). Still to do, by note: XP −/+ left and right of the bar with the total at its right (d2f54e0b); no wasted line break in today's wise words (99d73687); "Choose today's quests" uses the regular quest cards (b75f0442); swipe a check-in section left to snooze it a day (8baeafef); switching quest type keeps title and details (db9d9f75); quest done: celebration only after pressing Done (0aff9fa6); edited XP shows in the celebration (38b70e05); long-press/right-click a victory to edit it (068109c7); toucan menu cut off + a gear (top right) and × in his menu, settings as an in-context popup from the welcome screen, chevron under him (ed9b805c, af4647d3); keyboard: black band behind it on close (ed9b805c); 3 visible re-layouts after submitting feedback (eb0f2695); toucan respond field lower (25% overlap), centred, coloured when idle and off-white while typing (07f1e90d); bubble shows × to close it, ✎ only on long-press/right-click (aca19398); type a time by tapping the time field (0be9b53e); a Submit button bottom right of the sleep check-in (dd8690bf); tapping a pill in edit mode edits it (ba79a598); folded sleep check-in previews what was entered (cb22d80e); events: split by commas/semicolons + report other smooth input ideas to the owner (ea3e02ed); smiley-face option for emotional check-in metrics, toggled by long-press/right-click on the name (8b08e46d); the wise-saying "what would make it better" field is covered by the keyboard (f7f8033e); long-press a portrait image to delete it (92ce2ca5). One note ("Wtf is this?", d91dcff1) had only a screenshot at 390×347 (keyboard up): likely the keyboard band; ask the owner if unclear.
+4. ~~To buy cards: per-item reward~~ shipped Nov 1.
+5. **Online learning videos list**: 🎧 pill shipped Nov 1 (under a walk/drive/dog habit still to do, e.g. "Chester Care 🐶"; `LISTEN_HABIT` in `DailyHabits.tsx`, board found by title /learning videos|listen/). Later maybe: the calendar marks listening windows (commutes, dog walks) and suggests a video; dog walks should show on the calendar (owner, Nov 1). (Board "Online learning videos" made Nov 1, id ef1193ff-f30e-402e-bda0-758b7bc1859a, with the Facing Fragility quest off Today; links in quest descriptions are clickable now). Left: the reminder, once the owner picks one: a list (e.g. a board or a Settings › Lists entry) of videos for walks and car rides, seeded with https://spiraljourneyworkthatreconnects.org/facing-fragility/ ("Facing Fragility", Spiral Journey / Work That Reconnects). The owner needs reminding it exists: offer light options in a plain message and let them pick (e.g. the toucan mentions it when a walk/drive habit is checked, a weekly nudge, a welcome-screen pill, a + sheet shortcut). Don't overwhelm; no button walls.
+6. ~~Welcome-screen habit pills: Learn a language~~ shipped Nov 1 (`xp/LearnLanguage.tsx`, `lib/languages.ts`, `translatePhraseAction`). Next pill ideas welcome; add to `HABIT_PILLS`.
+7. **Quest Game note items** (owner picked these):
+   - ~~"How to support me" on the profile~~ shipped Nov 1 (a "💛 How to support me" button in the Guild Hall /feed that opens the note in place, `SupportButton` in `settings/SupportNote.tsx`; the owner wants it in the party area, not Settings, `life_wheel.support`, shown on /friends/<id>).
+   - Zoom in/out on boards with light animation; a single sub-quest fills the width.
+   - Longer, smoother victory sparkles; the quest title fully visible on the victory screen. (Checked Nov 1: the title already wraps in full, `QuestComplete.tsx` h2 `break-words`; sparkles linger 6.5s after the bar fills. Ask the owner what still feels short before changing.)
+   - A simpler XP burst for habits, rites and mini-quests.
+   - A shimmering border on reward cards. (Already there: `.reward-shimmer` on Treasure Chest cards, two passes on load; maybe the owner wants it continuous or on the border only. Ask.)
+   - Check the "+ board" chip on a Martin board quest (looks wrong; investigate).
+8. ~~Rituals of connection tracking~~ shipped Nov 1 (owner, Nov 1): each ritual (e.g. couples covenant, wheel of consent) shows how long since it was last done and a log of when; also in Insights like Streaks. Light: no button walls. Plan: rituals as rites with `kind = 'ritual'` (kept off the daily habit list), an Insights section "Rituals of connection" with days-since, a "Did it ✓" and the history.
+9. **Message anyone in the party** (owner, Nov 1, later): the recipient gets an email notification with the whole message in it.
+10. **Calendar listening windows** (owner, Nov 1, later): the calendar spots commutes/dog walks and suggests a video from the learning list; dog walks show on the calendar.
+11. Then the rest of section 1 (arrange in context on remaining screens, UX synthesis polish).
