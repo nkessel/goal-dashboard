@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, useTransition } from "react";
-import { saveCleaningAction } from "@/app/actions";
+import { saveCleaningAction, setSpaceMessAction } from "@/app/actions";
 import { freshKey } from "@/lib/quest-drafts";
 import {
   CHORE_ICONS,
@@ -17,6 +17,8 @@ import {
   laundryNow,
   levelOfTen,
   messNow,
+  spaceClean,
+  spaceWorth,
   styleOf,
   todaysPicks,
   type Chore,
@@ -156,8 +158,29 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
 
   function drag(it: Item, v: number) {
     let next: Cleaning = c;
-    if (it.kind === "space") next = { ...c, spaces: c.spaces.map((s) => (s.id === it.id ? { ...s, mess: v, level: levelOfTen(v), ratedOn: day } : s)) };
-    else if (it.kind === "laundry") next = { ...c, laundry: { ...c.laundry, readings: [...c.laundry.readings.filter((r) => r.on !== day), { on: day, fill: Math.round((v / 10) * 40) / 10 }].slice(-30) } };
+    if (it.kind === "space") {
+      // A space pays its share of its worth when made cleaner (owner, Nov 15); the server works it out.
+      const space = c.spaces.find((s) => s.id === it.id);
+      if (!space) return;
+      const { paid: paidToday } = spaceClean(space, day, v);
+      const was = c;
+      next = { ...c, spaces: c.spaces.map((s) => (s.id === it.id ? { ...s, mess: v, level: levelOfTen(v), ratedOn: day, paid: paidToday } : s)) };
+      setC(next);
+      setError(null);
+      resort(next);
+      startTransition(async () => {
+        try {
+          // The server's count wins (it may know of an earlier payment from another device).
+          const r = await setSpaceMessAction({ day, spaceId: it.id, mess: v });
+          setC((now) => ({ ...now, spaces: now.spaces.map((s) => (s.id === it.id ? { ...s, paid: r.cleaning.spaces.find((x) => x.id === it.id)?.paid ?? s.paid } : s)) }));
+        } catch (e) {
+          setC(was);
+          setError(e instanceof Error ? e.message : "Couldn't save that.");
+        }
+      });
+      return;
+    }
+    if (it.kind === "laundry") next = { ...c, laundry: { ...c.laundry, readings: [...c.laundry.readings.filter((r) => r.on !== day), { on: day, fill: Math.round((v / 10) * 40) / 10 }].slice(-30) } };
     else {
       const ch = c.chores.find((x) => x.id === it.id);
       if (ch) next = { ...c, chores: c.chores.map((x) => (x.id === ch.id ? choreFromNeed(ch, v, day) : x)) };
@@ -220,6 +243,12 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
                           {it.note}
                         </span>
                       </button>
+                      {/* What this space has paid today, as it grows (owner, Nov 15: cleaner pays XP at once). */}
+                      {space?.paid?.on === day && space.paid.xp > 0 && (
+                        <span key={space.paid.xp} data-space-xp title="XP this space has paid today" className="due-in shrink-0 text-[12.5px] font-bold" style={{ color: "#3f7a2c" }}>
+                          +{space.paid.xp} XP
+                        </span>
+                      )}
                       {k === topKey && (
                         <span className="shrink-0 rounded-full px-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ background: "rgba(217,180,95,.45)", color: "#6a4a10" }}>
                           today
@@ -359,6 +388,12 @@ function SpaceEditor({ s, onSet, onRemove, onClose }: { s: Space; day: string; o
         <DoneBtn changed={changed} onClose={onClose} />
       </div>
       <IconRow icons={SPACE_ICONS} value={s.icon} onPick={(icon) => onSet({ icon })} />
+      {/* What the whole space pays, messiest to spotless; each move cleaner pays its share. */}
+      <label className="flex items-center gap-1.5 text-[13px]" style={{ color: "var(--t-ink)" }}>
+        Worth
+        <input type="number" min={0} max={500} inputMode="numeric" defaultValue={spaceWorth(s)} aria-label="XP for cleaning the whole space" onBlur={(e) => e.target.value !== "" && Number(e.target.value) >= 0 && Math.round(Number(e.target.value)) !== spaceWorth(s) && onSet({ xp: Math.min(500, Math.round(Number(e.target.value))) })} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} className="h-8 w-14 rounded-lg px-1.5 text-center" style={field} />
+        XP, from a disaster to spotless
+      </label>
     </div>
   );
 }

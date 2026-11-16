@@ -3583,6 +3583,32 @@ export async function saveCleaningAction(cleaning: unknown) {
 }
 
 /**
+ * A space's bar moved: sets how messy it is now and, when it's cleaner than
+ * before, pays its share of the space's worth in XP
+ * (owner, Nov 15: "make the whole space be worth an amount and give the
+ * fraction of that which the user completed").
+ */
+export async function setSpaceMessAction(input: { day: string; spaceId: string; mess: number }) {
+  const ownerId = await requireProfileId();
+  const { normalizeCleaning, spaceClean, levelOfTen } = await import("@/lib/cleaning");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.day)) throw new Error("Bad day.");
+  const extras = await readExtras(ownerId);
+  const c = normalizeCleaning(extras.cleaning);
+  if (!c) throw new Error("Set up your spaces first.");
+  const space = c.spaces.find((s) => s.id === input.spaceId);
+  if (!space) throw new Error("That space is gone.");
+  const mess = Number.isFinite(Number(input.mess)) ? Math.max(0, Math.min(10, Math.round(Number(input.mess) * 10) / 10)) : null;
+  if (mess === null) throw new Error("Bad level.");
+  const { xp: xpEarned, paid } = spaceClean(space, input.day, mess);
+  const next = normalizeCleaning({ ...c, spaces: c.spaces.map((s) => (s.id === space.id ? { ...s, mess, level: levelOfTen(mess), ratedOn: input.day, paid } : s)) })!;
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, cleaning: next } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  const award = xpEarned > 0 ? await xp.awardXp(ownerId, xpEarned, "mess_battle") : null;
+  if (award) revalidatePath("/");
+  return { cleaning: next, xp: xpEarned };
+}
+
+/**
  * Fighting back the mess in a space: logs before and after (0–10), and
  * optionally minutes and the energy it took and gave; sets the space to how
  * it looks now; pays XP when it's cleaner than before (capped per day).

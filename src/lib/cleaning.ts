@@ -18,8 +18,12 @@ export type Space = {
   mess?: number | null;
   /** The day it was last rated (or tidied). */
   ratedOn: string | null;
-  /** Gets one step messier on its own every this many days (bathroom, kitchen); null = only when you say. */
+  /** Gets one step messier on its own every this many days (bathroom, kitchen); null = only when you say. Paused (owner, Nov 15): kept, not used. */
   driftDays: number | null;
+  /** XP the whole space is worth, spotless from a disaster (10 → 0); a move cleaner pays its share. Default `SPACE_XP_DEFAULT`. */
+  xp?: number | null;
+  /** XP this space has paid today: a space pays at most its worth a day, so dragging up and down again can't pay twice. */
+  paid?: { on: string; xp: number } | null;
 };
 
 export type Chore = {
@@ -108,6 +112,8 @@ export function normalizeCleaning(raw: unknown): Cleaning | null {
       mess: s.mess === null || s.mess === undefined || !Number.isFinite(Number(s.mess)) ? null : Math.max(0, Math.min(10, Math.round(Number(s.mess) * 10) / 10)),
       ratedOn: isDay(s.ratedOn) ? s.ratedOn : null,
       driftDays: Number(s.driftDays) >= 1 ? Math.min(60, Math.round(Number(s.driftDays))) : null,
+      xp: Number.isFinite(Number(s.xp)) && s.xp !== null && s.xp !== undefined ? Math.max(0, Math.min(500, Math.round(Number(s.xp)))) : null,
+      paid: s.paid && isDay(s.paid.on) && Number.isFinite(Number(s.paid.xp)) ? { on: s.paid.on, xp: Math.max(0, Math.min(500, Math.round(Number(s.paid.xp)))) } : null,
     }));
   const chores = (Array.isArray(r.chores) ? r.chores : [])
     .filter((c) => c && typeof c.id === "string" && text(c.name, 48))
@@ -171,11 +177,32 @@ export function dayLabel(d: string, today: string): string {
 // ---------------------------------------------------------------------------
 // Where things stand
 
-/** How messy a space is now on the 0–10 bar: the last rating, plus any drift since (about a third of the bar every `driftDays`). */
+/**
+ * How messy a space is now on the 0–10 bar: the last rating. Meters don't
+ * advance on their own (owner, Nov 15: "pause auto-advancing meters… it
+ * messes up the mechanism if it's inaccurately advanced"), so `driftDays` is
+ * kept but not used; `today` stays for when it comes back.
+ */
 export function messNow(s: Space, today: string): number {
-  const base = s.mess ?? tenOf(s.level);
-  if (!s.driftDays || !s.ratedOn) return base;
-  return Math.min(10, Math.round((base + (3.5 * Math.max(0, daysBetween(s.ratedOn, today))) / s.driftDays) * 10) / 10);
+  void today;
+  return s.mess ?? tenOf(s.level);
+}
+
+/** XP a whole space is worth when none is set. */
+export const SPACE_XP_DEFAULT = 20;
+export const spaceWorth = (s: Space) => s.xp ?? SPACE_XP_DEFAULT;
+
+/**
+ * Moving a space's bar to `after` today: the XP it pays (its worth × the share
+ * of the bar made cleaner, up to what's left of its worth for the day) and the
+ * day's new running total. Moving it messier pays nothing and takes nothing back.
+ */
+export function spaceClean(s: Space, day: string, after: number): { xp: number; paid: { on: string; xp: number } } {
+  const worth = spaceWorth(s);
+  const before = s.paid?.on === day ? s.paid.xp : 0;
+  const won = Math.max(0, messNow(s, day) - after);
+  const xp = Math.max(0, Math.min(Math.round((worth * won) / 10), worth - before));
+  return { xp, paid: { on: day, xp: before + xp } };
 }
 
 /** The same, as one of the style's three words. */
@@ -183,25 +210,19 @@ export function levelNow(s: Space, today: string): MessLevel {
   return levelOfTen(messNow(s, today));
 }
 
-/** Laundry: how full the bin likely is now, and the day the next load is due. */
+/**
+ * Laundry: how full the bin is, from your last reading since the last load
+ * (empty right after a load). No guessing how it fills over time for now
+ * (owner, Nov 15: auto-advancing meters paused): a load is "due" when you last
+ * set it full, "due tomorrow" at three quarters.
+ */
 export function laundryNow(l: Laundry, today: string): { fill: number | null; dueOn: string | null; daysLeft: number | null } {
   const lastLoad = l.loads.at(-1) ?? null;
-  const since = l.readings.filter((r) => !lastLoad || r.on >= lastLoad);
-  const last = since.at(-1) ?? null;
-  if (!last && !lastLoad) return { fill: null, dueOn: null, daysLeft: null };
-  // Quarters a day: from your readings since the last load, else from how often loads come round.
-  let rate: number | null = null;
-  const start = lastLoad ? { on: lastLoad, fill: 0 } : since[0];
-  if (last && start && daysBetween(start.on, last.on) >= 1 && last.fill > start.fill) rate = (last.fill - start.fill) / daysBetween(start.on, last.on);
-  if (rate === null && l.loads.length >= 2) {
-    const gaps = l.loads.slice(1).map((d, i) => daysBetween(l.loads[i], d)).filter((g) => g > 0);
-    if (gaps.length) rate = 4 / (gaps.reduce((a, b) => a + b, 0) / gaps.length);
-  }
-  rate ??= 4 / 7;
-  const from = last ?? { on: lastLoad!, fill: 0 };
-  const fill = Math.min(4, from.fill + rate * Math.max(0, daysBetween(from.on, today)));
-  const dueOn = from.fill >= 4 ? from.on : addDays(from.on, Math.max(0, Math.ceil((4 - from.fill) / rate - 0.25)));
-  return { fill, dueOn, daysLeft: daysBetween(today, dueOn) };
+  const last = l.readings.filter((r) => !lastLoad || r.on >= lastLoad).at(-1) ?? null;
+  const fill = last ? last.fill : lastLoad ? 0 : null;
+  if (fill === null) return { fill: null, dueOn: null, daysLeft: null };
+  const daysLeft = fill >= 3.9 ? 0 : fill >= 3 ? 1 : null;
+  return { fill, dueOn: daysLeft === null ? null : addDays(today, daysLeft), daysLeft };
 }
 
 /** The day a chore next wants doing (a snooze pushes it on). */

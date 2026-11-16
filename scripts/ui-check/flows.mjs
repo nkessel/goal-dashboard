@@ -684,7 +684,13 @@ export const FLOWS = [
         await h.page.getByLabel("How messy is Bathroom?").first().dispatchEvent("pointerup").catch(() => {});
         await h.settle(700);
         await h.check("cleaning: re-sorted");
-        await h.tap("text=Kitchen", "edit a space", { optional: true });
+        // Cleaner pays its share of the space's worth (owner, Nov 15): 9 → 3 on a 20 XP space = +12 XP.
+        await h.page.getByLabel("How messy is Bathroom?").first().fill("3").catch(() => {});
+        await h.page.getByLabel("How messy is Bathroom?").first().dispatchEvent("pointerup").catch(() => {});
+        await h.settle(200);
+        if (!(await h.page.locator("[data-space-xp]").first().isVisible().catch(() => false))) throw new Error("cleaning: no +XP after making a space cleaner");
+        await h.check("cleaning: +XP for a cleaner space");
+        await h.tap('button[title="Edit"]:has-text("Kitchen")', "edit a space", { optional: true });
         await h.check("space editor");
         await esc(h);
       }
