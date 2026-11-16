@@ -8,11 +8,11 @@ unless one is blocked. Each task is self-contained: read its notes, build, check
 - **Design review before shipping** (owner, Nov 14): screen changes go to a `review/<topic>` branch and a review page of screenshots, and reach `main` only after the owner's OK (`CLAUDE.md` › "Design review before shipping").
 - Follow `CLAUDE.md` and `docs/HANDOFF.md` (sections 3 and 4) exactly: `npm run ui-check` for the
   flows you touched before every push, fix every **error** on your screens, add new screens/popups to
-  `scripts/ui-check/flows.mjs`, update HANDOFF "Recently shipped" in the same push.
+  `scripts/ui-check/flows.mjs`, add an entry at the top of `docs/SHIPPED.md` in the same push.
 - Read the open notes before changing a screen: the `screens` query in `docs/FEEDBACK-BY-SCREEN.md`.
   Read each note in full: `select body from journal_entries where id::text like '<prefix>%'`.
 - Mark what you built: `update journal_entries set auto_shipped_at = now() where id::text like '<prefix>%'`
-  (only notes you fully built; say "part" in HANDOFF for partial ones and leave them open).
+  (only notes you fully built; say "part" in `docs/SHIPPED.md` for partial ones and leave them open).
 - Hard rules (HANDOFF section 4): no keys/passwords typed anywhere; never press "Place on the calendar" /
   "Put these on my calendar"; production SQL OK but never "Run without RLS", verify with a SELECT, save schema
   changes as a migration; bulk changes to the owner's quests need his OK first. The repo is public.
@@ -140,7 +140,7 @@ on the live app if any signed-in browser is available; otherwise look for the ne
 
 - Character info at the top of Settings / a character screen [98a2c58f]: brainstorm, report back.
 - Email to Daniel about his Champion title [13b4b2d4]: his OK and wording.
-- Habit editor A/B/C, daily coursework as a habit, import card mockups A/B/C (HANDOFF section 0a).
+- Habit editor A/B/C, daily coursework as a habit, import card mockups A/B/C (`docs/WAITING.md`).
 - What "more visual balance" means on the quest popup.
 - Email sending: needs a domain the owner owns for Resend (`RESEND_API_KEY`, `EMAIL_FROM` set by the owner in Vercel).
 - Prioritize swipe right (paused by the owner, Nov 12).
