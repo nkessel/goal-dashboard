@@ -511,20 +511,35 @@ export const FLOWS = [
       await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
       await h.page.getByText("Gym 🏋️").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
       await h.settle(300);
-      // Complete lesson (owner, Nov 16): the button under a course habit pays XP and coins with the small celebration.
-      await h.page.locator("[data-lesson-button]").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
+      // Count every tick (owner, Nov 16): a habit set to it gives another completion, XP and celebration each tick,
+      // the card counts the day's times, the menu undoes the last one, and the XP changes on the celebration.
+      const walk = (p) => p.locator("li", { hasText: "Walk Chester" }).first();
+      await walk(h.page).evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
       await h.settle(300);
-      await h.check("lesson button");
-      if (await h.tap((p) => p.locator("[data-lesson-button] button[aria-label='Change what a lesson pays']").first(), "lesson: what it pays", { optional: true, expectMove: true })) {
-        await h.check("lesson button: XP and coins");
-        await h.tap((p) => p.locator("[data-lesson-button] button[aria-label='Change what a lesson pays']").first(), "lesson: close pay", { optional: true, expectMove: true });
-      }
-      if (await h.tap((p) => p.locator("[data-lesson-button] button", { hasText: /complete lesson/i }).first(), "lesson: complete", { optional: true })) {
-        await h.settle(1200);
-        await h.check("lesson complete celebration");
-        await h.tap((p) => p.getByRole("button", { name: /^close$/i }).first(), "lesson: close celebration", { optional: true });
-        await h.settle(600);
-        await h.check("lesson button: counted today");
+      await h.check("habit cards: listen link inline");
+      if (await h.tap((p) => walk(p).getByRole("button", { name: /more for walk chester/i }), "habit menu", { optional: true, expectMove: true })) {
+        await h.check("habit menu: count every time");
+        await h.tap((p) => p.getByRole("menuitem", { name: /count every time/i }).first(), "count every time", { optional: true, expectMove: true });
+        await h.settle(300);
+        const closeParty = async () => {
+          await h.tap((p) => p.getByRole("button", { name: /^close$/i }).first(), "close celebration", { optional: true });
+          await h.settle(500);
+        };
+        if (await h.tap((p) => walk(p).getByRole("checkbox").first(), "tick: first", { optional: true })) {
+          await h.settle(1400);
+          await h.check("habit tick: celebration with XP to change");
+          await closeParty();
+          await h.tap((p) => walk(p).getByRole("checkbox").first(), "tick: again", { optional: true });
+          await h.settle(1600);
+          await h.check("habit tick: done again");
+          await closeParty();
+          await h.check("habit card: times today");
+          if (await h.tap((p) => walk(p).getByRole("button", { name: /more for walk chester/i }), "habit menu again", { optional: true, expectMove: true })) {
+            await h.check("habit menu: undo the last one");
+            await h.tap((p) => p.getByRole("menuitem", { name: /undo the last one/i }).first(), "undo the last one", { optional: true });
+            await h.settle(600);
+          }
+        }
       }
       // The habit editor (repeat ask 15): sub-habits in view, dragged to reorder, a dot opens XP/coins/Remove.
       if (await h.tap("text=Gym 🏋️", "habit editor", { optional: true, expectMove: true })) {

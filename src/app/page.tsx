@@ -1,5 +1,5 @@
 import { cookies, headers } from "next/headers";
-import { cleanLessons } from "@/lib/lessons";
+import { habitTicksSeed } from "@/lib/habit-ticks";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { auth, signIn } from "@/auth";
@@ -207,8 +207,7 @@ export default async function Home() {
   const habitPlanRaw = (profile?.life_wheel as { habitPlan?: { core?: unknown; days?: Record<string, unknown> } } | null | undefined)?.habitPlan;
   const idList = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
   const habitPlan = { core: idList(habitPlanRaw?.core), today: idList(habitPlanRaw?.days?.[dayKey]) };
-  const lessonStore = cleanLessons((profile?.life_wheel as { lessons?: unknown } | null | undefined)?.lessons);
-  const lessonSeed = { buttons: lessonStore.buttons, today: lessonStore.days[dayKey] ?? {} };
+  const ticksSeed = habitTicksSeed((profile?.life_wheel as { habitTicks?: unknown } | null | undefined)?.habitTicks, dayKey);
   const plannedHabits = [...new Set([...habitPlan.core, ...habitPlan.today])];
   // Your videos to listen to (a board named like "Online learning videos"): offered under walk and drive habits.
   const listenBoard = (projectBoards as { id: string; title: string }[]).find((b) => /learning videos|listen/i.test(b.title)) ?? null;
@@ -312,12 +311,12 @@ export default async function Home() {
                   theme={theme}
                   between={
                     habits && rites?.some((r) => "slot" in r) ? (
-                      <DailyHabits lessons={lessonSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                      <DailyHabits ticks={ticksSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
                     ) : null
                   }
                   habitsInToday={
                     habits && plannedHabits.length > 0 ? (
-                      <DailyHabits bare lessons={lessonSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                      <DailyHabits bare ticks={ticksSeed} listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
                     ) : null
                   }
                 />

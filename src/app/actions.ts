@@ -1,6 +1,6 @@
 "use server";
 
-import { LESSON_DEFAULT, cleanLessons, type LessonButton, type LessonStore } from "@/lib/lessons";
+import { cleanHabitTicks, habitTicksSeed, type HabitTicks, type HabitTicksSeed } from "@/lib/habit-ticks";
 import { isTentativeTitle } from "@/lib/tentative";
 import { revalidatePath } from "next/cache";
 import { auth, signIn, CALENDAR_AUTH_PARAMS } from "@/auth";
@@ -5236,71 +5236,102 @@ export async function tourCompletePracticeAction(taskId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Complete lesson: a button on a habit that pays XP and coins each time a lesson is done
-// (owner, Nov 16: "a complete lesson button that gives an XP celebration… with editable XP and coin values")
+// Habits done more than once a day (owner, Nov 16: "every tick of the checkbox gives another
+// completion/victory/xp gain… the card keeps track of how many times per day it's been done")
 
-async function saveLessons(ownerId: string, extras: Record<string, unknown>, store: LessonStore) {
-  // The last 90 days of counts are enough for the card.
-  const days = Object.fromEntries(Object.entries(store.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 90));
-  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, lessons: { buttons: store.buttons, days } } }).eq("id", ownerId);
+async function saveHabitTicks(ownerId: string, extras: Record<string, unknown>, ticks: HabitTicks) {
+  // The last 14 days are enough for an undo.
+  const days = Object.fromEntries(Object.entries(ticks.days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 14));
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, habitTicks: { many: ticks.many, days } } }).eq("id", ownerId);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
 }
 
-/** Each habit's lesson button, and how many lessons each has on `day`. */
-export async function lessonsAction(day: string): Promise<{ buttons: Record<string, LessonButton>; today: Record<string, number> }> {
+/** Which habits count every tick, and today's ticks after the first. */
+export async function habitTicksAction(day: string): Promise<HabitTicksSeed> {
   const ownerId = await requireProfileId();
-  const store = cleanLessons((await readExtras(ownerId)).lessons);
-  return { buttons: store.buttons, today: store.days[day] ?? {} };
+  return habitTicksSeed((await readExtras(ownerId)).habitTicks, day);
 }
 
-export async function saveLessonButtonAction(riteId: string, patch: Partial<LessonButton>) {
+/** A habit counts every tick (many times a day), or goes back to once a day. */
+export async function setHabitManyAction(riteId: string, on: boolean) {
   const ownerId = await requireProfileId();
   if (!QUEST_ID.test(riteId)) throw new Error("Unknown habit.");
   const extras = await readExtras(ownerId);
-  const store = cleanLessons(extras.lessons);
-  store.buttons = cleanLessons({ buttons: { ...store.buttons, [riteId]: { ...LESSON_DEFAULT, ...store.buttons[riteId], ...patch } } }).buttons;
-  await saveLessons(ownerId, extras, store);
-  return store.buttons[riteId];
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  ticks.many = on ? [...new Set([...ticks.many, riteId])] : ticks.many.filter((id) => id !== riteId);
+  await saveHabitTicks(ownerId, extras, ticks);
 }
 
-/** One lesson done: pays its XP and coins, counts it for the day and logs it as an event (Insights). */
-export async function completeLessonAction(riteId: string, day: string) {
+/** Done again today: pays the habit's XP and coins once more and counts it. */
+export async function tickHabitAgainAction(riteId: string, day: string) {
   const ownerId = await requireProfileId();
   assertDay(day);
   const rite = await ritesData.getRite(riteId, ownerId);
   if (!rite) throw new Error("That habit is gone.");
   const extras = await readExtras(ownerId);
-  const store = cleanLessons(extras.lessons);
-  const b = store.buttons[riteId] ?? { on: true, ...LESSON_DEFAULT };
-  const count = (store.days[day]?.[riteId] ?? 0) + 1;
-  store.days[day] = { ...(store.days[day] ?? {}), [riteId]: count };
-  await saveLessons(ownerId, extras, store);
-  const award = b.xp > 0 ? await xp.awardXp(ownerId, b.xp, "task_completed") : null;
-  if (b.coins > 0) await rewardsData.addCoins(ownerId, b.coins).catch(() => {});
-  const note = await energyData.addCheckNote(ownerId, `Lesson: ${rite.title}`.slice(0, 200), null, false, { tone: 1 }).catch(() => null);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  const earned = Math.max(0, rite.xp_value);
+  const coinAdjust = rite.coin_value == null ? 0 : Math.max(0, rite.coin_value) - coinsForXp(rite.xp_value);
+  const list = [...(ticks.days[day]?.[riteId] ?? []), [earned, coinAdjust] as [number, number]];
+  ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
+  await saveHabitTicks(ownerId, extras, ticks);
+  let coinsEarned = 0;
+  if (earned > 0) coinsEarned = (await xp.awardXp(ownerId, earned, "task_completed")).coinsEarned;
+  if (coinAdjust !== 0) {
+    await rewardsData.addCoins(ownerId, coinAdjust);
+    coinsEarned += coinAdjust;
+  }
   revalidatePath("/");
-  revalidatePath("/insights");
-  return { xp: b.xp, coins: b.coins, coinsEarned: (award?.coinsEarned ?? 0) + b.coins, totalXp: award?.totalXp ?? null, count, noteId: note?.id ?? null };
+  return { xp: earned, coinsEarned, extra: list.length };
 }
 
-/** Take the last lesson back (a slip of the thumb): its XP, coins, count and event. */
-export async function undoLessonAction(riteId: string, day: string, paid: { xp: number; coins: number; noteId: string | null }) {
+/** Take back the last extra tick of the day (what it paid). False when there was none: undo the habit itself. */
+export async function undoHabitTickAction(riteId: string, day: string) {
   const ownerId = await requireProfileId();
   assertDay(day);
   if (!QUEST_ID.test(riteId)) throw new Error("Unknown habit.");
   const extras = await readExtras(ownerId);
-  const store = cleanLessons(extras.lessons);
-  const had = store.days[day]?.[riteId] ?? 0;
-  if (had < 1) return { count: 0 };
-  // Never take back more than a lesson can pay.
-  const backXp = Math.max(0, Math.min(Math.round(Number(paid.xp) || 0), 500));
-  const backCoins = Math.max(0, Math.min(Math.round(Number(paid.coins) || 0), 100));
-  store.days[day] = { ...store.days[day], [riteId]: had - 1 };
-  await saveLessons(ownerId, extras, cleanLessons(store));
-  if (backXp > 0) await xp.awardXp(ownerId, -backXp, "task_completed").catch(() => {});
-  if (backCoins > 0) await rewardsData.addCoins(ownerId, -backCoins).catch(() => {});
-  if (paid.noteId) await energyData.deleteCheckNote(ownerId, paid.noteId).catch(() => {});
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  const list = [...(ticks.days[day]?.[riteId] ?? [])];
+  const last = list.pop();
+  if (!last) return { undone: false, extra: 0 };
+  ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
+  await saveHabitTicks(ownerId, extras, cleanHabitTicks(ticks));
+  if (last[0] > 0) await xp.awardXp(ownerId, -last[0], "task_completed").catch(() => {});
+  if (last[1] !== 0) await rewardsData.addCoins(ownerId, -last[1]).catch(() => {});
   revalidatePath("/");
-  revalidatePath("/insights");
-  return { count: had - 1 };
+  return { undone: true, extra: list.length };
+}
+
+/** The XP changed on the celebration (owner, Nov 16): the habit pays that from now on, and the tick just made is paid the difference. */
+export async function setHabitXpNowAction(riteId: string, day: string, xpValue: number) {
+  const ownerId = await requireProfileId();
+  assertDay(day);
+  const rite = await ritesData.getRite(riteId, ownerId);
+  if (!rite) throw new Error("That habit is gone.");
+  const next = Math.max(0, Math.min(500, Math.round(Number(xpValue) || 0)));
+  const db = supabaseAdmin();
+  const { error } = await db.from("rites").update({ xp_value: next }).eq("owner_id", ownerId).eq("id", riteId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  const extras = await readExtras(ownerId);
+  const ticks = cleanHabitTicks(extras.habitTicks);
+  const list = [...(ticks.days[day]?.[riteId] ?? [])];
+  let delta = 0;
+  if (list.length) {
+    // The latest tick was an extra one.
+    delta = next - list[list.length - 1][0];
+    list[list.length - 1] = [next, list[list.length - 1][1]];
+    ticks.days[day] = { ...(ticks.days[day] ?? {}), [riteId]: list };
+    await saveHabitTicks(ownerId, extras, ticks);
+  } else {
+    // It was the day's first: the completion itself.
+    const { data } = await db.from("rite_completions").select("xp_awarded").eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day).maybeSingle<{ xp_awarded: number }>();
+    if (data) {
+      delta = next - data.xp_awarded;
+      await db.from("rite_completions").update({ xp_awarded: next }).eq("owner_id", ownerId).eq("rite_id", riteId).eq("day", day);
+    }
+  }
+  if (delta !== 0) await xp.awardXp(ownerId, delta, "task_completed").catch(() => {});
+  revalidatePath("/");
+  return { xp: next };
 }

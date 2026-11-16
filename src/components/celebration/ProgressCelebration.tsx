@@ -1,5 +1,6 @@
 "use client";
 
+import { InlineNumber } from "@/components/ui/InlineNumber";
 import { useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { CoinIcon } from "@/components/ui/Icons";
@@ -18,6 +19,8 @@ export type ProgressCelebrationDetail = {
   heading?: string;
   /** Replaces the line under the bar. */
   barCaption?: string;
+  /** The XP can be changed right here (owner, Nov 16): tap the number, type another. */
+  onXp?: (xp: number) => void;
 };
 
 const CONFETTI_COLORS = ["#f2c94c", "#e2bf63", "#58a04a", "#c0503a", "#4d7fc0", "#f6e6bb"];
@@ -52,6 +55,7 @@ export function ProgressCelebration({
   steps,
   heading = "Progress made!",
   barCaption,
+  onXp,
   extra,
   card = false,
   noBar = false,
@@ -65,6 +69,7 @@ export function ProgressCelebration({
   noBar?: boolean;
 }) {
   const [shown, setShown] = useState(0);
+  const [edited, setEdited] = useState<number | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [pinned, setPinned] = useState(!AUTO_DISMISS);
   const hasExtra = !!extra;
@@ -167,8 +172,20 @@ export function ProgressCelebration({
           </div>}
 
           <p className="pc-xp m-0 mt-1 text-[34px] font-bold leading-none tabular-nums" style={{ color: "var(--t-xp)" }}>
-            +{shown} XP
+            {onXp && (edited !== null || shown === xp) ? (
+              <>
+                +
+                <InlineNumber value={edited ?? xp} onChange={(n) => (setEdited(n), onXp(n))} min={0} max={500} suffix=" XP" label="XP for this (tap to change)" />
+              </>
+            ) : (
+              <>+{shown} XP</>
+            )}
           </p>
+          {onXp && (
+            <p className="m-0 text-[12px]" style={{ color: "#7a6a4a" }}>
+              tap the XP to change it
+            </p>
+          )}
           {coinsEarned > 0 && (
             <p className="m-0 flex items-center gap-1.5 text-[14px]" style={{ color: "#5a4a30" }}>
               <CoinIcon size={16} /> +{coinsEarned} {coinsEarned === 1 ? "coin" : "coins"}

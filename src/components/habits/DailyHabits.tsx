@@ -21,8 +21,11 @@ import { coinsForXp } from "@/lib/coins";
 import { fromFeedback } from "@/lib/from-feedback";
 import { defaultCleaning, normalizeCleaning, todaysPicks } from "@/lib/cleaning";
 import { CleaningCheckIn } from "@/components/habits/CleaningCheckIn";
-import { LanguagePractice, openLanguageWindow } from "@/components/xp/LearnLanguage";
-import { LessonButton, LessonMenuItem, type LessonSeed } from "./LessonButton";
+import { openLanguageWindow } from "@/components/xp/LearnLanguage";
+import { setHabitTicks, useHabitTicks } from "@/lib/use-habit-ticks";
+import type { HabitTicksSeed } from "@/lib/habit-ticks";
+import { setHabitManyAction, setHabitXpNowAction, tickHabitAgainAction, undoHabitTickAction } from "@/app/actions";
+import { celebrateProgress } from "@/components/celebration/QuestCelebrationHost";
 import { SwipeReveal } from "@/components/ui/SwipeReveal";
 import { Fold } from "@/components/ui/Fold";
 
@@ -46,10 +49,10 @@ export function DailyHabits({
   planned = [],
   core = [],
   bare = false,
-  lessons = null,
+  ticks: ticksSeed = null,
 }: {
-  /** Complete lesson buttons and today's counts, so they show from the first paint. */
-  lessons?: LessonSeed | null;
+  /** Habits that count every tick, and today's ticks after the first, so cards are right from the first paint. */
+  ticks?: HabitTicksSeed | null;
   /** Habits in today's plan (core ones and the ones picked for today): they sit in Today's Quests, not here. */
   planned?: string[];
   /** Core habits: a gold star, and they always come up in the day's plan. */
@@ -328,12 +331,71 @@ export function DailyHabits({
     });
   }
 
-  function toggle(h: RiteView) {
+  // Habits that count every tick (owner, Nov 16): each tick is another completion with its XP.
+  const ticks = useHabitTicks(day, ticksSeed);
+  const isMany = (id: string) => ticks.many.includes(id);
+  const timesToday = (id: string, isDone: boolean) => (isDone ? 1 + (isMany(id) ? (ticks.today[id] ?? 0) : 0) : 0);
+  /** The small celebration for a tick, with the XP changeable right on it. */
+  function celebrateTick(h: RiteView, xp: number, coinsEarned: number, times: number) {
     if (!day) return;
+    celebrateProgress({
+      title: h.title,
+      heading: times > 1 ? "Done again!" : "Habit complete!",
+      xp,
+      coinsEarned,
+      fromPct: 0,
+      toPct: 100,
+      barCaption: times > 1 ? `${times} times today` : "First one today",
+      onXp: (n) => void setHabitXpNowAction(h.id, day, n).catch(() => setError("Couldn't change the XP.")),
+    });
+  }
+  function toggleMany(h: RiteView) {
+    const on = !isMany(h.id);
+    setHabitTicks({ many: on ? [...ticks.many, h.id] : ticks.many.filter((id) => id !== h.id) });
+    void setHabitManyAction(h.id, on).catch(() => setError("Couldn't save that."));
+  }
+  function tickAgain(h: RiteView) {
+    if (!day) return;
+    setError(null);
+    const before = ticks.today[h.id] ?? 0;
+    setHabitTicks({ today: { ...ticks.today, [h.id]: before + 1 } });
+    startTransition(async () => {
+      try {
+        const r = await tickHabitAgainAction(h.id, day);
+        setHabitTicks({ today: { ...ticks.today, [h.id]: r.extra } });
+        celebrateTick(h, r.xp, r.coinsEarned, r.extra + 1);
+      } catch (e) {
+        setHabitTicks({ today: { ...ticks.today, [h.id]: before } });
+        setError(e instanceof Error ? e.message : "Couldn't save that.");
+      }
+    });
+  }
+  /** From the menu: take back the latest tick (the habit itself when it was the only one). */
+  function undoTick(h: RiteView) {
+    if (!day) return;
+    const extra = ticks.today[h.id] ?? 0;
+    if (extra < 1) return toggle(h, true);
+    setHabitTicks({ today: { ...ticks.today, [h.id]: extra - 1 } });
+    startTransition(async () => {
+      try {
+        const r = await undoHabitTickAction(h.id, day);
+        setHabitTicks({ today: { ...ticks.today, [h.id]: r.extra } });
+      } catch {
+        setHabitTicks({ today: { ...ticks.today, [h.id]: extra } });
+        setError("Couldn't undo that.");
+      }
+    });
+  }
+
+  function toggle(h: RiteView, undo = false) {
+    if (!day) return;
+    // Already done and it counts every tick: this is one more.
+    if (!undo && done(h.id) && isMany(h.id)) return tickAgain(h);
     const next = !done(h.id);
+    if (next && isMany(h.id)) celebrateTick(h, h.xp_value, h.coin_value ?? coinsForXp(h.xp_value), 1);
     setError(null);
     setOptimistic((o) => ({ ...o, [h.id]: next }));
-    if (next && h.xp_value > 0) {
+    if (next && h.xp_value > 0 && !isMany(h.id)) {
       setPop({ id: h.id, xp: h.xp_value });
       setTimeout(() => setPop((p) => (p?.id === h.id ? null : p)), 1400);
     }
@@ -550,7 +612,8 @@ export function DailyHabits({
                       type="button"
                       role="checkbox"
                       aria-checked={d}
-                      aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
+                      aria-label={d ? (isMany(h.id) ? `Done again: ${h.title}` : `Undo ${h.title}`) : `Done: ${h.title}`}
+                      title={d && isMany(h.id) ? "Tick again each time you do it" : undefined}
                       onClick={() => toggle(h)}
                       className="relative z-[1] h-11 w-11 shrink-0 rounded-full transition-transform active:scale-90"
                       style={{ boxShadow: d ? "0 0 0 2.5px #58a04a" : "0 0 0 2px #a58c66" }}
@@ -570,7 +633,8 @@ export function DailyHabits({
                       type="button"
                       role="checkbox"
                       aria-checked={d}
-                      aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
+                      aria-label={d ? (isMany(h.id) ? `Done again: ${h.title}` : `Undo ${h.title}`) : `Done: ${h.title}`}
+                      title={d && isMany(h.id) ? "Tick again each time you do it" : undefined}
                       onClick={() => toggle(h)}
                       className="relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
                       style={{
@@ -616,11 +680,32 @@ export function DailyHabits({
                           </svg>
                         </>
                       )}
+                      {/* Something to listen to, in the title's line like the cleaning area (owner, Nov 16). */}
+                      {listenHref && !d && LISTEN_HABIT.test(h.title) && (
+                        <span
+                          role="link"
+                          tabIndex={0}
+                          data-listen-link
+                          title="Something to listen to"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => (e.stopPropagation(), window.location.assign(listenHref))}
+                          onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), window.location.assign(listenHref))}
+                          className="ml-2 inline-flex cursor-pointer items-center gap-1 whitespace-nowrap align-baseline text-[14px] font-semibold underline-offset-2 hover:underline"
+                          style={{ color: "#7a5410" }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+                            <rect x="3" y="14" width="4.5" height="6.5" rx="1.6" />
+                            <rect x="16.5" y="14" width="4.5" height="6.5" rx="1.6" />
+                          </svg>
+                          Listen
+                        </span>
+                      )}
                     </span>
                     {/* How long it takes sits by the XP (owner, Nov 2); this line only when there's a time of day or a note. */}
-                    {(h.description || scheduleLabel(h)) && (
+                    {(h.description || scheduleLabel(h) || timesToday(h.id, d) > 1) && (
                       <span className="block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                        {[scheduleLabel(h), h.description].filter(Boolean).join(" · ")}
+                        {[timesToday(h.id, d) > 1 ? `Done ${timesToday(h.id, d)} times today` : null, scheduleLabel(h), h.description].filter(Boolean).join(" · ")}
                       </span>
                     )}
                   </button>
@@ -747,7 +832,16 @@ export function DailyHabits({
                         </span>
                         {isCore(h.id) ? "Not a core habit" : "Make it a core habit"}
                       </button>
-                      {day && <LessonMenuItem habit={h} day={day} onPicked={() => setMenuFor(null)} />}
+                      {isMany(h.id) && d && (
+                        <button type="button" role="menuitem" data-mi="undo-tick" onClick={() => (setMenuFor(null), undoTick(h))} className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5" style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}>
+                          <span aria-hidden className="w-[18px] text-center">↶</span>
+                          Undo the last one
+                        </button>
+                      )}
+                      <button type="button" role="menuitem" data-mi="many" onClick={() => (setMenuFor(null), toggleMany(h))} className="relative z-[1] flex min-h-11 items-center gap-2 px-4 text-left text-[15px] hover:bg-black/5" style={{ borderTop: "1px solid rgba(139,112,64,.2)" }}>
+                        <span aria-hidden className="w-[18px] text-center text-[13px] font-bold">×N</span>
+                        {isMany(h.id) ? "Once a day is enough" : "Count every time I do it"}
+                      </button>
                       {/* No "Skip today": Snooze does the same (owner, Nov 2). */}
                       <button
                         type="button"
@@ -847,13 +941,6 @@ export function DailyHabits({
                   )}
                 </div>
                 </SwipeReveal>
-                {/learn(ing)? (a )?language|language practice/i.test(h.title) && <LanguagePractice />}
-                {day && <LessonButton habit={h} day={day} seed={lessons} dark={isAdventure} />}
-                {listenHref && !d && LISTEN_HABIT.test(h.title) && (
-                  <a href={listenHref} onPointerDown={(e) => e.stopPropagation()} className="due-in ml-11 mt-0.5 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold no-underline" style={{ background: "rgba(201,162,74,.14)", border: "1px solid rgba(160,120,40,.45)", color: "#6b4c12" }}>
-                    <span aria-hidden>🎧</span> Something to listen to
-                  </a>
-                )}
                 {cleaning && day && h.id === cleanId && <CleaningCheckIn key={day} initial={cleaning} day={day} habitDone={d} isAdventure={isAdventure} open={cleanOpen} />}
                 </SortableHabit>
               );
