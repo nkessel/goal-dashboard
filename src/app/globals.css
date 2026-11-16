@@ -916,6 +916,10 @@ html[data-evening] [data-theme="adventure"] {
     evening-sparkle var(--tw-dur, 6s) ease-in-out var(--tw-delay, 0s) infinite,
     evening-sparkle-shimmer 5s ease-in-out var(--sh-delay, 0s) infinite;
 }
+.evening-sky[data-unseen] .evening-star,
+.evening-sky[data-unseen] .evening-sparkle {
+  animation-play-state: paused;
+}
 /* A wave of light passing over the stars: each one flares as it goes by. */
 /* (transform only: animating shadows and filters on every star repainted the card each frame) */
 @keyframes evening-star-shimmer {
@@ -1224,7 +1228,7 @@ html[data-evening] [data-theme="adventure"] {
 @keyframes mist-bird-back { 0% { transform: translate(112vw, 0); } 40% { transform: translate(60vw, -2vh); } 100% { transform: translate(-12vw, -3vh); } }
 .mist-bird-bob { animation: mist-bob ease-in-out infinite alternate; }
 @keyframes mist-bob { from { transform: translateY(-3px); } to { transform: translateY(3px); } }
-.mist-wing-l, .mist-wing-r { transform-box: view-box; transform-origin: 13px 9px; animation: mist-flap-l ease-in-out infinite; }
+.mist-wing-l, .mist-wing-r { overflow: visible; transform-origin: 50% 64.2857%; animation: mist-flap-l ease-in-out infinite; }
 .mist-wing-r { animation-name: mist-flap-r; }
 @keyframes mist-flap-l {
   0%, 30% { transform: rotate(0deg); }
@@ -2052,21 +2056,22 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 .owl-say-wrap[data-side="above"] .owl-say-tail,
 .owl-say-wrap:not([data-side]) .owl-say-tail { bottom: -7px; border-top: 0; border-left: 0; }
 .owl-say-wrap[data-side="below"] .owl-say-tail { top: -7px; border-bottom: 0; border-right: 0; }
-.toucan-spirit { animation: none; }
+.toucan-spirit { animation: none; position: relative; display: inline-block; }
 @keyframes toucan-hover {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
 }
-.toucan-aura { animation: toucan-aura 2.6s ease-in-out infinite; transform-origin: 50% 50%; transform-box: fill-box; }
+/* His moving parts are whole sheets (see Sheet in ToucanArt.tsx), so they run on the graphics card and the page rests. */
+svg.toucan-aura { animation: toucan-aura 2.6s ease-in-out infinite; }
 @keyframes toucan-aura {
   0%, 100% { opacity: 0.7; }
   50% { opacity: 0.95; }
 }
 .toucan-mote { animation: toucan-mote 3s ease-in-out infinite; }
 @keyframes toucan-mote {
-  0% { opacity: 0; transform: translateY(4px); }
+  0% { opacity: 0; transform: translateY(calc(4px * var(--tk, 1))); }
   40% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-14px); }
+  100% { opacity: 0; transform: translateY(calc(-14px * var(--tk, 1))); }
 }
 .toucan-wisdom {
   animation: toucan-wisdom-in 0.35s cubic-bezier(.2,.8,.3,1.2) both;
@@ -2075,7 +2080,7 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
   from { opacity: 0; transform: translateY(6px) scale(0.92); }
   to { opacity: 1; transform: none; }
 }
-.toucan-halo { transform-origin: 22px 12px; animation: toucan-halo 36s linear infinite; }
+.toucan-halo { transform-origin: 42.3077% 21.4286%; animation: toucan-halo 36s linear infinite; }
 @keyframes toucan-halo { to { transform: rotate(360deg); } }
 .toucan-stars { animation: toucan-twinkle 2.4s ease-in-out infinite; }
 @keyframes toucan-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
@@ -2117,6 +2122,11 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 @keyframes owl-arrive { from { opacity: 0; } to { opacity: 1; } }
 .owl-body { display: block; transform-origin: 50% 100%; }
 .owl-body svg { display: block; overflow: visible; }
+.owl-body .toucan-spirit { display: block; }
+/* The perched toucan's resting shadow, worn by each sheet (he is drawn 1.3× there, so 3px/4px/10px ÷ 1.3).
+   Hover, dragging and hiding still put their own filter on the whole button, as before. */
+.owl-perch.owl-sheets:not(:hover):not(.owl-dragging):not(.owl-hidden-here) .toucan-spirit > svg { filter: drop-shadow(0 2.308px 3.077px rgba(0,0,0,.45)) drop-shadow(0 0 7.692px rgba(255,236,170,.25)); }
+.owl-perch.owl-sheets:not(:hover):not(.owl-dragging):not(.owl-hidden-here) .toucan-waiting-dot { filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 10px rgba(255,236,170,.25)); }
 @keyframes owl-breathe-glance {
   0%, 100% { transform: scale(1, 1) rotate(0deg); }
   20% { transform: scale(1.015, 1.03) rotate(0deg); }
@@ -2139,7 +2149,9 @@ html[data-evening] nav[data-app-nav] [data-nav-highlight] {
 @keyframes owl-flare-r { 0% { transform: rotate(0deg); } 100% { transform: rotate(32deg) scaleY(1.05); } }
 .owl-landing .owl-wing-l { animation: owl-flare-l 0.26s ease-out forwards; }
 .owl-landing .owl-wing-r { animation: owl-flare-r 0.26s ease-out forwards; }
-@keyframes owl-settle { 0% { transform: scale(1.04, 0.9); } 60% { transform: scale(0.98, 1.03); } 100% { transform: scale(1, 1); } }
+/* `scale`, not `transform`: two transform animations on one element keep both off the graphics card for good,
+   and the breathing then cost a page redraw on every frame of every screen. */
+@keyframes owl-settle { 0% { scale: 1.04 0.9; } 60% { scale: 0.98 1.03; } 100% { scale: 1 1; } }
 .owl-perched .owl-idle { animation: owl-settle 0.32s ease-out, owl-breathe-glance 7.5s ease-in-out 0.32s infinite; }
 @media (prefers-reduced-motion: reduce) {
   .owl-idle, .owl-perched .owl-idle, .owl-takeoff .owl-idle { animation: none !important; }
@@ -2946,6 +2958,8 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 
 /* A toucan note: he flies in from the side, lands, and then speaks. */
 .nudge-bird { animation: nudge-fly 1100ms linear both; }
+/* His shadow sits on each of his sheets, not around him, so his moving parts stay on the graphics card. */
+.nudge-shadow .toucan-spirit > svg { filter: drop-shadow(0 4px 6px rgba(0,0,0,.45)); }
 @keyframes nudge-fly { 0% { opacity: 0; transform: translate(150px, -100px) rotate(12deg) scale(-.75, .75); animation-timing-function: ease-in-out; } 35% { opacity: 1; transform: translate(80px, -48px) rotate(3deg) scale(-.86, .86); animation-timing-function: ease-in-out; } 65% { transform: translate(26px, -22px) rotate(8deg) scale(-.95, .95); animation-timing-function: ease-out; } 85% { transform: translate(2px, -3px) rotate(-15deg); animation-timing-function: ease-in; } 93% { transform: translateY(2px) scale(1.04, .95) rotate(-3deg); } 100% { transform: none; } }
 .nudge-bubble { animation: nudge-bubble 300ms 980ms cubic-bezier(.2,.9,.3,1.2) both; transform-origin: 0% 100%; }
 @keyframes nudge-bubble { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }

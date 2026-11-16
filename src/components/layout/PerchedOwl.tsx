@@ -764,7 +764,7 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
         }}
         aria-label={spirit && waiting ? "The great toucan spirit has something for you — tap to hear it" : spirit ? "The great toucan spirit — tap for wisdom, hold to return to the owl" : "A snowy owl — tap and it flies to another perch; hold to summon the great toucan spirit"}
         title={spirit ? "The great toucan spirit" : "Hoo!"}
-        className={`owl-perch fixed left-0 top-0 ${over ? "z-[48]" : "z-[45]"} touch-none select-none p-0 ${dragging ? "owl-dragging" : ""} ${hidingHere && !dragging ? "owl-hidden-here" : ""}`}
+        className={`owl-perch fixed left-0 top-0 ${over ? "z-[48]" : "z-[45]"} touch-none select-none p-0 ${spirit ? "owl-sheets" : ""} ${dragging ? "owl-dragging" : ""} ${hidingHere && !dragging ? "owl-hidden-here" : ""}`}
         style={{
           width: OWL_W,
           height: OWL_H,
@@ -772,7 +772,9 @@ export function PerchedOwl({ name = null, toucan = null }: { name?: string | nul
           border: 0,
           willChange: "transform",
           visibility: "hidden",
-          filter: "drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 10px rgba(255,236,170,.25))",
+          // The toucan wears this shadow on each of his sheets instead (`.owl-sheets` in globals.css): a shadow
+          // filter around parts that move makes the page redraw every frame, on every screen he perches on.
+          ...(spirit ? {} : { filter: "drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 10px rgba(255,236,170,.25))" }),
         }}
       >
         <div className={charging ? "owl-charging" : undefined}>

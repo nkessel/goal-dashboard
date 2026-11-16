@@ -133,6 +133,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - **Editors:** Ctrl/⌘+Enter and Ctrl/⌘+S save any dialog; × at top right; the quest editor autosaves when editing.
 - **The Great Toucan Spirit** (`components/toucan/`): a wise, compassionate guide. Never call it a "coach" or use clinical terms. Modes: simple, lite, full.
 - **Phones matter:** the owner uses an iPhone a lot. The page must not resize when the keyboard opens.
+- **Light in use (owner, Nov 16):** a `<Link>` to the current route with other search params gets `prefetch={false}` (it re-fetches in a loop otherwise); always-running animations go on an HTML element or a whole `<svg>`, never a shape inside one, with no `filter` on an ancestor. Measure with `npm run perf` (see `docs/SHIPPED.md`, Nov 16).
 - **React compiler lint:** no `Date.now()`/`Math.random()` in render (use `freshKey()` in `lib/quest-drafts.ts` or handlers); no components defined inside components; `setState` in an effect needs an eslint-disable with a reason; no Tailwind `translate-*` on elements whose keyframes animate `transform`.
 
 ---

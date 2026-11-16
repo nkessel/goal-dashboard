@@ -70,6 +70,7 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     if (currentPathnameRef.current === pathname) return;
     previousPathnameRef.current = currentPathnameRef.current;
     currentPathnameRef.current = pathname;
+    const screenUnder = lastAppPathnameRef.current;
     if (!isOverlayPage(pathname)) lastAppPathnameRef.current = pathname;
     const html = document.documentElement;
     const pending = pendingRef.current;
@@ -79,6 +80,11 @@ export function ViewTransitionProvider({ children }: { children: React.ReactNode
     // stays still (it never left), so no entrance plays and nothing jumps.
     const boardPeek = (p: string | null) => !!p && /^\/boards\/[^/]+/.test(p);
     if (!pending && (boardPeek(previousPathnameRef.current) || boardPeek(pathname))) return;
+    // The same for the menu (Settings as a panel over the screen): opening it, moving
+    // inside it and closing it back onto the same screen leave that screen alone.
+    // Replaying the screen's entrance here made the whole page blink under the menu.
+    const menu = (p: string | null) => !!p && p.startsWith("/settings");
+    if (!pending && screenUnder && (menu(pathname) || (menu(previousPathnameRef.current) && pathname === screenUnder))) return;
     html.setAttribute("data-enter", pending?.direction ?? "fade");
     const t = setTimeout(
       () => {

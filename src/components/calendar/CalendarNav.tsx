@@ -44,13 +44,18 @@ export function SlideLink({
 }: { dir: "left" | "right" | "fade"; href: string; children: React.ReactNode } & Omit<React.ComponentProps<typeof Link>, "href" | "onClick">) {
   const router = useRouter();
   return (
+    // prefetch off: these point at this same screen with other search words, and Next then fetches them again
+    // and again for as long as they show (hundreds of requests a second, found Nov 16). A finger or the mouse
+    // arriving fetches it once instead.
     <Link
       href={href}
+      prefetch={false}
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
         prepareSlide(dir);
       }}
       onPointerEnter={() => router.prefetch(href)}
+      onPointerDown={() => router.prefetch(href)}
       {...rest}
     >
       {children}

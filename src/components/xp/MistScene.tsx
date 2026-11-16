@@ -272,10 +272,14 @@ export function MistScene({ time, leaving = false, castle = "spires", castleSeed
           BIRDS.map((b, i) => (
             <div key={i} className={`${b.back ? "mist-bird-back" : "mist-bird"} absolute left-0`} style={{ top: `${b.top}%`, animationDuration: `${b.fly}s`, animationDelay: `${b.delay}s` }}>
               <div className="mist-bird-bob" style={{ animationDuration: `${b.bob}s` }}>
-                <svg width={26 * b.size} height={14 * b.size} viewBox="0 0 26 14" fill="none" stroke={when === "dusk" ? "#3a2b45" : "#4a5468"} strokeWidth="1.5" strokeLinecap="round" opacity=".7">
-                  <path className="mist-wing-l" d="M13,9 Q8,3.5 1.5,6" style={{ animationDuration: `${b.flap}s`, animationDelay: `${b.flapDelay}s` }} />
-                  <path className="mist-wing-r" d="M13,9 Q18,3.5 24.5,6" style={{ animationDuration: `${b.flap}s`, animationDelay: `${b.flapDelay}s` }} />
-                </svg>
+                {/* Each wing is its own drawing, so its beat runs on the graphics card (a shape animated inside one SVG makes the page redraw every frame). */}
+                <span className="relative inline-block overflow-hidden" style={{ width: 26 * b.size, height: 14 * b.size, opacity: 0.7 }}>
+                  {(["l", "r"] as const).map((side) => (
+                    <svg key={side} className={`mist-wing-${side} absolute left-0 top-0`} width={26 * b.size} height={14 * b.size} viewBox="0 0 26 14" fill="none" stroke={when === "dusk" ? "#3a2b45" : "#4a5468"} strokeWidth="1.5" strokeLinecap="round" style={{ animationDuration: `${b.flap}s`, animationDelay: `${b.flapDelay}s` }}>
+                      <path d={side === "l" ? "M13,9 Q8,3.5 1.5,6" : "M13,9 Q18,3.5 24.5,6"} />
+                    </svg>
+                  ))}
+                </span>
               </div>
             </div>
           ))}
