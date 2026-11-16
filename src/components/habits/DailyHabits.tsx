@@ -152,6 +152,15 @@ export function DailyHabits({
   const [error, setError] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [menuUp, setMenuUp] = useState(false);
+  const [menuMax, setMenuMax] = useState<number | undefined>(undefined);
+  /** The menu opens on the roomier side of its card and scrolls inside when even that is short (the bottom bar takes 100px). */
+  const placeMenu = (r: DOMRect) => {
+    const below = window.innerHeight - r.bottom - 100;
+    const above = r.top - 12;
+    const up = below < 500 && above > below;
+    setMenuUp(up);
+    setMenuMax(Math.max(180, up ? above : below));
+  };
   // A tap anywhere outside the open menu closes it.
   useEffect(() => {
     if (!menuFor) return;
@@ -598,7 +607,7 @@ export function DailyHabits({
                     if ((e.target as Element).closest("input,textarea,a")) return;
                     e.preventDefault();
                     const r = e.currentTarget.getBoundingClientRect();
-                    setMenuUp(window.innerHeight - r.bottom < 520 && r.top > window.innerHeight - r.bottom);
+                    placeMenu(r);
                     setMenuFor(h.id);
                   }}
                   className={`habit-row relative flex flex-wrap items-center gap-x-3 rounded-2xl px-3 py-2 ${isAdventure ? "parchment" : ""}`}
@@ -758,7 +767,7 @@ export function DailyHabits({
                       onClick={(e) => {
                         // Near the bottom of the screen the menu opens upward so it isn't cut off.
                         const r = e.currentTarget.getBoundingClientRect();
-                        setMenuUp(window.innerHeight - r.bottom < 520 && r.top > window.innerHeight - r.bottom);
+                        placeMenu(r);
                         setMenuFor(menuFor === h.id ? null : h.id);
                       }}
                       data-habit-menu
@@ -771,7 +780,7 @@ export function DailyHabits({
                     </button>
                   )}
                   {menuFor === h.id && (
-                    <div data-habit-menu data-menu="habit" role="menu" className={`card-pop-in absolute right-2 z-30 flex flex-col overflow-hidden rounded-xl parchment ${menuUp ? "bottom-full mb-1" : "top-full mt-1"}`} style={{ borderRadius: 12, minWidth: 190 }}>
+                    <div data-habit-menu data-menu="habit" role="menu" className={`card-pop-in absolute right-2 z-30 flex flex-col overflow-y-auto overflow-x-hidden rounded-xl parchment ${menuUp ? "bottom-full mb-1" : "top-full mt-1"}`} style={{ maxHeight: menuMax, borderRadius: 12, minWidth: 190 }}>
                       <button
                         type="button"
                         role="menuitem"
