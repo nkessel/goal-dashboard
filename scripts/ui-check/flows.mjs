@@ -544,6 +544,11 @@ export const FLOWS = [
           await h.page.keyboard.press("Escape").catch(() => {});
           await h.settle(200);
         }
+        // Escape above may have shut the editor: open it again for the pills.
+        if (!(await h.page.locator("[data-mi=pills]").first().isVisible().catch(() => false))) {
+          await h.tap("text=Gym 🏋️", "habit editor again", { optional: true, expectMove: true });
+          await h.settle(500);
+        }
         // Its details are pills now: open Repeats, then pick Certain days.
         await h.tap((p) => p.locator("[data-mi=pills] button").first(), "repeats pill", { optional: true, expectMove: true });
         await h.check("habit editor: repeats pill");
