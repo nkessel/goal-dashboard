@@ -33,6 +33,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - `review/import-calendar` (import card A: a calendar time from Due, a landing line, no "To schedule" type): built Nov 16, review page sent.
 - `review/time-ranges-lesson-button` (time ranges for habits and quests, chosen habits in the auto-scheduler, Complete lesson button): built Nov 16, review page sent, waiting on his OK or notes.
 - Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
+- The social side (invites to quests and boards, XP splits, the victory share check): designed in `docs/SOCIAL-DESIGN.md`, waiting on his answers to its section 9.
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
 - The email to Daniel about his Champion title: needs his OK and wording.
 - Waiting on his iPhone: a list of things cloud sessions can't check (in `docs/WAITING.md` and `docs/PRIORITIES.md`).
