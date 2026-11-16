@@ -8,12 +8,13 @@ import { FileChips } from "@/components/ui/FileChips";
 import { createContext, useContext, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createBoardQuickAction, decideImportCardAction, editImportCardAction, importCardAction, markImportCardImportedAction } from "@/app/actions";
+import { createBoardQuickAction, decideImportCardAction, editImportCardAction, importCardAction, markImportCardImportedAction, scheduleTaskAction } from "@/app/actions";
 import type { ImportCard } from "@/lib/data/import-cards";
 import { useEscape } from "@/lib/use-escape";
 import { DateField } from "@/components/ui/DateField";
 import { SnoozePicker, type SnoozeChoice } from "@/components/tasks/SnoozePicker";
-import { ESTIMATE_PICKS, StepsGlyph, dueChipLabel, dueQuickPicks } from "@/components/tasks/QuestEditorDialog";
+import { ESTIMATE_PICKS, StepsGlyph, dueChipLabel, dueQuickPicks, shortTime, slotWords } from "@/components/tasks/QuestEditorDialog";
+import { WhenPicker } from "@/components/calendar/WhenPicker";
 import { IconScale } from "@/components/tasks/IconScale";
 import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { QuestMonogram } from "@/components/tasks/QuestMonogram";
@@ -36,12 +37,12 @@ import { ScheduleWithin as SchedRate } from "@/components/tasks/ScheduleWithin";
  * quest can open the full quest editor from there.
  */
 
+const asQuest = (c: ImportCard): ImportCard => (c.kind === "schedule" ? { ...c, kind: "quest" } : c);
 type BoardOpt = { id: string; title: string; color: string | null; /** The board it sits inside, if any. */ parent?: string | null };
 type Step = "board" | "plan" | "matters" | "often" | "time" | "review";
 type Kind = ImportCard["kind"];
 const KINDS: { key: Kind; label: string; icon: string }[] = [
   { key: "quest", label: "Quests", icon: "⚔" },
-  { key: "schedule", label: "To schedule", icon: "📅" },
   { key: "habit", label: "Habits", icon: "🌱" },
   { key: "project", label: "Projects", icon: "🗺" },
   { key: "shopping", label: "To buy", icon: "🛒" },
@@ -144,8 +145,9 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
   const router = useRouter();
   // Boards (a new one made from the picker joins at once).
   const [boards, setBoards] = useState(boardsIn);
-  const [queue, setQueue] = useState(waiting);
-  const [aside, setAsideList] = useState(setAside);
+  // "To schedule" isn't a type any more (owner, Nov 15): it imports exactly like a quest, so those cards show as quests.
+  const [queue, setQueue] = useState(() => waiting.map(asQuest));
+  const [aside, setAsideList] = useState(() => setAside.map(asQuest));
   const [mode, setMode] = useState<"card" | "guided" | "all">("card");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [stepAt, setStepAt] = useState(0);
@@ -270,7 +272,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     setFocusId(c.id);
     const d = draftFor(c);
     const a = attrsOf(c.id);
-    const full: Draft = { ...d, boardId: a.board === undefined ? findBoard(boards, c.board_hint)?.id : a.board, minutes: a.minutes === undefined ? d.minutes : a.minutes, due: a.due === undefined ? d.due : a.due, importance: a.importance || d.importance };
+    const full: Draft = { ...d, boardId: a.board === undefined ? findBoard(boards, c.board_hint)?.id : a.board, minutes: a.minutes === undefined ? d.minutes : a.minutes, due: a.due === undefined ? d.due : a.due, importance: a.importance || d.importance, rated: d.rated || !!a.slot };
     // Everything already set on the card's pills: import it straight away, no questions.
     if (!all && withAttrs(full.kind) && baseFor(full).length === 0) return save(full, c);
     setDraft(full);
@@ -348,7 +350,9 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     const soonest = [daysOut, d.planDays ?? null].filter((x): x is number => x !== null);
     const near = soonest.length ? Math.min(...soonest) : null;
     const urgency = d.urgency ?? (near === null ? null : near <= 0 ? 5 : near === 1 ? 4 : near <= 7 ? 3 : 2);
-    const planBy = d.kind !== "habit" && typeof d.planDays === "number" ? new Date(`${inDays(d.planDays)}T23:59`).toISOString() : null;
+    // A time picked on the card puts it straight on the calendar, so it doesn't also wait on the list to schedule.
+    const slot = withAttrs(d.kind) && d.kind !== "done" ? (attrsOf(card.id).slot ?? null) : null;
+    const planBy = d.kind !== "habit" && !slot && typeof d.planDays === "number" ? new Date(`${inDays(d.planDays)}T23:59`).toISOString() : null;
     const from = inDays(0);
     const habitTiming =
       d.often === "weekdays"
@@ -365,7 +369,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     start(async () => {
       try {
         setError(null);
-        await importCardAction(card.id, {
+        const made = await importCardAction(card.id, {
           kind: SERVER_KIND(d.kind),
           title: d.title,
           description: d.description.trim() || null,
@@ -379,6 +383,15 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           minutes: d.minutes ?? null,
           ...(d.kind === "habit" ? habitTiming : withAttrs(d.kind) ? { ...questExtras(attrsOf(card.id)), stepXp: attrsOf(card.id).stepXp, stepCoins: attrsOf(card.id).stepCoins } : {}),
         });
+        let placed = "";
+        if (slot && made.kind === "quest") {
+          try {
+            await scheduleTaskAction(made.id, slot.start, slot.end);
+            placed = `, on your calendar ${slotWords(slot)}`;
+          } catch {
+            placed = " (couldn't put it on the calendar: try Schedule… from its card)";
+          }
+        }
         const board = boards.find((b) => b.id === d.boardId);
         const nRewards = d.kind === "shopping" ? d.steps.filter((x) => d.rewards?.includes(x)).length : 0;
         if (nRewards) {
@@ -387,7 +400,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
           router.refresh();
           return;
         }
-        say(d.kind === "ritual" ? `“${d.title}” is one of your rituals of connection (Insights keeps how long since)${planBy ? ", and on your list to schedule" : ""}` : d.kind === "habit" ? `“${d.title}” is one of your habits now` : d.kind === "reward" ? `“${d.title}” is in your Treasure Chest` : d.kind === "project" ? `“${d.title}” is a board now${d.steps.length ? `, with ${d.steps.length} quests` : ""}` : d.kind === "done" ? `Logged “${d.title}” as done ✓` : planBy ? `“${d.title}” is on your list to schedule` : `Added “${d.title}”${board ? ` to ${board.title}` : ""}`);
+        say(d.kind === "ritual" ? `“${d.title}” is one of your rituals of connection (Insights keeps how long since)${planBy ? ", and on your list to schedule" : ""}` : d.kind === "habit" ? `“${d.title}” is one of your habits now` : d.kind === "reward" ? `“${d.title}” is in your Treasure Chest` : d.kind === "project" ? `“${d.title}” is a board now${d.steps.length ? `, with ${d.steps.length} quests` : ""}` : d.kind === "done" ? `Logged “${d.title}” as done ✓` : planBy ? `“${d.title}” is on your list to schedule` : `Added “${d.title}”${board ? ` to ${board.title}` : ""}${placed}`);
         next(card.id);
         router.refresh();
       } catch (e) {
@@ -477,7 +490,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
         </div>
     ) : null;
   return (
-    <BoardsCtx.Provider value={{ boards, add: (b) => setBoards((x) => [...x, b]), resteps }}>
+    <BoardsCtx.Provider value={{ boards, add: (b) => setBoards((x) => [...x, b]), resteps, adventure: isAdventure }}>
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <h1 className="m-0 whitespace-nowrap font-display text-[24px]" style={{ color: isAdventure ? "#f2d27e" : INK }}>
@@ -698,7 +711,7 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
         </div>
       )}
       <span className="text-[12.5px] leading-snug" style={{ color: "#6b5631" }}>
-        {importWhere(card.kind, card.plan_within_days)}
+        <LandsLine card={card} attrs={attrs} />
       </span>
       <ImportFoot card={card} later={later} onLater={() => setLater((v) => !v)} onImport={onImport} onDone={onDone} onDelete={onDelete} />
       <LaterRow open={later} done={card.kind === "done"} onSnooze={onSnooze} onSkip={onSkip} onDelete={onDelete} onQuick={onQuick} />
@@ -729,6 +742,27 @@ const importWhere = (k: Kind, planDays: number | null | undefined) => {
         : "A quest on its board and in Additional Quests. Pick “Schedule within” to also give it a time on your calendar.";
   }
 };
+
+/**
+ * One line, just above Import, naming where this card lands (owner, Nov 15): the board, the due day,
+ * the calendar time or the auto-scheduler's list. Other kinds keep their plain line.
+ */
+function LandsLine({ card, attrs }: { card: ImportCard; attrs: Attrs }) {
+  const { boards } = useContext(BoardsCtx);
+  let words = importWhere(card.kind, card.plan_within_days);
+  if (card.kind === "quest" || card.kind === "schedule" || card.kind === "shopping") {
+    const boardId = attrs.board === undefined ? (findBoard(boards, card.board_hint)?.id ?? null) : attrs.board;
+    const board = boards.find((b) => b.id === boardId);
+    const due = attrs.due === undefined ? (card.due_on ?? null) : attrs.due;
+    const parts = [
+      board ? `Lands on the ${board.title} board and in Additional Quests` : "Lands in Additional Quests",
+      attrs.slot ? `on your calendar ${slotWords(attrs.slot)}` : card.plan_within_days != null ? "on the auto-scheduler's list to get a time" : null,
+      due ? `due ${dueChipLabel(due)}` : null,
+    ].filter(Boolean);
+    words = `${parts.join(", ")}.`;
+  }
+  return <>{words}</>;
+}
 
 /**
  * The card's foot (owner, Nov 12): a trash can at the lower left (deleted after a moment, with Undo),
@@ -1394,7 +1428,7 @@ function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAt
       {/* The pills get the row's whole width; Import sits under them at the right. */}
       {withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} small />}
       <span className="text-[11.5px] leading-snug" style={{ color: "#6b5631" }}>
-        {importWhere(card.kind, card.plan_within_days)}
+        <LandsLine card={card} attrs={attrs} />
       </span>
       <ImportFoot card={card} small later={more} onLater={() => setMore((v) => !v)} onImport={onImport} onDone={onDone} onDelete={onDelete} />
       <LaterRow open={more} small done={card.kind === "done"} onSnooze={onSnooze} onSkip={onSkip} onDelete={onDelete} onQuick={onQuick} />
@@ -1916,7 +1950,7 @@ const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind ==
 // `.qe-fact` pills, `.qe-fact-panel` panels, the editor's XP bar and coin stepper, Due picks, Time picks and IconScale.
 
 /** A quest's details picked on the card, before importing. Kept on this device by card id. */
-type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; /** Coins a sub-quest pays when done, by its name. */ stepCoins?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null };
+type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; /** Coins a sub-quest pays when done, by its name. */ stepCoins?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null; /** A time on the calendar, picked on the card (owner, Nov 15); placed right after import. */ slot?: { start: string; end: string } | null };
 type AttrKey = "reward" | "time" | "due" | "tiny" | "importance" | "board";
 const ATTRS: { key: AttrKey; label: string }[] = [
   { key: "reward", label: "XP & coins" },
@@ -1946,7 +1980,7 @@ const withAttrs = (k: Kind) => k === "quest" || k === "schedule" || k === "shopp
 const XP_MAX = 350;
 
 /** The boards, for the Board pill (and a new board made from it). */
-const BoardsCtx = createContext<{ boards: BoardOpt[]; add: (b: BoardOpt) => void; /** Save a card's edited sub-quests. */ resteps: (id: string, steps: string[]) => void }>({ boards: [], add: () => {}, resteps: () => {} });
+const BoardsCtx = createContext<{ boards: BoardOpt[]; add: (b: BoardOpt) => void; /** Save a card's edited sub-quests. */ resteps: (id: string, steps: string[]) => void; adventure?: boolean }>({ boards: [], add: () => {}, resteps: () => {} });
 
 function readJSON<T>(key: string, fallback: T): T {
   try {
@@ -1973,6 +2007,47 @@ function Glyph({ src, size = 14 }: { src: string; size?: number }) {
 }
 
 /** The pills: the ones you chose show; the rest wait under "More". One opens its panel in place at a time. */
+/** The quest editor's Calendar row: "Calendar · Sat 3–3:30pm · Change ×", Find a time opens the day picker in place. */
+function CalendarRow({ title, minutes, slot, onSlot }: { title: string; minutes: number | null; slot: { start: string; end: string } | null; onSlot: (s: { start: string; end: string } | null) => void }) {
+  const { adventure } = useContext(BoardsCtx);
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  // Once the day has slid open, bring it all into view above the bottom bar.
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => box.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 340);
+    return () => clearTimeout(t);
+  }, [open]);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex min-h-8 items-center gap-2">
+        <Glyph src="/design/ui-calendar.png" />
+        <span className="shrink-0 text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+          Calendar
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[13px] tabular-nums" style={{ color: slot ? "var(--t-ink)" : "var(--t-ink-soft)" }}>
+          {slot ? slotWords(slot) : "Not on it yet"}
+        </span>
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="qe-fact flex h-8 shrink-0 items-center rounded-full px-3 text-[12.5px] font-semibold" data-open={open ? "true" : undefined}>
+          {slot ? "Change" : "Find a time"}
+        </button>
+        {slot && (
+          <button type="button" onClick={() => (onSlot(null), setOpen(false))} aria-label="Take it off the calendar" title="Take it off the calendar" className="h-8 w-6 shrink-0 leading-none" style={{ color: "var(--t-ink-soft)" }}>
+            <CloseIcon size={10} />
+          </button>
+        )}
+      </div>
+      <Fold open={open}>
+        {open && (
+          <div ref={box} className="pt-1" style={{ scrollMarginBottom: 120, scrollMarginTop: 80 }}>
+            <WhenPicker minutes={Math.max(15, minutes || 30)} title={title || "This quest"} isAdventure={!!adventure} initial={slot?.start ?? null} onPick={(s) => (onSlot({ start: s.start, end: s.end }), setOpen(false))} />
+          </div>
+        )}
+      </Fold>
+    </div>
+  );
+}
+
 function AttrPills({ card, attrs, shown, onChange, small = false }: { card: ImportCard; attrs: Attrs; shown: AttrKey[]; onChange: (a: Attrs) => void; small?: boolean }) {
   const { boards, add } = useContext(BoardsCtx);
   const [open, setOpen] = useState<AttrKey | null>(null);
@@ -2009,7 +2084,8 @@ function AttrPills({ card, attrs, shown, onChange, small = false }: { card: Impo
     due: (
       <>
         <Glyph src="/design/ui-calendar.png" />
-        {due ? `Due ${dueChipLabel(due)}` : "Due date"}
+        {/* As the quest editor's pill: "Due Fri · Thu 3pm". */}
+        {[due && `Due ${dueChipLabel(due)}`, attrs.slot && `${new Date(attrs.slot.start).toLocaleDateString(undefined, { weekday: "short" })} ${shortTime(attrs.slot.start).replace(":00", "")}`].filter(Boolean).join(" · ") || "Due date"}
       </>
     ),
     tiny: (
@@ -2145,6 +2221,8 @@ function AttrPills({ card, attrs, shown, onChange, small = false }: { card: Impo
               </button>
             )}
           </div>
+          {/* The quest editor's Calendar row (owner, Nov 15: "visually schedule on the calendar directly from this screen"). */}
+          <CalendarRow title={card.title} minutes={minutes} slot={attrs.slot ?? null} onSlot={(slot) => set({ slot })} />
         </div>
       );
     if (k === "importance")

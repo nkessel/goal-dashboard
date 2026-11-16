@@ -770,6 +770,16 @@ export const FLOWS = [
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /xp/i }).first(), "attrs: xp", { optional: true, expectMove: true })) await h.check("attrs: xp open");
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^importance/i }).first(), "attrs: importance", { optional: true, expectMove: true })) await h.check("attrs: importance open");
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^time$|^\d+m$/i }).first(), "attrs: time", { optional: true, expectMove: true })) await h.check("attrs: time open");
+      // Due holds the quest editor's Calendar row (owner, Nov 15): Find a time draws the day in place, a pick goes on the card.
+      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^due/i }).first(), "attrs: due", { optional: true, expectMove: true })) {
+        await h.check("attrs: due open");
+        if (await h.tap((p) => p.locator("[data-import-attrs] button", { hasText: /^(Find a time|Change)$/ }).first(), "due: find a time", { optional: true, expectMove: true })) {
+          await h.settle(700);
+          await h.check("due: find a time");
+          await h.tap((p) => p.locator("[data-import-attrs] button", { hasText: /^✨ Auto-schedule/ }).first(), "due: pick the time", { optional: true, expectMove: true });
+          await h.check("due: time picked");
+        }
+      }
       // The board is the tag on the portrait (owner, Nov 12): it opens every board, sub-boards folded with a count.
       if (await h.tap((p) => p.locator("[data-import-portrait]").getByRole("button", { name: /^board/i }).first(), "portrait: board tag", { optional: true, expectMove: true })) {
         await h.check("board list open");
