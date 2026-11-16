@@ -2,7 +2,7 @@
 
 Written Nov 16 (high-effort design pass) for the owner's notes 6d473d8d ("VERY VERY important… invite a friend to a quest or a part of a quest or a board or anything… choose to (not) share victories"), 80ac8b67 ("split XP percentages with my teammate(s) on any quest/etc") and f8e7f00a ("we still need a toggle for sharing with my quest party").
 
-**Status: design only. Nothing here is built.** Section 9 lists the owner's open questions; each has a default marked **(default)**. Don't build a part whose question is still open unless the owner has answered it or said "go with the defaults". Everything on screen goes through the design review (`CLAUDE.md`).
+**Status: design only. Nothing here is built. The owner answered the questions on Nov 16 (section 9): the defaults stand, with two changes (comments on quests, section 7a; a teammate's friends can see a shared quest unless it is private, section 5 rule 2).** It can be built in the order of section 10. Everything on screen goes through the design review (`CLAUDE.md`).
 
 ## 1. What exists today (checked in the code and the database, Nov 16)
 
@@ -93,9 +93,9 @@ alter table invite_links add column share_id uuid references shares(id) on delet
 | Action | Host | Teammate (joined) | Supporter (joined) | Invited, not yet joined | Rest of the host's party |
 |---|---|---|---|---|---|
 | See the quest, its sub-quests and progress | ✓ | ✓ | ✓ | title, host and their share only | only if not private and the host shares that screen (today's rule) |
-| Cheer, comment | ✓ | ✓ | ✓ | – | as today, on the shared victory |
+| Cheer, comment (section 7a) | ✓ | ✓ | ✓ | – | ✓ anyone who can see the quest |
 | Tick, add, edit, reorder sub-quests | ✓ | ✓ | – | – | – |
-| Edit title, notes, due date, icon | ✓ | ✓ **(default, Q3)** | – | – | – |
+| Edit title, notes, due date, icon | ✓ | ✓  | – | – | – |
 | Complete or fail the quest | ✓ | ✓ | – | – | – |
 | Change total XP/coins, the split, the mode | ✓ | – | – | – | – |
 | Invite or remove people | ✓ | – (can leave) | – (can leave) | can decline | – |
@@ -105,7 +105,7 @@ alter table invite_links add column share_id uuid references shares(id) on delet
 **Visibility rules (the part that is easy to get wrong):**
 
 1. **An explicit share beats "private".** Marking a shared quest private hides it from party-wide places (friend's page, feed) but never from its own quest party.
-2. **A teammate's friends don't inherit access.** When deciding whether viewer V may see a handle on member M's shared screens, evaluate V against the **host** quest: V must be the host, a joined member, or in the *host's* party with the host quest not private. One function, `viewerCanSeeTask`, replaces the scattered `is_private` checks for rows with `shared_task_id`.
+2. **A teammate's friends can see a shared quest, unless it is set to private (owner, Nov 16).** Viewer V may see a shared quest if V is the host or a joined member; or V is in the party of the host or of any joined member, the **host row is not private**, and the person whose screen V is looking at shares that screen (`share_settings`) and hasn't marked their own row private. So: host sets private → only the quest party sees it, on everyone's screens; a teammate sets their own handle private → hidden from that teammate's friends only. One function, `viewerCanSeeTask`, replaces the scattered `is_private` checks for rows with `shared_task_id`. The "With" panel should say who else will see it ("Tiffany's party can see this too") beside the private switch.
 3. **Teammates see each other on that quest only** (name, avatar, what they did on it), even if they aren't friends with each other.
 4. **Unfriending ends every share between the two people** (status `left`, handles removed). XP already paid stays.
 5. **Board members** (kind `board`) see the board's non-private quests, can add quests (`added_by`, as today) and can ask to join one. Being on a board does not put you on its quests or in their XP.
@@ -128,11 +128,38 @@ alter table invite_links add column share_id uuid references shares(id) on delet
 ## 7. Sharing each victory (notes 6d473d8d, f8e7f00a)
 
 - Completion still writes the `activity_events` row (the owner's own history needs it), but with **`audience` set by the owner's choice on the celebration screen**, not automatically.
-- On `celebration/QuestComplete.tsx`: one `GoldCheck` line, "Share with my party". It remembers the last choice (`readExtras`, merged into `profiles.life_wheel`), starts on **(default, Q4)**, and is absent for private quests. The feed row is published **when the celebration is closed / the reward claimed**, so an undo in the first seconds never reaches anyone.
+- On `celebration/QuestComplete.tsx`: one `GoldCheck` line, "Share with my party". It remembers the last choice (`readExtras`, merged into `profiles.life_wheel`), starts on, and is absent for private quests. The feed row is published **when the celebration is closed / the reward claimed**, so an undo in the first seconds never reaches anyone.
 - `listFeed` shows `audience = 'party'` to friends, `'team'` to the quest party only, `'none'` to nobody. A Together quest always reaches its own quest party; the check controls only the wider party.
 - One feed row per Together quest, naming everyone ("Peace General and Daniel finished …"), not one per person. Show the XP as "+25 XP" (note 89c05f2c).
 - Settings › Sharing gets the same choice as a standing setting: Ask each time / Always / Never.
 - This part is independent of the rest and can be built first.
+
+## 7a. Comments on quests and anything else (owner, Nov 16)
+
+His words: "let's add a comments section to quests, etc. that way, friends can comment directly on them in the party section, and also teammates and supporters can comment on quests in case they want to make or suggest any edits, or cheer you on while you do the task."
+
+```sql
+create table comments (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('quest','step','board')),  -- later: 'habit','goal','reward'
+  target_id uuid not null,            -- for a quest: always the HOST row, never a handle
+  task_id uuid references tasks(id) on delete cascade,
+  board_id uuid references boards(id) on delete cascade,
+  author_id uuid not null references profiles(id) on delete cascade,
+  body text not null check (length(body) between 1 and 2000),
+  created_at timestamptz not null default now(),
+  edited_at timestamptz
+);
+create index comments_target_idx on comments(kind, target_id, created_at);
+alter table comments enable row level security;
+```
+
+- **Any quest can have comments, shared or not.** Whoever can see it can comment and cheer: the owner, teammates, supporters, and friends looking at it in the party section (a friend's page, shared boards, the feed). `can(viewer, 'comment', …)` is the same test as seeing it. A private quest takes comments only from its quest party.
+- **One thread per quest, wherever it's opened.** Comments made from a handle are stored against the host row. When the quest is completed, the feed row for that victory shows the same thread (join on `task_id`); existing `activity_comments` rows stay and are listed with it.
+- Authors edit and delete their own; the quest's host can delete any.
+- Notify the host and joined teammates with the existing `comment` notification kind, by `notify_level`; supporters only when replied to after they commented. Each notification opens the quest at the thread ("see it in context", note 376e008e).
+- **Suggesting edits is just a comment for now.** A "suggest a change" that the host accepts with one tap is a possible later step; ask before building it.
+- **Screens:** reuse `social/CommentThread.tsx`. In the quest editor it is a "Comments" drawer under the quest (closed by default, its bar shows the count, hidden entirely while there are none and the quest isn't shared or visible to anyone). On quest cards a small flat speech-line icon with the count, only when there are comments. In the party section, each quest on a friend's page or shared board opens the same thread inline.
 
 ## 8. Screens, in the app's existing parts (for the design review, not final)
 
@@ -145,20 +172,21 @@ alter table invite_links add column share_id uuid references shares(id) on delet
 - **Someone not in the app:** the existing invite writer (`social/InviteComposer`), with the link carrying the share so accepting lands them in the party and on the quest.
 - Add every new state to `scripts/ui-check/flows.mjs` (the fake database needs a second profile and a friendship).
 
-## 9. Questions for the owner (asked Nov 16; record answers here)
+## 9. The owner's answers (Nov 16: "I like the defaults", with two notes)
 
-1. **Together or each their own?** Default: both exist; Together is built first and is what "invite a friend" does unless you switch it.
-2. **What a split means.** Default: it divides the quest's XP and coins (100 XP at 60/40 pays 60 and 40), starting even.
-3. **What a teammate may change.** Default: tick and add sub-quests, edit the title, notes and due date, and complete it; only the host changes XP, the split, who's on it, or deletes it. Plus a "supporter" who watches and cheers and earns nothing.
-4. **The victory check.** Default: "Share with my party" on the celebration screen, starts on, remembers your last choice, sent when you claim the reward.
-5. **Do invites need accepting?** Default: yes, Join / Not now, and nothing lands in their lists until they join.
-6. **One party, or named teams?** Default: one party; you pick people per quest or board. Named teams (Family, Openthink) later if wanted. Words: "party" for all your friends, "quest party" for the people on one quest.
-7. **Friends of friends.** Default: a teammate's friends can't see a shared quest unless they are in your party too.
+1. **Together or each their own:** both exist; Together is built first and is what "invite a friend" does unless switched.
+2. **A split** divides the quest's XP and coins (100 XP at 60/40 pays 60 and 40), starting even.
+3. **A teammate** may tick and add sub-quests, edit the title, notes and due date, and complete it; only the host changes XP, the split, who's on it, or deletes it. A "supporter" watches and cheers and earns nothing. **Added by the owner: a comments section on quests etc.** (section 7a).
+4. **The victory check:** "Share with my party" on the celebration screen, starts on, remembers the last choice, sent when the reward is claimed.
+5. **Invites need accepting:** Join / Not now; nothing lands in their lists until they join.
+6. **One party;** people are picked per quest or board. Named teams later if wanted. "Party" = all your friends, "quest party" = the people on one quest.
+7. **Changed by the owner: teammates' friends can see the shared quest, unless you set it to private** (section 5, rule 2).
 
 ## 10. Build order (each step is its own review branch)
 
-1. **Victory check** (section 7). Small; touches `completeTask`, `activity.ts`, `QuestComplete.tsx`, Settings › Sharing. Needs Q4.
-2. **Shares table, data layer and Together quests:** migration, `src/lib/data/shares.ts` (`can`, `invite`, `respond`, `leave`, `syncHandles`, `resolveHost`, `viewerCanSeeTask`), the "With" panel with an even split, invite notifications, Join / Not now, handles, completion and undo paying every row. Needs Q1, Q2, Q3, Q5, Q7. **Write tests for the split math and the pay-once guard** (rounding sums to the total; replayed completion pays nothing; undo returns every row to zero).
+1. **Victory check** (section 7). Small; touches `completeTask`, `activity.ts`, `QuestComplete.tsx`, Settings › Sharing.
+1a. **Comments on quests** (section 7a). Independent of sharing; can go before or after step 2.
+2. **Shares table, data layer and Together quests:** migration, `src/lib/data/shares.ts` (`can`, `invite`, `respond`, `leave`, `syncHandles`, `resolveHost`, `viewerCanSeeTask`), the "With" panel with an even split, invite notifications, Join / Not now, handles, completion and undo paying every row. **Write tests for the split math and the pay-once guard** (rounding sums to the total; replayed completion pays nothing; undo returns every row to zero).
 3. **Changing the split; sub-quest invites and assignees.**
 4. **Boards with named people;** "Join" beside "Take this on too" on shared boards.
 5. **Each their own mode; supporters' progress view.**

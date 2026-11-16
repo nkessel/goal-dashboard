@@ -17,7 +17,7 @@ Ids are the in-app feedback notes (first 8 characters). "Brainstorm first" means
 - Choose whether to share each victory on the celebration screen, instead of it sharing automatically.
 - Message anyone in the party, with an email notification.
 
-**Designed Nov 16: `docs/SOCIAL-DESIGN.md`** (data model, permission rules, build order). Waiting on your answers to its seven questions (section 9) before anything is built.
+**Designed Nov 16: `docs/SOCIAL-DESIGN.md`** (data model, permission rules, build order). Your answers are recorded in its section 9; ready to build, step by step, each through design review.
 
 ## 3. Calendar as a real planner
 - **Repeating events, quests or not, and travel time.** Reached from the right-click menu (13c5ba6a).
