@@ -30,7 +30,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 
 - `review/prioritize-bars` (taller Prioritize bars): built Nov 14, not UI-checked or reviewed.
 - `review/walkthrough-v2` (the rebuilt walkthrough): built Nov 15, review page sent, waiting on his OK or notes.
-- Import card screen: his pick of mockup A, B or C.
+- `review/import-calendar` (import card A: a calendar time from Due, a landing line, no "To schedule" type): built Nov 16, review page sent.
 - Daily coursework as a habit: options A–D sent Nov 11.
 - Habits in the daily plan, part 2: not built yet (plan in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
