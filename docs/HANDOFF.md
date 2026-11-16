@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file is the map: the standing rules, how to ship, and where everything else lives. It is loaded into every session, so **keep it short** (see "Keeping this file current"). If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-16 (handoff split into linked docs; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
+- **Last updated:** 2026-11-16 evening (walkthrough merged after the owner's OK; handoff split into linked docs; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** the database is the full list (query in section 3; by screen in `docs/FEEDBACK-BY-SCREEN.md`). 316 open on Nov 12; many are already built but were never marked: check the code and `docs/SHIPPED.md` before building one again, and mark it. If the Supabase connector is missing, ask the owner to connect it (claude.ai Settings › Connectors).
 
@@ -29,7 +29,6 @@ The owner's Claude project also keeps a priorities list by model (Nov 16) in its
 Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Read the topic's entry there before touching it. When something new waits on him (a design review, a pick), add it there with its branch, review page link and date, and add its name to this list.
 
 - `review/prioritize-bars` (taller Prioritize bars): built Nov 14, not UI-checked or reviewed.
-- `review/walkthrough-v2` (the rebuilt walkthrough): built Nov 15, review page sent, waiting on his OK or notes.
 - `review/import-calendar` (import card A: a calendar time from Due, a landing line, no "To schedule" type): built Nov 16, review page sent.
 - `review/time-ranges-lesson-button` (time ranges for habits and quests, chosen habits in the auto-scheduler, Complete lesson button): built Nov 16, review page sent, waiting on his OK or notes.
 - Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
