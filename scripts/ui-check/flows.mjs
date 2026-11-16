@@ -595,14 +595,6 @@ export const FLOWS = [
       await h.settle(1200);
       await h.check("tour: one quest left");
       await next("create your first quest", "create: intro, pointing at +");
-      // The three looks for the step's ask, on this step (owner's review).
-      for (const style of ["gold", "ink"]) {
-        await h.page.evaluate((v) => (localStorage.setItem("tour-ask-look", v), window.dispatchEvent(new Event("tour-look-change"))), style);
-        await h.settle(400);
-        await h.check(`create: ask as ${style}`);
-      }
-      await h.page.evaluate(() => (localStorage.removeItem("tour-ask-look"), window.dispatchEvent(new Event("tour-look-change"))));
-      await h.settle(300);
       await h.tap(/^create something new$/i, "tour: + ", { expectMove: true });
       await h.settle(500);
       await h.check("create: tap New quest");

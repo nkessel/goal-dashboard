@@ -46,22 +46,3 @@ function subscribe(cb: () => void) {
 export function useTourLook(): TourLook {
   return useSyncExternalStore(subscribe, read, () => "narrator");
 }
-
-/**
- * How the floating ask beside the lit control looks (owner, Nov 16: "a floating instruction for each click",
- * apart from his card). Three looks under review, kept on this device (`tour-ask-look`) until one is chosen:
- * "parchment" (a cream label, dark ink), "gold" (a bright gilded tag) and "ink" (glowing words and a drawn arrow).
- */
-export type TourPress = "parchment" | "gold" | "ink";
-const PRESS_KEY = "tour-ask-look";
-function readPress(): TourPress {
-  try {
-    const v = localStorage.getItem(PRESS_KEY);
-    return v === "gold" || v === "ink" ? v : "parchment";
-  } catch {
-    return "parchment";
-  }
-}
-export function useTourPress(): TourPress {
-  return useSyncExternalStore(subscribe, readPress, () => "parchment");
-}

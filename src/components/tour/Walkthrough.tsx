@@ -9,7 +9,7 @@ import { ToucanArt } from "@/components/toucan/ToucanArt";
 import { SnoozeIcon } from "@/components/ui/Icons";
 import { AVATAR_STYLE_OPTIONS, DEFAULT_AVATAR_STYLE, SAMPLE_AVATAR_PROMPTS } from "@/lib/avatar-prompts";
 import { readTour, subscribeTour, writeTour } from "@/lib/tour-store";
-import { useTourLook, useTourPress } from "@/lib/tour-look";
+import { useTourLook } from "@/lib/tour-look";
 
 /**
  * The new-adventurer walkthrough, guided by the Great Toucan Spirit (owner, Nov 13–15; every account goes
@@ -33,7 +33,8 @@ type Step = {
   press?: string;
   /** Needs Today on screen (offers to go there). */
   today?: boolean;
-  /** The ask in a few words, floating beside the lit control (owner, Nov 16: one instruction per tap). */
+  /** The ask, floating beside the lit control (owner, Nov 16: one instruction per tap): "What to do|why", the
+   *  first part bold, the second quieter under it. */
   tag?: string;
   /** Several taps in a row, one instruction at a time: the last one whose control is on screen is shown. */
   asks?: { find: () => Element | null; say: string }[];
@@ -86,7 +87,7 @@ const STEPS: Record<string, Step> = {
     title: () => "Two quests await you",
     text: (n) => `Take them in any order, ${n}: one shows you around the realm, the other helps you create your first real quest. Each pays XP and coins when it's done.`,
     press: "Tap either quest on Today's Quests, or choose one here.",
-    tag: "Tap a quest to begin",
+    tag: "Tap a quest|to begin it",
   },
   "ex-calendar": { target: NAV("/calendar"), part: ex(1), title: () => "The Calendar", text: () => "For scheduling your quests, planning your days, and seeing what's coming up next. Your quests sit beside your own calendars: drag one onto a time to plan it.", next: "Next" },
   "ex-boards": { target: NAV("/boards"), part: ex(2), title: () => "All Quests", text: () => "Every quest you have, gathered on boards for your projects and areas of life. Break big goals into steps, see what's next on each board, and use the priority matrix to sort what matters most from what can wait.", next: "Next" },
@@ -109,8 +110,8 @@ const STEPS: Record<string, Step> = {
       "This is where you add your first quest. A quest can be big or small, and should be something that matters to you. I recommend starting with something you can finish today, so you can begin with a victory under your belt. You can add additional quests at any time.",
     press: "Tap the glowing +, then choose New quest.",
     asks: [
-      { find: () => document.querySelector(PLUS), say: "Tap +" },
-      { find: () => buttonByText(/^new quest/i), say: "Tap New quest" },
+      { find: () => document.querySelector(PLUS), say: "Tap the plus|to start a new quest" },
+      { find: () => buttonByText(/^new quest/i), say: "Tap New quest|to name it and set it up" },
     ],
   },
   "cr-name": {
@@ -119,7 +120,7 @@ const STEPS: Record<string, Step> = {
     title: () => "Name your quest",
     text: () => "Write it the way you'd say it to a friend: what you'll actually do.",
     press: "Type it in the glowing field.",
-    tag: "Type your quest's name",
+    tag: "Type your quest's name|what you'll actually do",
     next: "Next",
   },
   "cr-eta": {
@@ -129,8 +130,8 @@ const STEPS: Record<string, Step> = {
     text: () => "A rough guess is fine. It helps me find room for it in your day.",
     press: "Tap Time, then pick a length.",
     asks: [
-      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-time"]`), say: "Tap Time" },
-      { find: () => document.querySelector(`${EDITOR} [data-tour="panel-time"]`), say: "Pick how long it'll take" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-time"]`), say: "Tap Time|to set how long it takes" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="panel-time"]`), say: "Pick a length|a rough guess is fine" },
     ],
     next: "Next",
   },
@@ -141,8 +142,8 @@ const STEPS: Record<string, Step> = {
     text: () => "Give it a due day. If you like, block out a time for it on your calendar too: a quest with a day is a quest that happens.",
     press: "Tap Due, pick a day, and “Find a time” for your calendar.",
     asks: [
-      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-due"]`), say: "Tap Due date" },
-      { find: () => document.querySelector(`${EDITOR} [data-tour="panel-due"]`), say: "Pick a day (and a time, if you like)" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-due"]`), say: "Tap Due date|to choose when it's done" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="panel-due"]`), say: "Pick a day|and a time, if you like" },
     ],
     next: "Next",
   },
@@ -153,8 +154,8 @@ const STEPS: Record<string, Step> = {
     text: () => "Use XP and coins to reward and motivate yourself. XP helps you level up your character, and coins buy special rewards you set for yourself in your Treasure Chest. Give just enough to make you want to start.",
     press: "Tap XP, then set the XP with − and + (or type it), and the coins beside it.",
     asks: [
-      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-xp"]`), say: "Tap XP" },
-      { find: () => document.querySelector(`${EDITOR} [data-tour="xp-row"]`), say: "Set the XP with − and +, or type it" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="fact-xp"]`), say: "Tap XP|to choose your reward" },
+      { find: () => document.querySelector(`${EDITOR} [data-tour="xp-row"]`), say: "Set your XP|with − and +, or type a number" },
     ],
     next: "Next",
   },
@@ -164,7 +165,7 @@ const STEPS: Record<string, Step> = {
     title: () => "Create it",
     text: () => "It will wait for you on Today's Quests.",
     press: "Tap Create quest.",
-    tag: "Tap Create quest",
+    tag: "Tap Create quest|it waits on Today's Quests",
   },
   "cr-engage": {
     today: true,
@@ -173,8 +174,8 @@ const STEPS: Record<string, Step> = {
     text: () => "When you're ready to begin, Engage Quest clears everything else away so you can focus on this one thing.",
     press: "Tap ⋯ on your new quest (or hold the card), then Engage Quest.",
     asks: [
-      { find: () => document.querySelector(`[data-task-id="${readTour()?.realId}"] [aria-label="Quest actions"]`), say: "Tap ⋯" },
-      { find: () => buttonByText(/^engage quest/i), say: "Tap Engage Quest" },
+      { find: () => document.querySelector(`[data-task-id="${readTour()?.realId}"] [aria-label="Quest actions"]`), say: "Tap ⋯|your new quest's menu" },
+      { find: () => buttonByText(/^engage quest/i), say: "Tap Engage Quest|to focus on just this one" },
     ],
   },
   "cr-focus": {
@@ -183,7 +184,7 @@ const STEPS: Record<string, Step> = {
     title: () => "One quest, nothing else",
     text: () => "Do it now, and tap Complete when it's done. Already done it? Tell me how long it took, then Complete. If it's for later, skip this step: it waits on Today.",
     press: "When it's done, tap Complete.",
-    tag: "Tap Complete when it's done",
+    tag: "Tap Complete|when it's done",
   },
   "cr-claim": {
     today: true,
@@ -191,7 +192,7 @@ const STEPS: Record<string, Step> = {
     title: () => "Claim your first victory!",
     text: (n) => `Well done, ${n}! Now claim the reward for this one: tap the circle and watch your XP and coins pour in!`,
     press: `Tap the circle on “${CREATE}”.`,
-    tag: "Tap the circle to claim it",
+    tag: "Tap the circle|to claim your reward",
   },
   done: {
     title: (n) => `You're ready, ${n} ✦`,
@@ -244,7 +245,6 @@ export function Walkthrough() {
   const router = useRouter();
   const pathname = usePathname();
   const look = useTourLook();
-  const askLook = useTourPress();
   const tour = useSyncExternalStore(subscribeTour, () => localStorage.getItem("tour-state") ?? "", () => "");
   const state: TourState | null = tour ? (JSON.parse(tour) as TourState) : null;
   const welcomeUp = useSyncExternalStore(subscribeHtml, welcomeUpNow, () => true);
@@ -257,6 +257,8 @@ export function Walkthrough() {
   const cardRef = useRef<HTMLDivElement>(null);
   const [cardH, setCardH] = useState(180);
   const [ask, setAsk] = useState<string | null>(null);
+  const [tipW, setTipW] = useState(200);
+  const [tipH, setTipH] = useState(56);
   // Where the card's bottom edge last sat: it stays there while it can, so he moves as little as he must.
   const [lastB, setLastB] = useState<number | null>(null);
 
@@ -384,6 +386,7 @@ export function Walkthrough() {
       const l = Math.min(...parts.map((r) => r.left)), tp = Math.min(...parts.map((r) => r.top));
       return new DOMRect(l, tp, Math.max(...parts.map((r) => r.right)) - l, Math.max(...parts.map((r) => r.bottom)) - tp);
     };
+    let broughtFor: string | null = null;
     const tick = () => {
       // Several taps in a row: the latest one whose control is showing.
       let el: Element | null = null;
@@ -396,6 +399,12 @@ export function Walkthrough() {
         }
       } else if (!withStarters) el = findTarget(target);
       setAsk((old) => (old === say ? old : say));
+      // A control to tap that sits off screen (a new quest still joining Today) is brought into view, once.
+      const eb = s.asks ? el?.getBoundingClientRect() : null;
+      if (el && eb && say && broughtFor !== say && (eb.bottom < 40 || eb.top > window.innerHeight - 100)) {
+        broughtFor = say;
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
       const r = withStarters ? union() : (el?.getBoundingClientRect() ?? null);
       setRect((old) => (old && r && Math.abs(old.top - r.top) < 1 && Math.abs(old.left - r.left) < 1 && Math.abs(old.width - r.width) < 1 && Math.abs(old.height - r.height) < 1 ? old : r));
     };
@@ -487,7 +496,7 @@ export function Walkthrough() {
   // still leaves the lit control and its floating ask clear; otherwise the nearest place that does. Anchored by
   // its bottom edge, so a longer or shorter step grows upward instead of shifting the whole card.
   const NAV_ROOM = 96;
-  const ASK_ROOM = ask ? 50 : 16;
+  const ASK_ROOM = ask ? 74 : 16;
   const left = Math.max(14, Math.min(vw - W - 14, rect ? rect.left + rect.width / 2 - W / 2 : vw / 2 - W / 2));
   const fits = (b: number) => b <= vh - BOTROOM && b - cardH >= TOPROOM && (!rect || b + 4 <= rect.top - ASK_ROOM || b - cardH - 4 >= rect.bottom + ASK_ROOM);
   const low = vh - NAV_ROOM - BOTROOM;
@@ -502,10 +511,15 @@ export function Walkthrough() {
   const bottom = choices.find(fits) ?? Math.max(TOPROOM + cardH, Math.min(low, vh - BOTROOM));
   const top = bottom - cardH;
   // The floating ask: beside the lit control, on the card's side of it.
-  const askBelow = rect ? rect.bottom <= top : false;
+  // The tip goes on the card's side of the control; its pointer lands on the control's middle.
+  // Above the control unless the card is above it or there's no room up there.
+  const askBelow = rect ? rect.bottom <= top || rect.top - 13 - tipH < 56 : false;
+  const cx = rect ? rect.left + rect.width / 2 : 0;
+  const tipLeft = Math.max(10, Math.min(vw - tipW - 10, cx - tipW / 2));
   const askSpot: React.CSSProperties | null = rect
-    ? { left: Math.max(10, Math.min(vw - 250, rect.left + rect.width / 2 - 90)), top: askBelow ? rect.bottom + 10 : rect.top - 44 }
+    ? { left: 0, top: 0, translate: `${tipLeft}px ${askBelow ? rect.bottom + 13 : rect.top - 13 - tipH}px` }
     : null;
+  const [askTitle, askSub] = (ask ?? "").split("|");
 
   const needsToday = s.today && pathname !== "/";
 
@@ -579,11 +593,21 @@ export function Walkthrough() {
       {/* Placed by transform, so following the control as it scrolls never counts as the page jumping. */}
       <Remember value={bottom} onChange={setLastB} />
       {/* One instruction at a time, floating right by what to tap: its own look, apart from his card. */}
+      {/* One instruction at a time, right by what to tap (owner's pick, Nov 16: "Ink and gold"). */}
       {rect && ask && askSpot && (
-        <div key={ask} data-tour-tag data-ask-look={askLook} className="tour-ask pointer-events-none fixed z-[137] flex max-w-[260px] items-center gap-2" style={askSpot}>
-          {askLook === "ink" ? <ArrowGlyph dir={askBelow ? "up" : "down"} /> : <TapGlyph />}
-          <span>{ask}</span>
-          {askLook !== "ink" && <span aria-hidden className="tour-ask-point" data-below={askBelow ? "true" : undefined} />}
+        <div
+          key={ask}
+          ref={(el) => {
+            if (el && Math.abs(el.offsetWidth - tipW) > 1) setTipW(el.offsetWidth);
+            if (el && Math.abs(el.offsetHeight - tipH) > 1) setTipH(el.offsetHeight);
+          }}
+          data-tour-tag
+          className="tour-tip pointer-events-none fixed z-[137]"
+          style={askSpot}
+        >
+          <span className="tour-tip-t">{askTitle}</span>
+          {askSub && <span className="tour-tip-s">{askSub}</span>}
+          <span aria-hidden className="tour-tip-tri" data-up={askBelow ? "true" : undefined} style={{ left: Math.max(14, Math.min(tipW - 28, cx - tipLeft - 7)) }} />
         </div>
       )}
       {rect && <div aria-hidden data-tour-ring className="tour-ring pointer-events-none fixed z-[134] rounded-2xl" style={{ left: 0, top: 0, transform: `translate(${rect.left - 6}px, ${rect.top - 6}px)`, width: rect.width + 12, height: rect.height + 12 }} />}
@@ -720,28 +744,6 @@ export function Walkthrough() {
 function Remember({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   useEffect(() => onChange(value), [value, onChange]);
   return null;
-}
-
-/** A tap: a dot with a ripple, drawn in the ask's ink. */
-function TapGlyph() {
-  return (
-    <svg aria-hidden width="18" height="18" viewBox="0 0 18 18" fill="none" className="tour-tap shrink-0">
-      <circle cx="9" cy="9" r="3" fill="currentColor" />
-      <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.4" opacity=".55" />
-    </svg>
-  );
-}
-
-/** A small hand-drawn arrow toward the lit control (or a quill mark when it points at nothing). */
-function ArrowGlyph({ dir }: { dir: "up" | "down" | "left" | "right" | null }) {
-  if (!dir) return <span aria-hidden className="mt-[1px] shrink-0">✦</span>;
-  const turn = { up: "none", down: "rotate(180deg)", left: "rotate(-90deg)", right: "rotate(90deg)" }[dir];
-  return (
-    <svg aria-hidden width="14" height="16" viewBox="0 0 14 16" fill="none" className="mt-[2px] shrink-0" style={{ transform: turn }}>
-      <path d="M7 15 C5 11, 9 8, 7 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M3.5 5 L7 1.5 L10.5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
 }
 
 /**
