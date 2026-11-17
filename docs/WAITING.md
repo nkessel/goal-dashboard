@@ -30,3 +30,5 @@ Started in the owner's Claude project threads; written here so another account c
 **Ideas floated, not asked for:** a cheap DIY wall-calendar tablet tied to the app; growing the Final Boss into a fuller planning screen; the life wheel as the backbone of boards (see `docs/archive/planning-brief-2026-10-18.md`).
 
 **Non-dev, owner side:** choosing a domain (lifequests.win was the next to check; lifequest.win is premium-priced).
+
+- **Welcome screen, toucan-only version** (owner, Nov 17): the welcome screen is paused (Settings › Welcome Screen › Off). He wants to bring it back "with just the Tucan asking what's most important right now", as a choice beside the full screen and Off. Mock it up and show him before building.

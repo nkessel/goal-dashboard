@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { getWelcomeLayoutAction, saveWelcomeLayoutAction, type WelcomeLayout } from "@/app/actions";
 import { loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
 
-const KEYS = ["welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
+const KEYS = ["welcomeMode", "welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
 const pick = (fx: FxSettings): WelcomeLayout => {
   const out: WelcomeLayout = {};
   for (const k of KEYS) if (fx[k] !== undefined) out[k] = fx[k];

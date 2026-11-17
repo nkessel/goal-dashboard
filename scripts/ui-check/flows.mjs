@@ -20,6 +20,28 @@ const esc = async (h) => {
 
 export const FLOWS = [
   {
+    // Paused by default (owner, Nov 17): the day's first visit opens no welcome screen; Settings can turn it back on.
+    name: "welcomeoff",
+    async run(h) {
+      await h.goto("/", { name: "welcomeoff" });
+      await h.page.evaluate(() => {
+        for (const k of ["daily-login", "welcome-pending", "daily-login-open", "welcome-back-at"]) localStorage.removeItem(k);
+        const fx = JSON.parse(localStorage.getItem("goalFxSaved") || "{}");
+        delete fx.welcomeMode;
+        localStorage.setItem("goalFxSaved", JSON.stringify(fx));
+      });
+      await h.page.reload();
+      await h.page.waitForTimeout(4000);
+      if (await h.page.locator("[data-welcome-root]").count()) throw new Error("welcomeoff: the welcome screen opened while switched off");
+      if (await h.page.evaluate(() => document.documentElement.hasAttribute("data-fog"))) throw new Error("welcomeoff: the mist stayed over Today");
+      await h.check("first visit, welcome screen off");
+      await h.goto("/settings?open=welcome-screen", { name: "welcomeoff-settings" });
+      if (!(await h.page.locator("[data-welcome-mode] button[aria-pressed=true]", { hasText: "Off" }).count())) throw new Error("welcomeoff: Settings doesn't show the welcome screen as Off");
+      await h.page.locator("[data-welcome-mode]").scrollIntoViewIfNeeded();
+      await h.check("Settings › Welcome Screen: Off");
+    },
+  },
+  {
     name: "welcome",
     async run(h) {
       await h.goto("/", { welcome: true, name: "welcome" });

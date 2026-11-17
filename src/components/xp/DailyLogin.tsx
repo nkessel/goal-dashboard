@@ -48,7 +48,7 @@ import { lineForDay } from "@/lib/greetings";
 import { backHours, greetingFor, ownLines } from "@/lib/welcome";
 import { voice } from "@/lib/toucan-style";
 import { readStyle } from "@/lib/toucan-style-store";
-import { loadFx, subscribeFx } from "@/lib/celebration-fx";
+import { loadFx, subscribeFx, welcomeOn } from "@/lib/celebration-fx";
 import { clearFog, fogOn, liftFog, welcomeDue } from "@/lib/welcome-fog";
 
 const BACK_KEY = "welcome-back-at";
@@ -176,6 +176,14 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     // Evening: no morning check-in. Your login still counts, and the toucan offers the evening
     // routine once tonight instead (owner, Nov 9: "prompt the user to do the evening check-in once
     // it's time for that instead of the morning check-in").
+    // Welcome screen switched off (owner, Nov 17: "pause the welcome screen for now"): the login
+    // still counts, nothing opens.
+    if (!welcomeOn()) {
+      liftFog();
+      setPending(null);
+      if (first) dailyCheckInAction(new Date().getTimezoneOffset()).catch(() => {});
+      return;
+    }
     if (isEveningCheckInTime()) {
       liftFog();
       setPending(null);

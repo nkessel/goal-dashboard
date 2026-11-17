@@ -33,6 +33,9 @@ export type FxSettings = {
   welcomeCastle?: string;
   /** The generated spire castle's seed (Generate castle draws a new one). */
   welcomeCastleSeed?: number;
+  /** Whether the welcome screen opens at all (owner, Nov 17: "pause the welcome screen for now"):
+   *  "full" opens it as before; unset or "off" keeps it away (your login still counts). */
+  welcomeMode?: "full" | "off";
   /** Back after this many hours since your last check-in: a "welcome back" screen (0 = never). */
   welcomeBackHours?: number;
   /** Your own "welcome back" greetings, one per line (they take turns with the built-in ones left on). */
@@ -384,4 +387,9 @@ export function subscribeFx(cb: () => void) {
     window.removeEventListener("fx-change", cb);
     window.removeEventListener("storage", cb);
   };
+}
+
+/** Is the welcome screen switched on? Off (paused) unless chosen in Settings › Welcome Screen. */
+export function welcomeOn(fx: FxSettings = loadFx()): boolean {
+  return fx.welcomeMode === "full";
 }

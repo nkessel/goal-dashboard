@@ -339,7 +339,7 @@ async function walk({ browser, device, time, tz, cookie }) {
           localStorage.setItem("evening-prompt-at", "off");
           try {
             const fx = JSON.parse(localStorage.getItem("goalFxSaved") || "{}");
-            localStorage.setItem("goalFxSaved", JSON.stringify({ ...fx, welcomeDawnOn: true }));
+            localStorage.setItem("goalFxSaved", JSON.stringify({ ...fx, welcomeDawnOn: true, welcomeMode: "full" }));
           } catch {}
         } else {
           localStorage.setItem("daily-login", key);
