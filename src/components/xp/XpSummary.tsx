@@ -88,7 +88,7 @@ export function XpSummary({
       <div className="flex flex-col gap-2">
         {/* Equal side columns keep the avatar dead center and both stat pairs
             balanced around it, whatever the screen width. */}
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-2">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:gap-2" data-tour="hero">
           <div className="flex flex-col gap-5 justify-self-center sm:gap-6">
             <StatTile iconSrc="/design/ui-shield.png" value={stats?.questsComplete ?? 0} label={<>Quests<br />Complete</>} />
             <StatTile iconSrc="/design/ui-flame.png" value={profile.streak_count} label={<>Quest<br />Streak</>} />

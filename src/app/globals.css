@@ -3411,12 +3411,12 @@ body[data-quest-drag] .today-cal-tab { box-shadow: 0 0 0 2px rgba(246, 220, 142,
 
 /* The walkthrough's ring around the control it points at (owner, Nov 13). */
 @keyframes tour-ring-pulse { 0%, 100% { box-shadow: 0 0 0 2px #f2d58a, 0 0 0 6px rgba(242,213,138,.35), 0 0 18px rgba(242,213,138,.5); } 50% { box-shadow: 0 0 0 2px #f2d58a, 0 0 0 10px rgba(242,213,138,.15), 0 0 26px rgba(242,213,138,.65); } }
-.tour-ring { transition: left 200ms ease, top 200ms ease, width 200ms ease, height 200ms ease; animation: tour-ring-pulse 1.8s ease-in-out infinite; }
+.tour-ring { transition: transform 200ms ease, width 200ms ease, height 200ms ease; animation: tour-ring-pulse 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .tour-ring { animation: none; box-shadow: 0 0 0 3px #f2d58a; } }
 /* The walkthrough is the toucan's own voice, so it looks like nothing else in the app (owner, Nov 14: "some kind of
    special border or other UI distinction"): a night-teal spirit card in a double gilded frame with a slow glow, the
    toucan in a medallion breaking out of its corner, and the screen dimmed around what to press. */
-.tour-spot { border-radius: 16px; box-shadow: 0 0 0 200vmax rgba(8, 14, 12, .52); transition: left 200ms ease, top 200ms ease, width 200ms ease, height 200ms ease; }
+.tour-spot { border-radius: 16px; box-shadow: 0 0 0 200vmax rgba(8, 14, 12, .52); transition: transform 200ms ease, width 200ms ease, height 200ms ease; }
 .tour-card {
   background: radial-gradient(ellipse 120% 80% at 20% 0%, #2a4d4e 0%, #18302f 55%, #10201f 100%);
   box-shadow: inset 0 0 0 1px rgba(242, 213, 138, .55), 0 0 0 3px #10201f, 0 0 0 4.5px #c9a24a, 0 14px 36px rgba(0, 0, 0, .5), 0 0 26px rgba(120, 230, 210, .28);
@@ -3456,6 +3456,66 @@ body[data-quest-drag] .today-cal-tab { box-shadow: 0 0 0 2px rgba(246, 220, 142,
 @media (prefers-reduced-motion: reduce) { .tour-name-line::after { animation: none; } }
 .tour-card :focus-visible { outline: 2px solid #f2d58a; outline-offset: 2px; }
 html[data-tour-open] [data-perched-owl] { visibility: hidden; }
+/* The guide's three looks (owner, Nov 15): "A with the narrator" by default (the teal spirit card, the toucan
+   floating at its top-left corner), Original A (the same card with a tail, the toucan floating below it) and
+   Blend 3 (a storybook parchment page with the spirit's glow). Settings › Help › The guide's look. */
+.tour-toucan { position: absolute; pointer-events: none; filter: drop-shadow(0 0 12px rgba(120, 230, 210, .55)); }
+.tour-card[data-look="narrator"] .tour-toucan, .tour-card[data-look="page"] .tour-toucan { left: -16px; top: -52px; }
+.tour-card[data-look="spirit"] .tour-toucan { left: -8px; bottom: -78px; }
+.tour-card[data-look="spirit"]::after {
+  content: ""; position: absolute; left: 70px; bottom: -11px; width: 20px; height: 20px; background: #10201f;
+  transform: rotate(45deg); box-shadow: 3px 3px 0 1.5px #c9a24a; border-radius: 0 0 5px 0; pointer-events: none;
+}
+.tour-title { color: #fbeecb; }
+.tour-text { color: #efe3c6; }
+.tour-skip { color: #c9e9e2; }
+.tour-card[data-look="page"] {
+  background: radial-gradient(ellipse at 20% 10%, rgba(255, 255, 255, .55), transparent 60%), radial-gradient(ellipse at 90% 100%, rgba(160, 110, 40, .18), transparent 55%), linear-gradient(#f7edd2, #ecdcb3);
+  box-shadow: 0 0 0 1.5px #b98e3e, 0 0 0 5px #f1e3bd, 0 0 0 6.5px #9c7530, 0 16px 30px rgba(0, 0, 0, .45), 0 0 34px 4px rgba(120, 230, 210, .45);
+  border-radius: 10px 10px 16px 16px; animation: card-pop-in .32s cubic-bezier(.2, .9, .3, 1.2) both;
+}
+.tour-card[data-look="page"]::before { content: ""; position: absolute; inset: 7px; border: 1px solid rgba(156, 117, 48, .45); border-radius: 6px; pointer-events: none; }
+.tour-card[data-look="page"] .tour-title { color: #5a2316; }
+.tour-card[data-look="page"] .tour-text { color: #3a2a17; }
+.tour-card[data-look="page"] .tour-eyebrow { color: #8a6a2a; }
+.tour-card[data-look="page"] .tour-skip { color: #7a5a2c; }
+.tour-card[data-look="page"] .tour-chip { color: #3a2a17; background: rgba(120, 80, 20, .06); border-color: rgba(138, 97, 22, .55); }
+.tour-card[data-look="page"] .tour-chip:hover { background: rgba(120, 80, 20, .12); }
+.tour-card[data-look="page"] .tour-snooze { color: #7a5a2c; border-color: rgba(138, 97, 22, .45); background: rgba(120, 80, 20, .05); }
+.tour-card[data-look="page"] .tour-call { color: #7a5a2c; }
+.tour-card[data-look="page"] .tour-name, .tour-card[data-look="page"] .tour-describe { color: #6b3a14; caret-color: #8a6116; text-shadow: none; }
+.tour-card[data-look="page"] .tour-name::placeholder, .tour-card[data-look="page"] .tour-describe::placeholder { color: rgba(107, 58, 20, .4); }
+.tour-card[data-look="page"] .tour-name-star { color: #a07a2c; }
+.tour-card[data-look="page"] .tour-press { box-shadow: 0 0 0 1px #a88a3f, 0 1px 0 rgba(0, 0, 0, .06); }
+/* The floating ask beside the lit control (owner, Nov 16): one instruction per tap, its own look apart from
+   the toucan's card. It bobs gently toward the control. Three looks under review (data-ask-look). */
+.tour-whisper { color: #f2d58a; }
+.tour-card[data-look="page"] .tour-whisper { color: #7a4a14; }
+/* "Ink and gold" (owner's pick): near-black ink, a thin gold edge, the app's Garamond in warm cream, a pointer
+   that lands on the control's middle. */
+@keyframes tour-tip-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tour-tip { --tip: #18120c; max-width: 270px; padding: 10px 14px 11px; border-radius: 12px; background: var(--tip); box-shadow: 0 0 0 1.5px #c9a24a, 0 10px 26px rgba(0, 0, 0, .55); animation: tour-tip-in .35s cubic-bezier(.2, .9, .3, 1.15) both; }
+.tour-tip-t { display: block; font: 600 18px/1.2 var(--font-display, Georgia, serif); color: #f8e9c3; }
+.tour-tip-s { display: block; margin-top: 2px; font: 400 13.5px/1.3 var(--font-display, Georgia, serif); color: #c9b88e; }
+.tour-tip-tri { position: absolute; bottom: -7px; width: 14px; height: 14px; background: var(--tip); rotate: 45deg; box-shadow: 1.5px 1.5px 0 0 #c9a24a; }
+.tour-tip-tri[data-up="true"] { bottom: auto; top: -7px; box-shadow: -1.5px -1.5px 0 0 #c9a24a; }
+/* His welcome: the world behind goes nearly dark, so his first words are all there is. */
+.tour-spot[data-dark="true"] { box-shadow: 0 0 0 200vmax rgba(3, 7, 6, .9); }
+@keyframes tour-step-in { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+.tour-step-in { animation: tour-step-in .32s ease both; }
+@media (prefers-reduced-motion: reduce) { .tour-tip, .tour-step-in { animation: none; } }
+/* The character's description, written on the card like the name: no box, a gilded line under it. */
+.tour-describe { background: transparent; border: 0; outline: none; resize: none; width: 100%; font-size: 16px; line-height: 1.4; color: #f6dd98; caret-color: #f2d58a; font-style: italic; }
+.tour-describe::placeholder { color: rgba(242, 213, 138, .42); }
+.tour-describe-line { position: relative; padding-bottom: 4px; }
+.tour-describe-line::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px; background: linear-gradient(90deg, transparent, #c9a24a 12%, #f2d58a 50%, #c9a24a 88%, transparent); }
+.tour-card .tour-chip[aria-checked="true"], .tour-card .tour-style[aria-checked="true"] { background: rgba(242, 213, 138, .26); border-color: #f2d58a; }
+.tour-card[data-look="page"] .tour-chip[aria-checked="true"] { background: rgba(217, 180, 95, .35); border-color: #8a6116; }
+.tour-portrait { border-radius: 9999px; box-shadow: 0 0 0 2px #c9a24a, 0 0 0 4px #10201f, 0 0 0 5px rgba(242, 213, 138, .6), 0 0 18px rgba(120, 230, 210, .4); object-fit: cover; }
+@keyframes tour-paint { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.tour-painting { animation: tour-paint 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tour-painting { animation: none; } }
+
 @media (prefers-reduced-motion: reduce) { .tour-card { animation: none; } }
 
 /* A finished habit or quest card: a soft green wash over the whole card instead of a crossed-out name (owner, Nov 12). */

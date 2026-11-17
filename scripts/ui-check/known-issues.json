@@ -70,5 +70,9 @@
   {
     "match": "^calendar\\|moved-on-tap\\|daily event folded",
     "reason": "Nov 14: folding a daily event's options at the very end of the calendar gear's scrolling panel: the panel's content gets shorter, so the browser pulls it down to its new end (it glides with the fold). The row itself doesn't change; nothing to fix there."
+  },
+  {
+    "match": "^tour\\|layout-shift\\|.*Relational Leadership Academy",
+    "reason": "Walkthrough, after Create it: the quest you just made joins Today's Quests (fresh data after the save), so the cards under it move down one card. That is the new quest arriving, not the page jumping; the card it points at next is the new quest."
   }
 ]

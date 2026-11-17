@@ -384,6 +384,7 @@ export function DailyHabits({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        data-tour="daily-habits"
         // Open, the header and its tray read as one section: one border around both.
         className={`drawer-header relative flex min-h-[58px] w-full flex-col items-center justify-center overflow-hidden px-12 py-2.5 transition-[border-radius] duration-200 ${open ? "rounded-t-2xl" : "rounded-2xl"}`}
         style={
