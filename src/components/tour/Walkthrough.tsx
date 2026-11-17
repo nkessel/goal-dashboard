@@ -98,7 +98,7 @@ const STEPS: Record<string, Step> = {
     target: "[data-feedback-btn]",
     part: ex(6),
     title: () => "Help shape this world",
-    text: () => "This realm is still being built, and your voice shapes it. Tap this button whenever something is confusing, broken, or could be better. Every note goes straight to the people building it.",
+    text: () => "This realm is still being built, and your voice shapes it. Tap this button whenever something is confusing, broken, or could be better. Every note goes straight to the people building it. You can drag it anywhere it suits you.",
     next: "Claim this quest ✦",
   },
   "cr-intro": {
