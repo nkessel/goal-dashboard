@@ -4,17 +4,17 @@ Written Nov 16, 2026 (design only, nothing built). Covers the owner's notes: und
 
 Everything here was found by reading the code on `main` (after pull request 6). Nothing was reproduced in a browser, so each build step starts by confirming its cause with a test. Lines are as of Nov 16.
 
-## 0. Questions only the owner can answer
+## 0. The owner's answers (Nov 16)
 
-Each has a default the build uses if he doesn't answer.
+1. **Snoozing a quest that already has a calendar time: ask each time.** In place, three pills under the snooze: "Same time that day" · "Take it off the calendar" · "Leave it where it is". Each is one undoable step.
+2. **A repeating quest** is a fresh quest each time, with its own XP, on Today on its day.
+3. **A repeating item marked for Google** becomes one true repeating event there.
+4. **Travel time is app-only.** Google Calendar has no travel-time field, so sending it would mean an extra event per trip; not done unless he asks.
+5. **Lunch never shrinks.** When there is no free gap for it, it keeps its full length and stands side by side with what's there.
+6. Undo's reach (not answered, default stands): any change to a time, from any screen, can be undone from the calendar during the same visit.
+7. Still his to pick: the look of the "add to Google Calendar" check, from the three UX teams (step 9).
 
-1. **Snoozing a quest that already has a time on the calendar.** Today the quest leaves Today but its calendar block stays at the old time. Default: it moves to the same time on the day it was snoozed to (or the first free spot after that), with a line "Moved to Tmrw 2:00 pm · Undo". Other choices: take it off the calendar, or ask each time.
-2. **A repeating quest.** Default: each time is its own fresh quest with its own XP, appearing on Today on its day (like a habit, but with a quest's card). The other choice: one quest that simply shows on many days.
-3. **Repeating items and Google.** Default: an item marked for Google becomes one true repeating event there (Google shows the repeat itself). The cheaper choice: repeats live in the app only.
-4. **Travel time and Google.** Default: travel time shows in the app only; Google gets just the event.
-5. **When something has to overlap an essential** (a fixed appointment over all of lunch's range). Default: lunch first shrinks (down to 15 minutes) to fit a free gap; if there is none it sits side by side with the other item at its ideal time, marked, never hidden.
-6. **Undo's reach.** Default: any change to a time (from the calendar, Today, the auto-scheduler) can be undone from the calendar during the same visit; the list is forgotten when the app is closed.
-7. The owner asked for **"3 iterations from 3 UX bots"** for the "add to Google Calendar" check [3e7e0b78]. That is step 9 below and ends in a pick by him.
+**His Nov 16 notes on daily events are part of step 7:** drag daily non-negotiables and habits [1ecfbf74]; a dragged one becomes a calendar appointment at the time it was moved to, with "Turn into quest card" kept [d2caf0ac]; right-click "Add a different quest here" lets him drag the new quest's block and moves the daily event to another spot by itself [1ecfbf74]; one day's event (today's lunch) can become a quest without all of them becoming quests [f7f0f274]; the menu's two edit buttons become one editor, reusing the existing one (XP, coins, avatar) [d2caf0ac]. Editor polish in the same step: the sleep tracker's time picker for the range and a simpler length picker [f7f0f274, 9599ee19], a save button at the lower right [cdfda496], edit buttons on hover and an up caret to close the section [aafd005c], room for the full name "Clean up & breakfast prep" [93b843eb].
 
 ## 1. Causes found
 
@@ -44,7 +44,7 @@ The note is from Nov 5 and the picker has been rebuilt since, so the exact case 
 4. **Times outside 7 am–10:30 pm.** `outside()` hides them behind the early/late buttons and `offset()` clamps a card that starts before 7 to the top edge, so it looks placed at 7. The picker allows any time inside the scheduler's day range.
 5. **The time-zone picture in 1a.1**: after a direct load the card can be seen at the UTC time for a moment.
 
-**Fixes (step 2):** changing the day keeps the time of day (`pick = day start + minutes of old pick`, clamped), and the foot's day label comes from `pick`, never `dayIdx`; a pick outside the window is cleared. Move the app's time first, then Google, and keep Google failures as a quiet "Google didn't take it" line. After placing outside the shown hours, open early/late and scroll to it. Snooze follows question 1.
+**Fixes (step 2):** changing the day keeps the time of day (`pick = day start + minutes of old pick`, clamped), and the foot's day label comes from `pick`, never `dayIdx`; a pick outside the window is cleared. Move the app's time first, then Google, and keep Google failures as a quiet "Google didn't take it" line. After placing outside the shown hours, open early/late and scroll to it. Snooze asks each time (answer 1).
 
 ### 1c. "I don't know what happened to Lunch" [68e84514]
 
@@ -107,9 +107,12 @@ Rules inside `applyCalendarOps`: change the app's rows first and Google after (a
 
 Two states, one function.
 
-- **Proposed** (as now: dashed, floating): `essentialsFor(day, settings, items)` in `lib/auto-schedule.ts`, the only place a float is worked out, used by every surface. It never returns nothing: nearest free gap to the ideal time; else shrink toward 15 minutes; else sit at the ideal time beside what's there, marked.
+- **Proposed** (as now: dashed, floating): `essentialsFor(day, settings, items)` in `lib/auto-schedule.ts`, the only place a float is worked out, used by every surface. It never returns nothing and never shrinks: the nearest free gap to the ideal time at full length; else it sits at the ideal time, full length, beside what's there.
 - **Accepted** (solid, "like the other things"): a `calendar_blocks` row. It is made when the owner accepts a plan preview that includes it, drags it, resizes it, or picks "Keep it here". From then on it is an ordinary item: draggable, in the item menu, undoable, counted as busy by everything, never moved by the auto-scheduler. It is not sent to Google unless its Google check is on.
 - **Never covered:** both states go through the same lane layout as cards (they join `items` in `WeekView`), so an overlap puts them side by side. `DailyBlocks` as a background layer goes away.
+- **Dragging** [1ecfbf74, d2caf0ac]: a proposed or accepted essential or timed habit drags like any card; letting go is `{ op: "place" }`, which makes (or moves) its row, so it is an appointment at that time from then on. Today the holds let clicks through to the grid (`WeekView.tsx` about 1808) and can't be dragged.
+- **"Add a different quest here"** (right-click): starts the grid's own drag-to-pick on that spot; when the quest is made, one batch places it and moves the essential to its next spot from `essentialsFor` (one undo step).
+- **One day into a quest** [f7f0f274]: "Turn into quest card" on one day's block makes a quest at that time and marks that day's row skipped; the daily event itself is unchanged on other days.
 - Skipping for a day is `{ op: "skip" }` (a row with `state = 'skipped'`), also undoable.
 
 ### 2e. Travel time [13c5ba6a]
@@ -126,8 +129,8 @@ Half of this exists: "drives" (`useAllQuestDrives`, the dashed bands in `WeekVie
 - Reuse the habit editor's repeat control and `lib/habit-repeat.ts` (`Repeat = { every, unit, from }`), extended with `weekdays?: number[]` for weekly and an end (`until` or `count`). One control app-wide.
 - A series is a rule; its days are worked out when read (`expandSeries(series, from, to)`), from the wall-clock time and the series' time zone, so daylight-saving changes keep "9:00" at 9:00. This must be done with the zone named, never the server's clock (see 1a.1).
 - A change to one day is a `calendar_blocks` row with `series_id` and `day` (moved, resized or skipped). Editing asks, in place, "This one · This and later · All" (three pills). "This and later" ends the old series the day before and starts a new one.
-- Quest series follow question 2: by default the day's quest is created when its day arrives (the daily cron) or when the owner first touches that day's card.
-- Google follows question 3: one event with a repeat rule; a changed day becomes a changed instance. Google's own repeating events stay read-only in the app, as now.
+- Quest series (answer 2): each day is a fresh quest, created when its day arrives (the daily cron) or when the owner first touches that day's card.
+- Google (answer 3): one event with a repeat rule; a changed day becomes a changed instance. Google's own repeating events stay read-only in the app, as now.
 - Reached from: the item menu ("Repeat…"), the quest editor and event editor (a `.qe-fact` pill beside Due/Time), and the add popup.
 
 ### 2g. "Add to Google Calendar" check [3e7e0b78]
@@ -151,14 +154,15 @@ Small steps, each its own `review/<topic>` branch and review page unless marked 
 | 2d | Settings saved as a merge on the server | Haiku 5.5 | `saveSchedulerSettingsAction`. Nothing visible. |
 | 3 | Migration 0090 and the copy of drives and day holds | Sonnet 5.5 | Verify with SELECTs; keep old keys readable for one release. Nothing visible. |
 | 4 | `CalItem` and `listCalendarItems`; views read it (no change in looks) | Opus 5.5 | The big refactor. Pixel-compare the UI check's calendar shots before and after. |
-| 5 | `applyCalendarOps` with opposites; every time-changing action routed through it; snooze per question 1 | Opus 5.5 | Tests against the fake database: apply then undo returns every row to its start. |
+| 5 | `applyCalendarOps` with opposites; every time-changing action routed through it; snooze asks each time (answer 1) | Opus 5.5 | Tests against the fake database: apply then undo returns every row to its start. |
 | 6 | Undo/redo store, keys and buttons | Sonnet 5.5 | New flow in `flows.mjs`. |
-| 7 | `essentialsFor` as the one float; essentials in the lane layout; accepted rows | Opus 5.5 for the function and layout, Sonnet 5.5 for the menu | Marks 68e84514 and the data half of 3e7e0b78. |
+| 7a | `essentialsFor` as the one float (never shrinks); essentials and timed habits in the lane layout; accepted rows; dragging them | Opus 5.5 | Marks 68e84514, 1ecfbf74 (drag), d2caf0ac (becomes an appointment) and the data half of 3e7e0b78. |
+| 7b | "Add a different quest here"; one day into a quest; one editor for daily events with the polish notes in section 0 | Sonnet 5.5 | Marks the rest of 1ecfbf74, d2caf0ac, f7f0f274, 9599ee19, cdfda496, aafd005c, 93b843eb. |
 | 8 | Travel time for every item: menu fold, editor pill, draggable band, `busyWindow` everywhere | Sonnet 5.5 | Replace the 🚗. |
 | 9 | Google check: three UX teams, three options each, owner picks, then build | Sonnet 5.5 runs the teams and builds | Fix `pushMissingGoogleEvents` in the same push. |
 | 10a | `expandSeries` with tests (daylight saving, month ends, weekdays, until/count) | Opus 5.5 | Pure code, nothing visible. |
 | 10b | Repeat control (shared with habits), series in the app, "This one · This and later · All" | Sonnet 5.5 | |
-| 10c | Quest series per question 2; Google repeat rule per question 3 | Opus 5.5 | Needs the owner's real Google Calendar to confirm; say so. |
+| 10c | Quest series; Google repeat rule | Opus 5.5 | Needs the owner's real Google Calendar to confirm; say so. |
 
 ## 4. Overlap with work in flight
 
