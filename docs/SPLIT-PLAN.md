@@ -232,7 +232,7 @@ Baselines from S3 (sizes, perf numbers): *to be filled in by S3.*
 - [ ] C1 · [ ] C2 · [ ] C3 · [ ] C4
 - [ ] D0 · [ ] D1 · [ ] D2 · [ ] D3 · [ ] D4 · [ ] D5
 
-By model: Haiku 5.5 takes 8 steps, Sonnet 5.5 takes 24, Opus 5.5 takes 13. None needs Fable.
+By model: Haiku 5.5 takes 8 steps, Sonnet 5.5 takes 24, Opus 5.5 takes 11. None needs Fable.
 
 ## 11. What a cloud session cannot confirm
 
