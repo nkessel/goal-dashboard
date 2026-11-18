@@ -937,6 +937,14 @@ export const FLOWS = [
         await h.settle(700);
         await h.check("leaf: logged");
       }
+      // The water drop beside it (owner, Nov 18): same wheels, logs "💧 Ejaculated".
+      if (await h.tap((p) => p.locator("[data-drop-log]").first(), "drop button", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("drop: time wheels");
+        await h.tap((p) => p.getByRole("button", { name: /^log it$/i }).first(), "log it (drop)", { optional: true, expectMove: true });
+        await h.settle(700);
+        await h.check("drop: logged");
+      }
     },
   },
   {

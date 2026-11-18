@@ -11,6 +11,8 @@ const INK = "#3b2a14";
 const pill = { background: "rgba(233,212,154,.55)", border: "1px solid #a88a3f", color: "#2a1c10" } as const;
 
 const LEAF_EVENT = "🍃 Cannabis";
+// Says "ejaculated", so the "Days since last ejaculation" streak counts it as a slip.
+const DROP_EVENT = "💧 Ejaculated";
 
 /** A seven-fingered leaf, green on parchment (owner, Nov 13: "better drawn, have the leaf be green"). */
 function LeafIcon() {
@@ -29,6 +31,16 @@ function LeafIcon() {
       {blades.map(([deg, k]) => (
         <path key={deg} d="M0 0C-2.300-3.800-1.700-9 0-13.500 1.700-9 2.300-3.800 0 0Z" transform={`translate(12 15.800) rotate(${deg}) scale(${k})`} fill="#3f9a3a" stroke="#1f5a1e" strokeWidth={0.7 / k} strokeLinejoin="round" />
       ))}
+    </svg>
+  );
+}
+
+/** A water drop, blue on parchment, drawn to sit beside the leaf (owner, Nov 18). */
+function DropIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 2.800C9.400 6.600 5.800 10.700 5.800 14.600a6.200 6.200 0 0 0 12.400 0C18.200 10.700 14.600 6.600 12 2.800Z" fill="#4f9fd8" stroke="#1d4f7a" strokeWidth="1.100" strokeLinejoin="round" />
+      <path d="M9.100 14.300c0 1.700 1 3 2.400 3.500" fill="none" stroke="#eaf5fc" strokeWidth="1.300" strokeLinecap="round" />
     </svg>
   );
 }
@@ -52,8 +64,15 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
     setNames(next);
     saveTrackedEventsAction(next).catch(() => setSaid({ text: "That didn't save. Try again?" }));
   };
-  // The leaf button (owner, Nov 12): logs it at a time picked on wheels, now by default.
-  const [leaf, setLeaf] = useState<number | null>(null);
+  // The leaf and drop buttons (owner, Nov 12 / Nov 18): log it at a time picked on wheels, now by default.
+  const [quick, setQuick] = useState<{ event: string; m: number } | null>(null);
+  const leaf = quick?.m ?? null;
+  const setLeaf = (m: number | null) => setQuick((q) => (m === null || !q ? null : { ...q, m }));
+  const openQuick = (event: string) => {
+    const d = new Date();
+    setQuick((q) => (q?.event === event ? null : { event, m: d.getHours() * 60 + d.getMinutes() }));
+  };
+  const isDrop = quick?.event === DROP_EVENT;
   const log = async (name: string, when?: Date) => {
     // Stamped now, so it keeps its real time when it waits for a connection.
     const out = await saveOrQueue("logEvent", { title: name, at: (when ?? new Date()).toISOString() }).catch((e) => ({ queued: false as const, result: { ok: false as const, error: e instanceof Error ? e.message : "Couldn't log that." } }));
@@ -124,21 +143,32 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
             style={{ color: INK, borderBottom: "1px solid #a88a3f" }}
           />
         )}
-        <button
-          type="button"
-          aria-expanded={leaf !== null}
-          aria-label="Log cannabis"
-          title="Log cannabis: pick the time, now by default"
-          onClick={() => {
-            const d = new Date();
-            setLeaf((v) => (v === null ? d.getHours() * 60 + d.getMinutes() : null));
-          }}
-          data-leaf-log
-          className="hover-glow ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-          style={{ background: "radial-gradient(circle at 35% 30%, #fffaf0, #f0e4c4 75%)", border: "1px solid #7a9a5a", boxShadow: leaf !== null ? "0 0 0 2px rgba(63,138,58,.4)" : undefined }}
-        >
-          <LeafIcon />
-        </button>
+<span className="ml-auto flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            aria-expanded={quick?.event === LEAF_EVENT}
+            aria-label="Log cannabis"
+            title="Log cannabis: pick the time, now by default"
+            onClick={() => openQuick(LEAF_EVENT)}
+            data-leaf-log
+            className="hover-glow flex h-9 w-9 items-center justify-center rounded-full"
+            style={{ background: "radial-gradient(circle at 35% 30%, #fffaf0, #f0e4c4 75%)", border: "1px solid #7a9a5a", boxShadow: quick?.event === LEAF_EVENT ? "0 0 0 2px rgba(63,138,58,.4)" : undefined }}
+          >
+            <LeafIcon />
+          </button>
+          <button
+            type="button"
+            aria-expanded={isDrop}
+            aria-label="Log ejaculation"
+            title="Log ejaculation: pick the time, now by default"
+            onClick={() => openQuick(DROP_EVENT)}
+            data-drop-log
+            className="hover-glow flex h-9 w-9 items-center justify-center rounded-full"
+            style={{ background: "radial-gradient(circle at 35% 30%, #fffaf0, #f0e4c4 75%)", border: "1px solid #5a86a8", boxShadow: isDrop ? "0 0 0 2px rgba(58,120,170,.4)" : undefined }}
+          >
+            <DropIcon />
+          </button>
+        </span>
       </div>
       <Fold open={leaf !== null}>
         <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
@@ -153,11 +183,12 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
                 at.setHours(Math.floor(m / 60), m % 60, 0, 0);
                 // A time later than now means that time yesterday (nothing is logged in the future).
                 if (m > now + 1) at.setDate(at.getDate() - 1);
+                const event = quick?.event ?? LEAF_EVENT;
                 setLeaf(null);
-                void log(LEAF_EVENT, m === now ? undefined : at);
+                void log(event, m === now ? undefined : at);
               }}
               className="h-9 rounded-full px-4 text-[13.5px] font-bold"
-              style={{ background: "linear-gradient(180deg,#8fd17a,#4f9a47)", border: "1px solid #2c5f28", color: "#10240e" }}
+              style={isDrop ? { background: "linear-gradient(180deg,#8cc4ec,#3f86c0)", border: "1px solid #1d4f7a", color: "#0b2236" } : { background: "linear-gradient(180deg,#8fd17a,#4f9a47)", border: "1px solid #2c5f28", color: "#10240e" }}
             >
               Log it
             </button>
