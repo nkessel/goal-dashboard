@@ -309,7 +309,11 @@ export default async function Home() {
                   theme={theme}
                   between={
                     habits && rites?.some((r) => "slot" in r) ? (
-                      <DailyHabits listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                      // Daily Habits, then the habits not up today as their own section, like Additional Quests (owner, Nov 18).
+                      <div className="flex flex-col gap-6">
+                        <DailyHabits listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                        <DailyHabits additional listenHref={listenBoard ? `/boards/${listenBoard.id}` : null} habits={habits} completions={habitHistory} skips={habitSkips} stepChecks={stepChecks ?? []} cleaning={profile?.life_wheel?.cleaning ?? null} theme={theme} planned={plannedHabits} core={habitPlan.core} />
+                      </div>
                     ) : null
                   }
                   habitsInToday={

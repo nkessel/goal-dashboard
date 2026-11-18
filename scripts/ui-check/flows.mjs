@@ -532,10 +532,14 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/", { name: "habiteditor" });
       await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
-      // Additional habits (Nov 18): the ones not up today, folded under the list, and still doable.
+      // Additional Habits (Nov 18): the habits not up today, as their own section under Daily Habits, like Additional Quests.
       if (await h.tap(/^additional habits/i, "open additional habits", { optional: true, expectMove: true })) {
         await h.check("additional habits open");
-        if (await h.tap("css=[aria-label^=\"Done anyway: Water the garden\"]", "tick an additional habit", { optional: true })) await h.check("additional habit done");
+        // (Playwright's touch tap times out on habit ticks inside the sortable list, so this one is a click.)
+        if (await h.page.evaluate(() => { const el = document.querySelector('[aria-label="Done: Water the garden beds"]'); el?.click(); return !!el; })) {
+          await h.settle(900);
+          await h.check("additional habit done");
+        }
         await h.tap(/^additional habits/i, "close additional habits", { optional: true, expectMove: true });
       }
       await h.page.getByText("Gym 🏋️").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
