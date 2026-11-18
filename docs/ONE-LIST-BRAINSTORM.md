@@ -2,6 +2,8 @@
 
 Written Nov 16, 2026. **Ideas only, nothing built.** For the owner's pick before any building ("brainstorm" rule). Covers his Nov 15 ask (merge Daily Habits, Today's Quests and maybe Due soon on Today) and notes [9bc0034b] ("integrate habits into the daily agenda") and [29018ed3] (section headers that are easier to digest).
 
+**Mockups (Nov 17):** phone mockups of Today now, A, B and C side by side: https://claude.ai/artifact/1f1KvCyDFQWtUzZoZvPGet
+
 ## Choices for the owner
 
 1. **Which shape?** A (three shelves in one panel), B (one list in the order you'll do things), or C (the day's calendar as the list). **I recommend B**, built so that C can grow out of it later.
