@@ -260,12 +260,18 @@ export const FLOWS = [
       }
       // A habit with sub-habits: tapping its card shows them inside the card (owner, Nov 2).
       // (Daily Habits is already open from the toggle above; tapping its header again would close it.)
-      await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
-      await h.page.getByText("Vitamins before 12pm").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
-      await h.settle(300);
-      if (await h.tap("text=Vitamins before 12pm", "habit sub-habits", { optional: true, expectMove: true })) {
+      // (Daily Habits is open from the toggle above.) Clicked from the page, since the card can sit under the bottom bar on a phone.
+      const vit = h.page.locator(".habit-row", { hasText: "Vitamins before 12pm" }).first().getByRole("button", { name: /Vitamins before 12pm/ }).first();
+      if (await vit.count()) {
+        await vit.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
+        await h.settle(600);
         await h.check("habit sub-habits open");
-        await h.tap("text=Vitamins before 12pm", "habit sub-habits close", { optional: true, expectMove: true });
+        // Idea D (owner, Nov 18): the count line under the name changes as one is ticked; a dotted thread joins the checks.
+        await h.page.locator(".habit-row", { hasText: "Vitamins before 12pm" }).first().getByRole("checkbox", { name: /^B12/ }).first().evaluate((el) => el.click()).catch(() => {});
+        await h.settle(600);
+        await h.check("habit sub-habit ticked");
+        await vit.evaluate((el) => el.click()).catch(() => {});
+        await h.settle(300);
       }
       // Schedule a quest from its ⋯ menu: the day drawn, tap a time (repeat ask 10).
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for schedule", { optional: true })) {
