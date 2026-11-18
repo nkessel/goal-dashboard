@@ -19,6 +19,7 @@ Read these only when you need them. Don't load them all at the start.
 | `docs/FEEDBACK-OPEN.md`, `docs/HIGH-EFFORT.md` | The owner's open notes by area (to Nov 5); bigger asks that need a long, high-effort session. |
 | `docs/WAITING.md` | Before touching anything in section 0a below, and for parked ideas and things to remind the owner of. |
 | `docs/SHIPPED.md` | To learn how a feature was built, which files hold it, or whether an ask is already done. Search it (`grep -n`), don't read it whole. |
+| `docs/CALENDAR-PLANNER-DESIGN.md` | Before any calendar or scheduling work: causes of the glitchy opening and the wrong-time bug, the shared design (undo, repeats, travel time, essentials), and the build order by model. |
 | `docs/ui-check.md` | Running or extending the UI check. |
 | `docs/WIP-ux-synthesis.md`, `docs/ux/` | The UX teams' reviews and what's left from them. |
 
