@@ -917,7 +917,7 @@ export function DailyHabits({
                     return (
                       <li key={h.id}>
                         <div
-                          className={`habit-row flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-1.5 ${d ? "" : "opacity-85 hover:opacity-100"} ${isAdventure ? "parchment" : ""}`}
+                          className={`habit-row relative flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-1.5 ${d ? "" : "opacity-85 hover:opacity-100"} ${isAdventure ? "parchment" : ""}`}
                           data-done={d ? "" : undefined}
                           style={isAdventure ? { borderRadius: 16 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
                         >
