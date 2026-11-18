@@ -2,7 +2,7 @@
 // (long quest titles, several boards, habits, due dates, import cards), with
 // dates relative to now so "due soon" and "today" always mean something.
 // Nothing here is the owner's real data.
-import { randomUUID } from "node:crypto";
+import { newId as randomUUID } from "./ids.mjs";
 
 export const OWNER_ID = "00000000-0000-4000-8000-0000000000a1";
 export const FRIEND_ID = "00000000-0000-4000-8000-0000000000b2";

@@ -21,6 +21,12 @@
 // Output: ui-check-out/report.md (read this), report.json, and a screenshot per step
 // with the problems boxed in red (errors) and orange (warnings).
 // Exit code 1 when there are errors not listed in known-issues.json.
+//
+// Before/after compare (S1, for splits and other changes that shouldn't change any screen):
+//   npm run ui-check -- --snapshot ui-check-out/before            save each step's page (normalized HTML + a clean screenshot)
+//   npm run ui-check -- --no-build --compare ui-check-out/before  walk again; the report lists every step whose page differs
+// Both stop the clock at --clock (default 2026-11-18T12:00:00Z; "morning"/"evening" zones follow it) and fix the fake
+// database's ids, so two runs of the same code match. Exit code 1 when a step differs. See docs/ui-check.md.
 import { spawn } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -29,6 +35,7 @@ import { startFakeDb } from "./fake-db.mjs";
 import { makeFixtures, OWNER_ID } from "./fixtures.mjs";
 import { installRecorders, auditPage, snapshotLayout, fakeKeyboard, drawBoxes, clearBoxes } from "./audit.mjs";
 import { FLOWS } from "./flows.mjs";
+import { clockScript, normalizeDom, compareSnapshots } from "./snapshot.mjs";
 
 const require = createRequire(import.meta.url);
 let chromium;
@@ -60,6 +67,22 @@ const TIMES = { morning: 8.5, evening: 20.75 };
 const only = opt("only", "").split(",").filter(Boolean);
 const devices = opt("devices", "phone,tablet").split(",");
 const times = opt("times", "morning,evening").split(",");
+// Before/after compare: stop the clock here, in `next start` and in the browser (frozen.cjs, clockScript).
+const compareDir = opt("compare", "");
+const snapDir = opt("snapshot", "") || (compareDir ? "ui-check-out/snapshot-latest" : "");
+const abs = (d) => (d.startsWith("/") ? d : ROOT + d).replace(/\/?$/, "/");
+const SNAP = snapDir ? abs(snapDir) : "";
+const BEFORE = compareDir ? abs(compareDir) : "";
+if (SNAP && SNAP === BEFORE) throw new Error("--snapshot and --compare must be different folders");
+if (BEFORE && !existsSync(BEFORE)) throw new Error(`--compare: no snapshot at ${BEFORE} (make one with --snapshot)`);
+const CLOCK_SEED = 1;
+if (SNAP) {
+  const at = Date.parse(opt("clock", "2026-11-18T12:00:00Z"));
+  if (!Number.isFinite(at)) throw new Error("--clock needs a date like 2026-11-18T12:00:00Z");
+  process.env.UI_CHECK_CLOCK_AT = String(at);
+  process.env.UI_CHECK_SEED = String(CLOCK_SEED);
+  require("./frozen.cjs");
+}
 const known = existsSync(new URL("known-issues.json", import.meta.url)) ? JSON.parse(readFileSync(new URL("known-issues.json", import.meta.url), "utf8")) : [];
 
 const env = {
@@ -78,6 +101,8 @@ const env = {
   NODE_USE_ENV_PROXY: "1",
   ...(existsSync("/root/.ccr/ca-bundle.crt") ? { NODE_EXTRA_CA_CERTS: "/root/.ccr/ca-bundle.crt" } : {}),
 };
+// `next start` gets the same frozen clock (the build doesn't: it would bake the fixed date into static pages).
+const serverEnv = SNAP ? { NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --require ${new URL("frozen.cjs", import.meta.url).pathname}`.trim() } : {};
 
 function run(cmd, cmdArgs, extraEnv = {}, { quiet = false } = {}) {
   return new Promise((resolve, reject) => {
@@ -107,7 +132,7 @@ async function startServer(tz) {
   } catch (e) {
     if (e.message.startsWith("port")) throw e;
   }
-  const p = spawn("npx", ["next", "start", "-p", String(APP_PORT)], { cwd: ROOT, env: { ...env, APP_TIMEZONE: tz, TZ: tz }, stdio: "pipe", detached: true });
+  const p = spawn("npx", ["next", "start", "-p", String(APP_PORT)], { cwd: ROOT, env: { ...env, ...serverEnv, APP_TIMEZONE: tz, TZ: tz }, stdio: "pipe", detached: true });
   const stop = () => {
     try {
       process.kill(-p.pid, "SIGTERM");
@@ -128,12 +153,14 @@ async function startServer(tz) {
 }
 
 const results = [];
+const snapSeen = new Map();
 const steps = [];
 let shotN = 0;
 
 async function walk({ browser, device, time, tz, cookie }) {
   const ctx = await browser.newContext({ ...DEVICES[device], timezoneId: tz.startsWith("Etc/GMT") ? tz : tz, locale: "en-US" });
   await ctx.addCookies([{ name: "authjs.session-token", value: cookie, domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
+  if (SNAP) await ctx.addInitScript(clockScript, { at: Number(process.env.UI_CHECK_CLOCK_AT), seed: CLOCK_SEED });
   await ctx.addInitScript(installRecorders);
   const page = await ctx.newPage();
   page.setDefaultTimeout(6000);
@@ -180,6 +207,16 @@ async function walk({ browser, device, time, tz, cookie }) {
   async function check(label, { scroll = true } = {}) {
     await settle(250);
     const name = `${String(++shotN).padStart(3, "0")}-${device}-${time}${kb ? "-kb" : ""}-${screen}-${label}`.replace(/[^\w.-]+/g, "_").slice(0, 120);
+    if (SNAP) {
+      // Before the audit draws its boxes: the page as it is, and a clean screenshot to look at.
+      let key = `${device}-${time}${kb ? "-kb" : ""}-${screen}-${label}`.replace(/[^\w.-]+/g, "_").slice(0, 110);
+      const n = (snapSeen.get(key) || 0) + 1;
+      snapSeen.set(key, n);
+      if (n > 1) key += `~${n}`;
+      const html = await page.evaluate(normalizeDom).catch((e) => `(couldn't read the page: ${e.message.split("\n")[0]})\n`);
+      writeFileSync(`${SNAP}${key}.html.txt`, html);
+      await page.screenshot({ path: `${SNAP}${key}.png` }).catch(() => {});
+    }
     const top = await page.evaluate(auditPage, { label, kbHeight: kb });
     for (const i of top.issues) record({ ...i, step: label, shot: name + ".png" });
     await page.evaluate(drawBoxes, top.issues);
@@ -396,8 +433,13 @@ async function walk({ browser, device, time, tz, cookie }) {
 }
 
 // ------------------------------------------------------------------ main
-rmSync(OUT, { recursive: true, force: true });
+// Only this run's own output: a saved --snapshot folder inside ui-check-out/ (a baseline) stays.
+for (const f of ["shots", "report.md", "report.json"]) rmSync(OUT + f, { recursive: true, force: true });
 mkdirSync(OUT + "shots", { recursive: true });
+if (SNAP) {
+  rmSync(SNAP, { recursive: true, force: true });
+  mkdirSync(SNAP, { recursive: true });
+}
 
 if (!flag("no-build")) {
   console.log("Building the app against the fake database (next build --webpack)…");
@@ -431,6 +473,22 @@ for (const time of times) {
 }
 await browser.close();
 
+// ------------------------------------------------------------------ before/after compare
+const cmp = BEFORE ? compareSnapshots(BEFORE.slice(0, -1), SNAP.slice(0, -1)) : null;
+const rel = (d) => d.replace(OUT, "").replace(ROOT, "../");
+const cmpLines = !cmp
+  ? []
+  : [
+      "",
+      `## Before/after compare (against \`${BEFORE.replace(ROOT, "")}\`)`,
+      "",
+      `${cmp.same} steps the same · **${cmp.differ.length} differ** · ${cmp.onlyBefore.length} only in the before · ${cmp.onlyAfter.length} only in this run`,
+      "",
+      ...cmp.differ.map((d) => `- **${d.key}** · ${d.count} lines differ; first at line ${d.line}, in \`${d.path}\`\n  - before: \`${d.before.replace(/`/g, "'")}\`\n  - after:  \`${d.after.replace(/`/g, "'")}\`\n  - [before](${rel(BEFORE)}${d.key}.png) · [after](${rel(SNAP)}${d.key}.png) · \`diff ${BEFORE.replace(ROOT, "")}${d.key}.html.txt ${SNAP.replace(ROOT, "")}${d.key}.html.txt\``),
+      ...(cmp.onlyBefore.length ? ["", "Steps in the before but not in this run (a step that didn't run, or a renamed step):", ...cmp.onlyBefore.slice(0, 40).map((k) => `- ${k}`)] : []),
+      ...(cmp.onlyAfter.length ? ["", "Steps only in this run:", ...cmp.onlyAfter.slice(0, 40).map((k) => `- ${k}`)] : []),
+    ];
+
 // ------------------------------------------------------------------ report
 const fresh = results.filter((r) => !r.known);
 const errs = fresh.filter((r) => r.severity === "error");
@@ -455,6 +513,7 @@ const md = [
   "",
   "Boxes in the screenshots: red = error, orange = warning. Simulated keyboard = visualViewport shrunk by 336px (can't show iOS panning; still check on a real iPhone).",
   "",
+  ...(cmpLines.length ? [...cmpLines.slice(1), ""] : []),
   "## Errors",
   ...(errs.length ? group(errs).map(line) : ["None."]),
   "",
@@ -477,4 +536,9 @@ writeFileSync(OUT + "report.md", md);
 writeFileSync(OUT + "report.json", JSON.stringify({ results, steps, dbNotes: [...dbNotes], serverNotes }, null, 1));
 console.log(`\n${group(errs).length} errors, ${group(warns).length} warnings. Report: ui-check-out/report.md`);
 for (const g of group(errs).slice(0, 25)) console.log("  ✗ " + line(g).replace(/ — \[.*$/, ""));
-process.exit(errs.length ? 1 : 0);
+if (SNAP) console.log(`Snapshot: ${SNAP.replace(ROOT, "")} (${snapSeen.size} steps)`);
+if (cmp) {
+  console.log(`Compare: ${cmp.same} the same, ${cmp.differ.length} differ, ${cmp.onlyBefore.length + cmp.onlyAfter.length} in only one run.`);
+  for (const d of cmp.differ.slice(0, 15)) console.log(`  ≠ ${d.key}: line ${d.line} in ${d.path}`);
+}
+process.exit(errs.length || cmp?.differ.length || cmp?.onlyBefore.length ? 1 : 0);

@@ -19,7 +19,8 @@ Read these only when you need them. Don't load them all at the start.
 | `docs/FEEDBACK-OPEN.md`, `docs/HIGH-EFFORT.md` | The owner's open notes by area (to Nov 5); bigger asks that need a long, high-effort session. |
 | `docs/WAITING.md` | Before touching anything in section 0a below, and for parked ideas and things to remind the owner of. |
 | `docs/SHIPPED.md` | To learn how a feature was built, which files hold it, or whether an ask is already done. Search it (`grep -n`), don't read it whole. |
-| `docs/ui-check.md` | Running or extending the UI check. |
+| `docs/ui-check.md` | Running or extending the UI check, and its before/after compare (`--snapshot`, `--compare`) for splits. |
+| `docs/ACTIONS-SPLIT-PLAN.md` | Before splitting `src/app/actions.ts` (Run D), or adding a server action file. |
 | `docs/WIP-ux-synthesis.md`, `docs/ux/` | The UX teams' reviews and what's left from them. |
 
 The owner's Claude project also keeps a priorities list by model (Nov 16) in its project files: `planning/2026-11-16-dev-priorities-by-model.md` (not in this repo).
