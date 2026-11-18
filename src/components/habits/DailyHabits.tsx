@@ -1,7 +1,6 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
-import { progressWords } from "@/lib/progress-words";
 import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -549,7 +548,7 @@ export function DailyHabits({
                       aria-checked={d}
                       aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
                       onClick={() => toggle(h)}
-                      className="relative z-[2] h-11 w-11 shrink-0 rounded-full transition-transform active:scale-90"
+                      className="relative z-[1] h-11 w-11 shrink-0 rounded-full transition-transform active:scale-90"
                       style={{ boxShadow: d ? "0 0 0 2.5px #58a04a" : "0 0 0 2px #a58c66" }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element -- habit portrait */}
@@ -569,7 +568,7 @@ export function DailyHabits({
                       aria-checked={d}
                       aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
                       onClick={() => toggle(h)}
-                      className="relative z-[2] flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
+                      className="relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
                       style={{
                         background: d ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "radial-gradient(circle at 40% 35%, #fffaf0, #efe2c2)",
                         border: `2px solid ${d ? "#2f5a26" : "#b08a3a"}`,
@@ -627,15 +626,29 @@ export function DailyHabits({
                     </span>
                     {/* How long it takes sits by the XP (owner, Nov 2); this line only when there's a time of day or a note. */}
                     {(() => {
-                      // How many sub-habits, in words (never "0/3"), on the line under the name with its time and note (owner, Nov 18).
+                      // How many sub-habits, under the name with its time and note (owner, Nov 18): "3 habits"; once one is
+                      // ticked, "2 of 3 left" with the quest cards' gold bar; then "✓ all done". The cleaning habit has none.
                       const subs = h.id === cleanId ? [] : subsOf(h);
-                      const count = subs.length ? progressWords(subs.filter((st) => ticked(h, st.id)).length, subs.length, "sub-habit") : "";
-                      const line = [count, scheduleLabel(h), h.description].filter(Boolean).join(" · ");
-                      return line ? (
-                        <span className="block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                          {line}
+                      const n = subs.filter((st) => ticked(h, st.id)).length;
+                      const count = !subs.length ? "" : n >= subs.length ? "✓ all done" : n === 0 ? `${subs.length} habit${subs.length === 1 ? "" : "s"}` : `${subs.length - n} of ${subs.length} left`;
+                      const rest = [scheduleLabel(h), h.description].filter(Boolean).join(" · ");
+                      if (!count && !rest) return null;
+                      return (
+                        <span className="flex flex-wrap items-center gap-x-1.5 text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+                          {count && <span className="tabular-nums">{count}</span>}
+                          {n > 0 && n < subs.length && (
+                            <span
+                              aria-hidden
+                              className="h-1.5 w-14 overflow-hidden rounded-full"
+                              style={{ background: isAdventure ? "#2a2416" : "var(--t-card-border)", border: isAdventure ? "1px solid #8a6c2c" : undefined, boxShadow: isAdventure ? "inset 0 1px 2px rgba(0,0,0,.5)" : undefined }}
+                            >
+                              <span className="block h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.round((n / subs.length) * 100)}%`, background: isAdventure ? "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)" : "var(--t-accent)" }} />
+                            </span>
+                          )}
+                          {count && rest && <span aria-hidden>·</span>}
+                          {rest && <span>{rest}</span>}
                         </span>
-                      ) : null;
+                      );
                     })()}
                   </button>
                   <span className="relative z-[1] flex shrink-0 flex-col items-end gap-0.5">
@@ -777,8 +790,6 @@ export function DailyHabits({
                   )}
                   {subsOf(h).length > 0 && openSubs.has(h.id) && (
                     <ul className="due-in relative z-[1] m-0 mt-1 flex w-full basis-full list-none flex-col gap-0.5 pb-0.5 pl-12">
-                      {/* A dotted gold thread from the habit's check down to each of its sub-habits, so they read as one piece (owner, Nov 18: idea D). It starts behind the habit's check (z-[2]). */}
-                      <span aria-hidden className="pointer-events-none absolute bottom-[22px] top-[-24px]" style={{ left: (h.icon_key ? 22 : 18) - 1, borderLeft: "2px dotted rgba(176,138,58,.6)" }} />
                       {subsOf(h).map((st) => {
                         const t = ticked(h, st.id);
                         const sk = `${h.id}:${st.id}`;
@@ -793,7 +804,6 @@ export function DailyHabits({
                             }}
                             className="relative"
                           >
-                            <span aria-hidden className="pointer-events-none absolute top-1/2" style={{ left: (h.icon_key ? 22 : 18) - 48, width: 48 - (h.icon_key ? 22 : 18) + 6, borderTop: "2px dotted rgba(176,138,58,.6)" }} />
                             <button
                               type="button"
                               role="checkbox"
