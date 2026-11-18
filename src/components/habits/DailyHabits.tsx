@@ -549,7 +549,7 @@ export function DailyHabits({
                       aria-checked={d}
                       aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
                       onClick={() => toggle(h)}
-                      className="relative z-[1] h-11 w-11 shrink-0 rounded-full transition-transform active:scale-90"
+                      className="relative z-[2] h-11 w-11 shrink-0 rounded-full transition-transform active:scale-90"
                       style={{ boxShadow: d ? "0 0 0 2.5px #58a04a" : "0 0 0 2px #a58c66" }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element -- habit portrait */}
@@ -569,7 +569,7 @@ export function DailyHabits({
                       aria-checked={d}
                       aria-label={d ? `Undo ${h.title}` : `Done: ${h.title}`}
                       onClick={() => toggle(h)}
-                      className="relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
+                      className="relative z-[2] flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
                       style={{
                         background: d ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "radial-gradient(circle at 40% 35%, #fffaf0, #efe2c2)",
                         border: `2px solid ${d ? "#2f5a26" : "#b08a3a"}`,
@@ -599,7 +599,21 @@ export function DailyHabits({
                           ★
                         </span>
                       )}
-                      {h.title}
+                      {/* A habit with sub-habits: a small caret after its name opens them in place (owner, Nov 18: idea D). The cleaning habit has none. */}
+                      {h.id !== cleanId && subsOf(h).length > 0 ? (
+                        // The caret stays with the name's last word, so it never sits alone on a line.
+                        <>
+                          {h.title.replace(/\S+$/, "")}
+                          <span className="whitespace-nowrap">
+                            {h.title.match(/\S+$/)?.[0]}
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="ml-1.5 inline-block align-middle opacity-60 transition-transform duration-300" style={{ transform: openSubs.has(h.id) ? "rotate(180deg)" : undefined }}>
+                              <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </span>
+                        </>
+                      ) : (
+                        h.title
+                      )}
                       {h.id === cleanId && cleaning && (
                         <>
                           {cleanTop ? ": " : ""}
@@ -608,36 +622,22 @@ export function DailyHabits({
                               {cleanTop.icon} {cleanTop.name}
                             </span>
                           )}
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="ml-1.5 inline-block align-middle opacity-60 transition-transform duration-300" style={{ transform: cleanOpen ? "rotate(180deg)" : undefined }}>
-                            <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
                         </>
                       )}
                     </span>
                     {/* How long it takes sits by the XP (owner, Nov 2); this line only when there's a time of day or a note. */}
-                    {(h.description || scheduleLabel(h)) && (
-                      <span className="block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                        {[scheduleLabel(h), h.description].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
+                    {(() => {
+                      // How many sub-habits, in words (never "0/3"), on the line under the name with its time and note (owner, Nov 18).
+                      const subs = h.id === cleanId ? [] : subsOf(h);
+                      const count = subs.length ? progressWords(subs.filter((st) => ticked(h, st.id)).length, subs.length, "sub-habit") : "";
+                      const line = [count, scheduleLabel(h), h.description].filter(Boolean).join(" · ");
+                      return line ? (
+                        <span className="block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+                          {line}
+                        </span>
+                      ) : null;
+                    })()}
                   </button>
-                  {subsOf(h).length > 0 && (
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onClick={() => setOpenSubs((o) => { const n = new Set(o); if (n.has(h.id)) n.delete(h.id); else n.add(h.id); return n; })}
-                      aria-expanded={openSubs.has(h.id)}
-                      aria-label={`${openSubs.has(h.id) ? "Hide" : "Show"} the sub-habits of ${h.title}`}
-                      className="relative z-[1] flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-[12.5px] font-semibold tabular-nums hover:bg-black/[.05]"
-                      style={{ color: "var(--t-ink-soft)", border: "1px solid rgba(139,112,64,.35)" }}
-                    >
-                      {progressWords(subsOf(h).filter((st) => ticked(h, st.id)).length, subsOf(h).length, "sub-habit")}
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: openSubs.has(h.id) ? "rotate(90deg)" : undefined }}>
-                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  )}
                   <span className="relative z-[1] flex shrink-0 flex-col items-end gap-0.5">
                     {h.estimate_minutes ? (
                       <span className="flex items-center gap-1 text-[12.5px] font-semibold tabular-nums leading-none" style={{ color: "var(--t-ink-soft)" }} title={`About ${h.estimate_minutes} minutes`}>
@@ -777,6 +777,8 @@ export function DailyHabits({
                   )}
                   {subsOf(h).length > 0 && openSubs.has(h.id) && (
                     <ul className="due-in relative z-[1] m-0 mt-1 flex w-full basis-full list-none flex-col gap-0.5 pb-0.5 pl-12">
+                      {/* A dotted gold thread from the habit's check down to each of its sub-habits, so they read as one piece (owner, Nov 18: idea D). It starts behind the habit's check (z-[2]). */}
+                      <span aria-hidden className="pointer-events-none absolute bottom-[22px] top-[-24px]" style={{ left: (h.icon_key ? 22 : 18) - 1, borderLeft: "2px dotted rgba(176,138,58,.6)" }} />
                       {subsOf(h).map((st) => {
                         const t = ticked(h, st.id);
                         const sk = `${h.id}:${st.id}`;
@@ -791,6 +793,7 @@ export function DailyHabits({
                             }}
                             className="relative"
                           >
+                            <span aria-hidden className="pointer-events-none absolute top-1/2" style={{ left: (h.icon_key ? 22 : 18) - 48, width: 48 - (h.icon_key ? 22 : 18) + 6, borderTop: "2px dotted rgba(176,138,58,.6)" }} />
                             <button
                               type="button"
                               role="checkbox"

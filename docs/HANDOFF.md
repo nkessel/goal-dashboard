@@ -28,6 +28,7 @@ The owner's Claude project also keeps a priorities list by model (Nov 16) in its
 
 Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Read the topic's entry there before touching it. When something new waits on him (a design review, a pick), add it there with its branch, review page link and date, and add its name to this list.
 
+- `review/sub-habits-in-place` (sub-habits open in place on habit cards, idea D): built Nov 18, review page sent.
 - `review/prioritize-bars` (taller Prioritize bars): built Nov 14, not UI-checked or reviewed.
 - `review/import-calendar` (import card A: a calendar time from Due, a landing line, no "To schedule" type): built Nov 16, review page sent.
 - `review/time-ranges-lesson-button` (time ranges for habits and quests, chosen habits in the auto-scheduler, Complete lesson button): built Nov 16, review page sent, waiting on his OK or notes.
