@@ -3527,3 +3527,7 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
    above with the same slam they do in the celebration screen"). */
 .cal-slam { animation: qc-checkDrop .9s linear both; transform-origin: center; position: relative; z-index: 2; }
 @media (prefers-reduced-motion: reduce) { .cal-slam { animation: none; } }
+
+/* Quest Drop: the falling card shakes when it can't go that way. */
+@keyframes quest-drop-shake { 0%, 100% { translate: 0 0; } 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
+.quest-drop-shake { animation: quest-drop-shake 0.18s ease-in-out; }

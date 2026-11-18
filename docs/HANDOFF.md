@@ -29,6 +29,7 @@ The owner's Claude project also keeps a priorities list by model (Nov 16) in its
 
 Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Read the topic's entry there before touching it. When something new waits on him (a design review, a pick), add it there with its branch, review page link and date, and add its name to this list.
 
+- `claude/project-thread-dhpu9o` (Quest Drop, a falling-blocks scheduling game on the calendar): built Nov 18, review page sent.
 - `review/prioritize-bars` (taller Prioritize bars): built Nov 14, not UI-checked or reviewed.
 - `review/additional-habits` (habits not on today in an "Additional habits" fold, still tickable): built Nov 18, review page sent.
 - `review/import-calendar` (import card A: a calendar time from Due, a landing line, no "To schedule" type): built Nov 16, review page sent.

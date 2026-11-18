@@ -940,6 +940,44 @@ export const FLOWS = [
     },
   },
   {
+    // Quest Drop (owner, Nov 18): the scheduling list as a falling-blocks game, from the calendar's plan buttons.
+    name: "questdrop",
+    async run(h) {
+      await h.goto("/calendar?view=week", { name: "questdrop" });
+      await h.settle(1000);
+      await h.page.evaluate(() => localStorage.setItem("quest-drop", JSON.stringify({ sound: "off", startSpeed: 1, ramp: 0.5, musicLink: "" })));
+      await h.page.locator("[data-quest-drop-open]").first().scrollIntoViewIfNeeded().catch(() => {});
+      await h.page.locator("[data-quest-drop-open]").first().click({ timeout: 5000 });
+      await h.page.locator("[data-quest-drop-card=ready]").waitFor({ timeout: 15000 });
+      await h.check("ready to start");
+      await h.page.getByRole("button", { name: /^game settings$/i }).first().click();
+      await h.settle(500);
+      await h.check("settings open");
+      await h.page.getByRole("button", { name: /^game settings$/i }).first().click();
+      await h.settle(400);
+      await h.page.locator("[data-quest-drop-start]").click();
+      await h.settle(900);
+      if (!(await h.page.locator("[data-quest-drop-falling]").count())) throw new Error("questdrop: no quest came down after Start");
+      if (!(await h.page.locator("[data-quest-drop-ghost]").count())) h.record({ kind: "questdrop", severity: "warn", target: "ghost", detail: "No landing outline for the first quest" });
+      await h.check("playing: first quest falling");
+      await h.page.getByRole("button", { name: /^next day$/i }).click();
+      await h.page.getByRole("button", { name: /^later in the day$/i }).click();
+      await h.page.getByRole("button", { name: /^later in the day$/i }).click();
+      await h.settle(300);
+      await h.check("moved a day and down");
+      await h.page.getByRole("button", { name: /^bring it back later$/i }).click();
+      await h.settle(500);
+      await h.check("later: when it comes back");
+      await h.page.getByRole("button", { name: /^in 3 quests$/i }).click();
+      await h.settle(500);
+      await h.page.getByRole("button", { name: /^place it$/i }).click();
+      await h.settle(700);
+      await h.check("placed one (with Undo)");
+      await h.page.locator("[data-quest-drop] button[aria-label=Close]").click();
+      await h.settle(600);
+    },
+  },
+  {
     // The calendar (owner, Nov 3: "beautiful like the mockup"): week and day, quests and mini-quests for their duration.
     name: "calendar",
     async run(h) {
