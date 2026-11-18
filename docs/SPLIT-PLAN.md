@@ -10,8 +10,8 @@ Written Nov 16 by Fable as a plan only: nothing here is built. It is meant to be
 
 ## 0. Questions only the owner can answer
 
-1. **Three review branches touch the files to be split.** `review/time-ranges-lesson-button` (14 lines in the quest editor, 167 in `actions.ts`, most of `use-quest-cal.ts`), `review/import-calendar` (108 lines all through the import screen) and `review/walkthrough-v2` (10 lines in the quest editor). Splitting is far cheaper once they are merged or dropped. Can you give each an OK or notes first? The plan works either way: the quest editor's 24 lines can be re-applied by hand after a split (listed in 9), but the import screen's split (section 6) waits for `review/import-calendar`, and the data move (section 8) waits for `review/time-ranges-lesson-button`.
-2. **When a quest is shared with a teammate (the social design), whose card colour or picture shows?** The plan assumes: the place is shared (it is a fact about the quest), the card's look is each person's own. This needs no decision before the data move; it only matters when the social side is built.
+1. **Two review branches still touch the files to be split** (`review/walkthrough-v2` merged on Nov 17). The owner's go-ahead on `review/time-ranges-lesson-button` and `review/import-calendar` unblocks the data move (section 9) and the import screen's split (section 6). Everything else can start without it.
+2. ~~Shared quests' card look~~ **Answered (owner, Nov 17):** a team quest shows both teammates' avatars on its card; its colour and all its settings are shared; the XP share for each person is set in the quest editor. So place, card look and progress count all live on the shared quest, not per person.
 
 Everything else below needed no answer from you.
 
@@ -173,7 +173,7 @@ Everything else in `life_wheel` (toucan notes, inventory, cleaning, welcome layo
 
 jsonb columns rather than several plain ones because each value is read and written whole, already has a cleaning function, and nothing sorts or filters by its insides.
 
-Shared quests (the social design): a teammate's handle is its own `tasks` row, so a column can be shared (read from the host row) or personal (read from the handle) with no change to this schema. Assumed: place shared, card look personal (question 2).
+Shared quests (the social design): a teammate's handle is its own `tasks` row. The owner decided (Nov 17) that a team quest's colour and every setting are shared, so `place`, `card_look` and `progress_unit` are always read from and written to the host row, never the handle. The social build's `resolveHost` is the place to do that.
 
 Migration number: the next free one on `main` when the step runs. There are two files numbered 0088, and the calendar design has claimed 0090.
 
@@ -213,7 +213,7 @@ Start anywhere a row says "nothing". One step per session keeps each cheap.
 
 - `review/time-ranges-lesson-button`: `useQuestWindow(task?.id)` and the "Time of day" block with `TimeRangePick` go into `EditorScheduling` (E7); the extra line in `dueChipWords` stays in the dialog; three imports.
 - `review/import-calendar`: `shortTime` and `slotWords` are exported from `editor/dates.ts` after L2 already; point its import there.
-- `review/walkthrough-v2`: `<XpGuide />` loses its `onPick` and the XP row gains `data-tour="xp-row"` (both in `EditorXp`, E5); `data-tour` on the due button and on the two fact panels (the dialog's frame).
+- `review/walkthrough-v2`: merged on Nov 17, so its lines are already in the editor; nothing to re-apply.
 
 Add a line to each branch's entry in `docs/WAITING.md` saying so when phase E starts.
 
