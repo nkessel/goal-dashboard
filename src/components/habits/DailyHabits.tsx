@@ -901,40 +901,66 @@ export function DailyHabits({
               ))}
             </p>
           )}
-          {/* Habits not up today: still here to see and edit. */}
+          {/* Additional habits (owner, Nov 18): the ones not up today, folded like Additional Quests, and still doable. */}
           {notToday.length > 0 && (
             <div className="mt-2 flex flex-col items-center gap-1.5">
               <button type="button" onClick={() => setShowNotToday((v) => !v)} aria-expanded={showNotToday} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px]" style={{ color: isAdventure ? "var(--t-cream)" : "var(--t-ink-soft)", opacity: 0.85 }}>
-                Not today ({notToday.length})
+                Additional habits ({notToday.length})
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: showNotToday ? "rotate(90deg)" : undefined }}>
                   <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
               <Fold open={!!showNotToday}>
                 <ul className="m-0 flex w-full list-none flex-col gap-1.5 p-0">
-                  {notToday.map((h) => (
-                    <li key={h.id}>
-                      <button
-                        type="button"
-                        onClick={() => setEditing(h)}
-                        title="Edit habit"
-                        className={`flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-1.5 text-left opacity-80 hover:opacity-100 ${isAdventure ? "parchment" : ""}`}
-                        style={isAdventure ? { borderRadius: 16 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
-                      >
-                        <span className="relative z-[1] min-w-0 flex-1">
-                          <span className="block text-[15px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
-                            {h.title}
-                          </span>
-                          <span className="block text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
-                            {nextLabel(h, day)}
-                          </span>
-                        </span>
-                        <span aria-hidden className="relative z-[1] text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
-                          ✎
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                  {notToday.map((h) => {
+                    const d = done(h.id);
+                    return (
+                      <li key={h.id}>
+                        <div
+                          className={`habit-row flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 py-1.5 ${d ? "" : "opacity-85 hover:opacity-100"} ${isAdventure ? "parchment" : ""}`}
+                          data-done={d ? "" : undefined}
+                          style={isAdventure ? { borderRadius: 16 } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
+                        >
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={d}
+                            aria-label={d ? `Undo ${h.title}` : `Done anyway: ${h.title}`}
+                            title={d ? "Undo" : "Done today anyway"}
+                            onClick={() => toggle(h)}
+                            className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
+                            style={{
+                              background: d ? "radial-gradient(circle at 35% 30%, #a8d88a, #58a04a 60%, #3d7a32)" : "radial-gradient(circle at 40% 35%, #fffaf0, #efe2c2)",
+                              border: `2px solid ${d ? "#2f5a26" : "#b08a3a"}`,
+                              boxShadow: d ? "0 0 8px rgba(120,190,90,.55)" : "inset 0 1px 2px rgba(90,60,20,.25), 0 0 0 1px rgba(255,240,200,.6)",
+                            }}
+                          >
+                            {d && (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                                <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </button>
+                          <button type="button" onClick={() => setEditing(h)} title="Edit habit" className="relative z-[1] flex min-w-0 flex-1 items-center gap-2 text-left">
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[15px] font-semibold leading-snug" style={{ color: "var(--t-ink)" }}>
+                                {h.title}
+                              </span>
+                              <span className="block text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+                                {d ? "Done today" : nextLabel(h, day)}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-[13.5px] font-bold tabular-nums" style={{ color: "var(--t-xp)" }}>
+                              +{h.xp_value} XP
+                            </span>
+                            <span aria-hidden className="shrink-0 text-[14px]" style={{ color: "var(--t-ink-soft)" }}>
+                              ✎
+                            </span>
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </Fold>
             </div>
