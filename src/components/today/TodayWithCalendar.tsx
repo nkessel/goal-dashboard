@@ -72,7 +72,7 @@ export function TodayWithCalendar({ calendar, children }: { calendar: React.Reac
         data-today-cal
         data-peek={peek ? "true" : undefined}
         aria-label="Today's calendar"
-        className={`today-cal fixed right-0 z-[44] flex w-[min(82vw,340px)] flex-col md:sticky md:right-auto md:top-14 md:z-[5] md:h-[calc(100dvh-4.5rem)] md:w-[300px] md:shrink-0 lg:w-[360px] xl:w-[400px] ${shown ? "" : "md:hidden"}`}
+        className={`today-cal fixed right-0 z-[44] flex w-[min(82vw,340px)] flex-col md:sticky md:right-auto md:top-14 md:z-[5] md:h-[calc(100dvh-4.5rem-var(--app-nav-h,0px))] md:w-[300px] md:shrink-0 lg:w-[360px] xl:w-[400px] ${shown ? "" : "md:hidden"}`}
       >
         <div className="flex items-center gap-2 px-1 pb-1.5">
           <h2 className="m-0 min-w-0 flex-1 truncate font-display text-[17px]" style={{ color: "var(--t-cream, var(--t-ink))", textShadow: "0 1px 2px rgba(0,0,0,.45)" }}>

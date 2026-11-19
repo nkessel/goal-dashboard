@@ -1179,6 +1179,9 @@ export const FLOWS = [
             el.dispatchEvent(new Event("input", { bubbles: true }));
           });
           await h.settle(1800);
+          // The hours grow with the zoom at once (measured 70 ms after the change). A person's drag counts as input, but
+          // this scripted change doesn't, so the check took it for the page jumping by itself (Nov 19): drop those.
+          await h.page.evaluate(() => (window.__uiShifts || []).splice(0)).catch(() => {});
           await h.check("week: zoomed to 2½ days");
           const words = await h.page.locator("[data-days-zoom]").first().innerText().catch(() => "");
           if (!/2½ days/.test(words)) h.record({ kind: "zoom", severity: "error", target: "days zoom", detail: `The slider reads "${words}" after sliding to 2½ days` });
@@ -1210,7 +1213,8 @@ export const FLOWS = [
           for (const fx of [0.6, 0.3, 0.85, 0.15]) {
             const x = r.left + r.width * fx, y = r.top + Math.min(r.height / 2, 20);
             const at = document.elementFromPoint(x, y);
-            if (at && at.closest(".cal-days-scroll")) return { x, y };
+            // On the hold itself: a quest drawn over it (the fixtures' times follow the clock) would open the quest's menu.
+            if (at && at.closest(".cal-days-scroll") && at.closest("[data-hold-key=lunch]")) return { x, y };
           }
           return { covered: true };
         });

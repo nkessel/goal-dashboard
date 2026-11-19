@@ -185,6 +185,21 @@ export function BottomNav({ theme, name = null, toucan = null, navOrder = null }
     return () => window.clearTimeout(t);
   }, [router, pathname]);
   const navigateWithTransition = useViewTransitionNavigate();
+  // The bar's height, for things that must end above it (Today's side calendar on a computer; UI check, Nov 19).
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const set = () => root.style.setProperty("--app-nav-h", `${Math.round(el.getBoundingClientRect().height)}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--app-nav-h");
+    };
+  }, []);
   const evening = useEveningMode();
   const isAdventure = theme === "adventure";
 
@@ -284,6 +299,7 @@ export function BottomNav({ theme, name = null, toucan = null, navOrder = null }
 
   return (
     <nav
+      ref={navRef}
       data-hide-when-typing
       data-app-nav
       className="fixed inset-x-0 bottom-0 z-30 flex w-full items-stretch justify-between"
