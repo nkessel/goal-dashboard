@@ -90,5 +90,9 @@
   {
     "match": "^faces\\|layout-shift\\|<div> \"Today's Quests",
     "reason": "Completing a quest takes it off Today's Quests underneath the celebration, which covers the whole screen; the list closes up behind it, out of sight. The celebration itself doesn't move (see the screenshot)."
+  },
+  {
+    "match": "^faces\\|layout-shift\\|<div> \"Daily Habits",
+    "reason": "The faces flow opens Daily Habits by script (no tap) after a tick, because the check's save reloads Today; the tray sliding open is that, not a jump."
   }
 ]

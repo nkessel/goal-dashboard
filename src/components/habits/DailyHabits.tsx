@@ -34,6 +34,9 @@ import { Fold } from "@/components/ui/Fold";
 // Habits you can listen along to (walks, drives, the dog).
 const LISTEN_HABIT = /\b(walk|walking|drive|driving|dog|commute|car ride|errands?|hike)\b|🐶|🐕/iu;
 
+/** Whether each Daily Habits tray was open, kept outside the list so a redraw doesn't close it. */
+const trayOpen = new Map<string, boolean>();
+
 export function DailyHabits({
   habits,
   completions,
@@ -70,7 +73,11 @@ export function DailyHabits({
   // "How do you feel?" under the habit just ticked (owner, Nov 19).
   const feltFor = useFeltHabit();
   const closeFelt = useCallback(() => setFeltHabit(null), []);
-  const [open, setOpen] = useState(false);
+  // Kept across a redraw (ticking a habit refreshes Today, which can draw the list anew), so the tray stays open.
+  const [open, setOpen] = useState(() => trayOpen.get(bare ? "bare" : "main") ?? false);
+  useEffect(() => {
+    trayOpen.set(bare ? "bare" : "main", open);
+  }, [open, bare]);
   const [look, setLook] = useState<HeaderLook>("togo");
   const [mark, setMark] = useState<HabitMark>("seedling");
   const [lookMenu, setLookMenu] = useState(false);

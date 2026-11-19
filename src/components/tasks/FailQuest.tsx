@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createQuestAction, failTaskAction } from "@/app/actions";
 import { markFailedNow } from "@/lib/failed-now";
@@ -17,16 +17,82 @@ const hashOf = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0))
  * based off the failed quest or a new one"). The reason is written straight on the menu's parchment (no white box).
  * After it's marked, two ways on: try again (a copy of the quest on Today's Quests) or start a new one (the + menu).
  */
-export function FailQuest({ task, onBack, onDone }: { task: Pick<Task, "id" | "title" | "description" | "xp_value" | "coin_value" | "estimate_minutes" | "board_id" | "importance" | "urgency" | "icon_key" | "icon_source">; onBack: () => void; onDone: () => void }) {
+type FailTask = Pick<Task, "id" | "title" | "description" | "xp_value" | "coin_value" | "estimate_minutes" | "board_id" | "importance" | "urgency" | "icon_key" | "icon_source">;
+
+export function FailQuest({ task, onBack, onDone }: { task: FailTask; onBack: () => void; onDone: () => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [failed, setFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <form
+      className="relative z-[1] flex flex-col gap-2 p-3"
+      data-fail-form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const reason = String(new FormData(e.currentTarget).get("reason") ?? "");
+        setError(null);
+        startTransition(async () => {
+          try {
+            await failTaskAction(task.id, reason);
+            markFailedNow(task.id);
+            // The follow-up opens as its own scene (it stays when the quest leaves Today's list), and the menu closes.
+            window.dispatchEvent(new CustomEvent("quest-failed", { detail: task }));
+            onDone();
+            router.refresh();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Couldn't mark it failed.");
+          }
+        });
+      }}
+    >
+      <span className="font-display text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
+        Quest failure
+      </span>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-[12px] italic" style={{ color: "var(--t-ink-soft)" }}>
+          What got in the way? (optional)
+        </span>
+        <input
+          name="reason"
+          autoFocus
+          maxLength={300}
+          aria-label="Why it failed (optional)"
+          className="bare-input fail-reason text-[16px]"
+          style={{ color: "var(--t-ink)" }}
+        />
+      </label>
+      <span className="text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+        It earns no XP and shows a red ✕. You can undo it later.
+      </span>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onBack} className="h-9 px-2 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
+          Back
+        </button>
+        <button type="submit" disabled={pending} className="h-9 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60" style={{ background: "#b5321f", color: "#fff" }}>
+          Mark failed
+        </button>
+      </div>
+      {error && (
+        <p className="m-0 text-[12.5px]" style={{ color: "var(--t-warn)" }}>
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
+/**
+ * After a quest is marked as failed (owner, Nov 19): a wise line, "How do you feel?", then Try again (a copy of this
+ * quest, or a new one) or Continue. Shown as its own small scene, so it stays when the quest leaves the list.
+ */
+export function FailNext({ task, onDone }: { task: FailTask; onDone: () => void }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [again, setAgain] = useState<string | null>(null);
   const [retry, setRetry] = useState(false);
-
-  if (failed)
-    return (
+  return (
       <div className="relative z-[1] flex flex-col gap-2 p-3" data-fail-next>
         <span className="font-display text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
           Marked as failed
@@ -105,58 +171,32 @@ export function FailQuest({ task, onBack, onDone }: { task: Pick<Task, "id" | "t
       </div>
     );
 
+}
+
+/** The scene the follow-up shows in: a parchment card over a soft dim, opened by "quest-failed". Mounted once in the app shell. */
+export function FailSceneHost() {
+  const [task, setTask] = useState<FailTask | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const t = (e as CustomEvent<FailTask>).detail;
+      if (!t) return;
+      setLeaving(false);
+      setTask(t);
+    };
+    window.addEventListener("quest-failed", on);
+    return () => window.removeEventListener("quest-failed", on);
+  }, []);
+  if (!task) return null;
+  const close = () => {
+    setLeaving(true);
+    setTimeout(() => setTask(null), 260);
+  };
   return (
-    <form
-      className="relative z-[1] flex flex-col gap-2 p-3"
-      data-fail-form
-      onSubmit={(e) => {
-        e.preventDefault();
-        const reason = String(new FormData(e.currentTarget).get("reason") ?? "");
-        setError(null);
-        startTransition(async () => {
-          try {
-            await failTaskAction(task.id, reason);
-            markFailedNow(task.id);
-            setFailed(true);
-            router.refresh();
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "Couldn't mark it failed.");
-          }
-        });
-      }}
-    >
-      <span className="font-display text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
-        Quest failure
-      </span>
-      <label className="flex flex-col gap-0.5">
-        <span className="text-[12px] italic" style={{ color: "var(--t-ink-soft)" }}>
-          What got in the way? (optional)
-        </span>
-        <input
-          name="reason"
-          autoFocus
-          maxLength={300}
-          aria-label="Why it failed (optional)"
-          className="bare-input fail-reason text-[16px]"
-          style={{ color: "var(--t-ink)" }}
-        />
-      </label>
-      <span className="text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-        It earns no XP and shows a red ✕. You can undo it later.
-      </span>
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onBack} className="h-9 px-2 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
-          Back
-        </button>
-        <button type="submit" disabled={pending} className="h-9 rounded-full px-4 text-[13.5px] font-bold disabled:opacity-60" style={{ background: "#b5321f", color: "#fff" }}>
-          Mark failed
-        </button>
+    <div className={`fixed inset-0 z-[70] flex items-center justify-center p-4 ${leaving ? "overlay-fade-out" : "overlay-fade-in"}`} style={{ background: "rgba(10,14,9,.55)" }} onClick={(e) => e.target === e.currentTarget && close()} data-fail-scene>
+      <div role="dialog" aria-label="Quest not done" className="card-pop-in parchment parchment-framed relative w-full max-w-[360px] rounded-2xl" style={{ boxShadow: "0 18px 44px rgba(0,0,0,.45)" }}>
+        <FailNext task={task} onDone={close} />
       </div>
-      {error && (
-        <p className="m-0 text-[12.5px]" style={{ color: "var(--t-warn)" }}>
-          {error}
-        </p>
-      )}
-    </form>
+    </div>
   );
 }
