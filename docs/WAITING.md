@@ -4,7 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
-- **Session claude-2d (Opus, owner's account, Nov 18–19 overnight)**: calendar + boards batch built and waiting on review (`review/boards-nov18`, below). Now working on, in order: BUILD-PLAN 16 (sequence and sub-quests in the creator [dafe3364]), then the toucan-only welcome screen mockups (owner, Nov 17), then BUILD-PLAN 12 (Insights) and 15 (anti-habits) if the check-in branches have merged. **Other sessions: please take something else.**
+- **Session claude-2d (Opus, owner's account, Nov 19 overnight)**: waiting on review: `review/boards-nov18`, `review/subquests-sequence`; toucan-only welcome mockups sent (https://claude.ai/artifact/BPVwECytEiCCt3HUa5EobL). **Now on BUILD-PLAN 12, Insights** (today's check-ins log with a range, ⋯ edit / delete / star a check-in [388c0f4e, bd692d57, a4df137c], the gears [388c0f4e], sleep/wake and notes on the chart [10a509a0, f3cca214], the Wheel of Time spun by dragging [bb5ca474]); not touching `insights/TrackedEvents.tsx` (claude/project-thread-3hgy8j has it). Other sessions: please take something else.
 
 ## 0a. Work in progress and waiting on the owner (Nov 12)
 
