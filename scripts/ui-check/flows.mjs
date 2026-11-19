@@ -840,6 +840,24 @@ export const FLOWS = [
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /xp/i }).first(), "attrs: xp", { optional: true, expectMove: true })) await h.check("attrs: xp open");
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^importance/i }).first(), "attrs: importance", { optional: true, expectMove: true })) await h.check("attrs: importance open");
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^time$|^\d+m$/i }).first(), "attrs: time", { optional: true, expectMove: true })) await h.check("attrs: time open");
+      // One When pill (owner, Nov 18): Complete by, then Flexible · Fixed, then an optional time on the calendar.
+      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^(when|within|by |around)/i }).first(), "attrs: when", { optional: true, expectMove: true })) {
+        await h.check("when open");
+        if (await h.tap((p) => p.locator("[data-import-attrs] button", { hasText: /^Within a week$/ }).first(), "when: within a week", { optional: true, expectMove: true })) {
+          await h.settle(400);
+          await h.check("when: flexible within a week");
+          if (await h.tap((p) => p.locator("[data-when-firm] button", { hasText: /^Fixed$/ }).first(), "when: fixed", { optional: true })) {
+            await h.settle(300);
+            await h.check("when: fixed");
+          }
+        }
+        if (await h.tap((p) => p.locator("[data-import-attrs] button", { hasText: /^(Open the day|Change)$/ }).first(), "when: open the day", { optional: true, expectMove: true })) {
+          await h.settle(700);
+          await h.check("when: the day open");
+          await h.tap((p) => p.locator("[data-import-attrs] button", { hasText: /^✨ Auto-schedule/ }).first(), "when: pick the time", { optional: true, expectMove: true });
+          await h.check("when: time picked");
+        }
+      }
       // The board is the tag on the portrait (owner, Nov 12): it opens every board, sub-boards folded with a count.
       if (await h.tap((p) => p.locator("[data-import-portrait]").getByRole("button", { name: /^board/i }).first(), "portrait: board tag", { optional: true, expectMove: true })) {
         await h.check("board list open");
@@ -859,9 +877,21 @@ export const FLOWS = [
       }
       if (await h.tap((p) => p.getByRole("button", { name: /^list$/i }).first(), "list view", { optional: true })) {
         await h.check("list view");
-        await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^this week$/i }).first(), "list: rate this week", { optional: true });
+        if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^(when|within|by |around)/i }).first(), "list: when", { optional: true })) {
+          await h.tap((p) => p.locator("[data-import-attrs] button", { hasText: /^Within a week$/ }).first(), "list: within a week", { optional: true });
+          await h.check("list: within a week");
+        }
         await h.tap((p) => p.getByRole("button", { name: /import as|add as|log as/i }).first(), "import from list", { optional: true });
         await h.check("list: import steps");
+        // After Import the message says where it went, with Auto-schedule now for a quest on the list (owner, Nov 18).
+        if (await h.tap((p) => p.getByRole("button", { name: /^add to my list to schedule|^add the quest/i }).first(), "list: add it", { optional: true })) {
+          await h.settle(900);
+          await h.check("import toast");
+          if (await h.tap((p) => p.locator("[role=status] button", { hasText: /^auto-schedule now/i }).first(), "toast: auto-schedule now", { optional: true })) {
+            await h.settle(1500);
+            await h.check("toast: auto-scheduled");
+          }
+        }
         if (await h.find((p) => p.getByPlaceholder(/search/i).first()).isVisible().catch(() => false)) await h.typeIn((p) => p.getByPlaceholder(/search/i).first(), "import search");
       }
     },

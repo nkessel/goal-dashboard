@@ -183,11 +183,11 @@ function localTime(iso: string | null | undefined) {
   return t === "23:59" ? "" : t;
 }
 /** "3:30pm". */
-function shortTime(iso: string) {
+export function shortTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AaPp])\.?\s?[Mm]\.?$/, (_, p: string) => `${p.toLowerCase()}m`);
 }
 /** "Sat 3–3:30pm" this week, "Nov 20 3–3:30pm" further off. */
-function slotWords(s: { start: string; end: string }) {
+export function slotWords(s: { start: string; end: string }) {
   const d = new Date(s.start);
   const days = (d.getTime() - Date.now()) / 86_400_000;
   const day = days > -1 && days < 6 ? d.toLocaleDateString(undefined, { weekday: "short" }) : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
