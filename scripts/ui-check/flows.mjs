@@ -538,6 +538,47 @@ export const FLOWS = [
     },
   },
   {
+    // "How do you feel?" (owner, Nov 19): five one-ink faces after a habit tick, a victory and a fail.
+    name: "faces",
+    async run(h) {
+      await h.goto("/", { name: "faces" });
+      await h.toggle(/daily habits/i, "daily habits");
+      const tick = h.page.locator(".habit-row [role=checkbox][aria-label^='Done: ']").first();
+      if (await tick.count()) {
+        await tick.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
+        await h.settle(1600);
+        await h.check("felt strip after a habit tick");
+        if (await h.tap((p) => p.locator("[data-felt-strip] [role=radio][aria-label=Good]").first(), "felt strip: good", { optional: true, expectMove: true })) await h.check("felt strip: kept");
+        await h.settle(1400);
+      }
+      // A victory: the celebration asks too, above Claim your reward · Continue Your Journey.
+      if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for complete", { optional: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^✓?\s*complete this/i }).first(), "complete from the menu", { optional: true, expectMove: true })) {
+          await h.settle(3500);
+          await h.check("celebration: how do you feel");
+          if (await h.tap((p) => p.locator("[data-felt-ask] [role=radio][aria-label=Great]").first(), "celebration: great", { optional: true, expectMove: true })) await h.check("celebration: felt kept");
+          await h.tap(/continue your journey/i, "continue your journey", { optional: true, expectMove: true });
+          await h.settle(800);
+        }
+        await esc(h);
+      }
+      // A fail: a wise line, the faces, then Try again · Continue.
+      if (await h.tap((p) => p.locator("li", { hasText: "Pick up medication" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for fail", { optional: true })) {
+        if (await h.tap((p) => p.getByRole("menuitem", { name: /^archive/i }).first(), "archive choices (fail)", { optional: true, expectMove: true })) {
+          if (await h.tap((p) => p.getByRole("button", { name: /mark as failed/i }).first(), "fail form", { optional: true, expectMove: true })) {
+            if (await h.tap((p) => p.getByRole("button", { name: /^mark failed$/i }).first(), "mark failed", { optional: true, expectMove: true })) {
+              await h.settle(1200);
+              await h.check("fail: wise line and faces");
+              if (await h.tap((p) => p.locator("[data-fail-next]").getByRole("button", { name: /^try again$/i }).first(), "fail: try again", { optional: true, expectMove: true })) await h.check("fail: copy or new");
+            }
+          }
+        }
+        await esc(h);
+        await esc(h);
+      }
+    },
+  },
+  {
     // The habit editor (repeat ask 15).
     name: "habiteditor",
     async run(h) {
