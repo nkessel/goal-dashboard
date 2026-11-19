@@ -974,6 +974,26 @@ export const FLOWS = [
         await h.settle(500);
         await h.check("chart open");
       }
+      // Spin the Wheel of Time by hand (owner, Nov 9): past halfway it sticks and asks what turned it.
+      {
+        const wheel = h.page.locator("[data-wheel-spin]").first();
+        if (await wheel.count()) {
+          await wheel.scrollIntoViewIfNeeded().catch(() => {});
+          const b = await wheel.boundingBox();
+          if (b) {
+            const cx = b.x + b.width / 2, cy = b.y + b.height * (207 / 440), r = b.width * 0.36;
+            await h.page.mouse.move(cx + r, cy);
+            await h.page.mouse.down();
+            for (const deg of [3, 6, 9, 12]) await h.page.mouse.move(cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180), { steps: 2 });
+            await h.page.mouse.up();
+            const stuck = await h.page.locator("[data-wheel-pulled]").first().waitFor({ timeout: 2500 }).then(() => true).catch(() => false);
+            await h.settle(600);
+            await h.check("wheel: spun by hand, stuck halfway");
+            if (!stuck) h.record({ kind: "wheel-spin", severity: "error", target: "wheel of time", detail: "Dragging the wheel past halfway didn't ask what turned it" });
+            else await h.tap((p) => p.locator("[data-wheel-pulled] button", { hasText: /roll back/i }).first(), "let it roll back", { optional: true, expectMove: true });
+          }
+        }
+      }
       await h.toggle(/last night/i, "last night", {});
       await h.tap(/did it/i, "ritual did it", { optional: true });
       await h.check("after ritual");

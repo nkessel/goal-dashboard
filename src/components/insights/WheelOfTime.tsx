@@ -122,6 +122,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
 
   // Today's doings belong to tonight, which is logged on tomorrow's morning;
   // yesterday's belong to last night (this morning's check-in).
+  const [pulled, setPulled] = useState<1 | -1 | null>(null);
   const pressKey = pressDay === "today" ? shiftDay(today, 1) : today;
   const pressNight = state.log[pressKey];
   const turned = wheelTurns(state);
@@ -263,7 +264,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
       {/* The stone wheel, and what turns it. */}
       <div className="flex flex-col gap-2.5">
         <div className="relative">
-          <StoneWheel angle={turned.net * WHEEL_STEP} sound={sound} />
+          <StoneWheel angle={turned.net * WHEEL_STEP} sound={sound} held={pulled !== null} onPull={(d) => setPulled(d)} />
           <button
             type="button"
             onClick={toggleSound}
@@ -276,10 +277,29 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
             {sound ? "🔊" : "🔇"}
           </button>
         </div>
-        <span className="text-center text-[12.5px]" style={{ color: SOFT }}>
-          <span aria-hidden className="mr-1 text-[14px]" style={{ color: GOLD }}>☸</span>
-          Turned forward <b style={{ color: GOLD }}>{turned.forward}</b> · back <b style={{ color: ROSE }}>{turned.back}</b>
-        </span>
+        {/* No count of turns (owner, Nov 9). Spun by hand past halfway, it waits for what turned it. */}
+        {pulled !== null ? (
+          <div className="reveal flex flex-col items-center gap-1.5 rounded-xl px-3 py-2" style={{ background: "rgba(0,0,0,.25)", border: `1px solid ${pulled > 0 ? "rgba(217,180,95,.55)" : "rgba(242,160,140,.5)"}` }} data-wheel-pulled>
+            <span className="text-center text-[13.5px]" style={{ color: CREAM }}>
+              {pulled > 0 ? "It's stuck halfway forward. What turned it?" : "It's stuck halfway back. What held it back?"}
+            </span>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {(pulled > 0 ? state.effort : state.hindrances).map((n) => (
+                <button key={n} type="button" onClick={() => (press(pulled > 0 ? "effort" : "hindrance", n), setPulled(null))} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ border: `1px solid ${pulled > 0 ? "rgba(217,180,95,.6)" : "rgba(242,160,140,.55)"}`, color: pulled > 0 ? GOLD : ROSE }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setPulled(null)} className="text-[12.5px] underline" style={{ color: SOFT }}>
+              Let it roll back
+            </button>
+          </div>
+        ) : (
+          <span className="text-center text-[12px]" style={{ color: SOFT }}>
+            <span aria-hidden className="mr-1 text-[14px]" style={{ color: GOLD }}>☸</span>
+            Spin it by hand, or press what you did
+          </span>
+        )}
         <div className="mx-auto flex rounded-full p-0.5" role="group" aria-label="Which day" style={{ background: "rgba(0,0,0,.3)", border: "1px solid rgba(217,180,95,.35)" }}>
           {(["today", "yesterday"] as const).map((d) => (
             <button

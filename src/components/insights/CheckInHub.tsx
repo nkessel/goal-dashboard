@@ -354,13 +354,13 @@ function CheckInLog({ readings, metrics, starred, onEdit }: { readings: Reading[
                       </svg>
                     </button>
                   </div>
-                  <div className="mt-0.5 grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-x-4 gap-y-1">
+                  <div className="mt-0.5 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-4 gap-y-1">
                     {[...g.items]
                       .sort((a, b) => order(a.metric) - order(b.metric))
                       .map((r) => (
                         <span key={r.metric} className="flex min-w-0 items-center gap-1.5 text-[13.5px]" style={{ color: "var(--t-cream)" }}>
                           <span className="min-w-0 flex-1 truncate">{r.metric}</span>
-                          <span aria-hidden className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full" style={{ background: "rgba(120,90,40,.18)" }}>
+                          <span aria-hidden className="h-1.5 w-10 shrink-0 overflow-hidden rounded-full" style={{ background: "rgba(120,90,40,.18)" }}>
                             <span className="block h-full rounded-full" style={{ width: `${Math.max(4, Math.min(100, r.level * 10))}%`, background: "linear-gradient(90deg,#d9b45f,#a88a3f)" }} />
                           </span>
                           <b className="w-7 shrink-0 text-right tabular-nums">{(Math.round(r.level * 10) / 10).toFixed(1)}</b>
