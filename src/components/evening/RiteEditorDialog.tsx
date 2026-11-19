@@ -1,5 +1,6 @@
 "use client";
 
+import { PillTrays } from "@/components/ui/PillTrays";
 import { TimeToken } from "@/components/xp/NightFields";
 import { useState, useTransition } from "react";
 import { nextOccurrence, repeatLabel, type Repeat } from "@/lib/habit-repeat";
@@ -241,8 +242,10 @@ export function RiteEditorDialog({
           </div>
         )}
 
+        {/* Each pill's tray opens under its own line, pointing at it (owner, Nov 19). */}
+        <PillTrays open={isHabit && !!pill} className="relative z-[1]">
         {isHabit && (
-          <div data-mi="pills" className="relative z-[1] flex flex-wrap items-center gap-1.5" role="group" aria-label="Habit details">
+          <div data-mi="pills" className="contents" role="group" aria-label="Habit details">
             {(
               [
                 ["repeats", <span key="r" className="text-[14px] leading-none">↻</span>, repeat ? repeatLabel(repeat) : days.length === 7 ? "Daily" : days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ") || "No days"],
@@ -272,7 +275,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div data-mi="repeats" className={`relative z-[1] flex flex-col gap-2 ${pill === "repeats" ? "reveal qe-fact-panel rounded-xl p-3" : "hidden"}`}>
+          <div data-pill-tray data-mi="repeats" className={`relative z-[1] flex flex-col gap-2 ${pill === "repeats" ? "reveal qe-fact-panel pill-tray-box rounded-xl p-3" : "hidden"}`}>
             <button type="button" onClick={() => setRepeatsOpen((o) => !o)} aria-expanded={repeatsOpen} className="hidden items-center gap-1.5 self-start text-[14.5px] font-semibold">
               <Caret open={repeatsOpen} />
               Repeats
@@ -376,7 +379,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div data-mi="takes" className={`relative z-[1] flex-wrap items-center gap-1.5 ${pill === "takes" ? "reveal qe-fact-panel flex rounded-xl p-3" : "hidden"}`}>
+          <div data-pill-tray data-mi="takes" className={`relative z-[1] flex-wrap items-center gap-1.5 ${pill === "takes" ? "reveal qe-fact-panel pill-tray-box flex rounded-xl p-3" : "hidden"}`}>
             <span className="mr-0.5 text-[14.5px] font-semibold">Takes</span>
             {MINUTE_PRESETS.map((m) => (
               <button
@@ -430,7 +433,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && pill === "reward" && (
-          <div data-mi="xp" className="reveal qe-fact-panel relative z-[1] flex flex-col gap-2 rounded-xl p-3">
+          <div data-pill-tray data-mi="xp" className="reveal qe-fact-panel pill-tray-box relative z-[1] flex flex-col gap-2 rounded-xl p-3">
             {/* The quest editor's own XP row: −5 and +5 either side of the bar, the amount to its right. */}
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setXp(Math.max(0, xp - 5))} aria-label="5 XP less" title="−5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
@@ -481,7 +484,7 @@ export function RiteEditorDialog({
         )}
 
         {!isHabit && (
-        <div data-mi="xp" className="relative z-[1] flex flex-wrap items-center gap-1.5">
+        <div data-mi="xp" className="relative z-[1] flex basis-full flex-wrap items-center gap-1.5">
           <span className="mr-0.5 text-[14.5px] font-semibold">XP</span>
           {XP_PRESETS.map((v) => (
             <button
@@ -515,7 +518,7 @@ export function RiteEditorDialog({
         )}
 
         {isHabit && (
-          <div data-mi="due" className={`relative z-[1] flex-col gap-2 ${pill === "due" ? "reveal qe-fact-panel flex rounded-xl p-3" : "hidden"}`}>
+          <div data-pill-tray data-mi="due" className={`relative z-[1] flex-col gap-2 ${pill === "due" ? "reveal qe-fact-panel pill-tray-box flex rounded-xl p-3" : "hidden"}`}>
             <button type="button" onClick={() => setDueOpen((o) => !o)} aria-expanded={dueOpen} className="hidden items-center gap-1.5 self-start text-[14.5px] font-semibold">
               <Caret open={dueOpen} />
               {windowTo ? "Time" : "Due by"}
@@ -547,6 +550,7 @@ export function RiteEditorDialog({
             )}
           </div>
         )}
+        </PillTrays>
 
 
         {!isHabit && (
