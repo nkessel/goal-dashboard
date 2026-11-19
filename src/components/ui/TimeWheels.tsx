@@ -103,8 +103,9 @@ export function TimeWheels({ value, onChange }: { value: number; onChange: (minu
             if (e.key === "Enter") e.currentTarget.blur();
             if (e.key === "Escape") setTyping(null);
           }}
-          className="bare-input font-display absolute inset-x-1.5 z-[2] rounded-lg text-center text-[21px] tabular-nums"
-          style={{ top: ROW, height: ROW, background: "rgba(251,243,220,.97)", border: "1px solid #a88a3f", color: "#2a1c10" }}
+          // Typed in place on the chosen row: no box, no focus ring, just a thin gold line under the words (owner, Nov 19).
+          className="bare-input font-display absolute inset-x-1.5 z-[2] rounded-lg text-center text-[21px] tabular-nums outline-none focus:outline-none"
+          style={{ top: ROW, height: ROW, background: "#f2e3b9", border: "none", boxShadow: "inset 0 -1.5px 0 #b58a2c", color: "#2a1c10", outline: "none" }}
         />
       )}
       <Wheel items={HOURS} index={hi} onIndex={(i) => set(i, m, half)} label="Hour" width={44} onType={() => setTyping(`${HOURS[hi]}:${MINUTES[m]} ${HALVES[half].toLowerCase()}`)} />

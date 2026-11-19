@@ -156,12 +156,12 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
                 setLeaf(null);
                 void log(LEAF_EVENT, m === now ? undefined : at);
               }}
-              className="h-9 rounded-full px-4 text-[13.5px] font-bold"
-              style={{ background: "linear-gradient(180deg,#8fd17a,#4f9a47)", border: "1px solid #2c5f28", color: "#10240e" }}
+              // The app's forest-green primary, like the quest editor's Save (owner, Nov 19: the bright green was off).
+              className="qe-save h-9 rounded-full px-4 text-[14px] font-semibold"
             >
               Log it
             </button>
-            <button type="button" onClick={() => setLeaf(null)} className="h-7 text-[12.5px] underline underline-offset-2" style={{ color: "inherit", opacity: 0.8 }}>
+            <button type="button" onClick={() => setLeaf(null)} className="h-7 text-[13px] underline underline-offset-2" style={{ color: "inherit" }}>
               Cancel
             </button>
           </div>
