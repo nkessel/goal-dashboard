@@ -30,6 +30,10 @@ npm run ui-check -- --no-build --compare ui-check-out/before --only today,create
 - A difference means the screen changed: stop and find it. Never re-take the "before" to make a step pass.
 - `ui-check-out/` is git-ignored and a run only clears its own `shots/` and reports, so a baseline saved inside it stays.
 
+## Server time zone
+
+`--server-tz <zone>` runs `next start` in that zone (default: the morning zone). Use `--server-tz UTC` to match Vercel and catch server/browser mismatches: the calendar flow's `first-picture` check fetches the server's HTML for day and week view and flags more day columns than show, or cards drawn before the browser takes over.
+
 ## How it works
 
 - `scripts/ui-check/fake-db.mjs`: an in-memory stand-in for Supabase's REST API. It reads the tables' columns and defaults from `supabase/migrations/*.sql` and answers what supabase-js sends (selects with simple embeds, the filters the app uses, order/limit/range, single, count, insert/upsert/update/delete; rpc returns null). Anything it can't answer is listed under "Check limitations" in the report. Writes stay in memory; `POST /__reset` reseeds (each flow starts fresh).
