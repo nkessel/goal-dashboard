@@ -1913,12 +1913,8 @@ export function QuestEditorDialog({
                     {/* Under the title: send some of the XP to character stats (the tray opens below the XP bar). */}
                     {!doingNow && (
                       <button type="button" onClick={() => setStatsOpen((o) => !o)} aria-expanded={statsOpen} className="flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-semibold" style={{ border: `1px solid ${chipBorder}`, color: "var(--t-ink)", background: statsOpen ? "rgba(217,180,95,.3)" : "rgba(255,250,235,.35)" }}>
-                        {statTotal > 0
-                          ? Object.entries(statSplit)
-                              .filter(([, p]) => p > 0)
-                              .map(([k, p]) => `${statAbbr(k)} ${Math.round((xp * p) / 100)}`)
-                              .join(" · ") + " XP"
-                          : "＋ Add to stats"}
+                        {/* The amounts per stat sit under the XP slider, so the pill never overflows (owner, Nov 19). */}
+                        {statTotal > 0 ? "Stats" : "＋ Add to stats"}
                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: statsOpen ? "rotate(90deg)" : undefined }}>
                           <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
@@ -1972,6 +1968,20 @@ export function QuestEditorDialog({
                     </span>
                   </span>
                 </div>
+                {/* Each stat's share of the XP, under the slider; wraps to more lines when there are many (owner, Nov 19). Tapping it opens the stats tray; hidden while the tray (which lists them) is open, so the editor does not jump as you tap. */}
+                {!doingNow && statTotal > 0 && !statsOpen && (
+                  <button type="button" onClick={() => setStatsOpen((o) => !o)} aria-label="Change the XP shared with stats" className="due-in -mt-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 self-stretch px-1 text-left text-[13px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>
+                    {Object.entries(statSplit)
+                      .filter(([, p]) => p > 0)
+                      .map(([k, p]) => (
+                        <span key={k} className="whitespace-nowrap" title={k}>
+                          <span className="font-display text-[11px] font-bold tracking-wide" style={{ color: isAdventure ? "#8a6116" : "var(--t-accent)" }}>{statAbbr(k)}</span>{" "}
+                          <b style={{ color: "var(--t-ink)" }}>{Math.round((xp * p) / 100)}</b> XP
+                        </span>
+                      ))}
+                    <span className="whitespace-nowrap">· {xp - Object.values(statSplit).reduce((a, p) => a + Math.round((xp * p) / 100), 0)} XP to your level</span>
+                  </button>
+                )}
                 <div className="flex flex-wrap items-center gap-2">
                   {!doingNow && (
                     <span className="ml-auto flex h-9 shrink-0 items-center gap-0.5 rounded-lg border px-1" style={fieldStyle} title="Coins earned on completion">

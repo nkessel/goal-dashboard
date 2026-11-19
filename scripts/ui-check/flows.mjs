@@ -233,6 +233,8 @@ export const FLOWS = [
           if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /add to stats|XP to stats|^\w{3} \d+/i }).first(), "editor: stats tray", { optional: true, expectMove: true })) {
             await h.tap((p) => p.getByRole("button", { name: /more xp to strength/i }).first(), "stats: strength +", { optional: true });
             await h.tap((p) => p.getByRole("button", { name: /more xp to wisdom/i }).first(), "stats: wisdom +", { optional: true });
+            // Five stats: their amounts wrap under the XP slider, not in the pill (owner, Nov 19).
+            for (const st of ["intelligence", "charisma", "dexterity"]) await h.tap((p) => p.getByRole("button", { name: new RegExp(`more xp to ${st}`, "i") }).first(), `stats: ${st} +`, { optional: true });
             await h.check("quest editor: stats tray");
             if (await h.tap((p) => p.getByRole("button", { name: /a new stat/i }).first(), "stats: new stat", { optional: true, expectMove: true })) await h.check("quest editor: new stat field");
             await h.tap((p) => p.getByRole("button", { name: /^save$/i }).first(), "stats: save", { optional: true, expectMove: true });
