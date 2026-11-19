@@ -970,7 +970,25 @@ export const FLOWS = [
       await h.check("later: when it comes back");
       await h.page.getByRole("button", { name: /^in 3 quests$/i }).click();
       await h.settle(500);
+      // Enter asks "Put it here?" (owner, Nov 19): yes, adjust (15 min / a day), or redo.
       await h.page.getByRole("button", { name: /^place it$/i }).click();
+      await h.settle(500);
+      if (!(await h.page.locator("[data-quest-drop-ask]").count())) throw new Error("questdrop: Place didn't ask \"Put it here?\"");
+      await h.check("asking: put it here?");
+      await h.page.getByRole("button", { name: /^adjust$/i }).click();
+      await h.page.getByRole("button", { name: /^15 minutes later$/i }).click();
+      await h.page.getByRole("button", { name: /^a day later$/i }).click();
+      await h.settle(400);
+      await h.check("adjusting by hand");
+      if (await h.page.getByRole("button", { name: /^done adjusting$/i }).isEnabled()) {
+        await h.page.getByRole("button", { name: /^done adjusting$/i }).click();
+      } else {
+        await h.page.keyboard.press("Escape");
+        await h.settle(300);
+        await h.page.getByRole("button", { name: /^place it$/i }).click();
+      }
+      await h.settle(400);
+      await h.page.getByRole("button", { name: /^yes, put it here$/i }).click();
       await h.settle(700);
       await h.check("placed one (with Undo)");
       await h.page.locator("[data-quest-drop] button[aria-label=Close]").click();

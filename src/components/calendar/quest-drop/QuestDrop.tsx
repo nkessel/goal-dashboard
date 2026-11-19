@@ -32,6 +32,10 @@ const KEY = "quest-drop";
 const DAYS = 14;
 type Shown = { start: number; end: number; title: string; kind: "event" | "meal" | "placed" };
 type Phase = "loading" | "ready" | "play" | "later" | "done" | "empty";
+/** While playing: falling, asking "put it here?", or nudging it by hand (owner, Nov 19). */
+type Aim = "fall" | "confirm" | "adjust";
+/** Each quest starts three drop slots above the day's first time, so there's time to steer it to the right day (owner, Nov 19). */
+const LEAD = 3 * DROP_STEP;
 
 function readSettings(): DropSettings {
   try {
@@ -89,6 +93,8 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
   const [queue, setQueue] = useState<DropQuest[]>(() => dropOrder(quests));
   const [phase, setPhase] = useState<Phase>("loading");
   const [paused, setPaused] = useState(false);
+  const [aim, setAim] = useState<Aim>("fall");
+  const [spot, setSpot] = useState<{ start: Date; end: Date } | null>(null);
   const [pos, setPos] = useState<{ day: number; y: number }>({ day: 0, y: 0 });
   const [view, setView] = useState(0);
   const [cols, setCols] = useState(3);
@@ -111,7 +117,7 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
 
   const cur = queue[0] ?? null;
   const later = phase === "later";
-  const playing = phase === "play" && !paused && !showSettings;
+  const playing = phase === "play" && aim === "fall" && !paused && !showSettings;
 
   // Settings (yours, on this device) and your calendar: events, quests placed, habits with a time, meals kept free.
   useEffect(() => {
@@ -166,10 +172,18 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
 
   const dayStart = sched?.dayStart ?? SCHEDULER_DEFAULTS.dayStart;
   const dayEnd = sched?.dayEnd ?? SCHEDULER_DEFAULTS.dayEnd;
-  const pxPerMin = boardH / Math.max(60, dayEnd - dayStart);
+  const boardTop = dayStart - LEAD;
+  const pxPerMin = boardH / Math.max(60, dayEnd - boardTop);
   const allBusy = useMemo(() => [...busy, ...placed.map((p) => ({ start: p.start.getTime(), end: p.end.getTime() }))], [busy, placed]);
-  const ghost = useMemo(() => (cur && sched ? landingFrom(cur, dayAt(today, pos.day), pos.y, allBusy, sched, now) : null), [cur, sched, today, pos, allBusy, now]);
+  const ghost = useMemo(() => (cur && sched ? landingFrom(cur, dayAt(today, pos.day), Math.max(pos.y, dayStart), allBusy, sched, now) : null), [cur, sched, today, pos, allBusy, now, dayStart]);
   const mins = cur ? blockMinutes(cur) : 30;
+  // When nudged by hand: is that exact time free (by the same rules)?
+  const spotFree = useMemo(() => {
+    if (!spot || !cur || !sched) return false;
+    const day = new Date(spot.start);
+    const fit = landingFrom(cur, day, minuteOf(spot.start.getTime()), allBusy, sched, now);
+    return Boolean(fit && fit.start.getTime() === spot.start.getTime());
+  }, [spot, cur, sched, allBusy, now]);
 
   function save(next: DropSettings) {
     setSettings(next);
@@ -193,7 +207,9 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
     const plan = planSchedule([{ id: q.id, title: q.title, minutes: blockMinutes(q), effort: null, dueAt: q.dueAt, planBy: q.planBy }], busyNow, sched, new Date());
     const p = plan.placed[0];
     const day = p ? Math.max(0, Math.min(DAYS, Math.round((new Date(p.start).setHours(0, 0, 0, 0) - today.getTime()) / 86_400_000))) : 0;
-    setPos({ day, y: dayStart });
+    setPos({ day, y: dayStart - LEAD });
+    setAim("fall");
+    setSpot(null);
     setView((v) => (day < v ? day : day > v + cols - 1 ? day - cols + 1 : v));
   }
 
@@ -211,7 +227,7 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
   }
 
   function move(dx: number) {
-    if (phase !== "play" || !cur) return;
+    if (phase !== "play" || !cur || aim !== "fall") return;
     const day = Math.max(0, Math.min(DAYS, pos.day + dx));
     if (day === pos.day) {
       music.current?.sfx("nope");
@@ -224,23 +240,67 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
   }
 
   function down() {
-    if (phase !== "play" || !cur) return;
-    if (pos.y + DROP_STEP + mins > dayEnd) return land(true);
+    if (phase !== "play" || !cur || aim !== "fall") return;
+    if (pos.y + DROP_STEP + mins > dayEnd) return ask(true);
     setPos({ ...pos, y: pos.y + DROP_STEP });
   }
 
-  /** It lands: where the outline is, or (reaching the bottom) in the day's last free stretch. */
-  function land(bottom = false) {
-    if (!cur || !sched || phase !== "play") return;
+  /** Enter: it stops where the outline is (or, reaching the bottom, in the day's last free stretch) and asks "Put it here?". */
+  function ask(bottom = false) {
+    if (!cur || !sched || phase !== "play" || aim !== "fall") return;
     const day = dayAt(today, pos.day);
-    const spot = bottom ? (landingAtBottom(cur, day, allBusy, sched, now) ?? ghost) : ghost;
-    if (!spot) {
+    const at = bottom ? (landingAtBottom(cur, day, allBusy, sched, now) ?? ghost) : ghost;
+    if (!at) {
       music.current?.sfx("nope");
       setShake((n) => n + 1);
       setNote({ text: `No room left on ${dayWord(day, today)}. Try another day.` });
-      setPos({ ...pos, y: dayStart });
+      setPos({ ...pos, y: dayStart - LEAD });
       return;
     }
+    music.current?.sfx("move");
+    setSpot(at);
+    setAim("confirm");
+  }
+
+  /** ↑ in the question: back to the top of that day, falling again. */
+  function redo() {
+    setAim("fall");
+    setSpot(null);
+    setPos({ ...pos, y: dayStart - LEAD });
+  }
+
+  /** In "adjust": arrows move it 15 minutes up or down, or a day left or right. */
+  function nudge(minutes: number, days: number) {
+    if (!spot) return;
+    const start = new Date(spot.start);
+    start.setDate(start.getDate() + days);
+    start.setMinutes(start.getMinutes() + minutes);
+    const day = Math.round((new Date(start).setHours(0, 0, 0, 0) - today.getTime()) / 86_400_000);
+    const m = minuteOf(start.getTime());
+    if (day < 0 || day > DAYS || m < dayStart || m + mins > dayEnd || (days !== 0 && new Date(start).toDateString() === spot.start.toDateString())) {
+      music.current?.sfx("nope");
+      setShake((n) => n + 1);
+      return;
+    }
+    music.current?.sfx("move");
+    setSpot({ start, end: new Date(start.getTime() + mins * 60_000) });
+    setPos({ day, y: m });
+    setView((v) => (day < v ? day : day > v + cols - 1 ? day - cols + 1 : v));
+  }
+
+  /** Done nudging: ask again (only for a free time). */
+  function adjustDone() {
+    if (!spotFree) {
+      music.current?.sfx("nope");
+      setShake((n) => n + 1);
+      return;
+    }
+    setAim("confirm");
+  }
+
+  /** Yes: it goes on the calendar and the next quest starts. */
+  function land() {
+    if (!cur || !sched || phase !== "play" || aim !== "confirm" || !spot) return;
     const q = cur;
     const nextPlaced = [...placed, { q, start: spot.start, end: spot.end }];
     setPlaced(nextPlaced);
@@ -275,7 +335,9 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
     setNote(null);
     void unscheduleTaskAction(last.q.id).catch(() => setError(`Couldn't take "${last.q.title}" off the calendar.`));
     if (phase === "done") setPhase("play");
-    setPos({ day: Math.round((new Date(last.start).setHours(0, 0, 0, 0) - today.getTime()) / 86_400_000), y: dayStart });
+    setAim("fall");
+    setSpot(null);
+    setPos({ day: Math.round((new Date(last.start).setHours(0, 0, 0, 0) - today.getTime()) / 86_400_000), y: dayStart - LEAD });
   }
 
   /** ↑: this quest comes back later in the line. */
@@ -315,6 +377,7 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
 
   useEscape(() => {
     if (later) setPhase("play");
+    else if (phase === "play" && aim !== "fall") redo();
     else if (showSettings) setShowSettings(false);
     else close();
   });
@@ -338,7 +401,12 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
       if (phase !== "play") return;
       if (k === "p" || k === "P") return setPaused((v) => !v);
       if (paused) return;
-      const act: Record<string, () => void> = { ArrowLeft: () => move(-1), ArrowRight: () => move(1), ArrowDown: down, ArrowUp: () => setPhase("later"), " ": () => land(), Enter: () => land() };
+      const keys: Record<Aim, Record<string, () => void>> = {
+        fall: { ArrowLeft: () => move(-1), ArrowRight: () => move(1), ArrowDown: down, ArrowUp: () => setPhase("later"), " ": () => ask(), Enter: () => ask() },
+        confirm: { Enter: land, " ": land, ArrowDown: () => setAim("adjust"), ArrowUp: redo },
+        adjust: { ArrowLeft: () => nudge(0, -1), ArrowRight: () => nudge(0, 1), ArrowUp: () => nudge(-DROP_STEP, 0), ArrowDown: () => nudge(DROP_STEP, 0), Enter: adjustDone, " ": adjustDone },
+      };
+      const act = keys[aim];
       if (act[k]) {
         e.preventDefault();
         act[k]();
@@ -359,9 +427,18 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
     const dx = e.clientX - t.x;
     const dy = e.clientY - t.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 28) return;
-    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1);
-    else if (dy > 0) land();
-    else setPhase("later");
+    const sideways = Math.abs(dx) > Math.abs(dy);
+    if (aim === "fall") {
+      if (sideways) move(dx > 0 ? 1 : -1);
+      else if (dy > 0) ask();
+      else setPhase("later");
+    } else if (aim === "confirm") {
+      if (!sideways && dy > 0) setAim("adjust");
+      else if (!sideways) redo();
+    } else {
+      if (sideways) nudge(0, dx > 0 ? 1 : -1);
+      else nudge(dy > 0 ? DROP_STEP : -DROP_STEP, 0);
+    }
   }
 
   const ink = "var(--t-ink)";
@@ -369,7 +446,7 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
   const gold = isAdventure ? "var(--t-gold)" : "var(--t-accent)";
   const line = isAdventure ? "rgba(139,112,64,.22)" : "var(--t-card-border)";
   const days = Array.from({ length: cols }, (_, i) => view + i).filter((d) => d <= DAYS);
-  const top = (m: number) => (m - dayStart) * pxPerMin;
+  const top = (m: number) => (m - boardTop) * pxPerMin;
   const tag = cur ? whenTag(cur) : null;
   const next = queue.slice(1, 3);
   const musicLink = cleanMusicLink(settings.musicLink);
@@ -547,10 +624,10 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
                   return mb > ma ? { t: top(ma), h: (mb - ma) * pxPerMin } : null;
                 };
                 const isCol = d === pos.day && phase === "play";
-                const pastH = d === 0 ? Math.max(0, Math.min(boardH, top(minuteOf(now.getTime())))) : 0;
+                const pastH = d === 0 ? Math.max(0, Math.min(boardH, top(minuteOf(now.getTime())) - top(dayStart))) : 0;
                 return (
                   <div key={d} className="relative flex-1 transition-colors duration-150" style={{ borderLeft: `1px solid ${line}`, background: isCol ? "rgba(217,180,95,.12)" : undefined }}>
-                    {pastH > 0 && <div className="pointer-events-none absolute inset-x-0 top-0" style={{ height: pastH, background: "repeating-linear-gradient(135deg, rgba(120,90,40,.07) 0 6px, transparent 6px 12px)" }} />}
+                    {pastH > 0 && <div className="pointer-events-none absolute inset-x-0" style={{ top: top(dayStart), height: pastH, background: "repeating-linear-gradient(135deg, rgba(120,90,40,.07) 0 6px, transparent 6px 12px)" }} />}
                     {shown.filter(inDay).sort((a, b) => (a.kind === "meal" ? 0 : 1) - (b.kind === "meal" ? 0 : 1)).map((x, i) => {
                       const c = clip(x.start, x.end);
                       if (!c) return null;
@@ -570,7 +647,7 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
                         </div>
                       );
                     })}
-                    {isCol && ghost && cur && (
+                    {isCol && aim === "fall" && ghost && cur && (
                       <div className="pointer-events-none absolute inset-x-[2px] rounded-md" data-quest-drop-ghost style={{ top: top(minuteOf(ghost.start.getTime())), height: Math.max(14, mins * pxPerMin - 1), border: `2px dashed ${gold}`, background: "rgba(217,180,95,.12)", transition: "top .12s ease-out" }} />
                     )}
                     {isCol && cur && (
@@ -578,10 +655,11 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
                         key={`${cur.id}-${shake}`}
                         className={`pointer-events-none absolute inset-x-[1px] z-[2] flex flex-col overflow-hidden rounded-lg px-1.5 py-0.5 ${shake ? "quest-drop-shake" : ""}`}
                         data-quest-drop-falling
-                        style={{ top: top(pos.y), height: Math.max(36, mins * pxPerMin), background: isAdventure ? "linear-gradient(180deg,#fffaf0,#f3e3bd)" : "var(--t-card)", border: `2px solid ${gold}`, boxShadow: "0 6px 16px rgba(40,25,5,.28)", color: ink, transition: `top ${Math.min(220, stepMs(level))}ms linear` }}
+                        data-aim={aim}
+                        style={{ top: top(spot && aim !== "fall" ? minuteOf(spot.start.getTime()) : pos.y), height: Math.max(36, mins * pxPerMin), background: isAdventure ? "linear-gradient(180deg,#fffaf0,#f3e3bd)" : "var(--t-card)", border: aim === "adjust" && !spotFree ? "2px dashed #a33" : aim === "adjust" ? `2px dashed ${gold}` : `2px solid ${gold}`, boxShadow: aim === "confirm" ? "0 0 0 3px rgba(217,180,95,.45), 0 6px 16px rgba(40,25,5,.28)" : "0 6px 16px rgba(40,25,5,.28)", color: ink, transition: `top ${aim === "fall" ? Math.min(220, stepMs(level)) : 120}ms ${aim === "fall" ? "linear" : "ease-out"}` }}
                       >
                         <span className="text-[10.5px] font-semibold leading-tight" style={{ color: soft }}>
-                          {ghost ? `${hm(ghost.start)} · ${mins}m` : "No room below"}
+                          {spot && aim !== "fall" ? `${hm(spot.start)} · ${mins}m${aim === "adjust" && !spotFree ? " · busy" : ""}` : ghost ? `${hm(ghost.start)} · ${mins}m` : "No room below"}
                         </span>
                         <span className="flex min-w-0 items-center gap-1 text-[12px] font-bold leading-tight">
                           <Portrait q={cur} size={15} />
@@ -610,10 +688,10 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
                     <>
                       <p className={`m-0 ${isAdventure ? "font-display text-[20px]" : "text-[17px] font-bold"}`}>{queue.length} quest{queue.length === 1 ? "" : "s"} to place</p>
                       <p className="mb-3 mt-1 text-[13.5px] leading-snug" style={{ color: soft }}>
-                        One at a time, most urgent first. Steer it to a day, let it fall to the time you want, then place it where the gold outline shows. It speeds up as you go.
+                        One at a time, most urgent first. Steer it to a day, let it fall to the time you want, then place it where the gold outline shows and check the spot. It speeds up as you go.
                       </p>
-                      <p className="mb-3 hidden text-[12.5px] sm:block" style={{ color: soft }}>← → day · ↓ later in the day · Space place · ↑ bring it back later · P pause</p>
-                      <p className="mb-3 text-[12.5px] sm:hidden" style={{ color: soft }}>Swipe sideways for the day, down to place, up for later.</p>
+                      <p className="mb-3 hidden text-[12.5px] sm:block" style={{ color: soft }}>← → day · ↓ later in the day · Enter place · ↑ bring it back later · P pause. Enter asks &ldquo;Put it here?&rdquo;: Enter yes, ↓ adjust, ↑ redo.</p>
+                      <p className="mb-3 text-[12.5px] sm:hidden" style={{ color: soft }}>Swipe sideways for the day, down to place, up for later. Then say yes, adjust it, or redo.</p>
                       <button type="button" onClick={start} className="h-11 rounded-full px-6 text-[15px] font-bold" style={goldBtn(isAdventure)} data-quest-drop-start>
                         {musicLink ? "Start and play my music ↗" : "Start"}
                       </button>
@@ -644,7 +722,11 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
 
         {/* What just happened (with Undo), and any trouble. */}
         <div className="relative z-[1] flex min-h-[30px] items-center gap-2 py-0 pl-4 pr-16 pt-1 text-[12.5px]" style={{ color: soft }} aria-live="polite">
-          {error ? (
+          {phase === "play" && aim !== "fall" && spot ? (
+            <span key={aim} className="reveal min-w-0 flex-1 truncate font-semibold" style={{ color: aim === "adjust" && !spotFree ? "#a33" : ink }} data-quest-drop-ask>
+              {aim === "confirm" ? `Put it here? ${dayWord(spot.start, today)}, ${hm(spot.start)}` : spotFree ? `${dayWord(spot.start, today)}, ${hm(spot.start)}: move it, then Done` : `${dayWord(spot.start, today)}, ${hm(spot.start)} is busy`}
+            </span>
+          ) : error ? (
             <span className="min-w-0 flex-1 truncate" style={{ color: "#a33" }}>{error}</span>
           ) : note ? (
             <span key={note.text} className="reveal min-w-0 flex-1 truncate">{note.text}</span>
@@ -659,17 +741,43 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
           )}
         </div>
 
-        {/* Thumb pad: ◀ ▼ ▶, Later, Place. */}
-        <div className="relative z-[1] grid grid-cols-5 gap-1.5 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-1.5" data-quest-drop-pad>
-          <PadButton label="Earlier day" onClick={() => move(-1)} disabled={phase !== "play" || paused}><Arrow dir="left" /></PadButton>
-          <PadButton label="Later in the day" onClick={down} disabled={phase !== "play" || paused}><Arrow dir="down" /></PadButton>
-          <PadButton label="Next day" onClick={() => move(1)} disabled={phase !== "play" || paused}><Arrow dir="right" /></PadButton>
-          <PadButton label="Bring it back later" onClick={() => setPhase(later ? "play" : "later")} disabled={(phase !== "play" && phase !== "later") || paused}>
-            <span className="flex flex-col items-center leading-none"><Arrow dir="up" /><span className="mt-0.5 text-[10.5px] font-semibold">Later</span></span>
-          </PadButton>
-          <button type="button" onClick={() => land()} disabled={phase !== "play" || paused || !ghost} className="h-12 rounded-xl text-[14.5px] font-bold disabled:opacity-45" style={goldBtn(isAdventure)} aria-label="Place it">
-            Place
-          </button>
+        {/* Thumb pad. Falling: ◀ ▼ ▶, Later, Place. Asking: Redo, Adjust, Yes. Adjusting: ◀ ▲ ▼ ▶, Done. */}
+        <div className="relative z-[1] grid grid-cols-5 gap-1.5 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-1.5" data-quest-drop-pad={phase === "play" ? aim : "fall"}>
+          {phase === "play" && aim === "confirm" ? (
+            <>
+              <PadButton label="Redo" onClick={redo} disabled={paused}>
+                <span className="flex flex-col items-center leading-none"><Arrow dir="up" /><span className="mt-0.5 text-[10.5px] font-semibold">Redo</span></span>
+              </PadButton>
+              <PadButton label="Adjust" onClick={() => setAim("adjust")} disabled={paused}>
+                <span className="flex flex-col items-center leading-none"><Arrow dir="down" /><span className="mt-0.5 text-[10.5px] font-semibold">Adjust</span></span>
+              </PadButton>
+              <button type="button" onClick={land} disabled={paused} className="col-span-3 h-12 rounded-xl text-[15px] font-bold disabled:opacity-45" style={goldBtn(isAdventure)} aria-label="Yes, put it here">
+                Yes, put it here
+              </button>
+            </>
+          ) : phase === "play" && aim === "adjust" ? (
+            <>
+              <PadButton label="A day earlier" onClick={() => nudge(0, -1)} disabled={paused}><Arrow dir="left" /></PadButton>
+              <PadButton label="15 minutes earlier" onClick={() => nudge(-DROP_STEP, 0)} disabled={paused}><Arrow dir="up" /></PadButton>
+              <PadButton label="15 minutes later" onClick={() => nudge(DROP_STEP, 0)} disabled={paused}><Arrow dir="down" /></PadButton>
+              <PadButton label="A day later" onClick={() => nudge(0, 1)} disabled={paused}><Arrow dir="right" /></PadButton>
+              <button type="button" onClick={adjustDone} disabled={paused || !spotFree} className="h-12 rounded-xl text-[14.5px] font-bold disabled:opacity-45" style={goldBtn(isAdventure)} aria-label="Done adjusting">
+                Done
+              </button>
+            </>
+          ) : (
+            <>
+              <PadButton label="Earlier day" onClick={() => move(-1)} disabled={phase !== "play" || paused}><Arrow dir="left" /></PadButton>
+              <PadButton label="Later in the day" onClick={down} disabled={phase !== "play" || paused}><Arrow dir="down" /></PadButton>
+              <PadButton label="Next day" onClick={() => move(1)} disabled={phase !== "play" || paused}><Arrow dir="right" /></PadButton>
+              <PadButton label="Bring it back later" onClick={() => setPhase(later ? "play" : "later")} disabled={(phase !== "play" && phase !== "later") || paused}>
+                <span className="flex flex-col items-center leading-none"><Arrow dir="up" /><span className="mt-0.5 text-[10.5px] font-semibold">Later</span></span>
+              </PadButton>
+              <button type="button" onClick={() => ask()} disabled={phase !== "play" || paused || !ghost} className="h-12 rounded-xl text-[14.5px] font-bold disabled:opacity-45" style={goldBtn(isAdventure)} aria-label="Place it">
+                Place
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>,
