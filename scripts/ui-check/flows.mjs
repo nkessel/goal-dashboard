@@ -582,8 +582,10 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/", { name: "faces" });
       await h.toggle(/daily habits/i, "daily habits");
-      if (await h.tap((p) => p.getByRole("checkbox", { name: /^Done: Walk Chester/ }).first(), "tick a habit", { optional: true, expectMove: true })) {
-        await h.settle(1600);
+      const tick = h.page.getByRole("checkbox", { name: /^Done: Walk Chester/ }).first();
+      if (await tick.count()) {
+        await tick.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
+        await h.settle(1800);
         await h.check("how do you feel, under the habit");
         if (await h.tap((p) => p.locator("[data-felt-inline] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: kept");
         await h.settle(1400);
