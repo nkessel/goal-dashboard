@@ -953,6 +953,22 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/insights", { name: "insights" });
       await h.check("top");
+      // The check-in log (owner, Nov 10 and 18): today's by default, a longer range from its drop-down, and each one's
+      // ⋯ with Star, Change and Remove.
+      if (await h.tap((p) => p.locator("[data-checkin-log] button[aria-label='Check-in options']").first(), "check-in ⋯", { optional: true, expectMove: true })) {
+        await h.settle(400);
+        await h.check("check-in log: options");
+        await h.tap((p) => p.locator("[data-checkin-log] [role=menuitem]", { hasText: /^Star$/ }).first(), "star a check-in", { optional: true });
+        await h.settle(400);
+        await h.check("check-in log: starred");
+      } else h.record({ kind: "checkin-log", severity: "error", target: "check-in log", detail: "No check-in in today's log to open (the fixtures have one an hour ago)" });
+      if (await h.tap((p) => p.locator("[data-checkin-log] button[aria-expanded]").first(), "check-in log range", { optional: true, expectMove: true })) {
+        await h.tap((p) => p.locator("[data-checkin-log] [role=radio]", { hasText: "This week" }).first(), "this week", { optional: true, expectMove: true });
+        await h.settle(500);
+        await h.check("check-in log: this week");
+        await h.tap((p) => p.locator("[data-checkin-log] button[aria-expanded]").first(), "check-in log range again", { optional: true, expectMove: true });
+        await h.tap((p) => p.locator("[data-checkin-log] [role=radio]", { hasText: "Today" }).first(), "today", { optional: true, expectMove: true });
+      }
       // The chart waits behind a plain button (owner, Nov 9).
       if (await h.tap(/show insights chart/i, "show the chart", { optional: true })) {
         await h.settle(500);

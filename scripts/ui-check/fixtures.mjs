@@ -114,6 +114,9 @@ export function makeFixtures() {
     { owner_id: OWNER_ID, metric: "Mood", level: 7, created_at: inHours(-26) },
     { owner_id: OWNER_ID, metric: "Sleep quality", level: 6, created_at: inHours(-30) },
     { owner_id: OWNER_ID, metric: "Energy", level: 5, created_at: inHours(-50) },
+    // Today's check-in, for the log under the check-in (owner, Nov 10 and 18).
+    { owner_id: OWNER_ID, metric: "Mood", level: 6.5, created_at: inHours(-1) },
+    { owner_id: OWNER_ID, metric: "Sleep quality", level: 7, created_at: inHours(-1) },
   ].map((r) => ({ id: randomUUID(), ...r }));
 
   const xp_events = [
