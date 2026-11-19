@@ -2934,6 +2934,18 @@ button.night-time:focus-visible { outline: none; border-color: #a88a3f; box-shad
 .qe-fact:hover { border-color: #a88a3f; }
 .qe-fact[data-open="true"] { background: rgba(217, 180, 95, 0.35); border-color: #8a6116; box-shadow: 0 0 0 2px rgba(217, 180, 95, 0.3); }
 .qe-fact-panel { border: 1px solid rgba(139, 112, 64, 0.35); background: rgba(255, 250, 238, 0.45); }
+/* A pill's tray opens right under the pill's own line, with a point aimed at it (owner picked "the pointer", Nov 19). See ui/PillTrays.tsx. */
+.pill-trays > [data-pill-tray] { flex-basis: 100%; min-width: 0; }
+.pill-tray-box { position: relative; border: 1px solid rgba(138, 97, 22, 0.55); background: #faefd2; box-shadow: 0 3px 10px rgba(74, 57, 19, 0.15); }
+.pill-trays > .pill-tray-box { margin-top: 4px; }
+.pill-tray-pad { padding-top: 8px; }
+/* The editors' trays slide in with `reveal`, whose clip would cut off the point: same motion, with room for it. */
+.pill-tray-box.reveal { animation-name: pill-tray-reveal; }
+@keyframes pill-tray-reveal {
+  from { opacity: 0; transform: translateY(-6px); clip-path: inset(-10px -12px 100% -12px); }
+  to { opacity: 1; transform: none; clip-path: inset(-10px -12px -12px -12px); }
+}
+.pill-tray-box::before { content: ""; position: absolute; top: -7.5px; left: clamp(10px, calc(var(--tray-x, 28px) - 7px), calc(100% - 24px)); width: 14px; height: 14px; background: #faefd2; border-left: 1px solid rgba(138, 97, 22, 0.55); border-top: 1px solid rgba(138, 97, 22, 0.55); border-top-left-radius: 3px; transform: rotate(45deg); transition: left 0.2s ease; pointer-events: none; }
 /* Check-in −/+ beside each slider; a 44px touch area around a small mark. */
 .ec-step { color: var(--ec-gold, #f2d27e); border: 1px solid var(--ec-line, rgba(217,180,95,.5)); background: rgba(255, 250, 238, 0.12); }
 .ec-step::before { content: ""; position: absolute; inset: -8px; }

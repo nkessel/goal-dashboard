@@ -840,7 +840,7 @@ export const FLOWS = [
       if (await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^other/i }).first(), "rate: other", { optional: true, expectMove: true })) await h.check("rate: other open");
       // Quest details as the editor's pills (owner, Nov 6): XP & coins in one, Time, Due, ⚡ Tiny, 🔥 Importance (with difficulty and energy), Board.
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /xp/i }).first(), "attrs: xp", { optional: true, expectMove: true })) await h.check("attrs: xp open");
-      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^importance/i }).first(), "attrs: importance", { optional: true, expectMove: true })) await h.check("attrs: importance open");
+      if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^(urgency|importance)/i }).first(), "attrs: importance", { optional: true, expectMove: true })) await h.check("attrs: importance open");
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^time$|^\d+m$/i }).first(), "attrs: time", { optional: true, expectMove: true })) await h.check("attrs: time open");
       // One When pill (owner, Nov 18): Complete by, then Flexible · Fixed, then an optional time on the calendar.
       if (await h.tap((p) => p.locator("[data-import-attrs]").getByRole("button", { name: /^(when|within|by |around)/i }).first(), "attrs: when", { optional: true, expectMove: true })) {

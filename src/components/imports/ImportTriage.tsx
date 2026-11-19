@@ -1,5 +1,6 @@
 "use client";
 
+import { PillTrays } from "@/components/ui/PillTrays";
 import { Fold, useLingerValue } from "@/components/ui/Fold";
 import { GearIcon, CloseIcon, SnoozeIcon } from "@/components/ui/Icons";
 
@@ -274,7 +275,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     setFocusId(c.id);
     const d = draftFor(c);
     const a = attrsOf(c.id);
-    const full: Draft = { ...d, boardId: a.board === undefined ? findBoard(boards, c.board_hint)?.id : a.board, minutes: a.minutes === undefined ? d.minutes : a.minutes, due: a.due === undefined ? d.due : a.due, importance: a.importance || d.importance, rated: d.rated || !!a.slot || !!(a.due === undefined ? d.due : a.due) };
+    const full: Draft = { ...d, boardId: a.board === undefined ? findBoard(boards, c.board_hint)?.id : a.board, minutes: a.minutes === undefined ? d.minutes : a.minutes, due: a.due === undefined ? d.due : a.due, importance: a.importance || d.importance, urgency: a.urgency || d.urgency, rated: d.rated || !!a.slot || !!(a.due === undefined ? d.due : a.due) };
     // Everything already set on the card's pills: import it straight away, no questions.
     if (!all && withAttrs(full.kind) && baseFor(full).length === 0) return save(full, c);
     setDraft(full);
@@ -2010,13 +2011,13 @@ const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind ==
 // `.qe-fact` pills, `.qe-fact-panel` panels, the editor's XP bar and coin stepper, Due picks, Time picks and IconScale.
 
 /** A quest's details picked on the card, before importing. Kept on this device by card id. */
-type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; /** Coins a sub-quest pays when done, by its name. */ stepCoins?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null; /** A time on the calendar, picked on the card (owner, Nov 15); placed right after import. */ slot?: { start: string; end: string } | null; /** The date is Fixed (has to be done by then) or Flexible (a goal); owner, Nov 18. Unset: a date from the notes reads as Fixed. */ firm?: boolean };
+type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; /** Coins a sub-quest pays when done, by its name. */ stepCoins?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; urgency?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null; /** A time on the calendar, picked on the card (owner, Nov 15); placed right after import. */ slot?: { start: string; end: string } | null; /** The date is Fixed (has to be done by then) or Flexible (a goal); owner, Nov 18. Unset: a date from the notes reads as Fixed. */ firm?: boolean };
 type AttrKey = "reward" | "time" | "due" | "tiny" | "importance" | "board";
 const ATTRS: { key: AttrKey; label: string }[] = [
   { key: "reward", label: "XP & coins" },
   { key: "time", label: "Time" },
   { key: "due", label: "When" },
-  { key: "importance", label: "Importance" },
+  { key: "importance", label: "Urgency & importance" },
   { key: "board", label: "Board" },
 ];
 const ATTR_SHOWN_DEFAULT: AttrKey[] = ["reward", "time", "due", "importance", "board"];
@@ -2260,7 +2261,8 @@ function AttrPills({ card, attrs, shown, onChange, onRate, small = false }: { ca
     importance: (
       <>
         <Glyph src="/design/ui-flame-sm.png" />
-        {attrs.importance ? `Importance ${attrs.importance}` : "Importance"}
+        {/* Urgency and importance, as on the quest card (owner, Nov 19), next to When. */}
+        {attrs.urgency || attrs.importance ? [attrs.urgency ? `Urgency ${attrs.urgency}` : "", attrs.importance ? `Importance ${attrs.importance}` : ""].filter(Boolean).join(" · ") : "Urgency & importance"}
       </>
     ),
     board: (
@@ -2366,10 +2368,11 @@ function AttrPills({ card, attrs, shown, onChange, onRate, small = false }: { ca
       return <WhenPanel card={card} attrs={attrs} due={due} minutes={minutes} set={set} onRate={onRate} />;
     if (k === "importance")
       return (
-        // The editor's scales, left to right: importance (🔥), difficulty, energy boost (owner, Nov 6).
+        // The quest editor's scales: importance, urgency, difficulty, energy boost (owner, Nov 6; urgency Nov 19).
         <LevelScales
           items={[
-            { key: "importance", label: "Importance", icon: "/design/ui-flame-sm.png", value: attrs.importance ?? 0, onChange: (v) => set({ importance: v }) },
+            { key: "importance", label: "Importance", icon: "/design/ui-trophy.svg", value: attrs.importance ?? 0, onChange: (v) => set({ importance: v }) },
+            { key: "urgency", label: "Urgency", icon: "/design/ui-flame-sm.png", value: attrs.urgency ?? 0, onChange: (v) => set({ urgency: v }) },
             { key: "difficulty", label: "Difficulty", icon: "/design/ui-muscle.svg", hint: "How hard it is — how much it takes out of you", value: attrs.effort ?? 0, onChange: (v) => set({ effort: v }) },
             { key: "energy", label: "Energy boost", icon: "/design/ui-bolt.png", hint: "How much energy finishing it gives you", value: attrs.energy ?? 0, onChange: (v) => set({ energy: v }) },
           ]}
@@ -2387,8 +2390,8 @@ function AttrPills({ card, attrs, shown, onChange, onRate, small = false }: { ca
   // The panel keeps its last contents while it slides shut.
   const shownPanel = useLingerValue(open, 340);
   return (
-    <div className="flex flex-col gap-1.5" data-import-attrs>
-      <div className="flex flex-wrap items-center gap-1.5">
+    <PillTrays open={!!open} data-import-attrs>
+      <div className="contents">
         {shown.map(button)}
         {hidden.length > 0 && (
           <button type="button" aria-expanded={more} onClick={() => setMore((v) => !v)} className={`qe-fact flex items-center whitespace-nowrap rounded-full px-2.5 font-semibold ${small ? "h-7 text-[12px]" : "h-8 text-[12.5px]"}`} data-open={more ? "true" : undefined} style={{ borderStyle: "dashed" }}>
@@ -2396,17 +2399,20 @@ function AttrPills({ card, attrs, shown, onChange, onRate, small = false }: { ca
           </button>
         )}
       </div>
-      <div className="drawer-body" data-open={(more && hidden.length > 0) || undefined}>
+      <div className="drawer-body basis-full" data-open={(more && hidden.length > 0) || undefined}>
         <div className="drawer-inner">
           <div className="flex flex-wrap items-center gap-1.5">{hidden.map(button)}</div>
         </div>
       </div>
-      <div className="drawer-body" data-open={!!open || undefined}>
+      {/* The tray opens under the open pill's own line, pointing at it (owner, Nov 19). */}
+      <div className="drawer-body" data-open={!!open || undefined} data-pill-tray>
         <div className="drawer-inner">
-          <div className="qe-fact-panel flex flex-col gap-2 rounded-xl p-3">{panel(shownPanel.value)}</div>
+          <div className="pill-tray-pad">
+            <div className="qe-fact-panel pill-tray-box flex flex-col gap-2 rounded-xl p-3">{panel(shownPanel.value)}</div>
+          </div>
         </div>
       </div>
-    </div>
+    </PillTrays>
   );
 }
 
