@@ -582,7 +582,7 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/", { name: "faces" });
       await h.toggle(/daily habits/i, "daily habits");
-      if (await h.tap((p) => p.locator(".habit-row [role=checkbox][aria-label^='Done: ']:visible").first(), "tick a habit", { optional: true, expectMove: true })) {
+      if (await h.tap((p) => p.getByRole("checkbox", { name: /^Done: Walk Chester/ }).first(), "tick a habit", { optional: true, expectMove: true })) {
         await h.settle(1600);
         await h.check("how do you feel, under the habit");
         if (await h.tap((p) => p.locator("[data-felt-inline] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: kept");
@@ -605,8 +605,10 @@ export const FLOWS = [
           if (await h.tap((p) => p.getByRole("button", { name: /mark as failed/i }).first(), "fail form", { optional: true, expectMove: true })) {
             if (await h.tap((p) => p.getByRole("button", { name: /^mark failed$/i }).first(), "mark failed", { optional: true, expectMove: true })) {
               await h.settle(1200);
+              await h.page.waitForSelector("[data-fail-scene]", { timeout: 6000 }).catch(() => {});
+              await h.settle(600);
               await h.check("fail: wise line and faces");
-              if (await h.tap((p) => p.locator("[data-fail-next]").getByRole("button", { name: /^try again$/i }).first(), "fail: try again", { optional: true, expectMove: true })) await h.check("fail: copy or new");
+              if (await h.tap((p) => p.locator("[data-fail-scene]").getByRole("button", { name: /^try again$/i }).first(), "fail: try again", { optional: true, expectMove: true })) await h.check("fail: copy or new");
             }
           }
         }
