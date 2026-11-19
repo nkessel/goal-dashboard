@@ -239,6 +239,9 @@ export const FLOWS = [
       }
       await h.toggle(/additional quests/i, "additional quests");
       await h.toggle(/daily habits/i, "daily habits");
+      // (toggle shows it open, then closes it again): open it to tick one.
+      await h.page.evaluate(() => [...document.querySelectorAll("button[aria-expanded='false']")].find((b) => /Daily Habits/.test(b.textContent || ""))?.click());
+      await h.settle(700);
       // The Check in button folds away as the check-in opens, so it's closed with its ×.
       await h.tap(/^check in/i, "open check-in", { expectMove: true });
       await h.check("check-in open");
@@ -586,6 +589,10 @@ export const FLOWS = [
       if (await tick.count()) {
         await tick.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
         await h.settle(1800);
+        // (In the check the save reloads Today, which closes the tray: open it again to see the row.)
+        await h.page.evaluate(() => [...document.querySelectorAll("button[aria-expanded='false']")].find((b) => /Daily Habits/.test(b.textContent || ""))?.click());
+        await h.settle(700);
+        await h.page.locator("[data-felt-inline]").first().scrollIntoViewIfNeeded().catch(() => {});
         await h.check("how do you feel, under the habit");
         if (await h.tap((p) => p.locator("[data-felt-inline] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: kept");
         await h.settle(1400);
