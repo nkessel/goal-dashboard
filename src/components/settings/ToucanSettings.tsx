@@ -1,9 +1,9 @@
 "use client";
 
-import { loadFx, patchFx } from "@/lib/celebration-fx";
+import { loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
 
 import { FoldGroup } from "./FoldGroup";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useBubbleStyle } from "@/lib/use-bubble-style";
 import { saveToucanPrefsAction } from "@/app/actions";
 import { BUBBLE_LOOKS, BUBBLE_PAINT, BUBBLE_WAYS, saveBubbleStyle, type BubbleLook, type BubbleWay, FLOURISHES, TALK_LOOKS, readFlourish, readTalkLook, saveFlourish, saveTalkLook, type Flourish, type TalkLook } from "@/lib/toucan-flourish";
@@ -204,6 +204,7 @@ export function ToucanLookSettings() {
   const pick = (on: boolean) => (on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border, rgba(139,112,64,.35))", color: "var(--t-ink)" });
   return (
     <div className="flex flex-col gap-2.5" style={{ color: "var(--t-ink)" }}>
+      <AskBackground />
       <ArrivalTalk />
       <BubbleStyleSettings />
       <ToucanPreview text="Rivers carve canyons not by force, but by returning." talk={talk} flourish={flourish} play={play} />
@@ -346,6 +347,46 @@ function BubbleStyleSettings() {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+const ASK_BGS = [
+  { key: "mist", label: "Grey mist" },
+  { key: "fog", label: "Fog for the time of day" },
+  { key: "forest", label: "Dark forest" },
+  { key: "clear", label: "Clear" },
+] as const;
+
+/**
+ * What's behind him when he asks what's most important (the toucan's question, owner Nov 19: "let's have this
+ * background be editable in some settings"), and how thick the mist is.
+ */
+function AskBackground() {
+  const bg = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskBg ?? "mist", () => "mist");
+  const mist = useSyncExternalStore(subscribeFx, () => loadFx().toucanAskMist ?? 0.7, () => 0.7);
+  const quote = useSyncExternalStore(subscribeFx, () => loadFx().toucanKeptQuote !== false, () => true);
+  const set = (patch: Partial<FxSettings>) => patchFx(patch);
+  const pick = (on: boolean) => (on ? { background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", border: "1.5px solid #4a3913", color: "#2a1c10" } : { border: "1.5px solid var(--t-card-border, rgba(139,112,64,.35))", color: "var(--t-ink)" });
+  return (
+    <div className="flex flex-col gap-1.5" data-toucan-ask-bg>
+      <span className="text-sm font-semibold">Behind him when he asks what&rsquo;s most important</span>
+      <div role="radiogroup" aria-label="Background behind the toucan's question" className="flex flex-wrap gap-1.5">
+        {ASK_BGS.map((b) => (
+          <button key={b.key} type="button" role="radio" aria-checked={bg === b.key} onClick={() => set({ toucanAskBg: b.key })} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={pick(bg === b.key)}>
+            {b.label}
+          </button>
+        ))}
+      </div>
+      <label className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+        <span>Light</span>
+        <input type="range" min={0} max={1} step={0.05} value={mist} onChange={(e) => set({ toucanAskMist: Number(e.target.value) })} aria-label="How thick the mist is" className="h-7 min-w-0 flex-1" style={{ accentColor: "#a88a3f" }} />
+        <span>Thick</span>
+      </label>
+      <label className="flex items-center gap-2 text-[13px]">
+        <input type="checkbox" checked={quote} onChange={(e) => set({ toucanKeptQuote: e.target.checked })} style={{ accentColor: "#a88a3f" }} />
+        A wise line under what you kept
+      </label>
     </div>
   );
 }

@@ -4838,7 +4838,7 @@ export async function saveOwnWordsAction(words: OwnWords) {
 
 /** The welcome screen's layout (order, hidden parts, its buttons), kept on the account so every device shows the same screen. */
 export type WelcomeLayout = Record<string, unknown> & { at?: number };
-const WELCOME_LAYOUT_KEYS = ["welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
+const WELCOME_LAYOUT_KEYS = ["welcomeMode", "toucanAskBg", "toucanAskMist", "toucanKeptQuote", "welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
 /** The bottom bar's tab order (hold and drag a tab). */
 export async function saveNavOrderAction(order: string[]) {
   const ownerId = await requireProfileId();

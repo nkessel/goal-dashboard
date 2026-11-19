@@ -35,7 +35,14 @@ export type FxSettings = {
   welcomeCastleSeed?: number;
   /** Whether the welcome screen opens at all (owner, Nov 17: "pause the welcome screen for now"):
    *  "full" opens it as before; unset or "off" keeps it away (your login still counts). */
-  welcomeMode?: "full" | "off";
+  welcomeMode?: "full" | "toucan" | "off";
+  /** The toucan's question (owner, Nov 19): what's behind him. "mist" (grey, like the old welcome fog), "fog" (that fog's
+   *  colour for the time of day), "forest" (dark), "clear" (Today as it is). */
+  toucanAskBg?: "mist" | "fog" | "forest" | "clear";
+  /** How thick the mist is, 0 (light) to 1 (thick). */
+  toucanAskMist?: number;
+  /** The wise line under what you kept (off once you tap "hide"). */
+  toucanKeptQuote?: boolean;
   /** Back after this many hours since your last check-in: a "welcome back" screen (0 = never). */
   welcomeBackHours?: number;
   /** Your own "welcome back" greetings, one per line (they take turns with the built-in ones left on). */
@@ -392,4 +399,9 @@ export function subscribeFx(cb: () => void) {
 /** Is the welcome screen switched on? Off (paused) unless chosen in Settings › Welcome Screen. */
 export function welcomeOn(fx: FxSettings = loadFx()): boolean {
   return fx.welcomeMode === "full";
+}
+
+/** Is the toucan's question chosen instead of the full welcome screen (Settings › Welcome Screen)? */
+export function toucanAskOn(fx: FxSettings = loadFx()): boolean {
+  return fx.welcomeMode === "toucan";
 }

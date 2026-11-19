@@ -10,6 +10,8 @@ import dynamic from "next/dynamic";
 // The welcome screen is a big piece of code needed once a day: it loads on its own (started as soon as
 // it's due, behind the mist) instead of with every screen's first JavaScript (owner, Nov 12: "load faster").
 const loadWelcome = () => import("./WelcomeCard").then((m) => m.WelcomeCard);
+// The toucan's question (owner, Nov 19), in its own file: it loads only on the morning it asks.
+const ToucanQuestion = dynamic(() => import("./ToucanQuestion").then((m) => m.ToucanQuestion), { ssr: false });
 const WelcomeCard = dynamic(loadWelcome, { ssr: false });
 
 type WelcomeCtx = Awaited<ReturnType<typeof welcomeContextAction>>;
@@ -48,7 +50,7 @@ import { lineForDay } from "@/lib/greetings";
 import { backHours, greetingFor, ownLines } from "@/lib/welcome";
 import { voice } from "@/lib/toucan-style";
 import { readStyle } from "@/lib/toucan-style-store";
-import { loadFx, subscribeFx, welcomeOn } from "@/lib/celebration-fx";
+import { loadFx, subscribeFx, toucanAskOn, welcomeOn } from "@/lib/celebration-fx";
 import { clearFog, fogOn, liftFog, welcomeDue } from "@/lib/welcome-fog";
 
 const BACK_KEY = "welcome-back-at";
@@ -96,6 +98,7 @@ type Shown = { mode: "day" | "back"; award: WelcomeAward | null; ctx: Awaited<Re
 export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
   const router = useRouter();
   const [shown, setShownRaw] = useState<Shown | null>(null);
+  const [ask, setAsk] = useState(false);
   const setShown = (s: Shown | null) => setShownRaw(s && { ...s, seed: s.seed ?? `${Date.now()}:${Math.random()}` });
   // The mist comes first, always: before this page paints (arriving by a link inside the app,
   // where the page's own fog script doesn't run), fog it if the welcome screen is about to open.
@@ -182,6 +185,9 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
       liftFog();
       setPending(null);
       if (first) dailyCheckInAction(new Date().getTimezoneOffset()).catch(() => {});
+      // Or just the toucan, asking what's most important (owner, Nov 19), on the day's first visit.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage decides whether it asks
+      if (first && toucanAskOn() && !isEveningCheckInTime()) setAsk(true);
       return;
     }
     if (isEveningCheckInTime()) {
@@ -343,6 +349,7 @@ export function DailyLogin({ levelCap = 10 }: { levelCap?: number }) {
     };
   }, [router, levelCap, wake]);
 
+  if (ask) return <ToucanQuestion onClose={() => setAsk(false)} />;
   if (!shown) return null;
   const fx = loadFx();
   // A fresh greeting each time the screen opens (kept while it's open).

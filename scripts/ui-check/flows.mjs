@@ -42,6 +42,45 @@ export const FLOWS = [
     },
   },
   {
+    // The toucan's question (owner, Nov 19): just the toucan, over a grey mist, asking what's most important.
+    name: "toucanask",
+    timeoutMs: 300_000,
+    async run(h) {
+      await h.goto("/", { name: "toucanask" });
+      await h.page.evaluate(() => {
+        for (const k of ["daily-login", "welcome-pending", "daily-login-open", "welcome-back-at", "toucan-kept"]) localStorage.removeItem(k);
+        localStorage.setItem("evening-prompt-at", "off");
+        const fx = JSON.parse(localStorage.getItem("goalFxSaved") || "{}");
+        localStorage.setItem("goalFxSaved", JSON.stringify({ ...fx, welcomeMode: "toucan" }));
+      });
+      await h.page.reload();
+      await h.page.waitForSelector("[data-toucan-question]", { timeout: 15000 }).catch(() => {});
+      await h.settle(900);
+      if (!(await h.page.locator("[data-toucan-question]").count())) throw new Error("toucanask: the toucan's question didn't open on the day's first visit");
+      await h.check("the toucan's question");
+      await h.typeIn((p) => p.locator("[data-toucan-question] textarea").first(), "toucan's question answer");
+      await h.page.locator("[data-toucan-question] textarea").first().fill("Call Dad about Sunday");
+      await h.check("the toucan's question, answered");
+      await h.tap((p) => p.locator("[data-toucan-question]").getByRole("button", { name: /^keep it$/i }).first(), "keep it", { expectMove: true });
+      await h.settle(1200);
+      await h.check("kept: the floating target");
+      if (await h.tap((p) => p.getByRole("button", { name: /^what's most important today$/i }).first(), "open the kept target", { optional: true, expectMove: true })) {
+        await h.check("kept: open");
+        await h.tap((p) => p.locator("[data-kept-card]").getByRole("button", { name: /^close$/i }).first(), "kept: close asks", { optional: true, expectMove: true });
+        await h.check("kept: close asks first");
+        await h.tap((p) => p.locator("[data-kept-card]").getByRole("button", { name: /^shrink$/i }).first(), "kept: shrink", { optional: true, expectMove: true });
+      }
+      await h.goto("/settings?open=welcome-screen", { name: "toucanask-settings" });
+      await h.page.locator("[data-welcome-mode]").scrollIntoViewIfNeeded().catch(() => {});
+      await h.check("Settings › Welcome Screen: the toucan's question");
+      await h.goto("/settings?open=toucan-spirit", { name: "toucanask-look" });
+      if (await h.tap((p) => p.getByRole("button", { name: /^his look/i }).first(), "his look", { optional: true, expectMove: true })) {
+        await h.page.locator("[data-toucan-ask-bg]").scrollIntoViewIfNeeded().catch(() => {});
+        await h.check("Settings › His look: behind the toucan's question");
+      }
+    },
+  },
+  {
     name: "welcome",
     async run(h) {
       await h.goto("/", { welcome: true, name: "welcome" });
@@ -542,8 +581,9 @@ export const FLOWS = [
     name: "faces",
     async run(h) {
       await h.goto("/", { name: "faces" });
-      await h.toggle(/daily habits/i, "daily habits");
       const tick = h.page.locator(".habit-row [role=checkbox][aria-label^='Done: ']").first();
+      const head = h.page.locator("button[aria-expanded]", { hasText: /daily habits/i }).first();
+      if ((await head.getAttribute("aria-expanded").catch(() => null)) === "false") await h.toggle(/daily habits/i, "daily habits");
       if (await tick.count()) {
         await tick.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
         await h.settle(1600);
@@ -563,7 +603,7 @@ export const FLOWS = [
         await esc(h);
       }
       // A fail: a wise line, the faces, then Try again · Continue.
-      if (await h.tap((p) => p.getByRole("button", { name: /^actions for take out the trash$/i }).first(), "quest menu for fail", { optional: true })) {
+      if (await h.tap((p) => p.locator("li", { hasText: "AR class homework" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for fail")) {
         if (await h.tap((p) => p.getByRole("menuitem", { name: /^archive/i }).first(), "archive choices (fail)", { optional: true, expectMove: true })) {
           if (await h.tap((p) => p.getByRole("button", { name: /mark as failed/i }).first(), "fail form", { optional: true, expectMove: true })) {
             if (await h.tap((p) => p.getByRole("button", { name: /^mark failed$/i }).first(), "mark failed", { optional: true, expectMove: true })) {
