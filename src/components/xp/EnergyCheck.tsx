@@ -904,16 +904,27 @@ export function EnergyCheck({
             {/* Only what came with this check-in: written in the half hour before it, or since. */}
             {chipsFor(notes.filter((n) => sessionIds.has(n.id) || !("at" in n) || !n.at || !savedAt || new Date(n.at).getTime() >= new Date(savedAt).getTime() - 30 * 60_000))}
             {noteInput}
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]" style={{ color: "var(--t-cream)" }}>
-              {mounted && savedAt && <span style={{ opacity: 0.75 }}>✓ Checked in at {clock(savedAt)}</span>}
-              <button type="button" onClick={() => setEditing(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
+            {/* After a check-in: Edit it, or a new one behind its own button (owner, Nov 18: "check in again" was too faint;
+                no "+ event/tag" by a finished check-in, an "Edit check-in" button instead). */}
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-[13px]" style={{ color: "var(--t-cream)" }}>
+              {mounted && savedAt && <span className="w-full text-center font-semibold">✓ Checked in at {clock(savedAt)}</span>}
+              {full ? (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent("checkin-edit-latest"))}
+                  className="hover-glow h-8 rounded-full px-3.5 text-[13.5px] font-semibold"
+                  style={{ border: "1.5px solid var(--ec-line, rgba(217,180,95,.6))", color: "var(--t-cream)" }}
+                >
+                  Edit check-in
+                </button>
+              ) : (
+                <Link href="/insights#edit-checkin" className="hover-glow flex h-8 items-center rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1.5px solid var(--ec-line, rgba(217,180,95,.6))", color: "var(--t-cream)" }}>
+                  Edit check-in
+                </Link>
+              )}
+              <button type="button" onClick={() => setEditing(true)} className="hover-glow h-8 rounded-full px-3.5 text-[13.5px] font-bold" style={{ background: "var(--t-gold)", color: "#2a1c10" }}>
                 Check in again
               </button>
-              {full && !noting && (
-                <button type="button" onClick={() => setNoting(true)} className="underline underline-offset-2" style={{ color: "var(--t-gold)" }}>
-                  + Event or #tag
-                </button>
-              )}
             </div>
           </div>
         )}

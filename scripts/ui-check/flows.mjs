@@ -1001,6 +1001,22 @@ export const FLOWS = [
       if (await h.tap((p) => p.locator("[data-leaf-log]").first(), "leaf button", { optional: true, expectMove: true })) {
         await h.settle(500);
         await h.check("leaf: time wheels");
+        // Tap the chosen hour to type the time (owner, Nov 17).
+        {
+          const hour = await h.page.locator("[data-time-wheels] [role=spinbutton][aria-label=Hour]").first().boundingBox().catch(() => null);
+          if (hour) {
+            await h.page.mouse.click(hour.x + hour.width / 2, hour.y + 34 * 1.5);
+            const typed = await h.page.locator("[data-time-wheels] input[aria-label='Type a time']").first().waitFor({ timeout: 2000 }).then(() => true).catch(() => false);
+            if (!typed) h.record({ kind: "time-type", severity: "error", target: "time wheels", detail: "Tapping the chosen hour didn't open a field to type the time" });
+            else {
+              await h.page.keyboard.press("Control+A");
+              await h.page.keyboard.type("7:05 am");
+              await h.check("time wheels: typing a time");
+              await h.page.keyboard.press("Enter");
+              await h.settle(400);
+            }
+          }
+        }
         await h.tap((p) => p.getByRole("button", { name: /^log it$/i }).first(), "log it", { optional: true, expectMove: true });
         await h.settle(700);
         await h.check("leaf: logged");

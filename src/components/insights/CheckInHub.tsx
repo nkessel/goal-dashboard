@@ -1,7 +1,7 @@
 "use client";
 
 import { TimeToken } from "@/components/xp/NightFields";
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { saveOrQueue } from "@/lib/offline";
@@ -283,6 +283,19 @@ function CheckInLog({ readings, metrics, starred, onEdit }: { readings: Reading[
       router.refresh();
     });
   };
+  // "Edit check-in" (under the check-in, or from Today as /insights#edit-checkin) opens the latest one to change.
+  useEffect(() => {
+    const open = () => {
+      const latest = groupCheckIns(readings)[0];
+      if (latest) onEdit(latest);
+    };
+    if (window.location.hash === "#edit-checkin") {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      open();
+    }
+    window.addEventListener("checkin-edit-latest", open);
+    return () => window.removeEventListener("checkin-edit-latest", open);
+  }, [readings, onEdit]);
   // A day heading above the first check-in of each day (longer ranges only).
   const heads = groups.map((g, i) => (days > 1 && (i === 0 || dayWords(groups[i - 1].at) !== dayWords(g.at)) ? dayWords(g.at) : null));
   return (
