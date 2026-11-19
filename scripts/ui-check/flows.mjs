@@ -1046,6 +1046,35 @@ export const FLOWS = [
           } else await esc(h);
         }
       }
+      // A repeating event's quests share a look (owner, Nov 18): raise one gym session's XP, close the editor,
+      // and the card at the foot asks "Just this one · This and later · All".
+      {
+        const card = h.page.locator("[title^='Edit \"Gym with Sam']").first();
+        if (await card.count()) {
+          await card.click({ button: "right" }).catch(() => {});
+          await h.settle(400);
+          await h.check("event menu: failed-safe menu with ×");
+          if (await h.tap((p) => p.getByRole("menuitem", { name: /^edit quest$/i }).first(), "edit the gym quest", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.tap((p) => p.locator("[data-tour=fact-xp]").first(), "xp pill", { optional: true, expectMove: true });
+            await h.settle(400);
+            await h.tap((p) => p.locator("[data-tour=xp-row] button", { hasText: "+5" }).first(), "+5 XP", { optional: true });
+            await h.settle(900);
+            await h.page.keyboard.press("Escape");
+            const asked = await h.page.locator("[data-series-ask]").first().waitFor({ timeout: 6000 }).then(() => true).catch(() => false);
+            if (!asked) h.record({ kind: "series-ask", severity: "error", target: "series look", detail: "Changing one gym session's XP didn't ask about the other sessions" });
+            else {
+              await h.settle(500);
+              await h.check("series look: asks this one / later / all");
+              await h.page.locator("[data-series-ask] [data-scope=all]").first().click().catch(() => {});
+              const saved = await h.page.locator("[data-series-ask]", { hasText: "Saved for" }).first().waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+              if (!saved) h.record({ kind: "series-ask", severity: "error", target: "series look", detail: `After "All" the card never said it saved` });
+              else await h.check("series look: saved for all");
+              await h.settle(2200);
+            }
+          } else await esc(h);
+        } else h.record({ kind: "series-ask", severity: "warning", target: "series look", detail: "The gym quest wasn't on the week view" });
+      }
       // Seamless days (repeat ask 12): scroll sideways part of a day; it stays where it's left.
       await h.page.evaluate(() => document.querySelector(".cal-days-scroll")?.scrollBy({ left: 130 })).catch(() => {});
       await h.settle(900);
@@ -1057,7 +1086,7 @@ export const FLOWS = [
         if (await zoom.count()) {
           await zoom.evaluate((el) => {
             const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-            set.call(el, String(Math.round((Math.log(2.5) / Math.log(14)) * 1000)));
+            set.call(el, String(1000 - Math.round((Math.log(2.5) / Math.log(14)) * 1000)));
             el.dispatchEvent(new Event("input", { bubbles: true }));
           });
           await h.settle(1800);
@@ -1070,7 +1099,7 @@ export const FLOWS = [
           // Back to the week for the steps that follow.
           await zoom.evaluate((el) => {
             const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-            set.call(el, String(Math.round((Math.log(7) / Math.log(14)) * 1000)));
+            set.call(el, String(1000 - Math.round((Math.log(7) / Math.log(14)) * 1000)));
             el.dispatchEvent(new Event("input", { bubbles: true }));
           });
           await h.settle(1500);

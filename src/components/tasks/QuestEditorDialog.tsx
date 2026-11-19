@@ -877,6 +877,8 @@ export function QuestEditorDialog({
       if (completedNow) void Promise.resolve(saving).catch(() => {}).then(celebrateCompleted);
     }
     setPhase("closing");
+    // One of a repeating event's quests: ask whether its others should take this look (owner, Nov 18).
+    if (task) window.dispatchEvent(new CustomEvent("series-look-check", { detail: { taskId: task.id } }));
     setTimeout(onClose, embedded ? 0 : origin === "fab" ? 260 : 180);
   }
   /** Leaving a new quest with writing in it asks first: keep writing, save a draft, or discard. */

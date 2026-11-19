@@ -1,5 +1,6 @@
 "use client";
 
+import { EventQuestsSwitch } from "./EventQuestsSwitch";
 import { MagicCalendarIcon } from "@/components/ui/Icons";
 import { PaintTodayArt } from "./PaintTodayArt";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -330,6 +331,7 @@ export function CalendarLayers({
             <PaintTodayArt />
             {row("Finished quests", layers.done, () => set({ done: !layers.done }))}
             {row("All-day events", layers.allDay, () => set({ allDay: !layers.allDay }))}
+            {calendars.length > 0 && <EventQuestsSwitch />}
             <LookPicker
               label="Daily events (meals, wind-down…)"
               value={layers.essentials}

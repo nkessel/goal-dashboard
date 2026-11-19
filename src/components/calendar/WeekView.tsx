@@ -1624,24 +1624,25 @@ function DaysZoom({ span, isAdventure, onChange, onStep }: { span: number; isAdv
   );
   return (
     <span data-days-zoom className="ml-auto flex shrink-0 items-center gap-1" style={{ color: ink }}>
-      <button type="button" className={btn} aria-label="Fewer days (closer)" title="Fewer days (closer)" onClick={() => onStep(Math.max(1, Math.ceil(span - 0.01) - 1))}>
-        {glass(true)}
+      {/* Farther on the left, closer on the right (owner, Nov 17: "reverse the directionality"). */}
+      <button type="button" className={btn} aria-label="More days (farther)" title="More days (farther)" onClick={() => onStep(Math.min(MAX_SPAN, Math.floor(span + 0.01) + 1))}>
+        {glass(false)}
       </button>
       <input
         type="range"
         min={0}
         max={1000}
         step={1}
-        value={v}
+        value={1000 - v}
         aria-label="Days shown"
         aria-valuetext={spanWords(span)}
-        title="Slide for more or fewer days"
-        onChange={(e) => onChange(Math.exp((Number(e.target.value) / 1000) * LOG))}
+        title="Slide right to come closer, left for more days"
+        onChange={(e) => onChange(Math.exp(((1000 - Number(e.target.value)) / 1000) * LOG))}
         className="gilded-range w-24 sm:w-36 lg:w-48"
-        style={{ "--p": `${v / 10}%` } as React.CSSProperties}
+        style={{ "--p": `${(1000 - v) / 10}%` } as React.CSSProperties}
       />
-      <button type="button" className={btn} aria-label="More days (farther)" title="More days (farther)" onClick={() => onStep(Math.min(MAX_SPAN, Math.floor(span + 0.01) + 1))}>
-        {glass(false)}
+      <button type="button" className={btn} aria-label="Fewer days (closer)" title="Fewer days (closer)" onClick={() => onStep(Math.max(1, Math.ceil(span - 0.01) - 1))}>
+        {glass(true)}
       </button>
       <span className="w-[58px] text-right text-[12.5px] font-semibold tabular-nums">{spanWords(span)}</span>
     </span>

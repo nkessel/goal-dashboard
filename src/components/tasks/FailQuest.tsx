@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createQuestAction, failTaskAction } from "@/app/actions";
+import { markFailedNow } from "@/lib/failed-now";
 import type { Task } from "@/lib/data/types";
 
 /**
@@ -102,6 +103,7 @@ export function FailQuest({ task, onBack, onDone }: { task: Pick<Task, "id" | "t
         startTransition(async () => {
           try {
             await failTaskAction(task.id, reason);
+            markFailedNow(task.id);
             setFailed(true);
             router.refresh();
           } catch (err) {

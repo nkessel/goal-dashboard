@@ -1,5 +1,6 @@
 "use client";
 
+import { useFailedNow } from "@/lib/failed-now";
 import { isTentativeTitle } from "@/lib/tentative";
 import { createContext, useContext, useState } from "react";
 
@@ -105,7 +106,8 @@ export function CalendarTaskChip({
         <QuestCard
           task={task}
           box={box}
-          art={monsterImageUrl ?? (monsterEmoji ? null : creatureFor(task.id))}
+          // No portrait: a blank check circle, never a random creature (owner, Nov 16).
+          art={monsterImageUrl}
           emoji={monsterEmoji ?? null}
           timeLabel={timeLabel}
           warned={isWarned}
@@ -139,7 +141,9 @@ export function CalendarTaskChip({
     borderStyle: "solid",
     borderWidth: isAdventure ? 1.5 : isCompleted || isWarned ? 1 : 0,
     borderColor: isCompleted
-      ? "var(--t-good)"
+      ? task.failed_at
+        ? "#b5321f"
+        : "var(--t-good)"
       : isWarned
         ? "var(--t-warn)"
         : isAdventure
@@ -220,7 +224,7 @@ export function CalendarTaskChip({
             task.title
           )}
         </p>
-        {!oneLine && (show.xp || show.coins) && <Pays xp={show.xp ? task.xp_value : 0} coins={show.coins ? (task.coin_value ?? coinsForXp(task.xp_value)) : 0} done={isCompleted} center={tall} px={10.5 * (1 + (big - 1) * 0.6)} />}
+        {!oneLine && !task.failed_at && (show.xp || show.coins) && <Pays xp={show.xp ? task.xp_value : 0} coins={show.coins ? (task.coin_value ?? coinsForXp(task.xp_value)) : 0} done={isCompleted} center={tall} px={10.5 * (1 + (big - 1) * 0.6)} />}
         {show.time && timeLabel && !oneLine && !tall && (
           <p className="truncate leading-tight" style={{ color: "var(--t-ink-soft)", fontSize: 10.5 * (1 + (big - 1) * 0.6) }}>
             {timeLabel}
@@ -296,7 +300,10 @@ function QuestCard({
   portrait: boolean;
   onOpen: () => void;
 }) {
-  const done = task.status === "completed";
+  // Failed a moment ago on this page: looks failed before fresh data arrives.
+  const failedNow = useFailedNow(task.id);
+  const failed = !!task.failed_at || failedNow;
+  const done = task.status === "completed" || failedNow;
   const { w, h } = box;
   // The quests waiting behind it, as an agenda (owner, Nov 3: time with Dad, then what to bring up).
   const agenda = useContext(AgendaContext)[task.id] ?? [];
@@ -313,7 +320,8 @@ function QuestCard({
   // What it pays: XP and coins (done: what it paid). Shown on a line of its own when there's room, else at the end of a one-line card.
   const xpN = done ? (task.xp_awarded ?? task.xp_value) : task.xp_value;
   const coinN = task.coin_value ?? coinsForXp(xpN);
-  const pays = (show.xp && xpN > 0) || (show.coins && coinN > 0);
+  // A failed quest paid nothing: no XP line (owner, Nov 17: "failed quest shouldn't show as green").
+  const pays = !failed && ((show.xp && xpN > 0) || (show.coins && coinN > 0));
   // Narrow and tall enough: the creature stands above the title; a narrow one-hour card puts it beside, like the mockup.
   const stack = !line && (portrait || w < 130) && h >= 66;
   // With room to spare (a close-up on a big screen), the words and the creature grow with the card (owner, Nov 12:
@@ -340,7 +348,7 @@ function QuestCard({
     const need = whole ? Math.min(stack ? 3 : 2, Math.max(1, Math.ceil((task.title.length * tp * 0.5) / Math.max(1, (stack ? w : w * 0.62) - 8)))) : 1;
     return chrome + artNeed + Math.ceil(tp * 1.12 * need) + extras <= h ? f : null;
   };
-  const roomy = line ? 1 : roomyScale(w, h);
+  const roomy = line || (isTentativeTitle(task.title) && !done) ? 1 : roomyScale(w, h);
   let fit: Fit = { big: 0.8, time: false, place: false, doneNote: false, payLine: false };
   if (line) fit = { big: 1, time: false, place: false, doneNote: false, payLine: false };
   else
@@ -394,7 +402,7 @@ function QuestCard({
         e.stopPropagation();
         onOpen();
       }}
-      className={`cal-chip quest-card ${done ? "quest-card-done" : isTentativeTitle(task.title) ? "cal-tentative" : ""} flex h-full w-full min-w-0 overflow-hidden ${stack ? "flex-col items-center justify-start text-center" : "items-center text-left"}`}
+      className={`cal-chip quest-card ${done ? (failed ? "quest-card-failed" : "quest-card-done") : isTentativeTitle(task.title) ? "cal-tentative" : ""}${lookBg && !done ? " quest-card-look" : ""} flex h-full w-full min-w-0 overflow-hidden ${stack ? "flex-col items-center justify-start text-center" : "items-center text-left"}`}
       style={{
         gap: stack ? 3 : line ? 4 : 6,
         padding: line ? "1px 4px" : stack ? "5px 3px 4px" : "4px 6px 4px 4px",
@@ -406,11 +414,11 @@ function QuestCard({
         // Done just now: the check (or a failure's ✕) slams onto the card like the celebration's (owner, Nov 12).
         <span
           className={`quest-seal flex shrink-0 items-center justify-center rounded-full${justDone(task.completed_at) ? " cal-slam" : ""}`}
-          style={{ width: sealPx, height: sealPx, ...(task.failed_at ? { background: "radial-gradient(circle at 40% 35%,#d4543f,#8e2414)", boxShadow: "0 0 0 1.5px #6e1a0e" } : {}) }}
-          aria-label={task.failed_at ? "Failed" : "Completed"}
+          style={{ width: sealPx, height: sealPx, ...(failed ? { background: "radial-gradient(circle at 40% 35%,#d4543f,#8e2414)", boxShadow: "0 0 0 1.5px #6e1a0e" } : {}) }}
+          aria-label={failed ? "Failed" : "Completed"}
         >
           <svg width="62%" height="62%" viewBox="0 0 24 24" fill="none" aria-hidden>
-            {task.failed_at ? <path d="M7 7l10 10M17 7L7 17" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" /> : <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />}
+            {failed ? <path d="M7 7l10 10M17 7L7 17" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" /> : <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />}
           </svg>
         </span>
       ) : showArt ? (
@@ -441,11 +449,24 @@ function QuestCard({
               }}
             />
           ) : (
-            <span style={{ fontSize: artPx * 0.72, lineHeight: 1 }}>{emoji}</span>
+            emoji ? (
+              <span style={{ fontSize: artPx * 0.72, lineHeight: 1 }}>{emoji}</span>
+            ) : (
+              <svg width="78%" height="78%" viewBox="0 0 24 24" fill="none" aria-hidden data-blank-portrait>
+                <circle cx="12" cy="12" r="9.5" stroke="#8a6d3b" strokeWidth="1.5" opacity=".7" />
+                <path d="M8 12.4l2.7 2.7L16.2 9.4" stroke="#8a6d3b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity=".35" />
+              </svg>
+            )
           )}
         </span>
       ) : null}
       <span className={stack ? "w-full min-w-0" : "min-w-0 flex-1"}>
+        {/* The time on top, the title under it (owner, Nov 17: "show the time at the top of the cards"). */}
+        {timeLine && (
+          <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: smallPx, lineHeight: `${smallLine}px` }}>
+            {timeLabel}
+          </span>
+        )}
         <span
           lang="en" className="font-display [overflow-wrap:break-word] [hyphens:auto]"
           style={{
@@ -486,11 +507,6 @@ function QuestCard({
         {agendaBadge && (
           <span className="mt-0.5 inline-flex items-center rounded-full px-1.5 font-semibold" style={{ fontSize: 10, lineHeight: "14px", background: "rgba(168,138,63,.18)", color: "#7a5a1c" }}>
             Agenda {agenda.length}
-          </span>
-        )}
-        {timeLine && (
-          <span className="block truncate" style={{ color: "var(--t-ink-soft)", fontSize: smallPx, lineHeight: `${smallLine}px` }}>
-            {timeLabel}
           </span>
         )}
       </span>

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { addTaskSessionAction, completeTaskAction, createQuestAction, reopenTaskAction, unscheduleTaskAction } from "@/app/actions";
 import { FailQuest } from "@/components/tasks/FailQuest";
+import { CloseIcon } from "@/components/ui/Icons";
 import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { SlotPickerDialog } from "@/components/tasks/SlotPickerDialog";
 import { sessionRef } from "@/lib/calendar-task-window";
@@ -14,6 +15,7 @@ import { fromFeedback } from "@/lib/from-feedback";
 import { CardLookPicker } from "./CardLookPicker";
 import { DrivePicks } from "@/components/tasks/DrivePicks";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
+import { useFailedNow } from "@/lib/failed-now";
 
 export type MenuTarget = { kind: "task"; task: Task; start: Date; end: Date } | { kind: "event"; id: string; title: string; start: Date; end: Date };
 
@@ -27,6 +29,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
   const ref = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"menu" | "followup" | "look" | "place" | "fail">("menu");
   const place = useQuestPlace(target.kind === "task" ? target.task.id : undefined);
+  const failedNow = useFailedNow(target.kind === "task" ? target.task.id : undefined);
   const [minutes, setMinutes] = useState(15);
   const [title, setTitle] = useState(`Follow up: ${target.kind === "task" ? target.task.title : target.title}`.slice(0, 120));
   const [editing, setEditing] = useState<Task | null>(null);
@@ -110,6 +113,9 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
     <div ref={ref} role="menu" data-menu="calendar-item" className="parchment fixed z-[80] flex flex-col overflow-hidden py-1" style={{ left, top, width: W, borderRadius: 12, border: "1px solid #b39a6a", boxShadow: "0 12px 30px rgba(0,0,0,.35)" }}>
       {mode === "menu" ? (
         <>
+          <button type="button" aria-label="Close menu" onClick={onClose} className="absolute right-1 top-1 z-[2] flex h-7 w-7 items-center justify-center rounded-full hover:bg-black/5" style={{ color: "var(--t-ink-soft)" }}>
+            <CloseIcon size={12} />
+          </button>
           {target.kind === "task" && (
             <>
               <button type="button" role="menuitem" data-mi="open" className={item} style={{ color: "var(--t-ink)" }} onClick={() => setEditing(target.task)}>
@@ -178,7 +184,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
             Schedule follow-up quest
           </button>
           {/* Below the last divider (owner, Nov 13): failing a quest, or taking a failure back. */}
-          {target.kind === "task" && target.task.status !== "completed" && (
+          {target.kind === "task" && target.task.status !== "completed" && !failedNow && (
             <button type="button" role="menuitem" data-mi="fail" className={`${item} border-t`} style={{ color: "#8a2a1c", borderColor: "rgba(139,112,64,.25)" }} onClick={() => setMode("fail")}>
               ✕ Quest failure
             </button>
@@ -200,6 +206,13 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
               }
             >
               Undo quest failure
+            </button>
+          )}
+          {/* An event's menu always ends with Delete (owner, Nov 16 and Nov 18). It opens the event's own
+              delete question (just this day, or every repeat). */}
+          {target.kind === "event" && (
+            <button type="button" role="menuitem" data-mi="delete" className={`${item} border-t`} style={{ color: "#8a2a1c", borderColor: "rgba(139,112,64,.25)" }} onClick={() => (window.dispatchEvent(new CustomEvent("gcal-item", { detail: { id: target.id, action: "delete" } })), onClose())}>
+              Delete…
             </button>
           )}
           {error && (
