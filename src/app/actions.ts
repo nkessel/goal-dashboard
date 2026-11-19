@@ -3461,7 +3461,10 @@ export async function moveOffSchedulingAction(taskId: string, toToday: boolean) 
 export async function saveSchedulerSettingsAction(settings: Record<string, unknown>) {
   const ownerId = await requireProfileId();
   const clean = JSON.parse(JSON.stringify(settings ?? {}));
-  const { error } = await supabaseAdmin().from("profiles").update({ scheduler: clean }).eq("id", ownerId);
+  // Merged onto what's saved (planner step 2d): a copy from another tab or an older screen that lacks a part
+  // no longer wipes it ("Keep it here on lunch made it disappear").
+  const { data: cur } = await supabaseAdmin().from("profiles").select("scheduler").eq("id", ownerId).maybeSingle<{ scheduler: Record<string, unknown> | null }>();
+  const { error } = await supabaseAdmin().from("profiles").update({ scheduler: { ...(cur?.scheduler ?? {}), ...clean } }).eq("id", ownerId);
   if (error) throw new Error(/scheduler/.test(error.message) ? "Saved on this device (your account needs a quick database update to keep it everywhere)." : `Couldn't save: ${error.message}`);
 }
 

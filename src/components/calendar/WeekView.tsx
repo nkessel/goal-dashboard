@@ -124,6 +124,22 @@ export function WeekView({
   // 7 AM–10:30 PM by default; the hours before and after open from a button (owner, Nov 6: "The user should have to click a button to see before 7am and after 10:30pm").
   const [early, setEarly] = useState(false);
   const [late, setLate] = useState(false);
+  // Just placed at a time behind the early/late buttons (from a picker): open those hours so it's seen (planner step 2c).
+  useEffect(() => {
+    let at: string | null = null;
+    try {
+      at = window.sessionStorage.getItem("cal-reveal");
+      if (at) window.sessionStorage.removeItem("cal-reveal");
+    } catch {
+      /* storage unavailable */
+    }
+    if (!at) return;
+    const d = new Date(at);
+    const hr = d.getHours() + d.getMinutes() / 60;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from storage after a placement
+    if (hr < DAY_FROM) setEarly(true);
+    else if (hr >= DAY_UNTIL) setLate(true);
+  }, [tasks]);
   const H0 = early ? HOUR_START : DAY_FROM;
   const H1 = late ? HOUR_END + 1 : DAY_UNTIL;
   const [gripY, setGripY] = useState<number | null>(null);
