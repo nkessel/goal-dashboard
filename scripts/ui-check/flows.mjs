@@ -20,6 +20,28 @@ const esc = async (h) => {
 
 export const FLOWS = [
   {
+    // Paused by default (owner, Nov 17): the day's first visit opens no welcome screen; Settings can turn it back on.
+    name: "welcomeoff",
+    async run(h) {
+      await h.goto("/", { name: "welcomeoff" });
+      await h.page.evaluate(() => {
+        for (const k of ["daily-login", "welcome-pending", "daily-login-open", "welcome-back-at"]) localStorage.removeItem(k);
+        const fx = JSON.parse(localStorage.getItem("goalFxSaved") || "{}");
+        delete fx.welcomeMode;
+        localStorage.setItem("goalFxSaved", JSON.stringify(fx));
+      });
+      await h.page.reload();
+      await h.page.waitForTimeout(4000);
+      if (await h.page.locator("[data-welcome-root]").count()) throw new Error("welcomeoff: the welcome screen opened while switched off");
+      if (await h.page.evaluate(() => document.documentElement.hasAttribute("data-fog"))) throw new Error("welcomeoff: the mist stayed over Today");
+      await h.check("first visit, welcome screen off");
+      await h.goto("/settings?open=welcome-screen", { name: "welcomeoff-settings" });
+      if (!(await h.page.locator("[data-welcome-mode] button[aria-pressed=true]", { hasText: "Off" }).count())) throw new Error("welcomeoff: Settings doesn't show the welcome screen as Off");
+      await h.page.locator("[data-welcome-mode]").scrollIntoViewIfNeeded();
+      await h.check("Settings › Welcome Screen: Off");
+    },
+  },
+  {
     name: "welcome",
     async run(h) {
       await h.goto("/", { welcome: true, name: "welcome" });
@@ -238,12 +260,18 @@ export const FLOWS = [
       }
       // A habit with sub-habits: tapping its card shows them inside the card (owner, Nov 2).
       // (Daily Habits is already open from the toggle above; tapping its header again would close it.)
-      await h.tap(/^daily habits/i, "open daily habits", { optional: true, expectMove: true });
-      await h.page.getByText("Vitamins before 12pm").first().evaluate((el) => el.scrollIntoView({ block: "center" })).catch(() => {});
-      await h.settle(300);
-      if (await h.tap("text=Vitamins before 12pm", "habit sub-habits", { optional: true, expectMove: true })) {
+      // (Daily Habits is open from the toggle above.) Clicked from the page, since the card can sit under the bottom bar on a phone.
+      const vit = h.page.locator(".habit-row", { hasText: "Vitamins before 12pm" }).first().getByRole("button", { name: /Vitamins before 12pm/ }).first();
+      if (await vit.count()) {
+        await vit.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
+        await h.settle(600);
         await h.check("habit sub-habits open");
-        await h.tap("text=Vitamins before 12pm", "habit sub-habits close", { optional: true, expectMove: true });
+        // Idea D (owner, Nov 18): the count line under the name changes as one is ticked; a dotted thread joins the checks.
+        await h.page.locator(".habit-row", { hasText: "Vitamins before 12pm" }).first().getByRole("checkbox", { name: /^B12/ }).first().evaluate((el) => el.click()).catch(() => {});
+        await h.settle(600);
+        await h.check("habit sub-habit ticked");
+        await vit.evaluate((el) => el.click()).catch(() => {});
+        await h.settle(300);
       }
       // Schedule a quest from its ⋯ menu: the day drawn, tap a time (repeat ask 10).
       if (await h.tap((p) => p.getByRole("button", { name: /^quest actions$/i }).first(), "quest menu for schedule", { optional: true })) {
@@ -543,8 +571,9 @@ export const FLOWS = [
     },
   },
   {
-    // The new-adventurer walkthrough (owner, Nov 13): the intro, the practice quest made from +, the choice,
-    // then a real quest's name, ETA, XP guide and Save, then the screens tour.
+    // The new-adventurer walkthrough (owner, Nov 13–15): his first words and your name, the character painter,
+    // the two starter quests, Explore the realm (Today's parts, the screens, claimed with a celebration), then
+    // Create your first quest (name, time, due, reward with the XP guide, create, claim), and the end.
     name: "tour",
     async run(h) {
       await h.goto("/", { name: "tour" });
@@ -555,46 +584,87 @@ export const FLOWS = [
       await h.settle(900);
       if (!(await h.page.locator("[data-tour-card]").count())) throw new Error("Walkthrough card didn't show");
       await h.check("tour: intro");
-      // The toucan asks what to call you; snooze opens its choices in place.
+      // His welcome in the other two looks (the speech bubble shows him saying it).
+      for (const look of ["spirit", "page"]) {
+        await h.page.evaluate((l) => (localStorage.setItem("tour-look", l), window.dispatchEvent(new Event("tour-look-change"))), look);
+        await h.settle(500);
+        await h.check(`tour: intro, look ${look}`);
+      }
+      await h.page.evaluate(() => (localStorage.removeItem("tour-look"), window.dispatchEvent(new Event("tour-look-change"))));
+      await h.settle(300);
+      const card = (p) => p.locator("[data-tour-card]");
+      const next = async (label, shot) => {
+        await h.tap((p) => card(p).getByRole("button", { name: new RegExp(`^${label}`, "i") }), `tour: ${shot}`, { optional: true, expectMove: true });
+        await h.settle(700);
+        await h.check(`tour: ${shot}`);
+      };
+      // Snooze sits at the card's lower left and opens its choices in place.
       await h.tap((p) => p.getByRole("button", { name: /snooze or skip the walkthrough/i }), "tour: snooze choices", { expectMove: true });
       await h.check("tour: snooze choices");
       await h.tap((p) => p.getByRole("button", { name: /snooze or skip the walkthrough/i }), "tour: snooze choices closed", { optional: true });
       await h.page.locator("#tour-name").fill("Robin").catch(() => {});
-      await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: /^let's begin$/i }), "tour: begin", { expectMove: true });
-      await h.settle(1500);
-      await h.check("tour: practice quest, pointing at +");
+      await next("let's begin", "character");
+      if (!(await h.page.locator("[data-tour-character]").count())) throw new Error("Character painter missing from the walkthrough");
+      await h.typeIn((p) => p.locator("[data-tour-character] textarea").first(), "tour character", "A calm monk with a lantern");
+      await h.tap((p) => card(p).getByRole("radio", { name: /storybook/i }), "tour: art style", { optional: true });
+      await h.tap((p) => card(p).getByRole("button", { name: /tips for a great portrait/i }), "tour: portrait tips", { optional: true, expectMove: true });
+      await h.check("tour: character described");
+      // The fake database can't paint: skip the step, which sets out the two starter quests and tours the home screen.
+      await next("skip this step", "home: you");
+      for (const shot of ["home: due soon", "home: daily habits", "home: today's quests", "home: additional quests", "home: victories today"]) await next("next", shot);
+      await next("next", "two starter quests");
+      if ((await h.page.getByText(/explore the realm/i).count()) < 2) throw new Error("Starter quest “Explore the realm” isn't on Today");
+      await next("explore the realm", "explore: calendar");
+      for (const shot of ["explore: boards", "explore: insights", "explore: party", "explore: treasure chest", "explore: feedback"]) await next("next", shot);
+      await h.tap((p) => card(p).getByRole("button", { name: /claim this quest/i }), "tour: claim explore", { optional: true, expectMove: true });
+      await h.settle(2500);
+      await h.page.getByRole("button", { name: /^continue$/i }).first().click({ timeout: 3000 }).catch(() => {});
+      await h.page.keyboard.press("Escape").catch(() => {});
+      await h.settle(1200);
+      await h.check("tour: one quest left");
+      await next("create your first quest", "create: intro, pointing at +");
       await h.tap(/^create something new$/i, "tour: + ", { expectMove: true });
       await h.settle(500);
+      await h.check("create: tap New quest");
       await h.tap((p) => p.getByRole("button", { name: /^new quest/i }).first(), "tour: + › New quest", { optional: true, expectMove: true });
       await h.settle(900);
-      await h.check("tour: name it");
-      await h.typeIn((p) => p.locator('[role="dialog"][data-save-keys] [aria-label="Title"]').first(), "tour title", "Drink a glass of water");
+      await h.check("create: name it");
+      await h.typeIn((p) => p.locator('[role="dialog"][data-save-keys] [aria-label="Title"]').first(), "tour title", "Call the dentist");
+      await next("next", "create: how long");
+      await next("next", "create: due day");
+      await next("next", "create: reward, tap XP");
+      await h.tap((p) => p.locator('[role="dialog"][data-save-keys] [data-tour="fact-xp"]').first(), "tour: XP pill", { optional: true, expectMove: true });
+      await h.settle(500);
+      if (await h.page.locator('[data-xp-guide] button:not([aria-label="Hide this tip"])').count()) throw new Error("The XP tip still has buttons that fill the reward in");
+      await h.check("create: XP controls lit");
+      await next("next", "create: create it");
       await h.tap((p) => p.locator('[role="dialog"][data-save-keys] [data-submit]').first(), "tour: create quest", { optional: true, expectMove: true });
       await h.settle(2500);
-      await h.page.keyboard.press("Escape").catch(() => {});
+      await h.check("create: engage your quest");
+      await h.tap((p) => p.locator("[data-task-id]", { hasText: "Call the dentist" }).getByRole("button", { name: /^quest actions$/i }).first(), "tour: quest menu", { optional: true, expectMove: true });
+      await h.settle(500);
+      await h.tap((p) => p.getByRole("menuitem", { name: /engage quest/i }).first(), "tour: engage quest", { optional: true, expectMove: true });
+      await h.settle(900);
+      await h.check("create: one quest, nothing else");
+      await h.tap((p) => p.locator(".one-thing").getByRole("button", { name: /complete/i }).first(), "tour: complete in engage", { optional: true, expectMove: true });
+      await h.settle(2500);
       await h.page.getByRole("button", { name: /^continue$/i }).first().click({ timeout: 3000 }).catch(() => {});
+      await h.page.keyboard.press("Escape").catch(() => {});
       await h.settle(1200);
-      await h.check("tour: choice");
-      if (await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: /create a real quest/i }), "tour: create a real quest", { optional: true, expectMove: true })) {
-        await h.settle(600);
-        await h.tap(/^create something new$/i, "tour: + again", { expectMove: true });
+      await h.check("create: claim your first victory");
+      await h.tap((p) => p.getByRole("checkbox", { name: /complete create your first quest/i }).first(), "tour: claim create", { optional: true, expectMove: true });
+      await h.settle(2500);
+      await h.page.getByRole("button", { name: /^continue$/i }).first().click({ timeout: 3000 }).catch(() => {});
+      await h.page.keyboard.press("Escape").catch(() => {});
+      await h.settle(1200);
+      await h.check("tour: you're ready");
+      // The other two looks, on the last card.
+      for (const look of ["spirit", "page"]) {
+        await h.page.evaluate((l) => (localStorage.setItem("tour-look", l), window.dispatchEvent(new Event("tour-look-change"))), look);
         await h.settle(500);
-        await h.tap((p) => p.getByRole("button", { name: /^new quest/i }).first(), "tour: + › New quest again", { optional: true, expectMove: true });
-        await h.settle(900);
-        await h.check("tour: real name");
-        for (const [label, shot] of [["next", "tour: ETA"], ["next", "tour: XP"]]) {
-          await h.tap((p) => p.locator("[data-tour-card]").getByRole("button", { name: new RegExp(`^${label}$`, "i") }), `tour: ${label}`, { optional: true, expectMove: true });
-          await h.settle(500);
-          await h.check(shot);
-        }
-        // The XP guide in the editor's XP panel.
-        await h.tap((p) => p.locator('[role="dialog"][data-save-keys] [data-tour="fact-xp"]').first(), "tour: XP pill", { optional: true, expectMove: true });
-        await h.settle(500);
-        if (!(await h.page.locator("[data-xp-guide]").count())) throw new Error("XP guide missing from the XP panel");
-        await h.check("tour: XP guide");
-        await h.page.keyboard.press("Escape").catch(() => {});
-        await h.page.keyboard.press("Escape").catch(() => {});
+        await h.check(`tour: look ${look}`);
       }
+      await h.page.evaluate(() => (localStorage.removeItem("tour-look"), window.dispatchEvent(new Event("tour-look-change"))));
       // Leave the walkthrough finished for the flows after this one.
       await h.page.evaluate(() => localStorage.setItem("tour-state", JSON.stringify({ step: "end", done: true, at: Date.now() + 2e9 })));
     },
@@ -881,6 +951,14 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/calendar?view=week", { name: "calendar" });
       await h.settle(1200);
+      // The server's first picture (Nov 19, the loading glitch): only the days that will show, and no cards placed by
+      // the server's clock. Before the fix a day view sent 15 squeezed day columns, a week 21.
+      for (const [view, want] of [["day", 1], ["week", 7]]) {
+        const html = await h.page.request.get(new URL(`/calendar?view=${view}`, h.page.url()).href).then((r) => r.text()).catch(() => "");
+        const cols = (html.match(/data-cal-hit="/g) || []).length;
+        const cards = (html.match(/class="[^"]*cal-chip/g) || []).length;
+        if (html && (cols > want || cards > 0)) h.record({ kind: "first-picture", severity: "error", target: `calendar ${view}`, detail: `the server's page has ${cols} day columns (want ${want}) and ${cards} cards (want 0: cards are placed in the browser, in its time zone)` });
+      }
       await h.check("week");
       // 7 AM–10:30 PM by default, the rest behind a button each (owner, Nov 6), and the day headings pinned once scrolled (Nov 12).
       if (await h.tap((p) => p.locator("[data-hours='early']").first(), "before 7 AM", { optional: true, expectMove: true })) {

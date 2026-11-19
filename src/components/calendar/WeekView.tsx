@@ -72,6 +72,16 @@ export function useNowMinute() {
   );
 }
 
+/**
+ * Whether this is the browser, after hydration. The server's clock is in another time zone than the person's,
+ * so cards, essentials and the now-line placed there land hours off and React throws that picture away
+ * (Nov 19, the calendar's loading glitch). The server draws only the grid, hours and day headings.
+ */
+const noSubscribe = () => () => {};
+function useHydrated() {
+  return useSyncExternalStore(noSubscribe, () => true, () => false);
+}
+
 /** The fixed time column, while the days scroll under it: parchment, so the days slide behind it. */
 const TIME_BG = "linear-gradient(90deg, #f3e6c8 85%, #efe0bd)";
 
@@ -226,6 +236,7 @@ export function WeekView({
   const zoomAnim = useRef(0);
   const timeBg = isAdventure ? TIME_BG : "var(--t-card)";
   const nowMinute = useNowMinute();
+  const hydrated = useHydrated();
   const now = nowMinute ? new Date(nowMinute * 60_000) : null;
   const hourCount = Math.ceil(H1 - H0);
   const gridMinutes = (H1 - H0) * 60;
@@ -390,6 +401,14 @@ export function WeekView({
     };
   }, [HOUR_PX, H0, embedded]);
   const [colWidth, setColWidth] = useState(0);
+  // Until the screen is measured, only the days that will show are drawn, at equal widths. Drawing every loaded
+  // day (7 more each side, for scrolling) squeezed them all onto the screen: the "14-day view" flash (Nov 19).
+  const pre = seamless && colWidth <= 0;
+  const preFrom = pre ? buffer : 0;
+  const preTo = pre ? Math.min(days.length, buffer + vis) : days.length;
+  const nCols = preTo - preFrom;
+  const col = (i: number) => i - preFrom + 2;
+  const mapDrawn = <T,>(fn: (day: Date, i: number) => T) => days.map((day, i) => (i >= preFrom && i < preTo ? fn(day, i) : null));
   useLayoutEffect(() => {
     const el = boxRef.current;
     if (!el) return;
@@ -1040,7 +1059,7 @@ export function WeekView({
     | { kind: "task"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; task: Task }
     | { kind: "event"; key: string; dayIndex: number; top: number; bottom: number; start: Date; end: Date; event: GoogleCalendarEvent };
   const items: Item[] = [];
-  for (const event of events) {
+  for (const event of hydrated ? events : []) {
     if (event.isAllDay) continue;
     const start = new Date(event.start);
     const end = new Date(event.end);
@@ -1050,7 +1069,7 @@ export function WeekView({
     const top = offset(start, days[dayIndex]);
     items.push({ kind: "event", key: `e-${event.id}`, dayIndex, top, bottom: Math.max(top + 20, offset(end, days[dayIndex])), start, end, event });
   }
-  for (const task of tasks) {
+  for (const task of hydrated ? tasks : []) {
     if (!showsOnCalendar(task)) continue;
     const { start, end } = getTaskDisplayWindow(task);
     const dayIndex = days.findIndex((d) => isSameDay(d, start));
@@ -1209,12 +1228,12 @@ export function WeekView({
             ref={pinRowRef}
             className="grid"
             style={{
-              gridTemplateColumns: seamless && colWidth > 0 ? `40px repeat(${days.length}, ${colWidth}px)` : `40px repeat(${days.length}, minmax(0, 1fr))`,
+              gridTemplateColumns: seamless && colWidth > 0 ? `40px repeat(${days.length}, ${colWidth}px)` : `40px repeat(${nCols}, minmax(0, 1fr))`,
               columnGap: 2,
             }}
           >
             <div />
-            {days.map((day, i) => (
+            {mapDrawn((day, i) => (
               <div key={`pin-${day.toISOString()}`} className="flex flex-col items-center py-0.5 text-center">
                 {dayHead(day, i, !!now && isSameDay(day, now), true)}
               </div>
@@ -1249,7 +1268,7 @@ export function WeekView({
       <div
         className="grid"
         style={{
-          gridTemplateColumns: fluid?.w ? `40px repeat(${days.length}, ${fluid.w}px)` : seamless && colWidth > 0 ? `40px repeat(${days.length}, ${colWidth}px)` : `40px repeat(${days.length}, minmax(0, 1fr))`,
+          gridTemplateColumns: fluid?.w ? `40px repeat(${days.length}, ${fluid.w}px)` : seamless && colWidth > 0 ? `40px repeat(${days.length}, ${colWidth}px)` : `40px repeat(${nCols}, minmax(0, 1fr))`,
           gridTemplateRows: `auto repeat(${hourCount - 1}, ${HOUR_PX}px) ${lastRowPx}px`,
           columnGap: 2,
           transform: fluid?.dx ? `translateX(${fluid.dx}px)` : undefined,
@@ -1259,7 +1278,7 @@ export function WeekView({
       >
         <div />
         {/* The grip on the last day's edge: pull it in for narrower days (more of them), out for wider ones. */}
-        <div className="pointer-events-none relative z-[3]" style={{ gridColumn: (seamless ? Math.min(days.length, firstIdx + vis) : days.length) + 1, gridRow: 1 }}>
+        <div className="pointer-events-none relative z-[3]" style={{ gridColumn: (pre ? nCols : seamless ? Math.min(days.length, firstIdx + vis) : days.length) + 1, gridRow: 1 }}>
           {!seamless && <button
             type="button"
             onPointerDown={startDayResize}
@@ -1278,11 +1297,14 @@ export function WeekView({
             </span>
           )}
         </div>
-        {days.map((day, i) => {
+        {mapDrawn((day, i) => {
           const isToday = !!now && isSameDay(day, now);
           return (
+            // prefetch off: a link to this same screen with other search words makes Next fetch it again and
+            // again for as long as it shows (hundreds of requests a second, found Nov 16).
             <Link
               key={day.toISOString()}
+              prefetch={false}
               href={`/calendar?view=day&date=${formatDateParam(day)}`}
               draggable={false}
               onPointerDown={startDayScroll}
@@ -1293,7 +1315,7 @@ export function WeekView({
                 }
               }}
               className="relative z-[1] flex cursor-grab select-none flex-col items-center pb-1.5 text-center"
-              style={{ borderBottom: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, paddingTop: isAdventure ? 18 : undefined, gridColumn: i + 2, gridRow: 1 }}
+              style={{ borderBottom: `2px solid ${isAdventure ? "var(--t-panel-border)" : "var(--t-card-border)"}`, paddingTop: isAdventure ? 18 : undefined, gridColumn: col(i), gridRow: 1 }}
             >
               {isAdventure && isToday && <TodayCrest />}
               {dayHead(day, i, isToday, false)}
@@ -1301,15 +1323,15 @@ export function WeekView({
           );
         })}
 
-        {days.map((day, i) =>
+        {mapDrawn((day, i) =>
           now && isSameDay(day, now) ? (
             isAdventure ? (
-              single ? null : <div key={`hl-${i}`} aria-hidden className="quest-today pointer-events-none" style={{ gridColumn: i + 2, gridRow: `1 / ${hourCount + 2}`, margin: "0 -1px" }} />
+              single ? null : <div key={`hl-${i}`} aria-hidden className="quest-today pointer-events-none" style={{ gridColumn: col(i), gridRow: `1 / ${hourCount + 2}`, margin: "0 -1px" }} />
             ) : (
             <div
               key={`hl-${i}`}
               style={{
-                gridColumn: i + 2,
+                gridColumn: col(i),
                 gridRow: `2 / ${hourCount + 2}`,
                 background: isAdventure ? "rgba(209,161,60,.10)" : "var(--t-accent-soft)",
                 opacity: isAdventure ? 1 : 0.4,
@@ -1344,7 +1366,7 @@ export function WeekView({
           <div
             key={`line-${row}`}
             className="relative"
-            style={{ gridColumn: `2 / ${days.length + 2}`, gridRow: row + 2, borderTop: `1px solid ${lineColor}` }}
+            style={{ gridColumn: `2 / ${nCols + 2}`, gridRow: row + 2, borderTop: `1px solid ${lineColor}` }}
           >
 
           </div>
@@ -1356,12 +1378,12 @@ export function WeekView({
             task/event chips below so a chip occupying the same cell stacks
             visually on top and keeps first claim on pointer events there;
             dragging must start from genuinely empty space. */}
-        {days.map((_, dayIndex) => (
+        {mapDrawn((_, dayIndex) => (
           <div
             key={`hit-${dayIndex}`}
             data-cal-hit={dayIndex}
             className="relative select-none"
-            style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}`, cursor: 'url("/design/cursor-hand.svg") 11 3, pointer', touchAction: seamless ? "pan-x pan-y" : "pan-y" }}
+            style={{ gridColumn: col(dayIndex), gridRow: `2 / ${hourCount + 2}`, cursor: 'url("/design/cursor-hand.svg") 11 3, pointer', touchAction: seamless ? "pan-x pan-y" : "pan-y" }}
             onPointerDown={(e) => pickDown(e, dayIndex)}
             onPointerMove={(e) => {
               if (carried && e.pointerType === "mouse") setGhost({ dayIndex, min: minuteAt(e) });
@@ -1450,14 +1472,14 @@ export function WeekView({
         ))}
 
         {/* Items, placed to the minute, plus the current-time line */}
-        {days.map((day, dayIndex) => {
+        {mapDrawn((day, dayIndex) => {
           const dayItems = items.filter((it) => it.dayIndex === dayIndex);
           const nowTop = now && isSameDay(day, now) ? offset(now, day) : null;
           const showNow = nowTop !== null && nowTop > 0 && nowTop < gridMinutes;
           return (
-            <div key={`col-${dayIndex}`} className="pointer-events-none relative" style={{ gridColumn: dayIndex + 2, gridRow: `2 / ${hourCount + 2}` }}>
+            <div key={`col-${dayIndex}`} className="pointer-events-none relative" style={{ gridColumn: col(dayIndex), gridRow: `2 / ${hourCount + 2}` }}>
 
-              {daily && (
+              {daily && hydrated && (
                 <DailyBlocks
                   day={day}
                   daily={daily}

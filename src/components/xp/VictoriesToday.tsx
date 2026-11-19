@@ -119,6 +119,7 @@ export function VictoriesToday({
 
   return (
     <section
+      data-tour="victories"
       className={`relative flex flex-col rounded-2xl px-5 pb-3 pt-4 ${isAdventure ? "parchment parchment-framed" : ""}`}
       style={isAdventure ? undefined : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" }}
     >

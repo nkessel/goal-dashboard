@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "ui-check": "node scripts/ui-check/run.mjs"
+    "ui-check": "node scripts/ui-check/run.mjs",
+    "perf": "node scripts/perf/taps.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

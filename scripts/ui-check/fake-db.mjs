@@ -10,7 +10,7 @@
 // Usage: startFakeDb({ port, fixtures }) → { close, log, tables }
 import http from "node:http";
 import { readFileSync, readdirSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { newId as randomUUID, resetIds } from "./ids.mjs";
 
 const MIG_DIR = new URL("../../supabase/migrations/", import.meta.url);
 
@@ -63,7 +63,7 @@ function addColumn(t, def) {
 function defaultValue(col) {
   if (!col?.def) return null;
   const d = col.def.toLowerCase();
-  if (d.includes("gen_random_uuid") || d.includes("uuid_generate")) return randomUUID();
+  if (d.includes("gen_random_uuid") || d.includes("uuid_generate")) return randomUUID("w");
   if (d.startsWith("now") || d.includes("current_timestamp")) return new Date().toISOString();
   if (d.includes("current_date")) return new Date().toISOString().slice(0, 10);
   if (d === "true" || d === "false") return d === "true";
@@ -253,6 +253,7 @@ export function startFakeDb({ port = 54329, fixtures = {}, quiet = true } = {}) 
     for (const k of Object.keys(tables)) delete tables[k];
     for (const [name, rows] of Object.entries(fx)) tables[name] = rows.map((r) => fill(name, r));
   };
+  resetIds();
   seed(typeof fixtures === "function" ? fixtures() : fixtures);
 
   function embedRows(parentTable, row, e) {
@@ -343,6 +344,7 @@ export function startFakeDb({ port = 54329, fixtures = {}, quiet = true } = {}) 
     const wantsObject = accept.includes("vnd.pgrst.object");
     try {
       if (url.pathname === "/__reset") {
+        resetIds();
         seed(typeof fixtures === "function" ? fixtures() : fixtures);
         return respond(res, 200, { ok: true });
       }

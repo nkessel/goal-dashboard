@@ -4,7 +4,7 @@ import { FoldGroup } from "./FoldGroup";
 import { useEffect, useState, useRef } from "react";
 import { CastleArt } from "@/components/xp/CastleArt";
 import { CheckinIcon } from "@/components/xp/CheckinIcon";
-import { CHECKIN_ICONS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, checkinIconOf, checkinStyleOf, loadFx, saveFx, subscribeFx, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
+import { CHECKIN_ICONS, CHECKIN_STYLES, FAB_STYLES, FEEDBACK_HOLDS, FEEDBACK_STYLES, FX_DEFAULTS, PACES, checkinIconOf, checkinStyleOf, loadFx, saveFx, subscribeFx, welcomeOn, type FeedbackStyle, type FxSettings, EFFECTS_LEVELS } from "@/lib/celebration-fx";
 import { SentBurst } from "@/components/feedback/FeedbackDock";
 import { WelcomeCard } from "@/components/xp/WelcomeCard";
 import { welcomeContextAction } from "@/app/actions";
@@ -79,6 +79,18 @@ export function CelebrationSettings({ welcomeOnly = false }: { welcomeOnly?: boo
   if (welcomeOnly)
     return (
       <div className="flex flex-col gap-2" style={{ color: "var(--t-ink)" }}>
+        {/* On or off (owner, Nov 17: paused for now; the login still counts either way). */}
+        <div className="flex flex-wrap items-center gap-2" data-welcome-mode>
+          <span className="text-sm font-bold">Welcome screen</span>
+          {([["full", "On"], ["off", "Off"]] as const).map(([k, label]) => {
+            const on = (k === "full") === welcomeOn(fx);
+            return (
+              <button key={k} type="button" aria-pressed={on} className="hover-glow h-8 rounded-full px-3.5 text-[13px] font-bold" style={pick(on)} onClick={() => update({ welcomeMode: k })}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
         <FoldGroup title="When it opens" value={backHours(fx) ? `Every ${backHours(fx)} ${backHours(fx) === 1 ? "hour" : "hours"}` : "Once a day"}>
           <div className="flex flex-col gap-2">
         <p className="m-0 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>

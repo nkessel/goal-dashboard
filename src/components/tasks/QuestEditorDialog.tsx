@@ -1905,7 +1905,7 @@ export function QuestEditorDialog({
       <>
               {/* XP and coins */}
               <div className="flex flex-col gap-1">
-                {!doingNow && <XpGuide onPick={(x, c) => (setXp(x), setCoinValue(c))} />}
+                {!doingNow && <XpGuide />}
                 <div className="flex items-center gap-2">
                   <span className="flex flex-col items-start gap-0.5">
                     <span className={labelCls}>{isAdventure ? "XP reward" : "Points"}</span>
@@ -1933,7 +1933,7 @@ export function QuestEditorDialog({
                   </span>
                 </div>
                 {!doingNow && <StatSplitEditor xp={xp} split={statSplit} onChange={changeStatSplit} isAdventure={isAdventure} open={statsOpen} onOpenChange={setStatsOpen} />}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" data-tour="xp-row">
                   {/* −5 and +5 either side of the bar, the amount to its right. */}
                   <button type="button" onClick={() => (setXp(Math.max(0, xp - 5)), setXpOwn(true))} aria-label="5 XP less" title="−5 XP" className="xp-nudge flex h-9 shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-bold tabular-nums">
                     −5
@@ -2720,7 +2720,7 @@ export function QuestEditorDialog({
                     ))}
                     {/* When it's due, right on the surface; and once it has a date, an optional bonus for finishing early. */}
                     {!doingNow && !isCompleted && (
-                      <button type="button" onClick={() => setFactOpen((o) => (o === "due" ? null : "due"))} aria-expanded={factOpen === "due"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "due" ? "true" : undefined}>
+                      <button type="button" onClick={() => setFactOpen((o) => (o === "due" ? null : "due"))} aria-expanded={factOpen === "due"} className="qe-fact flex h-9 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold" data-open={factOpen === "due" ? "true" : undefined} data-tour="fact-due">
                         {/* eslint-disable-next-line @next/next/no-img-element -- card glyph */}
                         <img src="/design/ui-calendar.png" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" />
                         <span className="max-w-[210px] truncate">{dueChipWords}</span>
@@ -2773,7 +2773,7 @@ export function QuestEditorDialog({
                     </div>
                   )}
                   {factOpen === "due" && (
-                    <div key="due" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
+                    <div key="due" className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3" data-tour="panel-due">
                       <div className="flex flex-wrap items-center gap-1">
                         {dueQuickPicks().map((q) => (
                           <button key={q.label} type="button" aria-pressed={dueDate === q.day} onClick={() => setDueDate(q.day)} className="qe-fact h-8 rounded-full px-2.5 text-[13px] font-semibold" data-open={dueDate === q.day ? "true" : undefined}>
@@ -2815,7 +2815,7 @@ export function QuestEditorDialog({
                   )}
 
                   {factOpen && factOpen !== "due" && factOpen !== "bonus" && factOpen !== "place" && factOpen !== "look" && facts.includes(factOpen) && (
-                    <div key={factOpen} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3">
+                    <div key={factOpen} className="reveal qe-fact-panel flex flex-col gap-2 rounded-xl p-3" data-tour={`panel-${factOpen}`}>
                       {partNodes[factOpen]}
                     </div>
                   )}

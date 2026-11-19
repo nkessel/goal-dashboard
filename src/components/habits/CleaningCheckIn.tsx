@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { saveCleaningAction, setSpaceMessAction } from "@/app/actions";
 import { freshKey } from "@/lib/quest-drafts";
 import {
@@ -156,13 +156,30 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
     }
   }, [order]);
 
+  // A burst of gold sparks and a rising "+N XP" on the space that just paid (owner, Nov 16: "a celebration effect when gaining XP here").
+  const [burst, setBurst] = useState<{ id: string; xp: number; n: number } | null>(null);
+  const burstTimer = useRef<number | null>(null);
+  const celebrate = (id: string, xp: number) => {
+    setBurst((b) => ({ id, xp, n: (b?.n ?? 0) + 1 }));
+    if (burstTimer.current) window.clearTimeout(burstTimer.current);
+    burstTimer.current = window.setTimeout(() => setBurst(null), 1500);
+  };
+  // How the tray joins its card, while the owner picks one of three (Nov 16): kept per device until then.
+  useEffect(() => {
+    try {
+      const look = window.localStorage.getItem("cleaning-tray-look");
+      if (look === "b" || look === "c") document.documentElement.dataset.cleanTray = look;
+    } catch {}
+  }, []);
+
   function drag(it: Item, v: number) {
     let next: Cleaning = c;
     if (it.kind === "space") {
       // A space pays its share of its worth when made cleaner (owner, Nov 15); the server works it out.
       const space = c.spaces.find((s) => s.id === it.id);
       if (!space) return;
-      const { paid: paidToday } = spaceClean(space, day, v);
+      const { xp: gain, paid: paidToday } = spaceClean(space, day, v);
+      if (gain > 0) celebrate(it.id, gain);
       const was = c;
       next = { ...c, spaces: c.spaces.map((s) => (s.id === it.id ? { ...s, mess: v, level: levelOfTen(v), ratedOn: day, paid: paidToday } : s)) };
       setC(next);
@@ -206,7 +223,7 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
 
   const box = isAdventure ? { background: "linear-gradient(180deg, rgba(250,240,214,.96), rgba(238,222,186,.96))", border: "1.5px solid #b39a6a", boxShadow: "inset 0 1px 0 rgba(255,255,255,.5)" } : { background: "var(--t-card)", border: "1px solid var(--t-card-border)" };
   return (
-    <div {...holdStill}>
+    <div {...holdStill} data-clean-open={open ? "" : undefined}>
       {/* After the 20 minutes, one question, right under the habit (tray open or not). */}
       {askAfter && top && (
         <div className="reveal ml-7 mt-1 rounded-xl px-2.5 py-1.5" style={box}>
@@ -217,9 +234,9 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
           )}
         </div>
       )}
-      <div className="drawer-body" data-open={open ? "true" : "false"}>
+      <div className="drawer-body clean-drawer" data-open={open ? "true" : "false"}>
         <div className="drawer-inner" inert={!open}>
-          <div className="ml-7 mt-1 flex flex-col rounded-xl px-2.5 py-1.5" style={box}>
+          <div className="clean-tray flex flex-col px-2.5 py-1.5" style={box}>
             {error && (
               <p className="m-0 pb-1 text-[13px]" style={{ color: "var(--t-warn)" }}>
                 {error}
@@ -245,8 +262,16 @@ export function CleaningCheckIn({ initial, day, habitDone, isAdventure, open }: 
                       </button>
                       {/* What this space has paid today, as it grows (owner, Nov 15: cleaner pays XP at once). */}
                       {space?.paid?.on === day && space.paid.xp > 0 && (
-                        <span key={space.paid.xp} data-space-xp title="XP this space has paid today" className="due-in shrink-0 text-[12.5px] font-bold" style={{ color: "#3f7a2c" }}>
+                        <span key={space.paid.xp} data-space-xp title="XP this space has paid today" className="due-in relative shrink-0 text-[12.5px] font-bold" style={{ color: "#3f7a2c" }}>
                           +{space.paid.xp} XP
+                          {burst && burst.id === space.id && (
+                            <span key={burst.n} aria-hidden className="mess-burst">
+                              {[0, 45, 90, 135, 180, 225, 270, 315].map((a, j) => (
+                                <span key={a} className="mess-spark" style={{ "--a": `${a}deg`, "--d": `${18 + (j % 3) * 7}px` } as React.CSSProperties} />
+                              ))}
+                              <span className="mess-rise">+{burst.xp} XP</span>
+                            </span>
+                          )}
                         </span>
                       )}
                       {k === topKey && (

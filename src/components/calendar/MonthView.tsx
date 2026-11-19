@@ -69,6 +69,7 @@ export function MonthView({
             return (
               <Link
                 key={day.toISOString()}
+                prefetch={false}
                 href={`/calendar?view=day&date=${formatDateParam(day)}`}
                 className="flex aspect-square flex-col items-center gap-0.5 rounded-lg pt-1"
                 style={{

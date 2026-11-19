@@ -14,6 +14,26 @@ Then read `ui-check-out/report.md` (git-ignored). Every step has a screenshot in
 
 Exit code 1 means there are errors not in `scripts/ui-check/known-issues.json`.
 
+## Before/after compare (for splits and anything that shouldn't change a screen)
+
+```
+npm run ui-check -- --snapshot ui-check-out/before                 # on main, before the change
+# … make the change, rebuild …
+npm run ui-check -- --compare ui-check-out/before                  # walks again, lists every step whose page differs
+npm run ui-check -- --no-build --compare ui-check-out/before --only today,create   # just the flows you touched
+```
+
+- At every `check()` it saves the page as normalized HTML (`<step>.html.txt`, one element or text run per line) and a clean screenshot (`<step>.png`, no boxes) into the snapshot folder. `--compare` saves this run into `ui-check-out/snapshot-latest/` and adds a "Before/after compare" section to the top of `report.md`: each step that differs, how many lines, the first differing line with the elements around it, links to both screenshots and a `diff` command. Exit code 1 if any step differs or is missing.
+- Both modes stop the clock: in the check, in `next start` (`frozen.cjs` via `NODE_OPTIONS`) and in the browser, `Date.now()` and `new Date()` always return `--clock` (default `2026-11-18T12:00:00Z`; the morning and evening zones follow it). Timers still run. `Math.random` is seeded. The fake database's rows get counted ids instead of random ones (`ids.mjs`). So the dates in the shots are that day, not today.
+- What the normalizer drops, because it changes between two runs of the same code (`normalizeDom` in `snapshot.mjs`): scripts, styles and links; React's generated ids; server-action ids (they change when an action moves file); ids of rows the app makes itself (numbered by first appearance instead); build hashes in asset names; animation-driven inline styles (transform, opacity, transition, animation…); sub-pixel rounding in inline positions; anything inside an element with `data-clock` (put that on a live clock if one shows up as a difference).
+- Take the "before" and "after" with the same flags (`--only`, `--devices`, `--times`), or steps show as missing.
+- A difference means the screen changed: stop and find it. Never re-take the "before" to make a step pass.
+- `ui-check-out/` is git-ignored and a run only clears its own `shots/` and reports, so a baseline saved inside it stays.
+
+## Server time zone
+
+`--server-tz <zone>` runs `next start` in that zone (default: the morning zone). Use `--server-tz UTC` to match Vercel and catch server/browser mismatches: the calendar flow's `first-picture` check fetches the server's HTML for day and week view and flags more day columns than show, or cards drawn before the browser takes over.
+
 ## How it works
 
 - `scripts/ui-check/fake-db.mjs`: an in-memory stand-in for Supabase's REST API. It reads the tables' columns and defaults from `supabase/migrations/*.sql` and answers what supabase-js sends (selects with simple embeds, the filters the app uses, order/limit/range, single, count, insert/upsert/update/delete; rpc returns null). Anything it can't answer is listed under "Check limitations" in the report. Writes stay in memory; `POST /__reset` reseeds (each flow starts fresh).

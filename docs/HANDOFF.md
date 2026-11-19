@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file is the map: the standing rules, how to ship, and where everything else lives. It is loaded into every session, so **keep it short** (see "Keeping this file current"). If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-16 (handoff split into linked docs; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
+- **Last updated:** 2026-11-19 (welcome screen paused; handoff split into linked docs; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** the database is the full list (query in section 3; by screen in `docs/FEEDBACK-BY-SCREEN.md`). 316 open on Nov 12; many are already built but were never marked: check the code and `docs/SHIPPED.md` before building one again, and mark it. If the Supabase connector is missing, ask the owner to connect it (claude.ai Settings › Connectors).
 
@@ -19,7 +19,8 @@ Read these only when you need them. Don't load them all at the start.
 | `docs/FEEDBACK-OPEN.md`, `docs/HIGH-EFFORT.md` | The owner's open notes by area (to Nov 5); bigger asks that need a long, high-effort session. |
 | `docs/WAITING.md` | Before touching anything in section 0a below, and for parked ideas and things to remind the owner of. |
 | `docs/SHIPPED.md` | To learn how a feature was built, which files hold it, or whether an ask is already done. Search it (`grep -n`), don't read it whole. |
-| `docs/ui-check.md` | Running or extending the UI check. |
+| `docs/ui-check.md` | Running or extending the UI check, and its before/after compare (`--snapshot`, `--compare`) for splits. |
+| `docs/ACTIONS-SPLIT-PLAN.md` | Before splitting `src/app/actions.ts` (Run D), or adding a server action file. |
 | `docs/WIP-ux-synthesis.md`, `docs/ux/` | The UX teams' reviews and what's left from them. |
 
 The owner's Claude project also keeps a priorities list by model (Nov 16) in its project files: `planning/2026-11-16-dev-priorities-by-model.md` (not in this repo).
@@ -29,13 +30,13 @@ The owner's Claude project also keeps a priorities list by model (Nov 16) in its
 Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Read the topic's entry there before touching it. When something new waits on him (a design review, a pick), add it there with its branch, review page link and date, and add its name to this list.
 
 - `review/prioritize-bars` (taller Prioritize bars): built Nov 14, not UI-checked or reviewed.
-- `review/walkthrough-v2` (the rebuilt walkthrough): built Nov 15, review page sent, waiting on his OK or notes.
+- `review/additional-habits` (habits not on today in an "Additional habits" fold, still tickable): built Nov 18, review page sent.
 - `review/import-calendar` (import card A: a calendar time from Due, a landing line, no "To schedule" type): built Nov 16, review page sent.
-- `claude/project-thread-6rvbre` (cleaning XP: a cleaner meter pays its share of the space's worth; meters don't advance on their own): built Nov 16, review page sent.
-- Daily coursework as a habit: options A–D sent Nov 11.
-- Habits in the daily plan, part 2: not built yet (plan in WAITING).
+- `review/time-ranges-lesson-button` (time ranges for habits and quests, chosen habits in the auto-scheduler, Complete lesson button): built Nov 16, review page sent, waiting on his OK or notes.
+- Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
-- The email to Daniel about his Champion title: only after the app has a domain email address (owner, Nov 15), then his OK and wording.
+- The welcome screen is paused (off by default); a toucan-only version is next: mock it up first.
+- The email to Daniel about his Champion title: needs his OK and wording.
 - Waiting on his iPhone: a list of things cloud sessions can't check (in `docs/WAITING.md` and `docs/PRIORITIES.md`).
 - When weekly / monthly / yearly reviews are built: remind him of the lines he saved (in `docs/WAITING.md`).
 
@@ -133,6 +134,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - **Editors:** Ctrl/⌘+Enter and Ctrl/⌘+S save any dialog; × at top right; the quest editor autosaves when editing.
 - **The Great Toucan Spirit** (`components/toucan/`): a wise, compassionate guide. Never call it a "coach" or use clinical terms. Modes: simple, lite, full.
 - **Phones matter:** the owner uses an iPhone a lot. The page must not resize when the keyboard opens.
+- **Light in use (owner, Nov 16):** a `<Link>` to the current route with other search params gets `prefetch={false}` (it re-fetches in a loop otherwise); always-running animations go on an HTML element or a whole `<svg>`, never a shape inside one, with no `filter` on an ancestor. Measure with `npm run perf` (see `docs/SHIPPED.md`, Nov 16).
 - **React compiler lint:** no `Date.now()`/`Math.random()` in render (use `freshKey()` in `lib/quest-drafts.ts` or handlers); no components defined inside components; `setState` in an effect needs an eslint-disable with a reason; no Tailwind `translate-*` on elements whose keyframes animate `transform`.
 
 ---

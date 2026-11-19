@@ -49,5 +49,6 @@ export function hideTip(id: string) {
 /** Start the walkthrough again from the top (Settings › Help). */
 export function restartTour() {
   const t = readTour();
-  writeTour({ step: "intro", done: false, hidden: t?.hidden ?? [] });
+  // Tips you closed stay closed; the walkthrough's own progress marks (they start with _) start over.
+  writeTour({ step: "intro", done: false, hidden: (t?.hidden ?? []).filter((h) => !h.startsWith("_")), name: t?.name ?? null });
 }

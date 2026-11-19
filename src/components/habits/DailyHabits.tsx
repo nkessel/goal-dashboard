@@ -1,7 +1,6 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
-import { progressWords } from "@/lib/progress-words";
 import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -384,6 +383,7 @@ export function DailyHabits({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        data-tour="daily-habits"
         // Open, the header and its tray read as one section: one border around both.
         className={`drawer-header relative flex min-h-[58px] w-full flex-col items-center justify-center overflow-hidden px-12 py-2.5 transition-[border-radius] duration-200 ${open ? "rounded-t-2xl" : "rounded-2xl"}`}
         style={
@@ -598,7 +598,21 @@ export function DailyHabits({
                           ★
                         </span>
                       )}
-                      {h.title}
+                      {/* A habit with sub-habits: a small caret after its name opens them in place (owner, Nov 18: idea D). The cleaning habit has none. */}
+                      {h.id !== cleanId && subsOf(h).length > 0 ? (
+                        // The caret stays with the name's last word, so it never sits alone on a line.
+                        <>
+                          {h.title.replace(/\S+$/, "")}
+                          <span className="whitespace-nowrap">
+                            {h.title.match(/\S+$/)?.[0]}
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="ml-1.5 inline-block align-middle opacity-60 transition-transform duration-300" style={{ transform: openSubs.has(h.id) ? "rotate(180deg)" : undefined }}>
+                              <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </span>
+                        </>
+                      ) : (
+                        h.title
+                      )}
                       {h.id === cleanId && cleaning && (
                         <>
                           {cleanTop ? ": " : ""}
@@ -607,36 +621,36 @@ export function DailyHabits({
                               {cleanTop.icon} {cleanTop.name}
                             </span>
                           )}
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden className="ml-1.5 inline-block align-middle opacity-60 transition-transform duration-300" style={{ transform: cleanOpen ? "rotate(180deg)" : undefined }}>
-                            <path d="M5.5 9l6.5 6.5L18.5 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
                         </>
                       )}
                     </span>
                     {/* How long it takes sits by the XP (owner, Nov 2); this line only when there's a time of day or a note. */}
-                    {(h.description || scheduleLabel(h)) && (
-                      <span className="block text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-                        {[scheduleLabel(h), h.description].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
+                    {(() => {
+                      // How many sub-habits, under the name with its time and note (owner, Nov 18): "3 habits"; once one is
+                      // ticked, "2 of 3 left" with the quest cards' gold bar; then "✓ all done". The cleaning habit has none.
+                      const subs = h.id === cleanId ? [] : subsOf(h);
+                      const n = subs.filter((st) => ticked(h, st.id)).length;
+                      const count = !subs.length ? "" : n >= subs.length ? "✓ all done" : n === 0 ? `${subs.length} habit${subs.length === 1 ? "" : "s"}` : `${subs.length - n} of ${subs.length} left`;
+                      const rest = [scheduleLabel(h), h.description].filter(Boolean).join(" · ");
+                      if (!count && !rest) return null;
+                      return (
+                        <span className="flex flex-wrap items-center gap-x-1.5 text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+                          {count && <span className="tabular-nums">{count}</span>}
+                          {n > 0 && n < subs.length && (
+                            <span
+                              aria-hidden
+                              className="h-1.5 w-14 overflow-hidden rounded-full"
+                              style={{ background: isAdventure ? "#2a2416" : "var(--t-card-border)", border: isAdventure ? "1px solid #8a6c2c" : undefined, boxShadow: isAdventure ? "inset 0 1px 2px rgba(0,0,0,.5)" : undefined }}
+                            >
+                              <span className="block h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.round((n / subs.length) * 100)}%`, background: isAdventure ? "linear-gradient(180deg, #f8e3a0, #d9b45f 55%, #a88a3f)" : "var(--t-accent)" }} />
+                            </span>
+                          )}
+                          {count && rest && <span aria-hidden>·</span>}
+                          {rest && <span>{rest}</span>}
+                        </span>
+                      );
+                    })()}
                   </button>
-                  {subsOf(h).length > 0 && (
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onClick={() => setOpenSubs((o) => { const n = new Set(o); if (n.has(h.id)) n.delete(h.id); else n.add(h.id); return n; })}
-                      aria-expanded={openSubs.has(h.id)}
-                      aria-label={`${openSubs.has(h.id) ? "Hide" : "Show"} the sub-habits of ${h.title}`}
-                      className="relative z-[1] flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-[12.5px] font-semibold tabular-nums hover:bg-black/[.05]"
-                      style={{ color: "var(--t-ink-soft)", border: "1px solid rgba(139,112,64,.35)" }}
-                    >
-                      {progressWords(subsOf(h).filter((st) => ticked(h, st.id)).length, subsOf(h).length, "sub-habit")}
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform" style={{ transform: openSubs.has(h.id) ? "rotate(90deg)" : undefined }}>
-                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  )}
                   <span className="relative z-[1] flex shrink-0 flex-col items-end gap-0.5">
                     {h.estimate_minutes ? (
                       <span className="flex items-center gap-1 text-[12.5px] font-semibold tabular-nums leading-none" style={{ color: "var(--t-ink-soft)" }} title={`About ${h.estimate_minutes} minutes`}>
