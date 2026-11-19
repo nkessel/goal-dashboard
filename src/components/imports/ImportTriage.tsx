@@ -15,7 +15,7 @@ import type { ImportCard } from "@/lib/data/import-cards";
 import { useEscape } from "@/lib/use-escape";
 import { DateField } from "@/components/ui/DateField";
 import { SnoozePicker, type SnoozeChoice } from "@/components/tasks/SnoozePicker";
-import { ESTIMATE_PICKS, StepsGlyph, dueChipLabel, dueQuickPicks, shortTime, slotWords } from "@/components/tasks/QuestEditorDialog";
+import { ESTIMATE_PICKS, StepsGlyph, dueChipLabel, shortTime, slotWords } from "@/components/tasks/QuestEditorDialog";
 import { WhenPicker } from "@/components/calendar/WhenPicker";
 import { IconScale } from "@/components/tasks/IconScale";
 import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
@@ -29,7 +29,7 @@ import { CoinIcon } from "@/components/ui/Icons";
 import { NumberInput } from "@/components/ui/NumberInput";
 import type { Task } from "@/lib/data/types";
 import { quickPlanDays } from "@/lib/schedule-horizon";
-import { ScheduleWithin as SchedRate } from "@/components/tasks/ScheduleWithin";
+import { ScheduleWithin as SchedRate, withinLabel } from "@/components/tasks/ScheduleWithin";
 
 /*
  * Sorting imports, one card at a time: Import, Snooze or Skip. Import walks
@@ -274,7 +274,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     setFocusId(c.id);
     const d = draftFor(c);
     const a = attrsOf(c.id);
-    const full: Draft = { ...d, boardId: a.board === undefined ? findBoard(boards, c.board_hint)?.id : a.board, minutes: a.minutes === undefined ? d.minutes : a.minutes, due: a.due === undefined ? d.due : a.due, importance: a.importance || d.importance, rated: d.rated || !!a.slot };
+    const full: Draft = { ...d, boardId: a.board === undefined ? findBoard(boards, c.board_hint)?.id : a.board, minutes: a.minutes === undefined ? d.minutes : a.minutes, due: a.due === undefined ? d.due : a.due, importance: a.importance || d.importance, rated: d.rated || !!a.slot || !!(a.due === undefined ? d.due : a.due) };
     // Everything already set on the card's pills: import it straight away, no questions.
     if (!all && withAttrs(full.kind) && baseFor(full).length === 0) return save(full, c);
     setDraft(full);
@@ -367,14 +367,16 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     if (!card || !dIn) return;
     const d = dIn;
     const due = d.due || null;
-    const dueAt = due ? new Date(`${due}T23:59`).toISOString() : null;
+    // Fixed: a due date (and onto the list, to be placed before it). Flexible: only the list's aim (owner, Nov 18).
+    const firm = due ? firmOf(attrsOf(card.id), due) : false;
+    const dueAt = due && firm ? new Date(`${due}T23:59`).toISOString() : null;
     const daysOut = due ? Math.round((new Date(`${due}T12:00`).getTime() - new Date(`${inDays(0)}T12:00`).getTime()) / 86_400_000) : null;
     const soonest = [daysOut, d.planDays ?? null].filter((x): x is number => x !== null);
     const near = soonest.length ? Math.min(...soonest) : null;
     const urgency = d.urgency ?? (near === null ? null : near <= 0 ? 5 : near === 1 ? 4 : near <= 7 ? 3 : 2);
     // A time picked on the card puts it straight on the calendar, so it doesn't also wait on the list to schedule.
     const slot = withAttrs(d.kind) && d.kind !== "done" ? (attrsOf(card.id).slot ?? null) : null;
-    const planBy = d.kind !== "habit" && !slot && typeof d.planDays === "number" ? new Date(`${inDays(d.planDays)}T23:59`).toISOString() : null;
+    const planBy = d.kind === "habit" || slot ? null : due ? new Date(`${due}T23:59`).toISOString() : typeof d.planDays === "number" ? new Date(`${inDays(d.planDays)}T23:59`).toISOString() : null;
     const from = inDays(0);
     const habitTiming =
       d.often === "weekdays"
@@ -427,7 +429,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
             const day = localDayKey(new Date(slot.start));
             say(`“${d.title}” is on your calendar ${slotWords(slot)}`, undefined, { label: "See it", run: () => (setToast(null), router.push(`/calendar?view=day&date=${day}`)) });
           } else if (planBy) {
-            const within = typeof d.planDays === "number" ? withinWords(d.planDays) : "soon";
+            const within = due ? `${firm ? "by" : "around"} ${dueChipLabel(due)}` : typeof d.planDays === "number" ? withinWords(d.planDays) : "soon";
             say(`“${d.title}” is on the auto-scheduler's list (${within})`, undefined, { label: "Auto-schedule now", run: () => autoNow(made.id, d.title, d.minutes ?? null, dueAt, planBy) });
           } else {
             say(`Added “${d.title}”${board ? ` to ${board.title}` : ""} · not on your calendar`);
@@ -734,8 +736,8 @@ function CardView({ card, frame, onEdit, onRetag, onRate, attrs, shownAttrs, onA
           ))}
         </div>
       )}
-      {rateable(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} />}
-      {withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} />}
+      {rateable(card.kind) && !withAttrs(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} />}
+      {withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} onRate={onRate} />}
       {(card.source_label || card.source_text) && (
         <div className="flex flex-col gap-1">
           <button type="button" onClick={() => setSource(!source)} disabled={!card.source_text} aria-expanded={source} className="flex items-center gap-1 self-start text-[12.5px]" style={{ color: "#7a6440" }}>
@@ -795,7 +797,7 @@ function LandsLine({ card, attrs }: { card: ImportCard; attrs: Attrs }) {
     const boardId = attrs.board === undefined ? (findBoard(boards, card.board_hint)?.id ?? null) : attrs.board;
     const board = boards.find((b) => b.id === boardId);
     const due = attrs.due === undefined ? (card.due_on ?? null) : attrs.due;
-    words = landsWords(board?.title ?? null, attrs.slot ?? null, card.plan_within_days ?? null, due);
+    words = landsWords(board?.title ?? null, attrs.slot ?? null, card.plan_within_days ?? null, due, firmOf(attrs, due));
   }
   return <>{words}</>;
 }
@@ -805,19 +807,20 @@ function LandsLine({ card, attrs }: { card: ImportCard; attrs: Attrs }) {
  * that the user knows what's happening to it when they accept the import"). Nothing goes on the calendar
  * without the user's own pick: a picked time puts it there; "Schedule within" puts it on the auto-scheduler's list.
  */
-export function landsWords(board: string | null, slot: { start: string; end: string } | null, withinDays: number | null, due: string | null): string {
+export function landsWords(board: string | null, slot: { start: string; end: string } | null, withinDays: number | null, due: string | null, firm = true): string {
   const where = board ? `Goes on the ${board} board and in Additional Quests` : "Goes in Additional Quests";
-  const by = due ? `, due ${dueChipLabel(due)}` : "";
-  if (slot) return `${where}${by}, and on your calendar ${slotWords(slot)}.`;
-  if (withinDays != null) return `${where}${by}, and onto the auto-scheduler's list to get a time ${withinWords(withinDays)}. It won't be on your calendar until you Auto-schedule it.`;
-  return `${where}${by}. Not on your calendar.`;
+  const by = due ? (firm ? `, to be done by ${dueChipLabel(due)} (fixed)` : `, aiming for ${dueChipLabel(due)}`) : "";
+  const later = " It won't be on your calendar until you Auto-schedule it.";
+  if (slot) return `${where}, and on your calendar ${slotWords(slot)}${by}.`;
+  if (due) return `${where}, and onto the auto-scheduler's list ${firm ? `to be placed before ${dueChipLabel(due)} (fixed)` : `to get a time around ${dueChipLabel(due)}`}.${later}`;
+  if (withinDays != null) return `${where}, and onto the auto-scheduler's list to get a time ${withinWords(withinDays)}.${later}`;
+  return `${where}. Not on your calendar.`;
 }
 
 /** "within a week", "today", "within 2 weeks": the Schedule within pick, as the end of a sentence. */
 function withinWords(days: number): string {
   if (days <= 0) return "today";
-  const o = planOptions().find((x) => x.days === days);
-  const label = (o?.label ?? `${days} days`).toLowerCase();
+  const label = rangeLabel(days).toLowerCase();
   return label.startsWith("within") || label.startsWith("this") ? label : `within ${label}`;
 }
 
@@ -1481,9 +1484,9 @@ function ListRow({ card, first, onEdit, onRetag, onRate, attrs, shownAttrs, onAt
       <SubQuests card={card} small attrs={attrs} onAttrs={onAttrs} />
       <FileChips files={card.attachments} />
       <KindPicker open={picking} kind={card.kind} onPick={(k) => (onRetag(k), setPicking(false))} />
-      {rateable(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} small />}
+      {rateable(card.kind) && !withAttrs(card.kind) && <SchedRate days={card.plan_within_days} onRate={onRate} small />}
       {/* The pills get the row's whole width; Import sits under them at the right. */}
-      {withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} small />}
+      {withAttrs(card.kind) && <AttrPills card={card} attrs={attrs} shown={shownAttrs} onChange={onAttrs} onRate={onRate} small />}
       <span className="text-[11.5px] leading-snug" style={{ color: "#6b5631" }}>
         <LandsLine card={card} attrs={attrs} />
       </span>
@@ -2007,12 +2010,12 @@ const addLabel = (d: Draft) => (d.kind === "habit" ? "Add the habit" : d.kind ==
 // `.qe-fact` pills, `.qe-fact-panel` panels, the editor's XP bar and coin stepper, Due picks, Time picks and IconScale.
 
 /** A quest's details picked on the card, before importing. Kept on this device by card id. */
-type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; /** Coins a sub-quest pays when done, by its name. */ stepCoins?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null; /** A time on the calendar, picked on the card (owner, Nov 15); placed right after import. */ slot?: { start: string; end: string } | null };
+type Attrs = { /** XP a sub-quest pays when done, by its name. */ stepXp?: Record<string, number>; /** Coins a sub-quest pays when done, by its name. */ stepCoins?: Record<string, number>; xp?: number; coins?: number; due?: string | null; tiny?: boolean; minutes?: number | null; importance?: number; energy?: number; effort?: number; /** A board id; null: no board; unset: the note's suggestion. */ board?: string | null; /** A time on the calendar, picked on the card (owner, Nov 15); placed right after import. */ slot?: { start: string; end: string } | null; /** The date is Fixed (has to be done by then) or Flexible (a goal); owner, Nov 18. Unset: a date from the notes reads as Fixed. */ firm?: boolean };
 type AttrKey = "reward" | "time" | "due" | "tiny" | "importance" | "board";
 const ATTRS: { key: AttrKey; label: string }[] = [
   { key: "reward", label: "XP & coins" },
   { key: "time", label: "Time" },
-  { key: "due", label: "Due date" },
+  { key: "due", label: "When" },
   { key: "importance", label: "Importance" },
   { key: "board", label: "Board" },
 ];
@@ -2080,13 +2083,13 @@ function CalendarRow({ title, minutes, slot, onSlot }: { title: string; minutes:
       <div className="flex min-h-8 items-center gap-2">
         <Glyph src="/design/ui-calendar.png" />
         <span className="shrink-0 text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
-          Calendar
+          {slot ? "On your calendar" : "Pick a time"}
         </span>
         <span className="min-w-0 flex-1 truncate text-[13px] tabular-nums" style={{ color: slot ? "var(--t-ink)" : "var(--t-ink-soft)" }}>
-          {slot ? slotWords(slot) : "Not on it yet"}
+          {slot ? slotWords(slot) : "optional"}
         </span>
         <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="qe-fact flex h-8 shrink-0 items-center rounded-full px-3 text-[12.5px] font-semibold" data-open={open ? "true" : undefined}>
-          {slot ? "Change" : "Find a time"}
+          {slot ? "Change" : "Open the day"}
         </button>
         {slot && (
           <button type="button" onClick={() => (onSlot(null), setOpen(false))} aria-label="Take it off the calendar" title="Take it off the calendar" className="h-8 w-6 shrink-0 leading-none" style={{ color: "var(--t-ink-soft)" }}>
@@ -2105,7 +2108,110 @@ function CalendarRow({ title, minutes, slot, onSlot }: { title: string; minutes:
   );
 }
 
-function AttrPills({ card, attrs, shown, onChange, small = false }: { card: ImportCard; attrs: Attrs; shown: AttrKey[]; onChange: (a: Attrs) => void; small?: boolean }) {
+/** Fixed unless set otherwise: a date the notes gave reads as Fixed; a date picked here starts Flexible. */
+const firmOf = (attrs: Attrs, due: string | null) => (due ? (attrs.firm ?? true) : false);
+/** The When panel's ranges, in the owner's words (Nov 18: "within a week" etc). */
+const RANGES = [
+  { label: "Within a week", days: 7 },
+  { label: "Within 2 weeks", days: 14 },
+  { label: "Within a month", days: 30 },
+];
+const rangeLabel = (n: number) => RANGES.find((r) => r.days === n)?.label ?? withinLabel(n);
+const weekdayOf = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: "short" });
+
+/** The When pill's words: "Within a week", "Around Fri", "By Fri", "Thu 3pm", or "When". */
+function whenFace(withinDays: number | null, due: string | null, firm: boolean, slot: { start: string; end: string } | null): string {
+  const by = due ? `${firm ? "By" : "Around"} ${dueChipLabel(due)}` : withinDays != null ? rangeLabel(withinDays) : null;
+  const at = slot ? `${weekdayOf(slot.start)} ${shortTime(slot.start).replace(":00", "")}` : null;
+  return [by, at].filter(Boolean).join(" · ") || "When";
+}
+
+/**
+ * When, on the import card (owner, Nov 18: "the scheduling / due date situation is too complex", then picked
+ * layout 5c and the words Flexible / Fixed): one "Complete by" question. A range ("Within a week") or a day;
+ * once one is set, "This date is Flexible · Fixed"; then an optional time on the calendar.
+ * Flexible: the auto-scheduler aims for it and it never reads late. Fixed: it has to be done by then.
+ */
+function WhenPanel({ card, attrs, due, minutes, set, onRate }: { card: ImportCard; attrs: Attrs; due: string | null; minutes: number | null; set: (p: Attrs) => void; onRate: (days: number | null) => void }) {
+  const within = card.plan_within_days ?? null;
+  const firm = firmOf(attrs, due);
+  const [other, setOther] = useState(false);
+  const days = [
+    { label: "Today", day: inDays(0) },
+    { label: "Tomorrow", day: inDays(1) },
+  ];
+  const ranges = RANGES;
+  const pill = (on: boolean): React.CSSProperties => ({ ...pickOff, background: on ? "rgba(217,180,95,.45)" : pickOff.background });
+  const pickDay = (day: string | null) => {
+    if (within != null) onRate(null);
+    set({ due: day, firm: false });
+  };
+  const pickRange = (n: number | null) => {
+    onRate(n);
+    set({ due: null, firm: false });
+  };
+  const setFirm = (f: boolean) => {
+    if (f && !due && within != null) {
+      // "Within a week", made Fixed: the last day of that range, which can then be changed.
+      onRate(null);
+      set({ due: inDays(within), firm: true });
+    } else set({ firm: f });
+  };
+  const anything = !!due || within != null;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="shrink-0 text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
+          Complete by
+        </span>
+        {days.map((q) => (
+          <button key={q.label} type="button" aria-pressed={due === q.day} onClick={() => pickDay(due === q.day ? null : q.day)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={pill(due === q.day)}>
+            {q.label}
+          </button>
+        ))}
+        {ranges.map((o) => (
+          <button key={o.label} type="button" aria-pressed={within === o.days && !due} onClick={() => pickRange(within === o.days ? null : o.days)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={pill(within === o.days && !due)}>
+            {o.label}
+          </button>
+        ))}
+        <button type="button" aria-expanded={other} onClick={() => setOther((v) => !v)} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={pill(other || (!!due && !days.some((q) => q.day === due)))}>
+          {due && !days.some((q) => q.day === due) ? dueChipLabel(due) : "Other…"}
+        </button>
+      </div>
+      <Fold open={other}>
+        <div className="flex items-center gap-2 pb-0.5">
+          <span className="shrink-0 text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+            On or by
+          </span>
+          <DateField value={due ?? ""} min={inDays(0)} onChange={(d) => (pickDay(d || null), setOther(false))} ariaLabel="Complete by date" placeholder="Pick a day" className="h-8 min-w-0 flex-1 rounded-lg border px-2 text-[15px]" style={fieldStyle} />
+        </div>
+      </Fold>
+      <Fold open={anything}>
+        <div className="flex flex-wrap items-center gap-2" data-when-firm>
+          <span className="text-[13px]" style={{ color: "var(--t-ink-soft)" }}>
+            This date is
+          </span>
+          <span className="inline-flex h-8 overflow-hidden rounded-full text-[12.5px] font-semibold" style={{ border: "1px solid rgba(139,112,64,.55)" }} role="group" aria-label="Flexible or fixed">
+            {[
+              { f: false, label: "Flexible" },
+              { f: true, label: "Fixed" },
+            ].map((o) => (
+              <button key={o.label} type="button" aria-pressed={firm === o.f} onClick={() => setFirm(o.f)} className="px-3" style={{ background: firm === o.f ? "rgba(217,180,95,.55)" : "transparent", color: firm === o.f ? "var(--t-ink)" : "var(--t-ink-soft)" }}>
+                {o.label}
+              </button>
+            ))}
+          </span>
+          <span className="min-w-0 flex-1 text-[12px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
+            {firm ? "Has to be done by then." : "A goal: it can slide if your week fills up."}
+          </span>
+        </div>
+      </Fold>
+      <CalendarRow title={card.title} minutes={minutes} slot={attrs.slot ?? null} onSlot={(slot) => set({ slot })} />
+    </div>
+  );
+}
+
+function AttrPills({ card, attrs, shown, onChange, onRate, small = false }: { card: ImportCard; attrs: Attrs; shown: AttrKey[]; onChange: (a: Attrs) => void; onRate: (days: number | null) => void; small?: boolean }) {
   const { boards, add } = useContext(BoardsCtx);
   const [open, setOpen] = useState<AttrKey | null>(null);
   const [more, setMore] = useState(false);
@@ -2141,8 +2247,8 @@ function AttrPills({ card, attrs, shown, onChange, small = false }: { card: Impo
     due: (
       <>
         <Glyph src="/design/ui-calendar.png" />
-        {/* As the quest editor's pill: "Due Fri · Thu 3pm". */}
-        {[due && `Due ${dueChipLabel(due)}`, attrs.slot && `${new Date(attrs.slot.start).toLocaleDateString(undefined, { weekday: "short" })} ${shortTime(attrs.slot.start).replace(":00", "")}`].filter(Boolean).join(" · ") || "Due date"}
+        {/* One "when" (owner, Nov 18): "Within a week", "Around Fri", "By Fri", then a picked time: "By Fri · Thu 3pm". */}
+        {whenFace(card.plan_within_days ?? null, due, firmOf(attrs, due), attrs.slot ?? null)}
       </>
     ),
     tiny: (
@@ -2257,31 +2363,7 @@ function AttrPills({ card, attrs, shown, onChange, small = false }: { card: Impo
         </div>
       );
     if (k === "due")
-      return (
-        // The editor's Due picks: Today, Tomorrow, In a week, In 2 weeks, or a date.
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {dueQuickPicks().map((q) => (
-              <button key={q.label} type="button" onClick={() => (set({ due: due === q.day ? null : q.day }), setOpen(null))} className="h-8 rounded-full px-3 text-[13px] font-semibold" style={{ ...pickOff, background: due === q.day ? "rgba(217,180,95,.45)" : pickOff.background }}>
-                {q.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-[13px] font-semibold" style={{ color: "var(--t-ink-soft)" }}>
-              Pick a date
-            </span>
-            <DateField value={due ?? ""} onChange={(d) => set({ due: d || null })} ariaLabel="Due date" placeholder="No due date" className="h-8 min-w-0 flex-1 rounded-lg border px-2 text-[15px]" style={fieldStyle} />
-            {due && (
-              <button type="button" onClick={() => set({ due: null })} aria-label="Clear the due date" title="No due date" className="h-8 w-7 shrink-0 text-[18px] leading-none" style={{ color: "var(--t-ink-soft)" }}>
-                <CloseIcon size={11} />
-              </button>
-            )}
-          </div>
-          {/* The quest editor's Calendar row (owner, Nov 15: "visually schedule on the calendar directly from this screen"). */}
-          <CalendarRow title={card.title} minutes={minutes} slot={attrs.slot ?? null} onSlot={(slot) => set({ slot })} />
-        </div>
-      );
+      return <WhenPanel card={card} attrs={attrs} due={due} minutes={minutes} set={set} onRate={onRate} />;
     if (k === "importance")
       return (
         // The editor's scales, left to right: importance (🔥), difficulty, energy boost (owner, Nov 6).
