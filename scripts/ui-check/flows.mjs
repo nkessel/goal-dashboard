@@ -1121,6 +1121,8 @@ export const FLOWS = [
       // Display settings: what quest cards show (creature, time, XP, coins).
       if (await h.tap((p) => p.getByRole("button", { name: /display settings|calendar settings/i }).first(), "calendar display", { optional: true, expectMove: true })) {
         await h.check("display settings");
+        // Calendar events as quests (owner, Nov 18–19): shows only with Google calendars, which the fake run has none of.
+        if (await h.page.locator("[data-event-quests]").count()) await h.check("display: calendar events as quests");
         await h.tap((p) => p.getByRole("button", { name: /^creature$/i }).first(), "hide creature", { optional: true });
         await h.check("cards without creatures");
         await h.tap((p) => p.getByRole("button", { name: /^creature$/i }).first(), "show creature", { optional: true });

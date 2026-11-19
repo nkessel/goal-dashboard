@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import type { GoogleCalendarEvent } from "@/lib/google-calendar";
 import { QuestEditorDialog } from "@/components/tasks/LazyQuestEditorDialog";
 import { formatTimeRange } from "@/lib/calendar-dates";
-import { deleteGoogleEventAction, rsvpGoogleEventAction, updateGoogleEventAction } from "@/app/actions";
+import { deleteGoogleEventAction, recordEventQuestAction, rsvpGoogleEventAction, updateGoogleEventAction } from "@/app/actions";
 import { cleanEventDescription } from "@/lib/event-text";
 import { useEscape } from "@/lib/use-escape";
 import { CloseIcon } from "@/components/ui/Icons";
@@ -168,7 +168,9 @@ export function GoogleEventChip({
     setCreating(true);
   }
 
-  function onQuestCreated() {
+  function onQuestCreated(id?: string) {
+    // Remembered on the account: its event stays when the quest is removed, and it's never made again.
+    if (id) void recordEventQuestAction(id, event.id).catch(() => {});
     const ids = readHidden();
     ids.add(event.id);
     writeHidden(ids);

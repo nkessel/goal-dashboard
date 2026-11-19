@@ -165,7 +165,7 @@ export default async function CalendarPage({
     : Promise.resolve([]);
   // The auto-scheduler's sections on top: Today's quests, Additional quests and today's habits (owner, Nov 6).
   const sectionsP = import("@/app/actions").then(({ autoSchedulerSectionsAction }) => autoSchedulerSectionsAction(todayKey())).catch(() => null);
-  const [tasks, toSchedule, scheduleFolders, googleAll, planToday, interest, interestEvents, schedSections] = await Promise.all([
+  const [tasksLoaded, toSchedule, scheduleFolders, googleAll, planToday, interest, interestEvents, schedSections] = await Promise.all([
     listCalendarTasksForOwner(session.user.id, rangeStart, rangeEnd),
     listSchedulingList(session.user.id),
     getSchedulingFolders(session.user.id),
@@ -175,6 +175,13 @@ export default async function CalendarPage({
     interestEventsP,
     sectionsP,
   ]);
+  // Upcoming calendar events become quests when that's switched on (owner, Nov 18); drawn as quests at once.
+  let tasks = tasksLoaded;
+  if (googleAll) {
+    const linked = new Set(tasksLoaded.map((t) => t.google_calendar_event_id).filter((id): id is string => Boolean(id)));
+    const made = await import("@/lib/data/event-quests").then(({ makeEventQuests }) => makeEventQuests(session.user.id, googleAll.events, googleAll.calendars, linked)).catch(() => []);
+    if (made.length) tasks = [...tasksLoaded, ...made];
+  }
   // Quests and sessions put on the calendar without Google (from a chat with Claude, or offline) reach it now.
   if (googleAll && session.googleAccessToken) {
     const token = session.googleAccessToken;
