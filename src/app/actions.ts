@@ -428,6 +428,10 @@ async function releaseNext(ownerId: string, was: Task) {
 
 async function finishTaskItself(ownerId: string, taskId: string, completedAt?: string) {
   const was = await tasksData.getTask(taskId, ownerId);
+  // Already done (a second tap while the first was still saving): it pays once, not twice.
+  if (was?.status === "completed" && !was.failed_at) {
+    return { totalXp: (await profilesData.getProfileById(ownerId))?.total_xp ?? null, coinsEarned: 0, rewardCompleted: false, earlyBird: 0 };
+  }
   const completed = await tasksData.completeTask(taskId, ownerId, completedAt);
   // The next quest in its sequence steps forward (taking its place on Today).
   if (was) await releaseNext(ownerId, was).catch(() => {});

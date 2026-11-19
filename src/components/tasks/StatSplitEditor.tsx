@@ -195,7 +195,7 @@ function StatRow({ stat, pct, xp, isAdventure, onPct }: { stat: string; pct: num
         {statAbbr(stat)}
       </span>
       {/* The whole name, wrapping if it must (it was cut off; owner, Nov 5). */}
-      <span className="w-[92px] shrink-0 text-[14px] leading-tight [overflow-wrap:anywhere]" style={{ color: "var(--t-ink)" }}>
+      <span className="min-w-0 flex-1 text-[14px] leading-tight [overflow-wrap:anywhere] sm:w-[92px] sm:flex-none sm:shrink-0" style={{ color: "var(--t-ink)" }}>
         {stat}
       </span>
       <button type="button" onClick={() => onPct(pct - 5)} disabled={pct <= 0} aria-label={`Less XP to ${stat}`} className={step} style={stepStyle}>
@@ -209,7 +209,8 @@ function StatRow({ stat, pct, xp, isAdventure, onPct }: { stat: string; pct: num
         value={pct}
         onChange={(e) => onPct(Number(e.target.value))}
         aria-label={`Share of XP to ${stat}`}
-        className={isAdventure ? "gilded-range h-8 min-w-0 flex-1" : "h-8 min-w-0 flex-1"}
+        // Phones: no room for a working slider beside the name (it shrank to its knob), so − and + do it (owner, Nov 19).
+        className={isAdventure ? "gilded-range hidden h-8 min-w-0 flex-1 sm:block" : "hidden h-8 min-w-0 flex-1 sm:block"}
         style={isAdventure ? { ["--p" as string]: `${pct}%` } : { accentColor: "var(--t-accent)" }}
       />
       <button type="button" onClick={() => onPct(pct + 5)} disabled={pct >= 100} aria-label={`More XP to ${stat}`} className={step} style={stepStyle}>

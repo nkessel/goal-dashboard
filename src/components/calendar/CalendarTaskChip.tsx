@@ -1,5 +1,7 @@
 "use client";
 
+import { completeQuestNow } from "@/lib/complete-quest-now";
+import { useQuestNow } from "@/lib/failed-now";
 import { isTentativeTitle } from "@/lib/tentative";
 import { createContext, useContext, useState } from "react";
 
@@ -11,8 +13,6 @@ function justDone(at: string | null | undefined) {
 
 export const AgendaContext = createContext<Record<string, { id: string; title: string }[]>>({});
 import { EditTaskModal } from "@/components/tasks/EditTaskModal";
-import { completeTaskAction } from "@/app/actions";
-import { celebrateQuest } from "@/components/celebration/QuestCelebrationHost";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/lib/data/types";
 import { MONSTER_ICONS } from "@/lib/monster-icons";
@@ -34,7 +34,7 @@ export function roomyScale(w: number, h: number): number {
 }
 
 export function CalendarTaskChip({
-  task,
+  task: taskData,
   theme = "calm",
   showTime = false,
   compact = false,
@@ -59,32 +59,20 @@ export function CalendarTaskChip({
   /** Too short for two lines: "Title, 9am" on one line. */
   oneLine?: boolean;
 }) {
+  // Completed (or undone) on this page a moment ago: shown at once, before the server answers.
+  const task = useQuestNow(taskData);
   const isAdventure = theme === "adventure";
   const [editing, setEditing] = useState(false);
   const router = useRouter();
   const isCompleted = task.status === "completed";
-  // Tapping a quest's portrait completes it, with the celebration (owner, Nov 5).
+  // Tapping a quest's portrait completes it, with the celebration (owner, Nov 5). The check lands on the card
+  // at once and the celebration follows it; the server's totals fill in when it answers (owner, Nov 19:
+  // "completing a calendar quest is super buggy": a tap showed nothing for seconds while the save waited its turn).
   const [completing, setCompleting] = useState(false);
   function complete() {
     if (completing || isCompleted) return;
     setCompleting(true);
-    const fd = new FormData();
-    fd.set("taskId", task.id);
-    completeTaskAction(fd)
-      .then((res) => {
-        celebrateQuest({
-          taskId: task.id,
-          title: task.title,
-          description: task.description ?? null,
-          xp: task.xp_value,
-          iconSrc: task.icon_source === "ai" || task.icon_source === "library" ? task.icon_key : null,
-          totalXp: res?.totalXp ?? null,
-          coinsEarned: res?.coinsEarned ?? 0,
-        });
-        router.refresh();
-      })
-      .catch(() => {})
-      .finally(() => setCompleting(false));
+    completeQuestNow(taskData, () => router.refresh()).finally(() => setCompleting(false));
   }
   const isWarned = !isCompleted && task.reschedule_count >= 3;
   const tint = !isCompleted ? rescheduleRedness(task.reschedule_count) : undefined;
