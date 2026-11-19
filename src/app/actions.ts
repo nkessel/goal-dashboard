@@ -873,7 +873,9 @@ export async function scheduleTaskAction(
   const task = await tasksData.getTask(taskId, profileId);
   if (!task) throw new Error("Task not found");
 
-  await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO));
+  // Same start, new length (a resize, or shortening it to its time): not a reschedule.
+  const sameStart = !!task.scheduled_start && new Date(task.scheduled_start).getTime() === new Date(startISO).getTime();
+  await attachCalendarEvent(accessToken, profileId, task, new Date(startISO), new Date(endISO), !sameStart);
   revalidatePath("/");
   revalidatePath("/calendar");
 }

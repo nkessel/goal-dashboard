@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { applySeriesLookAction, seriesAskAction } from "@/app/actions";
+import { applySeriesLookAction, scheduleTaskAction, seriesAskAction } from "@/app/actions";
 import { SCOPE_LABELS, type SeriesScope } from "@/lib/series-look";
 import { CloseIcon } from "@/components/ui/Icons";
 
@@ -62,6 +62,49 @@ export function SeriesLookAsk() {
         setDone(e instanceof Error ? e.message : "Couldn't save that.");
       }
     });
+  }
+  // A quest made shorter than its calendar block: shrink the block too?
+  const [shrink, setShrink] = useState<{ taskId: string; title: string; start: string; minutes: number; was: number } | null>(null);
+  useEffect(() => {
+    const on = (e: Event) => setShrink((e as CustomEvent<{ taskId: string; title: string; start: string; minutes: number; was: number }>).detail);
+    window.addEventListener("calendar-shrink-ask", on);
+    return () => window.removeEventListener("calendar-shrink-ask", on);
+  }, []);
+  if (shrink && !ask && typeof document !== "undefined") {
+    const words = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} hr${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`);
+    return createPortal(
+      <div role="dialog" aria-label="Shorten it on the calendar?" data-shrink-ask className="card-pop-in parchment fixed left-1/2 z-[95] w-[min(360px,calc(100vw-24px))] -translate-x-1/2 rounded-2xl px-4 pb-3 pt-3" style={{ bottom: "calc(96px + env(safe-area-inset-bottom, 0px))", border: "1px solid #b39a6a", boxShadow: "0 14px 34px rgba(0,0,0,.38)" }}>
+        <p className="m-0 pr-6 font-display text-[16px] leading-snug" style={{ color: "var(--t-ink)" }}>
+          Shorten “{shrink.title}” on the calendar to {words(shrink.minutes)}?
+        </p>
+        <p className="m-0 mt-0.5 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>
+          Its block is {words(shrink.was)} now.
+        </p>
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            disabled={pending}
+            data-shrink="yes"
+            onClick={() =>
+              start(async () => {
+                const s0 = new Date(shrink.start);
+                await scheduleTaskAction(shrink.taskId, s0.toISOString(), new Date(s0.getTime() + shrink.minutes * 60_000).toISOString()).catch(() => {});
+                setShrink(null);
+                router.refresh();
+              })
+            }
+            className="hover-glow h-9 rounded-full px-3.5 text-[13.5px] font-semibold"
+            style={{ background: "var(--t-gold)", color: "#2a1c10", border: "1px solid #8a6116" }}
+          >
+            Shorten it
+          </button>
+          <button type="button" onClick={() => setShrink(null)} className="hover-glow h-9 rounded-full px-3.5 text-[13.5px] font-semibold" style={{ border: "1px solid rgba(139,112,64,.5)", color: "var(--t-ink)" }}>
+            Keep {words(shrink.was)}
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
   }
   if (!ask || typeof document === "undefined") return null;
   return createPortal(

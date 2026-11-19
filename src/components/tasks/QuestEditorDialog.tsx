@@ -879,6 +879,12 @@ export function QuestEditorDialog({
     setPhase("closing");
     // One of a repeating event's quests: ask whether its others should take this look (owner, Nov 18).
     if (task) window.dispatchEvent(new CustomEvent("series-look-check", { detail: { taskId: task.id } }));
+    // Made shorter than its block on the calendar: ask before shrinking the block (owner, Nov 5: "if the time was
+    // decreased… ask the user if they want to update the quest on the calendar with the shorter time").
+    if (task && task.status === "open" && task.is_on_calendar && task.scheduled_start && task.scheduled_end && est && est > 0 && est !== task.estimate_minutes) {
+      const len = Math.round((new Date(task.scheduled_end).getTime() - new Date(task.scheduled_start).getTime()) / 60_000);
+      if (est < len) window.dispatchEvent(new CustomEvent("calendar-shrink-ask", { detail: { taskId: task.session_id ? `s:${task.session_id}` : task.id, title: task.title, start: task.scheduled_start, minutes: est, was: len } }));
+    }
     setTimeout(onClose, embedded ? 0 : origin === "fab" ? 260 : 180);
   }
   /** Leaving a new quest with writing in it asks first: keep writing, save a draft, or discard. */
