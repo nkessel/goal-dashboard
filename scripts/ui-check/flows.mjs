@@ -547,8 +547,8 @@ export const FLOWS = [
       if (await tick.count()) {
         await tick.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
         await h.settle(1600);
-        await h.check("felt strip after a habit tick");
-        if (await h.tap((p) => p.locator("[data-felt-strip] [role=radio][aria-label=Good]").first(), "felt strip: good", { optional: true, expectMove: true })) await h.check("felt strip: kept");
+        await h.check("how do you feel, under the habit");
+        if (await h.tap((p) => p.locator("[data-felt-inline] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: kept");
         await h.settle(1400);
       }
       // A victory: the celebration asks too, above Claim your reward · Continue Your Journey.
@@ -563,7 +563,7 @@ export const FLOWS = [
         await esc(h);
       }
       // A fail: a wise line, the faces, then Try again · Continue.
-      if (await h.tap((p) => p.locator("li", { hasText: "Pick up medication" }).getByRole("button", { name: /^quest actions$/i }).last(), "quest menu for fail", { optional: true })) {
+      if (await h.tap((p) => p.getByRole("button", { name: /^actions for take out the trash$/i }).first(), "quest menu for fail", { optional: true })) {
         if (await h.tap((p) => p.getByRole("menuitem", { name: /^archive/i }).first(), "archive choices (fail)", { optional: true, expectMove: true })) {
           if (await h.tap((p) => p.getByRole("button", { name: /mark as failed/i }).first(), "fail form", { optional: true, expectMove: true })) {
             if (await h.tap((p) => p.getByRole("button", { name: /^mark failed$/i }).first(), "mark failed", { optional: true, expectMove: true })) {

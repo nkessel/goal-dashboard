@@ -3544,9 +3544,9 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
 @keyframes quest-drop-shake { 0%, 100% { translate: 0 0; } 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
 .quest-drop-shake { animation: quest-drop-shake 0.18s ease-in-out; }
 
-/* "How do you feel?" strip after a habit tick or a logged event (owner, Nov 19): slides up, slides away. */
-.felt-strip-in { animation: felt-in 0.28s cubic-bezier(.2,.8,.2,1) both; }
-.felt-strip-out { animation: felt-out 0.26s ease both; }
-@keyframes felt-in { from { transform: translate(-50%, 16px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-@keyframes felt-out { from { transform: translate(-50%, 0); opacity: 1; } to { transform: translate(-50%, 16px); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .felt-strip-in, .felt-strip-out { animation-duration: 0.01s; } }
+/* "How do you feel?" in place under a ticked habit or a logged event (owner, Nov 19): slides open and closed. */
+.felt-in { animation: felt-in 0.28s cubic-bezier(.2,.8,.2,1) both; overflow: hidden; }
+.felt-out { animation: felt-out 0.26s ease both; overflow: hidden; }
+@keyframes felt-in { from { max-height: 0; opacity: 0; } to { max-height: 120px; opacity: 1; } }
+@keyframes felt-out { from { max-height: 120px; opacity: 1; } to { max-height: 0; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .felt-in, .felt-out { animation-duration: 0.01s; } }

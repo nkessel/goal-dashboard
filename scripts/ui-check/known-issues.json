@@ -86,5 +86,9 @@
   {
     "match": "^today\\|clipped\\|<button \\.cal-chip\\.quest-card>.*cut off by <div> \"[A-Z]{3} \\d+",
     "reason": "Evening run only: the test quest is placed 1½ hours from now, which in the evening is after 10 PM, so it runs past the 10:30 PM fold of Today's side calendar and its card is cut at the fold until \"Show after 10:30 PM\" is pressed (owner, Nov 6: those hours open from a button). Before Nov 19 the bottom bar hid this spot entirely. Open question for the owner: should a quest that crosses the fold open the late hours by itself?"
+  },
+  {
+    "match": "^faces\\|layout-shift\\|.*\\(step: up to celebration",
+    "reason": "Completing a quest takes it off Today's Quests underneath the celebration, which covers the whole screen; the list closes up behind it, out of sight. The celebration itself doesn't move (see the screenshot)."
   }
 ]

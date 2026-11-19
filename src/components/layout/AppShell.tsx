@@ -22,7 +22,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { BackToToday } from "@/components/layout/BackToToday";
 import { BackToSettings } from "@/components/layout/BackToSettings";
 import { FocusTimerPill } from "@/components/one-thing/FocusTimerPill";
-import { FeedbackDock, FeltStrip, Walkthrough } from "@/components/layout/LazyShell";
+import { FeedbackDock, Walkthrough } from "@/components/layout/LazyShell";
 import { PlanMyDayHost } from "@/components/calendar/PlanMyDay";
 import { NotificationPreview } from "@/components/notifications/NotificationPreview";
 import { Suspense } from "react";
@@ -135,7 +135,6 @@ export async function AppShell({
       {profileId && <WeatherSync place={profile?.life_wheel?.weather ?? null} />}
       {profileId && <BottomNav theme={theme} name={profile?.name ?? null} toucan={profile?.toucan ?? null} navOrder={(profile?.life_wheel as { navOrder?: unknown } | null | undefined)?.navOrder ?? null} />}
       {profileId && <FeedbackDock theme={theme} />}
-      {profileId && <FeltStrip />}
       {profileId && <PlanMyDayHost theme={theme} />}
       {profileId && <NotificationPreview />}
     </div>

@@ -12,4 +12,3 @@ export const FeedbackDock = dynamic(() => import("@/components/feedback/Feedback
 export const LanguageWindow = dynamic(() => import("@/components/xp/LearnLanguage").then((m) => m.LanguageWindow), { ssr: false });
 export const PackingWindow = dynamic(() => import("@/components/settings/PackingLists").then((m) => m.PackingWindow), { ssr: false });
 export const Walkthrough = dynamic(() => import("@/components/tour/Walkthrough").then((m) => m.Walkthrough), { ssr: false });
-export const FeltStrip = dynamic(() => import("@/components/ui/FeltAsk").then((m) => m.FeltStrip), { ssr: false });
