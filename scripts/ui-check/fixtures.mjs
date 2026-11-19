@@ -69,6 +69,8 @@ export function makeFixtures() {
     // Written in [brackets]: a maybe, drawn as a dashed outline with no fill (owner, Nov 12).
     task("[Stretch and tea on the porch]", at(5.5, 45)),
     task("Rune puzzle: fix the printer", at(-19, 30)),
+    // A quest marked failed (owner, Nov 17: "failed quest shouldn't show as green").
+    task("Call the venue about the deposit", { status: "completed", completed_at: inHours(-20), failed_at: inHours(-20), ...at(-21, 60) }),
     task("Take out the trash", { is_tiny: true, is_manual_priority: true, due_at: inHours(8), estimate_minutes: 15 }),
   );
   // A repeating calendar event made into quests: two weekly gym sessions in one series (owner, Nov 18).

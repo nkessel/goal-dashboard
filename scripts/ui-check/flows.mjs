@@ -1567,16 +1567,40 @@ export const FLOWS = [
         await h.settle(900);
         await h.check("feed: conversation");
       }
-      // A board scroll (owner, Nov 9): "Show N more quests" lists the rest in place; tapping the title rolls it up.
+      // A board scroll (owner, Nov 12–13): pull its bottom roller down to unroll more quests; the top roller rolls it up;
+      // its title opens the board.
       await h.goto("/boards");
-      if (await h.tap((p) => p.getByRole("button", { name: /^and \d+ more/i }).first(), "boards: show more quests", { optional: true })) {
-        await h.settle(450);
-        await h.check("boards: more quests");
+      {
+        const pull = h.page.locator("main [data-scroll-pull]").first();
+        if (await pull.count()) {
+          await pull.scrollIntoViewIfNeeded().catch(() => {});
+          const box = await pull.boundingBox();
+          if (box) {
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+            await h.page.mouse.down();
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 40, { steps: 4 });
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 90, { steps: 4 });
+            await h.page.mouse.up();
+            await h.settle(500);
+            await h.check("boards: pulled the scroll open");
+          }
+        } else h.record({ kind: "scroll-pull", severity: "warning", target: "board scroll", detail: "No scroll had a roller to pull (no board with more than one quest?)" });
       }
-      if (await h.tap((p) => p.locator("main .board-card button[aria-expanded=true]").first(), "boards: roll up a scroll", { optional: true })) {
+      if (await h.tap((p) => p.locator("main .board-card .scroll-rod-tap.top").first(), "boards: roll up a scroll", { optional: true })) {
         await h.settle(450);
         await h.check("boards: rolled up");
-        await h.tap((p) => p.locator("main .board-card button[aria-expanded=false]").first(), "boards: unroll it", { optional: true });
+        await h.tap((p) => p.locator("main .board-card .scroll-rod-tap.top").first(), "boards: unroll it", { optional: true });
+      }
+      // All Quests › List, by due date: each row says its due day, and past-due ones can be hidden (owner, Nov 13).
+      await h.goto("/quests");
+      if (await h.tap((p) => p.getByRole("radio", { name: /due soonest/i }).first(), "list: due soonest", { optional: true })) {
+        await h.settle(400);
+        await h.check("list: due soonest, past-due choices");
+        await h.tap((p) => p.getByRole("radio", { name: /hide past due/i }).first(), "list: hide past due", { optional: true });
+        await h.settle(400);
+        await h.check("list: past due hidden");
+        await h.tap((p) => p.getByRole("radio", { name: /all past due/i }).first(), "list: all past due", { optional: true });
+        await h.tap((p) => p.getByRole("radio", { name: /newest/i }).first(), "list: newest", { optional: true });
       }
       // Find a quest from the boards list.
       await h.goto("/boards");
@@ -1591,9 +1615,13 @@ export const FLOWS = [
         await h.tap((p) => p.locator('[data-fb-name="Sub-board: Seeds to order"]').first(), "open a folder inside it", { optional: true, expectMove: true });
         await h.settle(900);
         await h.check("boards: folder in a folder");
-        // "See board ›" opens the board as the popup, and the page behind doesn't run down to its bottom (owner, Nov 6).
+        // Hold or right-click a sub-board: "Open the board ›" opens it as the popup, and the page behind doesn't run
+        // down to its bottom (owner, Nov 6 and 12).
         const before = await h.page.evaluate(() => window.scrollY);
-        if (await h.tap((p) => p.locator("main a", { hasText: /see board/i }).first(), "see board", { optional: true, expectMove: true })) {
+        await h.page.locator('[data-fb-name="Sub-board: Garden beds"]').first().click({ button: "right" }).catch(() => {});
+        await h.settle(400);
+        await h.check("boards: sub-board menu");
+        if (await h.tap((p) => p.locator("[data-menu=sub-board] a", { hasText: /open the board/i }).first(), "open the board", { optional: true, expectMove: true })) {
           await h.settle(1500);
           const y = await h.page.evaluate(() => window.scrollY);
           if (y - before > 120) h.record({ kind: "page-jumped", severity: "error", target: "board popup", detail: `the page behind the board popup scrolled from ${before}px to ${y}px` });
@@ -1602,7 +1630,7 @@ export const FLOWS = [
       }
       // The first board.
       await h.goto("/boards");
-      if (await h.tap((p) => p.locator("main a[href^='/boards/']").first(), "open a board", { optional: true, expectMove: true })) {
+      if (await h.tap((p) => p.locator("main a[data-board-title][href^='/boards/'], main a[href^='/boards/']").first(), "open a board", { optional: true, expectMove: true })) {
         h.screen = "board";
         await h.settle(1500);
         await h.check("board");

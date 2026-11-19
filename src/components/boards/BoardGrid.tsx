@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useLongPress } from "@/lib/use-long-press";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,6 +38,9 @@ import { Fold, useClosing } from "@/components/ui/Fold";
 /** Where the Uncategorized card sits among the boards (it has no saved order of its own). */
 const LOOSE_KEY = "boards-loose-index";
 const FOLDED_KEY = "boards-folded";
+const ROWS_KEY = "boards-rows";
+/** Height of one quest row in a scroll's list: the roller moves by this much per quest. */
+const ROW_PX = 30;
 
 /** Two rolled scrolls, one behind the other: boards inside this board. */
 function SubBoardsIcon() {
@@ -131,7 +135,28 @@ export function BoardGrid({
   const [addingTo, setAddingTo] = useState<string | null>(null);
   // Rolled-up scrolls (just the title and counts), kept on this device; "Show N more" lists, for this visit.
   const [folded, setFolded] = useState<string[]>([]);
-  const [moreOpen, setMoreOpen] = useState<string[]>([]);
+  // How many of a board's other quests show under its next step, set by dragging the scroll's bottom roller
+  // (owner, Nov 12–13: "show more and less is archaic… drag the bottom of the scroll to resize"). Kept per device.
+  const [rows, setRows] = useState<Record<string, number>>({});
+  useEffect(() => {
+    try {
+      const v = JSON.parse(window.localStorage.getItem(ROWS_KEY) ?? "{}");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after hydration
+      if (v && typeof v === "object") setRows(v as Record<string, number>);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const saveRows = (id: string, n: number) =>
+    setRows((m) => {
+      const next = { ...m, [id]: n };
+      try {
+        window.localStorage.setItem(ROWS_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
   useEffect(() => {
     try {
       const v = JSON.parse(window.localStorage.getItem(FOLDED_KEY) ?? "[]");
@@ -152,7 +177,6 @@ export function BoardGrid({
       return next;
     });
   }
-  const toggleMore = (id: string) => setMoreOpen((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]));
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const isAdventure = theme === "adventure";
@@ -188,6 +212,17 @@ export function BoardGrid({
   function onDragEnd(e: DragEndEvent) {
     setActive(null);
     const a = String(e.active.id);
+    // Held and let go without moving (a finger's long press): the board's menu, to open, edit or move it
+    // (owner, Nov 12: "long pressing on a card actually open a context menu").
+    if (a.startsWith(BOARD) && Math.hypot(e.delta.x, e.delta.y) < 10) {
+      const b = initialBoards.find((x) => x.id === a.slice(BOARD.length));
+      const ev = e.activatorEvent as (TouchEvent & MouseEvent) | null;
+      const pt = ev && "touches" in ev && ev.touches?.[0] ? ev.touches[0] : (ev as MouseEvent | null);
+      if (b && !b.isVirtual && ev && typeof TouchEvent !== "undefined" && ev instanceof TouchEvent) {
+        setMenu({ board: b, x: pt?.clientX ?? 40, y: pt?.clientY ?? 120 });
+        return;
+      }
+    }
     const over = e.over ? String(e.over.id) : null;
     if (!over) return;
     if (a.startsWith(BOARD)) {
@@ -256,7 +291,6 @@ export function BoardGrid({
     const rule = dream ? "rgba(120,150,190,.25)" : isAdventure ? "rgba(120,90,40,.28)" : "var(--t-card-border)";
 
     const isFolded = folded.includes(board.id);
-    const isMore = moreOpen.includes(board.id);
     const ink = dream ? "#5f87b8" : isAdventure ? "#8a6116" : "var(--t-accent)";
     // Counts are open quests and boards only (owner, Nov 9): done quests show only when nothing is open.
     const openCount = open.length;
@@ -266,16 +300,24 @@ export function BoardGrid({
     const firstShown = nextStep ?? (openCount === 0 ? done[0] : undefined);
     const restList = nextStep ? open.filter((q) => q.id !== nextStep.id) : openCount === 0 ? done.slice(1) : [];
     const restDone = openCount === 0;
+    const shownRest = Math.min(restList.length, rows[board.id] ?? 0);
     const stop = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation(), onTouchStart: (e: React.TouchEvent) => e.stopPropagation() };
 
     const body = (
       <div className="flex h-full flex-col px-3 pb-2.5 pt-2.5">
-        {/* Header: tap the title (or the scroll's top roller) to roll the scroll up to just its title and counts. */}
-        <button
-          type="button"
-          onClick={() => toggleFold(board.id)}
-          aria-expanded={!isFolded}
+        {/* Header: tap the title to open the board (owner, Nov 13: "clicking on the title of the board opens it");
+            the scroll's top roller rolls it up to just its title and counts. */}
+        <Link
+          href={board.isVirtual ? "/boards" : href}
+          draggable={false}
+          onClick={(e) => {
+            if (board.isVirtual) {
+              e.preventDefault();
+              toggleFold(board.id);
+            }
+          }}
           data-fb-name={`Board: ${board.title}`}
+          data-board-title
           className="board-title-pad flex w-full items-start gap-1.5 rounded-md pr-7 text-left"
         >
           <span className="mt-[2px]">
@@ -300,7 +342,7 @@ export function BoardGrid({
               </span>
             )}
           </span>
-        </button>
+        </Link>
 
         <Fold open={!isFolded} eager>
           <div className="flex flex-col gap-2 pt-2">
@@ -343,31 +385,11 @@ export function BoardGrid({
                   {dream ? "Nothing here yet." : "No quests yet."}
                 </p>
               )}
-              {/* The rest of the board's quests, listed in place (completed ones when nothing is open). */}
-              {restList.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    {...stop}
-                    onClick={() => toggleMore(board.id)}
-                    aria-expanded={isMore}
-                    className="board-quest flex min-h-[26px] items-center gap-0.5 self-start rounded-md px-1 pl-[26px] text-[12px]"
-                    style={{ color: soft }}
-                  >
-                    {isMore ? "show less" : `and ${restList.length} more${restDone ? " done" : ""}`}
-                    <span aria-hidden className="text-[11px]" style={{ display: "inline-block", transform: isMore ? "rotate(-90deg)" : "rotate(90deg)", transition: "transform 200ms ease" }}>›</span>
-                  </button>
-                  <Fold open={isMore}>
-                    <ul className="flex flex-col">
-                      {restList.map((q) => (restDone ? <DoneRow key={q.id} q={q} onOpen={() => setOpenQuest(q)} /> : <QuestPreview key={q.id} q={q} disabled={dragging} onOpen={() => setOpenQuest(q)} />))}
-                    </ul>
-                  </Fold>
-                </>
-              )}
-              {isMore && !board.isVirtual && (
-                <Link href={href} draggable={false} {...stop} className="mt-0.5 self-start px-1 text-[12px] underline underline-offset-2" style={{ color: soft }}>
-                  Open the board ›
-                </Link>
+              {/* The rest of the board's quests, as many as the scroll is pulled open to (its bottom roller). */}
+              {shownRest > 0 && (
+                <ul className="flex flex-col">
+                  {restList.slice(0, shownRest).map((q) => (restDone ? <DoneRow key={q.id} q={q} onOpen={() => setOpenQuest(q)} /> : <QuestPreview key={q.id} q={q} disabled={dragging} onOpen={() => setOpenQuest(q)} />))}
+                </ul>
               )}
             </div>
 
@@ -420,7 +442,16 @@ export function BoardGrid({
             </button>
           )}
         </div>
-        {scroll && <span aria-hidden className="scroll-rod bottom" />}
+        {scroll && !isFolded && restList.length > 0 ? (
+          <ScrollPull
+            shown={shownRest}
+            total={restList.length}
+            onChange={(n) => saveRows(board.id, n)}
+            label={`${board.title}: pull to show ${restList.length - shownRest > 0 ? `${restList.length - shownRest} more` : "fewer"} quests`}
+          />
+        ) : (
+          scroll && <span aria-hidden className="scroll-rod bottom" />
+        )}
       </div>
     );
   }
@@ -587,6 +618,9 @@ function SubBoardFolder({
   nested?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // Hold it or right-click it: a small menu with "Open the board" (owner, Nov 12: the "See board" links go).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const press = useLongPress(() => setMenuOpen(true));
   const [data, setData] = useState<FolderContents | null>(null);
   const [failed, setFailed] = useState(false);
   const [, startLoad] = useTransition();
@@ -614,8 +648,18 @@ function SubBoardFolder({
       <div className="flex min-w-0 flex-wrap items-center gap-x-1">
         <button
           type="button"
-          onClick={toggle}
+          {...press.handlers}
+          onContextMenu={(e) => {
+            // Its own menu, not the board card's around it.
+            e.stopPropagation();
+            press.handlers.onContextMenu(e);
+          }}
+          onClick={() => {
+            if (press.wasLong()) return;
+            toggle();
+          }}
           aria-expanded={open}
+          aria-haspopup="menu"
           data-fb-name={`Sub-board: ${sb.title}`}
           className={`board-quest flex min-h-[32px] w-full min-w-0 items-center gap-1 rounded-md px-1 py-[2px] text-left text-[12.5px]`}
           style={{ color: "var(--t-ink)", background: open ? (dream ? "rgba(120,150,190,.12)" : "rgba(168,138,63,.14)") : undefined }}
@@ -633,17 +677,7 @@ function SubBoardFolder({
             <FolderCaret open={open} />
           </span>
         </button>
-        {open && (
-          <Link
-            href={`/boards/${sb.id}`}
-            draggable={false}
-            {...stop}
-            className="reveal shrink-0 whitespace-nowrap rounded-md px-0.5 py-[2px] text-[11.5px] font-semibold underline underline-offset-2"
-            style={{ color: dream ? "#5f87b8" : "#8a6116" }}
-          >
-            See board ›
-          </Link>
-        )}
+        {menuOpen && <SubBoardMenu id={sb.id} title={sb.title} open={open} onToggle={toggle} onClose={() => setMenuOpen(false)} dream={dream} />}
       </div>
       <Fold open={open}>
         <div className="ml-[7px] border-l pb-1 pl-1.5" style={{ borderColor: rule }}>
@@ -906,5 +940,85 @@ function NestPicker({ board, isAdventure, onClose: closeNow, onPick }: { board: 
       </div>
     </div>,
     document.body
+  );
+}
+
+/**
+ * The scroll's bottom roller, as a handle: pull it down to unroll more of the board's quests, push it up to roll
+ * them away (owner, Nov 12–13). A tap unrolls three more, or rolls them all back once everything shows.
+ */
+function ScrollPull({ shown, total, onChange, label }: { shown: number; total: number; onChange: (n: number) => void; label: string }) {
+  const start = useRef<{ y: number; n: number; moved: boolean } | null>(null);
+  const [live, setLive] = useState<number | null>(null);
+  const n = live ?? shown;
+  const clamp = (v: number) => Math.max(0, Math.min(total, v));
+  const hidden = total - n;
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={hidden > 0 ? `Pull down to show ${hidden} more` : "Push up to show fewer"}
+      data-scroll-pull
+      className="scroll-rod bottom scroll-rod-tap scroll-pull"
+      style={{ touchAction: "none" }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        start.current = { y: e.clientY, n: shown, moved: false };
+      }}
+      onPointerMove={(e) => {
+        const s = start.current;
+        if (!s) return;
+        const dy = e.clientY - s.y;
+        if (Math.abs(dy) > 6) s.moved = true;
+        if (s.moved) setLive(clamp(s.n + Math.round(dy / ROW_PX)));
+      }}
+      onPointerUp={() => {
+        const s = start.current;
+        start.current = null;
+        if (!s) return;
+        const next = s.moved ? (live ?? s.n) : s.n >= total ? 0 : clamp(s.n + 3);
+        setLive(null);
+        onChange(next);
+      }}
+      onPointerCancel={() => {
+        start.current = null;
+        setLive(null);
+      }}
+    >
+      {hidden > 0 && (
+        <span aria-hidden className="scroll-pull-count">
+          {hidden}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** A sub-board's menu, under its row: open the whole board, or open / close it here. */
+function SubBoardMenu({ id, title, open, onToggle, onClose, dream }: { id: string; title: string; open: boolean; onToggle: () => void; onClose: () => void; dream: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const down = (e: PointerEvent) => ref.current && !ref.current.contains(e.target as Node) && onClose();
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("pointerdown", down);
+    window.addEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("keydown", key);
+    };
+  }, [onClose]);
+  const item = "flex min-h-9 w-full items-center px-3 text-left text-[13.5px] hover:bg-black/[.06]";
+  return (
+    <div ref={ref} role="menu" aria-label={title} data-menu="sub-board" className="reveal parchment relative z-[5] mt-1 flex w-full flex-col overflow-hidden py-1" style={{ borderRadius: 10, border: "1px solid #b39a6a", boxShadow: "0 8px 20px rgba(0,0,0,.28)" }}>
+      <Link href={`/boards/${id}`} role="menuitem" className={item} style={{ color: dream ? "#3f5f88" : "var(--t-ink)" }} onClick={onClose}>
+        Open the board ›
+      </Link>
+      <button type="button" role="menuitem" className={item} style={{ color: "var(--t-ink)" }} onClick={() => (onToggle(), onClose())}>
+        {open ? "Close it here" : "Show it here"}
+      </button>
+    </div>
   );
 }

@@ -3539,3 +3539,15 @@ html[data-tour-open] [data-perched-owl] { visibility: hidden; }
 
 /* A card's own colour or picture is its background only: the portrait keeps its own colours (owner, Nov 17). */
 .quest-card-look .quest-art { mix-blend-mode: normal; }
+
+/* A board scroll's bottom roller as a handle (owner, Nov 12–13): pull it to unroll more quests. */
+.scroll-pull { cursor: ns-resize; border: 0; padding: 0; }
+.scroll-pull::before, .scroll-pull::after { pointer-events: none; }
+.scroll-pull:hover, .scroll-pull:focus-visible { filter: brightness(1.12); }
+.scroll-pull-count {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%;
+  min-width: 18px; height: 14px; padding: 0 4px; border-radius: 999px;
+  font: 700 10px/14px var(--font-sans, system-ui); color: #2a1c10;
+  background: radial-gradient(circle at 40% 35%, #f6dc8e, #d9b45f 60%, #a88a3f);
+  box-shadow: 0 0 0 1px rgba(74, 57, 19, .6);
+}
