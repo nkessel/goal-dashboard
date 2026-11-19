@@ -1021,6 +1021,25 @@ export const FLOWS = [
         await h.settle(700);
         await h.check("leaf: logged");
       }
+      // Check in, then: Edit check-in opens the latest to change, and Check in again is a gold button (owner, Nov 18).
+      await h.goto("/insights", { name: "insights" });
+      {
+        const slider = h.page.locator("section[aria-label='Check in'] input[type=range]").first();
+        if (await slider.count()) {
+          await slider.focus().catch(() => {});
+          for (let i = 0; i < 3; i++) await h.page.keyboard.press("ArrowRight");
+          await h.settle(300);
+          if (await h.tap((p) => p.getByRole("button", { name: /^submit check-in$/i }).first(), "submit check-in", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.check("after checking in");
+            if (await h.tap((p) => p.getByRole("button", { name: /^edit check-in$/i }).first(), "edit check-in", { optional: true, expectMove: true })) {
+              await h.settle(700);
+              await h.check("edit check-in: the latest one to change");
+              await esc(h);
+            }
+          }
+        }
+      }
     },
   },
   {
