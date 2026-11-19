@@ -974,6 +974,20 @@ export const FLOWS = [
         await h.settle(500);
         await h.check("chart open");
       }
+      // The check-in's Journal: five faces, words on the card, and Tag / event and Supplement inside it; what you started
+      // is kept if you leave and come back (owner, Nov 18).
+      if (await h.tap((p) => p.locator("section[aria-label='Check in'] button", { hasText: /^✎ Journal$|^Journal$/ }).first(), "check-in journal", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.page.locator("[data-checkin-journal] textarea").first().fill("Slept well, slow start").catch(() => {});
+        await h.check("check-in journal: faces, words, tag and supplement inside");
+        if (!(await h.page.locator("[data-checkin-journal] button", { hasText: /tag \/ event/i }).count())) h.record({ kind: "checkin-journal", severity: "error", target: "check-in journal", detail: "Tag / event isn't inside the journal" });
+        await h.page.reload();
+        await h.settle(1500);
+        const kept = await h.page.locator("[data-checkin-draft]").first().isVisible().catch(() => false);
+        if (!kept) h.record({ kind: "checkin-draft", severity: "error", target: "check-in draft", detail: "A started check-in wasn't kept after leaving and coming back" });
+        await h.check("check-in: kept from earlier");
+        await h.tap((p) => p.locator("[data-checkin-draft] button").first(), "start fresh", { optional: true, expectMove: true });
+      }
       // Spin the Wheel of Time by hand (owner, Nov 9): past halfway it sticks and asks what turned it.
       {
         const wheel = h.page.locator("[data-wheel-spin]").first();
