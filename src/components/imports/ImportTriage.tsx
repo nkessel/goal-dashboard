@@ -8,7 +8,9 @@ import { FileChips } from "@/components/ui/FileChips";
 import { createContext, useContext, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createBoardQuickAction, decideImportCardAction, editImportCardAction, importCardAction, markImportCardImportedAction, scheduleTaskAction } from "@/app/actions";
+import { createBoardQuickAction, decideImportCardAction, editImportCardAction, importCardAction, markImportCardImportedAction, scheduleTaskAction, applyAutoScheduleAction, unscheduleTaskAction } from "@/app/actions";
+import { findSlot } from "@/components/calendar/place-next";
+import { localDayKey } from "@/lib/auto-schedule";
 import type { ImportCard } from "@/lib/data/import-cards";
 import { useEscape } from "@/lib/use-escape";
 import { DateField } from "@/components/ui/DateField";
@@ -155,7 +157,7 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
   const setSnoozing = (on: boolean, c: ImportCard | null = card) => setSnoozingFor(on ? c : null);
   const [menu, setMenu] = useState(false);
   const [editor, setEditor] = useState(false);
-  const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
+  const [toast, setToast] = useState<{ text: string; undo?: () => void; act?: { label: string; run: () => void } } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, start] = useTransition();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -249,10 +251,10 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
 
   useEscape(() => (mode === "guided" && stepAt > 0 ? setStepAt(stepAt - 1) : setMode("card")), mode !== "card" && !snoozing && !editor);
 
-  function say(text: string, undo?: () => void) {
+  function say(text: string, undo?: () => void, act?: { label: string; run: () => void }) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ text, undo });
-    toastTimer.current = setTimeout(() => setToast(null), 5000);
+    setToast({ text, undo, act });
+    toastTimer.current = setTimeout(() => setToast(null), act ? 8000 : 5000);
   }
   function next(id = card?.id) {
     setFocusId(null);
@@ -340,6 +342,26 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
     });
   }
 
+  /** "Auto-schedule now" from the toast: this one quest into the first free spot (the calendar's own rule), with Undo. */
+  function autoNow(id: string, title: string, minutes: number | null, dueAt: string | null, planBy: string | null) {
+    setToast(null);
+    (async () => {
+      try {
+        const slot = await findSlot({ id, title, estimate_minutes: minutes ?? 30, effort: undefined, due_at: dueAt, plan_by: planBy });
+        if (!slot) return say(`No free spot in the next two weeks for “${title}”: it stays on the list`);
+        await applyAutoScheduleAction([{ taskId: id, startISO: slot.start.toISOString(), endISO: slot.end.toISOString() }]);
+        const words = slotWords({ start: slot.start.toISOString(), end: slot.end.toISOString() });
+        say(`“${title}” is on your calendar ${words}`, () => {
+          setToast(null);
+          unscheduleTaskAction(id).then(() => router.refresh(), (e: unknown) => setError(e instanceof Error ? e.message : "Couldn't take it off."));
+        });
+        router.refresh();
+      } catch (e) {
+        say(e instanceof Error ? e.message : "Couldn't place it.");
+      }
+    })();
+  }
+
   function save(dIn: Draft | null = draft, cIn: ImportCard | null = card) {
     const card = cIn;
     if (!card || !dIn) return;
@@ -396,6 +418,20 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
         const nRewards = d.kind === "shopping" ? d.steps.filter((x) => d.rewards?.includes(x)).length : 0;
         if (nRewards) {
           say(`${nRewards === 1 ? "1 item is a reward" : `${nRewards} items are rewards`} in your Treasure Chest${nRewards < d.steps.length ? `; the rest is on “${d.title}”` : ""}`);
+          next(card.id);
+          router.refresh();
+          return;
+        }
+        if (made.kind === "quest" && (d.kind === "quest" || d.kind === "schedule" || d.kind === "shopping")) {
+          if (slot && placed.startsWith(",")) {
+            const day = localDayKey(new Date(slot.start));
+            say(`“${d.title}” is on your calendar ${slotWords(slot)}`, undefined, { label: "See it", run: () => (setToast(null), router.push(`/calendar?view=day&date=${day}`)) });
+          } else if (planBy) {
+            const within = typeof d.planDays === "number" ? withinWords(d.planDays) : "soon";
+            say(`“${d.title}” is on the auto-scheduler's list (${within})`, undefined, { label: "Auto-schedule now", run: () => autoNow(made.id, d.title, d.minutes ?? null, dueAt, planBy) });
+          } else {
+            say(`Added “${d.title}”${board ? ` to ${board.title}` : ""} · not on your calendar`);
+          }
           next(card.id);
           router.refresh();
           return;
@@ -627,6 +663,11 @@ export function ImportTriage({ waiting, setAside, boards: boardsIn, theme, toSch
       {toast && (
         <div role="status" className="card-pop-in fixed inset-x-0 bottom-24 z-[60] mx-auto flex w-fit max-w-[92vw] items-center gap-3 rounded-full px-4 py-2 text-[14px]" style={{ background: "rgba(28,26,16,.95)", color: "#f6e7c1", border: "1px solid #8d7642", boxShadow: "0 6px 18px rgba(0,0,0,.4)" }}>
           <span className="min-w-0 truncate">{toast.text}</span>
+          {toast.act && (
+            <button type="button" onClick={toast.act.run} className="shrink-0 font-semibold underline underline-offset-2" style={{ color: "#f2d27e" }}>
+              {toast.act.label} ›
+            </button>
+          )}
           {toast.undo && (
             <button type="button" onClick={toast.undo} className="shrink-0 font-semibold underline underline-offset-2" style={{ color: "#f2d27e" }}>
               Undo
@@ -754,14 +795,30 @@ function LandsLine({ card, attrs }: { card: ImportCard; attrs: Attrs }) {
     const boardId = attrs.board === undefined ? (findBoard(boards, card.board_hint)?.id ?? null) : attrs.board;
     const board = boards.find((b) => b.id === boardId);
     const due = attrs.due === undefined ? (card.due_on ?? null) : attrs.due;
-    const parts = [
-      board ? `Lands on the ${board.title} board and in Additional Quests` : "Lands in Additional Quests",
-      attrs.slot ? `on your calendar ${slotWords(attrs.slot)}` : card.plan_within_days != null ? "on the auto-scheduler's list to get a time" : null,
-      due ? `due ${dueChipLabel(due)}` : null,
-    ].filter(Boolean);
-    words = `${parts.join(", ")}.`;
+    words = landsWords(board?.title ?? null, attrs.slot ?? null, card.plan_within_days ?? null, due);
   }
   return <>{words}</>;
+}
+
+/**
+ * What happens to a quest when you press Import, in one or two plain sentences (owner, Nov 18: "make sure
+ * that the user knows what's happening to it when they accept the import"). Nothing goes on the calendar
+ * without the user's own pick: a picked time puts it there; "Schedule within" puts it on the auto-scheduler's list.
+ */
+export function landsWords(board: string | null, slot: { start: string; end: string } | null, withinDays: number | null, due: string | null): string {
+  const where = board ? `Goes on the ${board} board and in Additional Quests` : "Goes in Additional Quests";
+  const by = due ? `, due ${dueChipLabel(due)}` : "";
+  if (slot) return `${where}${by}, and on your calendar ${slotWords(slot)}.`;
+  if (withinDays != null) return `${where}${by}, and onto the auto-scheduler's list to get a time ${withinWords(withinDays)}. It won't be on your calendar until you Auto-schedule it.`;
+  return `${where}${by}. Not on your calendar.`;
+}
+
+/** "within a week", "today", "within 2 weeks": the Schedule within pick, as the end of a sentence. */
+function withinWords(days: number): string {
+  if (days <= 0) return "today";
+  const o = planOptions().find((x) => x.days === days);
+  const label = (o?.label ?? `${days} days`).toLowerCase();
+  return label.startsWith("within") || label.startsWith("this") ? label : `within ${label}`;
 }
 
 /**

@@ -802,6 +802,15 @@ export const FLOWS = [
         await h.tap((p) => p.locator("[data-sched-rate]").getByRole("button", { name: /^this week$/i }).first(), "list: rate this week", { optional: true });
         await h.tap((p) => p.getByRole("button", { name: /import as|add as|log as/i }).first(), "import from list", { optional: true });
         await h.check("list: import steps");
+        // After Import the message says where it went, with Auto-schedule now for a quest on the list (owner, Nov 18).
+        if (await h.tap((p) => p.getByRole("button", { name: /^add to my list to schedule|^add the quest/i }).first(), "list: add it", { optional: true })) {
+          await h.settle(900);
+          await h.check("import toast");
+          if (await h.tap((p) => p.locator("[role=status] button", { hasText: /^auto-schedule now/i }).first(), "toast: auto-schedule now", { optional: true })) {
+            await h.settle(1500);
+            await h.check("toast: auto-scheduled");
+          }
+        }
         if (await h.find((p) => p.getByPlaceholder(/search/i).first()).isVisible().catch(() => false)) await h.typeIn((p) => p.getByPlaceholder(/search/i).first(), "import search");
       }
     },
