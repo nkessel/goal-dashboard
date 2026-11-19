@@ -1008,6 +1008,12 @@ export const FLOWS = [
           }
         }
       }
+      // Wheel factors move by dragging (owner, Nov 17).
+      if (await h.tap((p) => p.getByRole("button", { name: /edit what's on the wheel/i }).first(), "edit the wheel", { optional: true, expectMove: true })) {
+        await h.settle(500);
+        await h.check("wheel: its lists, dragged to reorder");
+        await h.tap((p) => p.getByRole("button", { name: /^done$/i }).first(), "wheel lists done", { optional: true, expectMove: true });
+      }
       await h.toggle(/last night/i, "last night", {});
       await h.tap(/did it/i, "ritual did it", { optional: true });
       await h.check("after ritual");

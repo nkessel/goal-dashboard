@@ -86,12 +86,11 @@ export function EventLog({ notes }: { notes: Note[] }) {
       return d.toISOString();
     }
     if (when === "now") return null;
-    if (when === "morning") {
-      d.setHours(9, 0, 0, 0);
-      return d.toISOString();
-    }
-    if (when === "yesterday") {
-      d.setDate(d.getDate() - 1);
+    // Earlier today or yesterday at the time you give (owner, Nov 18: "the event logged should be able to log the time").
+    if (when === "morning" || when === "yesterday") {
+      const [hh, mm] = (pickTime || "09:00").split(":").map(Number);
+      if (when === "yesterday") d.setDate(d.getDate() - 1);
+      d.setHours(Number.isFinite(hh) ? hh : 9, Number.isFinite(mm) ? mm : 0, 0, 0);
       return d.toISOString();
     }
     const t = new Date(`${pickDate}T${pickTime || "12:00"}`);
@@ -241,7 +240,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
             {(
               [
                 ["now", "Now"],
-                ["morning", "This morning"],
+                ["morning", "Earlier today"],
                 ["yesterday", "Yesterday"],
                 ["pick", "Pick a day…"],
               ] as const
@@ -260,7 +259,7 @@ export function EventLog({ notes }: { notes: Note[] }) {
                 style={{ borderColor: "#b39a6a", background: "rgba(255,255,255,.65)", color: INK }}
               />
             )}
-            {when === "pick" && !allDay && (
+            {when !== "now" && !allDay && (
               <TimeToken value={pickTime} onChange={setPickTime} label="What time" kind="any" compact />
             )}
             <label className="flex h-8 items-center gap-1.5 px-1 text-[13.5px] font-semibold" style={{ color: INK }}>

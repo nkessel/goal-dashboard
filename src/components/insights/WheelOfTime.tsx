@@ -1,5 +1,8 @@
 "use client";
 
+import { DndContext, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { saveNightAction, setWheelOfTimeAction } from "@/app/actions";
@@ -454,6 +457,7 @@ export function WheelOfTime({ initial, today }: { initial: WheelState; today: st
 
 function ListEditor({ title, color, items, weights, onChange, onWeight }: { title: string; color: string; items: string[]; weights: Record<string, number>; onChange: (next: string[]) => void; onWeight: (name: string, weight: number) => void }) {
   const [text, setText] = useState("");
+  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 6 } }));
   const add = () => {
     const t = text.replace(/\s+/g, " ").trim().slice(0, 60);
     if (t && !items.some((i) => i.toLowerCase() === t.toLowerCase())) onChange([...items, t]);
@@ -464,8 +468,21 @@ function ListEditor({ title, color, items, weights, onChange, onWeight }: { titl
       <span className="text-[11.5px] font-bold uppercase tracking-[.12em]" style={{ color }}>
         {title}
       </span>
-      {items.map((i) => (
-        <span key={i} className="flex items-center gap-2 text-[13.5px] leading-snug">
+      {/* Hold and drag a factor to move it (owner, Nov 17: "I should be able to re-order wheel factors"). */}
+      <DndContext
+        id={`wheel-${title}`}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={(e) => {
+          const from = items.indexOf(String(e.active.id));
+          const to = e.over ? items.indexOf(String(e.over.id)) : -1;
+          if (from >= 0 && to >= 0 && from !== to) onChange(arrayMove(items, from, to));
+        }}
+      >
+        <SortableContext items={items} strategy={verticalListSortingStrategy}>
+          {items.map((i) => (
+            <FactorRow key={i} id={i}>
+              <span className="flex items-center gap-2 text-[13.5px] leading-snug">
           <span className="flex-1">{i}</span>
           <span className="flex shrink-0 items-center rounded-full" role="group" aria-label={`How far ${i} turns the wheel`} style={{ border: "1px solid rgba(217,180,95,.4)" }}>
             <button type="button" onClick={() => onWeight(i, Math.max(1, weightOf(weights, i) - 1))} disabled={weightOf(weights, i) <= 1} aria-label={`Turn less for ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-bold hover:bg-white/10 disabled:opacity-30" style={{ color }}>
@@ -481,8 +498,11 @@ function ListEditor({ title, color, items, weights, onChange, onWeight }: { titl
           <button type="button" onClick={() => onChange(items.filter((x) => x !== i))} aria-label={`Remove ${i}`} className="flex h-7 w-7 items-center justify-center rounded-full text-[16px] hover:bg-white/10" style={{ color: SOFT }}>
             <CloseIcon size={10} />
           </button>
-        </span>
-      ))}
+              </span>
+            </FactorRow>
+          ))}
+        </SortableContext>
+      </DndContext>
       <div className="flex items-center gap-1.5 pt-1">
         <input
           value={text}
@@ -498,6 +518,22 @@ function ListEditor({ title, color, items, weights, onChange, onWeight }: { titl
           Add
         </button>
       </div>
+    </div>
+  );
+}
+
+/** One factor in the list, moved by holding and dragging the row itself. */
+function FactorRow({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      role="listitem"
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.85 : 1, zIndex: isDragging ? 2 : undefined, position: "relative", cursor: "grab", touchAction: "manipulation" }}
+    >
+      {children}
     </div>
   );
 }
