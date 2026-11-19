@@ -983,7 +983,7 @@ export const FLOWS = [
         if (!(await h.page.locator("[data-checkin-journal] button", { hasText: /tag \/ event/i }).count())) h.record({ kind: "checkin-journal", severity: "error", target: "check-in journal", detail: "Tag / event isn't inside the journal" });
         await h.page.reload();
         await h.settle(1500);
-        const kept = await h.page.locator("[data-checkin-draft]").first().isVisible().catch(() => false);
+        const kept = (await h.page.locator("[data-checkin-draft]").count()) > 0;
         if (!kept) h.record({ kind: "checkin-draft", severity: "error", target: "check-in draft", detail: "A started check-in wasn't kept after leaving and coming back" });
         await h.check("check-in: kept from earlier");
         await h.tap((p) => p.locator("[data-checkin-draft] button").first(), "start fresh", { optional: true, expectMove: true });

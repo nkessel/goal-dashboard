@@ -303,10 +303,7 @@ export function EnergyCheck({
         setEnergySet(true);
       }
       if (d.vals && Object.keys(d.vals).length) setVals(d.vals);
-      if (d.journal) {
-        setJournalText(d.journal);
-        setJournaling(true);
-      }
+      if (d.journal) setJournalText(d.journal);
       if (d.face !== null && d.face !== undefined) setJournalFace(d.face);
       setDraftBack(true);
       /* eslint-enable react-hooks/set-state-in-effect */
@@ -606,14 +603,6 @@ export function EnergyCheck({
                 <NightFields value={night} onChange={setNight} effort={wheel?.effort ?? []} hindrances={wheel?.hindrances ?? []} />
               </Fold>
             )}
-            {draftBack && (
-              <span className="fade-in flex items-center justify-center gap-2 text-[12.5px]" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }} data-checkin-draft>
-                Kept from earlier, not yet submitted
-                <button type="button" onClick={clearDraft} className="underline underline-offset-2">
-                  Start fresh
-                </button>
-              </span>
-            )}
             <div className="flex items-center gap-2">
               {/* The welcome screen's check-in is always open, so no caret there. */}
               {!(simple && full) && caret}
@@ -699,6 +688,15 @@ export function EnergyCheck({
                     >
                       <span aria-hidden style={{ color: "var(--t-gold)" }}>✎</span> Journal
                     </button>
+                    {/* A check-in started earlier and kept: said quietly on this line, so nothing below moves. */}
+                    {draftBack && (
+                      <span className="fade-in flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--ec-soft, rgba(239,230,204,.75))" }} data-checkin-draft>
+                        {journalText.trim() ? "Journal kept from earlier ·" : "Kept from earlier ·"}
+                        <button type="button" onClick={clearDraft} className="underline underline-offset-2">
+                          Start fresh
+                        </button>
+                      </span>
+                    )}
                     {suppSaved && <span className="confirm-pop text-[12.5px]" style={{ color: "var(--ec-gold, #f2d27e)" }}>✓ {suppSaved}</span>}
                     {journalSaved && <span className="confirm-pop text-[12.5px]" style={{ color: "var(--ec-gold, #f2d27e)" }}>✓ In your journal</span>}
                   </div>
