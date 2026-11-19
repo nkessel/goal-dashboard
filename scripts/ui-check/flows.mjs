@@ -1020,6 +1020,14 @@ export const FLOWS = [
     async run(h) {
       await h.goto("/calendar?view=week", { name: "calendar" });
       await h.settle(1200);
+      // The server's first picture (Nov 19, the loading glitch): only the days that will show, and no cards placed by
+      // the server's clock. Before the fix a day view sent 15 squeezed day columns, a week 21.
+      for (const [view, want] of [["day", 1], ["week", 7]]) {
+        const html = await h.page.request.get(new URL(`/calendar?view=${view}`, h.page.url()).href).then((r) => r.text()).catch(() => "");
+        const cols = (html.match(/data-cal-hit="/g) || []).length;
+        const cards = (html.match(/class="[^"]*cal-chip/g) || []).length;
+        if (html && (cols > want || cards > 0)) h.record({ kind: "first-picture", severity: "error", target: `calendar ${view}`, detail: `the server's page has ${cols} day columns (want ${want}) and ${cards} cards (want 0: cards are placed in the browser, in its time zone)` });
+      }
       await h.check("week");
       // 7 AM–10:30 PM by default, the rest behind a button each (owner, Nov 6), and the day headings pinned once scrolled (Nov 12).
       if (await h.tap((p) => p.locator("[data-hours='early']").first(), "before 7 AM", { optional: true, expectMove: true })) {

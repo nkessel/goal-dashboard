@@ -567,9 +567,14 @@ export async function failTask(taskId: string, ownerId: string, reason?: string 
     .eq("owner_id", ownerId)
     .eq("status", "open")
     .select("*")
-    .single();
+    .maybeSingle();
   if (error) throw new Error(`Couldn't mark that quest failed: ${error.message}`);
-  return data;
+  if (data) return data;
+  // Already finished (failed a moment ago from another card or tap, or done): nothing to change, no error
+  // (owner, Nov 18: a second tap on "Quest failure" showed React error #441).
+  const { data: cur, error: e2 } = await supabaseAdmin().from("tasks").select("*").eq("id", taskId).eq("owner_id", ownerId).maybeSingle();
+  if (e2 || !cur) throw new Error("That quest isn't there any more.");
+  return cur;
 }
 
 /**
