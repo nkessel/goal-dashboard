@@ -759,8 +759,8 @@ export function EnergyCheck({
                       rows={3}
                       placeholder="What's alive in you right now?"
                       aria-label="Journal about this check-in"
-                      className="bare-input w-full resize-none px-1 py-1 text-[16px] leading-snug sm:text-[15px]"
-                      style={{ background: "transparent", borderBottom: "1.5px solid rgba(217,180,95,.55)", color: "var(--t-cream)" }}
+                      className="bare-input w-full resize-none px-1 py-1 text-[16px] leading-snug outline-none focus:outline-none focus-visible:outline-none sm:text-[15px]"
+                      style={{ background: "transparent", border: 0, borderBottom: "1.5px solid rgba(217,180,95,.55)", borderRadius: 0, boxShadow: "none", color: "var(--t-cream)" }}
                     />
                     <span className="flex flex-wrap items-center gap-1.5">
                       <button

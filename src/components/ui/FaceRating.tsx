@@ -60,7 +60,7 @@ export function FaceRating({ value, onChange, label = "How it felt", compact = f
           >
             <FaceIcon v={f.v} size={compact ? 24 : 26} />
             {!compact && (
-              <span className="text-[11px] font-semibold" style={{ color: on ? f.color : light ? "rgba(239,230,204,.8)" : "#6b5631" }}>
+              <span className="text-[11px] font-semibold" style={{ color: on ? f.color : light ? "var(--ec-soft, rgba(239,230,204,.8))" : "#6b5631" }}>
                 {f.label}
               </span>
             )}
