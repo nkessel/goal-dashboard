@@ -485,9 +485,9 @@ function QuestCard({
           {task.title}
         </span>
         {doneNote && (
-          <span className="block truncate" style={{ color: "#4e6a35", fontSize: smallPx, fontStyle: "italic", lineHeight: `${smallLine}px` }}>
-            {/* When it was done (owner, Nov 5: "show when I completed quests in the past days"). */}
-            {task.completed_at ? `Done ${new Date(task.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase() + "m")}` : "Completed"}
+          <span className="block truncate" style={{ color: failed ? "#8a2a1c" : "#4e6a35", fontSize: smallPx, fontStyle: "italic", lineHeight: `${smallLine}px` }}>
+            {/* When it was done (owner, Nov 5: "show when I completed quests in the past days"), or failed. */}
+            {task.completed_at ? `${failed ? "Failed" : "Done"} ${new Date(task.completed_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).replace(/\s?([AP])M/i, (_, m: string) => m.toLowerCase() + "m")}` : failed ? "Failed" : "Completed"}
           </span>
         )}
         {placeLine && (
