@@ -161,7 +161,7 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
             >
               Log it
             </button>
-            <button type="button" onClick={() => setLeaf(null)} className="h-7 text-[13px] underline underline-offset-2" style={{ color: "inherit" }}>
+            <button type="button" onClick={() => setLeaf(null)} className="h-7 text-[13px] underline underline-offset-2" style={{ color: "#6b5631" }}>
               Cancel
             </button>
           </div>
