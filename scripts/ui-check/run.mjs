@@ -421,7 +421,7 @@ async function walk({ browser, device, time, tz, cookie }) {
     await fetch(`http://127.0.0.1:${DB_PORT}/__reset`, { method: "POST" }).catch(() => {});
     try {
       let timer;
-      await Promise.race([flow.run(h), new Promise((_, rej) => (timer = setTimeout(() => rej(new Error(`flow took over 4 minutes (stuck at screen "${screen}")`)), 240_000)))]).finally(() => clearTimeout(timer));
+      await Promise.race([flow.run(h), new Promise((_, rej) => (timer = setTimeout(() => rej(new Error(`flow took over ${Math.round((flow.timeoutMs ?? 240_000) / 60_000)} minutes (stuck at screen "${screen}")`)), flow.timeoutMs ?? 240_000)))]).finally(() => clearTimeout(timer));
     } catch (e) {
       record({ kind: "flow-crashed", severity: "error", target: flow.name, detail: e.message.split("\n")[0].slice(0, 300) });
       await page.screenshot({ path: `${OUT}shots/${String(++shotN).padStart(3, "0")}-${device}-${time}-${flow.name}-CRASH.png` }).catch(() => {});

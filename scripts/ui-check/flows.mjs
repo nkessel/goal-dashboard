@@ -181,6 +181,8 @@ export const FLOWS = [
     },
   },
   {
+    // The longest flow: it reached its last step right at 4 minutes on a phone (Nov 19), so it gets 7.
+    timeoutMs: 420_000,
     name: "today",
     async run(h) {
       await h.goto("/", { name: "today", reset: true });
