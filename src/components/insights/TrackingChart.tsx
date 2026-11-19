@@ -9,10 +9,8 @@ import { WeatherLocation } from "@/components/ui/WeatherLocation";
 import { fromFeedback } from "@/lib/from-feedback";
 
 type Reading = { metric: string; level: number; at: string };
+/** A thing you did or logged; `tone` is how it felt (-2 … 2), from an event's face or a quest's or habit's "How do you feel?". */
 type WinLite = { kind: string; at: string; xp: number; title?: string; icon?: string | null; details?: string | null; tone?: number | null };
-/** An event's colour by how it felt (minus, neutral, plus); others keep their kind's colour. */
-// A felt event shows its face on the chart (owner, Nov 13); its words on hover or a tap.
-const markColor = (w: WinLite, fallback: string) => (w.kind === "note" ? (faceOf(w.tone)?.color ?? fallback) : fallback);
 
 /** Series colors, checked for contrast and color-blind separation on parchment. */
 const SERIES = ["#c4620f", "#2a6fb5", "#24875a", "#8a3fa0", "#c23a48", "#a0880a"];
@@ -32,14 +30,33 @@ const TALLIES: { kind: string; one: string; many: string }[] = [
   { kind: "reward", one: "reward", many: "rewards" },
 ];
 const DAY = 86_400_000;
+/** Each day shows its waking hours, 7am to 11:30pm; the nights fold away between days (owner, Nov 19). */
+const H0 = 7;
+const H1 = 23.5;
+/** Where something you gave a face to sits on the 1–10 scale: Rough low … Wonderful high (owner, Nov 19). */
+const FACE_V: Record<number, number> = { [-2]: 1.6, [-1]: 3.5, 0: 5.5, 1: 7.5, 2: 9.4 };
+/** The check-in metric that rates the whole day. */
+const DAY_METRIC = "My day";
 const VIEW_KEY = "insights-view-2";
 const SHOWN_KEY = "insights-shown";
 
-type View = { range: 7 | 30 | 90; detail: "daily" | "every"; smooth: boolean; dots: boolean; marks?: "onLine" | "lines" | "lanes" };
+type View = {
+  range: 7 | 30 | 90;
+  detail: "daily" | "every";
+  smooth: boolean;
+  dots: boolean;
+  marks?: "onLine" | "lines" | "lanes";
+  /** Merged (things on the chart, by how they felt) or split (a time-of-day panel under it), owner Nov 19. */
+  layout?: "merged" | "split";
+  /** Each panel's height, dragged at its bottom edge. */
+  chartH?: number;
+  timeH?: number;
+};
 const DEFAULT_VIEW: View = { range: 30, detail: "every", smooth: true, dots: true, marks: "onLine" };
 
 const EVENTS: { key: string; label: string; kinds: string[]; glyph: string; color: string }[] = [
   { key: "quests", label: "Quests done", kinds: ["quest"], glyph: "◆", color: "#8a6116" },
+  { key: "fails", label: "Quests not done", kinds: ["fail"], glyph: "✕", color: "#8a2a1c" },
   { key: "habits", label: "Habits & rites", kinds: ["habit", "rite"], glyph: "●", color: "#5d7a3a" },
   { key: "journal", label: "Journal notes", kinds: ["journal"], glyph: "✎", color: "#6b4a8a" },
   { key: "notes", label: "Events & #tags", kinds: ["note"], glyph: "🏷", color: "#7a4a1a" },
@@ -158,6 +175,101 @@ function pathFor(pts: [number, number][], smooth: boolean) {
   return d;
 }
 
+/** A cloud that fills with the day's rain (owner, Nov 18: "the weather should show as a raincloud that is partially filled in"). */
+const CLOUD = "M-7 3a3.5 3.5 0 0 1 1-6.8a5 5 0 0 1 9.5-1a3.6 3.6 0 0 1 3.5 4.4a3 3 0 0 1-.5 3.4z";
+/** How full the cloud is: an inch (or 25 mm) fills it. */
+function rainShare(rain: number) {
+  const metric = !/^en-US/.test(typeof navigator === "undefined" ? "" : navigator.language);
+  return Math.max(0.15, Math.min(1, rain / (metric ? 25 : 1)));
+}
+
+type Placed = { key: string; x: number; y: number; u: number; hour: number; li: number; ev: (typeof EVENTS)[number]; w: WinLite; felt: number | null; label: string };
+
+/** One thing on the chart: a quest's portrait (or a gold check), a fail's ✕, or its kind's mark; in the split panel, with its face. */
+function ItemMark({ p, r, badge = false }: { p: Placed; r: number; badge?: boolean }) {
+  const { w, ev } = p;
+  const id = `im-${p.key}`;
+  return (
+    <g transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
+      <title>{p.label}</title>
+      {w.kind === "quest" ? (
+        w.icon ? (
+          <>
+            <clipPath id={id}>
+              <circle r={r - 1} />
+            </clipPath>
+            <circle r={r} fill="#efe2c2" stroke="#8a6c2c" strokeWidth="1.2" />
+            <image href={w.icon} x={-(r - 1)} y={-(r - 1)} width={(r - 1) * 2} height={(r - 1) * 2} clipPath={`url(#${id})`} preserveAspectRatio="xMidYMid slice" />
+          </>
+        ) : (
+          <>
+            <circle r={r} fill="#efe2c2" stroke="#8a6c2c" strokeWidth="1.2" />
+            <path d={`M${-r * 0.42} 0l${r * 0.28} ${r * 0.3} ${r * 0.56} ${-r * 0.6}`} stroke={INK} strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </>
+        )
+      ) : w.kind === "fail" ? (
+        <>
+          <circle r={r} fill="#efe2c2" stroke="#8a6c2c" strokeWidth="1.2" />
+          <path d={`M${-r * 0.36} ${-r * 0.36}l${r * 0.72} ${r * 0.72}M${r * 0.36} ${-r * 0.36}l${-r * 0.72} ${r * 0.72}`} stroke="#8a2a1c" strokeWidth="1.6" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <circle r={r} fill="#fbf3df" stroke={ev.color} strokeWidth="1.1" />
+          <EventMark k={ev.key} color={ev.color} size={r * 1.15} />
+        </>
+      )}
+      {badge && p.felt != null && (
+        <g transform={`translate(${(r * 0.85).toFixed(1)} ${(r * 0.85).toFixed(1)})`}>
+          <FaceIcon v={p.felt} size={r * 1.3} inSvg />
+        </g>
+      )}
+    </g>
+  );
+}
+
+/** A panel's bottom edge, dragged up or down to resize it; it lights gold when hovered or held. */
+function ResizeEdge({ y, x1, x2, label, svgRef, W, value, min, max, onChange }: { y: number; x1: number; x2: number; label: string; svgRef: React.RefObject<SVGSVGElement | null>; W: number; value: number; min: number; max: number; onChange: (v: number) => void }) {
+  const [hot, setHot] = useState(false);
+  const drag = useRef<{ y: number; v: number } | null>(null);
+  return (
+    <g>
+      <line x1={x1} x2={x2} y1={y} y2={y} stroke="#d9b45f" strokeWidth="3" strokeLinecap="round" opacity={hot ? 0.95 : 0} style={{ transition: "opacity 150ms" }} />
+      <rect
+        x={x1}
+        y={y - 6}
+        width={x2 - x1}
+        height={12}
+        fill="transparent"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={label}
+        aria-valuenow={Math.round(value)}
+        style={{ cursor: "ns-resize", touchAction: "none" }}
+        onPointerEnter={() => setHot(true)}
+        onPointerLeave={() => !drag.current && setHot(false)}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          e.currentTarget.setPointerCapture(e.pointerId);
+          drag.current = { y: e.clientY, v: value };
+          setHot(true);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          const r = svgRef.current?.getBoundingClientRect();
+          const scale = r ? W / r.width : 1;
+          onChange(Math.round(Math.max(min, Math.min(max, d.v + (e.clientY - d.y) * scale))));
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+          setHot(false);
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </g>
+  );
+}
+
 /**
  * Every tracked metric on one 1–10 chart, each toggled with a checkbox, with
  * optional strips for the weather and for things you did (quests, habits,
@@ -215,7 +327,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
     writeJSON(VIEW_KEY, next);
   }
   // Metrics and XP are on by default; weather and events off until ticked.
-  const isOn = (k: string) => shown[k] ?? !(k === "weather" || EVENTS.some((e) => e.key === k));
+  // Metrics, XP, quests, fails, habits and events are on by default (owner, Nov 19: they sit on the chart); weather, journal and rewards off until ticked.
+  const isOn = (k: string) => shown[k] ?? !(k === "weather" || k === "journal" || k === "rewards");
   function flip(k: string) {
     const next = { ...shown, [k]: !isOn(k) };
     setShown(next);
@@ -236,34 +349,57 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
   const W = 440;
   const L = 28;
   const R = 12;
-  const weatherH = showWeather ? 34 : 0;
-  const T = 10 + weatherH;
-  const plotH = 190;
-  // Events sit with the lines (on them, or as a marker line) unless kept in their own rows.
+  // Events sit on the chart by how they felt, as marker lines, or in their own rows.
   const marks = view.marks ?? "onLine";
+  const split = view.layout === "split";
+  // The visible window, in days (0 … n), each day its waking hours; pinching zooms it.
+  const [v0, v1] = zoom && zoom[0] >= 0 && zoom[1] <= n ? zoom : [0, n];
+  const visDays = Math.max(1, Math.round(v1 - v0));
+  // Zoomed in to a few days: the times show along the bottom and the days are divided by dotted lines.
+  const close = visDays <= 3;
+  const headH = showWeather ? 40 : 24;
+  const T = headH + 4;
+  const plotH = Math.max(90, Math.min(360, view.chartH ?? 190));
   const eventsH = activeEvents.length && marks === "lanes" ? 14 + activeEvents.length * 16 : 0;
-  const B = 22 + eventsH;
-  const H = T + plotH + B;
-  const [v0, v1] = zoom && zoom[0] >= start && zoom[1] <= end ? zoom : [start, end];
-  const x = (t: number) => L + ((t - v0) / (v1 - v0)) * (W - L - R);
-  const xDay = (i: number) => x(start + i * DAY + DAY / 2);
+  const timesH = close ? 16 : 0;
+  const plotEnd = T + plotH + timesH + eventsH;
+  const tP = plotEnd + 12;
+  const timeH = split ? Math.max(90, Math.min(400, view.timeH ?? 200)) : 0;
+  const sleepY = (split ? tP + timeH : plotEnd) + 16;
+  const H = sleepY + (nights ? 8 : -6);
+  const uOf = (t: number) => {
+    const d = new Date(t);
+    const m = new Date(t);
+    m.setHours(0, 0, 0, 0);
+    const i = Math.round((m.getTime() - start) / DAY);
+    const h = d.getHours() + d.getMinutes() / 60;
+    return i + Math.max(0, Math.min(1, (h - H0) / (H1 - H0)));
+  };
+  const xu = (u: number) => L + ((u - v0) / (v1 - v0)) * (W - L - R);
+  const x = (t: number) => xu(uOf(t));
+  const xDay = (i: number) => xu(i + 0.5);
   /** Where a pointer sits, in chart units (0…W). */
   const svgX = (clientX: number) => {
     const r = svgRef.current?.getBoundingClientRect();
     return r ? ((clientX - r.left) / r.width) * W : 0;
   };
-  const tAt = (px: number) => v0 + ((px - L) / (W - L - R)) * (v1 - v0);
-  const dayAt = (px: number) => Math.floor((tAt(px) - start) / DAY);
-  const inView = (i: number) => start + (i + 1) * DAY > v0 && start + i * DAY < v1;
-  const visDays = Math.max(1, Math.round((v1 - v0) / DAY));
-  /** Keep a zoom window inside the span, at least three days wide. */
+  const uAt = (px: number) => v0 + ((px - L) / (W - L - R)) * (v1 - v0);
+  const dayAt = (px: number) => Math.floor(uAt(px));
+  const inView = (i: number) => i + 1 > v0 && i < v1;
+  /** Keep a zoom window inside the span, at least a day wide. */
   function clampWin(a: number, b: number): [number, number] | null {
-    const span = Math.min(end - start, Math.max(3 * DAY, b - a));
-    if (span >= end - start - DAY / 4) return null;
-    const lo = Math.max(start, Math.min(a, end - span));
+    const span = Math.min(n, Math.max(1, b - a));
+    if (span >= n - 0.25) return null;
+    const lo = Math.max(0, Math.min(a, n - span));
     return [lo, lo + span];
   }
   const y = (v: number) => T + ((10 - v) * plotH) / 9;
+  /** The time-of-day panel (split): morning at the top, night at the bottom. */
+  const tY = (h: number) => tP + 8 + ((Math.max(H0, Math.min(H1, h)) - H0) / (H1 - H0)) * (timeH - 16);
+  const hourOf = (t: number) => {
+    const d = new Date(t);
+    return d.getHours() + d.getMinutes() / 60;
+  };
 
   const series = metrics.map((m, i) => {
     const rs = readings.filter((r) => r.metric === m && new Date(r.at).getTime() >= start);
@@ -290,11 +426,59 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
     eventsByDay.set(k, [...(eventsByDay.get(k) ?? []), w]);
   }
 
+  // How the day was: the day's "My day" check-ins, averaged (shown above the chart).
+  const dayRate = days.map((d) => {
+    const vs = readings.filter((r) => r.metric === DAY_METRIC && dayKey(new Date(r.at)) === dayKey(d)).map((r) => r.level);
+    return vs.length ? Math.round(vs.reduce((a, b) => a + b, 0) / vs.length) : null;
+  });
+  // The line things without a face rest on: the first line shown, read at that moment.
+  const restLine = visible[0] ? visible[0].pts.map((p) => [x(p.t), y(p.v)] as [number, number]).sort((a, b) => a[0] - b[0]) : [];
+  const lineAt = (px: number) => {
+    if (!restLine.length) return y(5.5);
+    if (px <= restLine[0][0]) return restLine[0][1];
+    for (let i = 1; i < restLine.length; i++) {
+      const [ax, ay] = restLine[i - 1];
+      const [bx, by] = restLine[i];
+      if (px <= bx) return bx === ax ? by : ay + ((by - ay) * (px - ax)) / (bx - ax);
+    }
+    return restLine[restLine.length - 1][1];
+  };
+  // Everything shown on the chart, placed so none hides another (owner, Nov 19: "making sure that items … aren't overlapping too much").
+  const itemR = close ? 9 : 7.5;
+  const placed: Placed[] = (() => {
+    const out: Placed[] = [];
+    const taken: [number, number][] = restLine.filter(([px]) => px >= L && px <= W - R);
+    const all = activeEvents
+      .flatMap((ev, li) => wins.filter((w) => ev.kinds.includes(w.kind)).map((w, wi) => ({ ev, li, w, wi, t: new Date(w.at).getTime() })))
+      .filter((o) => o.t >= start && o.t < end)
+      .sort((a, b) => a.t - b.t);
+    for (const o of all) {
+      const u = uOf(o.t);
+      if (u < v0 - 0.2 || u > v1 + 0.2) continue;
+      const px = xu(u);
+      const felt = typeof o.w.tone === "number" && FACE_V[o.w.tone] !== undefined ? o.w.tone : null;
+      const want = felt != null ? y(FACE_V[felt]) : lineAt(px) - itemR - 4;
+      const step = itemR * 2 + 2;
+      let py = want;
+      for (const k of [0, -1, 1, -2, 2, -3, 3, -4, 4]) {
+        const c = Math.max(T + itemR + 1, Math.min(T + plotH - itemR - 1, want + k * step));
+        if (taken.every(([tx, ty]) => Math.hypot(tx - px, ty - c) >= step - 1)) {
+          py = c;
+          break;
+        }
+      }
+      taken.push([px, py]);
+      const when = new Date(o.w.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      out.push({ key: `${o.ev.key}-${o.wi}`, x: px, y: py, u, hour: hourOf(o.t), li: o.li, ev: o.ev, w: o.w, felt, label: [`${o.w.title ?? o.ev.label} · ${when}`, felt != null ? faceOf(felt)?.label : null, o.w.details].filter(Boolean).join(" — ") });
+    }
+    return out;
+  })();
+
   const showXp = isOn("xp");
   const xpByDay = days.map((d) => (eventsByDay.get(dayKey(d)) ?? []).reduce((a, w) => a + (w.xp || 0), 0));
   const xpTop = Math.ceil(Math.max(10, ...xpByDay) / 10) * 10;
   const xpTotal = xpByDay.reduce((a, b) => a + b, 0);
-  const dayW = ((W - L - R) * DAY) / (v1 - v0);
+  const dayW = (W - L - R) / (v1 - v0);
 
   const tickEvery = visDays <= 7 ? 1 : visDays <= 30 ? 7 : 14;
   const hd = hover !== null ? days[hover] : null;
@@ -495,43 +679,56 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
             <clipPath id="plot-clip">
               <rect x={L} y={0} width={W - L - R} height={H} />
             </clipPath>
+            <clipPath id="head-clip">
+              <rect x={L} y={0} width={W - L - R + R} height={H} />
+            </clipPath>
+            <clipPath id="time-clip">
+              <rect x={L} y={tP} width={W - L - R} height={timeH} />
+            </clipPath>
           </defs>
-          {/* Weather strip */}
-          {showWeather && weather && (
-            <g clipPath="url(#plot-clip)">
-              {days.map((d, i) => {
-                const w = weather[dayKey(d)];
-                if (!w) return null;
-                const label = n <= 30 || i % 3 === 0;
-                return (
-                  <g key={i}>
-                    {w.rain > 0.02 && (() => {
-                      // A light-blue drop, filled with dark blue as far as the day was wet (an inch fills it).
-                      const metric = !/^en-US/.test(typeof navigator === "undefined" ? "" : navigator.language);
-                      const full = Math.max(0.15, Math.min(1, w.rain / (metric ? 25 : 1)));
-                      const drop = "M0 -6C2.6 -2.6 4 -0.6 4 1.6A4 4 0 0 1 -4 1.6C-4 -0.6 -2.6 -2.6 0 -6Z";
-                      const cx = xDay(i);
-                      const cy = 10 + weatherH - 7;
-                      return (
-                        <g transform={`translate(${cx.toFixed(1)} ${cy})`}>
-                          <clipPath id={`rain-${i}`}>
-                            <rect x="-5" y={(5.6 - 11.6 * full).toFixed(2)} width="10" height="12" />
-                          </clipPath>
-                          <path d={drop} fill="#cfe3f7" stroke="#2f5f9e" strokeWidth="0.9" />
-                          <path d={drop} fill="#2f5f9e" clipPath={`url(#rain-${i})`} />
-                        </g>
-                      );
-                    })()}
-                    {label && (
-                      <text x={xDay(i)} y={20} textAnchor="middle" fontSize={n <= 7 ? 12 : 9.5} fill={INK_SOFT}>
-                        {w.hi}°
+          {/* Above the chart, what belongs to a whole day (owner, Nov 19): its date, how the day was (the "My day"
+              check-in), and the rain, as a cloud that fills with how wet it was. */}
+          <g clipPath="url(#head-clip)">
+            {days.map((d, i) => {
+              if (!inView(i)) return null;
+              if (dayW < 34 && (n - 1 - i) % tickEvery !== 0) return null;
+              const x0 = xu(i) + 3;
+              const rate = dayRate[i];
+              const w = showWeather && weather ? weather[dayKey(d)] : null;
+              const wide = dayW >= 58;
+              return (
+                <g key={i}>
+                  <text x={wide ? x0 : xDay(i)} y={13} textAnchor={wide ? "start" : "middle"} fontSize="11.5" fill={INK_SOFT} fontFamily="var(--font-display, Georgia), serif">
+                    {i === n - 1 && !wide ? "today" : d.toLocaleDateString(undefined, wide ? { weekday: "short", day: "numeric" } : visDays <= 14 ? { weekday: "short" } : { month: "numeric", day: "numeric" })}
+                  </text>
+                  {rate != null && wide && (
+                    <g transform={`translate(${(x0 + 50).toFixed(1)} 9)`}>
+                      <title>{`How the day was: ${rate} of 10`}</title>
+                      <circle r="8" fill="#fffaf0" stroke="#a88a3f" strokeWidth="1" />
+                      <text y="3.6" textAnchor="middle" fontSize="10" fontWeight="700" fill={INK}>
+                        {rate}
                       </text>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
-          )}
+                    </g>
+                  )}
+                  {w && (wide || dayW >= 26) && (
+                    <g transform={`translate(${(wide ? x0 + 7 : xDay(i)).toFixed(1)} 30)`}>
+                      <title>{`${w.hi}° / ${w.lo}°${w.rain > 0.02 ? `, rain ${w.rain.toFixed(2)}` : ""}`}</title>
+                      <clipPath id={`cloud-${i}`}>
+                        <path d={CLOUD} />
+                      </clipPath>
+                      {w.rain > 0.02 && <rect x="-8" y={(3 - 9 * rainShare(w.rain)).toFixed(2)} width="16" height="10" fill="#7d93a8" opacity=".6" clipPath={`url(#cloud-${i})`} />}
+                      <path d={CLOUD} fill="none" stroke={INK} strokeWidth="1" />
+                      {wide && (
+                        <text x="11" y="3" fontSize="9.5" fill={INK_SOFT}>
+                          {w.hi}°
+                        </text>
+                      )}
+                    </g>
+                  )}
+                </g>
+              );
+            })}
+          </g>
 
           {/* XP per day: gilded columns behind the lines, on their own scale (top label, right). */}
           {showXp && (
@@ -561,14 +758,34 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               )}
             </g>
           ))}
-          {days.map((d, i) =>
-            (n - 1 - i) % tickEvery === 0 && inView(i) ? (
-              <text key={i} x={xDay(i)} y={T + plotH + 16} textAnchor="middle" fontSize="12" fill={INK_SOFT}>
-                {i === n - 1 ? "today" : d.toLocaleDateString(undefined, visDays <= 7 ? { weekday: "short" } : { month: "short", day: "numeric" })}
-              </text>
-            ) : null
-          )}
-          {hover !== null && <line x1={xDay(hover)} x2={xDay(hover)} y1={T} y2={T + plotH + eventsH + 20} stroke={INK_SOFT} strokeWidth="1" strokeDasharray="3 3" />}
+          {/* Days divided by a thin line, faint when zoomed out and dotted when zoomed in; the hours, dotted and fainter, with their times, once a day is wide enough (owner, Nov 19). */}
+          <g clipPath="url(#plot-clip)">
+            {days.map((_, i) =>
+              i > 0 && inView(i) ? (
+                <g key={i}>
+                  <line x1={xu(i)} x2={xu(i)} y1={T} y2={T + plotH} stroke="rgba(110,85,40,.42)" strokeWidth="1.1" strokeDasharray={close ? "2 3" : undefined} opacity={close ? 1 : 0.7} />
+                  {split && <line x1={xu(i)} x2={xu(i)} y1={tP} y2={tP + timeH} stroke="rgba(110,85,40,.42)" strokeWidth="1.1" strokeDasharray={close ? "2 3" : undefined} opacity={close ? 1 : 0.7} />}
+                </g>
+              ) : null
+            )}
+            {close &&
+              days.flatMap((_, i) =>
+                inView(i)
+                  ? [9, 12, 15, 18, 21].map((h) => {
+                      const hx = xu(i + (h - H0) / (H1 - H0));
+                      return (
+                        <g key={`${i}-${h}`}>
+                          <line x1={hx} x2={hx} y1={T} y2={T + plotH} stroke={GRID} strokeWidth="1" strokeDasharray="1 4" />
+                          <text x={hx} y={T + plotH + 12} textAnchor="middle" fontSize="9.5" fill={INK_SOFT}>
+                            {h === 12 ? "noon" : `${h % 12}${h < 12 ? "a" : "p"}`}
+                          </text>
+                        </g>
+                      );
+                    })
+                  : []
+              )}
+          </g>
+          {hover !== null && <line x1={xDay(hover)} x2={xDay(hover)} y1={T} y2={sleepY - 10} stroke={INK_SOFT} strokeWidth="1" strokeDasharray="3 3" />}
 
           {/* Lines */}
           <g clipPath="url(#plot-clip)">
@@ -595,57 +812,86 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
 
           </g>
 
-          {/* Events by the lines: a marker line at the moment, or the icon sitting on the day's average. */}
+          {/* Marker lines: a dashed line at the moment, its mark at the top. */}
           <g clipPath="url(#plot-clip)">
-          {marks !== "lanes" &&
-            activeEvents.flatMap((ev, li) =>
-              wins
-                .filter((w) => ev.kinds.includes(w.kind))
-                .map((w, wi) => {
-                  const t = new Date(w.at).getTime();
-                  if (t < start || t >= end) return null;
-                  const px = x(t);
-                  const di = Math.floor((t - start) / DAY);
-                  if (marks === "lines")
-                    return (
-                      <g key={`${ev.key}-${wi}`}>
-                        <title>{[w.title, w.details].filter(Boolean).join(" — ")}</title>
-                        <line x1={px} x2={px} y1={T} y2={T + plotH} stroke={markColor(w, ev.color)} strokeWidth="1.3" strokeDasharray="3 3" opacity=".75" />
-                        <g transform={`translate(${px.toFixed(1)} ${T + 6 + li * 12})`}>
-                          <EventMark k={ev.key} color={markColor(w, ev.color)} size={9} />
-                        </g>
-                      </g>
-                    );
-                  // On the average of the lines shown, at that moment (the middle when there's nothing to sit on).
-                  const near = visible
-                    .map((s) => {
-                      const inDay = s.pts.filter((p) => p.t >= start + di * DAY && p.t < start + (di + 1) * DAY);
-                      return inDay.length ? inDay.reduce((a, p) => a + p.v, 0) / inDay.length : null;
-                    })
-                    .filter((v): v is number => v !== null);
-                  const avgV = near.length ? near.reduce((a, b) => a + b, 0) / near.length : 5.5;
-                  return (
-                    <g key={`${ev.key}-${wi}`} transform={`translate(${px.toFixed(1)} ${(y(avgV) - 1 - (wi % 3) * 3).toFixed(1)})`}>
-                      {/* Hover: its title and details. A felt event is a coloured + / ● / − button. */}
-                      <title>{[w.title, w.details].filter(Boolean).join(" — ")}</title>
-                      {w.kind === "note" && faceOf(w.tone) ? (
-                        <FaceIcon v={w.tone!} size={18} inSvg />
-                      ) : (
-                        <>
-                          <circle r="7.5" fill="#fbf3df" stroke={ev.color} strokeWidth="1.2" opacity=".95" />
-                          <EventMark k={ev.key} color={ev.color} size={9} />
-                        </>
-                      )}
-                    </g>
-                  );
-                })
-            )}
-
+          {marks === "lines" &&
+            placed.map((p) => (
+              <g key={p.key}>
+                <title>{p.label}</title>
+                <line x1={p.x} x2={p.x} y1={T} y2={T + plotH} stroke={p.ev.color} strokeWidth="1.3" strokeDasharray="3 3" opacity=".75" />
+                <g transform={`translate(${p.x.toFixed(1)} ${T + 6 + p.li * 12})`}>
+                  <EventMark k={p.ev.key} color={p.ev.color} size={9} />
+                </g>
+              </g>
+            ))}
+          {/* Merged (owner, Nov 19): each thing at its time, at the height of the face you gave it; without a face,
+              just above the line at that moment. Nudged up or down so none hides another; the time stays put. */}
+          {marks === "onLine" && !split && placed.map((p) => <ItemMark key={p.key} p={p} r={close ? 9 : 7.5} />)}
           </g>
+
+          {/* Split: the time-of-day panel under the chart, check-ins on the left of each day, things on the right. */}
+          {split && (
+            <g>
+              <rect x={L} y={tP} width={W - L - R} height={timeH} rx="6" fill="rgba(255,250,235,.45)" />
+              {[9, 12, 15, 18, 21].map((h) => (
+                <g key={h}>
+                  <line x1={L} x2={W - R} y1={tY(h)} y2={tY(h)} stroke={GRID} strokeWidth="1" strokeDasharray="1 4" />
+                  <text x={L - 4} y={tY(h) + 3} textAnchor="end" fontSize="9.5" fill={INK_SOFT}>
+                    {h === 12 ? "noon" : `${h % 12}${h < 12 ? "a" : "p"}`}
+                  </text>
+                </g>
+              ))}
+              <g clipPath="url(#time-clip)">
+                {readings
+                  .filter((r) => isOn(r.metric) && r.metric === (visible[0]?.metric ?? ""))
+                  .map((r, i) => {
+                    const t = new Date(r.at).getTime();
+                    if (t < start || t >= end) return null;
+                    const di = Math.floor(uOf(t));
+                    if (!inView(di)) return null;
+                    const cx = xu(di + 0.3);
+                    const cy = tY(hourOf(t));
+                    return (
+                      <path key={i} d={`M${cx.toFixed(1)} ${(cy - 6).toFixed(1)}L${(cx + 5).toFixed(1)} ${cy.toFixed(1)}L${cx.toFixed(1)} ${(cy + 6).toFixed(1)}L${(cx - 5).toFixed(1)} ${cy.toFixed(1)}Z`} fill="#d9b45f" stroke="#6b4a14" strokeWidth="1">
+                        <title>{`Check-in, ${new Date(r.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}</title>
+                      </path>
+                    );
+                  })}
+                {placed.map((p) => (
+                  <ItemMark key={p.key} p={{ ...p, x: xu(Math.floor(p.u) + 0.68), y: tY(p.hour) }} r={close ? 9 : 7.5} badge />
+                ))}
+              </g>
+            </g>
+          )}
+
+          {/* Last night's sleep, under each day. */}
+          {nights && (
+            <g clipPath="url(#head-clip)">
+              {days.map((d, i) => {
+                const night = nights[dayKey(d)];
+                const m = night ? sleptMinutes({ bed: night.bed, wake: night.wake, effort: [], hindrances: [], at: "" }) : null;
+                if (!m || !inView(i) || dayW < 46) return null;
+                const x0 = xu(i) + 4;
+                return (
+                  <g key={i} transform={`translate(${x0.toFixed(1)} ${sleepY})`}>
+                    <title>{`Slept ${night?.bed ? prettyTime(night.bed) : "?"} → ${night?.wake ? prettyTime(night.wake) : "?"}`}</title>
+                    <path d="M5.5 -4.6A4 4 0 1 0 9 1.2A3.2 3.2 0 0 1 5.5 -4.6Z" fill="none" stroke={INK_SOFT} strokeWidth="1" />
+                    <text x="12" y="1" fontSize="9.5" fill={INK_SOFT}>
+                      {dayW >= 80 ? `slept ${minutesLabel(m)}` : minutesLabel(m)}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
+          {/* Each panel's bottom edge drags to give it more or less room (owner, Nov 19); no grip, the edge itself moves. */}
+          <ResizeEdge y={T + plotH} x1={L} x2={W - R} label="Resize the chart" svgRef={svgRef} W={W} value={plotH} min={90} max={360} onChange={(v) => setV({ chartH: v })} />
+          {split && <ResizeEdge y={tP + timeH} x1={L} x2={W - R} label="Resize the time-of-day panel" svgRef={svgRef} W={W} value={timeH} min={90} max={400} onChange={(v) => setV({ timeH: v })} />}
 
           {/* Event lanes */}
           {marks === "lanes" && activeEvents.map((ev, li) => {
-            const ly = T + plotH + 32 + li * 16;
+            const ly = T + plotH + timesH + 14 + li * 16;
             return (
               <g key={ev.key}>
                 <line x1={L} x2={W - R} y1={ly} y2={ly} stroke={GRID} strokeWidth="1" strokeDasharray="1 4" />
@@ -751,7 +997,8 @@ export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metr
               <Seg label="Time span" value={String(view.range)} options={[["7", "Week"], ["30", "Month"], ["90", "3 months"]]} onPick={(v) => setV({ range: Number(v) as View["range"] })} />
               <Seg label="Points" value={view.detail} options={[["daily", "Daily average"], ["every", "Every check-in"]]} onPick={(v) => setV({ detail: v as View["detail"] })} />
               <Seg label="Lines" value={view.smooth ? "smooth" : "straight"} options={[["smooth", "Smooth"], ["straight", "Straight"]]} onPick={(v) => setV({ smooth: v === "smooth" })} />
-              <Seg label="Events" value={view.marks ?? "onLine"} options={[["onLine", "On the line"], ["lines", "Marker lines"], ["lanes", "Own rows"]]} onPick={(v) => setV({ marks: v as View["marks"] })} />
+              <Seg label="Layout" value={view.layout ?? "merged"} options={[["merged", "Merged"], ["split", "Split"]]} onPick={(v) => setV({ layout: v as View["layout"] })} />
+              {!split && <Seg label="Things you did" value={view.marks ?? "onLine"} options={[["onLine", "On the chart"], ["lines", "Marker lines"], ["lanes", "Own rows"]]} onPick={(v) => setV({ marks: v as View["marks"] })} />}
               <label className="relative z-[1] flex min-h-8 items-center gap-2 text-[14px]" style={{ color: INK }}>
                 <input type="checkbox" checked={view.dots} onChange={() => setV({ dots: !view.dots })} />
                 Show each point

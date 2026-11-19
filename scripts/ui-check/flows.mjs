@@ -1060,6 +1060,31 @@ export const FLOWS = [
       if (await h.tap(/show insights chart/i, "show the chart", { optional: true })) {
         await h.settle(500);
         await h.check("chart open");
+        // Round 3 (owner, Nov 19): a week, things on the chart by how they felt; then split, with its panels resized.
+        if (await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear", { optional: true, expectMove: true })) {
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^week$/i }).first(), "chart: a week", { optional: true });
+          await h.page.keyboard.press("Escape");
+          await h.settle(500);
+          await h.check("chart: the week, merged");
+          await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear again", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^split$/i }).first(), "chart: split", { optional: true });
+          await h.page.keyboard.press("Escape");
+          await h.settle(500);
+          await h.check("chart: split");
+          const edge = h.page.locator("[role=separator][aria-label='Resize the time-of-day panel']").first();
+          const box = await edge.boundingBox().catch(() => null);
+          if (box) {
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+            await h.page.mouse.down();
+            await h.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 60, { steps: 6 });
+            await h.page.mouse.up();
+            await h.settle(400);
+            await h.check("chart: split, the time panel taller");
+          }
+          await h.tap((p) => p.getByRole("button", { name: /^chart view settings$/i }).first(), "chart gear, back", { optional: true, expectMove: true });
+          await h.tap((p) => p.getByRole("dialog", { name: /chart view settings/i }).getByRole("radio", { name: /^merged$/i }).first(), "chart: merged", { optional: true });
+          await h.page.keyboard.press("Escape");
+        }
       }
       // The check-in's Journal: five faces, words on the card, and Tag / event and Supplement inside it; what you started
       // is kept if you leave and come back (owner, Nov 18).

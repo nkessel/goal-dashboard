@@ -57,14 +57,16 @@ export function makeFixtures() {
     task("Book the dentist cleaning", { plan_by: inHours(48), schedule_rank: 1 }),
     task("See Grandma for tea", { plan_by: inHours(24 * 9), schedule_rank: 2, estimate_minutes: 90 }),
     task("Clear out the shed someday", { schedule_rank: 3 }),
-    task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20 }),
+    task("Finished: return library books", { status: "completed", completed_at: inHours(-3), xp_awarded: 20, felt: 2 }),
+    // Failed yesterday, and how it felt (owner, Nov 19): a fail on the Insights chart.
+    task("Morning run", { status: "completed", completed_at: inHours(-20), failed_at: inHours(-20), felt: -1 }),
   ];
   // The calendar: quests placed on it today and this week, one done, and a mini-quest with a time (Nov 3).
   const at = (h, mins = 60) => ({ is_on_calendar: true, scheduled_start: inHours(h), scheduled_end: inHours(h + mins / 60), estimate_minutes: mins });
   tasks.push(
     task("Goblin paperwork: renew the car registration", at(1.5)),
     task("Draft the facilitation workshop outline", { board_id: course.id, ...at(3.5, 90) }),
-    task("Herb gathering at the farmers market", { status: "completed", completed_at: inHours(-1), xp_awarded: 20, ...at(-1.5, 45) }),
+    task("Herb gathering at the farmers market", { status: "completed", completed_at: inHours(-1), xp_awarded: 20, felt: 1, ...at(-1.5, 45) }),
     task("Scout the old trail with Chester", at(25, 60)),
     // Written in [brackets]: a maybe, drawn as a dashed outline with no fill (owner, Nov 12).
     task("[Stretch and tea on the porch]", at(5.5, 45)),

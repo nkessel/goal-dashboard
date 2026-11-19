@@ -36,7 +36,7 @@ export default async function InsightsPage() {
     listEnergySince(uid, since),
     listCheckInsSince(uid, since),
     getCheckMetrics(uid),
-    listWinsSince(uid, since),
+    listWinsSince(uid, since, { fails: true }),
     listCheckNotesSince(uid, since),
     // Streaks look back a year for slips.
     profileP.then((pr) => (pr?.life_wheel?.streaks?.length ? listCheckNotesSince(uid, yearAgo) : [])),
@@ -86,7 +86,7 @@ export default async function InsightsPage() {
   const archived = new Set(marks.archived ?? []);
   const readings = allReadings.filter((r) => !r.key || !archived.has(r.key));
   const chartWins = [
-    ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null })),
+    ...wins.filter((w) => w.kind !== "feedback" || (w.xp ?? 0) > 0).map((w) => ({ kind: w.kind, at: w.at, xp: w.xp ?? 0, title: w.title, icon: w.icon ?? null, tone: w.felt ?? null })),
     ...notes.map((n) => ({ kind: "note", at: n.created_at, xp: 0, title: n.body, details: n.details ?? null, tone: n.tone ?? null })),
   ];
 
