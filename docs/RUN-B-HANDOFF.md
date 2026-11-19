@@ -33,7 +33,7 @@ The Run B list from the dev plan, updated with what has happened since it was wr
 | `review/prioritize-bars` | **OK if the UI check is clean, not merged** | Merges clean. UI check the Prioritize flow; ship if clean, otherwise tell the owner what it found. |
 | `review/cleaning-xp` | **Not approved yet.** Finished Nov 19 (XP burst, three tray looks), conflicts with `main` | Merge `main` into it, UI check, publish a review page with the three tray looks, wait for his pick. |
 
-Waiting on the owner's review, **don't merge** without his OK: `review/boards-nov18` (contains `review/calendar-nov18`), `review/subquests-sequence`, `review/insights-nov19`. Their entries in `docs/WAITING.md` list the notes to mark when he says OK.
+Waiting on the owner's review, **don't merge** without his OK: `review/boards-nov18` (contains `review/calendar-nov18`) (**except** "Calendar events as quests": shipped to `main` on its own Nov 19 with XP by the event's length, `lib/data/event-quests.ts`, `lib/event-quest-xp.ts`, `EventQuestsSwitch.tsx`; when that branch merges, keep `main`'s versions of those files and drop the branch's `questSeries`/series-look writes from `makeEventQuests` unless the series look is approved too), `review/subquests-sequence`, `review/insights-nov19`. Their entries in `docs/WAITING.md` list the notes to mark when he says OK.
 
 **2. S2, S3** (split plan, `docs/plans/2026-11-16-split-plan.md`): fixtures, baselines, and splitting the UI check's too-long `today` flow (Light 8). S1 (`--snapshot` / `--compare`) is done; use it around every move.
 

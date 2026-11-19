@@ -50,6 +50,7 @@ import {
   listEvents,
 } from "@/lib/google-calendar";
 import { coinsForXp } from "@/lib/coins";
+import { readEventQuestSettings as readEventQuestSettingsOf } from "@/lib/data/event-quests";
 import { stepsComplete } from "@/lib/habit-steps";
 import { earlyBirdBonus, earlyBirdCoins, oneStepPerProject } from "@/lib/next-action";
 
@@ -2273,7 +2274,10 @@ export async function unscheduleTaskAction(taskId: string) {
   }
   const { data: t } = await supabaseAdmin().from("tasks").select("plan_xp, status").eq("id", taskId).eq("owner_id", profileId).maybeSingle<{ plan_xp: number | null; status: string }>();
   const eventId = await tasksData.unscheduleTask(taskId, profileId);
-  if (eventId && accessToken) await deleteCalendarEvent(accessToken, eventId).catch(() => {});
+  // A quest made from a calendar event leaves that event where it was (it may be a meeting someone else
+  // set up); only quests the app put on Google take their event with them.
+  const fromEvent = eventId ? !!readEventQuestSettingsOf(await readExtras(profileId)).made?.[eventId] : false;
+  if (eventId && accessToken && !fromEvent) await deleteCalendarEvent(accessToken, eventId).catch(() => {});
   if (t && t.plan_xp !== null && t.plan_xp !== undefined && t.status === "open") {
     await tasksData.deleteTask(taskId, profileId);
     if (t.plan_xp > 0) await xp.awardXp(profileId, -t.plan_xp, "task_completed");
@@ -3803,6 +3807,40 @@ export async function setCalCardLookAction(taskId: string, look: CalCardLook | n
   const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, calCardLooks: all } }).eq("id", ownerId);
   if (error) throw new Error(`Couldn't save: ${error.message}`);
   return l;
+}
+
+// ---------------------------------------------------------------------------
+// Calendar events as quests (owner, Nov 18; XP by the event's length, Nov 19)
+
+/** Whether upcoming calendar events become quests by themselves. */
+export async function eventQuestsSettingAction(): Promise<{ on: boolean }> {
+  const ownerId = await requireProfileId();
+  return { on: readEventQuestSettingsOf(await readExtras(ownerId)).on };
+}
+
+export async function setEventQuestsAction(on: boolean) {
+  const ownerId = await requireProfileId();
+  const extras = await readExtras(ownerId);
+  const cur = readEventQuestSettingsOf(extras);
+  // Turning it on starts from now: events already past stay as they are.
+  const next = { ...cur, on, ...(on && !cur.on ? { since: new Date().toISOString() } : {}) };
+  const { error } = await supabaseAdmin().from("profiles").update({ life_wheel: { ...extras, eventQuests: next } }).eq("id", ownerId);
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return { on };
+}
+
+/** "Make it a quest" on an event: remember it, so it's never made again and its event stays on removal. */
+export async function recordEventQuestAction(taskId: string, eventId: string) {
+  const ownerId = await requireProfileId();
+  if (!QUEST_ID.test(taskId) || !eventId || eventId.length > 300) return;
+  const extras = await readExtras(ownerId);
+  const cur = readEventQuestSettingsOf(extras);
+  await supabaseAdmin()
+    .from("profiles")
+    .update({ life_wheel: { ...extras, eventQuests: { ...cur, made: { ...(cur.made ?? {}), [eventId]: taskId } } } })
+    .eq("id", ownerId);
 }
 
 /** The gem each reward wears on its tag (a diamond unless chosen), kept on the account by reward id. */
