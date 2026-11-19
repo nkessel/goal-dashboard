@@ -1,5 +1,6 @@
 "use client";
 
+import { markReopenedNow } from "@/lib/failed-now";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -491,8 +492,16 @@ export function QuestComplete(props: QuestCompleteProps) {
                     // Wait for the completion to land first (or cancel it if it was still waiting offline).
                     const onlyHere = await settleCompletion(taskId);
                     if (!onlyHere) await reopenTaskAction(taskId);
-                    router.refresh();
+                    // Its card shows it open at once, and the scene is forgotten before the page redraws, so a
+                    // redraw never brings it back (owner, Nov 6: "puts me back into the celebration screen").
+                    markReopenedNow(taskId);
+                    try {
+                      sessionStorage.removeItem("quest-celebration");
+                    } catch {
+                      /* storage unavailable */
+                    }
                     onClose();
+                    router.refresh();
                   } catch (e) {
                     setUndoError(isNetworkError(e) ? "You're offline: try again once you're back." : e instanceof Error ? e.message : "Couldn't undo that.");
                   }

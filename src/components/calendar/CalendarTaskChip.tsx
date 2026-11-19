@@ -1,6 +1,6 @@
 "use client";
 
-import { useFailedNow } from "@/lib/failed-now";
+import { useFailedNow, useReopenedNow } from "@/lib/failed-now";
 import { isTentativeTitle } from "@/lib/tentative";
 import { createContext, useContext, useState } from "react";
 
@@ -63,7 +63,8 @@ export function CalendarTaskChip({
   const isAdventure = theme === "adventure";
   const [editing, setEditing] = useState(false);
   const router = useRouter();
-  const isCompleted = task.status === "completed";
+  const reopenedNow = useReopenedNow(task.id);
+  const isCompleted = task.status === "completed" && !reopenedNow;
   // Tapping a quest's portrait completes it, with the celebration (owner, Nov 5).
   const [completing, setCompleting] = useState(false);
   function complete() {
@@ -302,8 +303,9 @@ function QuestCard({
 }) {
   // Failed a moment ago on this page: looks failed before fresh data arrives.
   const failedNow = useFailedNow(task.id);
-  const failed = !!task.failed_at || failedNow;
-  const done = task.status === "completed" || failedNow;
+  const reopenedNow = useReopenedNow(task.id);
+  const failed = (!!task.failed_at && !reopenedNow) || failedNow;
+  const done = (task.status === "completed" && !reopenedNow) || failedNow;
   const { w, h } = box;
   // The quests waiting behind it, as an agenda (owner, Nov 3: time with Dad, then what to bring up).
   const agenda = useContext(AgendaContext)[task.id] ?? [];

@@ -15,7 +15,7 @@ import { fromFeedback } from "@/lib/from-feedback";
 import { CardLookPicker } from "./CardLookPicker";
 import { DrivePicks } from "@/components/tasks/DrivePicks";
 import { saveQuestPlace, useQuestPlace } from "@/lib/use-quest-places";
-import { useFailedNow } from "@/lib/failed-now";
+import { markReopenedNow, useFailedNow } from "@/lib/failed-now";
 
 export type MenuTarget = { kind: "task"; task: Task; start: Date; end: Date } | { kind: "event"; id: string; title: string; start: Date; end: Date };
 
@@ -200,6 +200,7 @@ export function CalendarItemMenu({ target, x, y, theme, onClose }: { target: Men
               onClick={() =>
                 startTransition(async () => {
                   await reopenTaskAction(target.task.id).catch(() => {});
+                  markReopenedNow(target.task.id);
                   router.refresh();
                   onClose();
                 })
