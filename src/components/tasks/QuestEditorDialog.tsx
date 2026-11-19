@@ -70,6 +70,7 @@ import { isNetworkError, isOffline, queueOffline, saveOrQueue } from "@/lib/offl
 import { addOptimisticQuest, markOptimisticQueued, resolveOptimisticQuest } from "@/lib/optimistic-quests";
 import { CoinIcon } from "@/components/ui/Icons";
 import { StatSplitEditor } from "./StatSplitEditor";
+import { StatXpLine } from "./StatXpLine";
 import { statAbbr } from "@/lib/stats";
 import { LevelScales, useScaleStyle, type ScaleItem } from "@/components/ui/LevelScales";
 import { QuestPicker, SequenceDialog } from "./Sequence";
@@ -1968,26 +1969,15 @@ export function QuestEditorDialog({
                     </span>
                   </span>
                 </div>
+                {/* Each stat's XP under the slider (owner, Nov 19). Review build: the three looks he's choosing between; hidden while the tray (which lists them) is open, so the editor doesn't jump as you tap. */}
+                {!doingNow && statTotal > 0 && !statsOpen && (
+                  <>
+                    {(["line", "ruler", "ledger"] as const).map((look) => (
+                      <StatXpLine key={look} look={look} xp={xp} split={statSplit} isAdventure={isAdventure} onOpen={() => setStatsOpen(true)} />
+                    ))}
+                  </>
+                )}
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* Each stat's XP as small chips under the slider, beside the coins; they wrap when there are many (owner, Nov 19: "shown beneath the xp slider", "make it look nicer").
-                      Tapping one opens the stats tray; hidden while the tray (which lists them) is open, so the editor doesn't jump as you tap. */}
-                  {!doingNow && statTotal > 0 && !statsOpen && (
-                    <button type="button" onClick={() => setStatsOpen(true)} aria-label="Change the XP shared with stats" className="due-in flex min-w-0 flex-1 flex-wrap items-center gap-1 text-left tabular-nums">
-                      {Object.entries(statSplit)
-                        .filter(([, p]) => p > 0)
-                        .map(([k, p]) => (
-                          <span key={k} title={k} className="qe-fact inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-full pl-1 pr-2 text-[12.5px]">
-                            <span aria-hidden className="font-display flex h-[18px] min-w-[30px] items-center justify-center rounded-full px-1 text-[9.5px] font-bold tracking-wide" style={{ background: "radial-gradient(circle at 35% 30%, #f6dc8e, #d9b45f 55%, #a88a3f)", color: "#2a1c10", border: "1px solid #6b5124" }}>
-                              {statAbbr(k)}
-                            </span>
-                            <b>+{Math.round((xp * p) / 100)}</b>
-                          </span>
-                        ))}
-                      <span className="inline-flex h-6 items-center whitespace-nowrap px-1 text-[12px]" style={{ color: "var(--t-ink-soft)" }}>
-                        <b className="mr-1" style={{ color: isAdventure ? "var(--t-xp)" : "var(--t-accent)" }}>{xp - Object.values(statSplit).reduce((a, p) => a + Math.round((xp * p) / 100), 0)}</b> to your level
-                      </span>
-                    </button>
-                  )}
                   {!doingNow && (
                     <span className="ml-auto flex h-9 shrink-0 items-center gap-0.5 rounded-lg border px-1" style={fieldStyle} title="Coins earned on completion">
                       <button
