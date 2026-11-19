@@ -4,6 +4,7 @@ Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on 
 
 ## In progress right now (claim before you start; remove your line when you ship)
 
+- **Run B (Sonnet 5.5), handed to another account Nov 19:** start from `docs/RUN-B-HANDOFF.md`. Its first step merges the approved `review/time-ranges-lesson-button`, `review/additional-habits` and `review/prioritize-bars`; other sessions: leave those three to it.
 - **Session claude-2d (Opus, owner's account, Nov 19 overnight)**: waiting on review: `review/boards-nov18`, `review/subquests-sequence`, `review/insights-nov19` (below); toucan-only welcome mockups sent. The Nov 18 check-in notes are built on `review/insights-nov19`; the shorter-quest ask is on `review/boards-nov18`. Not touching `insights/TrackedEvents.tsx`. Other sessions: please take something else.
 
 ## 0a. Work in progress and waiting on the owner (Nov 12)
