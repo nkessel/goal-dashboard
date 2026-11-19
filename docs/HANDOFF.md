@@ -38,7 +38,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 - `review/time-ranges-lesson-button` (time ranges for habits and quests, chosen habits in the auto-scheduler, Complete lesson button): built Nov 16, review page sent, waiting on his OK or notes.
 - Insights on one graph for every metric (owner, Nov 16): not built. The toucan offering habits: on hold (both in WAITING).
 - Merging Daily Habits and Today's Quests on Today: brainstorm with him first.
-- Stat XP cleanup (tray, your levels, celebration): mockups sent Nov 19, build his pick.
+- Stat XP pill when more stats than fit: mockups A–D sent Nov 19, build his pick.
 - The welcome screen is paused (off by default); toucan-only mockups A/B/C sent Nov 19: build his pick.
 - The email to Daniel about his Champion title: needs his OK and wording.
 - Waiting on his iPhone: a list of things cloud sessions can't check (in `docs/WAITING.md` and `docs/PRIORITIES.md`).
