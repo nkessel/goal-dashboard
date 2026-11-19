@@ -1,6 +1,7 @@
 "use client";
 
 import { FaceIcon, FaceRating, faceOf, isFace } from "@/components/ui/FaceRating";
+import { askFelt } from "@/components/ui/FeltAsk";
 
 import { TimeToken } from "@/components/xp/NightFields";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -115,10 +116,14 @@ export function EventLog({ notes }: { notes: Note[] }) {
       try {
         // "a, b; c" is three events (unless you keep it as one).
         const parts = splitEvents(words, split);
+        const ids: string[] = [];
         for (const w of parts) {
           const out = await saveOrQueue("logEvent", { title: w, details: parts.length > 1 ? null : details, tone, at: at ?? new Date().toISOString(), allDay });
           if (!out.queued && !out.result.ok) throw new Error(out.result.error);
+          if (!out.queued && out.result.ok && out.result.note?.id) ids.push(out.result.note.id);
         }
+        // No face picked: ask once it's logged (owner, Nov 19: "How do you feel?" at the end of logging anything).
+        if (tone == null && ids.length === 1 && !all.length) askFelt({ kind: "note", id: ids[0] });
         for (const t of all) {
           const out = await saveOrQueue("logEvent", { title: `#${t}`, details: words ? null : details, tone: words ? null : tone, at: at ?? new Date().toISOString(), allDay });
           if (!out.queued && !out.result.ok) throw new Error(out.result.error);

@@ -1,6 +1,7 @@
 "use client";
 
 import { clearQuestNow, markReopenedNow } from "@/lib/failed-now";
+import { FeltAsk } from "@/components/ui/FeltAsk";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -458,6 +459,12 @@ export function QuestComplete(props: QuestCompleteProps) {
             </div>
           </div>
 
+          {/* "How do you feel?" (owner, Nov 19): optional; a tap saves it, and it folds to a quiet ✓. */}
+          {taskId && !preview && (
+            <div className="qc-fade mt-1 w-full">
+              <FeltAsk target={{ kind: "quest", id: taskId }} light size={28} />
+            </div>
+          )}
           {/* Actions */}
           <div className="qc-btns mt-1 flex w-full gap-2.5">
             <button

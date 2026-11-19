@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { askFelt } from "@/components/ui/FeltAsk";
 import { deleteCheckNoteAction, saveTrackedEventsAction, trackedEventsAction } from "@/app/actions";
 import { saveOrQueue } from "@/lib/offline";
 import { Fold } from "@/components/ui/Fold";
@@ -71,6 +72,7 @@ export function TrackedEvents({ onLogged }: { onLogged?: () => void }) {
     const id = r.note?.id;
     setSaid({ text: `✓ ${name} · ${at}`, undo: id ? () => void deleteCheckNoteAction(id).then(() => (setSaid({ text: "Taken back" }), onLogged?.())) : undefined });
     onLogged?.();
+    if (id) askFelt({ kind: "note", id });
   };
   const add = () => {
     const t = draft.trim();

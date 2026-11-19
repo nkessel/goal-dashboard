@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { createQuestAction, failTaskAction } from "@/app/actions";
 import { markFailedNow } from "@/lib/failed-now";
 import type { Task } from "@/lib/data/types";
+import { FeltAsk } from "@/components/ui/FeltAsk";
+
+/** Short, kind lines about falling and rising, chosen by the quest so it stays the same while open. */
+const FAIL_LINES = ["Fall seven times, stand up eight.", "Every master was once a beginner.", "The path is made by walking it.", "Rest, then rise again.", "Each try leaves a footprint on the path."];
+const hashOf = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7);
 
 /**
  * Failing a quest, in place in a menu (owner, Nov 9–13: "fail it from the context menu… an optional reason… a red X
@@ -18,6 +23,7 @@ export function FailQuest({ task, onBack, onDone }: { task: Pick<Task, "id" | "t
   const [failed, setFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [again, setAgain] = useState<string | null>(null);
+  const [retry, setRetry] = useState(false);
 
   if (failed)
     return (
@@ -25,20 +31,22 @@ export function FailQuest({ task, onBack, onDone }: { task: Pick<Task, "id" | "t
         <span className="font-display text-[16px] font-semibold" style={{ color: "var(--t-ink)" }}>
           Marked as failed
         </span>
-        <span className="text-[13px] leading-snug" style={{ color: "var(--t-ink-soft)" }}>
-          Every quest teaches something. Want to plan a follow-up to finish the mission?
+        {/* A wise line, then how it felt, then Try again or Continue (owner, Nov 19). */}
+        <span className="font-display text-center text-[17px] italic leading-snug" style={{ color: "var(--t-ink)" }}>
+          &ldquo;{FAIL_LINES[Math.abs(hashOf(task.id)) % FAIL_LINES.length]}&rdquo;
         </span>
+        <FeltAsk target={{ kind: "quest", id: task.id }} size={26} />
         {again ? (
-          <span className="reveal text-[13px] font-semibold" style={{ color: "var(--t-good, #3f6b2a)" }}>
+          <span className="reveal text-center text-[13px] font-semibold" style={{ color: "var(--t-good, #3f6b2a)" }}>
             ✓ {again}
           </span>
-        ) : (
-          <div className="flex flex-col gap-1.5">
+        ) : retry ? (
+          <div className="reveal flex flex-col gap-1.5" data-fail-retry>
             <button
               type="button"
               disabled={pending}
               className="min-h-10 rounded-full px-4 text-left text-[14px] font-semibold disabled:opacity-60"
-              style={{ background: "linear-gradient(180deg,#f2d58a,#d9b45f)", border: "1px solid #8a6116", color: "#2a1c10" }}
+              style={{ border: "1px solid #b39a6a", color: "var(--t-ink)" }}
               onClick={() =>
                 startTransition(async () => {
                   try {
@@ -55,7 +63,7 @@ export function FailQuest({ task, onBack, onDone }: { task: Pick<Task, "id" | "t
                       iconSource: task.icon_source === "ai" || task.icon_source === "library" ? task.icon_source : undefined,
                       placement: "today",
                     });
-                    setAgain("Added to Today's Quests");
+                    setAgain("A copy is on Today's Quests");
                     router.refresh();
                   } catch (e) {
                     setError(e instanceof Error ? e.message : "Couldn't add it.");
@@ -63,7 +71,7 @@ export function FailQuest({ task, onBack, onDone }: { task: Pick<Task, "id" | "t
                 })
               }
             >
-              ↻ Try again: a new copy of this quest
+              A copy of this quest
             </button>
             <button
               type="button"
@@ -75,13 +83,18 @@ export function FailQuest({ task, onBack, onDone }: { task: Pick<Task, "id" | "t
                 setTimeout(() => (document.querySelector('[aria-label="Create something new"]') as HTMLElement | null)?.click(), 60);
               }}
             >
-              ✦ Start a new quest
+              A new quest
             </button>
           </div>
-        )}
-        <div className="flex justify-end">
-          <button type="button" onClick={onDone} className="h-9 px-2 text-[13px] underline underline-offset-2" style={{ color: "var(--t-ink-soft)" }}>
-            {again ? "Close" : "Not now"}
+        ) : null}
+        <div className="flex items-center justify-center gap-2 pt-1">
+          {!again && !retry && (
+            <button type="button" onClick={() => setRetry(true)} className="h-10 rounded-full px-5 text-[14px] font-semibold" style={{ background: "#fffaf0", border: "1px solid #a88a3f", color: "var(--t-ink)" }}>
+              Try again
+            </button>
+          )}
+          <button type="button" onClick={onDone} className="qe-save h-10 rounded-full px-5 text-[14px] font-semibold">
+            Continue
           </button>
         </div>
         {error && (

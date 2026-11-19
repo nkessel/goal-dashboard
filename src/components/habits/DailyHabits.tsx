@@ -1,6 +1,7 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
+import { askFelt } from "@/components/ui/FeltAsk";
 import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -336,8 +337,15 @@ export function DailyHabits({
     startTransition(async () => {
       try {
         // Done and undone share one key, so only the latest waits when offline.
-        if (next) await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
-        else await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+        if (next) {
+          const out = await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+          // "How do you feel?" (owner, Nov 19), once it's saved.
+          if (!out.queued) askFelt({ kind: "habit", riteId: h.id, day });
+        }
+        else {
+          await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);
+          window.dispatchEvent(new Event("felt-ask-done"));
+        }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [h.id]: !next }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");

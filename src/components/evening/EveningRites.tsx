@@ -1,6 +1,7 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
+import { askFelt } from "@/components/ui/FeltAsk";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { progressWords } from "@/lib/progress-words";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
@@ -259,8 +260,15 @@ export function EveningRites({
     }
     startTransition(async () => {
       try {
-        if (next) await saveOrQueue("completeRite", { id: r.id, day, pct }, `rite:${r.id}:${day}`);
-        else await saveOrQueue("uncompleteRite", { id: r.id, day }, `rite:${r.id}:${day}`);
+        if (next) {
+          const out = await saveOrQueue("completeRite", { id: r.id, day, pct }, `rite:${r.id}:${day}`);
+          // "How do you feel?" (owner, Nov 19), once it's saved.
+          if (!out.queued) askFelt({ kind: "habit", riteId: r.id, day });
+        }
+        else {
+          await saveOrQueue("uncompleteRite", { id: r.id, day }, `rite:${r.id}:${day}`);
+          window.dispatchEvent(new Event("felt-ask-done"));
+        }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [r.id]: !next }));
         setError(e instanceof Error ? e.message : "Couldn't save that.");
