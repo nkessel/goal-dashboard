@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { getWelcomeLayoutAction, saveWelcomeLayoutAction, type WelcomeLayout } from "@/app/actions";
 import { loadFx, patchFx, subscribeFx, type FxSettings } from "@/lib/celebration-fx";
+import { fromStartup } from "@/lib/startup";
 
 const KEYS = ["welcomeMode", "welcomeOrder", "welcomeHide", "welcomeArchived", "welcomeDawnOn", "welcomeHabitsOn", "welcomeButtons", "welcomeSleep", "welcomeMetrics", "welcomeLine", "welcomeStreak", "welcomeBar", "journalPrompts", "journalPromptsV", "journalAllPrompts", "journalPick"] as const;
 const pick = (fx: FxSettings): WelcomeLayout => {
@@ -24,7 +25,7 @@ export function WelcomeLayoutSync() {
     let last = "";
     let ready = false;
     let timer: number | undefined;
-    getWelcomeLayoutAction()
+    fromStartup("welcomeLayout", getWelcomeLayoutAction)
       .then((acct) => {
         if (!live) return;
         const local = pick(loadFx());

@@ -74,5 +74,9 @@
   {
     "match": "^tour\\|layout-shift\\|.*Relational Leadership Academy",
     "reason": "Walkthrough, after Create it: the quest you just made joins Today's Quests (fresh data after the save), so the cards under it move down one card. That is the new quest arriving, not the page jumping; the card it points at next is the new quest."
+  },
+  {
+    "match": "^tour\\|(covered-by-bar|floating-overlap)\\|.*tour-guard",
+    "reason": "On purpose (owner, Nov 19): during a show-and-tell step of the walkthrough, clear guards lie over the dimmed screen so taps there don't open what's hidden behind it (the avatar, the menu, other tabs). The lit part stays tappable."
   }
 ]

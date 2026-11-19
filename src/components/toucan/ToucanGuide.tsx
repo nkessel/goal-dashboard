@@ -53,6 +53,7 @@ import { ToucanQuiz } from "./ToucanQuiz";
 import { dailyBudget, polish, voice, windowOf } from "@/lib/toucan-style";
 import { storeStyle, useToucanStyle } from "@/lib/toucan-style-store";
 import { Fold } from "@/components/ui/Fold";
+import { fromStartup } from "@/lib/startup";
 
 type PlanTarget = { id: string; title: string; estimate: number | null; dueAt: string | null };
 type Msg = { role: "user" | "assistant"; content: string; actions?: (CoachAction & { auto?: boolean })[]; remembered?: CoachNote[] };
@@ -224,7 +225,7 @@ export function ToucanGuide() {
   const mode = useToucanMode();
   // Your choices (mode, switched-off lines) come along from your account.
   useEffect(() => {
-    toucanPrefsAction()
+    fromStartup("toucanPrefs", toucanPrefsAction)
       .then((p) => {
         try {
           if (window.localStorage.getItem("toucan-mode") !== p.mode) {

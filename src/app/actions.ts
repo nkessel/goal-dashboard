@@ -5130,6 +5130,34 @@ export async function tourNameAction(): Promise<string | null> {
   return ((data?.name as string | null | undefined) ?? "").trim().split(/\s+/)[0] || null;
 }
 
+/**
+ * What the app shell asks for as it opens, in one request (owner, Nov 19: "loading/opening the app is
+ * super buggy"). These were seven separate calls, and server actions run one at a time, so a tap
+ * (ticking a quest) waited behind all of them. Read through `fromStartup` in `src/lib/startup.ts`;
+ * a part that fails here is asked for again on its own.
+ */
+export async function startupAction() {
+  const [ownWords, welcomeLayout, questCalExtras, questPlaces, tour, tourName, toucanPrefs] = await Promise.allSettled([
+    getOwnWordsAction(),
+    getWelcomeLayoutAction(),
+    questCalExtrasAction(),
+    questPlacesAction(),
+    tourAction(),
+    tourNameAction(),
+    toucanPrefsAction(),
+  ]);
+  const ok = <T,>(r: PromiseSettledResult<T>) => (r.status === "fulfilled" ? { ok: true as const, value: r.value } : { ok: false as const });
+  return {
+    ownWords: ok(ownWords),
+    welcomeLayout: ok(welcomeLayout),
+    questCalExtras: ok(questCalExtras),
+    questPlaces: ok(questPlaces),
+    tour: ok(tour),
+    tourName: ok(tourName),
+    toucanPrefs: ok(toucanPrefs),
+  };
+}
+
 export async function saveTourAction(state: TourState) {
   const ownerId = await requireProfileId();
   const clean: TourState = {

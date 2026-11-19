@@ -58,7 +58,7 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 
 | Who | What | Files | Ships |
 |---|---|---|---|
-| Thread "Fix buggy app loading" (owner's account) | Tutorial dark area blocks taps; new versions switch over only while the app is in the background; Today's server uses the user's time zone (no redraw); one request on open instead of 10 | `tour/Walkthrough.tsx`, `public/sw.js`, `src/app/page.tsx` and the startup data loaders, likely `actions.ts` | Straight to `main` once checked (owner OK) |
+| Thread "Fix buggy app loading" (owner's account) | Tutorial dark area blocks taps; new versions switch over only while the app is in the background; Today's server uses the user's time zone (no redraw); one request on open instead of 10 | `tour/Walkthrough.tsx`, `public/sw.js`, `src/app/page.tsx` and the startup data loaders, likely `actions.ts` | **Shipped Nov 19** (see `docs/SHIPPED.md`) |
 | Thread "Design a tray that opens from its pill" (owner's account) | Pointer tray (B) for every `.qe-fact` pill row; the import card gets an Urgency scale beside When, like the quest card | `imports/ImportTriage.tsx`, the quest editor's pill row and panels, the habit editor, `globals.css` | `main` (owner asked to ship it live) |
 | Session claude-2d (Opus, owner's account) | Waiting on review: `review/boards-nov18`, `review/subquests-sequence`, `review/insights-nov19` | boards, calendar, quest editor (sub-quests), Insights | After his OK |
 

@@ -41,17 +41,16 @@ function registerWorker() {
 
 /**
  * The app opens from the copy kept on the device (public/sw.js) while the screen is fetched again
- * behind it. Once running, the page asks whether that's done: new data refreshes in place; a new
- * version of the app (a deploy) or a sign-out reloads, at once if you haven't touched anything
- * yet, otherwise the next time you leave the app.
+ * behind it. Once running, the page asks whether that's done: new data refreshes in place; a
+ * sign-out reloads at once. A new version of the app (a deploy) never reloads in front of you
+ * (owner, Nov 19: "loading/opening the app is super buggy": the screen showed, then reloaded a
+ * second later): it swaps in the next time the app is hidden, and this copy keeps working till then.
  */
 function askFresh(refresh: () => void): () => void {
   const sw = typeof navigator !== "undefined" ? navigator.serviceWorker : undefined;
   if (!sw?.controller) return () => {};
-  let touched = false;
-  const touch = () => (touched = true);
   let reloadLater = false;
-  // Opened again (not a reload), so the new copy the helper just kept shows at once.
+  // Opened again (not a reload), so the new copy the helper just kept shows next time.
   const reopen = () => window.location.replace(window.location.href);
   const onHide = () => {
     if (reloadLater && document.visibilityState === "hidden") reopen();
@@ -59,22 +58,42 @@ function askFresh(refresh: () => void): () => void {
   const onMsg = (e: MessageEvent) => {
     const d = e.data as { type?: string; ok?: boolean; build?: boolean; gone?: boolean } | null;
     if (d?.type !== "fresh") return;
-    if (d.gone || d.build) {
-      if (!touched) reopen();
-      else reloadLater = true;
-    } else if (d.ok) refresh();
+    if (d.gone) reopen();
+    else if (d.build) reloadLater = true;
+    else if (d.ok) refresh();
   };
-  window.addEventListener("pointerdown", touch, { once: true, capture: true });
-  window.addEventListener("keydown", touch, { once: true, capture: true });
   document.addEventListener("visibilitychange", onHide);
   sw.addEventListener("message", onMsg);
   sw.startMessages?.();
   sw.controller.postMessage({ type: "fresh?", url: window.location.href });
   return () => {
-    window.removeEventListener("pointerdown", touch, { capture: true });
-    window.removeEventListener("keydown", touch, { capture: true });
     document.removeEventListener("visibilitychange", onHide);
     sw.removeEventListener("message", onMsg);
+  };
+}
+
+/**
+ * A screen still running the version before a deploy can ask for a piece of code that the new
+ * version no longer has (opening an editor for the first time). Then it opens again from the new
+ * version, at most once a minute, instead of leaving a broken screen.
+ */
+function reloadOnStaleCode(): () => void {
+  const stale = (m: unknown) => /ChunkLoadError|Loading (CSS )?chunk [\w-]+ failed|Failed to fetch dynamically imported module/i.test(String(m));
+  const go = () => {
+    try {
+      const last = Number(sessionStorage.getItem("stale-code-reload")) || 0;
+      if (Date.now() - last < 60_000) return;
+      sessionStorage.setItem("stale-code-reload", String(Date.now()));
+    } catch {}
+    window.location.reload();
+  };
+  const onErr = (e: ErrorEvent) => (stale(e.message) || stale(e.error?.name)) && go();
+  const onRej = (e: PromiseRejectionEvent) => (stale(e.reason?.name) || stale(e.reason?.message ?? e.reason)) && go();
+  window.addEventListener("error", onErr);
+  window.addEventListener("unhandledrejection", onRej);
+  return () => {
+    window.removeEventListener("error", onErr);
+    window.removeEventListener("unhandledrejection", onRej);
   };
 }
 
@@ -106,12 +125,14 @@ export function OfflineSync({ profileId }: { profileId: string }) {
     void flushOffline();
     registerWorker();
     const stopFresh = askFresh(() => router.refresh());
+    const stopStale = reloadOnStaleCode();
     return () => {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
       window.removeEventListener("offline-synced", synced);
       document.removeEventListener("visibilitychange", seen);
       stopFresh();
+      stopStale();
     };
   }, [profileId, router]);
   return <OfflinePill />;

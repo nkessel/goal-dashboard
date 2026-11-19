@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { questCalExtrasAction, setCalCardLookAction, setQuestDriveAction, type CalCardLook } from "@/app/actions";
+import { fromStartup } from "@/lib/startup";
 
 // Driving time to a quest's place (minutes each way) and its calendar card's look, kept on the account
 // (`life_wheel.questDrives`, `life_wheel.calCardLooks`), read once per page load (owner, Nov 12).
@@ -13,7 +14,7 @@ const emit = () => subs.forEach((f) => f());
 
 function subscribe(cb: () => void) {
   subs.add(cb);
-  loading ??= questCalExtrasAction()
+  loading ??= fromStartup("questCalExtras", questCalExtrasAction)
     .then((r) => {
       drives = { ...r.drives, ...drives };
       looks = { ...r.looks, ...looks };
