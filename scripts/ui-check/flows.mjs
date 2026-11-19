@@ -240,7 +240,7 @@ export const FLOWS = [
             await h.tap((p) => p.getByRole("button", { name: /^save$/i }).first(), "stats: save", { optional: true, expectMove: true });
             await h.check("quest editor: stats saved");
             // Review build: the three looks for the stats under the XP slider, one at a time (owner, Nov 19).
-            for (const look of ["line", "ruler", "ledger"]) {
+            for (const look of ["board", "leaders", "strip"]) {
               const shown = await h.page.evaluate((l) => { const all = [...document.querySelectorAll("[data-stat-look]")]; all.forEach((el) => (el.style.display = el.dataset.statLook === l ? "" : "none")); return all.length; }, look).catch(() => 0);
               if (shown) { await h.settle(300); await h.check(`quest editor: stats look ${look}`); }
             }

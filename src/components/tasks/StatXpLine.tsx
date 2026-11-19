@@ -2,15 +2,16 @@ import { statAbbr } from "@/lib/stats";
 
 /**
  * Each stat's share of a quest's XP, under the quest editor's XP slider
- * (owner, Nov 19: "shown beneath the xp slider"). Three simple looks for his
- * pick; tapping opens the stats tray.
- *   line   — the stats' full names and XP in one quiet line of text
- *   ruler  — a thin bar split like the XP, with each stat's mark under its part
- *   ledger — a small, even table: mark and XP, and what's left for your level
+ * (owner, Nov 19: "shown beneath the xp slider"; picked the ledger, then asked
+ * for better spacing). Three spacings of the ledger for his pick; tapping
+ * opens the stats tray.
+ *   board   — evenly spread across the slider: mark on top, amount below; your level's share under the XP total
+ *   leaders — two even columns, mark · dotted leader · amount; your level's share closes the list
+ *   strip   — one row split by thin gold rules, evenly spread; your level's share under the XP total
  */
-export type StatXpLook = "line" | "ruler" | "ledger";
+export type StatXpLook = "board" | "leaders" | "strip";
 
-const GOLD = ["#c9a24a", "#a88a3f", "#dcbc6a", "#8a6c2c", "#e8cf8a", "#b8913f"];
+const MARK = "#8a6116";
 
 export function StatXpLine({
   look,
@@ -31,63 +32,66 @@ export function StatXpLine({
   if (!parts.length) return null;
   const left = Math.max(0, xp - parts.reduce((a, s) => a + s.amount, 0));
   const xpInk = isAdventure ? "var(--t-xp)" : "var(--t-accent)";
+  const cols = Math.min(parts.length, 5);
+  // Three to a row: "STR 10" needs more room than a phone gives five side by side.
+  const stripCols = Math.min(parts.length, 3);
   const common = { type: "button" as const, onClick: onOpen, "aria-label": "Change the XP shared with stats", "data-stat-look": look };
-  // Lines up with the slider's track (the −5 button is about 42px wide, then the 8px gap).
-  const align = "ml-[50px] mr-[86px] -mt-1";
+  // The slider row: −5 (≈42px) · gap · track · gap · +5 (≈42px) · gap · the XP total (≈64px).
+  const mark = "font-display text-[10px] font-bold uppercase tracking-[.12em]";
 
-  if (look === "line") {
+  if (look === "board") {
     return (
-      <button {...common} className={`due-in ${align} block text-left text-[12.5px] leading-snug`} style={{ color: "var(--t-ink-soft)" }}>
-        {parts.map((s, i) => (
-          <span key={s.stat}>
-            {i > 0 && " · "}
-            <span className="whitespace-nowrap">
-              {s.stat} <span className="tabular-nums" style={{ color: "var(--t-ink)" }}>{s.amount}</span>
+      <button {...common} className="due-in -mt-0.5 flex items-start text-center tabular-nums">
+        <span className="ml-[50px] grid flex-1 gap-y-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {parts.map((s) => (
+            <span key={s.stat} className="flex flex-col items-center leading-none" title={s.stat}>
+              <span className={mark} style={{ color: MARK }}>{statAbbr(s.stat)}</span>
+              <span className="mt-1 text-[15px] font-semibold" style={{ color: "var(--t-ink)" }}>{s.amount}</span>
             </span>
-          </span>
-        ))}
-        {" · "}
-        <span className="whitespace-nowrap">
-          <span className="tabular-nums" style={{ color: xpInk }}>{left}</span> to your level
+          ))}
+        </span>
+        <span className="ml-[50px] flex w-[64px] shrink-0 flex-col items-center leading-none">
+          <span className={mark} style={{ color: xpInk }}>Level</span>
+          <span className="mt-1 text-[15px] font-semibold" style={{ color: xpInk }}>{left}</span>
         </span>
       </button>
     );
   }
 
-  if (look === "ruler") {
-    const total = Math.max(1, xp);
+  if (look === "leaders") {
+    const row = "flex items-baseline gap-1.5 leading-tight";
+    const dots = <span aria-hidden className="mb-[3px] min-w-3 flex-1 border-b border-dotted" style={{ borderColor: "rgba(139,112,64,.45)" }} />;
     return (
-      <button {...common} className={`due-in ${align} flex flex-col gap-0.5 text-left`}>
-        <span className="flex h-[5px] w-full overflow-hidden rounded-full" style={{ background: "rgba(139,112,64,.18)" }}>
-          {parts.map((s, i) => (
-            <span key={s.stat} className="h-full" style={{ width: `${(s.amount / total) * 100}%`, background: GOLD[i % GOLD.length], borderRight: "1px solid #f6ecd2" }} />
-          ))}
-          <span className="h-full flex-1" style={{ background: xpInk, opacity: 0.55 }} />
-        </span>
-        <span className="flex flex-wrap gap-x-2 text-[11.5px] tabular-nums leading-tight" style={{ color: "var(--t-ink-soft)" }}>
-          {parts.map((s) => (
-            <span key={s.stat} className="whitespace-nowrap" title={s.stat}>
-              <span className="font-display text-[10px] font-bold tracking-wide" style={{ color: "#8a6116" }}>{statAbbr(s.stat)}</span> {s.amount}
-            </span>
-          ))}
-          <span className="whitespace-nowrap">
-            <span className="tabular-nums" style={{ color: xpInk }}>{left}</span> to your level
+      <button {...common} className="due-in ml-[50px] mr-[50px] -mt-0.5 grid grid-cols-2 gap-x-6 gap-y-1 text-left text-[13.5px] tabular-nums">
+        {parts.map((s) => (
+          <span key={s.stat} className={row} title={s.stat}>
+            <span className={mark} style={{ color: MARK }}>{statAbbr(s.stat)}</span>
+            {dots}
+            <span className="font-semibold" style={{ color: "var(--t-ink)" }}>{s.amount}</span>
           </span>
+        ))}
+        <span className={`${row} ${parts.length % 2 ? "" : "col-span-2"}`}>
+          <span className={mark} style={{ color: xpInk }}>Level</span>
+          {dots}
+          <span className="font-semibold" style={{ color: xpInk }}>{left}</span>
         </span>
       </button>
     );
   }
 
   return (
-    <button {...common} className={`due-in ${align} grid grid-cols-[repeat(3,minmax(0,62px))] gap-x-4 gap-y-0 text-left text-[12.5px] tabular-nums leading-snug`} style={{ color: "var(--t-ink-soft)" }}>
-      {parts.map((s) => (
-        <span key={s.stat} className="flex items-baseline gap-1.5 whitespace-nowrap" title={s.stat}>
-          <span className="font-display text-[10.5px] font-bold tracking-wide" style={{ color: "#8a6116" }}>{statAbbr(s.stat)}</span>
-          <span style={{ color: "var(--t-ink)" }}>{s.amount}</span>
-        </span>
-      ))}
-      <span className="col-span-3 whitespace-nowrap text-[12px]">
-        <span className="tabular-nums" style={{ color: xpInk }}>{left} XP</span> to your level
+    <button {...common} className="due-in -mt-0.5 flex items-center text-center tabular-nums">
+      <span className="ml-[50px] grid flex-1 gap-y-1" style={{ gridTemplateColumns: `repeat(${stripCols}, minmax(0, 1fr))` }}>
+        {parts.map((s, i) => (
+          <span key={s.stat} className="flex items-baseline justify-center gap-1.5 whitespace-nowrap text-[13.5px] leading-6" style={{ borderLeft: i % stripCols ? "1px solid rgba(168,138,63,.45)" : undefined }} title={s.stat}>
+            <span className={mark} style={{ color: MARK }}>{statAbbr(s.stat)}</span>
+            <span className="font-semibold" style={{ color: "var(--t-ink)" }}>{s.amount}</span>
+          </span>
+        ))}
+      </span>
+      <span className="ml-[50px] flex w-[64px] shrink-0 items-baseline justify-center gap-1 self-start whitespace-nowrap text-[13.5px] leading-6">
+        <span className={mark} style={{ color: xpInk }}>Lvl</span>
+        <span className="font-semibold" style={{ color: xpInk }}>{left}</span>
       </span>
     </button>
   );
