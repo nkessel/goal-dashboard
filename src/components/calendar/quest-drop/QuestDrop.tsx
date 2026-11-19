@@ -94,6 +94,10 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
   const [phase, setPhase] = useState<Phase>("loading");
   const [paused, setPaused] = useState(false);
   const [aim, setAim] = useState<Aim>("fall");
+  // The quest list on phones: a fold near the top, its height dragged by its bottom edge.
+  const [showQueue, setShowQueue] = useState(false);
+  const [queueH, setQueueH] = useState(150);
+  const queueDrag = useRef<{ y: number; h: number } | null>(null);
   const [spot, setSpot] = useState<{ start: Date; end: Date } | null>(null);
   const [pos, setPos] = useState<{ day: number; y: number }>({ day: 0, y: 0 });
   const [view, setView] = useState(0);
@@ -539,15 +543,22 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
 
         {/* What's falling, what's next, how fast. */}
         <div className="relative z-[1] flex items-center gap-2 px-3 pb-1.5 text-[12.5px]" style={{ color: soft }}>
-          <span className="shrink-0">Next</span>
-          <div className="flex min-w-0 flex-1 gap-1 overflow-hidden">
+          <button type="button" onClick={() => setShowQueue((v) => !v)} aria-expanded={showQueue} aria-label={showQueue ? "Hide the quest list" : "Show the quest list"} className="flex min-w-0 flex-1 items-center gap-1.5 text-left lg:invisible" data-quest-drop-queue-toggle>
+          <span className="flex shrink-0 items-center gap-0.5">
+            Next
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden className="transition-transform duration-200 lg:hidden" style={{ transform: showQueue ? "rotate(180deg)" : undefined }}>
+              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <span className="flex min-w-0 flex-1 gap-1 overflow-hidden">
             {next.length ? next.map((q) => (
-              <span key={q.id} className="qe-fact flex h-7 min-w-0 max-w-[45%] items-center gap-1 rounded-full px-2 text-[12px]">
+              <span key={q.id} className="qe-fact flex h-7 min-w-0 max-w-[45%] items-center gap-1 rounded-full px-2 text-[12px] lg:hidden">
                 <Portrait q={q} size={16} />
                 <span className="truncate">{q.title}</span>
               </span>
             )) : <span className="italic">{cur ? "the last one" : ""}</span>}
-          </div>
+          </span>
+          </button>
           <div className="flex shrink-0 items-center gap-0.5" aria-label="Falling speed">
             <button type="button" onClick={() => setLevel((l) => Math.max(1, l - 1))} aria-label="Slower" title="Slower" className="flex h-8 w-7 items-center justify-center rounded-full text-[16px] hover:bg-black/[.06]" style={{ color: ink }}>
               −
@@ -560,6 +571,34 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
             </button>
           </div>
         </div>
+
+        {/* The quest list on smaller screens: open from "Next", resized by dragging its bottom edge. */}
+        <Fold open={showQueue && phase !== "loading"} className="relative z-[1] lg:hidden">
+          <div className="qe-fact-panel mx-3 mb-2 flex flex-col overflow-hidden rounded-xl" data-quest-drop-queue>
+            <div className="overflow-y-auto overscroll-contain px-2 py-1.5" style={{ height: queueH }}>
+              <QueueList queue={queue} placed={placed.length} falling={phase === "play"} />
+            </div>
+            <div
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Drag to resize the quest list"
+              className="flex h-4 cursor-row-resize items-center justify-center"
+              style={{ touchAction: "none" }}
+              onPointerDown={(e) => {
+                (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                queueDrag.current = { y: e.clientY, h: queueH };
+              }}
+              onPointerMove={(e) => {
+                const d = queueDrag.current;
+                if (d) setQueueH(Math.max(70, Math.min(window.innerHeight * 0.5, d.h + e.clientY - d.y)));
+              }}
+              onPointerUp={() => (queueDrag.current = null)}
+              onPointerCancel={() => (queueDrag.current = null)}
+            >
+              <span className="h-[2px] w-10 rounded-full" style={{ background: "rgba(139,112,64,.4)" }} />
+            </div>
+          </div>
+        </Fold>
 
         {/* ↑ Later: when this quest comes back. */}
         <Fold open={later} className="relative z-[1]">
@@ -588,10 +627,11 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
           </div>
         </Fold>
 
-        {/* The board: days across, hours down. */}
+        {/* The board: days across, hours down; on large screens the quest list sits beside it. */}
+        <div className="relative z-[1] mx-3 flex min-h-0 flex-1 gap-2">
         <div
           ref={boardRef}
-          className="relative z-[1] mx-3 min-h-0 flex-1 select-none overflow-hidden rounded-xl"
+          className="relative min-h-0 min-w-0 flex-1 select-none overflow-hidden rounded-xl"
           style={{ touchAction: "none", background: isAdventure ? "rgba(255,250,238,.45)" : "var(--t-bg)", border: `1px solid ${line}` }}
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
@@ -719,6 +759,15 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
             )}
           </div>
         </div>
+        <aside className="qe-fact-panel hidden w-64 shrink-0 flex-col overflow-hidden rounded-xl lg:flex" aria-label="Quests to place" data-quest-drop-aside>
+          <div className={`px-3 pb-1 pt-2 ${isAdventure ? "font-display text-[16px]" : "text-[14px] font-bold"}`} style={{ color: ink }}>
+            Quests to place
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+            <QueueList queue={queue} placed={placed.length} falling={phase === "play"} />
+          </div>
+        </aside>
+        </div>
 
         {/* What just happened (with Undo), and any trouble. */}
         <div className="relative z-[1] flex min-h-[30px] items-center gap-2 py-0 pl-4 pr-16 pt-1 text-[12.5px]" style={{ color: soft }} aria-live="polite">
@@ -741,47 +790,71 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
           )}
         </div>
 
-        {/* Thumb pad. Falling: ◀ ▼ ▶, Later, Place. Asking: Redo, Adjust, Yes. Adjusting: ◀ ▲ ▼ ▶, Done. */}
-        <div className="relative z-[1] grid grid-cols-5 gap-1.5 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-1.5" data-quest-drop-pad={phase === "play" ? aim : "fall"}>
-          {phase === "play" && aim === "confirm" ? (
-            <>
-              <PadButton label="Redo" onClick={redo} disabled={paused}>
-                <span className="flex flex-col items-center leading-none"><Arrow dir="up" /><span className="mt-0.5 text-[10.5px] font-semibold">Redo</span></span>
-              </PadButton>
-              <PadButton label="Adjust" onClick={() => setAim("adjust")} disabled={paused}>
-                <span className="flex flex-col items-center leading-none"><Arrow dir="down" /><span className="mt-0.5 text-[10.5px] font-semibold">Adjust</span></span>
-              </PadButton>
-              <button type="button" onClick={land} disabled={paused} className="col-span-3 h-12 rounded-xl text-[15px] font-bold disabled:opacity-45" style={goldBtn(isAdventure)} aria-label="Yes, put it here">
-                Yes, put it here
-              </button>
-            </>
-          ) : phase === "play" && aim === "adjust" ? (
-            <>
-              <PadButton label="A day earlier" onClick={() => nudge(0, -1)} disabled={paused}><Arrow dir="left" /></PadButton>
-              <PadButton label="15 minutes earlier" onClick={() => nudge(-DROP_STEP, 0)} disabled={paused}><Arrow dir="up" /></PadButton>
-              <PadButton label="15 minutes later" onClick={() => nudge(DROP_STEP, 0)} disabled={paused}><Arrow dir="down" /></PadButton>
-              <PadButton label="A day later" onClick={() => nudge(0, 1)} disabled={paused}><Arrow dir="right" /></PadButton>
-              <button type="button" onClick={adjustDone} disabled={paused || !spotFree} className="h-12 rounded-xl text-[14.5px] font-bold disabled:opacity-45" style={goldBtn(isAdventure)} aria-label="Done adjusting">
-                Done
-              </button>
-            </>
-          ) : (
-            <>
-              <PadButton label="Earlier day" onClick={() => move(-1)} disabled={phase !== "play" || paused}><Arrow dir="left" /></PadButton>
-              <PadButton label="Later in the day" onClick={down} disabled={phase !== "play" || paused}><Arrow dir="down" /></PadButton>
-              <PadButton label="Next day" onClick={() => move(1)} disabled={phase !== "play" || paused}><Arrow dir="right" /></PadButton>
-              <PadButton label="Bring it back later" onClick={() => setPhase(later ? "play" : "later")} disabled={(phase !== "play" && phase !== "later") || paused}>
-                <span className="flex flex-col items-center leading-none"><Arrow dir="up" /><span className="mt-0.5 text-[10.5px] font-semibold">Later</span></span>
-              </PadButton>
-              <button type="button" onClick={() => ask()} disabled={phase !== "play" || paused || !ghost} className="h-12 rounded-xl text-[14.5px] font-bold disabled:opacity-45" style={goldBtn(isAdventure)} aria-label="Place it">
-                Place
-              </button>
-            </>
-          )}
+        {/* Thumb pad, laid out like a keyboard's arrows (owner, Nov 19): ↑ above ↓, ← and → beside ↓, the main button on the right. */}
+        <div className="relative z-[1] grid grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.4fr)] grid-rows-2 gap-1.5 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-1.5 sm:mx-auto sm:w-full sm:max-w-md" data-quest-drop-pad={phase === "play" ? aim : "fall"}>
+          {(() => {
+            const off = phase !== "play" || paused;
+            const k =
+              phase === "play" && aim === "confirm"
+                ? { up: { label: "Redo", sub: "Redo", on: redo }, down: { label: "Adjust", sub: "Adjust", on: () => setAim("adjust") }, left: null, right: null, main: { label: "Yes, put it here", text: "Yes", on: land, off: false } }
+                : phase === "play" && aim === "adjust"
+                  ? { up: { label: "15 minutes earlier", sub: "15 min", on: () => nudge(-DROP_STEP, 0) }, down: { label: "15 minutes later", sub: "15 min", on: () => nudge(DROP_STEP, 0) }, left: { label: "A day earlier", on: () => nudge(0, -1) }, right: { label: "A day later", on: () => nudge(0, 1) }, main: { label: "Done adjusting", text: "Done", on: adjustDone, off: !spotFree } }
+                  : { up: { label: "Bring it back later", sub: "Later", on: () => setPhase(later ? "play" : "later") }, down: { label: "Later in the day", sub: "", on: down }, left: { label: "Earlier day", on: () => move(-1) }, right: { label: "Next day", on: () => move(1) }, main: { label: "Place it", text: "Place", on: () => ask(), off: !ghost } };
+            const upOff = paused || (phase !== "play" && phase !== "later");
+            return (
+              <>
+                <div className="col-start-2 row-start-1">
+                  <PadButton label={k.up.label} onClick={k.up.on} disabled={upOff}>
+                    <span className="flex flex-col items-center leading-none"><Arrow dir="up" />{k.up.sub && <span className="mt-0.5 text-[10px] font-semibold">{k.up.sub}</span>}</span>
+                  </PadButton>
+                </div>
+                <div className="col-start-1 row-start-2">
+                  <PadButton label={k.left?.label ?? "Earlier day"} onClick={k.left?.on ?? (() => {})} disabled={off || !k.left}><Arrow dir="left" /></PadButton>
+                </div>
+                <div className="col-start-2 row-start-2">
+                  <PadButton label={k.down.label} onClick={k.down.on} disabled={off}>
+                    <span className="flex flex-col items-center leading-none"><Arrow dir="down" />{k.down.sub && <span className="mt-0.5 text-[10px] font-semibold">{k.down.sub}</span>}</span>
+                  </PadButton>
+                </div>
+                <div className="col-start-3 row-start-2">
+                  <PadButton label={k.right?.label ?? "Next day"} onClick={k.right?.on ?? (() => {})} disabled={off || !k.right}><Arrow dir="right" /></PadButton>
+                </div>
+                <button type="button" onClick={k.main.on} disabled={off || k.main.off} className="col-start-4 row-span-2 row-start-1 rounded-xl text-[15px] font-bold disabled:opacity-45" style={goldBtn(isAdventure)} aria-label={k.main.label}>
+                  {k.main.text}
+                </button>
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>,
     document.body
+  );
+}
+
+/** The quests still to place, in the order they come down (the first is falling now). */
+function QueueList({ queue, placed, falling }: { queue: DropQuest[]; placed: number; falling: boolean }) {
+  if (!queue.length) return <p className="m-0 px-1 py-2 text-[12.5px]" style={{ color: "var(--t-ink-soft)" }}>{placed ? "All placed." : "Nothing waiting."}</p>;
+  return (
+    <ol className="m-0 flex list-none flex-col gap-1 p-0">
+      {queue.map((q, i) => {
+        const tag = whenTag(q);
+        const now = i === 0 && falling;
+        return (
+          <li key={q.id} className="due-in flex min-h-8 items-center gap-1.5 rounded-lg px-1.5 py-1 text-[12.5px]" style={{ background: now ? "rgba(217,180,95,.28)" : undefined, color: "var(--t-ink)" }}>
+            <span className="w-4 shrink-0 text-right text-[11px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>{i + 1}</span>
+            <Portrait q={q} size={16} />
+            <span className={`min-w-0 flex-1 truncate ${now ? "font-bold" : ""}`}>{q.title}</span>
+            {tag && (
+              <span className="shrink-0 rounded-full px-1.5 text-[10.5px] leading-[18px]" style={{ border: `1px ${tag.fixed ? "solid" : "dashed"} ${tag.late ? "#a33" : "rgba(139,112,64,.55)"}`, color: tag.late ? "#a33" : "var(--t-ink-soft)", background: tag.fixed && !tag.late ? "rgba(217,180,95,.25)" : undefined }}>
+                {tag.words}
+              </span>
+            )}
+            <span className="shrink-0 text-[10.5px] tabular-nums" style={{ color: "var(--t-ink-soft)" }}>{blockMinutes(q)}m</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -800,7 +873,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function PadButton({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled} className="qe-fact flex h-12 items-center justify-center rounded-xl disabled:opacity-45" style={{ touchAction: "manipulation" }}>
+    <button type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled} className="qe-fact flex h-11 w-full items-center justify-center rounded-xl disabled:opacity-45" style={{ touchAction: "manipulation" }}>
       {children}
     </button>
   );

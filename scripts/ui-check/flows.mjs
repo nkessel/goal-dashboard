@@ -960,6 +960,14 @@ export const FLOWS = [
       if (!(await h.page.locator("[data-quest-drop-falling]").count())) throw new Error("questdrop: no quest came down after Start");
       if (!(await h.page.locator("[data-quest-drop-ghost]").count())) h.record({ kind: "questdrop", severity: "warn", target: "ghost", detail: "No landing outline for the first quest" });
       await h.check("playing: first quest falling");
+      // The quest list (owner, Nov 19): beside the board on large screens, a fold under "Next" on smaller ones.
+      if (await h.page.locator("[data-quest-drop-queue-toggle]").isVisible()) {
+        await h.page.locator("[data-quest-drop-queue-toggle]").click();
+        await h.settle(500);
+        await h.check("quest list open");
+        await h.page.locator("[data-quest-drop-queue-toggle]").click();
+        await h.settle(400);
+      }
       await h.page.getByRole("button", { name: /^next day$/i }).click();
       await h.page.getByRole("button", { name: /^later in the day$/i }).click();
       await h.page.getByRole("button", { name: /^later in the day$/i }).click();
