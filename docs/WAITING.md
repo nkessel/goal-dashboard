@@ -2,6 +2,10 @@
 
 Moved here from `docs/HANDOFF.md` (section 0a and the notes under section 1) on Nov 16. **Open this before you touch any topic named in HANDOFF section 0a**, and when the owner answers one of these. Update it in the same push: remove what's settled, add what's newly waiting (branch, review page link, date).
 
+## In progress right now (claim before you start; remove your line when you ship)
+
+- **Session claude-2d (Opus, owner's account, Nov 18 night)** is building, each on its own `review/` branch: (1) calendar: a recurring event's or daily event's portrait and look saved for "Just this one / This and later / All" occurrences, and a setting that makes future Google events quests automatically (owner, Nov 18); (2) calendar planner step 2 (`docs/CALENDAR-PLANNER-DESIGN.md` 2a–2d: picker day chips, app time before Google, times outside the shown hours, scheduler settings saved as a merge); (3) small calendar notes: delete in the event menu [11db5294, f562c138], zoom slider direction [197921bd], failed quests not green [492dd501], time at the top of cards [1261cd00], tentative text not scaled [ce649645], card colour on the background only [265161d1], a longer quest grows on the calendar [e4657ebb], a made-quest event gets a blank circle [679410a6] and no 14-day jump [7f911db5], snoozing on Today doesn't open the calendar [77368693]; then BUILD-PLAN 13 (boards) and 11 (undo completion). **Other sessions: please take something else** (e.g. planner step 1d/1e, which the Nov 19 first-picture fix led into).
+
 ## 0a. Work in progress and waiting on the owner (Nov 12)
 
 Started in the owner's Claude project threads; written here so another account can carry on.

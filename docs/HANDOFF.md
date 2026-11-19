@@ -17,7 +17,8 @@ Read these only when you need them. Don't load them all at the start.
 | `docs/REPEAT-ASKS.md` | Before work that touches an ask the owner has made 3+ times (see `CLAUDE.md`). |
 | `docs/FEEDBACK-BY-SCREEN.md` | Before changing any screen: its open notes and the `universal` ones (see `CLAUDE.md`). |
 | `docs/FEEDBACK-OPEN.md`, `docs/HIGH-EFFORT.md` | The owner's open notes by area (to Nov 5); bigger asks that need a long, high-effort session. |
-| `docs/WAITING.md` | Before touching anything in section 0a below, and for parked ideas and things to remind the owner of. |
+| `docs/WAITING.md` | **Its top section lists work other sessions have claimed right now: read it before starting, add your own line.** Also section 0a below, parked ideas, reminders. |
+| `docs/CALENDAR-PLANNER-DESIGN.md` | Before any calendar scheduling work: causes found, one data model, build order (steps 1–10). |
 | `docs/SHIPPED.md` | To learn how a feature was built, which files hold it, or whether an ask is already done. Search it (`grep -n`), don't read it whole. |
 | `docs/ui-check.md` | Running or extending the UI check, and its before/after compare (`--snapshot`, `--compare`) for splits. |
 | `docs/ACTIONS-SPLIT-PLAN.md` | Before splitting `src/app/actions.ts` (Run D), or adding a server action file. |
