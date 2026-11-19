@@ -230,19 +230,40 @@ export const FLOWS = [
         if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill", { optional: true, expectMove: true })) {
           if (await h.tap((p) => p.getByLabel("XP amount").first(), "editor: XP amount", { optional: true })) await h.check("quest editor: XP typed");
           // Stats: share some of the XP with character stats (the tray under the XP bar), then the add-a-stat field.
-          if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /add to stats|XP to stats|^\w{3} \d+/i }).first(), "editor: stats tray", { optional: true, expectMove: true })) {
-            await h.tap((p) => p.getByRole("button", { name: /more xp to strength/i }).first(), "stats: strength +", { optional: true });
-            await h.tap((p) => p.getByRole("button", { name: /more xp to wisdom/i }).first(), "stats: wisdom +", { optional: true });
-            // Five stats: their amounts wrap under the XP slider, not in the pill (owner, Nov 19).
-            for (const st of ["intelligence", "charisma", "dexterity"]) await h.tap((p) => p.getByRole("button", { name: new RegExp(`more xp to ${st}`, "i") }).first(), `stats: ${st} +`, { optional: true });
-            await h.check("quest editor: stats tray");
-            if (await h.tap((p) => p.getByRole("button", { name: /a new stat/i }).first(), "stats: new stat", { optional: true, expectMove: true })) await h.check("quest editor: new stat field");
-            await h.tap((p) => p.getByRole("button", { name: /^save$/i }).first(), "stats: save", { optional: true, expectMove: true });
-            await h.check("quest editor: stats saved");
-            // Review build: the three looks for the stats under the XP slider, one at a time (owner, Nov 19).
-            for (const look of ["board", "leaders", "strip"]) {
+          // Review build (owner, Nov 19): the stats under the XP slider with 2, 5 and 10 stats, in the two looks he's choosing between.
+          await h.page.getByLabel("XP amount").first().fill("60").catch(() => {});
+          const more = (st) => h.tap((p) => p.getByRole("button", { name: new RegExp(`^more xp to ${st}$`, "i") }).first(), `stats: ${st} +`, { optional: true });
+          const openTray = () => h.tap((p) => p.locator("[role=dialog] button", { hasText: /add to stats|^stats$/i }).first(), "editor: stats tray", { optional: true, expectMove: true });
+          const saveTray = () => h.tap((p) => p.getByRole("button", { name: /^save$/i }).first(), "stats: save", { optional: true, expectMove: true });
+          const looks = async (n) => {
+            for (const look of ["board", "strip"]) {
               const shown = await h.page.evaluate((l) => { const all = [...document.querySelectorAll("[data-stat-look]")]; all.forEach((el) => (el.style.display = el.dataset.statLook === l ? "" : "none")); return all.length; }, look).catch(() => 0);
-              if (shown) { await h.settle(300); await h.check(`quest editor: stats look ${look}`); }
+              if (shown) { await h.settle(300); await h.check(`quest editor: stats ${n} look ${look}`); }
+            }
+          };
+          if (await openTray()) {
+            await more("strength"); await more("strength"); await more("wisdom");
+            await h.check("quest editor: stats tray");
+            await saveTray();
+            await looks(2);
+            if (await openTray()) {
+              for (const st of ["intelligence", "charisma", "dexterity"]) await more(st);
+              await saveTray();
+              await looks(5);
+            }
+            if (await openTray()) {
+              await more("constitution");
+              for (const name of ["Creativity", "Courage", "Focus", "Kindness"]) {
+                if (await h.tap((p) => p.getByRole("button", { name: /a new stat/i }).first(), "stats: new stat", { optional: true, expectMove: true })) {
+                  await h.page.getByPlaceholder(/name it/i).first().fill(name).catch(() => {});
+                  await h.page.keyboard.press("Enter").catch(() => {});
+                  await h.settle(300);
+                  await more(name.toLowerCase());
+                }
+              }
+              await h.check("quest editor: new stats added");
+              await saveTray();
+              await looks(10);
             }
           }
           await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill shut", { optional: true, expectMove: true });
