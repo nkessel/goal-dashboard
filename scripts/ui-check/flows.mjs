@@ -749,6 +749,13 @@ export const FLOWS = [
       await h.tap(/daily habits/i, "open daily habits", { optional: true });
       if (await h.tap("text=20 mins of house cleaning", "cleaning check-in")) {
         await h.check("cleaning tray");
+        // The tray's other two looks, while the owner picks one (Nov 16): B "One card", C "Pointer".
+        for (const look of ["b", "c"]) {
+          await h.page.evaluate((l) => { document.documentElement.dataset.cleanTray = l; }, look);
+          await h.settle(200);
+          await h.check(`cleaning tray look ${look.toUpperCase()}`);
+        }
+        await h.page.evaluate(() => { delete document.documentElement.dataset.cleanTray; });
         // Set the bathroom's bar to messy: the rows sort themselves (owner, Nov 3).
         await h.page.getByLabel("How messy is Bathroom?").first().fill("9").catch(() => {});
         await h.page.getByLabel("How messy is Bathroom?").first().dispatchEvent("pointerup").catch(() => {});
