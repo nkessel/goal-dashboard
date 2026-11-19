@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { setFeltAction, type FeltTarget } from "@/app/felt-actions";
 import { FaceRating, type FaceValue } from "@/components/ui/FaceRating";
 
@@ -77,5 +77,25 @@ export function FeltInline({ target, onClose, light = false }: { target: FeltTar
         <FeltAsk target={target} light={light} size={24} onDone={() => close.current()} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Which habit is waiting for its face, kept outside the list so a redraw (the save refreshing Today) doesn't lose it.
+ */
+let pendingHabit: string | null = null;
+const listeners = new Set<() => void>();
+export function setFeltHabit(id: string | null) {
+  pendingHabit = id;
+  for (const l of listeners) l();
+}
+export function useFeltHabit(): string | null {
+  return useSyncExternalStore(
+    (cb) => {
+      listeners.add(cb);
+      return () => void listeners.delete(cb);
+    },
+    () => pendingHabit,
+    () => null,
   );
 }

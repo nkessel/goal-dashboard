@@ -35,7 +35,7 @@ export function KeptTarget() {
         aria-label={open ? "Shrink what's most important today" : "What's most important today"}
         aria-expanded={open}
         title="Most important today (drag to move)"
-        className="kept-target fixed z-[60] touch-none rounded-full"
+        className="kept-target fixed z-[38] touch-none rounded-full"
         style={{ left: pos.x, top: pos.y, width: size, height: size, background: "radial-gradient(circle, #fbf3dc 0 22%, #d9b45f 23% 30%, #fbf3dc 31% 48%, #d9b45f 49% 56%, #fbf3dc 57%)", border: "1.5px solid #8a6116", boxShadow: "0 6px 14px rgba(0,0,0,.35)", cursor: drag ? "grabbing" : "grab" }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -65,7 +65,7 @@ export function KeptTarget() {
       />
       {open && !drag && (
         <div
-          className="card-pop-in fixed z-[60] rounded-2xl px-4 pb-3 pt-2.5"
+          className="card-pop-in fixed z-[38] rounded-2xl px-4 pb-3 pt-2.5"
           role="dialog"
           aria-label="Most important today"
           data-kept-card

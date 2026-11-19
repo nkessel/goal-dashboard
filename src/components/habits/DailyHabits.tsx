@@ -1,7 +1,7 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
-import { FeltInline } from "@/components/ui/FeltAsk";
+import { FeltInline, setFeltHabit, useFeltHabit } from "@/components/ui/FeltAsk";
 import { GearIcon, SnoozeIcon } from "@/components/ui/Icons";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -68,8 +68,8 @@ export function DailyHabits({
   const day = useLocalDay();
   // Closed until opened (the header still shows how the day is going).
   // "How do you feel?" under the habit just ticked (owner, Nov 19).
-  const [feltFor, setFeltFor] = useState<string | null>(null);
-  const closeFelt = useCallback(() => setFeltFor(null), []);
+  const feltFor = useFeltHabit();
+  const closeFelt = useCallback(() => setFeltHabit(null), []);
   const [open, setOpen] = useState(false);
   const [look, setLook] = useState<HeaderLook>("togo");
   const [mark, setMark] = useState<HabitMark>("seedling");
@@ -343,11 +343,11 @@ export function DailyHabits({
         if (next) {
           const out = await saveOrQueue("completeRite", { id: h.id, day }, `rite:${h.id}:${day}`);
           // "How do you feel?" (owner, Nov 19), once it's saved.
-          if (!out.queued) setFeltFor(h.id);
+          if (!out.queued) setFeltHabit(h.id);
         }
         else {
           await saveOrQueue("uncompleteRite", { id: h.id, day }, `rite:${h.id}:${day}`);
-          setFeltFor((f) => (f === h.id ? null : f));
+          if (feltFor === h.id) setFeltHabit(null);
         }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [h.id]: !next }));

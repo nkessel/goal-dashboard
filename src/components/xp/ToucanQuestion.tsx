@@ -60,7 +60,9 @@ export function ToucanQuestion({ onClose }: { onClose: () => void }) {
   });
   if (!ready) return null;
   return createPortal(
-    <div className={`tq-root fixed inset-0 z-[80] flex flex-col items-center justify-center px-4 ${leaving ? "tq-out" : "tq-in"}`} role="dialog" aria-modal="true" aria-label="What's most important right now?" data-toucan-question>
+    <div className={`tq-root fixed inset-0 z-[80] flex flex-col items-center px-4 ${leaving ? "tq-out" : "tq-in"}`}
+      // High on the screen, so the card and its buttons stay above a phone's keyboard.
+      style={{ paddingTop: "max(calc(env(safe-area-inset-top, 0px) + 28px), 7vh)" }} role="dialog" aria-modal="true" aria-label="What's most important right now?" data-toucan-question>
       <div aria-hidden className="tq-mist absolute inset-0" data-bg={bg} data-fog={fog} style={{ ["--mist" as string]: String(thick) }} />
       <div className="relative flex w-full max-w-[400px] flex-col items-center">
         <div className="tq-toucan mb-2">

@@ -1,7 +1,7 @@
 "use client";
 
 import { stepsComplete } from "@/lib/habit-steps";
-import { FeltInline } from "@/components/ui/FeltAsk";
+import { FeltInline, setFeltHabit, useFeltHabit } from "@/components/ui/FeltAsk";
 import { stopKeysButSave } from "@/lib/stop-keys";
 import { progressWords } from "@/lib/progress-words";
 import { useCallback, useEffect, useState, useSyncExternalStore, useTransition } from "react";
@@ -193,8 +193,8 @@ export function EveningRites({
   const now = useSyncExternalStore(subscribeMinute, () => Math.floor(Date.now() / 60_000) * 60_000, () => 0);
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
   // "How do you feel?" under the rite just completed (owner, Nov 19).
-  const [feltFor, setFeltFor] = useState<string | null>(null);
-  const closeFelt = useCallback(() => setFeltFor(null), []);
+  const feltFor = useFeltHabit();
+  const closeFelt = useCallback(() => setFeltHabit(null), []);
   const [editing, setEditing] = useState<RiteView | { new: true; core: boolean } | null>(null);
   const [miniOpen, setMiniOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -266,11 +266,11 @@ export function EveningRites({
         if (next) {
           const out = await saveOrQueue("completeRite", { id: r.id, day, pct }, `rite:${r.id}:${day}`);
           // "How do you feel?" (owner, Nov 19), once it's saved.
-          if (!out.queued) setFeltFor(r.id);
+          if (!out.queued) setFeltHabit(r.id);
         }
         else {
           await saveOrQueue("uncompleteRite", { id: r.id, day }, `rite:${r.id}:${day}`);
-          setFeltFor((f) => (f === r.id ? null : f));
+          if (feltFor === r.id) setFeltHabit(null);
         }
       } catch (e) {
         setOptimistic((o) => ({ ...o, [r.id]: !next }));

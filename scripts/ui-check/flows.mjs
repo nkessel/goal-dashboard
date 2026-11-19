@@ -581,11 +581,8 @@ export const FLOWS = [
     name: "faces",
     async run(h) {
       await h.goto("/", { name: "faces" });
-      const tick = h.page.locator(".habit-row [role=checkbox][aria-label^='Done: ']").first();
-      const head = h.page.locator("button[aria-expanded]", { hasText: /daily habits/i }).first();
-      if ((await head.getAttribute("aria-expanded").catch(() => null)) === "false") await h.toggle(/daily habits/i, "daily habits");
-      if (await tick.count()) {
-        await tick.evaluate((el) => { el.scrollIntoView({ block: "center" }); el.click(); }).catch(() => {});
+      await h.toggle(/daily habits/i, "daily habits");
+      if (await h.tap((p) => p.locator(".habit-row [role=checkbox][aria-label^='Done: ']:visible").first(), "tick a habit", { optional: true, expectMove: true })) {
         await h.settle(1600);
         await h.check("how do you feel, under the habit");
         if (await h.tap((p) => p.locator("[data-felt-inline] [role=radio][aria-label=Good]").first(), "habit felt: good", { optional: true, expectMove: true })) await h.check("habit felt: kept");
