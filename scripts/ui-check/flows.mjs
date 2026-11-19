@@ -953,6 +953,17 @@ export const FLOWS = [
       await h.page.getByRole("button", { name: /^game settings$/i }).first().click();
       await h.settle(500);
       await h.check("settings open");
+      // My music (owner, Nov 19): songs saved to the account, and "Add this song for everyone".
+      {
+        const link = h.page.getByLabel("A song or playlist link");
+        if (await link.count()) {
+          await link.fill("https://open.spotify.com/playlist/37i9dQZF1DX0XUsuxWHRQd");
+          await h.settle(500);
+          await h.check("settings: adding a song");
+          await link.fill("");
+          await h.settle(300);
+        }
+      }
       await h.page.getByRole("button", { name: /^game settings$/i }).first().click();
       await h.settle(400);
       await h.page.locator("[data-quest-drop-start]").click();

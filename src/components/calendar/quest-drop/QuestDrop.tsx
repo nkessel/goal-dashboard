@@ -27,6 +27,8 @@ import {
 } from "@/lib/quest-drop";
 import { Chiptune } from "./chiptune";
 import { QuestDropIcon } from "./QuestDropIcon";
+import { MusicPicker, type Songs } from "./MusicPicker";
+import { addQuestDropSongAction, questDropSongsAction } from "@/app/quest-drop-actions";
 
 const KEY = "quest-drop";
 const DAYS = 14;
@@ -95,6 +97,7 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
   const [paused, setPaused] = useState(false);
   const [aim, setAim] = useState<Aim>("fall");
   // The quest list on phones: a fold near the top, its height dragged by its bottom edge.
+  const [songs, setSongs] = useState<Songs | null>(null);
   const [showQueue, setShowQueue] = useState(false);
   const [queueH, setQueueH] = useState(150);
   const queueDrag = useRef<{ y: number; h: number } | null>(null);
@@ -128,6 +131,12 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
     const to = dayAt(today, DAYS + 1);
     const hidden = readLocal("calendar-layers", (v) => (v as { hidden?: string[] }).hidden ?? []) ?? [];
     let live = true;
+    // Your songs, from your account. A link saved on this device before (Nov 18) moves onto it.
+    const local = cleanMusicLink(readSettings().musicLink);
+    questDropSongsAction()
+      .then((got) => (local && !got.mine.some((m) => m.url === local) ? addQuestDropSongAction({ url: local }, false) : got))
+      .then((got) => live && gotSongs(got))
+      .catch(() => live && setSongs({ mine: [], selected: null, everyone: [], me: "" }));
     schedulerContextAction(today.toISOString(), to.toISOString(), hidden)
       .then((ctx) => {
         if (!live) return;
@@ -188,6 +197,21 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
     const fit = landingFrom(cur, day, minuteOf(spot.start.getTime()), allBusy, sched, now);
     return Boolean(fit && fit.start.getTime() === spot.start.getTime());
   }, [spot, cur, sched, allBusy, now]);
+
+  /** Your songs live on your account; the one picked is kept here too, so Start can open it at once. */
+  function gotSongs(next: Songs) {
+    setSongs(next);
+    setSettings((cur) => {
+      const s2 = { ...cur, musicLink: next.selected ?? "" };
+      try {
+        window.localStorage.setItem(KEY, JSON.stringify(s2));
+      } catch {
+        /* storage unavailable */
+      }
+      if (music.current) music.current.setMusic(s2.sound === "tune" && !cleanMusicLink(s2.musicLink));
+      return s2;
+    });
+  }
 
   function save(next: DropSettings) {
     setSettings(next);
@@ -490,7 +514,7 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
         </div>
 
         <Fold open={showSettings} className="relative z-[1]">
-          <div className="qe-fact-panel mx-3 mb-2 flex flex-col gap-2 rounded-xl px-3 py-2.5 text-[13px]" style={{ color: ink }} data-quest-drop-settings>
+          <div className="qe-fact-panel mx-3 mb-2 flex max-h-[48svh] flex-col gap-2 overflow-y-auto overscroll-contain rounded-xl px-3 py-2.5 text-[13px]" style={{ color: ink }} data-quest-drop-settings>
             <Row label="Starting speed">
               <div className="grid min-w-0 flex-1 grid-cols-10 gap-1 sm:max-w-[22rem]">
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
@@ -522,21 +546,7 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
               </div>
             </Row>
             <Row label="My music">
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <input
-                  type="url"
-                  inputMode="url"
-                  value={settings.musicLink}
-                  onChange={(e) => save({ ...settings, musicLink: e.target.value })}
-                  placeholder="Paste a song or playlist link"
-                  aria-label="My music: a song or playlist link"
-                  className="bare-input h-8 w-full min-w-0 border-b bg-transparent text-[16px] outline-none sm:text-[13.5px]"
-                  style={{ borderColor: "rgba(139,112,64,.45)", color: ink }}
-                />
-                <span className="text-[12px]" style={{ color: soft }}>
-                  {musicLink ? "Opens in your music app when a game starts; the game's tune stays quiet." : "Spotify, YouTube, Apple Music… it opens when a game starts."}
-                </span>
-              </div>
+              <MusicPicker songs={songs} onSongs={gotSongs} />
             </Row>
           </div>
         </Fold>
@@ -714,8 +724,8 @@ export function QuestDrop({ quests, theme, onClose: closeNow }: { quests: DropQu
 
             {/* Start, empty, done and loading cards sit over the board. */}
             {phase !== "play" && phase !== "later" && (
-              <div className="absolute inset-0 z-[3] flex items-center justify-center p-4" style={{ background: "rgba(255,250,238,.55)" }}>
-                <div className="reveal w-full max-w-sm rounded-2xl px-4 py-4 text-center" style={{ background: isAdventure ? "#fbf3df" : "var(--t-card)", border: "1px solid rgba(139,112,64,.45)", boxShadow: "0 10px 30px rgba(40,25,5,.25)", color: ink }} data-quest-drop-card={phase}>
+              <div className="absolute inset-0 z-[3] flex overflow-y-auto p-4" style={{ background: "rgba(255,250,238,.55)" }}>
+                <div className="reveal m-auto w-full max-w-sm rounded-2xl px-4 py-4 text-center" style={{ background: isAdventure ? "#fbf3df" : "var(--t-card)", border: "1px solid rgba(139,112,64,.45)", boxShadow: "0 10px 30px rgba(40,25,5,.25)", color: ink }} data-quest-drop-card={phase}>
                   {phase === "loading" && <p className="m-0 text-[14px]" style={{ color: soft }}>{error ?? "Reading your calendar…"}</p>}
                   {phase === "empty" && (
                     <>

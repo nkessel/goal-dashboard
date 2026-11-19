@@ -130,3 +130,29 @@ export function whenTag(q: Pick<DropQuest, "dueAt" | "planBy">, now = Date.now()
   if (q.dueAt) return days < 0 ? { words: "Overdue", fixed: true, late: true } : { words: days === 0 ? "Due today" : `By ${day}`, fixed: true, late: days === 0 };
   return { words: days < 0 ? "Flexible" : `Around ${day}`, fixed: false, late: false };
 }
+
+/** A song or playlist for Quest Drop (owner, Nov 19: saved to your account, plus one list everyone can add to). */
+export type DropSong = { url: string; name: string; by?: string | null; byName?: string | null };
+
+/** A song as typed in: a safe link and a short name (the site's name when none is given). */
+export function cleanSong(raw: { url?: unknown; name?: unknown }): DropSong | null {
+  const url = typeof raw.url === "string" ? cleanMusicLink(raw.url) : null;
+  if (!url) return null;
+  const typed = typeof raw.name === "string" ? raw.name.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+  return { url, name: typed || songSite(url) };
+}
+
+/** "Spotify", "YouTube", "Apple Music"… from a link. */
+export function songSite(url: string): string {
+  try {
+    const h = new URL(url).hostname.replace(/^www\.|^m\.|^music\./, "");
+    if (/spotify/.test(h)) return "Spotify";
+    if (/youtu/.test(h)) return url.includes("music.youtube") ? "YouTube Music" : "YouTube";
+    if (/apple/.test(h)) return "Apple Music";
+    if (/soundcloud/.test(h)) return "SoundCloud";
+    if (/pandora/.test(h)) return "Pandora";
+    return h;
+  } catch {
+    return "Song";
+  }
+}
