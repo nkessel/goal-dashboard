@@ -1,5 +1,6 @@
 "use client";
 
+import { minutesLabel, prettyTime, sleptMinutes } from "@/lib/wheel-of-time";
 import { FaceIcon, faceOf } from "@/components/ui/FaceRating";
 
 import { useEffect, useRef, useState } from "react";
@@ -162,7 +163,7 @@ function pathFor(pts: [number, number][], smooth: boolean) {
  * optional strips for the weather and for things you did (quests, habits,
  * journal notes, rewards). The gear in the corner switches how it's drawn.
  */
-export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: string[]; readings: Reading[]; wins: WinLite[]; onAdd?: () => void }) {
+export function TrackingChart({ metrics, readings, wins, onAdd, nights }: { metrics: string[]; readings: Reading[]; wins: WinLite[]; onAdd?: () => void; /** Sleep by the morning it ended (Wheel of Time), shown on the day's card (owner, Nov 9). */ nights?: Record<string, { bed: string | null; wake: string | null }> }) {
   const [view, setView] = useState<View>(DEFAULT_VIEW);
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -312,6 +313,14 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
     .join(" · ");
   const hoverIcons = hoverWins.filter((w) => w.icon).slice(0, 6);
   const hoverWeather = hk && weather ? weather[hk] : null;
+  // The night that ended that morning: bed and wake times, and how long (owner, Nov 9: "show sleep/wake times… on the chart").
+  const hoverNight = hk && nights ? nights[hk] : null;
+  const nightWords = hoverNight && (hoverNight.bed || hoverNight.wake)
+    ? [hoverNight.bed ? prettyTime(hoverNight.bed) : "?", hoverNight.wake ? prettyTime(hoverNight.wake) : "?"].join(" → ") + (() => {
+        const m = sleptMinutes({ bed: hoverNight.bed, wake: hoverNight.wake, effort: [], hindrances: [], at: "" });
+        return m ? ` · ${minutesLabel(m)}` : "";
+      })()
+    : null;
   const fmt = (v: number) => (Math.round(v * 10) / 10).toFixed(1);
 
   return (
@@ -688,6 +697,14 @@ export function TrackingChart({ metrics, readings, wins, onAdd }: { metrics: str
                   // eslint-disable-next-line @next/next/no-img-element -- quest portrait
                   <img key={i} src={w.icon!} alt="" className="h-6 w-6 rounded-full object-cover" style={{ border: "1px solid #a58c66" }} />
                 ))}
+              </span>
+            )}
+            {nightWords && (
+              <span className="flex items-center gap-1.5">
+                <svg aria-hidden width="11" height="11" viewBox="0 0 24 24">
+                  <path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z" fill="none" stroke={INK_SOFT} strokeWidth="2.2" strokeLinejoin="round" />
+                </svg>
+                Slept <b className="ml-auto tabular-nums">{nightWords}</b>
               </span>
             )}
             {showWeather && hoverWeather && (

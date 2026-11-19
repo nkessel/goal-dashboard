@@ -41,7 +41,7 @@ function groupCheckIns(readings: Reading[]): { at: string; items: Reading[] }[] 
  */
 const CHART_KEY = "insights-chart";
 
-export function CheckInHub({ readings, metrics, wins, starred = [] }: { readings: Reading[]; metrics: string[]; wins: WinLite[]; starred?: string[] }) {
+export function CheckInHub({ readings, metrics, wins, starred = [], nights }: { readings: Reading[]; metrics: string[]; wins: WinLite[]; starred?: string[]; nights?: Record<string, { bed: string | null; wake: string | null }> }) {
   const mounted = useSyncExternalStore(noop, () => true, () => false);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<{ at: string; items: Reading[] } | null>(null);
@@ -82,7 +82,7 @@ export function CheckInHub({ readings, metrics, wins, starred = [] }: { readings
       </button>
       <Fold open={chart}>
         <div className="parchment parchment-framed relative flex flex-col gap-2 rounded-2xl px-3 py-3" style={{ borderRadius: 16 }}>
-          <TrackingChart metrics={metrics} readings={readings} wins={wins} onAdd={() => setAdding(true)} />
+          <TrackingChart metrics={metrics} readings={readings} wins={wins} nights={nights} onAdd={() => setAdding(true)} />
         </div>
       </Fold>
       {adding && <AddEntry metrics={metrics} onClose={() => setAdding(false)} />}
@@ -270,7 +270,6 @@ function CheckInLog({ readings, metrics, starred, onEdit }: { readings: Reading[
       }
       return n;
     });
-    setMenu(null);
     start(async () => {
       await starCheckInAction(keysOf(g), on).catch(() => {});
     });
