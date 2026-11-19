@@ -78,7 +78,7 @@ Details, wording he has chosen, links and branches are in `docs/WAITING.md`. Rea
 
 ## 3. How to ship (the loop)
 
-**Design review first (owner, Nov 14, replaces "ship straight to the live app"):** anything that changes what's on screen waits on a `review/<topic>` branch until the owner has seen its screenshots on a review page and said OK; then merge to `main`. Steps in `CLAUDE.md` › "Design review before shipping". Changes with nothing visible still ship straight. When the owner says "update the site", build the pending feedback, then send it for review.
+**Design review for design changes only (owner, Nov 19, replaces the Nov 14 rule):** new UI or design changes wait on a `review/<topic>` branch with a mockup/screenshot review page until the owner says OK; then merge to `main`. Bug fixes and everything else ship straight to `main` after the build and UI check. Steps in `CLAUDE.md` › "Design review before shipping". When the owner says "update the site", ship the pending feedback's fixes straight and send its design changes for review.
 
 1. **Sync.** `git fetch origin main` and start from the latest `main`. Other sessions ship to it several times a day.
 2. **Read pending feedback** (in-app notes live in `journal_entries` with `kind = 'feedback'`):

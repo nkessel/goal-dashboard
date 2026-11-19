@@ -4,9 +4,7 @@ Written Nov 19, 2026 for a fresh session on a different Claude account. Everythi
 
 ## 1. Paste this to start
 
-> Run B of `docs/plans/2026-11-18-chronological-dev-plan.md`, on Sonnet 5.5. Start by reading `docs/RUN-B-HANDOFF.md` in the repo `nkessel/goal-dashboard`; it says what's already done, what's left, what other sessions are touching right now and the rules for shipping. Then follow `CLAUDE.md` (read `docs/HANDOFF.md`, the feedback notes for each screen you touch, `docs/REPEAT-ASKS.md`). Work the Run B list in section 3 of the handoff top to bottom, one step per commit. Things with nothing visible (docs, data fixes, migrations, scripts, code moves that change no screen) ship straight to `main` after the build and UI check. Anything that changes what's on screen goes on a `review/<topic>` branch with a review page, and waits for my OK. Keep the app's existing design language: reuse the `.qe-fact` pills, panels, scales and flat icons, don't invent new controls. Before each push, `git fetch origin main` and merge it: other sessions ship to `main` several times a day. Give me short progress notes after each step, and ask decisions in plain messages. When the list is done, or the next step needs a different model, stop and tell me which run and model come next.
-
-If the owner wants visible changes to skip review in this run, add: "Ship visible changes straight to the live app too, with a review page I can look at afterwards."
+> Run B of `docs/plans/2026-11-18-chronological-dev-plan.md`, on Sonnet 5.5. Start by reading `docs/RUN-B-HANDOFF.md` in the repo `nkessel/goal-dashboard`; it says what's already done, what's left, what other sessions are touching right now and the rules for shipping. Then follow `CLAUDE.md` (read `docs/HANDOFF.md`, the feedback notes for each screen you touch, `docs/REPEAT-ASKS.md`). Work the Run B list in section 3 of the handoff top to bottom, one step per commit. New UI or design changes go on a `review/<topic>` branch with a mockup review page and wait for my OK. Bug fixes and everything else (docs, data fixes, migrations, scripts, code moves that change no screen) ship straight to `main` after the build and UI check, no review needed. Keep the app's existing design language: reuse the `.qe-fact` pills, panels, scales and flat icons, don't invent new controls. Before each push, `git fetch origin main` and merge it: other sessions ship to `main` several times a day. Give me short progress notes after each step, and ask decisions in plain messages. When the list is done, or the next step needs a different model, stop and tell me which run and model come next.
 
 ## 2. Access the other account needs
 
@@ -49,10 +47,10 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 
 **7. Cal 1a** (`docs/CALENDAR-PLANNER-DESIGN.md`): partly done. The UI check has `--server-tz <zone>` and a `first-picture` check in the calendar flow. Left: run it in two time zones by default (UTC server, New York browser) and fail on hydration errors.
 
-**8. Calendar fixes on one review branch, plus the data copy.** Changed since the plan was written:
+**8. Calendar fixes, plus the data copy.** Changed since the plan was written:
 - **Cal 1b, 1c: done** (live with the flash fix).
 - **Cal 2a, 2b, 2c, 2d: built** on `review/boards-nov18`, waiting on the owner. Don't build them again.
-- **Left: Cal 1d** (`cal-ui` cookie for span, zoom, early/late and layers) on a review branch, and **Cal 3** (migration 0090 and the copy of drives and day holds; nothing visible, verify with SELECTs). Cal 1d touches `WeekView.tsx` and `CalendarLayers.tsx`, which `review/boards-nov18` also changes: build it on top of that branch, or wait until it's merged.
+- **Left: Cal 1d** (`cal-ui` cookie for span, zoom, early/late and layers; it fixes the calendar opening on the wrong settings, so it ships straight to `main` after the UI check), and **Cal 3** (migration 0090 and the copy of drives and day holds; nothing visible, verify with SELECTs). Cal 1d touches `WeekView.tsx` and `CalendarLayers.tsx`, which `review/boards-nov18` also changes: build it on top of that branch, or wait until it's merged.
 
 **Then Run C (Haiku 5.5)**, the list in the dev plan. Its Cal 2a, 2b and 2d are already on `review/boards-nov18`.
 
@@ -69,7 +67,7 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 ## 5. Rules, short
 
 The full rules are in `CLAUDE.md` and `docs/HANDOFF.md`. The ones that matter most for this run:
-- **Shipping:** invisible changes go straight to `main` (push = deploy). Visible ones: `review/<topic>` branch, `npm run ui-check`, review page with phone-first screenshots, the owner's OK, then `main`. Log every push to `main` in `docs/SHIPPED.md`, `docs/PRIORITIES.md`, `docs/WAITING.md`, and bump "Last updated" in `docs/HANDOFF.md`.
+- **Shipping (owner, Nov 19):** new UI or design changes get a mockup review: `review/<topic>` branch, `npm run ui-check`, review page with phone-first screenshots, the owner's OK, then `main`. Bug fixes and everything else ship straight to `main` (push = deploy) after the build and UI check. Log every push to `main` in `docs/SHIPPED.md`, `docs/PRIORITIES.md`, `docs/WAITING.md`, and bump "Last updated" in `docs/HANDOFF.md`.
 - **Design language:** reuse the app's parts (`.qe-fact` pills, `.qe-fact-panel`, `LevelScales`, `GoldCheck`, the drawer); flat single-colour icons, never colour emoji; open in place with a slide, no popups; the owner's exact words for options.
 - **`life_wheel`:** always merge into it, never overwrite it.
 - **Never** press "Place on the calendar" or "Put these on my calendar" (they write to the owner's real Google Calendar). Never type keys, passwords or tokens into any site. The repo is public: no personal or private data in git.

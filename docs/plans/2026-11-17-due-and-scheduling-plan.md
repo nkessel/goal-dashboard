@@ -151,4 +151,4 @@ Steps 1 and 2 can start tomorrow. 3 is the one the owner asked for by name; if h
 
 - Reuse parts; no new control styles. Flat single-colour icons. Open in place, with a slide; no popups.
 - Never press "Place on the calendar" / "Put these on my calendar" against the owner's real Google Calendar. The UI check's fake data is the only place to place things.
-- No visible change reaches `main` without the owner's OK on a review page.
+- No new UI or design change reaches `main` without the owner's OK on a review page (bug fixes ship straight; CLAUDE.md, Nov 19).

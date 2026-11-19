@@ -9,7 +9,7 @@ This plan only puts the other plans in order. Each task's details are in its own
 - **Lighter-in-use handoff** (`planning/2026-11-16-lighter-in-use-handoff.md`): "Light 1" to "Light 8".
 - **The by-model list** (`planning/2026-11-16-dev-priorities-by-model.md`): the feature backlog.
 
-**How to start a run:** "Run <letter> of `planning/2026-11-18-chronological-dev-plan.md`. Work the list top to bottom. Follow CLAUDE.md (UI check, design review for anything visible). When the list is done, or the next task needs a different model, stop and tell me which run and model come next."
+**How to start a run:** "Run <letter> of `planning/2026-11-18-chronological-dev-plan.md`. Work the list top to bottom. Follow CLAUDE.md (UI check, design review for new UI or design changes; bug fixes ship straight). When the list is done, or the next task needs a different model, stop and tell me which run and model come next."
 
 ## Why this order
 
