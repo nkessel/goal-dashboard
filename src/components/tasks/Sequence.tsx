@@ -269,7 +269,7 @@ export function QuestPicker({ exclude, onPick, autoFocus = false, placeholder = 
  * down, take them out, add quests before or after this one, or turn the
  * quest's steps into a sequence of quests (a project).
  */
-export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, onStepsMoved, onEditSelf }: { taskId: string; title: string; isAdventure: boolean; onClose: () => void; onStepsMoved?: () => void; /** Tapping this quest's own row (e.g. close and go back to its editor). */ onEditSelf?: () => void }) {
+export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, onStepsMoved, onEditSelf, addFollowUp = false }: { taskId: string; title: string; isAdventure: boolean; onClose: () => void; onStepsMoved?: () => void; /** Tapping this quest's own row (e.g. close and go back to its editor). */ onEditSelf?: () => void; /** Open by adding "Follow-up work" after this quest, ready to edit (owner, Nov 15). */ addFollowUp?: boolean }) {
   const router = useRouter();
   // Changes show on the page once the window closes: refreshing while it's open took away the card
   // (and the editor) it was opened from, so the window vanished mid-edit (owner, Nov 4).
@@ -316,6 +316,29 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
       () => (setOpening(null), setError("Couldn't open that quest."))
     );
   };
+  /** A new quest named here joins the sequence and opens in its editor at once (owner, Nov 18: "I should be able
+   *  to edit the quest I just created"). */
+  const addNamed = (w: "before" | "after", name: string) =>
+    start(async () => {
+      setError(null);
+      try {
+        const before = new Set((chain ?? []).map((c) => c.id));
+        const next = await sequenceLinkAction(taskId, w, { title: name });
+        setChain(next);
+        changed.current = true;
+        const made = next.find((c) => !before.has(c.id) && c.id !== taskId);
+        if (made) edit(made.id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't add that.");
+      }
+    });
+  const followed = useRef(false);
+  useEffect(() => {
+    if (!addFollowUp || followed.current || chain === null) return;
+    followed.current = true;
+    addNamed("after", "Follow-up work");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as soon as the sequence has loaded
+  }, [addFollowUp, chain]);
   if (editing)
     return (
       <Suspense fallback={null}>
@@ -407,7 +430,10 @@ export function SequenceDialog({ taskId, title, isAdventure, onClose: closeNow, 
               “{title}”
             </span>
           </div>
-          <QuestPicker exclude={(chain ?? []).map((c) => c.id)} onPick={(p) => run(() => sequenceLinkAction(taskId, where, "id" in p ? { id: p.id } : { title: p.title }))} />
+          <QuestPicker exclude={(chain ?? []).map((c) => c.id)} onPick={(p) => ("id" in p ? run(() => sequenceLinkAction(taskId, where, { id: p.id })) : addNamed(where, p.title))} />
+          <button type="button" disabled={busy} onClick={() => addNamed("after", "Follow-up work")} className="self-start rounded-full px-3 py-1 text-[13px] font-semibold disabled:opacity-50" style={{ border: "1.5px dashed #b39a6a" }}>
+            ＋ Follow-up work after “{title.length > 28 ? `${title.slice(0, 27)}…` : title}”
+          </button>
         </div>
         {/* A project: its steps become quests of their own, one after another, with this quest last. */}
         {openSteps > 0 && (

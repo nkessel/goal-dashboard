@@ -524,6 +524,27 @@ export const FLOWS = [
         }
         await esc(h);
       }
+      // Sub-quests and the sequence from one pill (owner, Nov 4 and 13), and Follow-up work in one tap that opens the
+      // new quest to edit (Nov 15 and 18).
+      await h.goto("/", { name: "sequence" });
+      if (await h.tap("text=Pick up medication", "open quest editor", { optional: true, expectMove: true })) {
+        await h.settle(900);
+        if (await h.tap((p) => p.locator("[data-subseq] > button").first(), "sub-quests & sequence pill", { optional: true, expectMove: true })) {
+          await h.settle(500);
+          await h.check("sub-quests & sequence: choices");
+          if (!(await h.page.locator("[data-subseq-choices] button", { hasText: "Sub-quest" }).count())) h.record({ kind: "subseq", severity: "error", target: "sub-quests & sequence", detail: "The pill's choices didn't include ＋ Sub-quest" });
+          if (await h.tap((p) => p.locator("[data-subseq-choices] button", { hasText: "Follow-up work" }).first(), "follow-up work", { optional: true, expectMove: true })) {
+            const opened = await h.page.locator("input[value='Follow-up work'], textarea", { hasText: "Follow-up work" }).first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+            await h.settle(600);
+            await h.check("follow-up work: its editor");
+            if (!opened) h.record({ kind: "subseq", severity: "warning", target: "follow-up work", detail: "Follow-up work didn't open in an editor" });
+            await esc(h);
+            await h.settle(400);
+          }
+          await esc(h);
+        }
+        await esc(h);
+      }
     },
   },
   {
