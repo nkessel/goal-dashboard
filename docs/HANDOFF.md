@@ -2,7 +2,7 @@
 
 **Any Claude Code session, on any account, starts here.** This file is the map: the standing rules, how to ship, and where everything else lives. It is loaded into every session, so **keep it short** (see "Keeping this file current"). If it disagrees with `git log`, the log wins, and you fix this file.
 
-- **Last updated:** 2026-11-19 (stat XP: new-stat field ring fixed, cleanup mockups sent; opening the app steadier: walkthrough taps, no reload after deploys, Today hydration, one startup request; Run B handoff in `docs/RUN-B-HANDOFF.md`; import card: one When pill, Flexible · Fixed; Quest Drop shipped; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
+- **Last updated:** 2026-11-19 (calendar quest completion fix; stat XP: new-stat field ring fixed, cleanup mockups sent; opening the app steadier: walkthrough taps, no reload after deploys, Today hydration, one startup request; Run B handoff in `docs/RUN-B-HANDOFF.md`; import card: one When pill, Flexible · Fixed; Quest Drop shipped; latest shipped work is the top entry of `docs/SHIPPED.md`). `main` @ see `git log`.
 - **Live app:** https://goal-dashboard-kappa.vercel.app (the owner does NOT have tinyquest.win; never send links on it)
 - **Pending in-app feedback:** the database is the full list (query in section 3; by screen in `docs/FEEDBACK-BY-SCREEN.md`). 316 open on Nov 12; many are already built but were never marked: check the code and `docs/SHIPPED.md` before building one again, and mark it. If the Supabase connector is missing, ask the owner to connect it (claude.ai Settings › Connectors).
 
