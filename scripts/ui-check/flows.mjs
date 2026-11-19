@@ -1066,7 +1066,7 @@ export const FLOWS = [
             else {
               await h.settle(500);
               await h.check("series look: asks this one / later / all");
-              await h.page.locator("[data-series-ask] [data-scope=all]").first().click().catch(() => {});
+              await h.tap((p) => p.locator("[data-series-ask] [data-scope=all]").first(), "save for all", { optional: true, expectMove: true });
               const saved = await h.page.locator("[data-series-ask]", { hasText: "Saved for" }).first().waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
               if (!saved) h.record({ kind: "series-ask", severity: "error", target: "series look", detail: `After "All" the card never said it saved` });
               else await h.check("series look: saved for all");
@@ -1092,7 +1092,7 @@ export const FLOWS = [
             if (!asked) h.record({ kind: "shrink-ask", severity: "warning", target: "shorter quest", detail: "Making a 90-minute calendar quest 30 minutes didn't ask about its block" });
             else {
               await h.check("shorter quest: asks before shrinking its block");
-              await h.page.locator("[data-shrink-ask] [data-shrink=yes]").first().click().catch(() => {});
+              await h.tap((p) => p.locator("[data-shrink-ask] [data-shrink=yes]").first(), "shorten it", { optional: true, expectMove: true });
               await h.settle(1500);
               await h.check("shorter quest: block shrunk");
             }
