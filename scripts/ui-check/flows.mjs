@@ -229,6 +229,15 @@ export const FLOWS = [
         // The XP amount: no box; tapping it selects and pulses the number, with a gold bar for a cursor (owner, Nov 9).
         if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill", { optional: true, expectMove: true })) {
           if (await h.tap((p) => p.getByLabel("XP amount").first(), "editor: XP amount", { optional: true })) await h.check("quest editor: XP typed");
+          // Stats: share some of the XP with character stats (the tray under the XP bar), then the add-a-stat field.
+          if (await h.tap((p) => p.locator("[role=dialog] button", { hasText: /add to stats|XP to stats|^\w{3} \d+/i }).first(), "editor: stats tray", { optional: true, expectMove: true })) {
+            await h.tap((p) => p.getByRole("button", { name: /more xp to strength/i }).first(), "stats: strength +", { optional: true });
+            await h.tap((p) => p.getByRole("button", { name: /more xp to wisdom/i }).first(), "stats: wisdom +", { optional: true });
+            await h.check("quest editor: stats tray");
+            if (await h.tap((p) => p.getByRole("button", { name: /a new stat/i }).first(), "stats: new stat", { optional: true, expectMove: true })) await h.check("quest editor: new stat field");
+            await h.tap((p) => p.getByRole("button", { name: /^save$/i }).first(), "stats: save", { optional: true, expectMove: true });
+            await h.check("quest editor: stats saved");
+          }
           await h.tap((p) => p.locator("[role=dialog] button", { hasText: /^\W*\d+ XP/ }).first(), "editor: XP pill shut", { optional: true, expectMove: true });
         }
         // The extra pills (no "More" fold): open the scales, then the due panel with scheduling and early bonus.

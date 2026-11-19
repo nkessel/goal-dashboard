@@ -52,6 +52,8 @@ Waiting on the owner's review, **don't merge** without his OK: `review/boards-no
 - **Cal 2a, 2b, 2c, 2d: built** on `review/boards-nov18`, waiting on the owner. Don't build them again.
 - **Left: Cal 1d** (`cal-ui` cookie for span, zoom, early/late and layers; it fixes the calendar opening on the wrong settings, so it ships straight to `main` after the UI check), and **Cal 3** (migration 0090 and the copy of drives and day holds; nothing visible, verify with SELECTs). Cal 1d touches `WeekView.tsx` and `CalendarLayers.tsx`, which `review/boards-nov18` also changes: build it on top of that branch, or wait until it's merged.
 
+**9. Stats on sub-quests** (owner note 4eb6549b, Nov 16: sub-quests "should be a bit more like quests": time, char stat assignment, scheduling). Not designed yet: brainstorm with mockups first. The stat XP cleanup (`docs/WAITING.md`) goes first, so sub-quests reuse its tray.
+
 **Then Run C (Haiku 5.5)**, the list in the dev plan. Its Cal 2a, 2b and 2d are already on `review/boards-nov18`.
 
 ## 4. In flight right now: don't collide
