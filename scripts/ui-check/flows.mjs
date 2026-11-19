@@ -1075,6 +1075,30 @@ export const FLOWS = [
           } else await esc(h);
         } else h.record({ kind: "series-ask", severity: "warning", target: "series look", detail: "The gym quest wasn't on the week view" });
       }
+      // Shorter than its block (owner, Nov 5): the 90-minute workshop draft set to 30 min asks before shrinking.
+      {
+        const card = h.page.locator("[title^='Edit \"Draft the facilitation']").first();
+        if (await card.count()) {
+          await card.click({ button: "right" }).catch(() => {});
+          await h.settle(400);
+          if (await h.tap((p) => p.getByRole("menuitem", { name: /^edit quest$/i }).first(), "edit the workshop draft", { optional: true, expectMove: true })) {
+            await h.settle(1200);
+            await h.tap((p) => p.locator("[data-tour=fact-time]").first(), "time pill", { optional: true, expectMove: true });
+            await h.settle(400);
+            await h.tap((p) => p.getByRole("button", { name: /^30m$|^30 min$|^30$/ }).first(), "30 minutes", { optional: true });
+            await h.settle(900);
+            await h.page.keyboard.press("Escape");
+            const asked = await h.page.locator("[data-shrink-ask]").first().waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+            if (!asked) h.record({ kind: "shrink-ask", severity: "warning", target: "shorter quest", detail: "Making a 90-minute calendar quest 30 minutes didn't ask about its block" });
+            else {
+              await h.check("shorter quest: asks before shrinking its block");
+              await h.page.locator("[data-shrink-ask] [data-shrink=yes]").first().click().catch(() => {});
+              await h.settle(1500);
+              await h.check("shorter quest: block shrunk");
+            }
+          } else await esc(h);
+        }
+      }
       // Seamless days (repeat ask 12): scroll sideways part of a day; it stays where it's left.
       await h.page.evaluate(() => document.querySelector(".cal-days-scroll")?.scrollBy({ left: 130 })).catch(() => {});
       await h.settle(900);
